@@ -133,13 +133,9 @@ def collect_messages(args) -> list[tuple[str, str]]:
         return [("STAGED", _read_msg_from_file(path))]
 
     if args.staged:
-        # pre-commit 阶段没有 commit message；此模式下作为占位（不阻塞）
-        # 优先尝试 .git/COMMIT_EDITMSG（commit 流程开始时会生成）
-        candidate = REPO_ROOT / ".git" / "COMMIT_EDITMSG"
-        if candidate.exists():
-            text = _read_msg_from_file(candidate)
-            if text:
-                return [("STAGED", text)]
+        # pre-commit 钩子调用本脚本时，commit message 还不存在
+        # （由 commit-msg 钩子专门校验，不必重复）
+        # 此模式直接跳过：返回空列表 → 0 退出码（noop）
         return []
 
     if args.last:
