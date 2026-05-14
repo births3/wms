@@ -1,0 +1,80 @@
+# ============================================================
+# wms .gitignore
+# 治理原则：禁止任何密钥、构建产物、本地数据进入版本库
+# ============================================================
+
+# ---- 环境与密钥 ----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+.secrets/
+
+# ---- Rust ----
+target/
+**/*.rs.bk
+*.pdb
+Cargo.lock.bak
+
+# ---- Node / 前端 ----
+node_modules/
+dist/
+build/
+out/
+.next/
+.turbo/
+.vite/
+*.tsbuildinfo
+.pnpm-store/
+
+# ---- Python（治理脚本） ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ---- 编辑器 / IDE ----
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ---- 日志与临时 ----
+*.log
+logs/
+tmp/
+.tmp/
+*.local
+
+# ---- 测试与覆盖率 ----
+coverage/
+.coverage
+*.lcov
+.nyc_output/
+
+# ---- 数据库本地数据 ----
+*.sqlite
+*.sqlite3
+*.db
+pgdata/
+
+# ---- OS ----
+.AppleDouble
+.LSOverride
+desktop.ini
+
+# ---- 治理本身 ----
+# baseline 文件必须入库（这是治理资产）
+# scripts/governance/ 下生成的临时报告不入库
+scripts/governance/*.report.json
+scripts/governance/.cache/

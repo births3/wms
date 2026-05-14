@@ -1,0 +1,84 @@
+# wms 治理门禁规则（gate-rules.toml）
+#
+# 详细规则：见 docs/governance.md §2.2、ADR-0003 §机制 4
+#
+# 用途：
+#   task_check.py 根据 git diff 文件路径，在此查找匹配的规则，
+#   决定跑哪些治理脚本。
+#
+# 字段：
+#   match   — glob 模式（支持 ** 递归通配）
+#   checks  — 触发的脚本名（不含 .py 后缀）
+#   tier    — 所属 Tier（T1/T2/T3/T4）
+#
+# 兜底原则：
+#   - 没匹配到任何规则的变更 → 默认跑 T1 全套（在 task_check.py 内部处理）
+#   - T4 不受 diff 触发约束（合并前必须全量）
+
+# ============================================================
+# 文档相关变更（Tier 1）
+# ============================================================
+
+[[rules]]
+match = "docs/**"
+checks = ["check_doc_links"]
+tier = "T1"
+
+[[rules]]
+match = "docs/adr/**"
+checks = ["validate_adr_index", "check_doc_links"]
+tier = "T1"
+
+[[rules]]
+match = "*.md"
+checks = ["check_doc_links"]
+tier = "T1"
+
+# ============================================================
+# 治理脚本自身的变更（Tier 1）
+# ============================================================
+# 修改治理脚本时，至少跑一遍环境检查与文档链接，确认无破坏
+
+[[rules]]
+match = "scripts/governance/**"
+checks = ["validate_environment", "check_doc_links"]
+tier = "T1"
+
+[[rules]]
+match = "governance/gate-rules.toml"
+checks = ["validate_environment"]
+tier = "T1"
+
+# ============================================================
+# 占位规则（未来 Wave 启用，当前对应脚本不存在 → task_check 会跳过）
+# ============================================================
+
+# Wave 1 启用：检查 Rust 后端层级依赖与 unsafe
+[[rules]]
+match = "backend/crates/**"
+checks = ["check_layer_dependency", "check_unsafe_and_unwrap"]
+tier = "T2"
+
+# Wave 1 启用：检查 OpenAPI 契约
+[[rules]]
+match = "shared/openapi/openapi.json"
+checks = ["validate_openapi_artifacts", "check_openapi_contract"]
+tier = "T3"
+
+# Wave 2 启用：handler 测试覆盖
+[[rules]]
+match = "backend/crates/api/src/**"
+checks = ["check_handler_test_coverage"]
+tier = "T2"
+
+# Wave 3 启用：审计追踪覆盖（库存变更必须经 audit 层）
+[[rules]]
+match = "backend/crates/domain/src/inventory/**"
+checks = ["check_audit_trail_coverage", "check_idempotency_test"]
+tier = "T3"
+
+# Wave 4 启用：冷链温湿度数据新鲜度
+[[rules]]
+match = "backend/crates/domain/src/cold_chain/**"
+checks = ["check_cold_chain_data_freshness"]
+tier = "T3"
