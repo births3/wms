@@ -30,10 +30,11 @@ default:
 
 # ============================================================
 # Tier 1: quick-check（< 10 秒）
-# ============================================================
 # 写代码时随手跑、pre-commit 自动触发
 # 仅做：格式、lint、提交规范，不跑测试
 # ============================================================
+
+# Tier 1 quick-check (< 10s): fmt + lint + commit convention
 quick-check: _t1-banner _t1-fmt _t1-lint _t1-commit-conv
 
 _t1-banner:
@@ -41,23 +42,24 @@ _t1-banner:
 
 _t1-fmt:
     @echo "  · format check (placeholder, [WAVE-1])"
-    # cargo fmt --all -- --check
-    # pnpm -r exec prettier --check .
+    @# cargo fmt --all -- --check
+    @# pnpm -r exec prettier --check .
 
 _t1-lint:
     @echo "  · lint check (placeholder, [WAVE-1])"
-    # cargo clippy --workspace --all-targets --no-deps -- -D warnings
-    # pnpm -r run lint --quiet
+    @# cargo clippy --workspace --all-targets --no-deps -- -D warnings
+    @# pnpm -r run lint --quiet
 
 _t1-commit-conv:
     @python3 scripts/governance/check_commit_convention.py --staged || true
 
 # ============================================================
 # Tier 2: task-check（< 120 秒）
-# ============================================================
 # 任务结束、commit 前
 # T1 + diff 触发的最小治理集 + L1 单元测试 + L2 静态契约
 # ============================================================
+
+# Tier 2 task-check (< 120s): T1 + diff-driven + L1/L2
 task-check: quick-check _t2-banner _t2-diff-checks _t2-unit-tests _t2-contract-static
 
 _t2-banner:
@@ -69,19 +71,20 @@ _t2-diff-checks:
 
 _t2-unit-tests:
     @echo "  · L1 unit tests (placeholder, [WAVE-2])"
-    # cargo test --workspace --lib
-    # pnpm -r run test:unit
+    @# cargo test --workspace --lib
+    @# pnpm -r run test:unit
 
 _t2-contract-static:
     @echo "  · L2 API contract static (placeholder, [WAVE-2])"
-    # python3 scripts/governance/validate_openapi_artifacts.py
+    @# python3 scripts/governance/validate_openapi_artifacts.py
 
 # ============================================================
 # Tier 3: preflight（< 5 分钟）
-# ============================================================
 # 推送前、pre-push、PR 创建前
 # T2 + L3 业务流程 + L4 错误 + L5 数据一致 + L8 权限 + L11 幂等
 # ============================================================
+
+# Tier 3 preflight (< 5min): T2 + L3-L5/L8/L11
 preflight: task-check _t3-banner _t3-integration _t3-governance-l3
 
 _t3-banner:
@@ -89,9 +92,9 @@ _t3-banner:
 
 _t3-integration:
     @echo "  · L3-L5/L8/L11 integration tests (placeholder, [WAVE-3])"
-    # cargo test --workspace
-    # pnpm -r run test
-    # pnpm -r run test:integration
+    @# cargo test --workspace
+    @# pnpm -r run test
+    @# pnpm -r run test:integration
 
 _t3-governance-l3:
     @echo "  · governance T3 checks"
@@ -99,10 +102,11 @@ _t3-governance-l3:
 
 # ============================================================
 # Tier 4: verify（< 30 分钟）
-# ============================================================
 # 合并前、CI、发版前
 # T3 + L6 并发 + L7 性能 + L9 兼容 + L10 可观测 + 完整 E2E + 合规追溯
 # ============================================================
+
+# Tier 4 verify (< 30min): T3 + L6/L7/L9/L10 + E2E
 verify: preflight _t4-banner _t4-full-tests _t4-e2e _t4-perf-bench _t4-compat-check _t4-governance-l4
 
 _t4-banner:
@@ -110,20 +114,20 @@ _t4-banner:
 
 _t4-full-tests:
     @echo "  · full test suite incl. release mode (placeholder, [WAVE-4])"
-    # cargo test --workspace --release
+    @# cargo test --workspace --release
 
 _t4-e2e:
     @echo "  · E2E tests (placeholder, [WAVE-3])"
-    # pnpm -r run test:e2e
+    @# pnpm -r run test:e2e
 
 _t4-perf-bench:
     @echo "  · L7 performance baselines (placeholder, [WAVE-4])"
-    # cargo bench --workspace
-    # python3 scripts/governance/check_perf_baseline.py
+    @# cargo bench --workspace
+    @# python3 scripts/governance/check_perf_baseline.py
 
 _t4-compat-check:
     @echo "  · L9 OpenAPI compatibility (placeholder, [WAVE-3])"
-    # python3 scripts/governance/check_api_compat.py
+    @# python3 scripts/governance/check_api_compat.py
 
 _t4-governance-l4:
     @echo "  · governance T4 checks (full)"
@@ -179,7 +183,7 @@ gov-list:
 # 检查各 Tier 实际耗时（写入 governance/baselines/tier-runtime.json）
 tier-timing:
     @echo "▶ measuring tier runtimes (placeholder, [WAVE-2])"
-    # 后续实现：分别计时 quick-check / task-check / preflight / verify
+    @# 后续实现：分别计时 quick-check / task-check / preflight / verify
 
 # ============================================================
 # Wave 启动检查（占位）
