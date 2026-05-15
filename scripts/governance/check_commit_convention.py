@@ -40,18 +40,19 @@ _THIS = Path(__file__).resolve()
 REPO_ROOT = _THIS.parent.parent.parent
 
 TYPES = {
-    "feat", "fix", "docs", "style", "refactor",
-    "perf", "test", "build", "ci", "chore", "revert",
+    "功能", "修复", "文档", "格式", "重构",
+    "性能", "测试", "构建", "集成", "杂项", "回滚",
 }
 SCOPES = {
-    "master-data", "inbound", "inventory", "outbound", "quality",
-    "cold-chain", "billing", "compliance", "audit",
-    "pda", "web-admin", "api", "infra", "governance", "docs",
+    "基础档案", "入库", "库存", "出库", "质量",
+    "冷链", "计费", "合规", "审计",
+    "pda", "管理端", "接口", "基础设施", "治理", "文档",
+    "追溯码", "对账", "药检", "校验", "质量联系单", "企微", "快递",
 }
 
 # 允许 BREAKING CHANGE 在 footer
 HEADER_RE = re.compile(
-    r"^(?P<type>[a-z]+)(?:\((?P<scope>[a-z0-9\-,/ ]+)\))?(?P<bang>!)?:\s*(?P<subject>.+)$"
+    r"^(?P<type>[a-z\u4e00-\u9fff]+)(?:\((?P<scope>[a-z0-9\u4e00-\u9fff\-,/ ]+)\))?(?P<bang>!)?[:：]\s*(?P<subject>.+)$"
 )
 
 

@@ -79,25 +79,50 @@ wms 是一个**医药冷链 GSP 合规仓储管理系统**，目标是支撑：
 - 所有合入走 PR + 自审 + CI 通过
 - 合并策略：**Squash and merge**
 
-### 3.2 提交信息（Conventional Commits）
+### 3.2 提交信息（Conventional Commits 中文版）
 
 格式：
 
 ```
-<type>(<scope>): <subject>
+<类型>(<范围>)：<描述>
 
-<body>
+<正文>
 
-<footer>
+<脚注>
 ```
 
-**type**：`feat` `fix` `docs` `style` `refactor` `perf` `test` `build` `ci` `chore` `revert`
+**类型（type）**：
 
-**scope**（按业务上下文 + 基础设施）：
-`master-data` `inbound` `inventory` `outbound` `quality` `cold-chain`
-`billing` `compliance` `audit` `pda` `web-admin` `api` `infra` `governance` `docs`
+| 类型 | 含义 |
+|------|------|
+| 功能 | 新功能 |
+| 修复 | bug 修复 |
+| 文档 | 仅文档变更 |
+| 格式 | 代码格式（不影响运行） |
+| 重构 | 重构（非功能非修复） |
+| 性能 | 性能优化 |
+| 测试 | 测试相关 |
+| 构建 | 构建系统/依赖 |
+| 集成 | CI 配置 |
+| 杂项 | 其他杂项 |
+| 回滚 | 回滚提交 |
 
-**Breaking Change**：footer 写 `BREAKING CHANGE: <说明>`，对应 SemVer 主版本 +1。
+**范围（scope）**：
+`基础档案` `入库` `库存` `出库` `质量` `冷链` `计费` `合规` `审计`
+`pda` `管理端` `接口` `基础设施` `治理` `文档`
+`追溯码` `对账` `药检` `校验` `质量联系单` `企微` `快递`
+
+**示例**：
+```
+功能(入库)：ASN 状态机加入待校验状态
+
+收货通知单创建后先经过校验规则模块自动校验，
+校验通过后才进入"待收货"状态。
+
+关联：US-M2-001, M-VR
+```
+
+**Breaking Change**：脚注写 `破坏性变更：<说明>`，对应 SemVer 主版本 +1。
 
 ### 3.3 代码风格与质量
 
