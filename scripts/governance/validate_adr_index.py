@@ -37,6 +37,11 @@ FILENAME_RE = re.compile(r"^(\d{4})-([a-z0-9][a-z0-9-]*)\.md$")
 STATUS_RE = re.compile(r"^- 状态[:：]\s*(.+?)\s*$", re.MULTILINE)
 STATUS_OK = {"Proposed", "Accepted", "Deprecated"}
 STATUS_SUPERSEDED_RE = re.compile(r"^Superseded by ADR-\d{4}$")
+# 允许 "Accepted（v0.2，取代 ...）" 这种带括号注释的状态
+# 但禁止 "Acceptedxxx" 这种粘连
+STATUS_WITH_NOTE_RE = re.compile(
+    r"^(Proposed|Accepted|Deprecated)\s*[（(].*[）)]\s*$"
+)
 
 REQUIRED_SECTIONS = ["背景", "决策", "后果"]
 
@@ -73,8 +78,7 @@ def parse_adr(p: Path) -> AdrInfo:
         if (
             info.status not in STATUS_OK
             and not STATUS_SUPERSEDED_RE.match(info.status)
-            # 兼容版本号修饰：Accepted（v0.2，取代 v0.1 三阶段版）
-            and not any(info.status.startswith(s) for s in STATUS_OK)
+            and not STATUS_WITH_NOTE_RE.match(info.status)
         ):
             info.issues.append(f"invalid status: {info.status!r}")
 

@@ -50,7 +50,7 @@ TOOLS: list[Tool] = [
     Tool("pnpm", required=False, min_version=(8, 0)),
     Tool("just", required=False),
     Tool("lefthook", required=False),
-    Tool("gitleaks", required=False),
+    Tool("gitleaks", required=True),
 ]
 
 

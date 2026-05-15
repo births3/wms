@@ -27,13 +27,15 @@ pre-commit:
       run: just quick-check
       stage_fixed: true
 
-    # 2. secret 扫描（密钥不入库 — 红线）
+    # 2. secret 扫描（密钥不入库 — 红线不变量）
     secret-scan:
       run: |
         if command -v gitleaks >/dev/null 2>&1; then
           gitleaks protect --staged --redact --no-banner
         else
-          echo "  · gitleaks not installed, skipping secret scan (install recommended)"
+          echo "✘ gitleaks not installed — secret scanning is a hard requirement"
+          echo "  install: https://github.com/gitleaks/gitleaks#installing"
+          exit 1
         fi
 
 # ============================================================
@@ -49,15 +51,19 @@ commit-msg:
 # ============================================================
 pre-push:
   commands:
-    # 推送到 main 直接 reject（main 受保护）
-    block-direct-push-main:
+    # 任何推往 main / master 的引用都拒绝（main 受保护）
+    # lefthook 通过 stdin 传 "<local-ref> <local-sha> <remote-ref> <remote-sha>" 多行
+    block-protected-push:
       run: |
-        protected=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || echo "")
-        current=$(git branch --show-current)
-        if [ "$current" = "main" ]; then
-          echo "✘ direct push to 'main' is not allowed; create a feature branch + PR"
-          exit 1
-        fi
+        while read -r local_ref local_sha remote_ref remote_sha; do
+          case "$remote_ref" in
+            refs/heads/main|refs/heads/master)
+              echo "✘ direct push to '$remote_ref' is not allowed; create a feature branch + PR"
+              exit 1
+              ;;
+          esac
+        done
+        exit 0
 
     # Tier 3 preflight
     preflight:
