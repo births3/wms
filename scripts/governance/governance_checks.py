@@ -45,6 +45,7 @@ TIER_SCRIPTS: dict[str, list[str]] = {
         "validate_doc_layers.py",
         "check_file_naming.py",
         "check_user_story_structure.py",
+        "check_glossary_consistency.py",
         "check_commit_convention.py",
     ],
     "T2": [
