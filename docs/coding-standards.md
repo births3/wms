@@ -18,6 +18,53 @@
 
 ---
 
+## 零、文件命名速查表
+
+> 所有文件命名规则的唯一汇总。各章节的详细说明引用本表。
+> 检查脚本：`scripts/governance/check_file_naming.py`（T1）
+
+### 代码文件
+
+| 类型 | 命名规则 | 示例 | 反例 |
+|------|---------|------|------|
+| Rust 源文件 | snake_case.rs | `receipt_order.rs` | `ReceiptOrder.rs` |
+| Rust crate 目录 | kebab-case | `wms-domain/` | `wms_domain/` |
+| Rust mod 目录 | snake_case | `cold_chain/` | `cold-chain/` |
+| TS 组件文件 | PascalCase.tsx | `ReceiptForm.tsx` | `receipt-form.tsx` |
+| TS 非组件文件 | kebab-case.ts | `use-stock-query.ts` | `useStockQuery.ts` |
+| TS 目录 | kebab-case | `features/inbound/` | `features/Inbound/` |
+| SQL 迁移 | `NNNN_<description>.sql` | `0001_create_products.sql` | `create_products.sql` |
+| SQL 回滚 | `NNNN_<description>.down.sql` | `0001_create_products.down.sql` | — |
+| 治理脚本 | snake_case.py（公共库前缀 `_`） | `check_doc_links.py`, `_baseline.py` | `checkDocLinks.py` |
+| 测试文件（Rust） | 放在 `tests/` 目录，snake_case | `test_receive_expired.rs` | — |
+| 测试文件（TS） | `*.spec.ts` / `*.spec.tsx` | `receipt-form.spec.tsx` | `receipt-form.test.tsx` |
+
+### 文档文件
+
+| 类型 | 命名规则 | 示例 | 反例 |
+|------|---------|------|------|
+| ADR | `NNNN-<slug>.md`（slug kebab-case） | `0001-tech-stack.md` | `0001_tech_stack.md` |
+| 领域文档 | `<context>.md`（context = 代码目录名，kebab-case） | `docs/domain/master-data.md` | `docs/domain/MasterData.md` |
+| 合规文档 | `gsp-<topic>.md` | `docs/compliance/gsp-audit-trail.md` | `docs/compliance/审计.md` |
+| Retro | `wave-<N>-retro.md` | `docs/retros/wave-0-retro.md` | `docs/retros/retro1.md` |
+| 固定名文档 | 不可改名 | `governance.md`, `architecture-dependencies.md`, `coding-standards.md` | — |
+| 根目录文档 | 大写 | `README.md`, `ROADMAP.md`, `TODO.md`, `CHANGELOG.md`, `AGENTS.md` | `readme.md` |
+
+### 配置文件
+
+| 类型 | 命名规则 |
+|------|---------|
+| justfile | `justfile`（无后缀） |
+| lefthook | `lefthook.yml` |
+| editorconfig | `.editorconfig` |
+| gitignore | `.gitignore` |
+| gitattributes | `.gitattributes` |
+| gate-rules | `governance/gate-rules.toml` |
+| baseline | `governance/baselines/<check_name>.json` |
+| 环境变量 | `.env.example`（入库）/ `.env`（不入库） |
+
+---
+
 ## 一、Rust 代码规范
 
 ### 1.1 命名
