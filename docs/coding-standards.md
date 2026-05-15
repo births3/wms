@@ -1,7 +1,7 @@
-# AGENTS.md — wms 项目 AI 协作代码规范
+# wms 项目代码书写规范
 
-> 本文件供 AI 编码助手（Kiro / Copilot / Cursor 等）读取，作为生成代码时的强制约束。
-> 人类开发者同样遵守本规范。详细治理体系见 `docs/governance.md`。
+> 本文档是 wms 项目所有代码（Rust / TypeScript / SQL / 脚本）的书写规范唯一真相源。
+> AI 编码助手与人类开发者同样遵守。治理体系见 `docs/governance.md`。
 
 ---
 

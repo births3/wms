@@ -302,6 +302,7 @@ wms 是一个**医药冷链 GSP 合规仓储管理系统**，目标是支撑：
 
 ```
 docs/governance.md（本文档，规则源头）
+  ├─→ docs/coding-standards.md              （代码书写规范）
   ├─→ docs/adr/0001-tech-stack.md           （技术栈决策）
   ├─→ docs/adr/0002-monorepo-structure.md   （仓库结构决策）
   ├─→ docs/adr/0003-governance-model.md     （治理模型决策）

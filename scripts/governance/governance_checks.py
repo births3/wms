@@ -73,8 +73,15 @@ def run_script(name: str, *, json_mode: bool) -> ScriptResult:
     if json_mode:
         cmd.append("--json")
     start = time.perf_counter()
-    p = subprocess.run(cmd, check=False)
+    p = subprocess.run(cmd, capture_output=True, text=True, check=False)
     dur = int((time.perf_counter() - start) * 1000)
+    # 缩进子脚本输出，避免与调度器混排
+    if p.stdout and not json_mode:
+        for line in p.stdout.splitlines():
+            print(f"    {line}")
+    if p.stderr:
+        for line in p.stderr.splitlines():
+            print(f"    [err] {line}", file=sys.stderr)
     return ScriptResult(name=name, exit_code=p.returncode, duration_ms=dur)
 
 

@@ -82,3 +82,12 @@ tier = "T3"
 match = "backend/crates/domain/src/cold_chain/**"
 checks = ["check_cold_chain_data_freshness"]
 tier = "T3"
+
+# ============================================================
+# 兜底规则：未匹配任何上述规则的变更，默认跑 T1 全套
+# ============================================================
+
+[[rules]]
+match = "**"
+checks = ["validate_environment", "check_doc_links", "check_file_naming"]
+tier = "T1"

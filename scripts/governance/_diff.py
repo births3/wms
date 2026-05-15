@@ -13,7 +13,6 @@
 """
 from __future__ import annotations
 
-import fnmatch
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -96,37 +95,15 @@ def get_changed_files(
 
 @dataclass
 class GateRule:
-    match: str  # glob 模式（fnmatch 语法 + ** 支持）
+    match: str  # gitignore-style 模式
     checks: list[str]
     tier: str = "T2"
 
     def matches(self, path: str) -> bool:
-        return _glob_match(self.match, path)
+        import pathspec
 
-
-def _glob_match(pattern: str, path: str) -> bool:
-    """简易 glob 匹配，支持 ** 递归。"""
-    # 把 ** 翻成 fnmatch 不直接支持的形式：先用 fnmatch 处理一段
-    # 这里实现一个保守版本：把 ** 视为"任意路径段"。
-    if "**" in pattern:
-        # 拆分 ** 两侧
-        # e.g. "backend/crates/**" → 前缀 "backend/crates/"
-        # e.g. "**/test_*.py"      → 后缀 "/test_*.py" 或 "test_*.py"
-        if pattern.endswith("/**"):
-            prefix = pattern[:-3]
-            return path == prefix.rstrip("/") or path.startswith(prefix)
-        if pattern.startswith("**/"):
-            tail = pattern[3:]
-            # 要么直接匹配根下的 tail，要么任意目录下的 tail
-            return fnmatch.fnmatch(path, tail) or any(
-                fnmatch.fnmatch(path[i:], tail)
-                for i in range(len(path))
-                if i == 0 or path[i - 1] == "/"
-            )
-        # 中间含 ** ：用 fnmatch 把 ** 转 *
-        normalized = pattern.replace("**", "*")
-        return fnmatch.fnmatch(path, normalized)
-    return fnmatch.fnmatch(path, pattern)
+        spec = pathspec.PathSpec.from_lines("gitwildmatch", [self.match])
+        return spec.match_file(path)
 
 
 def match_rules(changed: list[str], rules: list[GateRule]) -> dict[str, list[str]]:
@@ -144,11 +121,7 @@ def match_rules(changed: list[str], rules: list[GateRule]) -> dict[str, list[str
 
 
 def load_gate_rules(toml_path: Path | None = None) -> list[GateRule]:
-    """读取 governance/gate-rules.toml。
-
-    Python 3.11+ 自带 tomllib；3.10 需 tomli。本仓库 Wave 0 阶段
-    用最简化的 TOML 子集，自带 'tomllib' 不可用时回退到正则解析。
-    """
+    """读取 governance/gate-rules.toml。"""
     if toml_path is None:
         toml_path = REPO_ROOT / "governance" / "gate-rules.toml"
     if not toml_path.exists():
@@ -157,50 +130,20 @@ def load_gate_rules(toml_path: Path | None = None) -> list[GateRule]:
     text = toml_path.read_text(encoding="utf-8")
     rules: list[GateRule] = []
 
+    # Python 3.11+ 有 tomllib；3.10 用 tomli
     try:
-        import tomllib  # Python 3.11+
-
+        import tomllib
         data = tomllib.loads(text)
-        for r in data.get("rules", []):
-            rules.append(
-                GateRule(
-                    match=r["match"],
-                    checks=list(r.get("checks", [])),
-                    tier=r.get("tier", "T2"),
-                )
-            )
-        return rules
     except ModuleNotFoundError:
-        pass  # 走简化解析
+        import tomli
+        data = tomli.loads(text)
 
-    # 简化解析（Python 3.10 兜底）：仅支持本仓库的 gate-rules.toml 子集
-    import re
-
-    block_re = re.compile(
-        r"\[\[rules\]\](.*?)(?=\n\[\[rules\]\]|\Z)", re.DOTALL
-    )
-    for m in block_re.finditer(text):
-        block = m.group(1)
-        match = _toml_string(block, "match")
-        tier = _toml_string(block, "tier") or "T2"
-        checks = _toml_array(block, "checks")
-        if match:
-            rules.append(GateRule(match=match, checks=checks, tier=tier))
+    for r in data.get("rules", []):
+        rules.append(
+            GateRule(
+                match=r["match"],
+                checks=list(r.get("checks", [])),
+                tier=r.get("tier", "T2"),
+            )
+        )
     return rules
-
-
-def _toml_string(block: str, key: str) -> str | None:
-    import re
-
-    m = re.search(rf'{key}\s*=\s*"([^"]*)"', block)
-    return m.group(1) if m else None
-
-
-def _toml_array(block: str, key: str) -> list[str]:
-    import re
-
-    m = re.search(rf"{key}\s*=\s*\[(.*?)\]", block, re.DOTALL)
-    if not m:
-        return []
-    inner = m.group(1)
-    return [s.strip().strip('"') for s in inner.split(",") if s.strip()]
