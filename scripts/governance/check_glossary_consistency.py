@@ -67,7 +67,9 @@ def parse_banned_terms() -> dict[str, str]:
             # 去掉括号注释：如"禁用（太具体）" → "禁用"
             word = re.sub(r"[（(].*?[）)]", "", word).strip()
             if word and len(word) >= 2:
-                banned[word] = correct_term
+                # 禁用词不能等于正确术语本身（防止自引用）
+                if word != correct_term:
+                    banned[word] = correct_term
 
     return banned
 
