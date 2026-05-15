@@ -3,7 +3,7 @@
 > 本文档是 wms 项目的"宪法"。所有规范、流程、决策机制都在此声明。
 > 修改本文档必须经过 PR，并在文末"变更记录"中追加条目。
 
-- 版本：v0.2（追加 TDD + 11 层 + Tier 重命名）
+- 版本：v0.3（追加文档四层管理 + validate_doc_layers 脚本）
 - 日期：2026-05-15
 - 适用范围：整个 wms 仓库（backend、apps/*、packages/*、scripts/*、docs/*）
 
@@ -136,19 +136,53 @@ wms 是一个**医药冷链 GSP 合规仓储管理系统**，目标是支撑：
 
 ### 3.5 文档规范
 
-| 文档 | 位置 | 内容 |
-|------|------|------|
-| README.md | 根 | 简介、快速开始、目录索引 |
-| docs/governance.md | docs/ | 本文档 |
-| docs/architecture.md | docs/ | 系统架构、技术栈、分层 |
-| docs/domain/*.md | docs/domain/ | 各限界上下文领域模型 |
-| docs/compliance/*.md | docs/compliance/ | GSP 条款 → 功能映射 |
-| docs/adr/NNNN-*.md | docs/adr/ | 架构决策记录 |
-| ROADMAP.md | 根 | 长期路线图 |
-| CHANGELOG.md | 根 | 自 Conventional Commits 生成 |
-| TODO.md | 根 | 当前迭代任务 |
+#### 3.5.1 文档四层管理
 
-#### ADR 制度
+文档按**读者 × 稳定性 × 变更频率**分为 4 层，自上而下约束：
+
+| 层 | 名称 | 管什么 | 稳定性 | 变更流程 | 位置 |
+|----|------|--------|--------|---------|------|
+| L1 | 决策层 | 不可逆技术决策 | 极高（写了不改，只 Deprecated） | 新增走 PR；不修改已 Accepted 的内容 | `docs/adr/` |
+| L2 | 规范层 | 所有人必须遵守的规则 | 高 | 修改走 PR + 文末追加变更记录 | `docs/governance.md`、`docs/architecture-dependencies.md` |
+| L3 | 设计层 | 业务模块设计细节 | 中（随业务迭代） | 代码 PR 改了行为必须同步更新 | `docs/domain/`、`docs/compliance/`、`docs/architecture.md` |
+| L4 | 运营层 | 项目当前状态 | 低（频繁更新） | 随时更新，无需单独 PR | `README.md`、`ROADMAP.md`、`TODO.md`、`CHANGELOG.md` |
+
+**层间约束规则**：
+
+- 下层不能违反上层（代码不能违反 L3 设计，L3 不能违反 L2 规范，L2 不能违反 L1 决策）
+- 如果下层需要违反上层 → **必须先修改上层**（走对应变更流程）
+- 上层越稳定、变更成本越高；下层越灵活、变更成本越低
+- 改了行为不改文档 = 撒谎；文档过时比没文档更糟
+
+**文档治理脚本覆盖**：
+
+| 脚本 | 校验什么 | 覆盖层 | 引入时机 |
+|------|---------|--------|---------|
+| `validate_adr_index.py` | ADR 编号唯一 / 状态合法 / 必填段 / 索引完整 | L1 | ✅ 已有 |
+| `check_doc_links.py` | 所有 .md 相对链接目标存在 | 跨层 | ✅ 已有 |
+| `validate_doc_layers.py` | 层间一致性（L2 引用的 ADR 存在；L3 文件与代码目录对应；L4 状态与 git 一致） | L1-L4 | ✅ 已有 |
+| `validate_governance_consistency.py` | governance.md 引用的 ADR/规范都存在且状态有效 | L2 | Wave 2 |
+| `validate_domain_glossary.py` | L3 文档术语与代码命名一致 | L3 | Wave 3 |
+| `validate_gsp_traceability.py` | GSP 条款 → 功能 → 测试 映射完整 | L3 | Wave 3 |
+| `check_changelog_freshness.py` | CHANGELOG 与最近 tag 同步 | L4 | Wave 4 |
+
+#### 3.5.2 文档清单
+
+| 文档 | 层 | 位置 | 内容 |
+|------|---|------|------|
+| docs/adr/NNNN-*.md | L1 | docs/adr/ | 架构决策记录 |
+| docs/governance.md | L2 | docs/ | 本文档（治理"宪法"） |
+| docs/architecture-dependencies.md | L2 | docs/ | 模块依赖图 |
+| docs/architecture.md | L3 | docs/ | 系统架构总览（Wave 1 后创建） |
+| docs/domain/*.md | L3 | docs/domain/ | 各限界上下文领域模型 |
+| docs/compliance/*.md | L3 | docs/compliance/ | GSP 条款 → 功能映射 |
+| README.md | L4 | 根 | 简介、快速开始、目录索引 |
+| ROADMAP.md | L4 | 根 | 长期路线图（波次状态） |
+| TODO.md | L4 | 根 | 当前 Wave 任务 |
+| CHANGELOG.md | L4 | 根 | 自 Conventional Commits 生成 |
+| docs/retros/wave-N-retro.md | L4 | docs/retros/ | 波次回顾 |
+
+#### 3.5.3 ADR 制度
 
 - 编号 4 位顺序号，**永不复用**
 - 模板：背景 / 候选方案 / 决策 / 后果 / 参考
@@ -289,3 +323,4 @@ docs/governance.md（本文档，规则源头）
 |------|------|------|
 | 2026-05-15 | v0.1 | 初版骨架（第 0 周） |
 | 2026-05-15 | v0.2 | L1-L4 改名 T1-T4；§3.6 测试规范引用 ADR-0006（TDD + 11 层）；文档关系图补 ADR-0006 与依赖图 |
+| 2026-05-15 | v0.3 | §3.5 文档规范重写为"四层管理"（L1 决策 / L2 规范 / L3 设计 / L4 运营）；新增 validate_doc_layers.py 脚本 |
