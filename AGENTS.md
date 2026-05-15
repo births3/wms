@@ -14,10 +14,25 @@
 ## 必读文档（按优先级）
 
 1. [docs/coding-standards.md](docs/coding-standards.md) — 代码书写规范（Rust / TS / 跨端 / 禁止清单）
-2. [docs/governance.md](docs/governance.md) — 治理体系（5 类 + 4 Tier + Baseline）
+2. [docs/governance.md](docs/governance.md) — 治理体系（5 类 + 4 Tier + Baseline + 文档四层管理）
 3. [docs/adr/0006-tdd-and-test-layers.md](docs/adr/0006-tdd-and-test-layers.md) — TDD + 11 层测试
-4. [docs/architecture-dependencies.md](docs/architecture-dependencies.md) — 模块依赖图
+4. [docs/architecture-dependencies.md](docs/architecture-dependencies.md) — 模块依赖图（11 业务 + 3 横向 + 5 波次）
 5. [docs/adr/README.md](docs/adr/README.md) — 所有架构决策索引
+
+## 其他文档索引
+
+| 文档 | 用途 |
+|------|------|
+| [docs/adr/0001-tech-stack.md](docs/adr/0001-tech-stack.md) | 技术栈选型决策 |
+| [docs/adr/0002-monorepo-structure.md](docs/adr/0002-monorepo-structure.md) | 仓库结构决策 |
+| [docs/adr/0003-governance-model.md](docs/adr/0003-governance-model.md) | 治理模型决策 |
+| [docs/adr/0004-phase-roadmap.md](docs/adr/0004-phase-roadmap.md) | 波次路线决策 |
+| [docs/retros/wave-0-retro.md](docs/retros/wave-0-retro.md) | Wave 0 回顾 |
+| [ROADMAP.md](ROADMAP.md) | 长期路线（波次状态） |
+| [TODO.md](TODO.md) | 当前 Wave 任务 |
+| [CHANGELOG.md](CHANGELOG.md) | 版本变更记录 |
+| [governance/gate-rules.toml](governance/gate-rules.toml) | 门禁触发规则 |
+| [governance/baselines/README.md](governance/baselines/README.md) | Baseline 机制说明 |
 
 ## 核心约束（速查）
 
