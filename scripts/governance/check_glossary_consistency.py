@@ -93,11 +93,23 @@ def scan_file(path: Path, banned: dict[str, str]) -> list[Violation]:
             continue
         for term in banned:
             if term in line:
-                # 简单上下文：取该行
-                context = line.strip()[:100]
-                violations.append(Violation(
-                    file=rel, line=lineno, term=term, context=context
-                ))
+                # 排除：禁用词是更长词的子串（如"储位"在"存储位"中）
+                idx = line.find(term)
+                while idx != -1:
+                    # 检查前后字符是否为中文（如果是，说明是更长词的一部分）
+                    before = line[idx - 1] if idx > 0 else ""
+                    after = line[idx + len(term)] if idx + len(term) < len(line) else ""
+                    is_part_of_longer = (
+                        ("\u4e00" <= before <= "\u9fff") or
+                        ("\u4e00" <= after <= "\u9fff")
+                    )
+                    if not is_part_of_longer:
+                        context = line.strip()[:100]
+                        violations.append(Violation(
+                            file=rel, line=lineno, term=term, context=context
+                        ))
+                        break
+                    idx = line.find(term, idx + 1)
 
     return violations
 
