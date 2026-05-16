@@ -11,6 +11,39 @@
 - 本文件修改必须随对应规范文档的 PR 一起提交
 - 保持极简：AI 助手应在 30 秒内读完本文件，再按需深入引用文档
 
+## 发现缺口时的确认流程
+
+> **核心原则：AI 不能自行决定新增模块/故事/基础设施，必须和用户确认。**
+
+当 AI 在工作中发现以下情况时，**必须暂停并向用户确认**：
+
+### 触发条件
+
+1. **功能缺口**：发现某个业务场景没有对应的用户故事覆盖
+2. **模块缺失**：发现需要新增一个独立模块（业务模块或基础设施模块）
+3. **设计冲突**：发现两个已有故事/决策之间存在矛盾
+4. **抽象机会**：发现多个模块有重复模式，可以抽象为公共能力
+5. **技术决策**：需要做出影响架构的技术选择（如新增依赖、改变数据模型）
+6. **范围变更**：某个故事的实现复杂度远超预期，可能需要拆分或简化
+
+### 确认流程
+
+```
+1. 描述发现：清晰说明发现了什么问题/缺口
+2. 分析影响：说明这个缺口影响哪些模块/流程
+3. 提出选项：给出 2-3 个解决方案（含利弊）
+4. 等待确认：不要自行选择方案，等用户决定
+5. 记录决策：确认后记录到 clarifications.md
+```
+
+### 不需要确认的情况
+
+- 修复脚本报错（error 级别）
+- 修复术语违规
+- 修复文件命名不合规
+- 补充审计追踪（所有写操作都需要，这是已确认的规则）
+- 代码层面的重构（不改变功能）
+
 ## 必读文档（按优先级）
 
 1. [docs/coding-standards.md](docs/coding-standards.md) — 代码书写规范（Rust / TS / 跨端 / 禁止清单）
@@ -18,6 +51,36 @@
 3. [docs/adr/0006-tdd-and-test-layers.md](docs/adr/0006-tdd-and-test-layers.md) — TDD + 11 层测试
 4. [docs/architecture-dependencies.md](docs/architecture-dependencies.md) — 模块依赖图（11 业务 + 3 横向 + 5 波次）
 5. [docs/adr/README.md](docs/adr/README.md) — 所有架构决策索引
+6. [docs/infra/technical-specs.md](docs/infra/technical-specs.md) — 基础设施技术规格（H6 状态机 / H7 导入导出 / H8 ERP 防腐层 / H9 打印）
+7. [docs/domain/clarifications.md](docs/domain/clarifications.md) — 业务澄清记录（32 项决策）
+8. [docs/glossary.md](docs/glossary.md) — 术语表（54 个，含禁用词）
+
+## 业务文档索引
+
+| 文档 | 用途 |
+|------|------|
+| [docs/domain/user-stories-m1-master-data.md](docs/domain/user-stories-m1-master-data.md) | M1 基础档案（10 个故事） |
+| [docs/domain/user-stories-m2-inbound.md](docs/domain/user-stories-m2-inbound.md) | M2 入库（8 个故事） |
+| [docs/domain/user-stories-m3-inventory.md](docs/domain/user-stories-m3-inventory.md) | M3 库存（10 个故事） |
+| [docs/domain/user-stories-m4-outbound.md](docs/domain/user-stories-m4-outbound.md) | M4 出库（11 个故事） |
+| [docs/domain/user-stories-m5-cold-chain.md](docs/domain/user-stories-m5-cold-chain.md) | M5 冷链（3 个故事） |
+| [docs/domain/user-stories-m6-audit-report.md](docs/domain/user-stories-m6-audit-report.md) | M6 报表（3 个故事） |
+| [docs/domain/user-stories-m8-retail-chain.md](docs/domain/user-stories-m8-retail-chain.md) | M8 连锁（3 个故事） |
+| [docs/domain/user-stories-m9-billing.md](docs/domain/user-stories-m9-billing.md) | M9 计费（3 个故事） |
+| [docs/domain/user-stories-m10-tms-plus.md](docs/domain/user-stories-m10-tms-plus.md) | M10 TMS+（3 个故事） |
+| [docs/domain/user-stories-m11-regulatory-edi.md](docs/domain/user-stories-m11-regulatory-edi.md) | M11 监管 EDI（3 个故事） |
+| [docs/domain/user-stories-mte-task-engine.md](docs/domain/user-stories-mte-task-engine.md) | M-TE 任务引擎（11 个故事） |
+| [docs/domain/user-stories-mrp-replenishment.md](docs/domain/user-stories-mrp-replenishment.md) | M-RP 补货（4 个故事） |
+| [docs/domain/user-stories-mpk-packing-station.md](docs/domain/user-stories-mpk-packing-station.md) | M-PK 包装站（6 个故事） |
+| [docs/domain/user-stories-mvr-validation-rules.md](docs/domain/user-stories-mvr-validation-rules.md) | M-VR 规则引擎（5 个故事） |
+| [docs/domain/user-stories-mtc-traceability-code.md](docs/domain/user-stories-mtc-traceability-code.md) | M-TC 追溯码（6 个故事） |
+| [docs/domain/user-stories-mql-quality-liaison.md](docs/domain/user-stories-mql-quality-liaison.md) | M-QL 质量联系单（5 个故事） |
+| [docs/domain/user-stories-mcg-code-generator.md](docs/domain/user-stories-mcg-code-generator.md) | M-CG 编码生成（2 个故事） |
+| [docs/domain/user-stories-msa-stock-adjustment.md](docs/domain/user-stories-msa-stock-adjustment.md) | M-SA 报损报溢（3 个故事） |
+| [docs/domain/user-stories-mrc-reconciliation.md](docs/domain/user-stories-mrc-reconciliation.md) | M-RC 对账（4 个故事） |
+| [docs/domain/user-stories-mdi-drug-inspection.md](docs/domain/user-stories-mdi-drug-inspection.md) | M-DI 药检单（4 个故事） |
+| [docs/domain/user-stories-h4-wechat-notify.md](docs/domain/user-stories-h4-wechat-notify.md) | H4 企业微信（4 个故事） |
+| [docs/domain/user-stories-h5-express.md](docs/domain/user-stories-h5-express.md) | H5 快递（5 个故事） |
 
 ## 其他文档索引
 
@@ -44,6 +107,7 @@
 - 禁止：`unwrap` / `any` / 裸 fetch / 注释掉的代码 / 硬编码密钥
 - 审计表只能 INSERT，禁止 UPDATE/DELETE
 - domain 不依赖 infra
+- **发现缺口必须确认**：新增模块/故事/基础设施前必须和用户确认（见上方流程）
 
 ## 当前阶段
 

@@ -138,6 +138,36 @@ def check_l3_domain_code_sync(issues: list[Issue]) -> None:
                 ))
 
 
+def check_infra_docs(issues: list[Issue]) -> None:
+    """docs/infra/ 基础设施文档校验。"""
+    infra_dir = DOCS_DIR / "infra"
+    if not infra_dir.exists():
+        issues.append(Issue(
+            layer="L2",
+            file="docs/infra/",
+            message="infra directory missing (expected technical-specs.md)",
+        ))
+        return
+    specs = infra_dir / "technical-specs.md"
+    if not specs.exists():
+        issues.append(Issue(
+            layer="L2",
+            file="docs/infra/technical-specs.md",
+            message="technical-specs.md missing",
+        ))
+        return
+    text = _read(specs)
+    required_sections = ["H6", "H7", "H8"]
+    for section in required_sections:
+        if section not in text:
+            issues.append(Issue(
+                layer="L2",
+                file="docs/infra/technical-specs.md",
+                message=f"missing infrastructure module section: {section}",
+                severity="warn",
+            ))
+
+
 def check_l4_existence(issues: list[Issue]) -> None:
     """L4 运营文档必须存在。"""
     required = ["README.md", "ROADMAP.md", "TODO.md", "CHANGELOG.md"]
@@ -154,6 +184,7 @@ def main(argv: list[str] | None = None) -> int:
     issues: list[Issue] = []
     check_l1_references(issues)
     check_l2_changelog(issues)
+    check_infra_docs(issues)
     check_l3_domain_code_sync(issues)
     check_l4_existence(issues)
 
