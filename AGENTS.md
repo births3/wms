@@ -44,32 +44,12 @@
 
 ### 概念审计的方法
 
-**核心问题：我们的认知框架里是否缺少某个维度？**
+详见 [docs/concept-audit.md](docs/concept-audit.md)（审计结果）。
 
-#### 多视角镜头
-
-| 镜头 | 问什么 | 能发现什么 |
-|------|--------|-----------|
-| 用户镜头 | 用户要做什么？ | 用户故事 |
-| 开发者镜头 | 写代码时会重复写什么？ | 基础设施/公共库 |
-| 运维镜头 | 上线后谁维护？怎么监控？ | 可观测性/部署 |
-| 安全镜头 | 攻击者会怎么攻击？ | 安全需求/威胁模型 |
-| 数据镜头 | 数据怎么流动？在哪停留？ | 数据架构/归档 |
-| 时间镜头 | 3 年后会变成什么样？ | 可扩展性/技术债 |
-| 失败镜头 | 什么会出错？出错怎么办？ | 容错/降级/补偿 |
-| 边界镜头 | 系统和外部的接触面？ | 集成层/防腐层 |
-
-#### 概念完备性检查
-
-对每个已有概念问"它的对立面/补集是什么"：
-- 有 X → "非 X 但系统需要的"是什么？
-- 有"单个" → "之间的"是什么？
-- 有"正常" → "异常"是什么？
-- 有"当前" → "历史"是什么？
-
-#### 类比迁移
-
-从成熟领域（建筑/城市/生物/制造业）借概念，检查软件系统是否有对应物。
+方法速查：
+- **多视角镜头**：用户/开发者/运维/安全/数据/时间/失败/边界 8 个视角
+- **概念完备性**：对已有概念问"它的对立面/补集是什么"
+- **类比迁移**：从成熟领域借概念
 
 ### 模式提炼的具体方法
 
@@ -151,8 +131,9 @@
 4. [docs/architecture-dependencies.md](docs/architecture-dependencies.md) — 模块依赖图（11 业务 + 3 横向 + 5 波次）
 5. [docs/adr/README.md](docs/adr/README.md) — 所有架构决策索引
 6. [docs/infra/technical-specs.md](docs/infra/technical-specs.md) — 基础设施技术规格（H6 状态机 / H7 导入导出 / H8 ERP 防腐层 / H9 打印）
-7. [docs/domain/clarifications.md](docs/domain/clarifications.md) — 业务澄清记录（32 项决策）
-8. [docs/glossary.md](docs/glossary.md) — 术语表（54 个，含禁用词）
+7. [docs/concept-audit.md](docs/concept-audit.md) — 概念审计报告（8 镜头扫描结果 + 数据量评估）
+8. [docs/domain/clarifications.md](docs/domain/clarifications.md) — 业务澄清记录（42 项决策）
+9. [docs/glossary.md](docs/glossary.md) — 术语表（54 个，含禁用词）
 
 ## 业务文档索引
 
