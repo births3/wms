@@ -146,3 +146,15 @@ reason = "补拣 — 是 M3 内部，已在 M3 跨故事约束兜底"
 [[approval_source_exemptions]]
 story_id = "US-M4-008"
 reason = "退货上架 — 审批源=退货审批，走 M-QL 流程隐含"
+
+[[approval_source_exemptions]]
+story_id = "US-DOCK-001"
+reason = "月台档案管理 — 月台启用/停用是物理资源管理，非库存状态变更"
+
+[[approval_source_exemptions]]
+story_id = "US-H2-005"
+reason = "事件总线 — 基础设施级订阅注册，本身不改库存状态"
+
+[[approval_source_exemptions]]
+story_id = "US-MPM-006"
+reason = "交易类型字典 — 字典管理，非库存状态变更（业务流水中使用 code 才会触发）"
