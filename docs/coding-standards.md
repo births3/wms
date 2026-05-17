@@ -88,6 +88,56 @@
 - 应用服务用 `<Context>Service`（`InboundService`）
 - 命令/查询用 `<Action><Entity>Command` / `<Entity>Query`（`ReceiveGoodsCommand`, `StockQuery`）
 
+**状态转换方法命名约定**（v3.1，借鉴 Odoo state button，参见 [ADR-0008](adr/0008-borrow-from-odoo.md) §9）：
+
+实体的状态转换方法必须使用统一前缀，便于阅读、审计扫描、治理脚本识别：
+
+| 前缀 | 含义 | 示例 |
+|----|----|----|
+| `confirm_` | 草稿 → 已确认（首次激活） | `inbound.confirm()` |
+| `validate_` | 已确认 → 已完成（最终签字） | `inbound.validate()` |
+| `done_` | 推进到完成态（业务流终态） | `picking.done()` |
+| `cancel_` | 任意态 → 已取消 | `order.cancel()` |
+| `assign_` | 资源分配/预占 | `order.assign_stock()` |
+| `revert_` | 撤回到上一状态 | `inbound.revert()` |
+
+**非状态转换方法**用其他前缀区分：
+- `compute_` = 派生字段/聚合计算
+- `query_` / `search_` = 只读查询
+- `import_` / `export_` = 数据交换
+- `find_` / `get_` = 数据获取
+
+**约定收益**：
+- 治理脚本可扫描状态转换方法名，自动校验所有此类方法都接入 audit_trail
+- 阅读代码时立即识别"业务计算"vs"状态变化"
+- 前端按钮事件名与后端方法对齐（`button onClick={() => confirmInbound(id)}`）
+
+### 1.1.1 Wizard / 临时模型规范
+
+> 借鉴 Odoo TransientModel 模式，参见 [ADR-0008](adr/0008-borrow-from-odoo.md) §8
+
+涉及多步骤交互的业务（盘点 / 双人验收 / 销毁审批 / 批量上架），不直接污染主业务表，使用 **wizard 模式**：
+
+```rust
+pub trait Wizard: Serialize + Deserialize {
+    type Result;
+    fn name() -> &'static str;
+    fn ttl_minutes() -> u32 { 60 }   // 默认 1 小时
+    async fn execute(&self, ctx: &Context) -> Result<Self::Result>;
+}
+```
+
+**wizard 数据存于** `wizard_session` 表（不进入主业务表）；TTL 到期由 `pg_cron` 自动清理。
+
+**何时用 wizard**：
+- 需要多步收集数据（向导式 UI）
+- 中间态不应影响主业务（如双人验收第一签字后等第二签字，未完成不应被其他流程消费）
+- 可能被中断后恢复（用户登出后回来继续）
+
+**何时不用 wizard**：
+- 单步操作（直接命令即可）
+- 数据需要参与业务查询（应该进主表）
+
 ### 1.2 模块组织
 
 ```

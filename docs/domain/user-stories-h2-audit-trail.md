@@ -3,7 +3,7 @@
 > 模块：H2 横向能力 / Wave 1 W1.B
 > 性质：所有业务模块的审计基础（与 H10 数据库备份共同保障 GSP 数据完整性）
 > 依赖：H1 权限（actor 来源）
-> 关联 ADR：0006（TDD）
+> 关联 ADR：0006（TDD）、ADR-0008（借鉴 Odoo ADR-0008 §1 Auditable trait）
 
 ---
 

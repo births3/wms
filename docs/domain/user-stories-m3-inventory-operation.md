@@ -2,7 +2,7 @@
 
 > 模块：M3 inventory
 > 依赖：M1 基础档案、M2 入库、H1 权限、H2 审计
-> 关联 ADR：0001、0006（TDD）
+> 关联 ADR：0001、0006（TDD）、ADR-0008（借鉴 Odoo ADR-0008 §2 inventory_move 三段式）
 
 ---
 

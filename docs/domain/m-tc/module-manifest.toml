@@ -1,0 +1,62 @@
+# M-TC 追溯码模块 manifest（示例 / v3.1 引入）
+#
+# 借鉴 Odoo __manifest__.py 模式（参见 docs/adr/0008-borrow-from-odoo.md §4）。
+# 本文件是 wms 模块声明式依赖图的示例样板；正式落地由治理脚本
+# `check_module_dependencies.py`（Wave 0+ 待实现）扫描所有
+# `domain/<module>/module-manifest.toml` 自动构建依赖图。
+#
+# 当前 Wave 0：本文件作为格式参考，未与代码联动。
+# Wave 1+ 实施：每个模块的 domain crate 加同名 manifest，治理脚本校验
+#               依赖图与 docs/architecture-dependencies.md §1 一致。
+
+[module]
+code = "M-TC"
+name = "追溯码模块"
+slug = "traceability-code"
+version = "v3.1"
+category = "horizontal-business"   # business | horizontal-business | horizontal-capability
+
+[depends]
+# 业务依赖：本模块启用前必须先装这些模块
+business = ["M1.master-data", "M-CG"]
+# 横向能力依赖
+horizontal = ["H1", "H2", "H4", "H8"]
+# 外部数据预置（启用时由 lifecycle.post_install 加载）
+external = ["barcodes_gs1_rules", "regulatory_code_20_rules"]
+
+[wave]
+# 计划启用波次（与 ROADMAP / ADR-0007 对齐）
+target = "Wave 4"
+parallel_track = "W4.D"
+
+[stories]
+# 本模块的用户故事文件
+file = "docs/domain/user-stories-mtc-traceability-code.md"
+count = 7
+
+[data]
+# 启用时按顺序加载的预置数据（Wave 4 实施时按本顺序）
+gs1_nomenclature = "data/trace_code_nomenclature_gs1.toml"
+regulatory_code_nomenclature = "data/trace_code_nomenclature_regulatory.toml"
+trace_code_categories = "data/trace_code_categories.toml"
+
+[lifecycle]
+# 模块启用钩子（v3.1 概念，Wave 1+ 实现）
+post_install = "post_init_load_gs1.sql"
+pre_uninstall = "warn_no_uninstall_during_active_codes.sql"
+
+[gsp]
+# GSP 合规相关
+relevant_clauses = ["追-1", "追-2", "追-3", "追-4", "追-5", "追-6", "8.111", "8.113"]
+mandatory_for_china = true        # 中国医药 GSP 必需
+
+[fields]
+# 与 §6 字段词典 v3.1 关联的关键字段
+canonicals = [
+  "追溯码",
+  "shipment_doc_no",
+  "operation_type",
+  "delivery_org_uscc",
+  "shipper_org_uscc",
+  "receiver_org_uscc",
+]

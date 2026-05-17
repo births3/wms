@@ -62,6 +62,28 @@
 | M-BA | 批号调整 | batch-adjustment |
 | M-PM | 参数对照（v24 新增：ERP 不规则字段规整化） | parameter-mapping |
 
+### 1.4 模块依赖图工具化（v3.1 引入，借鉴 Odoo __manifest__.py）
+
+> 参见 [ADR-0008](adr/0008-borrow-from-odoo.md) §4。
+
+每个模块在 `docs/domain/<module-slug>/module-manifest.toml` 声明依赖与启用约束，由治理脚本 `check_module_dependencies.py`（Wave 0+ 待实现）自动构建依赖图，与本文档 §1.1-§1.3 一致性校验。
+
+**示例**：[docs/domain/m-tc/module-manifest.toml](domain/m-tc/module-manifest.toml)
+
+**字段速览**：
+- `[module]`：code / name / slug / version / category
+- `[depends]`：business / horizontal / external
+- `[wave]`：target / parallel_track
+- `[stories]`：故事文件路径
+- `[data]`：启用时加载的预置数据
+- `[lifecycle]`：post_install / pre_uninstall 钩子
+- `[gsp]`：相关 GSP 条款 + mandatory_for_china
+- `[fields]`：与字段词典关联的关键 canonical
+
+**实施 Wave**：
+- Wave 0 末期：补 29 个模块的 manifest（每个 ~30 行）+ 写治理脚本
+- Wave 1+：按 manifest 自动加载预置数据 + 启动顺序
+
 ---
 
 ## 2. 核心路径依赖图

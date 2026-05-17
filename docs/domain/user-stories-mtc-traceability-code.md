@@ -4,6 +4,7 @@
 > 性质：独立业务模块，被 M2 入库（收货/验收）和 M4 出库（复核）依赖
 > 波次：Wave 2（与 M1 基础档案同期）
 > 依赖：M1 商品档案、H1 权限、H2 审计
+> 关联 ADR：ADR-0008 §ADR-0008 §5 GS1 nomenclature 数据驱动（trace_code_nomenclature + trace_code_rule，前后端共享 pattern matcher）
 
 ---
 
