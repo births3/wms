@@ -176,6 +176,9 @@
 | 多仓/连锁 | 4 | 默认仓库、跨仓可见性、门店补货统计天数、越库条件 |
 | 容器/物流 | 2 | 容器超期未回收预警天数、回收追踪开关 |
 | **双人作业矩阵** (v25) | 1 | 双人作业矩阵：流程 × 节点 × 特殊药品分类 → 单人 / 双人扫码 / 双人+主管审批 |
+| **月台预约** (v3.1) | 5 | dock_management_enabled（默认 false 关闭）/ dock_appointment_window_minutes（30）/ dock_overlap_allowed（false）/ dock_advance_hours（48）/ cold_chain_priority（true，冷链优先抢占月台）|
+| **告警引擎** (v3.1) | 4 | alert_escalation_levels（3 级 / 1 级简化）/ alert_silence_default_minutes（5）/ alert_off_hours_window（22:00-06:00）/ alert_dlq_threshold_count（1000）|
+| **数据归档** (v3.1) | 5 | inline_retention_months（12）/ archive_job_cron（每月 1 日）/ recovery_window_hours（24）/ retention_普通业务（5 年）/ retention_特殊药品台账（30 年）|
 
 2. **所有配置项必须有默认值**（开箱即用，无需配置即可运行）
 3. **配置向导**：首次部署时引导用户确认关键配置（分步骤，可跳过用默认值）

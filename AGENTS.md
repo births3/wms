@@ -339,8 +339,10 @@
 | [docs/domain/user-stories-h-driver.md](docs/domain/user-stories-h-driver.md) | H-Driver 司机端（5 个故事，v15 W4.E）|
 | [docs/domain/user-stories-h-store.md](docs/domain/user-stories-h-store.md) | H-Store 门店用户端（6 个故事，v15 W4.E）|
 | [docs/domain/user-stories-h1-auth-tenant.md](docs/domain/user-stories-h1-auth-tenant.md) | H1 权限与多租户（6 故事，v18 Wave 1 W1.A）|
-| [docs/domain/user-stories-h2-audit-trail.md](docs/domain/user-stories-h2-audit-trail.md) | H2 审计追踪基础设施（5 故事，v18 Wave 1 W1.B）|
+| [docs/domain/user-stories-h2-audit-trail.md](docs/domain/user-stories-h2-audit-trail.md) | H2 审计追踪 + 事件总线（6 故事，v18 Wave 1 W1.B；H2-005 升级为 H-EVT）|
 | [docs/domain/user-stories-h3-contract.md](docs/domain/user-stories-h3-contract.md) | H3 跨端契约 OpenAPI（4 故事，v18 Wave 1 W1.C）|
+| [docs/domain/user-stories-h-dock-management.md](docs/domain/user-stories-h-dock-management.md) | H-DOCK 月台预约管理（7 故事，v3.1，可启用开关，3PL/冷链优先仓启用）|
+| [docs/domain/user-stories-h-alert.md](docs/domain/user-stories-h-alert.md) | H-AL 告警引擎（5 故事，v3.1，GSP 5.71 触发响应时间合规）|
 
 ## 其他文档索引
 

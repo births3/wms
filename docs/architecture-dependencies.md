@@ -17,15 +17,17 @@
 | 编号 | 横向能力 | 简称 | 说明 |
 |-----|---------|------|------|
 | H1 | 权限与多租户（货主隔离） | auth-tenant | 所有 API 鉴权；多货主数据隔离 |
-| H2 | 审计追踪基础设施 | audit-trail | append-only 审计；GSP 不可篡改要求 |
+| H2 | 审计追踪基础设施 + 事件总线 | audit-trail | append-only 审计；H2-005 升级为统一事件总线（H-EVT 角色，覆盖审计/业务/系统三类事件） |
 | H3 | 跨端契约（OpenAPI + utoipa） | contract | 后端生成 OpenAPI；前端类型同步 |
-| H4 | 企业微信通知与审批 | wechat-notify | 通知配置/发送/审批流对接；所有模块共用 |
+| H4 | 企业微信通知与审批 | wechat-notify | 通知配置/发送/审批流对接；消息发送通道层 |
 | H5 | 快递面单与运单 | express | 配送方路由 + 自有/第三方差异化（详见 user-stories-h5）|
 | H6 | 状态机引擎 | state-machine | 多业务模块状态机统一引擎（详见 infra/technical-specs.md）|
 | H7 | 导入导出引擎 | import-export | Excel/CSV 数据导入导出统一引擎 |
 | H8 | ERP 防腐层 | erp-acl | WMS↔ERP 接口表 + 反馈回写（含档案补录通道）|
 | H9 | 打印模板引擎 | print-template | 标签/单据/PDF 台账统一模板引擎 |
 | H10 | 数据库备份与恢复 | db-backup | 全量+WAL+异地 + 加密+演练；与 H2 共同保障 GSP 数据完整性（详见 infra/technical-specs.md）|
+| **H-DOCK** | **月台预约管理（v3.1 新增）** | **dock-management** | **月台档案 + 预约调度 + 实到对账；可启用开关（默认关闭，3PL/冷链优先仓启用）；GSP 6.83/8.116/9.121** |
+| **H-AL** | **告警引擎（v3.1 新增）** | **alert-engine** | **告警分级/升级/生命周期/路由/静默；调用 H4 通道；GSP 5.71 触发响应时间合规** |
 
 ### 1.2 业务模块（M 层）
 
@@ -363,3 +365,4 @@ docs/architecture-dependencies.md（本文档，依赖唯一真相源）
 | 2026-05-16 | v0.2 | 对齐 ADR-0007：M11 移除；M-TC 承接码上放心；M-PK 承接原 M7；补齐横向业务能力清单 |
 | 2026-05-15 | v0.1 | 初版：11 个业务模块 + 3 个横向能力，5 波次划分 |
 | 2026-05-17 | v0.3 | v24 新增 M-PM 参数对照模块（Wave 2 W2.E）；M1.a 依赖关系增 W2.E |
+| 2026-05-18 | v3.1 | 横向能力 10 → 12：新增 H-DOCK 月台预约（可启用开关）+ H-AL 告警引擎（GSP 5.71 触发响应时间合规）；H2-005 升级为通用事件总线（覆盖 H-EVT 角色）；M-PM 加 US-MPM-006 交易类型字典管理（PIX 三码） |
