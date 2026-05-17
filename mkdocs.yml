@@ -132,6 +132,7 @@ nav:
     - 分库分表决策矩阵 (v25): infra/sharding-decision-matrix.md
   - 评审记录:
     - 用户故事审计 v1-v10: reviews/user-stories-audit-2026-05-16.md
+    - 软件设计审计 (12 维度): reviews/software-design-audit-2026-05-18.md
     - 波次参数对标 - Manhattan: reviews/wave-parameters-comparison-manhattan.md
     - 用户故事 Review 规范: review-guidelines-user-stories.md
     - Wave 0 回顾: retros/wave-0-retro.md
