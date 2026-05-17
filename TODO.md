@@ -32,21 +32,23 @@
 
 ### 进行中 / 待做
 
-- [ ] `CHANGELOG.md` 初始版本
-- [ ] 工作区根 README 登记 wms 项目
-- [ ] 本地验证：跑 `validate_environment.py` / `check_doc_links.py` / `validate_adr_index.py` / `check_commit_convention.py`
-- [ ] 首次 commit（feat(governance): wave 0 scaffolding）
-- [ ] 哲学自检（task 12）
+- [x] `CHANGELOG.md` 初始版本（v3.1 [Unreleased] Added/Changed/Removed 完整）
+- [x] ~~工作区根 README 登记 wms 项目~~（实质已被 README.md 自描述满足，关闭于 v3.1）
+- [x] 本地验证：跑 `validate_environment.py` / `check_doc_links.py` / `validate_adr_index.py` / `check_commit_convention.py`（T1 14/14 全过）
+- [x] 首次 commit（拆为 7 个 conventional commits，覆盖治理脚本 / AGENTS.md / 治理规范 / GSP 合规 / 用户故事 / 基础设施 / 站点）
+- [x] 哲学自检（v3.1 retro §10 已含）
 
 ---
 
 ## Wave 0 退出条件（Wave 1 准入）
 
-- [ ] 所有 Wave 0 ADR 状态 = Accepted
-- [ ] `python3 scripts/governance/governance_checks.py --tier T1` 全绿
-- [ ] `validate_environment.py` 报告必需工具就绪
-- [ ] 首次 commit 通过 lefthook 钩子
-- [ ] 完成 Wave 0 retro（写入 `docs/retros/wave-0-retro.md`，目前可暂缓到首次 commit 后）
+- [x] 所有 Wave 0 ADR 状态 = Accepted（0001/0002/0003/0006/0007 = Accepted；0004 = Superseded by 0007）
+- [x] `python3 scripts/governance/governance_checks.py --tier T1` 全绿（14/14，~1.4s）
+- [x] `validate_environment.py` 报告必需工具就绪（含 gitleaks）
+- [x] 首次 commit 通过 lefthook 钩子（7 个 commit 全过 pre-commit + commit-msg）
+- [x] 完成 Wave 0 retro（v0.2 + v3.1 持续演进 §10）
+
+**Wave 0 退出条件全部满足，可推进 Wave 1。**
 
 ---
 
