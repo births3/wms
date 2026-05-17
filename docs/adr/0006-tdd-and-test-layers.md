@@ -130,7 +130,7 @@ wms 是医药 GSP 合规系统，对**正确性**的要求远高于一般业务�
 | L4 错误处理 | 异常场景 | 业务异常、外部失败、边界条件 |
 | L5 数据一致性 | 状态持久化 | 事务回滚、审计落库、跨表一致 |
 | L6 并发安全 | 竞态条件 | 同一批次并发拣货、同库位并发上架 |
-| L7 性能 | 吞吐 / 资源 | 关键路径基准、bundle size、响应时间 |
+| L7 性能 | 吞吐 / 资源 / **易用性 SLA**（v25 新增）| 关键路径基准、bundle size、响应时间、PDA 单步交互 P95 ≤ 1.5s 等（详见 docs/infra/usability-baseline.md）|
 | L8 权限控制 | 认证 / 授权 | 角色矩阵、租户隔离、权限码覆盖 |
 | L9 兼容性 | 版本 / 类型 | OpenAPI 向后兼容、TS 类型 diff |
 | L10 可观测性 | 日志 / 指标 | tracing span、关键事件日志 |
@@ -146,7 +146,7 @@ wms 是医药 GSP 合规系统，对**正确性**的要求远高于一般业务�
 | L4 | `cargo test` 异常路径专项 | Vitest 异常路径 |
 | L5 | testcontainers + 事务断言 | （后端覆盖）|
 | L6 | `tokio::test` + `loom`（关键临界区）| 极少需要 |
-| L7 | `criterion` 基准（含 baseline）| Lighthouse、bundle 大小 |
+| L7 | `criterion` 基准（含 baseline）+ 易用性 SLA 验证（v25）| Lighthouse、bundle 大小、PDA 交互 P95 测量（v25）|
 | L8 | handler 集成测试 + 角色矩阵 | Playwright + 不同 session |
 | L9 | OpenAPI schema diff 工具 | TS 类型 diff 工具 |
 | L10 | tracing 测试订阅器 + 断言 | 控制台日志 / OTLP 断言 |

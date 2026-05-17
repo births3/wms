@@ -1,12 +1,13 @@
 # ADR-0004: 波次路线（依赖驱动并行 + TDD 节奏）
 
-- 状态：Accepted（v0.2，取代 v0.1 三阶段版）
+- 状态：Superseded by ADR-0007
 - 日期：2026-05-15
 - 决策者：项目发起人
 - 关联：`docs/governance.md`、`docs/architecture-dependencies.md`、ADR-0001、ADR-0002、ADR-0003、ADR-0006
 
 > v0.1 的"三阶段"措辞容易被误解为"砍功能 / 半成品 demo"。
 > v0.2 改为**波次驱动**：所有 11 个业务模块 + 3 个横向能力**全部生产化交付，按依赖图分波次推进**，每波内可 worktree 并行。
+> v0.3 路线已由 ADR-0007 取代：M11 移除，码上放心归 M-TC，药监 EDI 由 ERP/H8 边界承接。
 
 ---
 

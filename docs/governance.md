@@ -31,6 +31,8 @@ wms 是一个**医药冷链 GSP 合规仓储管理系统**，目标是支撑：
 3. **Baseline 机制**——锁定历史债务、新增必须修复、已修复自动收缩。**渐进式治理**。
 4. **diff 触发**——改什么查什么。无差别全量扫描不可持续。
 
+> **理念 4 落地说明**：diff 触发由 `task_check.py` 实现（基于 `governance/gate-rules.toml`），仅在 **T2 及以上** Tier 启用；**T1 仍为全量扫描**（因 T1 必须无脑可跑、不依赖 git history）。在 Wave 0 阶段 T2/T3/T4 仅累积 T1，diff 触发的真正价值会在 Wave 1+ 才显现（届时 backend / frontend 文件量大，全量扫描不可持续）。
+
 ---
 
 ## 2. 治理体系全景
@@ -124,6 +126,31 @@ wms 是一个**医药冷链 GSP 合规仓储管理系统**，目标是支撑：
 
 **Breaking Change**：脚注写 `破坏性变更：<说明>`，对应 SemVer 主版本 +1。
 
+#### 描述行（subject）规则
+
+- 长度：**≤ 50 字符**（不含类型/范围前缀）
+- 句式：动词开头（添加/修复/重构/...）
+- 末尾不带句号
+- 不写"我"等主语，使用客观语气
+
+#### 正文（body）规则
+
+- 复杂改动**必填**正文；琐碎改动可省略
+- 必填触发条件（任一）：
+  - 改动 ≥ 3 个文件
+  - 涉及业务规则 / 状态机 / GSP 合规 / 审计
+  - 引入新依赖
+  - Breaking Change
+- 正文内容：动机（为什么）+ 改动概要（做了什么）+ 影响范围（影响谁）
+- 与描述行之间空一行，每行 ≤ 72 字符
+
+#### 脚注（footer）规则
+
+- 关联：`关联：US-M2-001, ADR-0006, M-VR`（一行多项以逗号分隔）
+- 破坏性变更：`破坏性变更：<说明>`
+- 协作：`Co-authored-by: 名字 <邮箱>`
+- 关闭 issue：`Closes #123`（如使用 issue 跟踪）
+
 ### 3.3 代码风格与质量
 
 #### Rust 端
@@ -159,6 +186,36 @@ wms 是一个**医药冷链 GSP 合规仓储管理系统**，目标是支撑：
 - PR 描述用模板（变更说明 / 关联 / 自查清单 / 测试方法 / 截图）
 - 单 PR 改动 < 400 行（不含自动生成代码），超过强制拆分
 
+#### 3.4.1 commit 粒度规则
+
+合并策略是 **Squash and merge**（§3.1），因此：
+
+- **本地 commit 可细可粗**：一个 PR 可包含多个本地 commit；squash 时合并为一个
+- **推荐节奏**：每完成一个**原子任务**就 commit 一次（如修一个 bug、改一组关联文件、一次重构）
+- **必须拆分**的情形（即使在同一 PR 内也分多个 commit）：
+  - 跨 ≥ 2 个 scope（如同时改了"治理"和"基础档案"）
+  - 跨"格式" / "重构" / "功能"等不同 type（重构和功能不要混提交，便于 reviewer 区分）
+  - 单次累积变更 ≥ 400 行
+  - Breaking Change 必须独立 commit
+- **不建议拆分**的情形：
+  - 同主题强关联的多个文件（如改一个故事 + 配套字段表 + 配套测试）
+  - 同步重命名（rename 应一次完成）
+
+#### 3.4.2 何时建议 commit
+
+- 跑通 T1 治理脚本 + 关联测试 → 可 commit
+- 单一主题完成 → 可 commit
+- 长会话/长任务结束前 → **必须** commit（避免大量未提交变更累积）
+
+#### 3.4.3 PR 与 commit 的关系
+
+| 维度 | PR | commit（本地）|
+|---|---|---|
+| 粒度 | 一个完整功能/修复 | 一个原子改动 |
+| 行数上限 | < 400 行（硬约束）| 无硬约束，但 ≥ 400 行应拆分 |
+| 单 scope | **强制单一**（跨 scope 拆 PR）| 推荐单一（跨 scope 拆 commit）|
+| 提交人 | review 通过后 squash | 实时提交 |
+
 ### 3.5 文档规范
 
 #### 3.5.1 文档四层管理
@@ -183,13 +240,19 @@ wms 是一个**医药冷链 GSP 合规仓储管理系统**，目标是支撑：
 
 | 脚本 | 校验什么 | 覆盖层 | 引入时机 |
 |------|---------|--------|---------|
-| `validate_adr_index.py` | ADR 编号唯一 / 状态合法 / 必填段 / 索引完整 | L1 | ✅ 已有 |
-| `check_doc_links.py` | 所有 .md 相对链接目标存在 | 跨层 | ✅ 已有 |
-| `validate_doc_layers.py` | 层间一致性（L2 引用的 ADR 存在；L3 文件与代码目录对应；L4 状态与 git 一致） | L1-L4 | ✅ 已有 |
-| `validate_governance_consistency.py` | governance.md 引用的 ADR/规范都存在且状态有效 | L2 | Wave 2 |
-| `validate_domain_glossary.py` | L3 文档术语与代码命名一致 | L3 | Wave 3 |
-| `validate_gsp_traceability.py` | GSP 条款 → 功能 → 测试 映射完整 | L3 | Wave 3 |
-| `check_changelog_freshness.py` | CHANGELOG 与最近 tag 同步 | L4 | Wave 4 |
+| `validate_adr_index.py` | ADR 编号唯一 / 状态合法 / 必填段 / 索引完整 | L1 | ✅ 已有（T1）|
+| `check_doc_links.py` | 所有 .md 相对链接目标存在 + 附录跨模块引用 | 跨层 | ✅ 已有（T1）|
+| `validate_doc_layers.py` | 层间一致性（L2 引用的 ADR 存在；L3 文件与代码目录对应；L4 状态与 git 一致）| L1-L4 | ✅ 已有（T1）|
+| `check_user_story_structure.py` | 用户故事 As a/I want/So that 三件套结构 + 验收标准块（仅结构，不查语义）| L3 | ✅ 已有（T1）|
+| `check_glossary_consistency.py` | 禁用同义词在文档中是否出现（基于 glossary.md 表格）| L3 | ✅ 已有（T1）|
+| `check_approval_source_chain.py` | 库存状态变更故事必须声明审批源 | L3 | ✅ 已有（T1）|
+| `check_config_center_consistency.py` | 故事使用 ⇄ M1-008 配置中心 ⇄ 故事默认值 三向一致 | L3 | ✅ 已有（T1）|
+| `check_pda_story_completeness.py` | PDA 故事三件套（字段表 + 扫码顺序 + 离线声明）| L3 | ✅ 已有（T1）|
+| `check_gsp_field_traceability.py` | 70 GSP 字段在故事字段表中有实现（v25 字段追溯矩阵）| L3 | ✅ 已有（T1，原计划 Wave 3，提前实现）|
+| `check_baseline_health.py` | baseline 数量单调下降 + 过期检测（防止滥用 baseline 抑制噪音）| 跨层 | ✅ 已有（T1，v0.4 加入）|
+| `validate_governance_consistency.py` | governance.md 引用的 ADR/规范都存在且状态有效 | L2 | Wave 2（占位）|
+| `validate_domain_glossary.py` | L3 文档术语与代码命名一致 | L3 | Wave 3（占位）|
+| `check_changelog_freshness.py` | CHANGELOG 与最近 tag 同步 | L4 | Wave 4（占位）|
 
 #### 3.5.2 文档清单
 
@@ -229,9 +292,29 @@ wms 是一个**医药冷链 GSP 合规仓储管理系统**，目标是支撑：
 
 ### 3.7 安全与敏感信息
 
-- `.env` 不入库；`.env.example` 占位入库
-- pre-commit 跑 `gitleaks`
+#### 不得入库的文件 / 内容（红线）
+
+- 配置类：`.env` / `.env.local` / `.env.production`（占位用 `.env.example`）
+- 密钥类：私钥（`.pem` / `.key` / `id_rsa*`）、token、证书私钥
+- 凭据类：数据库密码、API key、OAuth client secret、JWT 签名密钥
+- 客户/用户数据：真实生产数据库 dump、含 PII 的样本数据
+- 大文件：> 5MB 的二进制 / 媒体文件（用 LFS 或 OSS）
+- IDE 个人配置：`.idea/`、`.vscode/settings.json`（除非项目级配置共享）
+
+如需在仓库提供示例，使用占位（如 `DATABASE_URL=postgres://USER:PASS@HOST/DB`），并在 `.gitignore` 加防御。
+
+#### 自动化检测
+
+- pre-commit 跑 `gitleaks`（`.gitleaks.toml` 可白名单已知占位）
 - CI 跑 `cargo audit` + `pnpm audit`
+- 发现疑似密钥 → 立即停止 commit，提示用户检查
+
+#### 误提交后处理
+
+1. 立即 revoke 该密钥/token
+2. 用 `git filter-repo` 或 BFG 从历史中清除（**有风险操作，必须用户审批**）
+3. force push 重写远程历史（**有风险操作，必须用户审批**）
+4. 通知所有协作者重新 clone
 
 #### 审计追踪强制项（GSP 核心）
 
@@ -305,6 +388,30 @@ wms 是一个**医药冷链 GSP 合规仓储管理系统**，目标是支撑：
 
 **核心：流程一个不少，严格度可调。**
 
+### 4.6 Tier 启动 SOP（v0.4 加入）
+
+每进入新 Wave 时，必须为 T2/T3/T4 添加对应治理脚本，让 Tier 体系不停留在 Wave 0 占位状态：
+
+| Wave | 必须新增的治理脚本 | 注册到 | 对应 gate-rules 规则 |
+|------|-----------------|------|------------------|
+| Wave 1 | `check_layer_dependency.py`（Rust 分层）/ `check_unsafe_and_unwrap.py` | T2 | `backend/crates/**` |
+| Wave 1 | `check_handler_test_coverage.py`（baseline 起步）| T2 | `backend/crates/api/src/**` |
+| Wave 1 | `check_field_coding_standards.py`（字段命名/类型/加密/审计）| T1 | `docs/compliance/gsp-field-traceability.md` + `docs/domain/user-stories-*.md` |
+| Wave 1 | `check_business_rules_registry.py`（业务规则字段引用）| T1 | `docs/compliance/gsp-business-rules-registry.md` + `docs/domain/user-stories-*.md` |
+| Wave 2 | `validate_openapi_artifacts.py` / `check_openapi_contract.py` | T2 | `shared/openapi/openapi.json` |
+| Wave 3 | `check_audit_trail_coverage.py` / `check_idempotency_test.py` | T3 | `backend/crates/domain/src/inventory/**` |
+| Wave 3 | `check_cold_chain_data_freshness.py` | T3 | `backend/crates/domain/src/cold_chain/**` |
+| Wave 4 | `check_perf_baseline.py` / `check_api_compat.py` | T4 | （CI 全量，非 diff 触发）|
+| Wave 4 | `check_observability_signals.py`（L10 可观测）| T4 | （CI 全量，非 diff 触发）|
+| Wave 5 | `check_changelog_freshness.py` | T1 | `*.md`（变更前必跑）|
+
+> **事实之源约定**：本表与 `governance/gate-rules.toml` 中的占位规则**必须保持一致**；以本表为权威源，gate-rules.toml 仅作为脚本侧实现承接。`task_check.py --strict` 模式（当前为 Wave 1+ 准备中）会强制检查未实现脚本。
+
+**门禁强制**：
+- `just wave-N-ready` 必须列出"应当新增的脚本"清单
+- 以及在 `task_check.py --strict` 模式下，gate-rules.toml 中引用但未实现的脚本视为失败（CI 启用 --strict）
+- 每 Wave 第一周完成补齐前，Wave 演进不通过
+
 ---
 
 ## 5. 工具链
@@ -350,3 +457,6 @@ docs/governance.md（本文档，规则源头）
 | 2026-05-15 | v0.1 | 初版骨架（第 0 周） |
 | 2026-05-15 | v0.2 | L1-L4 改名 T1-T4；§3.6 测试规范引用 ADR-0006（TDD + 11 层）；文档关系图补 ADR-0006 与依赖图 |
 | 2026-05-15 | v0.3 | §3.5 文档规范重写为"四层管理"（L1 决策 / L2 规范 / L3 设计 / L4 运营）；新增 validate_doc_layers.py 脚本 |
+| 2026-05-17 | v0.4 | 治理体系审计修复（11 项）：(P0) task_check 加 --strict 模式；§3.5.1 表格 gsp-field 时机更正；§1 加 diff 触发理念落地说明；(P1) 新增 check_baseline_health.py（T1）+ Python 包依赖检查 + 路径硬编码迁出到 governance/check-data.toml + 12 个治理脚本 smoke + core_logic 测试（共 81 项）；(P2) §4.6 加 Tier 启动 SOP + wave-1-ready 加门 + just tier-timing 落地 + glossary 词边界检测扩展到 ASCII + structure 输出补语义说明 |
+| 2026-05-17 | v0.4.1 | v0.4 review 二轮修复（5 项）：gate-rules.toml ↔ §4.6 Wave 时序统一（OpenAPI Wave 2 / handler Wave 1 / cold-chain Wave 3）；§4.6 表格加"对应 gate-rules 规则"列 + "事实之源约定"段；check_baseline_health 默认仅检测不改 working tree（--update-snapshot 才写）；task_check.py docstring 加 --strict 启用时机说明；governance/baselines/README.md 加治理元数据文件入库说明 |
+| 2026-05-17 | v0.4.2 | v0.4.1 review 三轮修复（4 项 + 2 验证）：(P0) §7 补 v0.4.1 变更记录；(P1) 新增 check_governance_consistency.py（元检查 §4.6 ↔ gate-rules.toml 一致性）；(P2) wave-1-ready 加 baseline-health 初始化 + --strict 启用提醒；测试加 v0.4.1 行为回归；baselines/README.md 标题改为"治理债务与元数据" |
