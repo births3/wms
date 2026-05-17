@@ -20,6 +20,7 @@
 | [ADR-0003](0003-governance-model.md) | 治理模型 | Accepted | 5 类 + 4 Tier + Baseline + diff 触发；与 ADR-0006 集成 |
 | [ADR-0006](0006-tdd-and-test-layers.md) | TDD + 11 层测试维度 | Accepted | outside-in 双层 TDD；L1-L11 测试维度；Tier×Layer 执行矩阵 |
 | [ADR-0007](0007-roadmap-v03-boundary-alignment.md) | 波次路线 v0.3 边界对齐 | Accepted | M11 移除；码上放心归 M-TC；药监 EDI 由 ERP/H8 边界承接；当前路线入口 |
+| [ADR-0008](0008-borrow-from-odoo.md) | 借鉴 Odoo 的 9 个设计 | Accepted | mail.thread/stock.move/ir.sequence/manifest/GS1 + ir.rule/access.csv/TransientModel/state button；分散到 Wave 0-4 落地，约 2.5 个月增量 |
 
 ## 已取代
 
@@ -32,7 +33,7 @@
 | 编号 | 状态 | 说明 |
 |------|------|------|
 | ADR-0005 | 预留 | Git Worktree 工作流（命名 / target/ / node_modules / baseline 协调）。计划 Wave 1 启动前补写。 |
-| ADR-0008+ | 未分配 | 后续按需新建（如限界上下文边界原则、消息队列选型 等） |
+| ADR-0009+ | 未分配 | 后续按需新建（如限界上下文边界原则、消息队列选型 等） |
 
 > 编号永不复用。空缺编号必须在此表登记原因。
 

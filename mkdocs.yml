@@ -121,6 +121,7 @@ nav:
     - ADR-0004 波次路线 (已取代): adr/0004-phase-roadmap.md
     - ADR-0006 TDD 与测试层: adr/0006-tdd-and-test-layers.md
     - ADR-0007 路线边界对齐: adr/0007-roadmap-v03-boundary-alignment.md
+    - ADR-0008 借鉴 Odoo 的 9 个设计: adr/0008-borrow-from-odoo.md
   - 架构与领域:
     - 模块依赖图: architecture-dependencies.md
     - 概念审计: concept-audit.md

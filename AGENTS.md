@@ -353,6 +353,7 @@
 | [docs/adr/0003-governance-model.md](docs/adr/0003-governance-model.md) | 治理模型决策 |
 | [docs/adr/0004-phase-roadmap.md](docs/adr/0004-phase-roadmap.md) | 波次路线旧决策（已被 ADR-0007 取代） |
 | [docs/adr/0007-roadmap-v03-boundary-alignment.md](docs/adr/0007-roadmap-v03-boundary-alignment.md) | 当前波次路线与边界对齐决策 |
+| [docs/adr/0008-borrow-from-odoo.md](docs/adr/0008-borrow-from-odoo.md) | 借鉴 Odoo 的 9 个设计（mail.thread / stock.move / ir.sequence / manifest / GS1 + ir.rule / access.csv / TransientModel / state button），实施 Wave 0-4 |
 | [docs/retros/wave-0-retro.md](docs/retros/wave-0-retro.md) | Wave 0 回顾 |
 | [docs/compliance/README.md](docs/compliance/README.md) | **GSP 合规追溯矩阵总索引**（v11 建立，按章节拆分追溯条款 → 用户故事）|
 | [ROADMAP.md](ROADMAP.md) | 长期路线（波次状态） |
