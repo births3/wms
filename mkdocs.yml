@@ -1,0 +1,167 @@
+site_name: WMS 用户故事文档
+site_description: 医药冷链 GSP 合规仓储管理系统 — 用户故事 + 设计文档
+site_author: WMS 项目组
+
+# 路径配置
+docs_dir: docs
+
+# 主题
+theme:
+  name: material
+  language: zh
+  features:
+    - navigation.tabs            # 顶部 tab 分类
+    - navigation.tabs.sticky     # tab 跟随滚动
+    - navigation.sections        # 侧边栏分组展开
+    - navigation.expand          # 默认展开侧边栏
+    - navigation.path            # 显示当前路径面包屑
+    - navigation.indexes         # 分组首页（README.md 自动作为分组首页）
+    - navigation.top             # 返回顶部按钮
+    - search.highlight           # 搜索高亮
+    - search.suggest             # 搜索建议
+    - search.share               # 搜索结果分享
+    - content.code.copy          # 代码复制按钮
+    - toc.follow                 # 右侧目录跟随滚动
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: 切换深色模式
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: 切换浅色模式
+  icon:
+    repo: fontawesome/brands/git-alt
+
+# Markdown 扩展
+markdown_extensions:
+  - admonition                   # !!! note 提示框
+  - attr_list                    # 给元素加属性
+  - md_in_html                   # HTML 内嵌 markdown（折叠块用）
+  - tables
+  - footnotes
+  - toc:
+      permalink: true            # 标题旁锚点链接
+  - pymdownx.details             # <details> 折叠块美化
+  - pymdownx.superfences:        # 增强代码块（含 mermaid 自定义围栏）
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
+# 插件
+plugins:
+  - search:
+      lang:
+        - zh
+        - en
+
+# 导航树
+nav:
+  - 首页: index.md
+  - 业务故事:
+    - M1 基础档案:
+      - 商品/供应商/客户: domain/user-stories-m1-master-data-product.md
+      - 仓库/库位/配置: domain/user-stories-m1-master-data-warehouse.md
+    - M2 入库:
+      - ASN 与收货: domain/user-stories-m2-inbound-asn.md
+      - 验收与上架: domain/user-stories-m2-inbound-verify.md
+    - M3 库存:
+      - 查询与批次: domain/user-stories-m3-inventory-query.md
+      - 养护/盘点/移库: domain/user-stories-m3-inventory-operation.md
+    - M4 出库:
+      - 订单与波次: domain/user-stories-m4-outbound-order.md
+      - 拣选/复核/发货: domain/user-stories-m4-outbound-pick.md
+      - 退货处理: domain/user-stories-m4-outbound-return.md
+    - M5 冷链数据集成: domain/user-stories-m5-cold-chain.md
+    - M6 报表与审计: domain/user-stories-m6-audit-report.md
+    - M8 连锁药店: domain/user-stories-m8-retail-chain.md
+    - M9 计费: domain/user-stories-m9-billing.md
+    - M10 TMS 集成: domain/user-stories-m10-tms-plus.md
+    - "~~M11 监管 EDI~~ (v7 移除)": domain/user-stories-m11-regulatory-edi.md
+  - 横向业务:
+    - M-TE 任务引擎: domain/user-stories-mte-task-engine.md
+    - M-RP 补货: domain/user-stories-mrp-replenishment.md
+    - M-PK 包装站: domain/user-stories-mpk-packing-station.md
+    - M-VR 规则引擎: domain/user-stories-mvr-validation-rules.md
+    - M-TC 追溯码: domain/user-stories-mtc-traceability-code.md
+    - M-QL 质量联系单: domain/user-stories-mql-quality-liaison.md
+    - M-CG 编码生成: domain/user-stories-mcg-code-generator.md
+    - M-SA 报损报溢: domain/user-stories-msa-stock-adjustment.md
+    - M-BA 批号调整 (v21): domain/user-stories-mba-batch-adjustment.md
+    - M-RC 对账: domain/user-stories-mrc-reconciliation.md
+    - M-DI 药检单: domain/user-stories-mdi-drug-inspection.md
+    - M-PM 参数对照 (v24): domain/user-stories-mpm-parameter-mapping.md
+  - 横向能力:
+    - H4 企业微信: domain/user-stories-h4-wechat-notify.md
+    - H5 快递: domain/user-stories-h5-express.md
+    - H-Driver 司机端 (W4.E): domain/user-stories-h-driver.md
+    - H-Store 门店用户端 (W4.E): domain/user-stories-h-store.md
+    - H1 权限与多租户 (W1.A): domain/user-stories-h1-auth-tenant.md
+    - H2 审计追踪 (W1.B): domain/user-stories-h2-audit-trail.md
+    - H3 跨端契约 OpenAPI (W1.C): domain/user-stories-h3-contract.md
+  - 设计决策:
+    - ADR 索引: adr/README.md
+    - ADR-0001 技术栈: adr/0001-tech-stack.md
+    - ADR-0002 仓库结构: adr/0002-monorepo-structure.md
+    - ADR-0003 治理模型: adr/0003-governance-model.md
+    - ADR-0004 波次路线 (已取代): adr/0004-phase-roadmap.md
+    - ADR-0006 TDD 与测试层: adr/0006-tdd-and-test-layers.md
+    - ADR-0007 路线边界对齐: adr/0007-roadmap-v03-boundary-alignment.md
+  - 架构与领域:
+    - 模块依赖图: architecture-dependencies.md
+    - 概念审计: concept-audit.md
+    - 业务澄清记录: domain/clarifications.md
+    - 术语表: glossary.md
+    - 基础设施技术规格: infra/technical-specs.md
+    - 易用性基线 (v25): infra/usability-baseline.md
+    - 分库分表决策矩阵 (v25): infra/sharding-decision-matrix.md
+  - 评审记录:
+    - 用户故事审计 v1-v10: reviews/user-stories-audit-2026-05-16.md
+    - 波次参数对标 - Manhattan: reviews/wave-parameters-comparison-manhattan.md
+    - 用户故事 Review 规范: review-guidelines-user-stories.md
+    - Wave 0 回顾: retros/wave-0-retro.md
+  - GSP 合规追溯:
+    - 总索引: compliance/README.md
+    - 第 5 章 质量管理体系: compliance/gsp-ch5-warehouse-management.md
+    - 第 6 章 采购与验收: compliance/gsp-ch6-procurement-acceptance.md
+    - 第 7 章 储存与养护: compliance/gsp-ch7-storage-maintenance.md
+    - 第 8 章 销售与出库: compliance/gsp-ch8-sales-delivery.md
+    - 冷链专项: compliance/gsp-ch9-cold-chain.md
+    - 追溯与不合格品: compliance/gsp-ch10-traceability.md
+    - 特殊药品 (v24): compliance/gsp-special-drugs.md
+    - 字段追溯矩阵 (v25): compliance/gsp-field-traceability.md
+    - 字段编码规范 (v2): compliance/gsp-field-coding-standards.md
+    - 业务规则字段注册表 (v2): compliance/gsp-business-rules-registry.md
+  - 治理:
+    - 治理总文档: governance.md
+    - 编码规范: coding-standards.md
+
+# 额外配置
+extra:
+  generator: false               # 隐藏 "Made with Material for MkDocs"
+
+# 排除不参与构建的文件
+exclude_docs: |
+  legacy-analysis/*
+  retros/README.md
+  adr/README.md.disabled
+  domain/todo-legacy-comparison.md
+  domain/.gitkeep
+  compliance/.gitkeep
+
+# Mermaid 渲染（v14 新增）
+extra_javascript:
+  - https://unpkg.com/mermaid@10.6.1/dist/mermaid.min.js
+  - js/mermaid-init.js

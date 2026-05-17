@@ -14,13 +14,13 @@
 2. 采购入库（PDA 收货 + 双人验收 + 上架）
 3. 库存与质量管控（批次 / 效期 / FIFO / 养护 / 盘点）
 4. 销售出库（订单 / 拣选 / 复核 / 随货同行单）
-5. 冷链基础管控（温湿度采集 / 冷链台账）
+5. 冷链数据集成（接收外部冷链系统数据 / 冷链台账）
 6. 报表与审计追踪（GSP 法定台账 / append-only 审计）
 7. 零拣复核包装站（Put-to-Light / 保温箱配置）
 8. 连锁药店专有（门店经营范围 / 自动补货 / 越库 / O2O）
 9. 3PL 计费管理（仓储费 / 作业费 / 月结账单）
-10. 高级物流与运输协同（路径优化 / 在途温控）
-11. 监管平台对接（"码上放心" / 药监局 EDI）
+10. 运输协同（接收外部 TMS 调度结果 / 周转箱回收）
+11. 追溯码与码上放心上报（药监 EDI 由 ERP 负责，WMS 不直连）
 
 ## 技术栈速览
 
@@ -81,9 +81,9 @@ wms/
 - **11 层测试维度**：L1 单元 / L2 契约 / L3 业务流程 / L4 错误 / L5 数据一致 / L6 并发 / L7 性能 / L8 权限 / L9 兼容 / L10 可观测 / L11 幂等
 - **必备维度判定**：写操作必须含 L4+L5+L8+L11
 
-### 3. 波次驱动（详见 [ADR-0004](docs/adr/0004-phase-roadmap.md)）
+### 3. 波次驱动（详见 [ADR-0007](docs/adr/0007-roadmap-v03-boundary-alignment.md)）
 
-- 11 个业务模块全部生产化交付，按依赖图分 5 个波次
+- 核心业务模块、横向业务能力、横向技术能力全部生产化交付，按依赖图分 5 个波次
 - 每波内可 worktree 并行（上限 3 个）
 - 每波完成都"生产可用"，不是半成品 demo
 
@@ -125,7 +125,7 @@ lefthook install
 | 文档 | 用途 |
 |------|------|
 | [docs/governance.md](docs/governance.md) | 治理总文档（"宪法"） |
-| [docs/architecture-dependencies.md](docs/architecture-dependencies.md) | 模块依赖图（11 业务 + 3 横向能力） |
+| [docs/architecture-dependencies.md](docs/architecture-dependencies.md) | 模块依赖图（当前模块清单 + 5 波次） |
 | [docs/adr/](docs/adr/README.md) | 架构决策记录索引 |
 | [ROADMAP.md](ROADMAP.md) | 长期路线（波次） |
 | [TODO.md](TODO.md) | 当前 Wave 任务 |

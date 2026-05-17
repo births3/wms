@@ -19,7 +19,8 @@
 - [x] ADR-0001 技术栈
 - [x] ADR-0002 仓库结构
 - [x] ADR-0003 治理模型（含 L1-L4 → T1-T4 重命名 + TDD 集成小节）
-- [x] ADR-0004 v0.2 波次路线（取代 v0.1 三阶段）
+- [x] ADR-0004 v0.2 波次路线（已由 ADR-0007 取代）
+- [x] ADR-0007 v0.3 路线边界对齐
 - [x] ADR-0006 TDD + 11 层测试维度
 - [x] `docs/architecture-dependencies.md` 依赖图
 - [x] `justfile`（T1-T4 入口）

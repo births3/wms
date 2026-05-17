@@ -78,3 +78,6 @@ desktop.ini
 # scripts/governance/ 下生成的临时报告不入库
 scripts/governance/*.report.json
 scripts/governance/.cache/
+
+# mkdocs 构建产物
+site/
