@@ -13,7 +13,7 @@ Tier：T1（< 10s）
 校验项：
 - L1: governance.md / architecture-dependencies.md 引用的 ADR 文件必须存在
 - L2: governance.md 变更记录段必须存在且非空
-- L3: docs/domain/*.md 如果存在，对应 backend/crates 目录应存在（弱校验）
+- L3: Wave 2 起 docs/domain/*.md 如果存在，对应 backend/crates 目录应存在（弱校验）
 - L4: ROADMAP.md / TODO.md / CHANGELOG.md 必须存在
 - 跨层: L2 文档引用的 L1 ADR 状态不能是 Deprecated（引用已废弃决策 = 规范过时）
 """
@@ -116,9 +116,19 @@ def check_l2_changelog(issues: list[Issue]) -> None:
 
 
 def check_l3_domain_code_sync(issues: list[Issue]) -> None:
-    """docs/domain/*.md 如果存在，对应 backend 目录应存在（弱校验）。"""
+    """Wave 2 起，docs/domain/*.md 如果存在，对应 backend 目录应存在（弱校验）。"""
     domain_dir = DOCS_DIR / "domain"
     if not domain_dir.exists():
+        return
+    backend = REPO_ROOT / "backend"
+    if not backend.exists():
+        return
+    # Wave 0/1 是设计先行阶段，backend 只有骨架时不应把领域文档报成噪音。
+    backend_files = [
+        p for p in backend.rglob("*")
+        if p.is_file() and p.name != ".gitkeep"
+    ]
+    if not backend_files:
         return
     for md in domain_dir.glob("*.md"):
         if md.name == ".gitkeep":
@@ -126,16 +136,14 @@ def check_l3_domain_code_sync(issues: list[Issue]) -> None:
         # 从文件名推断上下文名：如 inbound.md → backend/crates 下应有 inbound 相关
         ctx = md.stem.replace("-", "_")
         # 宽松检查：backend 目录树里有这个名字就行
-        backend = REPO_ROOT / "backend"
-        if backend.exists():
-            found = any(backend.rglob(f"*{ctx}*"))
-            if not found:
-                issues.append(Issue(
-                    layer="L3",
-                    file=f"docs/domain/{md.name}",
-                    message=f"domain doc exists but no matching backend path containing '{ctx}'",
-                    severity="warn",
-                ))
+        found = any(backend.rglob(f"*{ctx}*"))
+        if not found:
+            issues.append(Issue(
+                layer="L3",
+                file=f"docs/domain/{md.name}",
+                message=f"domain doc exists but no matching backend path containing '{ctx}'",
+                severity="warn",
+            ))
 
 
 def check_infra_docs(issues: list[Issue]) -> None:

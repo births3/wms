@@ -91,17 +91,19 @@ def scan_file(path: Path, banned: dict[str, str]) -> list[Violation]:
         # 跳过代码块
         if line.strip().startswith("```"):
             continue
+        # 跳过链接 / 锚点（如 [储位](#储位) 在文档导航中合法）
+        if line.strip().startswith("- [") or "](#" in line:
+            continue
         for term in banned:
             if term in line:
-                # 排除：禁用词是更长词的子串（如"储位"在"存储位"中）
+                # 排除：禁用词是更长词的子串（前后均为可能延续的"词字符"）
                 idx = line.find(term)
                 while idx != -1:
-                    # 检查前后字符是否为中文（如果是，说明是更长词的一部分）
+                    # 词边界检测：词字符 = 中文 / 英文字母 / 数字 / 下划线
                     before = line[idx - 1] if idx > 0 else ""
                     after = line[idx + len(term)] if idx + len(term) < len(line) else ""
                     is_part_of_longer = (
-                        ("\u4e00" <= before <= "\u9fff") or
-                        ("\u4e00" <= after <= "\u9fff")
+                        _is_word_char(before) or _is_word_char(after)
                     )
                     if not is_part_of_longer:
                         context = line.strip()[:100]
@@ -112,6 +114,22 @@ def scan_file(path: Path, banned: dict[str, str]) -> list[Violation]:
                     idx = line.find(term, idx + 1)
 
     return violations
+
+
+def _is_word_char(ch: str) -> bool:
+    """判断字符是否是"词字符"（中文 / 英文字母 / 数字 / 下划线 / 短横线）。
+
+    用于词边界检测：禁用词紧贴这些字符时视为更长词的一部分，不报警。
+    """
+    if not ch:
+        return False
+    if "\u4e00" <= ch <= "\u9fff":  # 中文
+        return True
+    if ch.isalnum():  # 英文字母 + 数字
+        return True
+    if ch in "_-":  # 复合词常用连接符
+        return True
+    return False
 
 
 def main(argv: list[str] | None = None) -> int:

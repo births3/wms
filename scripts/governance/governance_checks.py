@@ -46,6 +46,12 @@ TIER_SCRIPTS: dict[str, list[str]] = {
         "check_file_naming.py",
         "check_user_story_structure.py",
         "check_glossary_consistency.py",
+        "check_approval_source_chain.py",
+        "check_config_center_consistency.py",
+        "check_pda_story_completeness.py",
+        "check_gsp_field_traceability.py",
+        "check_baseline_health.py",
+        "check_governance_consistency.py",
         "check_commit_convention.py",
     ],
     "T2": [

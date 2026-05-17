@@ -16,6 +16,15 @@
 #   - T4 不受 diff 触发约束（合并前必须全量）
 
 # ============================================================
+# 故事文件拆分阈值（Tier 1 校验）
+# ============================================================
+
+[story_split_thresholds]
+max_file_kb = 20           # 单文件超过 20KB 触发 warning
+max_stories_per_file = 8   # 单文件超过 8 个故事触发 warning
+max_ac_per_story = 15      # 单故事验收标准超过 15 条触发 warning
+
+# ============================================================
 # 文档相关变更（Tier 1）
 # ============================================================
 
@@ -49,6 +58,22 @@ match = "governance/gate-rules.toml"
 checks = ["validate_environment"]
 tier = "T1"
 
+# v25 字段追溯矩阵：相关变更触发字段一致性核对
+[[rules]]
+match = "docs/compliance/gsp-field-traceability.md"
+checks = ["check_gsp_field_traceability"]
+tier = "T1"
+
+[[rules]]
+match = "docs/compliance/gsp-*.md"
+checks = ["check_gsp_field_traceability"]
+tier = "T1"
+
+[[rules]]
+match = "docs/domain/user-stories-*.md"
+checks = ["check_gsp_field_traceability", "check_story_size"]
+tier = "T1"
+
 # ============================================================
 # 占位规则（未来 Wave 启用，当前对应脚本不存在 → task_check 会跳过）
 # ============================================================
@@ -59,16 +84,28 @@ match = "backend/crates/**"
 checks = ["check_layer_dependency", "check_unsafe_and_unwrap"]
 tier = "T2"
 
-# Wave 1 启用：检查 OpenAPI 契约
-[[rules]]
-match = "shared/openapi/openapi.json"
-checks = ["validate_openapi_artifacts", "check_openapi_contract"]
-tier = "T3"
-
-# Wave 2 启用：handler 测试覆盖
+# Wave 1 启用：handler 测试覆盖（baseline 起步）
 [[rules]]
 match = "backend/crates/api/src/**"
 checks = ["check_handler_test_coverage"]
+tier = "T2"
+
+# Wave 1 启用：字段编码规范（命名/类型/加密/审计是否符合 gsp-field-coding-standards.md）
+[[rules]]
+match = "docs/compliance/gsp-field-traceability.md"
+checks = ["check_field_coding_standards"]
+tier = "T1"
+
+# Wave 1 启用：业务规则字段引用（每条 BR-N 在故事中有对应实现）
+[[rules]]
+match = "docs/compliance/gsp-business-rules-registry.md"
+checks = ["check_business_rules_registry"]
+tier = "T1"
+
+# Wave 2 启用：检查 OpenAPI 契约
+[[rules]]
+match = "shared/openapi/openapi.json"
+checks = ["validate_openapi_artifacts", "check_openapi_contract"]
 tier = "T2"
 
 # Wave 3 启用：审计追踪覆盖（库存变更必须经 audit 层）
@@ -77,11 +114,17 @@ match = "backend/crates/domain/src/inventory/**"
 checks = ["check_audit_trail_coverage", "check_idempotency_test"]
 tier = "T3"
 
-# Wave 4 启用：冷链温湿度数据新鲜度
+# Wave 3 启用：冷链温湿度数据新鲜度（业务方启动冷链时启用）
 [[rules]]
 match = "backend/crates/domain/src/cold_chain/**"
 checks = ["check_cold_chain_data_freshness"]
 tier = "T3"
+
+# Wave 5 启用：CHANGELOG 与 git tag 同步
+[[rules]]
+match = "CHANGELOG.md"
+checks = ["check_changelog_freshness"]
+tier = "T1"
 
 # ============================================================
 # 兜底规则：未匹配任何上述规则的变更，默认跑 T1 全套

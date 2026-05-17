@@ -129,9 +129,9 @@ def check_file(rel_path: str) -> Violation | None:
         return None
 
     # --- 合规文档 ---
-    if "docs/compliance" in rel_path and filename.endswith(".md") and filename != ".gitkeep":
+    if "docs/compliance" in rel_path and filename.endswith(".md") and filename not in (".gitkeep", "README.md"):
         if not COMPLIANCE_RE.match(filename):
-            return Violation(rel_path, "compliance-naming", f"Compliance doc must be gsp-<topic>.md: '{filename}'")
+            return Violation(rel_path, "compliance-naming", f"Compliance doc must be gsp-<topic>.md or README.md: '{filename}'")
         return None
 
     # --- 领域文档 ---

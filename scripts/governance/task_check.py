@@ -19,6 +19,11 @@ Tier：作为入口，根据 git diff 与 governance/gate-rules.toml 决定跑�
 - gate-rules.toml 是骨架（仅几条示例规则）
 - 大部分 check_* 脚本尚未实现，会跳过并提示
 - 只有依赖图引用的脚本才实际跑
+
+模式：
+- 默认（非 --strict）：未实现的脚本仅 print warning，exit_code=0（Wave 0 阶段需要）
+- --strict：未实现的脚本视为失败（Wave 1+ 进入 CI 时启用，强制脚本补齐）
+- 启用时机：进入 Wave 1 后在 lefthook pre-push / CI 中加 --strict 标志
 """
 from __future__ import annotations
 
@@ -70,6 +75,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--tier", default="T2", choices=["T1", "T2", "T3", "T4"])
     parser.add_argument("--base", default="main", help="diff base ref，默认 main")
+    parser.add_argument("--strict", action="store_true",
+                        help="--strict 模式下，gate-rules.toml 引用的占位脚本视为失败（Wave 1+ 推荐启用）")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--report-json", action="store_true")
     args = parser.parse_args(argv)
@@ -107,8 +114,13 @@ def main(argv: list[str] | None = None) -> int:
         r = run_one(check_name, json_mode=args.json)
         r.matched_files = len(files)
         if r.exit_code == -1:
-            print(f"    ! script not implemented yet: {check_name} (placeholder)")
-            r.exit_code = 0  # 不阻塞
+            # 脚本未实现：根据 --strict 决定是阻塞还是降级
+            if args.strict:
+                print(f"    ✘ script not implemented yet: {check_name} (--strict 模式下视为失败)")
+                r.exit_code = 2
+            else:
+                print(f"    ⚠ script not implemented yet: {check_name} (placeholder, 加 --strict 视为失败)")
+                r.exit_code = 0  # 默认降级（不阻塞 Wave 演进）
         results.append(r)
 
     failed = [r for r in results if r.exit_code != 0]

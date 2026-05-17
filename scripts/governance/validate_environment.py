@@ -54,6 +54,30 @@ TOOLS: list[Tool] = [
 ]
 
 
+# Python 包依赖（治理脚本运行时必须可 import）
+# 名称为 import 名（不是 pip 包名，注意区别如 PyYAML / yaml）
+PYTHON_PACKAGES_REQUIRED: list[str] = [
+    "pathspec",  # _diff.py 需要（gate-rules 的 glob 匹配）
+    "markdown",  # check_doc_links.py 需要（slugify 锚点）
+]
+
+# Python < 3.11 才需要的兼容包
+PYTHON_PACKAGES_REQUIRED_PY310: list[str] = [
+    "tomli",  # _diff.py / _check_data.py 在 PY<3.11 时需要
+]
+
+
+@dataclass
+class PyPackageCheck:
+    name: str
+    found: bool
+    note: str = ""
+
+    @property
+    def ok(self) -> bool:
+        return self.found
+
+
 @dataclass
 class CheckResult:
     name: str
@@ -120,6 +144,28 @@ def check_tool(t: Tool) -> CheckResult:
     return CheckResult(name=t.name, found=True, version=raw, ok=ok, note=note)
 
 
+def check_python_packages() -> list[PyPackageCheck]:
+    """检查治理脚本运行所需的 Python 包是否可 import。"""
+    import importlib
+
+    pkgs = list(PYTHON_PACKAGES_REQUIRED)
+    if sys.version_info < (3, 11):
+        pkgs.extend(PYTHON_PACKAGES_REQUIRED_PY310)
+
+    results: list[PyPackageCheck] = []
+    for pkg in pkgs:
+        try:
+            importlib.import_module(pkg)
+            results.append(PyPackageCheck(name=pkg, found=True))
+        except ImportError:
+            results.append(PyPackageCheck(
+                name=pkg,
+                found=False,
+                note=f"missing — install: pip install {pkg}",
+            ))
+    return results
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--json", action="store_true", help="JSON 输出")
@@ -131,13 +177,16 @@ def main(argv: list[str] | None = None) -> int:
     with ThreadPoolExecutor(max_workers=min(9, len(TOOLS))) as ex:
         results = list(ex.map(check_tool, TOOLS))
 
+    pkg_results = check_python_packages()
+
     if args.json:
         payload = {
             "check": "validate_environment",
             "tier": "T1",
             "category": "运行治理",
             "results": [asdict(r) for r in results],
-            "ok": all(r.ok for r in results),
+            "python_packages": [asdict(p) for p in pkg_results],
+            "ok": all(r.ok for r in results) and all(p.ok for p in pkg_results),
         }
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
@@ -147,13 +196,22 @@ def main(argv: list[str] | None = None) -> int:
             ver = r.version or "—"
             note = f"  ({r.note})" if r.note else ""
             print(f"  {mark} {r.name:<10} {ver}{note}")
-        failed = [r for r in results if not r.ok]
-        if failed:
-            print(f"\n{len(failed)} required tools failed checks")
+
+        print("  ── python packages ──")
+        for p in pkg_results:
+            mark = "✓" if p.ok else "✘"
+            note = f"  ({p.note})" if p.note else ""
+            print(f"  {mark} {p.name:<10} import{note}")
+
+        failed_tools = [r for r in results if not r.ok]
+        failed_pkgs = [p for p in pkg_results if not p.ok]
+        total_failed = len(failed_tools) + len(failed_pkgs)
+        if total_failed:
+            print(f"\n{total_failed} required check(s) failed")
         else:
             print("\n✓ environment OK")
 
-    return 0 if all(r.ok for r in results) else 1
+    return 0 if all(r.ok for r in results) and all(p.ok for p in pkg_results) else 1
 
 
 if __name__ == "__main__":

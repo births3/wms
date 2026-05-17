@@ -1,0 +1,114 @@
+"""通用 smoke 测试：所有 check_* / validate_* 治理脚本必须满足
+
+每个脚本应当：
+1. 能被 import（语法、依赖正确）
+2. 能用 --json 模式跑通（不抛异常）
+3. 退出码合法（0/1/2 三选一）
+4. JSON 输出有效且包含必填字段（check / tier / category / ok）
+
+这是黑盒 smoke 测试，不验证业务逻辑正确性。
+"""
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+SCRIPTS_DIR = Path(__file__).resolve().parent.parent
+REPO_ROOT = SCRIPTS_DIR.parent.parent
+
+# 所有应跑 smoke 测试的脚本
+GOVERNANCE_SCRIPTS = [
+    "validate_environment.py",
+    "check_doc_links.py",
+    "validate_adr_index.py",
+    "validate_doc_layers.py",
+    "check_file_naming.py",
+    "check_user_story_structure.py",
+    "check_glossary_consistency.py",
+    "check_approval_source_chain.py",
+    "check_config_center_consistency.py",
+    "check_pda_story_completeness.py",
+    "check_gsp_field_traceability.py",
+    "check_baseline_health.py",
+    "check_governance_consistency.py",
+    "check_commit_convention.py",
+]
+
+
+@pytest.mark.parametrize("script_name", GOVERNANCE_SCRIPTS)
+def test_script_imports(script_name):
+    """脚本至少能被 Python 解析（无语法 / import 错误）。"""
+    script = SCRIPTS_DIR / script_name
+    assert script.exists(), f"missing script: {script}"
+    # 只编译不执行
+    result = subprocess.run(
+        [sys.executable, "-m", "py_compile", str(script)],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, f"compile failed: {result.stderr}"
+
+
+@pytest.mark.parametrize("script_name", GOVERNANCE_SCRIPTS)
+def test_script_help(script_name):
+    """所有脚本必须支持 --help（Click/argparse 标准行为）。"""
+    script = SCRIPTS_DIR / script_name
+    result = subprocess.run(
+        [sys.executable, str(script), "--help"],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+    )
+    assert result.returncode == 0, f"--help failed: {result.stderr}"
+    assert "usage" in result.stdout.lower() or "用法" in result.stdout
+
+
+@pytest.mark.parametrize("script_name", GOVERNANCE_SCRIPTS)
+def test_script_json_output(script_name):
+    """所有脚本必须支持 --json，且输出可解析且包含 'ok' 字段。"""
+    script = SCRIPTS_DIR / script_name
+    result = subprocess.run(
+        [sys.executable, str(script), "--json"],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+        timeout=10,
+    )
+    # 退出码合法（0 / 1 / 2）
+    assert result.returncode in (0, 1, 2), \
+        f"invalid exit code {result.returncode}; stderr: {result.stderr}"
+
+    # JSON 可解析
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError as e:
+        pytest.fail(f"non-JSON output: {e}\nstdout: {result.stdout[:500]}")
+
+    # 必填字段
+    assert "ok" in payload, f"missing 'ok' field in output: {payload}"
+    assert isinstance(payload["ok"], bool), "'ok' must be bool"
+
+
+@pytest.mark.parametrize("script_name", GOVERNANCE_SCRIPTS)
+def test_script_exit_code_consistency(script_name):
+    """退出码与 ok 字段一致：ok=True ↔ exit=0；ok=False ↔ exit=1。"""
+    script = SCRIPTS_DIR / script_name
+    result = subprocess.run(
+        [sys.executable, str(script), "--json"],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+        timeout=10,
+    )
+    if result.returncode == 2:
+        pytest.skip("script self-error, skip consistency check")
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        pytest.skip("non-JSON output (skipped consistency)")
+    if payload.get("ok"):
+        assert result.returncode == 0, "ok=True but exit≠0"
+    else:
+        assert result.returncode == 1, "ok=False but exit≠1"

@@ -182,8 +182,8 @@ gov-list:
 
 # 检查各 Tier 实际耗时（写入 governance/baselines/tier-runtime.json）
 tier-timing:
-    @echo "▶ measuring tier runtimes (placeholder, [WAVE-2])"
-    @# 后续实现：分别计时 quick-check / task-check / preflight / verify
+    @echo "▶ measuring tier runtimes (单位: ms)"
+    @python3 scripts/governance/_tier_timing.py
 
 # ============================================================
 # Wave 启动检查（占位）
@@ -193,8 +193,26 @@ tier-timing:
 
 # 进入 Wave 1 前置检查
 wave-1-ready:
-    @echo "checking Wave 1 entry conditions (placeholder)"
+    @echo "▶ Wave 1 entry conditions"
+    @echo "  ── 治理体系核心 ──"
     @python3 scripts/governance/validate_environment.py
     @python3 scripts/governance/validate_adr_index.py
     @python3 scripts/governance/check_doc_links.py
-    @echo "✓ Wave 0 governance scaffold complete"
+    @echo "  ── T1 全套 ──"
+    @python3 scripts/governance/governance_checks.py --tier T1 > /dev/null && echo "  ✓ T1 14 项全部通过" || (echo "  ✘ T1 失败"; exit 1)
+    @echo "  ── pytest 治理脚本测试 ──"
+    @python3 -m pytest scripts/governance/tests/ -q 2>&1 | tail -3
+    @echo "  ── Wave 1 应当新增的治理脚本 ──"
+    @echo "    [ ] check_layer_dependency.py        — Rust 层级依赖（domain ⊥ infra）"
+    @echo "    [ ] check_unsafe_and_unwrap.py       — Rust unsafe / 生产路径 unwrap 检查"
+    @echo "    [ ] check_handler_test_coverage.py   — handler 测试覆盖（baseline）"
+    @echo "  注：以上脚本必须在 Wave 1 第一周补齐；当前为占位（在 task_check.py --strict 下会失败）"
+    @echo ""
+    @echo "  ── Wave 1 启动后必做 ──"
+    @echo "    [1] 初始化 baseline 快照（首次跑前手动执行 1 次）："
+    @echo "        python3 scripts/governance/check_baseline_health.py --update-snapshot"
+    @echo "    [2] 在 lefthook.yml pre-push 钩子中启用 --strict 模式："
+    @echo "        替换 'task_check.py --tier T2' 为 'task_check.py --tier T2 --strict'"
+    @echo "    [3] 在 CI workflow 中启用 --strict 模式（同上）"
+    @echo ""
+    @echo "✓ Wave 0 治理骨架完整 — 可进入 Wave 1"
