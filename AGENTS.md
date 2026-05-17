@@ -123,14 +123,188 @@
 - 补充审计追踪（所有写操作都需要，这是已确认的规则）
 - 代码层面的重构（不改变功能）
 
+## 风险分级标准（无风险自主修，有风险必确认）
+
+> **核心规则**：**无风险的自主改，有风险的必须用户确认**。出现边界模糊时，**默认归入"有风险"**，不擅自决定。
+
+### 🟢 无风险（自主修复，无需确认）
+
+满足以下**全部**条件即为无风险：
+
+1. **不改变业务语义**：修改不影响业务规则、合规边界、状态机迁移
+2. **不引入新概念**：没有新 canonical 字段、新故事、新模块、新角色、新状态、新审批源、新枚举值
+3. **不影响数据模型**：不增删字段、不改字段类型、不改约束（如 nullable/CHECK）
+4. **可被治理脚本验证**：修改后跑 T1（含 `check_gsp_field_traceability` / `check_user_story_structure` / `check_doc_links`）必须 0 error
+5. **可逆**：单文件单段改动，git revert 即可撤销
+
+#### 典型场景清单
+
+| 场景 | 例子 |
+|----|----|
+| **格式 / 编号 / 拼写** | 重复编号修复、错位的 markdown 项、链接错误、错别字 |
+| **同义词 alias 补充** | 在已有 canonical 的 aliases 数组追加 legacy 列名（如 WHSE → 仓库 ID）|
+| **已存在的事实标准集中说明** | 多个故事已采用同一策略但散落，把它集中到一处 + 其他故事引用（如 K15 审批集中入口） |
+| **澄清性注释** | 在已一致的多处加一句注释让语义更清楚（如 K11 "批号校验=ERP 指定批号是否有库存"）|
+| **从 H1/H5 等事实参考标准提取通用模式** | 如把 H5-003 打印失败处理提到通用 |
+| **治理纪律全局声明** | 加"测试要求"到所有故事跨故事约束 |
+| **删除已声明移除的残留** | v23/v25 已 strikethrough 但未清理的引用 |
+| **修复脚本 error / 术语违规 / 文件命名** | 治理硬约束 |
+| **补充审计追踪条款** | 所有写操作必须的规则，已是治理硬约束 |
+| **代码重构不改功能** | rename / 抽函数 / 提取常量 |
+
+### 🔴 有风险（必须用户确认）
+
+满足以下**任一**条件即为有风险：
+
+1. **业务规则取舍**：在多个合规且合理的方案中选择（如 C6 盘点期间出库 A/B/C 三选一）
+2. **GSP 合规边界**：影响法规符合性的取舍（如 C7 退货批号保留策略）
+3. **新增 canonical 字段**：哪怕字段定义清楚，也属于词典扩展（如 v3.1 新增 10 个 P0 字段需用户拍板）
+4. **新增 / 移除 / 拆分故事**：故事本身的存在与否
+5. **新增 / 移除 / 改写角色**：M1 角色清单的变更
+6. **改状态机**：增删状态、改迁移条件
+7. **改字段约束**：data_type / validation / nullable / encryption / audit_required
+8. **改审批人 / 审批源 / 触发源**：影响审计追踪与合规
+9. **跨模块语义改动**：影响 ≥ 2 个模块的实质性改动（不只是引用）
+10. **引入新默认值**：如"离线超时 24 小时"这种数字默认值，没有既存依据
+11. **决策有不确定性**：自己不敢拍胸脯说一定对的事
+12. **可能误删用户内容**：批量正则替换、跨文件批量删除
+
+#### 典型场景清单
+
+| 场景 | 例子 |
+|----|----|
+| **业务流程取舍** | 盘点期间出库怎么处理 / 退货批号是否保留 / 离线冲突默认时长 |
+| **新故事 / 拆故事** | H2 加数据归档故事 / 拆 US-M4-003 |
+| **新字段 canonical** | 加 country_of_origin 等新字段进 §6 词典 |
+| **GSP 合规边界** | 是否双人 / 是否审计 / 保留期年限 |
+| **新角色 / 新状态** | M1 角色清单变更 / 状态机加新状态 |
+| **配置项默认值定义** | 阈值、时长、配额等没明确依据的数字 |
+| **跨模块改写** | 同一字段在多个故事的统一改名 |
+| **大批量 git 操作** | 跨文件正则替换、reset --hard、push --force |
+| **删除任何业务内容** | 哪怕被 strikethrough 也先确认 |
+
+### 边界模糊时的判断方法
+
+按以下顺序应用：
+
+1. **能否被现有治理脚本兜底？** 跑 T1，0 error 才能改
+2. **是否有"既存事实标准"作依据？** 多模块已采用同一策略 → 集中说明可自主；只有一处 → 不可推广为标准
+3. **是否引入新数字 / 新枚举值？** 引入了 → 有风险（数字需要业务方依据）
+4. **撤销成本如何？** 改一个文件 git revert 就能撤销 → 倾向无风险；要改回多个文件甚至数据 → 有风险
+
+### 操作流程
+
+**无风险任务**：
+1. 直接改 → 跑治理脚本 → 给用户简短报告（修了什么 + 验证结果）
+
+**有风险任务**：
+1. 列出 2-3 个候选方案（含原文引用、利弊、GSP 关联、实施成本）
+2. 给推荐 + 推荐理由
+3. 等用户决策（默认推荐就回"全 A"）
+4. 落实决策后跑治理脚本验证
+
+## Git 操作引导
+
+> **规范本体**：[docs/governance.md §3.1 仓库与分支](docs/governance.md#31) / [§3.2 提交信息](docs/governance.md#32-conventional-commits) / [§3.4 PR 规范](docs/governance.md#34-pr)。
+> 本节只写**引导**与**AI 红线**，具体格式/类型/范围/示例去看上述章节。
+
+### AI 在 git 上的红线（任何理由不可违反）
+
+1. **绝不主动 commit**：必须用户明确说"提交"/"commit"/"打个 tag"等动作才能执行 git commit
+2. **绝不主动 push**：push 必须用户明确指令；推 main 分支额外要求显式确认
+3. **绝不 force push / reset --hard / clean -f / branch -D**：这类破坏性操作必须用户明示
+4. **绝不修改 .gitconfig / hooks / 远程配置**：包括 `git config` 任何子命令、改 lefthook.yml 的 hook 行为
+5. **绝不在 commit 里包含可疑文件**：`.env` / 私钥 / 密钥 / token 等先警告并停下
+6. **绝不 git add .** 当工作区跨主题混杂时：先列出文件让用户确认范围，再分主题分别 stage
+
+### AI 应该主动做的（不需用户确认）
+
+1. **每次改文件后** → 跑治理脚本（T1）验证 → 报告 EXIT 码
+2. **完成一个原子任务**（如修一个 bug、改一组关联文件）后 → **建议**用户考虑 commit，但不主动执行
+3. **跨主题工作累积** → 在累积变更跨 ≥ 2 个主题或 ≥ 5 个文件时，**主动建议**用户拆分多个 commit
+4. **看到未提交变更 > 400 行** → 主动提示"超过 PR 规范 400 行上限，建议拆分"
+5. **每次会话开始** → 跑 `git status` 看是否有遗留未提交变更
+
+### 用户说"提交"时 AI 的标准动作
+
+按以下顺序执行：
+
+1. 跑 `git status` 确认改动范围
+2. 跑 `git diff --stat` 给用户看本次提交涉及哪些文件 + 行数
+3. **如果跨多主题或 > 400 行** → 提示拆分建议，等用户确认怎么拆
+4. **如果在单一主题且 < 400 行** → 起草符合 [docs/governance.md §3.2](docs/governance.md#32-conventional-commits) 的 commit message（中文 type + scope + subject + 正文 + 关联）
+5. **展示 commit message 草稿给用户审阅**，等"确认"后再执行 `git commit`
+6. 跑 lefthook pre-commit / commit-msg 钩子，把脚本输出贴回给用户
+7. **不主动 push**，除非用户额外说"推上去"
+
+### 用户说"推送 / push"时 AI 的标准动作
+
+1. 确认目标分支（默认推当前分支到 origin）
+2. 如果是 main 分支 → **强制要求**用户显式确认（governance.md §3.1 禁止直推 main）
+3. 推送前提示运行 pre-push 钩子（T3 preflight）
+4. 推送后报告结果，并提示是否需要 PR
+
+### 提交信息起草要点（速查）
+
+- **格式**：`<类型>(<范围>)：<描述>` — 中文版（governance.md §3.2 完整定义）
+- **类型**：功能 / 修复 / 文档 / 格式 / 重构 / 性能 / 测试 / 构建 / 集成 / 杂项 / 回滚（11 类）
+- **范围**：基础档案 / 入库 / 库存 / 出库 / 质量 / 冷链 / 计费 / 合规 / 审计 / pda / 管理端 / 接口 / 基础设施 / 治理 / 文档 / 追溯码 / 对账 / 药检 / 校验 / 质量联系单 / 企微 / 快递（22 个）
+- **描述**：≤ 50 字，动词开头，不带句号
+- **正文**：动机 + 改动概要 + 影响范围（可空，复杂改动必填）
+- **脚注**：`关联：US-X-NNN, ADR-NNNN`、`破坏性变更：<说明>`、`Co-authored-by:` 等
+
+## 修复 / 审计优先级（脚本第一，语义第二）
+
+> 核心纪律：**能用脚本自动检查的问题，永远先于需要人工语义理解的问题修复**。
+> 目的：把容易自动化的问题在 commit 前消灭干净；让人工审计聚焦在真正需要语义判断的地方，不被脚本噪音淹没。
+
+### 三级优先级
+
+| 级别 | 修复对象 | 验证方式 | 典型例子 |
+|------|---------|---------|---------|
+| **P0 最高** | 已有脚本可检查的违规 | `just gov-t1` 退出码 / warning 数 | 编号重复 / 模糊词 / 角色白名单 / 术语黑名单 / 文件命名 |
+| **P1 次高** | 当前脚本未覆盖但**可以脚本化**的问题 | 先扩展脚本到能检查，再修复 | 跨文件引用失效 / 审批源链路 / 配置中心列表与默认值一致性 / 状态机闭合性 |
+| **P2 最后** | 必须人工语义判断的问题 | 人工 review，记入 review 报告 | GSP 法规边界 / 业务流程合理性 / 跨模块语义不一致的取舍 |
+
+### 工作流
+
+```
+发现问题
+    ↓
+能用现有脚本检查吗？
+  ├─ 是 → P0：直接修复，跑 just gov-t1 验证
+  └─ 否 → 能写脚本检查吗？
+           ├─ 是 → P1：先扩展脚本（加到 governance_checks），再修复
+           └─ 否 → P2：写入 review 报告，人工决策
+```
+
+### 实践要点
+
+1. **遇到批量同类问题先想"是否可脚本化"**：例如 v3 后审计发现的"审批源链路"问题（M-QL/M-SA/M2-003 调用 M3 状态变更时未声明 approval_source），如果有 5 处以上，应该先写一个 `check_approval_source_chain.py` 脚本，再批量修复。
+2. **P0 修复必须跑 T1 验证**：不能只看修改本身，要看脚本最终 0 error / 0 warning。
+3. **P1 升 P0 是常态**：审计中发现的语义检查只要有规律，应该尽快脚本化。`check_user_story_structure.py` 就是从"模糊词/角色/审计/幂等"这些规律演化来的。
+4. **P2 不可省略，但要稀缺**：人工审计时间贵，只用在真正需要业务/法规判断的地方。
+5. **脚本误报先修脚本，不修文档**：v3 阶段把"幂等性缺失"的 77 个 warning 通过让脚本识别"跨故事约束兜底模式"消除，比让 77 个故事各加一行幂等声明更整洁。
+
+### 何时新增检查脚本
+
+| 触发条件 | 行动 |
+|---------|------|
+| 同一类问题在 ≥3 个文件出现 | 写脚本 |
+| 单次审计发现的语义检查可表达为正则/AST/字符串规则 | 写脚本（即使只用一次） |
+| 脚本发现"已知误报" 持续存在 | 修脚本（让脚本理解约定模式），不修文档 |
+| 跨文件一致性需要反复人工对照 | 写脚本（如引用有效性、配置项一致性） |
+
+> 推论：审计报告中的"建议修复"清单应该按这三级排序展示，不按问题严重度排序。
+
 ## 必读文档（按优先级）
 
 1. [docs/coding-standards.md](docs/coding-standards.md) — 代码书写规范（Rust / TS / 跨端 / 禁止清单）
 2. [docs/governance.md](docs/governance.md) — 治理体系（5 类 + 4 Tier + Baseline + 文档四层管理）
 3. [docs/adr/0006-tdd-and-test-layers.md](docs/adr/0006-tdd-and-test-layers.md) — TDD + 11 层测试
-4. [docs/architecture-dependencies.md](docs/architecture-dependencies.md) — 模块依赖图（11 业务 + 3 横向 + 5 波次）
+4. [docs/architecture-dependencies.md](docs/architecture-dependencies.md) — 模块依赖图（当前模块清单 + 5 波次）
 5. [docs/adr/README.md](docs/adr/README.md) — 所有架构决策索引
-6. [docs/infra/technical-specs.md](docs/infra/technical-specs.md) — 基础设施技术规格（H6 状态机 / H7 导入导出 / H8 ERP 防腐层 / H9 打印）
+6. [docs/infra/technical-specs.md](docs/infra/technical-specs.md) — 基础设施技术规格（H6 状态机 / H7 导入导出 / H8 ERP 防腐层 / H9 打印 / H10 备份恢复）
 7. [docs/concept-audit.md](docs/concept-audit.md) — 概念审计报告（8 镜头扫描结果 + 数据量评估）
 8. [docs/domain/clarifications.md](docs/domain/clarifications.md) — 业务澄清记录（42 项决策）
 9. [docs/glossary.md](docs/glossary.md) — 术语表（54 个，含禁用词）
@@ -139,28 +313,34 @@
 
 | 文档 | 用途 |
 |------|------|
-| [docs/domain/user-stories-m1-master-data.md](docs/domain/user-stories-m1-master-data.md) | M1 基础档案（10 个故事） |
-| [docs/domain/user-stories-m2-inbound.md](docs/domain/user-stories-m2-inbound.md) | M2 入库（8 个故事） |
-| [docs/domain/user-stories-m3-inventory.md](docs/domain/user-stories-m3-inventory.md) | M3 库存（10 个故事） |
-| [docs/domain/user-stories-m4-outbound.md](docs/domain/user-stories-m4-outbound.md) | M4 出库（11 个故事） |
-| [docs/domain/user-stories-m5-cold-chain.md](docs/domain/user-stories-m5-cold-chain.md) | M5 冷链（3 个故事） |
+| [docs/domain/user-stories-m1-master-data-product.md](docs/domain/user-stories-m1-master-data-product.md) | M1 基础档案（10 个故事） |
+| [docs/domain/user-stories-m2-inbound-asn.md](docs/domain/user-stories-m2-inbound-asn.md) | M2 入库（10 个故事） |
+| [docs/domain/user-stories-m3-inventory-query.md](docs/domain/user-stories-m3-inventory-query.md) | M3 库存（11 个故事） |
+| [docs/domain/user-stories-m4-outbound-order.md](docs/domain/user-stories-m4-outbound-order.md) | M4 出库（11 个故事） |
+| [docs/domain/user-stories-m5-cold-chain.md](docs/domain/user-stories-m5-cold-chain.md) | M5 冷链数据集成（3 个故事，**温控由外部冷链系统采集**） |
 | [docs/domain/user-stories-m6-audit-report.md](docs/domain/user-stories-m6-audit-report.md) | M6 报表（3 个故事） |
-| [docs/domain/user-stories-m8-retail-chain.md](docs/domain/user-stories-m8-retail-chain.md) | M8 连锁（3 个故事） |
+| [docs/domain/user-stories-m8-retail-chain.md](docs/domain/user-stories-m8-retail-chain.md) | M8 连锁（2 个故事） |
 | [docs/domain/user-stories-m9-billing.md](docs/domain/user-stories-m9-billing.md) | M9 计费（3 个故事） |
-| [docs/domain/user-stories-m10-tms-plus.md](docs/domain/user-stories-m10-tms-plus.md) | M10 TMS+（3 个故事） |
-| [docs/domain/user-stories-m11-regulatory-edi.md](docs/domain/user-stories-m11-regulatory-edi.md) | M11 监管 EDI（3 个故事） |
+| [docs/domain/user-stories-m10-tms-plus.md](docs/domain/user-stories-m10-tms-plus.md) | M10 TMS+（4 个故事） |
+| [docs/domain/user-stories-m11-regulatory-edi.md](docs/domain/user-stories-m11-regulatory-edi.md) | ~~M11 监管 EDI~~（v7 移除：码上放心迁 M-TC，药监 EDI 由 ERP 做）|
 | [docs/domain/user-stories-mte-task-engine.md](docs/domain/user-stories-mte-task-engine.md) | M-TE 任务引擎（11 个故事） |
-| [docs/domain/user-stories-mrp-replenishment.md](docs/domain/user-stories-mrp-replenishment.md) | M-RP 补货（4 个故事） |
+| [docs/domain/user-stories-mrp-replenishment.md](docs/domain/user-stories-mrp-replenishment.md) | M-RP 补货（5 个故事） |
 | [docs/domain/user-stories-mpk-packing-station.md](docs/domain/user-stories-mpk-packing-station.md) | M-PK 包装站（6 个故事） |
 | [docs/domain/user-stories-mvr-validation-rules.md](docs/domain/user-stories-mvr-validation-rules.md) | M-VR 规则引擎（5 个故事） |
-| [docs/domain/user-stories-mtc-traceability-code.md](docs/domain/user-stories-mtc-traceability-code.md) | M-TC 追溯码（6 个故事） |
+| [docs/domain/user-stories-mtc-traceability-code.md](docs/domain/user-stories-mtc-traceability-code.md) | M-TC 追溯码（7 个故事） |
 | [docs/domain/user-stories-mql-quality-liaison.md](docs/domain/user-stories-mql-quality-liaison.md) | M-QL 质量联系单（5 个故事） |
 | [docs/domain/user-stories-mcg-code-generator.md](docs/domain/user-stories-mcg-code-generator.md) | M-CG 编码生成（2 个故事） |
 | [docs/domain/user-stories-msa-stock-adjustment.md](docs/domain/user-stories-msa-stock-adjustment.md) | M-SA 报损报溢（3 个故事） |
+| [docs/domain/user-stories-mba-batch-adjustment.md](docs/domain/user-stories-mba-batch-adjustment.md) | M-BA 批号调整（4 个故事，v21 库内业务）|
 | [docs/domain/user-stories-mrc-reconciliation.md](docs/domain/user-stories-mrc-reconciliation.md) | M-RC 对账（4 个故事） |
 | [docs/domain/user-stories-mdi-drug-inspection.md](docs/domain/user-stories-mdi-drug-inspection.md) | M-DI 药检单（4 个故事） |
 | [docs/domain/user-stories-h4-wechat-notify.md](docs/domain/user-stories-h4-wechat-notify.md) | H4 企业微信（4 个故事） |
 | [docs/domain/user-stories-h5-express.md](docs/domain/user-stories-h5-express.md) | H5 快递（5 个故事） |
+| [docs/domain/user-stories-h-driver.md](docs/domain/user-stories-h-driver.md) | H-Driver 司机端（5 个故事，v15 W4.E）|
+| [docs/domain/user-stories-h-store.md](docs/domain/user-stories-h-store.md) | H-Store 门店用户端（6 个故事，v15 W4.E）|
+| [docs/domain/user-stories-h1-auth-tenant.md](docs/domain/user-stories-h1-auth-tenant.md) | H1 权限与多租户（6 故事，v18 Wave 1 W1.A）|
+| [docs/domain/user-stories-h2-audit-trail.md](docs/domain/user-stories-h2-audit-trail.md) | H2 审计追踪基础设施（5 故事，v18 Wave 1 W1.B）|
+| [docs/domain/user-stories-h3-contract.md](docs/domain/user-stories-h3-contract.md) | H3 跨端契约 OpenAPI（4 故事，v18 Wave 1 W1.C）|
 
 ## 其他文档索引
 
@@ -169,8 +349,10 @@
 | [docs/adr/0001-tech-stack.md](docs/adr/0001-tech-stack.md) | 技术栈选型决策 |
 | [docs/adr/0002-monorepo-structure.md](docs/adr/0002-monorepo-structure.md) | 仓库结构决策 |
 | [docs/adr/0003-governance-model.md](docs/adr/0003-governance-model.md) | 治理模型决策 |
-| [docs/adr/0004-phase-roadmap.md](docs/adr/0004-phase-roadmap.md) | 波次路线决策 |
+| [docs/adr/0004-phase-roadmap.md](docs/adr/0004-phase-roadmap.md) | 波次路线旧决策（已被 ADR-0007 取代） |
+| [docs/adr/0007-roadmap-v03-boundary-alignment.md](docs/adr/0007-roadmap-v03-boundary-alignment.md) | 当前波次路线与边界对齐决策 |
 | [docs/retros/wave-0-retro.md](docs/retros/wave-0-retro.md) | Wave 0 回顾 |
+| [docs/compliance/README.md](docs/compliance/README.md) | **GSP 合规追溯矩阵总索引**（v11 建立，按章节拆分追溯条款 → 用户故事）|
 | [ROADMAP.md](ROADMAP.md) | 长期路线（波次状态） |
 | [TODO.md](TODO.md) | 当前 Wave 任务 |
 | [CHANGELOG.md](CHANGELOG.md) | 版本变更记录 |
@@ -191,4 +373,4 @@
 
 ## 当前阶段
 
-Wave 0 治理骨架已完成。下一步：Wave 1 横向底座（H1 权限 / H2 审计 / H3 OpenAPI）。
+Wave 0 治理骨架收尾中。完成 TODO.md 的退出条件后进入 Wave 1 横向底座（H1 权限 / H2 审计 / H3 OpenAPI）。
