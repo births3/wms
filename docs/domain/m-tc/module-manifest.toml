@@ -60,3 +60,23 @@ canonicals = [
   "shipper_org_uscc",
   "receiver_org_uscc",
 ]
+
+# ── ADR-0012 限界上下文声明（v3.1 引入）──
+
+[bounded_context]
+code = "M-TC"
+name = "追溯码模块"
+language_model = ["TraceCode", "Nomenclature", "GTIN", "RegulatoryReport", "ApplicationIdentifier"]
+
+[integrations]
+# 与每个有依赖关系的 BC 声明 8 种 DDD 集成模式之一
+M1 = "Conformist"               # 接受 M1 的商品定义
+M-CG = "OHS"                    # 通过 M-CG 取追溯码序号
+H1 = "OHS"                      # 通过 H1 鉴权
+H2 = "OHS"                      # 通过 H2 审计
+H4 = "OHS"                      # 通过 H4 上报失败时通知
+
+[shared_kernel]
+# 本 BC 不向外提供新的共享类型；消费 ADR-0012 §Shared Kernel 清单 9 类
+provides = []
+consumes = ["OwnerId", "TenantId", "ProductCode", "BatchNo", "OperatorId", "TraceId", "ErrorCode"]

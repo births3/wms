@@ -21,6 +21,9 @@
 | [ADR-0006](0006-tdd-and-test-layers.md) | TDD + 11 层测试维度 | Accepted | outside-in 双层 TDD；L1-L11 测试维度；Tier×Layer 执行矩阵 |
 | [ADR-0007](0007-roadmap-v03-boundary-alignment.md) | 波次路线 v0.3 边界对齐 | Accepted | M11 移除；码上放心归 M-TC；药监 EDI 由 ERP/H8 边界承接；当前路线入口 |
 | [ADR-0008](0008-borrow-from-odoo.md) | 借鉴 Odoo 的 9 个设计 | Accepted | mail.thread/stock.move/ir.sequence/manifest/GS1 + ir.rule/access.csv/TransientModel/state button；分散到 Wave 0-4 落地，约 2.5 个月增量 |
+| [ADR-0010](0010-error-codes.md) | 错误码体系与字典 | Accepted | 三段式 `<MODULE>_<CATEGORY>_<DETAIL>` + 4 级严重度 + 50 错误码字典 + check_error_codes.py 治理 |
+| [ADR-0011](0011-observability.md) | 可观测性方案 | Accepted | OpenTelemetry + Prometheus + Loki + Grafana 四件套 + KPI 命名约定 + SLO 告警 + check_observability.py 治理 |
+| [ADR-0012](0012-bounded-contexts.md) | 限界上下文与 Context Map | Accepted | 24 个 BC 显式声明 + 8 种 DDD 集成模式 + 9 类 Shared Kernel + check_bounded_contexts.py 治理 |
 
 ## 已取代
 
@@ -33,7 +36,8 @@
 | 编号 | 状态 | 说明 |
 |------|------|------|
 | ADR-0005 | 预留 | Git Worktree 工作流（命名 / target/ / node_modules / baseline 协调）。计划 Wave 1 启动前补写。 |
-| ADR-0009+ | 未分配 | 后续按需新建（如限界上下文边界原则、消息队列选型 等） |
+| ADR-0009 | 未分配 | 已被合并到 ADR-0010（错误码体系含 API 错误响应规范）+ coding-standards §3.5 已修复 URL 版本统一。如未来 API 版本策略有更复杂决议（如 GraphQL/gRPC 多协议）再单独补 |
+| ADR-0013+ | 未分配 | 后续按需新建（如限界上下文边界原则、消息队列选型 等） |
 
 > 编号永不复用。空缺编号必须在此表登记原因。
 

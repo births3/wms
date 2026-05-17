@@ -122,11 +122,15 @@ nav:
     - ADR-0006 TDD 与测试层: adr/0006-tdd-and-test-layers.md
     - ADR-0007 路线边界对齐: adr/0007-roadmap-v03-boundary-alignment.md
     - ADR-0008 借鉴 Odoo 的 9 个设计: adr/0008-borrow-from-odoo.md
+    - ADR-0010 错误码体系: adr/0010-error-codes.md
+    - ADR-0011 可观测性方案: adr/0011-observability.md
+    - ADR-0012 限界上下文: adr/0012-bounded-contexts.md
   - 架构与领域:
     - 模块依赖图: architecture-dependencies.md
     - 概念审计: concept-audit.md
     - 业务澄清记录: domain/clarifications.md
     - 术语表: glossary.md
+    - 错误码字典: error-codes.md
     - 基础设施技术规格: infra/technical-specs.md
     - 易用性基线 (v25): infra/usability-baseline.md
     - 分库分表决策矩阵 (v25): infra/sharding-decision-matrix.md

@@ -354,6 +354,10 @@
 | [docs/adr/0004-phase-roadmap.md](docs/adr/0004-phase-roadmap.md) | 波次路线旧决策（已被 ADR-0007 取代） |
 | [docs/adr/0007-roadmap-v03-boundary-alignment.md](docs/adr/0007-roadmap-v03-boundary-alignment.md) | 当前波次路线与边界对齐决策 |
 | [docs/adr/0008-borrow-from-odoo.md](docs/adr/0008-borrow-from-odoo.md) | 借鉴 Odoo 的 9 个设计（mail.thread / stock.move / ir.sequence / manifest / GS1 + ir.rule / access.csv / TransientModel / state button），实施 Wave 0-4 |
+| [docs/adr/0010-error-codes.md](docs/adr/0010-error-codes.md) | **错误码体系**（三段式 + 4 级严重度 + 50 错误码字典 + 治理脚本）|
+| [docs/adr/0011-observability.md](docs/adr/0011-observability.md) | **可观测性方案**（OpenTelemetry + Prometheus + Loki + Grafana + KPI 清单 + SLO 告警）|
+| [docs/adr/0012-bounded-contexts.md](docs/adr/0012-bounded-contexts.md) | **限界上下文与 Context Map**（24 BC + 8 种 DDD 集成模式 + 9 类 Shared Kernel）|
+| [docs/error-codes.md](docs/error-codes.md) | **错误码字典**（v3.1 初版 50 项，单一事实之源）|
 | [docs/retros/wave-0-retro.md](docs/retros/wave-0-retro.md) | Wave 0 回顾 |
 | [docs/reviews/user-stories-audit-2026-05-16.md](docs/reviews/user-stories-audit-2026-05-16.md) | 用户故事 5 维度审计（116 故事 / 22 模块）|
 | [docs/reviews/software-design-audit-2026-05-18.md](docs/reviews/software-design-audit-2026-05-18.md) | **软件设计 12 维度审计**（v3.1，识别 6 P0 / 4 P1 / 3 P2 共 13 项缺口；指引 Wave 1 启动前需补 5+ ADR）|

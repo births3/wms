@@ -71,7 +71,24 @@ tier = "T1"
 
 [[rules]]
 match = "docs/domain/user-stories-*.md"
-checks = ["check_gsp_field_traceability", "check_story_size"]
+checks = ["check_gsp_field_traceability", "check_story_size", "check_observability"]
+tier = "T1"
+
+# v3.1 错误码字典治理
+[[rules]]
+match = "docs/error-codes.md"
+checks = ["check_error_codes"]
+tier = "T1"
+
+# v3.1 限界上下文 / Context Map 治理
+[[rules]]
+match = "docs/domain/*/module-manifest.toml"
+checks = ["check_bounded_contexts"]
+tier = "T1"
+
+[[rules]]
+match = "docs/adr/0012-bounded-contexts.md"
+checks = ["check_bounded_contexts"]
 tier = "T1"
 
 # ============================================================
