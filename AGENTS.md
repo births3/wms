@@ -253,6 +253,53 @@
 - **正文**：动机 + 改动概要 + 影响范围（可空，复杂改动必填）
 - **脚注**：`关联：US-X-NNN, ADR-NNNN`、`破坏性变更：<说明>`、`Co-authored-by:` 等
 
+## AI 协作产出审查标准
+
+> 把 AI 当**实习生 + 速查工具**，不是把它当**架构师**。
+> 关键原则：**AI 输出必须可被人类验证**，不能盲信。
+
+### 9 条审查清单（每次 AI 产出后逐条勾选）
+
+1. **数字有出处**：所有"12 个维度"、"50 个错误码"、"4.84 亿行"等数字必须能追到证据（脚本输出 / 文件读取 / 字典 §6 行数）
+2. **决策有候选方案**：A/B/C 至少给 2 个候选，不能直接说"我推荐 X"
+3. **GSP 引用具体到条款**：不能只说"GSP 合规"，必须 §5.67 / §7.103 这种具体编号
+4. **风险有应对**：识别风险时必须给应对方案，不能停在"有风险"
+5. **代码 / 字段 / 故事修改可回滚**：不能批量正则替换 + 不验证；每次改文件都跑治理脚本
+6. **诚实标注未验证内容**：AI 推断的结论必须明示"推断 / 未验证"前缀
+7. **不冒充权威**：法规条款解释 / 业务方决策 / 安全审计 → AI 给参考意见，不下定论
+8. **跨文档一致性**：改 ADR 必同步 ADR README / AGENTS.md 索引；改字段词典必同步治理脚本
+9. **每次会话末做哲学自检**：苏格拉底（真理解了吗）+ 斯多葛（必要 vs 多余）+ 经验主义（每个断言有证据吗）
+
+### AI 产出反模式（红线）
+
+| 反模式 | 例子 | 危害 |
+|---|---|---|
+| **数字虚高** | "约 100-145 字段"（实际 45）| 决策被误导 |
+| **过度抽象** | 把简单 if-else 写成 12 层 trait | 维护成本爆炸 |
+| **照搬不思考** | 直接复制 odoo Python 代码到 Rust | 语言特性不对 |
+| **概念漂移** | "审批源" 在不同地方指不同概念 | 业务方对不上 |
+| **忽略治理脚本** | 改字段不跑 check_gsp_field_traceability | 一致性断链 |
+| **未读先答** | 不读 ADR-0008 就回答相关问题 | 给错答案 |
+| **跨主题混提交** | 一次 commit 改 5 个无关主题 | review 困难 |
+
+### PR 评审重点（针对 AI 产出）
+
+人类 reviewer 重点检查：
+
+1. **语义合理性** > 语法正确性（AI 写的代码语法基本对，但语义可能错）
+2. **业务规则**：AI 是否真理解业务流程？还是机械堆 keyword？
+3. **GSP 合规边界**：AI 容易在合规边界含糊（如"或可"、"可能需要"）
+4. **测试是否真验证业务**：AI 写的测试可能仅 happy path，错误路径常缺
+5. **是否漏了相关文档**：AI 改 H1 时容易漏改 H2-005（事件总线依赖）
+
+### 何时不该用 AI
+
+- **法规解释**（GSP 具体条款的法律含义）
+- **架构决策最终拍板**（AI 给候选，人决策）
+- **生产环境操作**（删数据 / 改 prod schema）
+- **业务方未确认的取舍**（A/B/C 哪个对，业务方说了算）
+- **安全 / 合规审计的最终结论**
+
 ## 修复 / 审计优先级（脚本第一，语义第二）
 
 > 核心纪律：**能用脚本自动检查的问题，永远先于需要人工语义理解的问题修复**。
@@ -357,6 +404,10 @@
 | [docs/adr/0010-error-codes.md](docs/adr/0010-error-codes.md) | **错误码体系**（三段式 + 4 级严重度 + 50 错误码字典 + 治理脚本）|
 | [docs/adr/0011-observability.md](docs/adr/0011-observability.md) | **可观测性方案**（OpenTelemetry + Prometheus + Loki + Grafana + KPI 清单 + SLO 告警）|
 | [docs/adr/0012-bounded-contexts.md](docs/adr/0012-bounded-contexts.md) | **限界上下文与 Context Map**（24 BC + 8 种 DDD 集成模式 + 9 类 Shared Kernel）|
+| [docs/adr/0013-config-secrets.md](docs/adr/0013-config-secrets.md) | **配置与 secrets 管理**（三层配置 + Vault + 90 天密钥轮换）|
+| [docs/adr/0014-data-migration.md](docs/adr/0014-data-migration.md) | **数据迁移策略**（CDC + 双写 + 货主级灰度 + 4 维校验）|
+| [docs/adr/0015-multi-end-rules.md](docs/adr/0015-multi-end-rules.md) | **多端业务规则放置**（A/B/C 三级 + OpenAPI 共享 schema）|
+| [docs/adr/0016-deployment.md](docs/adr/0016-deployment.md) | **部署形态**（docker-compose / k8s 双轨 + Migration 4 步走）|
 | [docs/error-codes.md](docs/error-codes.md) | **错误码字典**（v3.1 初版 50 项，单一事实之源）|
 | [docs/retros/wave-0-retro.md](docs/retros/wave-0-retro.md) | Wave 0 回顾 |
 | [docs/reviews/user-stories-audit-2026-05-16.md](docs/reviews/user-stories-audit-2026-05-16.md) | 用户故事 5 维度审计（116 故事 / 22 模块）|

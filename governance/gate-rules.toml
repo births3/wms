@@ -71,7 +71,7 @@ tier = "T1"
 
 [[rules]]
 match = "docs/domain/user-stories-*.md"
-checks = ["check_gsp_field_traceability", "check_story_size", "check_observability"]
+checks = ["check_gsp_field_traceability", "check_story_size", "check_observability", "check_multi_end_consistency"]
 tier = "T1"
 
 # v3.1 错误码字典治理
@@ -89,6 +89,22 @@ tier = "T1"
 [[rules]]
 match = "docs/adr/0012-bounded-contexts.md"
 checks = ["check_bounded_contexts"]
+tier = "T1"
+
+# v3.1 secrets 管理治理（任意源代码或 .gitignore 改动触发）
+[[rules]]
+match = ".gitignore"
+checks = ["check_secrets"]
+tier = "T1"
+
+[[rules]]
+match = "backend/**"
+checks = ["check_secrets"]
+tier = "T1"
+
+[[rules]]
+match = "apps/**"
+checks = ["check_secrets"]
 tier = "T1"
 
 # ============================================================

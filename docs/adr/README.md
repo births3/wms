@@ -24,6 +24,10 @@
 | [ADR-0010](0010-error-codes.md) | 错误码体系与字典 | Accepted | 三段式 `<MODULE>_<CATEGORY>_<DETAIL>` + 4 级严重度 + 50 错误码字典 + check_error_codes.py 治理 |
 | [ADR-0011](0011-observability.md) | 可观测性方案 | Accepted | OpenTelemetry + Prometheus + Loki + Grafana 四件套 + KPI 命名约定 + SLO 告警 + check_observability.py 治理 |
 | [ADR-0012](0012-bounded-contexts.md) | 限界上下文与 Context Map | Accepted | 24 个 BC 显式声明 + 8 种 DDD 集成模式 + 9 类 Shared Kernel + check_bounded_contexts.py 治理 |
+| [ADR-0013](0013-config-secrets.md) | 配置与 secrets 管理 | Accepted | 三层配置（编译/环境/运行时）+ Vault/k8s Secret + 90 天密钥轮换 + check_secrets.py 治理 |
+| [ADR-0014](0014-data-migration.md) | 数据迁移策略（legacy → wms）| Accepted | Debezium CDC + 双写 + 货主级灰度 + 4 维校验 + 30 分钟回滚 RTO |
+| [ADR-0015](0015-multi-end-rules.md) | 多端业务规则放置 | Accepted | A/B/C 三级规则分类 + OpenAPI schema 单一事实之源 + PDA 离线扩展 + check_multi_end_consistency.py 治理 |
+| [ADR-0016](0016-deployment.md) | 部署形态（Docker / k8s）| Accepted | docker-compose（小型 3PL）+ Kubernetes（大型连锁）双轨 + Dockerfile 模板 + Migration 4 步走 |
 
 ## 已取代
 
@@ -37,7 +41,7 @@
 |------|------|------|
 | ADR-0005 | 预留 | Git Worktree 工作流（命名 / target/ / node_modules / baseline 协调）。计划 Wave 1 启动前补写。 |
 | ADR-0009 | 未分配 | 已被合并到 ADR-0010（错误码体系含 API 错误响应规范）+ coding-standards §3.5 已修复 URL 版本统一。如未来 API 版本策略有更复杂决议（如 GraphQL/gRPC 多协议）再单独补 |
-| ADR-0013+ | 未分配 | 后续按需新建（如限界上下文边界原则、消息队列选型 等） |
+| ADR-0017+ | 未分配 | 后续按需新建 |
 
 > 编号永不复用。空缺编号必须在此表登记原因。
 

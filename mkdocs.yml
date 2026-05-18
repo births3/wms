@@ -125,6 +125,10 @@ nav:
     - ADR-0010 错误码体系: adr/0010-error-codes.md
     - ADR-0011 可观测性方案: adr/0011-observability.md
     - ADR-0012 限界上下文: adr/0012-bounded-contexts.md
+    - ADR-0013 配置与 secrets: adr/0013-config-secrets.md
+    - ADR-0014 数据迁移: adr/0014-data-migration.md
+    - ADR-0015 多端业务规则: adr/0015-multi-end-rules.md
+    - ADR-0016 部署形态: adr/0016-deployment.md
   - 架构与领域:
     - 模块依赖图: architecture-dependencies.md
     - 概念审计: concept-audit.md

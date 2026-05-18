@@ -138,6 +138,77 @@ pub trait Wizard: Serialize + Deserialize {
 - 单步操作（直接命令即可）
 - 数据需要参与业务查询（应该进主表）
 
+### 1.1.2 聚合根识别原则（v3.1，DDD 战术）
+
+> 关联 [ADR-0012](adr/0012-bounded-contexts.md) 限界上下文。
+
+**聚合根（Aggregate Root）**是 BC 内的"事务一致性边界"。识别聚合根的 4 个原则：
+
+1. **真不变量（True Invariants）**：聚合内必须事务性维护的不变量
+   - 例：`InboundOrder` 内"实到 + 缺货 + 拒收 = 预报数量"
+   - 例：`InventoryBatch` 内"批次状态变更必须有 approval_source"
+2. **生命周期一致**：聚合内对象同生同死
+   - `InboundOrderItem` 离开 `InboundOrder` 无意义 → 是聚合内子实体
+3. **小聚合优先**：宁可 5 个小聚合，不要 1 个大聚合
+   - `Inventory` 不该聚合 `OutboundOrder`（跨模块）
+4. **跨聚合用 ID 引用**：不直接持有对象引用
+   - ✅ `OutboundOrder { product_id: ProductId }`
+   - ❌ `OutboundOrder { product: Product }`
+
+**wms 主要聚合根**（v3.1，待 Wave 2-3 实施时复盘）：
+
+| 聚合根 | BC | 子实体 | 不变量 |
+|---|---|---|---|
+| `InboundOrder` | M2 | `InboundOrderItem` | 数量闭合 + 时间窗 + 双人验收 |
+| `OutboundOrder` | M4 | `OutboundOrderItem`, `PickTask` | 批号 ERP 指定 + 拣选≠复核 |
+| `InventoryBatch` | M3 | `InventoryTransaction` | 状态变更必有 approval_source |
+| `WarehouseAppointment` | H-DOCK | `AppointmentObject` | 时间窗不冲突 + 车辆温区匹配 |
+| `QualityLiaison` | M-QL | `LiaisonAttachment`, `LiaisonApproval` | 审批闭环 |
+| `TraceCode` | M-TC | `TraceCodeBinding` | GS1 解析 + 状态机 |
+| `User` | H1 | `UserRole`, `Permission` | 权限不可越权 |
+
+**禁止**：业务字段直接放 BC 之间（如 OutboundOrder 不该有 supplier_id，应该通过 InventoryBatch 间接引用）。
+
+### 1.1.3 领域事件命名约定（v3.1，DDD 战术）
+
+> 关联 [ADR-0011](adr/0011-observability.md) §事件分类与命名 + [ADR-0012](adr/0012-bounded-contexts.md)。
+
+**领域事件名 = `<聚合根>.<动作过去式>`**：
+
+| ✅ 好例子 | ❌ 反例 | 理由 |
+|---|---|---|
+| `InboundOrder.confirmed` | `confirm_inbound_order` | 名词聚合根 + 过去时（事件已发生）|
+| `InventoryBatch.recalled` | `recall_batch` | — |
+| `Appointment.arrived` | `dock_appointment_arrival_received` | 简洁清晰 |
+| `OutboundOrder.shipped` | `ship_order` | — |
+
+**事件类型分类**（参 ADR-0011 H2-005 事件总线）：
+
+```
+audit.<resource>.<action>          # 审计事件（H2 自动发布）
+business.<module>.<event>          # 业务事件（业务模块发布）
+system.<source>.<event>            # 系统事件（基础设施发布）
+```
+
+**事件载荷标准字段**：
+
+```rust
+struct DomainEvent {
+    event_type: String,              // 如 "business.inbound.confirmed"
+    aggregate_id: AggregateId,       // 聚合根 ID
+    aggregate_type: String,          // 聚合根类型名
+    tenant_id: TenantId,             // 多货主隔离
+    occurred_at: DateTime<Utc>,
+    actor: ActorRef,                 // 触发者（user / system / external）
+    payload: serde_json::Value,      // 业务载荷（按事件类型不同）
+    trace_id: TraceId,               // 跨模块追踪
+}
+```
+
+**禁止**：
+- 在事件名里加"成功/失败"（`order.shipped_success` ❌）→ 应该用单独的 failed 事件
+- 事件载荷含敏感字段（密码 / 身份证完整号）→ 必须脱敏
+
 ### 1.2 模块组织
 
 ```
