@@ -9,6 +9,10 @@
 !.env.example
 *.pem
 *.key
+id_rsa
+id_rsa.pub
+*.pfx
+*.p12
 *.p12
 *.pfx
 secrets/
