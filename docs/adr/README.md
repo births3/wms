@@ -41,7 +41,10 @@
 |------|------|------|
 | ADR-0005 | 预留 | Git Worktree 工作流（命名 / target/ / node_modules / baseline 协调）。计划 Wave 1 启动前补写。 |
 | ADR-0009 | 未分配 | 已被合并到 ADR-0010（错误码体系含 API 错误响应规范）+ coding-standards §3.5 已修复 URL 版本统一。如未来 API 版本策略有更复杂决议（如 GraphQL/gRPC 多协议）再单独补 |
-| ADR-0017+ | 未分配 | 后续按需新建 |
+| ADR-0017 | 未分配 | 预留 i18n（启动条件见 ROADMAP.md §国际化 backlog） |
+| [ADR-0018](0018-resilience-engineering.md) | 弹性工程 | Accepted | 6 大能力统一方案：幂等分级 / 重试 4 级（L0-L3）/ 限流 3 维度 / 熔断状态机 / 降级 4 级（D0-D3）/ 死信处理流程 + DLQ 表；继承 coding-standards §3.3 + ADR-0006 L11 + technical-specs §H8 + clarifications #36 |
+| [ADR-0019](0019-tenant-custom-fields.md) | 货主自定义属性 | Accepted | 简化版借鉴 Odoo Studio：JSONB 列 + 配置中心 schema + `x_` 前缀命名 + 6 聚合根白名单 + Rust 运行时校验；ADR-0008 第 10 项；Wave 5 实施 |
+| ADR-0020+ | 未分配 | 后续按需新建 |
 
 > 编号永不复用。空缺编号必须在此表登记原因。
 
