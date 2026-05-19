@@ -38,6 +38,8 @@
 - 部署相关（DB URL / 端口 / 副本数）→ 环境变量
 - 凭据（DB 密码 / JWT key / 加密密钥）→ 外部 secrets 管理器
 
+> **波次降级例外**：M1-008 业务配置中心在 Wave 2（W2.A）才上线。Wave 1 期间需要的业务开关（特指灰度发布的 Feature Flag）走 **环境变量 / `deploy/feature_flags.toml` 文件** 临时存储；Wave 2 M1-008 上线后批量迁入配置中心。详见 [ADR-0016 §Feature Flag 治理](0016-deployment.md)。
+
 ### 方案 B：全部用配置中心（M1-008）
 
 **否决**：业务配置和部署/secrets 不该混（多环境时业务方误改 prod DB URL）。
@@ -213,3 +215,4 @@ fn load_config() -> AppConfig {
 | 日期 | 版本 | 变更 |
 |------|------|------|
 | 2026-05-18 | v1 | 初版：三层配置 + 外部 secrets + 命名规范 + 加密密钥分级 + 治理脚本 |
+| 2026-05-18 | v1.1 | §候选方案 A 加 Feature Flag 波次降级例外：Wave 1 走环境变量/TOML，Wave 2 起迁 M1-008（关联 ADR-0016 v3.1.1）|

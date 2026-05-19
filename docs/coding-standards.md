@@ -684,6 +684,93 @@ Header: Idempotency-Key: <client-generated-uuid>
 - **禁止**：自增 int 作为对外 ID（可被枚举）
 - **禁止**：在 URL 中暴露内部序号
 
+### 3.6 定时任务 / 调度框架约定
+
+> 关联：模式提炼报告 §5.2 缺口 #2（12 个故事文件需要定时任务）；ADR-0018 §1 幂等键（定时任务场景）。
+
+**选型**：`tokio-cron-scheduler`（轻量、纯 Rust、与 Tokio 运行时原生集成）。
+
+**注册方式**：
+
+```rust
+// backend/crates/infra/src/scheduler/mod.rs
+pub fn register_jobs(scheduler: &JobScheduler) {
+    scheduler.add(Job::new_cron("0 0 2 * * *", |_uuid, _lock| {
+        // H10 每日备份
+    }));
+    scheduler.add(Job::new_cron("0 */5 * * * *", |_uuid, _lock| {
+        // M3 近效期预警扫描
+    }));
+}
+```
+
+**约束**：
+
+| 规则 | 说明 |
+|------|------|
+| 幂等 | 每次执行必须幂等（幂等键 = `task_type + scheduled_at`，参 ADR-0018 §1） |
+| 单实例 | 多副本部署时用 PG advisory lock 保证同一时刻只有一个实例执行同一任务 |
+| 超时 | 每个任务必须设 timeout（默认 5 min，长任务显式声明） |
+| 可观测 | 执行开始/结束/失败写 tracing span + metric `wms_scheduled_job_duration_seconds{job}` |
+| 失败处理 | 失败 → 按 ADR-0018 §2 重试策略 L1 快速重试；3 次失败 → H-AL 告警 |
+| 注册集中 | 所有任务在 `infra/src/scheduler/mod.rs` 集中注册，禁止散落各模块 |
+| 配置 | cron 表达式存配置中心（Wave 2 起）/ 环境变量（Wave 1）；禁止硬编码 |
+
+**已知定时任务清单**（从故事文件提取，Wave 1-3 逐步实现）：
+
+| 任务 | cron | 模块 | Wave |
+|------|------|------|------|
+| 每日备份 | `0 0 2 * * *` | H10 | 1 |
+| 近效期预警扫描 | `0 */5 * * * *` | M3 | 3 |
+| 资质到期预警 | `0 0 8 * * *` | M1 | 2 |
+| 养护计划生成 | `0 0 6 * * MON` | M3 | 3 |
+| DLQ 超期升级 | `0 0 9 * * *` | H2 | 1 |
+| 审计日志归档 | `0 0 3 1 * *` | H2 | 1 |
+| Feature Flag 过期检查 | `0 0 10 * * *` | infra | 1 |
+
+### 3.7 并发控制约定
+
+> 关联：模式提炼报告 §5.2 缺口 #4（3 个故事文件需要并发控制）；ADR-0018 §1 幂等。
+
+**默认策略：乐观锁（Optimistic Locking）**
+
+```rust
+// 所有可并发修改的聚合根必须有 version 字段
+#[derive(Debug)]
+pub struct InventoryBatch {
+    pub id: InventoryBatchId,
+    pub version: i64,  // 乐观锁版本号
+    // ...
+}
+```
+
+```sql
+-- 更新时 WHERE version = $expected
+UPDATE inventory_batch
+SET qty = $new_qty, version = version + 1, updated_at = now()
+WHERE id = $id AND version = $expected_version;
+-- affected_rows == 0 → 并发冲突 → 返回 409 Conflict
+```
+
+**约束**：
+
+| 规则 | 说明 |
+|------|------|
+| 默认乐观锁 | 所有聚合根写操作默认用 `version` 字段乐观锁 |
+| 冲突响应 | `affected_rows == 0` → HTTP 409 + 错误码 `SHARED_CONCURRENCY_CONFLICT` |
+| 前端重试 | 前端收到 409 → 自动重新获取最新数据 → 提示用户"数据已被他人修改，请确认后重试" |
+| 悲观锁场景 | **仅**库存扣减（M3/M4 高并发热点）允许 `SELECT ... FOR UPDATE`；必须设 lock_timeout（默认 3s） |
+| 死锁预防 | 多行锁定时必须按 `id ASC` 排序加锁；禁止嵌套事务中加锁 |
+| 分布式锁 | 跨服务资源锁用 Redis `SET NX EX`（TTL ≤ 30s）；禁止无 TTL 的分布式锁 |
+| 测试 | 涉及并发的写操作必须有 ADR-0006 L6 并发测试（至少 2 并发 + 验证冲突检测） |
+
+**悲观锁使用审批**：
+
+使用 `SELECT ... FOR UPDATE` 必须在 PR 描述中说明：
+1. 为什么乐观锁不够（热点行 + 高冲突率）
+2. lock_timeout 设了多少
+3. 加锁顺序是否按 id ASC
+
 ---
 
 ## 四、禁止清单（红线）

@@ -129,6 +129,8 @@ nav:
     - ADR-0014 数据迁移: adr/0014-data-migration.md
     - ADR-0015 多端业务规则: adr/0015-multi-end-rules.md
     - ADR-0016 部署形态: adr/0016-deployment.md
+    - ADR-0018 弹性工程: adr/0018-resilience-engineering.md
+    - ADR-0019 货主自定义属性: adr/0019-tenant-custom-fields.md
   - 架构与领域:
     - 模块依赖图: architecture-dependencies.md
     - 概念审计: concept-audit.md
@@ -136,11 +138,15 @@ nav:
     - 术语表: glossary.md
     - 错误码字典: error-codes.md
     - 基础设施技术规格: infra/technical-specs.md
+    - 文件存储方案: infra/file-storage.md
+    - 缓存策略: infra/cache-strategy.md
     - 易用性基线 (v25): infra/usability-baseline.md
     - 分库分表决策矩阵 (v25): infra/sharding-decision-matrix.md
   - 评审记录:
     - 用户故事审计 v1-v10: reviews/user-stories-audit-2026-05-16.md
     - 软件设计审计 (12 维度): reviews/software-design-audit-2026-05-18.md
+    - 模式提炼 (4 方法): reviews/pattern-extraction-2026-05-18.md
+    - 用户故事矩阵审计: reviews/user-stories-matrix-audit-2026-05-18.md
     - 波次参数对标 - Manhattan: reviews/wave-parameters-comparison-manhattan.md
     - 用户故事 Review 规范: review-guidelines-user-stories.md
     - Wave 0 回顾: retros/wave-0-retro.md

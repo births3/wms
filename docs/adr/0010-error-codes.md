@@ -99,9 +99,11 @@
     "batch_no": "BN20260517001"
   },
   "trace_id": "01H7K8...",
-  "retry_hint": "client_should_reduce"
+  "retry_hint": "no_retry"
 }
 ```
+
+> `retry_hint` 合法值：`no_retry` / `fast` / `standard` / `persistent`，语义定义见 [ADR-0018 §2.2](0018-resilience-engineering.md)。
 
 ### 字典存储
 

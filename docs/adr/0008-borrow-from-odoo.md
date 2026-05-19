@@ -17,7 +17,7 @@
 
 ---
 
-## 9 个借鉴清单
+## 9 个借鉴清单（v3.1 升级到 10 项）
 
 ### 速查表
 
@@ -32,6 +32,7 @@
 | 7 | ir.model.access.csv 声明式权限 | H1 `permission_matrix.csv` | 🟡 高 | 🟢 低 | 3 天 | **Wave 1**（H1 实施时）|
 | 8 | TransientModel 向导 | wms `wizard` Rust 模式 + 自动清理 | 🟢 中 | 🟢 低 | 1 周 | Wave 2（基础 CRUD 时）|
 | 9 | state button 命名约定 | 全局 `confirm_/validate_/done_/cancel_` 方法名 | 🟢 中 | 🟢 极低 | 半天 | **Wave 1** 立即采纳 |
+| **10** | **Studio + ir.model.fields**（简化版）| **wms `extra_attrs JSONB` 列 + 配置中心 schema**（详见 [ADR-0019](0019-tenant-custom-fields.md)）| 🟡 高（多货主 SaaS）| 🟡 中（运行时校验）| 2-3 周 | **Wave 5**（增值模块）|
 
 ---
 
@@ -551,3 +552,4 @@ impl InboundOrder {
 | 日期 | 版本 | 变更 |
 |------|------|------|
 | 2026-05-18 | v1 | 初版：基于 Odoo master 源码深入分析 9 个借鉴设计 + 实施 Wave 划分 |
+| 2026-05-18 | v2 | 升级到 10 项：新增第 10 项 Studio + ir.model.fields 简化版（详见 ADR-0019 货主自定义属性，Wave 5 实施）|
