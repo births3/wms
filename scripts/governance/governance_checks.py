@@ -53,10 +53,15 @@ TIER_SCRIPTS: dict[str, list[str]] = {
         "check_baseline_health.py",
         "check_governance_consistency.py",
         "check_commit_convention.py",
+        "check_prototype_index_consistency.py",
+        "check_prototype_story_sync.py",
+        "check_prototype_freshness.py",
+        "check_prototype_usability_baseline.py",
     ],
     "T2": [
         # T1 + diff 驱动（由 task_check.py 处理）
         # 这里只追加 T2 专属脚本，未来 Wave 2+ 加入
+        "check_prototype_review_signoff.py",
     ],
     "T3": [
         # 未来 Wave 3+：handler test coverage、idempotency、permission matrix 等

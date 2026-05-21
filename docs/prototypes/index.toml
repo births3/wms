@@ -1,0 +1,81 @@
+# docs/prototypes/index.toml — 原型必有清单（治理唯一真相源）
+#
+# 治理脚本 check_prototype_index_consistency.py 以此为准。
+# 每条 [[required]] 声明一个必须有高保真原型的故事。
+# priority: P0=Wave 0.5 必交付 / P1=Wave 1.5 / P2=Wave 2.5 / P3=Wave 3.5 / P4=Wave 4.5
+# 完整矩阵见 prototype-matrix-r3.md
+
+# 当前 Wave 标识（治理脚本据此判定哪些 priority 必须 approved）
+[meta]
+current_wave = "0.5"
+
+# ============================================================
+# P0 — Wave 0.5 必交付（Wave 1 涉及的 UI 故事）
+# ============================================================
+
+[[required]]
+story_id = "US-H1-001"
+prototype_slug = "pc-h1-login"
+end = "pc"
+priority = "P0"
+reason = "登录页三角色入口，Wave 1 首个交互页"
+
+[[required]]
+story_id = "US-H1-001"
+prototype_slug = "pda-h1-login"
+end = "pda"
+priority = "P0"
+reason = "PDA 端登录（简化版）"
+
+[required.viewport]
+touch_target_min_pt = 48
+font_size_min_pt = 18
+
+[[required]]
+story_id = "US-H1-002"
+prototype_slug = "pc-h1-role-permission"
+end = "pc"
+priority = "P0"
+reason = "权限矩阵交互复杂"
+
+[[required]]
+story_id = "US-H1-005"
+prototype_slug = "pc-h1-token-expire"
+end = "pc"
+priority = "P0"
+reason = "登出+过期提示交互"
+
+[[required]]
+story_id = "US-H1-006"
+prototype_slug = "pc-h1-apikey"
+end = "pc"
+priority = "P0"
+reason = "API Key 管理页"
+
+[[required]]
+story_id = "US-H2-002"
+prototype_slug = "pc-h2-audit-query"
+end = "pc"
+priority = "P0"
+reason = "审计查询+时间线展示"
+
+[[required]]
+story_id = "US-H2-004"
+prototype_slug = "pc-h2-archive-config"
+end = "pc"
+priority = "P0"
+reason = "归档策略配置"
+
+[[required]]
+story_id = "US-H2-006"
+prototype_slug = "pc-h2-lifecycle"
+end = "pc"
+priority = "P0"
+reason = "生命周期归档规则"
+
+[[required]]
+story_id = "US-H3-004"
+prototype_slug = "pc-h3-api-docs"
+end = "pc"
+priority = "P0"
+reason = "Swagger UI 定制页"

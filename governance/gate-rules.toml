@@ -108,6 +108,20 @@ checks = ["check_secrets"]
 tier = "T1"
 
 # ============================================================
+# 原型治理（Wave 0.5 启用）
+# ============================================================
+
+[[rules]]
+match = "docs/prototypes/**"
+checks = ["check_prototype_index_consistency", "check_prototype_story_sync", "check_prototype_freshness", "check_prototype_usability_baseline"]
+tier = "T1"
+
+[[rules]]
+match = "prototypes/**"
+checks = ["check_prototype_index_consistency", "check_prototype_story_sync"]
+tier = "T1"
+
+# ============================================================
 # 占位规则（未来 Wave 启用，当前对应脚本不存在 → task_check 会跳过）
 # ============================================================
 

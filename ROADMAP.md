@@ -41,6 +41,21 @@ M11 监管 EDI 已移除：码上放心由 M-TC 承接，药监 EDI 由 ERP/H8 �
 
 ---
 
+## Wave 0.5：原型 + 技术 Spike（进行中）
+
+**周期**：2 周
+**目标**：组件库骨架 + P0 原型（Wave 1 涉及的 9 个页面）+ 技术 Spike 验证。
+
+- [ ] Design Tokens + wms-theme.css + Storybook 配置
+- [ ] Layer 2 业务复合组件 Top 5（ScanInput / StepFlow / StatusBadge / FieldTable / OfflineIndicator）
+- [ ] Layer 2 剩余组件（DualSignPanel / AuditTimeline / KanbanBoard / PrintPreview / TempChart / RuleEditor / ApprovalFlow）
+- [ ] P0 原型页（9 个：H1 登录/权限/登出/API Key + H2 审计查询/归档/生命周期 + H3 API 文档）
+- [ ] 技术 Spike：Axum+JWT / H2 append-only / utoipa→OpenAPI→TS 全链路 / SQLx offline / RN 扫枪
+
+**完成标准**：Storybook 可运行；P0 原型 ≥1 次走查 approved；Spike 结论记录到 `docs/spikes/`。
+
+---
+
 ## Wave 1：横向底座（H 层）
 
 **周期**：4-6 周（个人）
@@ -227,3 +242,4 @@ M11 监管 EDI 已移除：码上放心由 M-TC 承接，药监 EDI 由 ERP/H8 �
 6. TDD 在所有 Wave 强制（按 ADR-0006）
 7. schema 变更串行
 8. 每波 worktree 上限 3 个（含 main）
+9. 涉及一线高频操作的 UI 页面，进入实现 Wave 前必须有高保真原型 + ≥1 次业务方走查 approved（ADR-0021）
