@@ -5,33 +5,46 @@ import { Button } from "./components/ui";
 import { H1LoginPda } from "./pages/h1-login-pda";
 import { H1LoginPc } from "./pages/h1-login-pc";
 import { H2AuditQuery } from "./pages/h2-audit-query";
+import { ComponentsGallery } from "./pages/components-gallery";
 
-type Tab = "pda-login" | "pc-login" | "audit-query";
+type Tab = "gallery" | "pda-login" | "pc-login" | "audit-query";
+
+const TABS: { value: Tab; label: string }[] = [
+  { value: "gallery", label: "组件库" },
+  { value: "pda-login", label: "PDA 登录" },
+  { value: "pc-login", label: "PC 登录" },
+  { value: "audit-query", label: "审计查询" },
+];
 
 function App() {
-  const initial = (window.location.hash.replace("#", "") as Tab) || "pc-login";
+  const initial = (window.location.hash.replace("#", "") as Tab) || "gallery";
   const [tab, setTab] = useState<Tab>(
-    ["pda-login", "pc-login", "audit-query"].includes(initial) ? initial : "pc-login"
+    TABS.some((t) => t.value === initial) ? initial : "gallery"
   );
 
   return (
     <div className="min-h-screen bg-muted/40 p-6 font-sans">
       <div className="flex items-center gap-4 mb-6 max-w-[1400px] mx-auto">
-        <h1 className="text-xl font-semibold">WMS P0 原型 · shadcn/ui</h1>
-        <span className="text-xs text-muted-foreground">ADR-0021 Layer 1 = shadcn 验证</span>
-        <div className="ml-auto flex gap-2">
-          <Button variant={tab === "pda-login" ? "default" : "outline"} size="sm" onClick={() => { setTab("pda-login"); window.location.hash = "pda-login"; }}>
-            PDA 登录
-          </Button>
-          <Button variant={tab === "pc-login" ? "default" : "outline"} size="sm" onClick={() => { setTab("pc-login"); window.location.hash = "pc-login"; }}>
-            PC 登录
-          </Button>
-          <Button variant={tab === "audit-query" ? "default" : "outline"} size="sm" onClick={() => { setTab("audit-query"); window.location.hash = "audit-query"; }}>
-            审计查询
-          </Button>
+        <h1 className="text-xl font-semibold">WMS 原型预览</h1>
+        <span className="text-xs text-muted-foreground">ADR-0021 / ADR-0022</span>
+        <div className="ml-auto flex gap-2 flex-wrap">
+          {TABS.map((t) => (
+            <Button
+              key={t.value}
+              variant={tab === t.value ? "default" : "outline"}
+              size="sm"
+              onClick={() => {
+                setTab(t.value);
+                window.location.hash = t.value;
+              }}
+            >
+              {t.label}
+            </Button>
+          ))}
         </div>
       </div>
 
+      {tab === "gallery" && <ComponentsGallery />}
       {tab === "pda-login" && (
         <div className="flex justify-center gap-8 flex-wrap">
           <div>
