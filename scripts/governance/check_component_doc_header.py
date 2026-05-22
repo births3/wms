@@ -66,17 +66,19 @@ def _check_file(path: Path) -> list[str]:
     text = path.read_text(encoding="utf-8")
     if SKIP_TAG in text[:500]:
         return []  # 显式豁免
-    m = DOC_BLOCK_RE.search(text[:2000])
-    if not m:
-        return [f"缺少顶部文档块 /** ... */"]
-    block = m.group(0)
-    missing = []
-    for name, pattern in REQUIRED_FIELDS:
-        if not pattern.search(block):
-            missing.append(name)
-    if missing:
-        return [f"文档头缺失字段: {', '.join(missing)}"]
-    return []
+    # 全文搜索文档块（pages 文件可能有 MOCK 数据前置，文档头在后）
+    blocks = list(DOC_BLOCK_RE.finditer(text))
+    if not blocks:
+        return [f"缺少 /** ... */ 文档块"]
+    # 检查所有文档块，至少一个满足全部 5 项字段
+    for m in blocks:
+        block = m.group(0)
+        if all(p.search(block) for _, p in REQUIRED_FIELDS):
+            return []  # 找到合格的文档块
+    # 没找到 → 报告第一个块缺哪些字段
+    block = blocks[0].group(0)
+    missing = [name for name, p in REQUIRED_FIELDS if not p.search(block)]
+    return [f"文档头缺失字段: {', '.join(missing)}"]
 
 
 def run() -> list[str]:
