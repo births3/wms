@@ -438,27 +438,70 @@ StatusBadge.displayName = "StatusBadge";
 
 ```bash
 cd prototypes && pnpm dev &                                    # 1. 起 vite
-python3 scripts/governance/capture_visual_snapshots.py         # 2. 截 11 个 tab → .visual-snapshots/
+python3 scripts/governance/capture_visual_snapshots.py         # 2. 截 N 个 tab → .visual-snapshots/
 python3 scripts/governance/check_visual_regression.py          # 3. 对比 baseline ↔ snapshot
 ```
 
-### 阈值（参 governance/visual-baselines/README.md）
+### 12.1 阈值（参 governance/visual-baselines/README.md）
 
 | 指标 | 通过 | 警告 | 错误（PR 阻断） |
 |---|---|---|---|
 | `mean_diff`（64×64 灰度均值差，0-255） | ≤ 2 | 2-10 | > 10 |
 | `pixel_diff_ratio`（像素级不同比例） | ≤ 0.5% | 0.5%-3% | > 3% |
 | MD5 一致 | ✓ 直接通过 | — | — |
+| **底部 30 行非白像素** | **< 5%** | — | **≥ 5%（疑似截断）** |
 
-### 何时更新 baseline
+### 12.2 何时更新 baseline
 
 - ✅ 业务方走查 approved 的视觉调整 → `cp prototypes/.visual-snapshots/*.png governance/visual-baselines/` + 更新 `manifest.toml.reviewed_at`
 - ❌ 回归 bug 不能更新 baseline（先修代码让脚本回到 0 差异）
 
-### 治理位置
+### 12.3 加新原型页的强制流程（红线）
 
-- `governance/visual-baselines/manifest.toml` — 11 个 tab 的元数据（viewport / 关联故事 / reviewed_by）
-- `scripts/governance/capture_visual_snapshots.py` — 截图脚本（chrome headless）
-- `scripts/governance/check_visual_regression.py` — 对比脚本（PIL + MD5 短路 + 像素差异 + 64×64 感知差异 + 差异图叠加）
-- T3（preflight 阶段，pre-push hook 触发）— 不进 T1 因为依赖 vite + chrome
+加 page 必须**同步三处**，否则 `check_baseline_completeness.py` 会阻断 PR：
+
+1. 写 `prototypes/src/pages/<kebab-name>/<PascalName>.tsx`
+2. 在 `prototypes/src/Tabs.tsx` 的 `TABS` 数组追加：
+   ```tsx
+   { value: "kebab-name", label: "页面名", group: "M? 模块名", device: ["pc"|"pda"|"pad"],
+     render: () => wrap(<PascalName />) },
+   ```
+3. 在 `governance/visual-baselines/manifest.toml` 追加：
+   ```toml
+   [[snapshots]]
+   tab = "kebab-name"
+   url_hash = "#kebab-name"
+   viewport = "1500x1100"        # PDA 双视图最少 1500x1100；长 PDA 1500x1700+
+   file = "kebab-name.png"
+   reviewed_by = "项目主人"
+   reviewed_at = "YYYY-MM-DD"
+   related_story = "US-X-NNN ..."
+   ```
+4. 起 vite + 跑 capture + check 入 baseline:
+   ```bash
+   python3 scripts/governance/capture_visual_snapshots.py
+   cp prototypes/.visual-snapshots/<kebab-name>.png governance/visual-baselines/
+   python3 scripts/governance/check_visual_regression.py    # 应 0 差异
+   ```
+5. **人工 review 截图视觉无异常**：底部不截断 / 无偏移 / 无遮挡 / 内容对齐
+
+### 12.4 视觉打磨清单（review 时检查）
+
+每张新截图必须依次确认（治理脚本 + 人眼）：
+
+- [ ] **截断检测**通过（底部 30 行非白 < 5%）— 自动
+- [ ] **响应式**：sidebar + main 不互相遮挡 — 人工
+- [ ] **居中/对齐**：内容紧贴 main 起点（不要 `justify-center` 让 PDA 视图偏右）— 人工
+- [ ] **复杂组件**（PrintPreview/TempChart/AuditTimeline）核心内容**完整可见**，不靠滚动 — 人工
+- [ ] **viewport 高度**预留 200+ px 空白，避免内容贴底 — 人工
+- [ ] **状态色阶**符合 design tokens（参 §3 颜色系统）— 人工
+
+### 12.5 治理脚本一览
+
+| 脚本 | Tier | 作用 |
+|---|---|---|
+| `check_baseline_completeness.py` | T1 | Tabs.tsx ↔ manifest.toml ↔ baseline PNG 三者一致（强制） |
+| `capture_visual_snapshots.py` | 工具 | chrome headless 截图（按 manifest.toml 配置） |
+| `check_visual_regression.py` | T3 | MD5 + 像素 + 64×64 感知差异 + 底部截断检测 |
+
 

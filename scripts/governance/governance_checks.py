@@ -62,6 +62,7 @@ TIER_SCRIPTS: dict[str, list[str]] = {
         "check_component_props_classname.py",
         "check_component_registry_consistency.py",
         "check_page_size.py",
+        "check_baseline_completeness.py",
     ],
     "T2": [
         # T1 + diff 驱动（由 task_check.py 处理）

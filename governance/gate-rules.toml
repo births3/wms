@@ -129,7 +129,18 @@ tier = "T1"
 
 [[rules]]
 match = "prototypes/src/pages/**"
-checks = ["check_component_doc_header", "check_page_size"]
+checks = ["check_component_doc_header", "check_page_size", "check_baseline_completeness"]
+tier = "T1"
+
+# baseline 完整性：Tabs.tsx ↔ manifest.toml ↔ baseline PNG 三者一致
+[[rules]]
+match = "prototypes/src/Tabs.tsx"
+checks = ["check_baseline_completeness"]
+tier = "T1"
+
+[[rules]]
+match = "governance/visual-baselines/manifest.toml"
+checks = ["check_baseline_completeness"]
 tier = "T1"
 
 [[rules]]

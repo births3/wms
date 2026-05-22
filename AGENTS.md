@@ -447,6 +447,7 @@
 - **单页面 `.tsx` < 300 行**（≥ 300 警告，≥ 500 PR 门禁，加 `@governance: skip-page-size` 注释豁免）
 - **流程类组件按决策树选型**（StepFlow 通用进度 / AuditTimeline 历史事件 / ApprovalFlow 审批 / DualSignPanel 双人签字特例）
 - 新增 Layer 2 组件 PR 必须在 component-registry.md §3.1 注册
+- **加新原型页强制三同步**（page → Tabs.tsx → manifest.toml → baseline PNG），跑一次 `capture_visual_snapshots.py` + 人工 review 截图无截断/偏移；`check_baseline_completeness.py` 强制阻断（参前端规范 §12.3）
 
 ### 前端治理脚本（T1 自动跑）
 
@@ -457,11 +458,13 @@
 | `check_component_props_classname.py` | Props 接口含 className + forwardRef + displayName |
 | `check_component_registry_consistency.py` | 注册表 ↔ 实际目录一致（区分"已开发"/"待开发"） |
 | `check_page_size.py` | 页面 < 300 行通过 / 300-499 警告 / ≥ 500 门禁 |
+| `check_baseline_completeness.py` | **Tabs.tsx ↔ manifest.toml ↔ baseline PNG 三者一致（强制）** |
 | `check_prototype_index_consistency.py` | 原型 index.toml 字段合法 |
 | `check_prototype_story_sync.py` | 原型 ↔ 故事文件同步 |
 | `check_prototype_freshness.py` | 原型走查时效（90 天） |
 | `check_prototype_usability_baseline.py` | PDA 触控/字号基线 |
 | `check_prototype_review_signoff.py` | 走查签字（T2，PR 阶段） |
+| `check_visual_regression.py` | **视觉回归（T3） + 底部截断检测**（参规范 §12.4） |
 
 ## 当前阶段
 
