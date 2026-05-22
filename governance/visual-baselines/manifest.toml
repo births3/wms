@@ -146,3 +146,30 @@ file = "m2-reject.png"
 reviewed_by = "项目主人"
 reviewed_at = "2026-05-22"
 related_story = "US-M2-006 PDA 拒收"
+
+[[snapshots]]
+tab = "m1-items"
+url_hash = "#m1-items"
+viewport = "1500x950"
+file = "m1-items.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-22"
+related_story = "US-M1-001 商品档案管理"
+
+[[snapshots]]
+tab = "m1-suppliers"
+url_hash = "#m1-suppliers"
+viewport = "1500x1000"
+file = "m1-suppliers.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-22"
+related_story = "US-M1-002 供应商资质档案"
+
+[[snapshots]]
+tab = "m1-locations"
+url_hash = "#m1-locations"
+viewport = "1500x1100"
+file = "m1-locations.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-22"
+related_story = "US-M1-004 仓库与库位管理"

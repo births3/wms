@@ -17,6 +17,9 @@ import { M2InboundTasks } from "./pages/m2-inbound-tasks";
 import { M2InboundAccept } from "./pages/m2-inbound-accept";
 import { M2Putaway } from "./pages/m2-putaway";
 import { M2Reject } from "./pages/m2-reject";
+import { M1Items } from "./pages/m1-items";
+import { M1Suppliers } from "./pages/m1-suppliers";
+import { M1Locations } from "./pages/m1-locations";
 
 type Tab =
   | "gallery"
@@ -33,9 +36,12 @@ type Tab =
   | "m2-tasks"
   | "m2-accept"
   | "m2-putaway"
-  | "m2-reject";
+  | "m2-reject"
+  | "m1-items"
+  | "m1-suppliers"
+  | "m1-locations";
 
-const TABS: { value: Tab; label: string; group: "组件" | "H1" | "H2" | "H3" | "M2" }[] = [
+const TABS: { value: Tab; label: string; group: "组件" | "H1" | "H2" | "H3" | "M1" | "M2" }[] = [
   { value: "gallery", label: "组件库", group: "组件" },
   { value: "h1-login-pda", label: "PDA 登录", group: "H1" },
   { value: "h1-login-pc", label: "PC 登录", group: "H1" },
@@ -45,6 +51,9 @@ const TABS: { value: Tab; label: string; group: "组件" | "H1" | "H2" | "H3" | 
   { value: "h2-audit", label: "审计查询", group: "H2" },
   { value: "h2-archive", label: "数据归档", group: "H2" },
   { value: "h3-swagger", label: "API 文档", group: "H3" },
+  { value: "m1-items", label: "M1 商品档案", group: "M1" },
+  { value: "m1-suppliers", label: "M1 供应商资质", group: "M1" },
+  { value: "m1-locations", label: "M1 仓库库位", group: "M1" },
   { value: "m2-tasks", label: "M2 任务列表", group: "M2" },
   { value: "m2-accept", label: "M2 14步验收", group: "M2" },
   { value: "m2-putaway", label: "M2 上架", group: "M2" },
@@ -178,6 +187,21 @@ function App() {
       {tab === "m2-reject" && (
         <div className="flex justify-center">
           <M2Reject />
+        </div>
+      )}
+      {tab === "m1-items" && (
+        <div className="flex justify-center">
+          <M1Items />
+        </div>
+      )}
+      {tab === "m1-suppliers" && (
+        <div className="flex justify-center">
+          <M1Suppliers />
+        </div>
+      )}
+      {tab === "m1-locations" && (
+        <div className="flex justify-center">
+          <M1Locations />
         </div>
       )}
     </div>
