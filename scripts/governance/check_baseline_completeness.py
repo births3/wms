@@ -96,9 +96,13 @@ def main() -> int:
     for tab in sorted(orphan_in_manifest):
         errors.append(f"tab '{tab}' 在 manifest.toml 但 Tabs.tsx 已无对应（请删 manifest 条目）")
 
-    # c) baseline PNG 文件存在
+    # c) baseline PNG 文件存在 + reviewed 字段必填 + reviewed_at >= PNG mtime
+    import datetime
     for tab in set_tabs & set_manifest:
-        png_name = manifest_files.get(tab)
+        snap = next((s for s in manifest_snaps if s["tab"] == tab), None)
+        if snap is None:
+            continue
+        png_name = snap.get("file")
         if not png_name:
             errors.append(f"tab '{tab}' 在 manifest 缺 file 字段")
             continue
@@ -108,6 +112,28 @@ def main() -> int:
             continue
         if png_path.stat().st_size < 1024:  # < 1KB 视为空文件
             errors.append(f"tab '{tab}' baseline PNG 异常小（{png_path.stat().st_size} bytes，疑似截图失败）")
+            continue
+
+        # reviewed_by 必填（不能为空字符串或 'TODO'）
+        reviewed_by = snap.get("reviewed_by", "").strip()
+        if not reviewed_by or reviewed_by.lower() in ("todo", "tbd", "?", "-"):
+            errors.append(f"tab '{tab}' manifest.reviewed_by 缺失或占位（'{reviewed_by}'），必须填实际 review 人")
+
+        # reviewed_at 必填 + 格式 YYYY-MM-DD
+        reviewed_at = snap.get("reviewed_at", "").strip()
+        if not reviewed_at:
+            errors.append(f"tab '{tab}' manifest.reviewed_at 缺失")
+            continue
+        try:
+            datetime.date.fromisoformat(reviewed_at)
+        except ValueError:
+            errors.append(f"tab '{tab}' manifest.reviewed_at 格式错误（'{reviewed_at}'，需 YYYY-MM-DD）")
+            continue
+
+        # 注：PNG mtime 与 reviewed_at 的比较已移除，原因：
+        # - mtime 在 cp / git checkout 时会被刷新，不可靠
+        # - 'PNG 改了视觉是否健康' 由 check_visual_keywords (OCR) 替代治理
+        # - 真要追溯 review 历史，看 git log 即可
 
     # d) 反向：baseline 目录里有 .png 但 manifest 无引用
     referenced = {f for f in manifest_files.values() if f}

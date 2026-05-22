@@ -73,6 +73,8 @@ TIER_SCRIPTS: dict[str, list[str]] = {
         # Wave 3+ handler test coverage / idempotency / permission matrix
         # 视觉回归（重，依赖 vite + chrome 提前生成 snapshot）
         "check_visual_regression.py",
+        # OCR 视觉关键字识别（图片识别替代人工 review 部分）
+        "check_visual_keywords.py",
     ],
     "T4": [
         # 未来 Wave 4+：perf baseline、observability、concurrency、API compat 等
