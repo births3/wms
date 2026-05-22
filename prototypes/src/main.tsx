@@ -11,6 +11,8 @@ import { H2AuditQuery } from "./pages/h2-audit-query";
 import { H2Archive } from "./pages/h2-archive";
 import { H3SwaggerUi } from "./pages/h3-swagger";
 import { ComponentsGallery } from "./pages/components-gallery";
+import { M2DualSign } from "./pages/m2-dual-sign";
+import { M2InboundKanban } from "./pages/m2-inbound-kanban";
 
 type Tab =
   | "gallery"
@@ -21,9 +23,11 @@ type Tab =
   | "h1-role"
   | "h2-audit"
   | "h2-archive"
-  | "h3-swagger";
+  | "h3-swagger"
+  | "m2-dual-sign"
+  | "m2-kanban";
 
-const TABS: { value: Tab; label: string; group: "组件" | "H1" | "H2" | "H3" }[] = [
+const TABS: { value: Tab; label: string; group: "组件" | "H1" | "H2" | "H3" | "M2" }[] = [
   { value: "gallery", label: "组件库", group: "组件" },
   { value: "h1-login-pda", label: "PDA 登录", group: "H1" },
   { value: "h1-login-pc", label: "PC 登录", group: "H1" },
@@ -33,6 +37,8 @@ const TABS: { value: Tab; label: string; group: "组件" | "H1" | "H2" | "H3" }[
   { value: "h2-audit", label: "审计查询", group: "H2" },
   { value: "h2-archive", label: "数据归档", group: "H2" },
   { value: "h3-swagger", label: "API 文档", group: "H3" },
+  { value: "m2-dual-sign", label: "M2 双人签字", group: "M2" },
+  { value: "m2-kanban", label: "M2 收货看板", group: "M2" },
 ];
 
 function App() {
@@ -130,6 +136,16 @@ function App() {
       {tab === "h3-swagger" && (
         <div className="flex justify-center">
           <H3SwaggerUi />
+        </div>
+      )}
+      {tab === "m2-dual-sign" && (
+        <div className="flex justify-center">
+          <M2DualSign />
+        </div>
+      )}
+      {tab === "m2-kanban" && (
+        <div className="flex justify-center">
+          <M2InboundKanban />
         </div>
       )}
     </div>
