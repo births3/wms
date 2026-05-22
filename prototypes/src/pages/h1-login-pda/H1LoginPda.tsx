@@ -13,9 +13,9 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui";
-import { OfflineIndicator } from "@/components/OfflineIndicator";
-import { ScanInput } from "@/components/ScanInput";
-import { StatusBadge } from "@/components/StatusBadge";
+import { OfflineIndicator } from "@/components/business";
+import { ScanInput } from "@/components/business";
+import { StatusBadge } from "@/components/business";
 
 type LoginMode = "badge" | "password";
 
@@ -24,7 +24,18 @@ export interface H1LoginPdaProps {
   errorState?: boolean;
 }
 
-/** US-H1-001 PDA 登录页 — shadcn/ui 重写 */
+/**
+ * H1LoginPda — PDA 端登录页
+ *
+ * 层级：Layer 3 页面级
+ * 关联故事：US-H1-001（PDA 主用工牌扫码 + 备用账号密码）
+ * Wave：Wave 0.5（P0 必交付）
+ * 业务约束：触控基线 ≥ 48pt；离线 token 缓存（H1 §7）；密码 5 次失败锁定
+ *
+ * @example
+ *   <H1LoginPda />
+ *   <H1LoginPda offlineMode errorState />
+ */
 export function H1LoginPda({ offlineMode, errorState }: H1LoginPdaProps = {}) {
   const [mode, setMode] = useState<LoginMode>("badge");
   const [account, setAccount] = useState("");

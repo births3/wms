@@ -45,6 +45,7 @@
 | [ADR-0018](0018-resilience-engineering.md) | 弹性工程 | Accepted | 6 大能力统一方案：幂等分级 / 重试 4 级（L0-L3）/ 限流 3 维度 / 熔断状态机 / 降级 4 级（D0-D3）/ 死信处理流程 + DLQ 表；继承 coding-standards §3.3 + ADR-0006 L11 + technical-specs §H8 + clarifications #36 |
 | [ADR-0019](0019-tenant-custom-fields.md) | 货主自定义属性 | Accepted | 简化版借鉴 Odoo Studio：JSONB 列 + 配置中心 schema + `x_` 前缀命名 + 6 聚合根白名单 + Rust 运行时校验；ADR-0008 第 10 项；Wave 5 实施 |
 | [ADR-0021](0021-high-fidelity-prototype-strategy.md) | 高保真原型策略 | Accepted | Storybook + shadcn/ui 真组件；Wave N 前必须有原型 + 走查；5 个治理脚本 |
+| [ADR-0022](0022-prototype-component-spec.md) | 原型组件规范 | Accepted | 三层架构（ui/business/pages）+ cva variants + tailwind + forwardRef + 文档头规范 + 4 治理脚本规划 |
 | ADR-0020+ | 未分配 | 后续按需新建 |
 
 > 编号永不复用。空缺编号必须在此表登记原因。

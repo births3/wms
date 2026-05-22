@@ -9,8 +9,8 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui";
-import { StatusBadge } from "@/components/StatusBadge";
-import { DiffPanel } from "@/components/DiffPanel";
+import { StatusBadge } from "@/components/business";
+import { DiffPanel } from "@/components/business";
 
 interface AuditEvent {
   id: string;
@@ -22,6 +22,18 @@ interface AuditEvent {
   result: "completed" | "unqualified";
   detail?: { before?: Record<string, string>; after?: Record<string, string> };
 }
+
+/**
+ * H2AuditQuery — 审计追踪查询页
+ *
+ * 层级：Layer 3 页面级
+ * 关联故事：US-H2-002（审计追踪查询，6 维度筛选 + DiffPanel 旧值新值对比）
+ * Wave：Wave 0.5（P0 必交付）
+ * 业务约束：append-only（GSP 合规，不可改不可删）；P99 ≤ 2s（30 天范围）
+ *
+ * @example
+ *   <H2AuditQuery />
+ */
 
 const MOCK_EVENTS: AuditEvent[] = [
   {

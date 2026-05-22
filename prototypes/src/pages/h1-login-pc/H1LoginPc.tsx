@@ -1,9 +1,20 @@
 import { useState } from "react";
 import { Button, Input, Label, Card, Checkbox, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui";
-import { StatusBadge } from "@/components/StatusBadge";
+import { StatusBadge } from "@/components/business";
 import { CheckCircle2 } from "lucide-react";
 
-/** US-H1-001 PC 登录页 — shadcn/ui 重写 */
+/**
+ * H1LoginPc — PC 端管理后台登录页
+ *
+ * 层级：Layer 3 页面级
+ * 关联故事：US-H1-001（PC 主用工号 + 密码）
+ * Wave：Wave 0.5（P0 必交付）
+ * 业务约束：5 次失败显示验证码；多货主切换；JWT 默认 8 小时
+ *
+ * @example
+ *   <H1LoginPc />
+ *   <H1LoginPc withCaptcha />
+ */
 export function H1LoginPc({ withCaptcha = false }: { withCaptcha?: boolean } = {}) {
   const [account, setAccount] = useState("");
   const [password, setPassword] = useState("");

@@ -347,14 +347,17 @@
 ## 必读文档（按优先级）
 
 1. [docs/coding-standards.md](docs/coding-standards.md) — 代码书写规范（Rust / TS / 跨端 / 禁止清单）
-2. [docs/governance.md](docs/governance.md) — 治理体系（5 类 + 4 Tier + Baseline + 文档四层管理）
-3. [docs/adr/0006-tdd-and-test-layers.md](docs/adr/0006-tdd-and-test-layers.md) — TDD + 11 层测试
-4. [docs/architecture-dependencies.md](docs/architecture-dependencies.md) — 模块依赖图（当前模块清单 + 5 波次）
-5. [docs/adr/README.md](docs/adr/README.md) — 所有架构决策索引
-6. [docs/infra/technical-specs.md](docs/infra/technical-specs.md) — 基础设施技术规格（H6 状态机 / H7 导入导出 / H8 ERP 防腐层 / H9 打印 / H10 备份恢复）
-7. [docs/concept-audit.md](docs/concept-audit.md) — 概念审计报告（8 镜头扫描结果 + 数据量评估）
-8. [docs/domain/clarifications.md](docs/domain/clarifications.md) — 业务澄清记录（42 项决策）
-9. [docs/glossary.md](docs/glossary.md) — 术语表（54 个，含禁用词）
+2. [docs/frontend-coding-standards.md](docs/frontend-coding-standards.md) — **前端编码规范**（项目结构 / 命名 / 组件接口 / Tailwind 风格 / PDA 触控基线 / 4 个治理脚本 / PR 自查清单）
+3. [docs/governance.md](docs/governance.md) — 治理体系（5 类 + 4 Tier + Baseline + 文档四层管理）
+4. [docs/adr/0006-tdd-and-test-layers.md](docs/adr/0006-tdd-and-test-layers.md) — TDD + 11 层测试
+5. [docs/adr/0021-high-fidelity-prototype-strategy.md](docs/adr/0021-high-fidelity-prototype-strategy.md) — 高保真原型策略（shadcn/ui + Storybook 工具链）
+6. [docs/adr/0022-prototype-component-spec.md](docs/adr/0022-prototype-component-spec.md) — 原型组件规范（三层架构 + cva + forwardRef + 文档头）
+7. [docs/architecture-dependencies.md](docs/architecture-dependencies.md) — 模块依赖图（当前模块清单 + 5 波次）
+8. [docs/adr/README.md](docs/adr/README.md) — 所有架构决策索引
+9. [docs/infra/technical-specs.md](docs/infra/technical-specs.md) — 基础设施技术规格（H6 状态机 / H7 导入导出 / H8 ERP 防腐层 / H9 打印 / H10 备份恢复）
+10. [docs/concept-audit.md](docs/concept-audit.md) — 概念审计报告（8 镜头扫描结果 + 数据量评估）
+11. [docs/domain/clarifications.md](docs/domain/clarifications.md) — 业务澄清记录（42 项决策）
+12. [docs/glossary.md](docs/glossary.md) — 术语表（54 个，含禁用词）
 
 ## 业务文档索引
 
@@ -430,6 +433,32 @@
 - 审计表只能 INSERT，禁止 UPDATE/DELETE
 - domain 不依赖 infra
 - **发现缺口必须确认**：新增模块/故事/基础设施前必须和用户确认（见上方流程）
+
+### 前端组件红线（详见 [frontend-coding-standards.md](docs/frontend-coding-standards.md)）
+
+- 三层架构：`components/ui/`（shadcn 原子）/ `components/business/`（业务复合）/ `pages/`（页面级）；依赖方向不可反向
+- 业务复合组件必须 `React.forwardRef` + 继承 `HTMLAttributes` + `cn()` 合并 className + `displayName`
+- 业务复合组件**禁止静态 inline style**（动态值用 `// 动态：理由` 注释豁免）
+- 颜色用 CSS 变量（`bg-primary`），不直写 hex；间距/字号/圆角用 tailwind token
+- 顶部文档头 5 项强制：用途 / 层级 / 关联故事 / Wave / @example
+- size 三档对齐 shadcn：`sm | default | lg`（禁止 md）
+- 状态枚举必须对齐 `docs/prototypes/component-registry.md §4.3`
+- PDA 端组件触控 ≥ 48pt / 字号 ≥ 16pt（usability-baseline §2.1）
+- 新增 Layer 2 组件 PR 必须在 component-registry.md §3.1 注册
+
+### 前端治理脚本（T1 自动跑）
+
+| 脚本 | 校验 |
+|---|---|
+| `check_component_doc_header.py` | 顶部文档头 5 项字段齐全 |
+| `check_component_no_inline_style.py` | 业务复合无静态 inline style（动态值豁免） |
+| `check_component_props_classname.py` | Props 接口含 className + forwardRef + displayName |
+| `check_component_registry_consistency.py` | 注册表 ↔ 实际目录一致（区分"已开发"/"待开发"） |
+| `check_prototype_index_consistency.py` | 原型 index.toml 字段合法 |
+| `check_prototype_story_sync.py` | 原型 ↔ 故事文件同步 |
+| `check_prototype_freshness.py` | 原型走查时效（90 天） |
+| `check_prototype_usability_baseline.py` | PDA 触控/字号基线 |
+| `check_prototype_review_signoff.py` | 走查签字（T2，PR 阶段） |
 
 ## 当前阶段
 

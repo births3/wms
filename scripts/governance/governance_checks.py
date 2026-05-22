@@ -57,6 +57,10 @@ TIER_SCRIPTS: dict[str, list[str]] = {
         "check_prototype_story_sync.py",
         "check_prototype_freshness.py",
         "check_prototype_usability_baseline.py",
+        "check_component_doc_header.py",
+        "check_component_no_inline_style.py",
+        "check_component_props_classname.py",
+        "check_component_registry_consistency.py",
     ],
     "T2": [
         # T1 + diff 驱动（由 task_check.py 处理）
