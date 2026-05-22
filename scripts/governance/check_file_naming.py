@@ -55,7 +55,7 @@ COMPLIANCE_RE = re.compile(r"^gsp-[a-z0-9][a-z0-9\-]*\.md$")
 # 治理脚本: snake_case.py（公共库 _前缀）
 GOV_SCRIPT_RE = re.compile(r"^_?[a-z][a-z0-9_]*\.py$")
 # TS 测试: *.spec.ts / *.spec.tsx
-TS_TEST_RE = re.compile(r"^.+\.spec\.tsx?$")
+TS_TEST_RE = re.compile(r"^.+\.(spec|test|stories)\.tsx?$")
 
 # 忽略的文件/目录
 IGNORE_NAMES = {
