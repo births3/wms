@@ -185,6 +185,24 @@ reviewed_at = "2026-05-23"
 related_story = "US-M4-003 PDA 拣货（FIFO）"
 
 [[snapshots]]
+tab = "m3-inventory"
+url_hash = "#m3-inventory"
+viewport = "1700x1200"
+file = "m3-inventory.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-23"
+related_story = "US-M3-001 库存查询（多维筛选）"
+
+[[snapshots]]
+tab = "m3-stocktake"
+url_hash = "#m3-stocktake"
+viewport = "1500x1700"
+file = "m3-stocktake.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-23"
+related_story = "US-M3-005 PDA 盘点（双盘）"
+
+[[snapshots]]
 tab = "m4-review"
 url_hash = "#m4-review"
 viewport = "1500x1700"

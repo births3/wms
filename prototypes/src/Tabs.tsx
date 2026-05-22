@@ -21,6 +21,8 @@ import { M4Picking } from "./pages/m4-picking";
 import { M4Review } from "./pages/m4-review";
 import { M4Manifest } from "./pages/m4-manifest";
 import { M4Exception } from "./pages/m4-exception";
+import { M3Inventory } from "./pages/m3-inventory";
+import { M3Stocktake } from "./pages/m3-stocktake";
 
 /**
  * tabs.tsx — 原型 tab 注册表（数据驱动）
@@ -30,7 +32,7 @@ import { M4Exception } from "./pages/m4-exception";
  */
 
 export type Device = "pc" | "pda" | "pad" | "shared";
-export type Group = "组件" | "H1 权限审计" | "H2/H3 治理" | "M1 基础数据" | "M2 采购入库" | "M4 销售出库";
+export type Group = "组件" | "H1 权限审计" | "H2/H3 治理" | "M1 基础数据" | "M2 采购入库" | "M3 库存核心" | "M4 销售出库";
 
 export interface TabDef {
   value: string;
@@ -115,6 +117,12 @@ export const TABS: TabDef[] = [
   { value: "m2-kanban", label: "收货看板", group: "M2 采购入库", device: ["pc", "pad"],
     render: () => wrap(<M2InboundKanban />) },
 
+  // M3 库存核心
+  { value: "m3-inventory", label: "库存查询", group: "M3 库存核心", device: ["pc"],
+    render: () => wrap(<M3Inventory />) },
+  { value: "m3-stocktake", label: "PDA 盘点", group: "M3 库存核心", device: ["pda"],
+    render: () => wrap(<M3Stocktake />) },
+
   // M4 销售出库
   { value: "m4-picking", label: "PDA 拣货", group: "M4 销售出库", device: ["pda"],
     render: () => wrap(<M4Picking />) },
@@ -139,5 +147,6 @@ export const GROUP_ORDER: Group[] = [
   "H2/H3 治理",
   "M1 基础数据",
   "M2 采购入库",
+  "M3 库存核心",
   "M4 销售出库",
 ];
