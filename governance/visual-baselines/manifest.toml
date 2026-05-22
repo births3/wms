@@ -228,3 +228,21 @@ file = "m4-exception.png"
 reviewed_by = "项目主人"
 reviewed_at = "2026-05-23"
 related_story = "US-M4-006 异常拣货"
+
+[[snapshots]]
+tab = "m5-cold"
+url_hash = "#m5-cold"
+viewport = "1700x1300"
+file = "m5-cold.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-23"
+related_story = "US-M5-002 冷链温度监控（TempChart ★）"
+
+[[snapshots]]
+tab = "m6-reports"
+url_hash = "#m6-reports"
+viewport = "1700x1300"
+file = "m6-reports.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-23"
+related_story = "US-M6-002 GSP 法定报表（AuditTimeline ★）"

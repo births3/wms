@@ -23,6 +23,8 @@ import { M4Manifest } from "./pages/m4-manifest";
 import { M4Exception } from "./pages/m4-exception";
 import { M3Inventory } from "./pages/m3-inventory";
 import { M3Stocktake } from "./pages/m3-stocktake";
+import { M5ColdMonitor } from "./pages/m5-cold-monitor";
+import { M6Reports } from "./pages/m6-reports";
 
 /**
  * tabs.tsx — 原型 tab 注册表（数据驱动）
@@ -32,7 +34,7 @@ import { M3Stocktake } from "./pages/m3-stocktake";
  */
 
 export type Device = "pc" | "pda" | "pad" | "shared";
-export type Group = "组件" | "H1 权限审计" | "H2/H3 治理" | "M1 基础数据" | "M2 采购入库" | "M3 库存核心" | "M4 销售出库";
+export type Group = "组件" | "H1 权限审计" | "H2/H3 治理" | "M1 基础数据" | "M2 采购入库" | "M3 库存核心" | "M4 销售出库" | "M5 冷链 / M6 报表";
 
 export interface TabDef {
   value: string;
@@ -132,6 +134,12 @@ export const TABS: TabDef[] = [
     render: () => wrap(<M4Manifest />) },
   { value: "m4-exception", label: "PDA 异常拣货", group: "M4 销售出库", device: ["pda"],
     render: () => wrap(<M4Exception />) },
+
+  // M5 冷链 / M6 报表
+  { value: "m5-cold", label: "冷链监控", group: "M5 冷链 / M6 报表", device: ["pc"],
+    render: () => wrap(<M5ColdMonitor />) },
+  { value: "m6-reports", label: "GSP 报表", group: "M5 冷链 / M6 报表", device: ["pc"],
+    render: () => wrap(<M6Reports />) },
 ];
 
 export const DEVICE_META: Record<Device, { label: string; color: string }> = {
@@ -149,4 +157,5 @@ export const GROUP_ORDER: Group[] = [
   "M2 采购入库",
   "M3 库存核心",
   "M4 销售出库",
+  "M5 冷链 / M6 报表",
 ];
