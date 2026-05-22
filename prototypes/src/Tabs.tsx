@@ -25,6 +25,10 @@ import { M3Inventory } from "./pages/m3-inventory";
 import { M3Stocktake } from "./pages/m3-stocktake";
 import { M5ColdMonitor } from "./pages/m5-cold-monitor";
 import { M6Reports } from "./pages/m6-reports";
+import { M2Asn } from "./pages/m2-asn";
+import { M2Hours } from "./pages/m2-hours";
+import { M8StorageFeeRules } from "./pages/m8-storage-fee";
+import { M10InTransitTemp } from "./pages/m10-in-transit-temp";
 
 /**
  * tabs.tsx — 原型 tab 注册表（数据驱动）
@@ -34,7 +38,7 @@ import { M6Reports } from "./pages/m6-reports";
  */
 
 export type Device = "pc" | "pda" | "pad" | "shared";
-export type Group = "组件" | "H1 权限审计" | "H2/H3 治理" | "M1 基础数据" | "M2 采购入库" | "M3 库存核心" | "M4 销售出库" | "M5 冷链 / M6 报表";
+export type Group = "组件" | "H1 权限审计" | "H2/H3 治理" | "M1 基础数据" | "M2 采购入库" | "M3 库存核心" | "M4 销售出库" | "M5 冷链 / M6 报表" | "M8 计费 / M10 TMS";
 
 export interface TabDef {
   value: string;
@@ -106,6 +110,8 @@ export const TABS: TabDef[] = [
     render: () => wrap(<M1Locations />) },
 
   // M2 采购入库
+  { value: "m2-asn", label: "ASN 接收", group: "M2 采购入库", device: ["pc"],
+    render: () => wrap(<M2Asn />) },
   { value: "m2-tasks", label: "PDA 任务列表", group: "M2 采购入库", device: ["pda"],
     render: () => wrap(<M2InboundTasks />) },
   { value: "m2-accept", label: "PDA 14 步验收", group: "M2 采购入库", device: ["pda"],
@@ -118,6 +124,8 @@ export const TABS: TabDef[] = [
     render: () => wrap(<M2DualSign />) },
   { value: "m2-kanban", label: "收货看板", group: "M2 采购入库", device: ["pc", "pad"],
     render: () => wrap(<M2InboundKanban />) },
+  { value: "m2-hours", label: "工时统计", group: "M2 采购入库", device: ["pc"],
+    render: () => wrap(<M2Hours />) },
 
   // M3 库存核心
   { value: "m3-inventory", label: "库存查询", group: "M3 库存核心", device: ["pc"],
@@ -140,6 +148,12 @@ export const TABS: TabDef[] = [
     render: () => wrap(<M5ColdMonitor />) },
   { value: "m6-reports", label: "GSP 报表", group: "M5 冷链 / M6 报表", device: ["pc"],
     render: () => wrap(<M6Reports />) },
+
+  // M8 计费 / M10 TMS
+  { value: "m8-storage-fee", label: "仓储费规则", group: "M8 计费 / M10 TMS", device: ["pc"],
+    render: () => wrap(<M8StorageFeeRules />) },
+  { value: "m10-in-transit", label: "在途温控", group: "M8 计费 / M10 TMS", device: ["pc"],
+    render: () => wrap(<M10InTransitTemp />) },
 ];
 
 export const DEVICE_META: Record<Device, { label: string; color: string }> = {
@@ -158,4 +172,5 @@ export const GROUP_ORDER: Group[] = [
   "M3 库存核心",
   "M4 销售出库",
   "M5 冷链 / M6 报表",
+  "M8 计费 / M10 TMS",
 ];

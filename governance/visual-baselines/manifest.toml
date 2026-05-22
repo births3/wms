@@ -144,6 +144,46 @@ expected_keywords = ["M2-002", "PO-2026-0001", "PO-2026-0002", "PO-2026-0003", "
 related_story = "US-M2-002 PDA 待收货任务列表"
 
 [[snapshots]]
+tab = "m2-asn"
+url_hash = "#m2-asn"
+viewport = "1700x1100"
+file = "m2-asn.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-23"
+expected_keywords = ["M2-001", "PO-2026-0034", "PUR-A4521", "GSP", "EDI"]
+related_story = "US-M2-001 ASN 接收（PC 入口）"
+
+[[snapshots]]
+tab = "m2-hours"
+url_hash = "#m2-hours"
+viewport = "1700x1300"
+file = "m2-hours.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-23"
+expected_keywords = ["M2-009", "u001", "u002", "u003", "u004"]
+related_story = "US-M2-009 收货工时统计"
+
+[[snapshots]]
+tab = "m8-storage-fee"
+url_hash = "#m8-storage-fee"
+viewport = "1700x1400"
+file = "m8-storage-fee.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-23"
+expected_keywords = ["M8-001", "GSP", "RT", "CR", "FR"]
+related_story = "US-M8-001 仓储费规则（RuleEditor ★）"
+
+[[snapshots]]
+tab = "m10-in-transit"
+url_hash = "#m10-in-transit"
+viewport = "1700x1300"
+file = "m10-in-transit.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-23"
+expected_keywords = ["M10-002", "GSP", "TR-2026", "5.6", "8.7"]
+related_story = "US-M10-002 在途温控（TempChart 第二次真用）"
+
+[[snapshots]]
 tab = "m2-accept"
 url_hash = "#m2-accept"
 viewport = "1500x1700"

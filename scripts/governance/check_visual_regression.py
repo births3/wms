@@ -87,41 +87,47 @@ def _detect_truncation(snapshot: Path) -> tuple[bool, float]:
     return (ratio >= 0.05, ratio)
 
 
-def _compare_pixels(baseline: Path, snapshot: Path, diff_out: Path | None = None) -> tuple[float, float, str]:
-    """Returns (mean_diff_64x64, pixel_diff_ratio, error_msg)"""
+def _compare_pixels(baseline: Path, snapshot: Path, diff_out: Path | None = None) -> tuple[float, float, str, int]:
+    """Returns (mean_diff_64x64, pixel_diff_ratio, error_msg, phash_distance)
+    phash_distance: -1 未计算，0 完全一致，越大结构越不同
+    """
     try:
         from PIL import Image, ImageChops
     except ImportError:
-        return (0.0, 0.0, "PIL 未安装")
+        return (0.0, 0.0, "PIL 未安装", -1)
 
     try:
         img_a = Image.open(baseline).convert("RGB")
         img_b = Image.open(snapshot).convert("RGB")
     except Exception as e:
-        return (0.0, 0.0, f"加载失败: {e}")
+        return (0.0, 0.0, f"加载失败: {e}", -1)
 
     if img_a.size != img_b.size:
-        return (-1.0, -1.0, f"尺寸不同 baseline={img_a.size} snapshot={img_b.size}")
+        return (-1.0, -1.0, f"尺寸不同 baseline={img_a.size} snapshot={img_b.size}", -1)
 
-    # 像素级差异比例
     diff = ImageChops.difference(img_a, img_b)
     bbox = diff.getbbox()
     if bbox is None:
-        return (0.0, 0.0, "")  # 完全一致
+        return (0.0, 0.0, "", 0)
     diff_l = diff.convert("L")
     pixels = list(diff_l.getdata())
     total = len(pixels)
-    nonzero = sum(1 for p in pixels if p > 5)  # 阈值 5 (256 灰度)，过滤抗锯齿微差
+    nonzero = sum(1 for p in pixels if p > 5)
     pixel_ratio = nonzero / total if total else 0.0
 
-    # 64×64 灰度均值差（感知差异）
     a64 = img_a.resize((64, 64)).convert("L")
     b64 = img_b.resize((64, 64)).convert("L")
     a_pix = list(a64.getdata())
     b_pix = list(b64.getdata())
     mean_diff = sum(abs(x - y) for x, y in zip(a_pix, b_pix)) / len(a_pix)
 
-    # 写差异图
+    phash_dist = -1
+    try:
+        import imagehash
+        phash_dist = imagehash.phash(img_a) - imagehash.phash(img_b)
+    except ImportError:
+        pass
+
     if diff_out is not None and bbox:
         diff_out.parent.mkdir(parents=True, exist_ok=True)
         red = Image.new("RGB", img_a.size, (255, 0, 0))
@@ -129,54 +135,7 @@ def _compare_pixels(baseline: Path, snapshot: Path, diff_out: Path | None = None
         composite = Image.composite(red, img_a, mask)
         composite.save(diff_out)
 
-    return (mean_diff, pixel_ratio, "")
-
-
-
-    """Returns (mean_diff_64x64, pixel_diff_ratio, error_msg)"""
-    try:
-        from PIL import Image, ImageChops
-    except ImportError:
-        return (0.0, 0.0, "PIL 未安装")
-
-    try:
-        img_a = Image.open(baseline).convert("RGB")
-        img_b = Image.open(snapshot).convert("RGB")
-    except Exception as e:
-        return (0.0, 0.0, f"加载失败: {e}")
-
-    if img_a.size != img_b.size:
-        return (-1.0, -1.0, f"尺寸不同 baseline={img_a.size} snapshot={img_b.size}")
-
-    # 像素级差异比例
-    diff = ImageChops.difference(img_a, img_b)
-    bbox = diff.getbbox()
-    if bbox is None:
-        return (0.0, 0.0, "")  # 完全一致
-    # 用 getdata 计算非零像素数
-    diff_l = diff.convert("L")
-    pixels = list(diff_l.getdata())
-    total = len(pixels)
-    nonzero = sum(1 for p in pixels if p > 5)  # 阈值 5 (256 灰度)，过滤抗锯齿微差
-    pixel_ratio = nonzero / total if total else 0.0
-
-    # 64×64 灰度均值差（感知差异）
-    a64 = img_a.resize((64, 64)).convert("L")
-    b64 = img_b.resize((64, 64)).convert("L")
-    a_pix = list(a64.getdata())
-    b_pix = list(b64.getdata())
-    mean_diff = sum(abs(x - y) for x, y in zip(a_pix, b_pix)) / len(a_pix)
-
-    # 写差异图
-    if diff_out is not None and bbox:
-        diff_out.parent.mkdir(parents=True, exist_ok=True)
-        # 红色叠加
-        red = Image.new("RGB", img_a.size, (255, 0, 0))
-        mask = diff_l.point(lambda p: 255 if p > 5 else 0)
-        composite = Image.composite(red, img_a, mask)
-        composite.save(diff_out)
-
-    return (mean_diff, pixel_ratio, "")
+    return (mean_diff, pixel_ratio, "", phash_dist)
 
 
 def main():
@@ -226,13 +185,14 @@ def main():
 
         # 2) 像素差异
         diff_out = None if args.no_diff_image else DIFF_DIR / snap["file"].replace(".png", ".diff.png")
-        mean_diff, pixel_ratio, err = _compare_pixels(baseline, snapshot, diff_out)
+        mean_diff, pixel_ratio, err, phash_dist = _compare_pixels(baseline, snapshot, diff_out)
         if err:
             errors.append(f"{tab}: 像素对比失败 - {err}")
             continue
 
-        # 分级
-        if mean_diff > MEAN_DIFF_ERR or pixel_ratio > PIXEL_RATIO_ERR:
+        # 三指标联合分级（mean_diff / pixel_ratio / phash）
+        is_phash_large = phash_dist >= 0 and phash_dist > 15
+        if mean_diff > MEAN_DIFF_ERR or pixel_ratio > PIXEL_RATIO_ERR or is_phash_large:
             level = "error"
             msg = f"{tab}: 视觉回归（mean_diff={mean_diff:.2f}, pixel_ratio={pixel_ratio*100:.2f}%）"
             errors.append(msg)

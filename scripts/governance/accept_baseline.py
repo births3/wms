@@ -45,6 +45,8 @@ TRUNCATION_THRESHOLD = 0.05  # 底部 30 行非白比例
 SMALL_CHANGE = 5.0           # mean_diff ≤ 5 视为小调整
 LARGE_CHANGE = 30.0          # mean_diff > 30 视为大变化
 LARGE_PIXEL_RATIO = 0.30     # pixel_ratio > 30% 视为大变化
+SMALL_PHASH = 5              # phash 距离 ≤ 5 视为视觉等价
+LARGE_PHASH = 15             # phash 距离 > 15 视为大幅 layout 变化
 
 
 def _load_toml(path: Path) -> dict:
@@ -95,17 +97,19 @@ def _detect_truncation(png: Path) -> float:
         return 0.0
 
 
-def _compare(baseline: Path, candidate: Path) -> tuple[float, float]:
-    """returns (mean_diff_64x64, pixel_ratio)"""
+def _compare(baseline: Path, candidate: Path) -> tuple[float, float, int]:
+    """returns (mean_diff_64x64, pixel_ratio, phash_distance)
+    phash_distance: 0 完全一致 / ≤ 5 视觉等价 / 5-10 中度变化 / > 10 大幅变化
+    """
     try:
         from PIL import Image, ImageChops
         a = Image.open(baseline).convert("RGB")
         b = Image.open(candidate).convert("RGB")
         if a.size != b.size:
-            return (-1.0, -1.0)
+            return (-1.0, -1.0, -1)
         diff = ImageChops.difference(a, b)
         if diff.getbbox() is None:
-            return (0.0, 0.0)
+            return (0.0, 0.0, 0)
         diff_l = diff.convert("L")
         ps = list(diff_l.getdata())
         ratio = sum(1 for p in ps if p > 5) / len(ps)
@@ -114,9 +118,20 @@ def _compare(baseline: Path, candidate: Path) -> tuple[float, float]:
         a_p = list(a64.getdata())
         b_p = list(b64.getdata())
         mean = sum(abs(x - y) for x, y in zip(a_p, b_p)) / len(a_p)
-        return (mean, ratio)
+
+        # phash 感知哈希距离（对 layout 结构变化比 mean_diff 敏感）
+        phash_dist = 0
+        try:
+            import imagehash
+            ha = imagehash.phash(a)
+            hb = imagehash.phash(b)
+            phash_dist = ha - hb
+        except ImportError:
+            phash_dist = -1  # 未装
+
+        return (mean, ratio, phash_dist)
     except Exception:
-        return (-1.0, -1.0)
+        return (-1.0, -1.0, -1)
 
 
 def _ocr_keyword_hits(png: Path, keywords: list[str]) -> int:
@@ -183,27 +198,41 @@ def _evaluate_one(snap: dict, args) -> tuple[bool, list[str], list[str], dict]:
         if _md5(baseline) == _md5(candidate):
             info["change"] = "identical"
         else:
-            mean_diff, pixel_ratio = _compare(baseline, candidate)
+            mean_diff, pixel_ratio, phash_dist = _compare(baseline, candidate)
             info["mean_diff"] = round(mean_diff, 2)
             info["pixel_ratio"] = round(pixel_ratio, 4)
+            info["phash"] = phash_dist
             if mean_diff < 0:
                 errors.append(f"B: baseline 与 candidate 尺寸不同")
-            elif mean_diff <= SMALL_CHANGE and pixel_ratio < LARGE_PIXEL_RATIO:
-                info["change"] = "small"
-            elif mean_diff > LARGE_CHANGE or pixel_ratio > LARGE_PIXEL_RATIO:
-                info["change"] = "major"
-                if not args.force_major:
-                    errors.append(
-                        f"B3: 大变化（mean_diff={mean_diff:.1f} pixel_ratio={pixel_ratio*100:.1f}%）"
-                        f"必须 --force-major 才接受（请先在浏览器人工确认）"
-                    )
             else:
-                info["change"] = "medium"
-                if not args.confirm_medium and not args.force_major:
-                    errors.append(
-                        f"B2: 中等变化（mean_diff={mean_diff:.1f} pixel_ratio={pixel_ratio*100:.1f}%）"
-                        f"需 --confirm-medium 或 --force-major"
-                    )
+                # 三指标联合判定：mean_diff 像素均值差 + pixel_ratio 像素差比例 + phash 感知哈希距离
+                # phash 比 mean_diff 对 layout 结构变化更敏感
+                is_major = (
+                    mean_diff > LARGE_CHANGE
+                    or pixel_ratio > LARGE_PIXEL_RATIO
+                    or (phash_dist >= 0 and phash_dist > LARGE_PHASH)
+                )
+                is_small = (
+                    mean_diff <= SMALL_CHANGE
+                    and pixel_ratio < LARGE_PIXEL_RATIO
+                    and (phash_dist < 0 or phash_dist <= SMALL_PHASH)
+                )
+                if is_major:
+                    info["change"] = "major"
+                    if not args.force_major:
+                        errors.append(
+                            f"B3: 大变化（mean_diff={mean_diff:.1f} pixel_ratio={pixel_ratio*100:.1f}% phash={phash_dist}）"
+                            f"必须 --force-major 才接受（请先在浏览器人工确认）"
+                        )
+                elif is_small:
+                    info["change"] = "small"
+                else:
+                    info["change"] = "medium"
+                    if not args.confirm_medium and not args.force_major:
+                        errors.append(
+                            f"B2: 中等变化（mean_diff={mean_diff:.1f} pixel_ratio={pixel_ratio*100:.1f}% phash={phash_dist}）"
+                            f"需 --confirm-medium 或 --force-major"
+                        )
     else:
         info["change"] = "new_baseline"
 
@@ -251,7 +280,7 @@ def main() -> int:
         icon = "✓" if ok else "✘"
         print(f"  {icon} {info['tab']:14s}  size={info.get('size_kb','?')}KB  ocr={info.get('ocr_chars','?')}  "
               f"hits={info.get('keyword_hits','?')}  change={change}  "
-              f"mean_diff={info.get('mean_diff','—')}")
+              f"mean_diff={info.get('mean_diff','—')}  phash={info.get('phash','—')}")
         for e in errors:
             print(f"      ✘ {e}")
         for w in warnings:
