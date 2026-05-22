@@ -13,7 +13,7 @@ import { Inbox } from "lucide-react";
  * @example
  *   <EmptyState title="暂无审计事件" description="尝试调整筛选条件" />
  */
-export interface EmptyStateProps extends React.HTMLAttributes<HTMLDivElement> {
+export interface EmptyStateProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "title"> {
   icon?: React.ReactNode;
   title: React.ReactNode;
   description?: React.ReactNode;

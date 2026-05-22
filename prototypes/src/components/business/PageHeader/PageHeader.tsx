@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
  * @example
  *   <PageHeader title="审计追踪查询" subtitle="H2 / append-only · GSP 法定台账" actions={<Button>导出</Button>} />
  */
-export interface PageHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
+export interface PageHeaderProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "title"> {
   title: React.ReactNode;
   subtitle?: React.ReactNode;
   actions?: React.ReactNode;
