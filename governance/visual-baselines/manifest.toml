@@ -19,7 +19,7 @@ url_hash = "#gallery"
 viewport = "1700x2800"
 file = "gallery.png"
 reviewed_by = "项目主人"
-reviewed_at = "2026-05-22"
+reviewed_at = "2026-05-23"
 expected_keywords = ["StatusBadge", "ScanInput", "StepFlow", "FieldTable", "DiffPanel", "PrintPreview", "TempChart"]
 related_story = "ComponentsGallery（组件库走查页）"
 
@@ -29,7 +29,7 @@ url_hash = "#h1-login-pda"
 viewport = "1500x1700"
 file = "h1-login-pda.png"
 reviewed_by = "项目主人"
-reviewed_at = "2026-05-22"
+reviewed_at = "2026-05-23"
 expected_keywords = ["WMS", "PDA", "v1.0", "u001"]
 related_story = "US-H1-001 PDA 登录"
 
@@ -39,7 +39,7 @@ url_hash = "#h1-login-pc"
 viewport = "1500x1900"
 file = "h1-login-pc.png"
 reviewed_by = "项目主人"
-reviewed_at = "2026-05-22"
+reviewed_at = "2026-05-23"
 expected_keywords = ["WMS", "PC", "u001"]
 related_story = "US-H1-001 PC 登录"
 
@@ -49,7 +49,7 @@ url_hash = "#h1-token"
 viewport = "1700x1300"
 file = "h1-token.png"
 reviewed_by = "项目主人"
-reviewed_at = "2026-05-22"
+reviewed_at = "2026-05-23"
 expected_keywords = ["Token", "PC"]
 related_story = "US-H1-005 Token 失效与登出"
 
@@ -59,7 +59,7 @@ url_hash = "#h1-apikey"
 viewport = "1700x1300"
 file = "h1-apikey.png"
 reviewed_by = "项目主人"
-reviewed_at = "2026-05-22"
+reviewed_at = "2026-05-23"
 expected_keywords = ["API", "Key", "wms_live", "wms_test"]
 related_story = "US-H1-006 API Key 管理"
 
@@ -69,7 +69,7 @@ url_hash = "#h1-role"
 viewport = "1700x1100"
 file = "h1-role.png"
 reviewed_by = "项目主人"
-reviewed_at = "2026-05-22"
+reviewed_at = "2026-05-23"
 expected_keywords = ["WMS", "u001"]
 related_story = "US-H1-002 角色与权限矩阵"
 
@@ -79,7 +79,7 @@ url_hash = "#h2-audit"
 viewport = "1700x1100"
 file = "h2-audit.png"
 reviewed_by = "项目主人"
-reviewed_at = "2026-05-22"
+reviewed_at = "2026-05-23"
 expected_keywords = ["ADR-0021", "GSP", "PO-2026-0001", "10.2.0.18", "PDA-A1B2C3", "u001"]
 related_story = "US-H2-002 审计追踪查询"
 
@@ -89,7 +89,7 @@ url_hash = "#h2-archive"
 viewport = "1700x1100"
 file = "h2-archive.png"
 reviewed_by = "项目主人"
-reviewed_at = "2026-05-22"
+reviewed_at = "2026-05-23"
 expected_keywords = ["GSP", "ADR-0021"]
 related_story = "US-H2-004 / US-H2-006 数据归档"
 
@@ -99,7 +99,7 @@ url_hash = "#h3-swagger"
 viewport = "1700x1100"
 file = "h3-swagger.png"
 reviewed_by = "项目主人"
-reviewed_at = "2026-05-22"
+reviewed_at = "2026-05-23"
 expected_keywords = ["API", "ADR-0021"]
 related_story = "US-H3-004 API 文档可访问性"
 
@@ -109,7 +109,7 @@ url_hash = "#m1-items"
 viewport = "1700x1100"
 file = "m1-items.png"
 reviewed_by = "项目主人"
-reviewed_at = "2026-05-22"
+reviewed_at = "2026-05-23"
 expected_keywords = ["P-001234", "P-001235", "P-002001", "P-003045", "GSP", "Pfizer"]
 related_story = "US-M1-001 商品档案管理"
 
@@ -119,7 +119,7 @@ url_hash = "#m1-suppliers"
 viewport = "1700x1100"
 file = "m1-suppliers.png"
 reviewed_by = "项目主人"
-reviewed_at = "2026-05-22"
+reviewed_at = "2026-05-23"
 expected_keywords = ["SUP-0001", "SUP-0002", "GSP", "GSP-BJ", "u001"]
 related_story = "US-M1-002 供应商资质档案"
 
@@ -129,7 +129,7 @@ url_hash = "#m1-locations"
 viewport = "1700x1200"
 file = "m1-locations.png"
 reviewed_by = "项目主人"
-reviewed_at = "2026-05-22"
+reviewed_at = "2026-05-23"
 expected_keywords = ["W001", "RT", "CR", "CL", "FR", "10-30", "2-8", "GSP"]
 related_story = "US-M1-004 仓库与库位管理"
 
@@ -139,7 +139,7 @@ url_hash = "#m2-tasks"
 viewport = "1500x1700"
 file = "m2-tasks.png"
 reviewed_by = "项目主人"
-reviewed_at = "2026-05-22"
+reviewed_at = "2026-05-23"
 expected_keywords = ["M2-002", "PO-2026-0001", "PO-2026-0002", "PO-2026-0003", "PO-2026-0004", "u001"]
 related_story = "US-M2-002 PDA 待收货任务列表"
 
@@ -149,7 +149,7 @@ url_hash = "#m2-accept"
 viewport = "1500x1700"
 file = "m2-accept.png"
 reviewed_by = "项目主人"
-reviewed_at = "2026-05-22"
+reviewed_at = "2026-05-23"
 expected_keywords = ["M2-003", "PO-2026-0001", "AB12-CD34-EF56", "20260301A", "GSP"]
 related_story = "US-M2-003 PDA 14 步验收"
 
@@ -159,7 +159,7 @@ url_hash = "#m2-putaway"
 viewport = "1500x1700"
 file = "m2-putaway.png"
 reviewed_by = "项目主人"
-reviewed_at = "2026-05-22"
+reviewed_at = "2026-05-23"
 expected_keywords = ["M2-005", "AB12-CD34-EF56", "A-01-02-03", "RT", "GSP"]
 related_story = "US-M2-005 PDA 上架"
 
@@ -169,7 +169,7 @@ url_hash = "#m2-reject"
 viewport = "1500x1800"
 file = "m2-reject.png"
 reviewed_by = "项目主人"
-reviewed_at = "2026-05-22"
+reviewed_at = "2026-05-23"
 expected_keywords = ["M2-006", "PO-2026-0001", "PKG_DAMAGE", "QTY_SHORTAGE", "GSP"]
 related_story = "US-M2-006 PDA 拒收"
 
@@ -179,7 +179,7 @@ url_hash = "#m2-dual-sign"
 viewport = "1500x1700"
 file = "m2-dual-sign.png"
 reviewed_by = "项目主人"
-reviewed_at = "2026-05-22"
+reviewed_at = "2026-05-23"
 expected_keywords = ["M2-004", "PO-2026-0001", "GSP", "u001", "u002"]
 related_story = "US-M2-004 双人验收签字（PDA）"
 
@@ -189,7 +189,7 @@ url_hash = "#m2-kanban"
 viewport = "1700x1100"
 file = "m2-kanban.png"
 reviewed_by = "项目主人"
-reviewed_at = "2026-05-22"
+reviewed_at = "2026-05-23"
 expected_keywords = ["M2-008", "PO-2026", "GSP"]
 related_story = "US-M2-008 收货进度看板"
 
