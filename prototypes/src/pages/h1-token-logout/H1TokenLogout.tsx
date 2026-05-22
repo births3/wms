@@ -80,7 +80,7 @@ export function H1TokenLogout({ showExpireDialog = false }: { showExpireDialog?:
   ];
 
   return (
-    <div className="w-[1280px] min-h-[800px] bg-muted/40 border rounded-xl p-6 font-sans">
+    <div className="w-full max-w-[1280px] min-h-[800px] bg-muted/40 border rounded-xl p-6 font-sans">
       <PageHeader title="登录会话与登出" subtitle="H1-005 / Token 黑名单 + 多设备会话管理" />
 
       <Dialog open={open} onOpenChange={setOpen}>

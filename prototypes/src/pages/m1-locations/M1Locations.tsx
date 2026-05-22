@@ -50,7 +50,7 @@ const ZONE_COLOR = {
  */
 export function M1Locations() {
   return (
-    <div className="w-[1400px] bg-background rounded-lg border shadow-sm">
+    <div className="w-full max-w-[1400px] bg-background rounded-lg border shadow-sm">
       <PageHeader
         title="仓库与库位管理"
         subtitle="W001 北京天竺仓 · 6 个温区 · 936 个库位"

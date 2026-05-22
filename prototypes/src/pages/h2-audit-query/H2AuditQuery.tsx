@@ -86,7 +86,7 @@ export function H2AuditQuery() {
   const selected = MOCK_EVENTS.find((e) => e.id === selectedId);
 
   return (
-    <div data-device="pc" className="w-[1280px] min-h-[800px] bg-muted/40 rounded-xl border overflow-hidden flex flex-col font-sans">
+    <div data-device="pc" className="w-full max-w-[1280px] min-h-[800px] bg-muted/40 rounded-xl border overflow-hidden flex flex-col font-sans">
       <div className="bg-background border-b px-6 py-4">
         <PageHeader
           title="审计追踪查询"

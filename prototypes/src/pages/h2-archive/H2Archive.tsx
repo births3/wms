@@ -125,7 +125,7 @@ export function H2Archive() {
   ];
 
   return (
-    <div className="w-[1280px] min-h-[800px] bg-muted/40 border rounded-xl p-6 font-sans">
+    <div className="w-full max-w-[1280px] min-h-[800px] bg-muted/40 border rounded-xl p-6 font-sans">
       <PageHeader
         title="数据归档与生命周期"
         subtitle="H2-004 审计归档 / H2-006 业务数据生命周期 · GSP 法定保留"

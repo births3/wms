@@ -24,7 +24,7 @@ export function H1LoginPc({ withCaptcha = false }: { withCaptcha?: boolean } = {
   return (
     <div
       data-device="pc"
-      className="w-[1280px] min-h-[800px] flex items-center justify-center p-6 rounded-xl border overflow-hidden font-sans"
+      className="w-full max-w-[1280px] min-h-[800px] flex items-center justify-center p-6 rounded-xl border overflow-hidden font-sans"
       style={{
         background: "linear-gradient(135deg, hsl(217,84%,53%) 0%, hsl(189,94%,43%) 100%)",
       }}

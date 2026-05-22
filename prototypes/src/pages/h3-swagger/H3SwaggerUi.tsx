@@ -67,7 +67,7 @@ export function H3SwaggerUi() {
   const deprecated = Object.values(MOCK_ENDPOINTS).flat().filter((e) => e.deprecated).length;
 
   return (
-    <div className="w-[1280px] min-h-[800px] bg-muted/40 border rounded-xl p-6 font-sans">
+    <div className="w-full max-w-[1280px] min-h-[800px] bg-muted/40 border rounded-xl p-6 font-sans">
       <PageHeader
         title="WMS API 文档"
         subtitle={`H3-004 · OpenAPI 3.1 · v1.0.0 · 共 ${total} 个端点 · ${deprecated} 个已弃用`}

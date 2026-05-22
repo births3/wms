@@ -164,7 +164,7 @@ export function M1Suppliers() {
   ];
 
   return (
-    <div className="w-[1400px] bg-background rounded-lg border shadow-sm">
+    <div className="w-full max-w-[1400px] bg-background rounded-lg border shadow-sm">
       <PageHeader
         title="供应商资质档案"
         subtitle="M1-002 · GSP 证 + 营业执照 + 经营范围 + 质量评分"

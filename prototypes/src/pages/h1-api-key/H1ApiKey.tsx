@@ -91,7 +91,7 @@ export function H1ApiKey({ showCreated = false }: { showCreated?: boolean } = {}
   const counts = MOCK_KEYS.reduce((acc, k) => ({ ...acc, [k.status]: (acc[k.status] ?? 0) + 1 }), {} as Record<string, number>);
 
   return (
-    <div className="w-[1280px] min-h-[800px] bg-muted/40 border rounded-xl p-6 font-sans">
+    <div className="w-full max-w-[1280px] min-h-[800px] bg-muted/40 border rounded-xl p-6 font-sans">
       <PageHeader
         title="API Key 管理"
         subtitle="H1-006 / 外部系统对接密钥"

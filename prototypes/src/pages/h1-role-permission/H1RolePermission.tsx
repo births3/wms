@@ -129,7 +129,7 @@ export function H1RolePermission() {
   const members = MEMBERS_BY_ROLE[selectedRole.id] ?? [];
 
   return (
-    <div className="w-[1280px] min-h-[800px] bg-muted/40 border rounded-xl p-6 font-sans">
+    <div className="w-full max-w-[1280px] min-h-[800px] bg-muted/40 border rounded-xl p-6 font-sans">
       <PageHeader
         title="角色与权限管理"
         subtitle="H1-002 / M1-006 · 权限码层级 · 内置角色不可删"

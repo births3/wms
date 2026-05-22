@@ -70,7 +70,7 @@ const COLUMNS: KanbanColumn[] = [
  */
 export function M2InboundKanban() {
   return (
-    <div className="w-[1400px] min-h-[800px] bg-muted/30 border rounded-xl p-6 font-sans">
+    <div className="w-full max-w-[1400px] min-h-[800px] bg-muted/30 border rounded-xl p-6 font-sans">
       <PageHeader
         title="收货进度看板"
         subtitle={`M2-008 · 实时刷新 · 共 ${COLUMNS.reduce((a, c) => a + c.items.length, 0)} 个 ASN · 最近刷新 2 秒前`}

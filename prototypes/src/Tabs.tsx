@@ -36,12 +36,10 @@ export interface TabDef {
   render: () => ReactNode;
 }
 
-const wrap = (children: ReactNode) => (
-  <div className="flex justify-center">{children}</div>
-);
+const wrap = (children: ReactNode) => <div>{children}</div>;
 
 const dual = (left: ReactNode, leftLabel: string, right: ReactNode, rightLabel: string) => (
-  <div className="flex justify-center gap-8 flex-wrap">
+  <div className="flex gap-6 flex-wrap items-start">
     <div>
       <p className="text-sm text-muted-foreground mb-2">{leftLabel}</p>
       {left}
@@ -54,7 +52,7 @@ const dual = (left: ReactNode, leftLabel: string, right: ReactNode, rightLabel: 
 );
 
 const stack = (top: ReactNode, topLabel: string, bottom: ReactNode, bottomLabel: string) => (
-  <div className="flex flex-col items-center gap-6">
+  <div className="flex flex-col gap-6 items-start">
     <div>
       <p className="text-sm text-muted-foreground mb-2">{topLabel}</p>
       {top}
