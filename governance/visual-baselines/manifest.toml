@@ -174,3 +174,39 @@ file = "m2-kanban.png"
 reviewed_by = "项目主人"
 reviewed_at = "2026-05-22"
 related_story = "US-M2-008 收货进度看板"
+
+[[snapshots]]
+tab = "m4-picking"
+url_hash = "#m4-picking"
+viewport = "1500x1700"
+file = "m4-picking.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-23"
+related_story = "US-M4-003 PDA 拣货（FIFO）"
+
+[[snapshots]]
+tab = "m4-review"
+url_hash = "#m4-review"
+viewport = "1500x1700"
+file = "m4-review.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-23"
+related_story = "US-M4-004 PDA 复核"
+
+[[snapshots]]
+tab = "m4-manifest"
+url_hash = "#m4-manifest"
+viewport = "1700x1700"
+file = "m4-manifest.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-23"
+related_story = "US-M4-005 随货同行单（PrintPreview ★）"
+
+[[snapshots]]
+tab = "m4-exception"
+url_hash = "#m4-exception"
+viewport = "1500x1700"
+file = "m4-exception.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-23"
+related_story = "US-M4-006 异常拣货"

@@ -85,7 +85,7 @@ export const PrintPreview = React.forwardRef<HTMLDivElement, PrintPreviewProps>(
           </div>
         </div>
         {/* 预览区 */}
-        <div className="p-6 flex justify-center overflow-auto max-h-[640px]">
+        <div className="p-6 flex justify-center overflow-auto max-h-[900px]">
           <div
             className="bg-background shadow-md border border-border/40 origin-top"
             style={{

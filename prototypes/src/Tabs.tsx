@@ -17,6 +17,10 @@ import { M2Reject } from "./pages/m2-reject";
 import { M1Items } from "./pages/m1-items";
 import { M1Suppliers } from "./pages/m1-suppliers";
 import { M1Locations } from "./pages/m1-locations";
+import { M4Picking } from "./pages/m4-picking";
+import { M4Review } from "./pages/m4-review";
+import { M4Manifest } from "./pages/m4-manifest";
+import { M4Exception } from "./pages/m4-exception";
 
 /**
  * tabs.tsx — 原型 tab 注册表（数据驱动）
@@ -26,7 +30,7 @@ import { M1Locations } from "./pages/m1-locations";
  */
 
 export type Device = "pc" | "pda" | "pad" | "shared";
-export type Group = "组件" | "H1 权限审计" | "H2/H3 治理" | "M1 基础数据" | "M2 采购入库";
+export type Group = "组件" | "H1 权限审计" | "H2/H3 治理" | "M1 基础数据" | "M2 采购入库" | "M4 销售出库";
 
 export interface TabDef {
   value: string;
@@ -110,6 +114,16 @@ export const TABS: TabDef[] = [
     render: () => wrap(<M2DualSign />) },
   { value: "m2-kanban", label: "收货看板", group: "M2 采购入库", device: ["pc", "pad"],
     render: () => wrap(<M2InboundKanban />) },
+
+  // M4 销售出库
+  { value: "m4-picking", label: "PDA 拣货", group: "M4 销售出库", device: ["pda"],
+    render: () => wrap(<M4Picking />) },
+  { value: "m4-review", label: "PDA 复核", group: "M4 销售出库", device: ["pda"],
+    render: () => wrap(<M4Review />) },
+  { value: "m4-manifest", label: "随货同行单", group: "M4 销售出库", device: ["pc"],
+    render: () => wrap(<M4Manifest />) },
+  { value: "m4-exception", label: "PDA 异常拣货", group: "M4 销售出库", device: ["pda"],
+    render: () => wrap(<M4Exception />) },
 ];
 
 export const DEVICE_META: Record<Device, { label: string; color: string }> = {
@@ -125,4 +139,5 @@ export const GROUP_ORDER: Group[] = [
   "H2/H3 治理",
   "M1 基础数据",
   "M2 采购入库",
+  "M4 销售出库",
 ];
