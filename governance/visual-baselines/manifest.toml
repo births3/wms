@@ -352,3 +352,23 @@ reviewed_by = "项目主人"
 reviewed_at = "2026-05-23"
 expected_keywords = ["M6-002e", "GSP", "P-003045", "P-007890", "20231201"]
 related_story = "US-M6-002e 近效期/不合格月报（GSP §50）"
+
+[[snapshots]]
+tab = "m6-custom"
+url_hash = "#m6-custom"
+viewport = "1700x1300"
+file = "m6-custom.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-23"
+expected_keywords = ["M6-003", "GSP"]
+related_story = "US-M6-003 业务报表（自定义维度+指标）"
+
+[[snapshots]]
+tab = "m6-special"
+url_hash = "#m6-special"
+viewport = "1700x1500"
+file = "m6-special.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-23"
+expected_keywords = ["M6-004", "GSP", "P-002001", "20260101N", "u001", "u002"]
+related_story = "US-M6-004 特殊管理药品台账（麻精/放射/血液）"
