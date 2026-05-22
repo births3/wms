@@ -304,11 +304,51 @@ expected_keywords = ["M5-002", "GSP", "5.2", "-26.8", "18.5", "RT", "CR", "FR"]
 related_story = "US-M5-002 冷链温度监控（TempChart ★）"
 
 [[snapshots]]
-tab = "m6-reports"
-url_hash = "#m6-reports"
+tab = "m6-purchase"
+url_hash = "#m6-purchase"
 viewport = "1700x1300"
-file = "m6-reports.png"
+file = "m6-purchase.png"
 reviewed_by = "项目主人"
 reviewed_at = "2026-05-23"
-expected_keywords = ["M6-002", "GSP", "PDF", "Excel", "JSON", "MD5", "u001", "u002", "u003"]
-related_story = "US-M6-002 GSP 法定报表（AuditTimeline ★）"
+expected_keywords = ["M6-002a", "GSP", "PDF", "Excel", "JSON", "MD5", "u001", "u002"]
+related_story = "US-M6-002a 采购入库月报（GSP §83）"
+
+[[snapshots]]
+tab = "m6-sales"
+url_hash = "#m6-sales"
+viewport = "1700x1200"
+file = "m6-sales.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-23"
+expected_keywords = ["M6-002b", "GSP", "SO-2026", "u001", "u002"]
+related_story = "US-M6-002b 销售出库月报（GSP §85）"
+
+[[snapshots]]
+tab = "m6-inventory"
+url_hash = "#m6-inventory"
+viewport = "1700x1200"
+file = "m6-inventory.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-23"
+expected_keywords = ["M6-002c", "GSP", "ST-2026"]
+related_story = "US-M6-002c 库存盘点月报（GSP §95）"
+
+[[snapshots]]
+tab = "m6-cold"
+url_hash = "#m6-cold"
+viewport = "1700x1500"
+file = "m6-cold.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-23"
+expected_keywords = ["M6-002d", "GSP", "PDF", "Excel"]
+related_story = "US-M6-002d 冷链温度月报（GSP §64）"
+
+[[snapshots]]
+tab = "m6-expiry"
+url_hash = "#m6-expiry"
+viewport = "1700x1300"
+file = "m6-expiry.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-23"
+expected_keywords = ["M6-002e", "GSP", "P-003045", "P-007890", "20231201"]
+related_story = "US-M6-002e 近效期/不合格月报（GSP §50）"

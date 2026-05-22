@@ -24,7 +24,11 @@ import { M4Exception } from "./pages/m4-exception";
 import { M3Inventory } from "./pages/m3-inventory";
 import { M3Stocktake } from "./pages/m3-stocktake";
 import { M5ColdMonitor } from "./pages/m5-cold-monitor";
-import { M6Reports } from "./pages/m6-reports";
+import { M6Purchase } from "./pages/m6-purchase";
+import { M6Sales } from "./pages/m6-sales";
+import { M6Inventory } from "./pages/m6-inventory";
+import { M6Cold } from "./pages/m6-cold";
+import { M6Expiry } from "./pages/m6-expiry";
 import { M2Asn } from "./pages/m2-asn";
 import { M2Hours } from "./pages/m2-hours";
 import { M8StorageFeeRules } from "./pages/m8-storage-fee";
@@ -38,7 +42,7 @@ import { M10InTransitTemp } from "./pages/m10-in-transit-temp";
  */
 
 export type Device = "pc" | "pda" | "pad" | "shared";
-export type Group = "组件" | "H1 权限审计" | "H2/H3 治理" | "M1 基础数据" | "M2 采购入库" | "M3 库存核心" | "M4 销售出库" | "M5 冷链 / M6 报表" | "M8 计费 / M10 TMS";
+export type Group = "组件" | "H1 权限审计" | "H2/H3 治理" | "M1 基础数据" | "M2 采购入库" | "M3 库存核心" | "M4 销售出库" | "M5 冷链监控" | "M6 GSP 报表" | "M8 计费 / M10 TMS";
 
 export interface TabDef {
   value: string;
@@ -143,11 +147,21 @@ export const TABS: TabDef[] = [
   { value: "m4-exception", label: "PDA 异常拣货", group: "M4 销售出库", device: ["pda"],
     render: () => wrap(<M4Exception />) },
 
-  // M5 冷链 / M6 报表
-  { value: "m5-cold", label: "冷链监控", group: "M5 冷链 / M6 报表", device: ["pc"],
+  // M5 冷链监控
+  { value: "m5-cold", label: "冷链监控", group: "M5 冷链监控", device: ["pc"],
     render: () => wrap(<M5ColdMonitor />) },
-  { value: "m6-reports", label: "GSP 报表", group: "M5 冷链 / M6 报表", device: ["pc"],
-    render: () => wrap(<M6Reports />) },
+
+  // M6 GSP 报表（5 张独立报表）
+  { value: "m6-purchase", label: "采购入库月报", group: "M6 GSP 报表", device: ["pc"],
+    render: () => wrap(<M6Purchase />) },
+  { value: "m6-sales", label: "销售出库月报", group: "M6 GSP 报表", device: ["pc"],
+    render: () => wrap(<M6Sales />) },
+  { value: "m6-inventory", label: "库存盘点月报", group: "M6 GSP 报表", device: ["pc"],
+    render: () => wrap(<M6Inventory />) },
+  { value: "m6-cold", label: "冷链温度月报", group: "M6 GSP 报表", device: ["pc"],
+    render: () => wrap(<M6Cold />) },
+  { value: "m6-expiry", label: "近效期/不合格月报", group: "M6 GSP 报表", device: ["pc"],
+    render: () => wrap(<M6Expiry />) },
 
   // M8 计费 / M10 TMS
   { value: "m8-storage-fee", label: "仓储费规则", group: "M8 计费 / M10 TMS", device: ["pc"],
@@ -171,6 +185,7 @@ export const GROUP_ORDER: Group[] = [
   "M2 采购入库",
   "M3 库存核心",
   "M4 销售出库",
-  "M5 冷链 / M6 报表",
+  "M5 冷链监控",
+  "M6 GSP 报表",
   "M8 计费 / M10 TMS",
 ];

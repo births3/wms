@@ -19,7 +19,7 @@ import {
 import { Search, Download, FileSpreadsheet, FileText, Database, Shield } from "lucide-react";
 
 /**
- * M6Reports — M6-002 GSP 法定报表
+ * M6Purchase — M6-002 GSP 法定报表
  *
  * 层级：Layer 3 页面级
  * 关联故事：US-M6-002（GSP 法定报表查询 + 导出 / 多维度筛选 / 含数据签名）
@@ -27,7 +27,7 @@ import { Search, Download, FileSpreadsheet, FileText, Database, Shield } from "l
  * 业务约束：导出含 MD5 签名（防篡改）；保留 5 年；查询/导出全部写 H2 审计
  *
  * @example
- *   <M6Reports />
+ *   <M6Purchase />
  */
 
 interface PurchaseRow {
@@ -77,7 +77,7 @@ const STATUS_LABEL = {
   rejected: { text: "拒收", color: "bg-destructive/10 text-destructive" },
 };
 
-export function M6Reports() {
+export function M6Purchase() {
   const [expanded, setExpanded] = useState<string | undefined>("e1");
 
   const cols: DataTableColumn<PurchaseRow>[] = [
@@ -99,8 +99,8 @@ export function M6Reports() {
   return (
     <div className="w-full max-w-[1400px] bg-background rounded-lg border shadow-sm">
       <PageHeader
-        title="GSP 法定报表"
-        subtitle="M6-002 · 查询 + 导出 · 含数据签名 · 留存 5 年（GSP §95）"
+        title="采购入库月报"
+        subtitle="M6-002a · GSP §83 · 月度查询 + 多格式导出 · 含数据签名"
         actions={
           <>
             <Button variant="outline" size="sm">
@@ -112,20 +112,7 @@ export function M6Reports() {
       />
 
       {/* 查询条件 */}
-      <div className="px-6 py-4 border-b bg-muted/30 grid grid-cols-6 gap-3 items-end">
-        <div>
-          <label className="text-xs text-muted-foreground mb-1 block">报表类型 *</label>
-          <Select defaultValue="purchase_monthly">
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="purchase_monthly">采购入库月报（GSP §83）</SelectItem>
-              <SelectItem value="sales_monthly">销售出库月报（GSP §85）</SelectItem>
-              <SelectItem value="inventory_monthly">库存盘点月报（GSP §95）</SelectItem>
-              <SelectItem value="cold_monthly">冷链温度月报（GSP §64）</SelectItem>
-              <SelectItem value="expiry_monthly">近效期/不合格月报（GSP §50）</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+      <div className="px-6 py-4 border-b bg-muted/30 grid grid-cols-5 gap-3 items-end">
         <div>
           <label className="text-xs text-muted-foreground mb-1 block">起始日期</label>
           <Input type="date" defaultValue="2026-04-01" />
