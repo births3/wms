@@ -110,3 +110,39 @@ file = "m2-kanban.png"
 reviewed_by = "项目主人"
 reviewed_at = "2026-05-22"
 related_story = "US-M2-008 收货进度看板"
+
+[[snapshots]]
+tab = "m2-tasks"
+url_hash = "#m2-tasks"
+viewport = "1100x1100"
+file = "m2-tasks.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-22"
+related_story = "US-M2-002 PDA 待收货任务列表"
+
+[[snapshots]]
+tab = "m2-accept"
+url_hash = "#m2-accept"
+viewport = "1100x1200"
+file = "m2-accept.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-22"
+related_story = "US-M2-003 PDA 14 步验收"
+
+[[snapshots]]
+tab = "m2-putaway"
+url_hash = "#m2-putaway"
+viewport = "1100x1200"
+file = "m2-putaway.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-22"
+related_story = "US-M2-005 PDA 上架"
+
+[[snapshots]]
+tab = "m2-reject"
+url_hash = "#m2-reject"
+viewport = "1100x1300"
+file = "m2-reject.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-22"
+related_story = "US-M2-006 PDA 拒收"

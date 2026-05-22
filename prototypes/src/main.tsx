@@ -13,6 +13,10 @@ import { H3SwaggerUi } from "./pages/h3-swagger";
 import { ComponentsGallery } from "./pages/components-gallery";
 import { M2DualSign } from "./pages/m2-dual-sign";
 import { M2InboundKanban } from "./pages/m2-inbound-kanban";
+import { M2InboundTasks } from "./pages/m2-inbound-tasks";
+import { M2InboundAccept } from "./pages/m2-inbound-accept";
+import { M2Putaway } from "./pages/m2-putaway";
+import { M2Reject } from "./pages/m2-reject";
 
 type Tab =
   | "gallery"
@@ -25,7 +29,11 @@ type Tab =
   | "h2-archive"
   | "h3-swagger"
   | "m2-dual-sign"
-  | "m2-kanban";
+  | "m2-kanban"
+  | "m2-tasks"
+  | "m2-accept"
+  | "m2-putaway"
+  | "m2-reject";
 
 const TABS: { value: Tab; label: string; group: "组件" | "H1" | "H2" | "H3" | "M2" }[] = [
   { value: "gallery", label: "组件库", group: "组件" },
@@ -37,6 +45,10 @@ const TABS: { value: Tab; label: string; group: "组件" | "H1" | "H2" | "H3" | 
   { value: "h2-audit", label: "审计查询", group: "H2" },
   { value: "h2-archive", label: "数据归档", group: "H2" },
   { value: "h3-swagger", label: "API 文档", group: "H3" },
+  { value: "m2-tasks", label: "M2 任务列表", group: "M2" },
+  { value: "m2-accept", label: "M2 14步验收", group: "M2" },
+  { value: "m2-putaway", label: "M2 上架", group: "M2" },
+  { value: "m2-reject", label: "M2 拒收", group: "M2" },
   { value: "m2-dual-sign", label: "M2 双人签字", group: "M2" },
   { value: "m2-kanban", label: "M2 收货看板", group: "M2" },
 ];
@@ -146,6 +158,26 @@ function App() {
       {tab === "m2-kanban" && (
         <div className="flex justify-center">
           <M2InboundKanban />
+        </div>
+      )}
+      {tab === "m2-tasks" && (
+        <div className="flex justify-center">
+          <M2InboundTasks />
+        </div>
+      )}
+      {tab === "m2-accept" && (
+        <div className="flex justify-center">
+          <M2InboundAccept />
+        </div>
+      )}
+      {tab === "m2-putaway" && (
+        <div className="flex justify-center">
+          <M2Putaway />
+        </div>
+      )}
+      {tab === "m2-reject" && (
+        <div className="flex justify-center">
+          <M2Reject />
         </div>
       )}
     </div>
