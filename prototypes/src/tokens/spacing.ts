@@ -11,3 +11,15 @@ export const touchTarget = {
   pda: 48,
   pc: 32,
 } as const;
+
+export const radius = {
+  sm: 4,
+  md: 6,
+  lg: 8,
+  full: 9999,
+} as const;
+
+export const fontStack = {
+  sans: '-apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif',
+  mono: '"SF Mono", Consolas, "Liberation Mono", monospace',
+} as const;

@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { colors } from "../../tokens";
+import { colors, fontStack } from "../../tokens";
 
 export type OfflineState = "online" | "offline" | "syncing";
 
@@ -30,6 +30,8 @@ export function OfflineIndicator({
 
   // online 状态默认不展示（避免占用 PDA 屏幕空间）
   if (state === "online" && !pendingCount) return null;
+  // syncing 100% 完成且无暂存 = 同步刚完成，自动隐藏
+  if (state === "syncing" && syncProgress === 100 && !pendingCount) return null;
 
   const containerStyle: CSSProperties = {
     display: "flex",
@@ -42,6 +44,7 @@ export function OfflineIndicator({
     fontWeight: 500,
     width: "100%",
     boxSizing: "border-box",
+    fontFamily: fontStack.sans,
   };
 
   return (

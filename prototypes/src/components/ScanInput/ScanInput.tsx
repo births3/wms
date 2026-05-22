@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
-import { colors } from "../../tokens";
+import { colors, fontStack } from "../../tokens";
 
 export type ScanMode = "scanner" | "camera" | "manual";
 
@@ -80,6 +80,7 @@ export function ScanInput({
     overflow: "hidden",
     background: "#fff",
     transition: "border-color 0.2s",
+    fontFamily: fontStack.sans,
   };
 
   return (
@@ -90,17 +91,25 @@ export function ScanInput({
           onClick={cycleMode}
           aria-label={`切换扫码模式，当前 ${MODE_LABEL[mode]}`}
           style={{
-            minWidth: minTouchTarget,
+            minWidth: minTouchTarget + 8,
             minHeight: minTouchTarget,
             background: colors.neutral[100],
             border: "none",
-            borderRight: `1px solid ${colors.neutral[200]}`,
+            borderRight: `1px solid ${colors.neutral[300]}`,
             cursor: "pointer",
             fontSize: 14,
-            padding: "0 12px",
+            fontWeight: 500,
+            color: colors.neutral[700],
+            padding: "0 10px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 4,
+            boxShadow: "inset 0 -2px 0 rgba(0,0,0,0.06)",
           }}
         >
-          {MODE_LABEL[mode]}
+          <span>{MODE_LABEL[mode]}</span>
+          <span style={{ fontSize: 10, opacity: 0.6 }} aria-hidden>▼</span>
         </button>
         <input
           ref={inputRef}

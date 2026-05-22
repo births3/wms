@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
-import { colors } from "../../tokens";
+import { colors, radius, fontStack } from "../../tokens";
 
 /** 状态枚举（对齐 docs/prototypes/component-registry.md §4.3） */
 export type StatusKey =
@@ -50,10 +50,11 @@ export function StatusBadge({
   testId,
 }: StatusBadgeProps) {
   const meta = STATUS_MAP[status];
+  // 拉大三档差异：sm 紧凑 / md 标准 / lg PDA 大尺寸
   const sizeStyle: Record<string, CSSProperties> = {
-    sm: { fontSize: 12, padding: "2px 8px", gap: 4 },
-    md: { fontSize: 14, padding: "4px 10px", gap: 6 },
-    lg: { fontSize: 18, padding: "6px 14px", gap: 8 }, // PDA 推荐
+    sm: { fontSize: 11, padding: "1px 6px", gap: 3, lineHeight: 1.5 },
+    md: { fontSize: 14, padding: "4px 10px", gap: 6, lineHeight: 1.5 },
+    lg: { fontSize: 20, padding: "8px 18px", gap: 8, lineHeight: 1.4, fontWeight: 600 },
   };
 
   return (
@@ -66,9 +67,10 @@ export function StatusBadge({
         alignItems: "center",
         background: meta.bg,
         color: meta.fg,
-        borderRadius: 6,
+        borderRadius: radius.md,
         fontWeight: 500,
         whiteSpace: "nowrap",
+        fontFamily: fontStack.sans,
         ...sizeStyle[size],
       }}
     >

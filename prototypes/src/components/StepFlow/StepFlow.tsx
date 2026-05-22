@@ -1,26 +1,22 @@
 import type { CSSProperties } from "react";
-import { colors } from "../../tokens";
+import { colors, radius, fontStack } from "../../tokens";
 
 export interface Step {
-  /** 步骤标题 */
   label: string;
-  /** 可选副标题/说明 */
   description?: string;
 }
 
 export interface StepFlowProps {
   steps: Step[];
-  /** 当前激活步骤索引（从 0 开始） */
   current: number;
-  /** 失败步骤索引集合（红色） */
   errorSteps?: number[];
-  /** 布局方向 */
   orientation?: "horizontal" | "vertical";
-  /** PDA 端用更大触控目标 */
   size?: "sm" | "md" | "lg";
   className?: string;
   testId?: string;
 }
+
+type StepState = "completed" | "current" | "error" | "pending";
 
 export function StepFlow({
   steps,
@@ -34,8 +30,10 @@ export function StepFlow({
   const isVertical = orientation === "vertical";
   const dotSize = size === "lg" ? 36 : size === "sm" ? 24 : 30;
   const fontSize = size === "lg" ? 16 : size === "sm" ? 12 : 14;
+  // 纵向 step 之间的最小间距（保证连接线可见）
+  const minGap = size === "lg" ? 56 : size === "sm" ? 36 : 44;
 
-  const getStepState = (i: number): "completed" | "current" | "error" | "pending" => {
+  const getStepState = (i: number): StepState => {
     if (errorSteps.includes(i)) return "error";
     if (i < current) return "completed";
     if (i === current) return "current";
@@ -49,15 +47,99 @@ export function StepFlow({
     pending: colors.neutral[300],
   };
 
-  const containerStyle: CSSProperties = {
-    display: "flex",
-    flexDirection: isVertical ? "column" : "row",
-    gap: 0,
-    width: "100%",
-  };
+  if (isVertical) {
+    return (
+      <div
+        data-testid={testId}
+        className={className}
+        style={{ display: "flex", flexDirection: "column", fontFamily: fontStack.sans }}
+      >
+        {steps.map((step, i) => {
+          const state = getStepState(i);
+          const color = stateColor[state];
+          const isLast = i === steps.length - 1;
+          const lineColor = i < current ? colors.success : colors.neutral[300];
 
+          return (
+            <div
+              key={i}
+              data-state={state}
+              style={{
+                display: "grid",
+                gridTemplateColumns: `${dotSize}px 1fr`,
+                gridTemplateRows: "auto 1fr",
+                columnGap: 12,
+                rowGap: 0,
+                minHeight: isLast ? "auto" : minGap + dotSize,
+              }}
+            >
+              {/* dot */}
+              <div
+                aria-current={state === "current" ? "step" : undefined}
+                style={{
+                  width: dotSize,
+                  height: dotSize,
+                  borderRadius: "50%",
+                  background: state === "pending" ? "#fff" : color,
+                  border: `2px solid ${color}`,
+                  color: state === "pending" ? colors.neutral[500] : "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: fontSize - 2,
+                  fontWeight: 600,
+                  gridColumn: 1,
+                  gridRow: 1,
+                }}
+              >
+                {state === "completed" ? "✓" : state === "error" ? "✗" : i + 1}
+              </div>
+              {/* label */}
+              <div
+                style={{
+                  gridColumn: 2,
+                  gridRow: 1,
+                  fontSize,
+                  color: state === "pending" ? colors.neutral[500] : colors.neutral[900],
+                  fontWeight: state === "current" ? 600 : 400,
+                  lineHeight: 1.4,
+                  paddingTop: (dotSize - fontSize * 1.4) / 2,
+                }}
+              >
+                <div>{step.label}</div>
+                {step.description && (
+                  <div style={{ fontSize: fontSize - 1, color: colors.neutral[700], marginTop: 4 }}>
+                    {step.description}
+                  </div>
+                )}
+              </div>
+              {/* connector line */}
+              {!isLast && (
+                <div
+                  style={{
+                    gridColumn: 1,
+                    gridRow: 2,
+                    width: 2,
+                    background: lineColor,
+                    margin: "4px auto",
+                    minHeight: minGap - 8,
+                  }}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // horizontal
   return (
-    <div data-testid={testId} className={className} style={containerStyle}>
+    <div
+      data-testid={testId}
+      className={className}
+      style={{ display: "flex", flexDirection: "row", fontFamily: fontStack.sans, width: "100%" }}
+    >
       {steps.map((step, i) => {
         const state = getStepState(i);
         const color = stateColor[state];
@@ -67,23 +149,9 @@ export function StepFlow({
           <div
             key={i}
             data-state={state}
-            style={{
-              display: "flex",
-              flexDirection: isVertical ? "row" : "column",
-              alignItems: isVertical ? "flex-start" : "center",
-              flex: isVertical ? "0 0 auto" : 1,
-              position: "relative",
-            }}
+            style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}
           >
-            <div
-              style={{
-                display: "flex",
-                flexDirection: isVertical ? "column" : "row",
-                alignItems: "center",
-                width: isVertical ? "auto" : "100%",
-              }}
-            >
-              {/* 圆点 */}
+            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", width: "100%" }}>
               <div
                 aria-current={state === "current" ? "step" : undefined}
                 style={{
@@ -99,41 +167,34 @@ export function StepFlow({
                   fontSize: fontSize - 2,
                   fontWeight: 600,
                   flexShrink: 0,
-                  zIndex: 1,
                 }}
               >
                 {state === "completed" ? "✓" : state === "error" ? "✗" : i + 1}
               </div>
-
-              {/* 连接线 */}
               {!isLast && (
                 <div
                   style={{
                     flex: 1,
-                    height: isVertical ? 24 : 2,
-                    width: isVertical ? 2 : "auto",
+                    height: 2,
                     background: i < current ? colors.success : colors.neutral[300],
-                    margin: isVertical ? `4px 0 4px ${dotSize / 2 - 1}px` : "0 4px",
+                    margin: "0 4px",
                   }}
                 />
               )}
             </div>
-
-            {/* 标签 */}
             <div
               style={{
-                marginTop: isVertical ? 0 : 8,
-                marginLeft: isVertical ? 12 : 0,
+                marginTop: 8,
                 fontSize,
                 color: state === "pending" ? colors.neutral[500] : colors.neutral[900],
                 fontWeight: state === "current" ? 600 : 400,
-                textAlign: isVertical ? "left" : "center",
+                textAlign: "center",
                 lineHeight: 1.4,
               }}
             >
               <div>{step.label}</div>
               {step.description && (
-                <div style={{ fontSize: fontSize - 2, color: colors.neutral[500], marginTop: 2 }}>
+                <div style={{ fontSize: fontSize - 1, color: colors.neutral[700], marginTop: 2 }}>
                   {step.description}
                 </div>
               )}
@@ -144,3 +205,5 @@ export function StepFlow({
     </div>
   );
 }
+
+export { radius as _r };
