@@ -69,7 +69,9 @@ TIER_SCRIPTS: dict[str, list[str]] = {
         "check_prototype_review_signoff.py",
     ],
     "T3": [
-        # 未来 Wave 3+：handler test coverage、idempotency、permission matrix 等
+        # Wave 3+ handler test coverage / idempotency / permission matrix
+        # 视觉回归（重，依赖 vite + chrome 提前生成 snapshot）
+        "check_visual_regression.py",
     ],
     "T4": [
         # 未来 Wave 4+：perf baseline、observability、concurrency、API compat 等

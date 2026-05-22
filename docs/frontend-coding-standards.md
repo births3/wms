@@ -429,3 +429,36 @@ StatusBadge.displayName = "StatusBadge";
 - 新增治理脚本须加入 `gate-rules.toml` + `governance_checks.py` T1
 - 反模式发现新案例时，回写到 §10
 - Wave 1 启动后，本文件适用范围扩展到 `apps/web-admin/`，可能新增"路由约定 / 状态管理 / API 调用"等章节
+
+---
+
+## 12. 视觉回归治理（T3）
+
+每次 UI 改动**强制**对比 baseline 截图。流程：
+
+```bash
+cd prototypes && pnpm dev &                                    # 1. 起 vite
+python3 scripts/governance/capture_visual_snapshots.py         # 2. 截 11 个 tab → .visual-snapshots/
+python3 scripts/governance/check_visual_regression.py          # 3. 对比 baseline ↔ snapshot
+```
+
+### 阈值（参 governance/visual-baselines/README.md）
+
+| 指标 | 通过 | 警告 | 错误（PR 阻断） |
+|---|---|---|---|
+| `mean_diff`（64×64 灰度均值差，0-255） | ≤ 2 | 2-10 | > 10 |
+| `pixel_diff_ratio`（像素级不同比例） | ≤ 0.5% | 0.5%-3% | > 3% |
+| MD5 一致 | ✓ 直接通过 | — | — |
+
+### 何时更新 baseline
+
+- ✅ 业务方走查 approved 的视觉调整 → `cp prototypes/.visual-snapshots/*.png governance/visual-baselines/` + 更新 `manifest.toml.reviewed_at`
+- ❌ 回归 bug 不能更新 baseline（先修代码让脚本回到 0 差异）
+
+### 治理位置
+
+- `governance/visual-baselines/manifest.toml` — 11 个 tab 的元数据（viewport / 关联故事 / reviewed_by）
+- `scripts/governance/capture_visual_snapshots.py` — 截图脚本（chrome headless）
+- `scripts/governance/check_visual_regression.py` — 对比脚本（PIL + MD5 短路 + 像素差异 + 64×64 感知差异 + 差异图叠加）
+- T3（preflight 阶段，pre-push hook 触发）— 不进 T1 因为依赖 vite + chrome
+

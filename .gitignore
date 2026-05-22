@@ -35,6 +35,8 @@ out/
 *.tsbuildinfo
 .pnpm-store/
 storybook-static/
+prototypes/.visual-snapshots/
+prototypes/.visual-diffs/
 
 # ---- Python（治理脚本） ----
 __pycache__/

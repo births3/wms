@@ -1,0 +1,112 @@
+# 视觉基线清单 — 每张 PNG 的元数据
+#
+# 治理脚本 check_visual_regression.py 以此为准
+# 修改 baseline 必须同步更新对应条目（hash + reviewed_by + reviewed_at）
+
+[meta]
+version = "v1"
+created_at = "2026-05-22"
+chrome_args = "--headless --disable-gpu --no-sandbox --hide-scrollbars"
+
+# ============================================================
+# 11 个 tab 的 baseline 截图
+# ============================================================
+
+[[snapshots]]
+tab = "gallery"
+url_hash = "#gallery"
+viewport = "1400x2400"
+file = "gallery.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-22"
+related_story = "ComponentsGallery（组件库走查页）"
+
+[[snapshots]]
+tab = "h1-login-pda"
+url_hash = "#h1-login-pda"
+viewport = "1100x1100"
+file = "h1-login-pda.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-22"
+related_story = "US-H1-001 PDA 登录"
+
+[[snapshots]]
+tab = "h1-login-pc"
+url_hash = "#h1-login-pc"
+viewport = "1400x1900"
+file = "h1-login-pc.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-22"
+related_story = "US-H1-001 PC 登录"
+
+[[snapshots]]
+tab = "h1-token"
+url_hash = "#h1-token"
+viewport = "1500x950"
+file = "h1-token.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-22"
+related_story = "US-H1-005 Token 失效与登出"
+
+[[snapshots]]
+tab = "h1-apikey"
+url_hash = "#h1-apikey"
+viewport = "1500x950"
+file = "h1-apikey.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-22"
+related_story = "US-H1-006 API Key 管理"
+
+[[snapshots]]
+tab = "h1-role"
+url_hash = "#h1-role"
+viewport = "1500x950"
+file = "h1-role.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-22"
+related_story = "US-H1-002 角色与权限矩阵"
+
+[[snapshots]]
+tab = "h2-audit"
+url_hash = "#h2-audit"
+viewport = "1500x950"
+file = "h2-audit.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-22"
+related_story = "US-H2-002 审计追踪查询"
+
+[[snapshots]]
+tab = "h2-archive"
+url_hash = "#h2-archive"
+viewport = "1500x950"
+file = "h2-archive.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-22"
+related_story = "US-H2-004 / US-H2-006 数据归档"
+
+[[snapshots]]
+tab = "h3-swagger"
+url_hash = "#h3-swagger"
+viewport = "1500x950"
+file = "h3-swagger.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-22"
+related_story = "US-H3-004 API 文档可访问性"
+
+[[snapshots]]
+tab = "m2-dual-sign"
+url_hash = "#m2-dual-sign"
+viewport = "1100x1100"
+file = "m2-dual-sign.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-22"
+related_story = "US-M2-004 双人验收签字（PDA）"
+
+[[snapshots]]
+tab = "m2-kanban"
+url_hash = "#m2-kanban"
+viewport = "1500x950"
+file = "m2-kanban.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-22"
+related_story = "US-M2-008 收货进度看板"
