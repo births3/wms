@@ -59,7 +59,80 @@ def _md5(path: Path) -> str:
     return h.hexdigest()
 
 
+def _detect_truncation(snapshot: Path) -> tuple[bool, float]:
+    """检测截图底部是否被截断
+    思路：取底部 30 行像素，统计非白色像素比例。
+    - 比例 < 5%：底部基本是白色（页面完整结束）
+    - 比例 >= 5%：底部有内容（页面可能被截断）
+    返回 (is_truncated, ratio)
+    """
+    try:
+        from PIL import Image
+    except ImportError:
+        return (False, 0.0)
+    try:
+        img = Image.open(snapshot).convert("L")  # 灰度
+    except Exception:
+        return (False, 0.0)
+    w, h = img.size
+    if h < 30:
+        return (False, 0.0)
+    # 取底部 30 行
+    bottom = img.crop((0, h - 30, w, h))
+    pixels = list(bottom.getdata())
+    # 非白色像素：灰度 < 250
+    nonwhite = sum(1 for p in pixels if p < 250)
+    ratio = nonwhite / len(pixels) if pixels else 0.0
+    # 阈值 5%：如果底部 30 行有 ≥5% 非白像素，认为可能截断
+    return (ratio >= 0.05, ratio)
+
+
 def _compare_pixels(baseline: Path, snapshot: Path, diff_out: Path | None = None) -> tuple[float, float, str]:
+    """Returns (mean_diff_64x64, pixel_diff_ratio, error_msg)"""
+    try:
+        from PIL import Image, ImageChops
+    except ImportError:
+        return (0.0, 0.0, "PIL 未安装")
+
+    try:
+        img_a = Image.open(baseline).convert("RGB")
+        img_b = Image.open(snapshot).convert("RGB")
+    except Exception as e:
+        return (0.0, 0.0, f"加载失败: {e}")
+
+    if img_a.size != img_b.size:
+        return (-1.0, -1.0, f"尺寸不同 baseline={img_a.size} snapshot={img_b.size}")
+
+    # 像素级差异比例
+    diff = ImageChops.difference(img_a, img_b)
+    bbox = diff.getbbox()
+    if bbox is None:
+        return (0.0, 0.0, "")  # 完全一致
+    diff_l = diff.convert("L")
+    pixels = list(diff_l.getdata())
+    total = len(pixels)
+    nonzero = sum(1 for p in pixels if p > 5)  # 阈值 5 (256 灰度)，过滤抗锯齿微差
+    pixel_ratio = nonzero / total if total else 0.0
+
+    # 64×64 灰度均值差（感知差异）
+    a64 = img_a.resize((64, 64)).convert("L")
+    b64 = img_b.resize((64, 64)).convert("L")
+    a_pix = list(a64.getdata())
+    b_pix = list(b64.getdata())
+    mean_diff = sum(abs(x - y) for x, y in zip(a_pix, b_pix)) / len(a_pix)
+
+    # 写差异图
+    if diff_out is not None and bbox:
+        diff_out.parent.mkdir(parents=True, exist_ok=True)
+        red = Image.new("RGB", img_a.size, (255, 0, 0))
+        mask = diff_l.point(lambda p: 255 if p > 5 else 0)
+        composite = Image.composite(red, img_a, mask)
+        composite.save(diff_out)
+
+    return (mean_diff, pixel_ratio, "")
+
+
+
     """Returns (mean_diff_64x64, pixel_diff_ratio, error_msg)"""
     try:
         from PIL import Image, ImageChops
@@ -125,6 +198,7 @@ def main():
     results: list[dict] = []
     errors: list[str] = []
     warnings: list[str] = []
+    truncations: list[str] = []
 
     for snap in snapshots:
         tab = snap["tab"]
@@ -137,6 +211,11 @@ def main():
         if not snapshot.exists():
             errors.append(f"{tab}: snapshot 缺失（先跑 capture）")
             continue
+
+        # 0) 截断检测（snapshot 底部是否非空白）
+        is_trunc, trunc_ratio = _detect_truncation(snapshot)
+        if is_trunc:
+            truncations.append(f"{tab}: 底部 30 行非白像素 {trunc_ratio*100:.1f}%（可能被截断，建议加大 viewport 高度）")
 
         # 1) MD5 短路
         md5_a = _md5(baseline)
@@ -194,6 +273,10 @@ def main():
             print(f"\n⚠ {len(warnings)} 项警告：")
             for w in warnings:
                 print(f"  - {w}")
+        if truncations:
+            print(f"\n⚠ {len(truncations)} 项底部截断：")
+            for t in truncations:
+                print(f"  - {t}")
         if errors:
             print(f"\n✘ {len(errors)} 项错误（PR 阻断）：")
             for e in errors:
