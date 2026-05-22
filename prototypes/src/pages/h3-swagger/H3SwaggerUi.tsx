@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { StatusBadge } from "@/components/business";
+import { StatusBadge, PageHeader } from "@/components/business";
 import { ChevronRight, FileJson, Search, Lock, Globe } from "lucide-react";
 
 interface ApiEndpoint {
@@ -68,22 +68,17 @@ export function H3SwaggerUi() {
 
   return (
     <div className="w-[1280px] min-h-[800px] bg-muted/40 border rounded-xl p-6 font-sans">
-      <header className="flex justify-between items-center mb-4">
-        <div>
-          <h1 className="text-xl font-semibold">WMS API 文档</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            H3-004 · OpenAPI 3.1 · v1.0.0 · 共 {total} 个端点 · {deprecated} 个已弃用
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm">
-            <FileJson className="size-4" />
-            下载 openapi.json
-          </Button>
-          <Button variant="outline" size="sm">Postman 导出</Button>
-          <Button size="sm">尝试调用</Button>
-        </div>
-      </header>
+      <PageHeader
+        title="WMS API 文档"
+        subtitle={`H3-004 · OpenAPI 3.1 · v1.0.0 · 共 ${total} 个端点 · ${deprecated} 个已弃用`}
+        actions={
+          <>
+            <Button variant="outline" size="sm"><FileJson className="size-4" />下载 openapi.json</Button>
+            <Button variant="outline" size="sm">Postman 导出</Button>
+            <Button size="sm">尝试调用</Button>
+          </>
+        }
+      />
 
       <Card className="p-4 mb-4">
         <div className="flex gap-3 items-center">

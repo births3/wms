@@ -118,9 +118,10 @@ prototypes/src/pages/  # Layer 3: 页面级
 ## 治理
 
 - **check_component_doc_header.py**：组件顶部文档头校验
-- **check_component_props_classname.py**：Props 接口必须支持 className
+- **check_component_props_classname.py**：Props 接口必须支持 className（forwardRef + displayName；泛型函数自动豁免 forwardRef）
 - **check_component_no_inline_style.py**：业务复合禁止 inline style
 - **check_component_registry_consistency.py**：注册表 ↔ 实际目录一致
+- **check_page_size.py**：页面级文件大小（300 警告 / 500 门禁）→ 强制提取 PageHeader/DataTable/FilterBar 等
 
 ---
 

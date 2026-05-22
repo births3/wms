@@ -259,14 +259,73 @@ PDA 端组件（含 PDA 模式）必须满足 `docs/infra/usability-baseline.md 
 
 ---
 
+## 7.5 页面级文件大小约束（强制）
+
+单个页面 `.tsx` 文件**不允许成为巨石**：
+
+| 行数 | 严重度 | 治理动作 |
+|---|---|---|
+| < 300 行 | ✅ 通过 | — |
+| 300-499 行 | ⚠️ 警告 | `check_page_size.py` 报 warning，强烈建议提取组件 |
+| ≥ 500 行 | 🔴 门禁 | `check_page_size.py` 报 error，PR 阻断（除非加豁免标签） |
+
+**触发提取的信号**：
+- 重复的 `<table>` 表格代码（≥ 30 行）→ 提取为 `<DataTable>`
+- 重复的"标题 + 副标题 + 操作按钮"块 → 提取为 `<PageHeader>`
+- 复杂子组件（≥ 50 行）→ 拆到同目录 `components/` 子目录
+- 多个 SummaryCard / FilterBar / Pagination → 提取（按需新增组件）
+
+**豁免**：极少数页面因业务复杂度合理超阈值，文件顶部加：
+
+```typescript
+// @governance: skip-page-size 三栏布局合理拆分代价高于价值
+```
+
+豁免必须有明确理由，PR 评审会重点 review。
+
+### 提取参考
+
+| 原始代码段 | 行数 | 应提取为 | 当前已有 |
+|---|---|---|---|
+| `<header>` 标题 + 副标题 + 按钮组 | ~15 行 | `<PageHeader>` | ✅ |
+| `<table><thead><tbody>` 列表 | ~30-50 行 | `<DataTable>` | ✅ |
+| 5-6 列筛选 + 重置/查询按钮 | ~30-50 行 | `<FilterBar>` | ⏸ 待加 |
+| 状态卡片（label+value+sub） | ~15 行/个 | `<SummaryCard>` | ⏸ 待加 |
+| 弹窗 | 任意 | `<Dialog>`（shadcn） | ✅ |
+| 空数据展示 | ~10 行 | `<EmptyState>` | ✅ |
+
+---
+
 ## 8. 治理脚本（守门）
 
 | 脚本 | Tier | 校验目标 | 例外豁免方式 |
 |---|---|---|---|
-| `check_component_doc_header.py` | T1 | 5 项强制字段齐全 | 顶部注释加 `@governance: skip-doc-header` 标签 + 理由 |
-| `check_component_props_classname.py` | T1 | Props 接口含 className（继承或显式） | 接口注释加 `@governance: skip-classname` |
-| `check_component_no_inline_style.py` | T1 | 业务复合无静态 inline style | 紧邻上方 `// 动态：理由` 注释豁免 |
-| `check_component_registry_consistency.py` | T1 | 业务复合目录 ↔ component-registry.md §3.1 一一对应 | `governance/check-data.toml` 配置 `[[component_exemptions]]` |
+| `check_component_doc_header.py` | T1 | 5 项强制字段齐全 | `@governance: skip-doc-header` |
+| `check_component_props_classname.py` | T1 | Props 接口含 className + forwardRef + displayName（**泛型函数自动豁免 forwardRef**） | `@governance: skip-classname` |
+| `check_component_no_inline_style.py` | T1 | 业务复合无静态 inline style | 紧邻上方 `// 动态：理由` 注释 |
+| `check_component_registry_consistency.py` | T1 | 业务复合目录 ↔ component-registry.md §3.1 一一对应 | `[[component_exemptions]]` |
+| `check_page_size.py` | T1 | 页面 < 300 通过 / 300-499 警告 / ≥ 500 门禁 | `@governance: skip-page-size` |
+
+---
+
+## 8.5 组件选择决策树（流程类组件易混淆）
+
+```
+要展示什么？
+├─ 业务流程"前进态"（pending → current → completed）
+│   └─ 通用：<StepFlow orientation="horizontal | vertical">
+│
+├─ 已发生事件流（按时间倒序）
+│   └─ <AuditTimeline>
+│
+├─ 审批节点（含审批人 + 意见 + 驳回）
+│   └─ <ApprovalFlow>
+│
+└─ 双人签字特例（first/second/approval 三槽 + M-VR 策略档位）
+    └─ <DualSignPanel>
+```
+
+**禁止**用 StepFlow 模拟审批流程（缺意见/驳回语义）；**禁止**用 ApprovalFlow 模拟通用进度（业务语义过重）。
 
 ---
 

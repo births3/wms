@@ -10,7 +10,12 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { StatusBadge } from "@/components/business";
+import {
+  StatusBadge,
+  PageHeader,
+  DataTable,
+  type DataTableColumn,
+} from "@/components/business";
 import { Database, Archive, Plus } from "lucide-react";
 import { useState } from "react";
 
@@ -71,24 +76,66 @@ const STATUS_MAP = {
 export function H2Archive() {
   const [tab, setTab] = useState<"rules" | "jobs">("rules");
 
+  const ruleColumns: DataTableColumn<ArchiveRule>[] = [
+    { key: "scope", header: "数据范围", className: "font-medium" },
+    {
+      key: "retentionYears",
+      header: "保留",
+      render: (r) => (
+        <span className={r.retentionYears >= 30 ? "text-destructive font-semibold" : ""}>
+          {r.retentionYears} 年{r.retentionYears >= 30 && "（GSP）"}
+        </span>
+      ),
+    },
+    { key: "archiveAfter", header: "归档触发", className: "text-muted-foreground" },
+    { key: "destination", header: "归档目的地", mono: true },
+    { key: "encryption", header: "加密", className: "uppercase text-xs" },
+    {
+      key: "status",
+      header: "状态",
+      render: (r) => {
+        const m = STATUS_MAP[r.status];
+        return <StatusBadge status={m.status} size="sm" label={m.label} />;
+      },
+    },
+    { key: "action", header: "操作", render: () => <Button variant="outline" size="sm">编辑</Button> },
+  ];
+
+  const jobColumns: DataTableColumn<ArchiveJob>[] = [
+    { key: "scope", header: "数据范围", mono: true },
+    { key: "startedAt", header: "开始时间", className: "text-muted-foreground" },
+    { key: "duration", header: "耗时", className: "text-muted-foreground" },
+    { key: "recordCount", header: "归档记录数", render: (j) => <span className="font-mono">{j.recordCount.toLocaleString()}</span> },
+    { key: "size", header: "归档大小" },
+    {
+      key: "status",
+      header: "状态",
+      render: (j) => {
+        const m = STATUS_MAP[j.status];
+        return <StatusBadge status={m.status} size="sm" label={m.label} />;
+      },
+    },
+    {
+      key: "action",
+      header: "操作",
+      render: (j) =>
+        j.status === "failed" ? <Button variant="outline" size="sm">重试</Button> :
+        j.status === "completed" ? <Button variant="link" size="sm" className="px-0">查看日志</Button> : null,
+    },
+  ];
+
   return (
     <div className="w-[1280px] min-h-[800px] bg-muted/40 border rounded-xl p-6 font-sans">
-      <header className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-xl font-semibold">数据归档与生命周期</h1>
-          <p className="text-sm text-muted-foreground mt-1">H2-004 审计归档 / H2-006 业务数据生命周期 · GSP 法定保留</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm">
-            <Archive className="size-4" />
-            手动触发归档
-          </Button>
-          <Button size="sm">
-            <Plus className="size-4" />
-            新建规则
-          </Button>
-        </div>
-      </header>
+      <PageHeader
+        title="数据归档与生命周期"
+        subtitle="H2-004 审计归档 / H2-006 业务数据生命周期 · GSP 法定保留"
+        actions={
+          <>
+            <Button variant="outline" size="sm"><Archive className="size-4" />手动触发归档</Button>
+            <Button size="sm"><Plus className="size-4" />新建规则</Button>
+          </>
+        }
+      />
 
       {/* 总览卡片 */}
       <div className="grid grid-cols-4 gap-4 mb-6">
@@ -106,120 +153,53 @@ export function H2Archive() {
       </Tabs>
 
       {tab === "rules" && (
-        <Card className="p-0 overflow-hidden">
-          <div className="px-6 py-4 border-b grid grid-cols-4 gap-4 items-end bg-muted/20">
-            <div className="space-y-1">
-              <Label className="text-xs">数据范围</Label>
-              <Select defaultValue="all">
-                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">全部</SelectItem>
-                  <SelectItem value="audit">审计类</SelectItem>
-                  <SelectItem value="business">业务类</SelectItem>
-                </SelectContent>
-              </Select>
+        <DataTable
+          columns={ruleColumns}
+          data={MOCK_RULES}
+          rowKey={(r) => r.id}
+          caption={
+            <div className="grid grid-cols-4 gap-4 items-end">
+              <div className="space-y-1">
+                <Label className="text-xs">数据范围</Label>
+                <Select defaultValue="all">
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">全部</SelectItem>
+                    <SelectItem value="audit">审计类</SelectItem>
+                    <SelectItem value="business">业务类</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">保留年限</Label>
+                <Select defaultValue="all">
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">全部</SelectItem>
+                    <SelectItem value="5">5 年</SelectItem>
+                    <SelectItem value="30">30 年</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">状态</Label>
+                <Select defaultValue="all">
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">全部</SelectItem>
+                    <SelectItem value="enabled">已启用</SelectItem>
+                    <SelectItem value="disabled">已停用</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Input className="h-8 text-xs" placeholder="搜索规则名 / 数据表" />
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs">保留年限</Label>
-              <Select defaultValue="all">
-                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">全部</SelectItem>
-                  <SelectItem value="5">5 年</SelectItem>
-                  <SelectItem value="30">30 年</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">状态</Label>
-              <Select defaultValue="all">
-                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">全部</SelectItem>
-                  <SelectItem value="enabled">已启用</SelectItem>
-                  <SelectItem value="disabled">已停用</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <Input className="h-8 text-xs" placeholder="搜索规则名 / 数据表" />
-          </div>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs text-muted-foreground text-left bg-muted/40 border-b">
-                <th className="px-4 py-2 font-medium">数据范围</th>
-                <th className="px-4 py-2 font-medium">保留</th>
-                <th className="px-4 py-2 font-medium">归档触发</th>
-                <th className="px-4 py-2 font-medium">归档目的地</th>
-                <th className="px-4 py-2 font-medium">加密</th>
-                <th className="px-4 py-2 font-medium">状态</th>
-                <th className="px-4 py-2 font-medium">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {MOCK_RULES.map((r) => {
-                const meta = STATUS_MAP[r.status];
-                return (
-                  <tr key={r.id} className="border-b last:border-b-0 hover:bg-accent/40">
-                    <td className="px-4 py-3 font-medium">{r.scope}</td>
-                    <td className="px-4 py-3">
-                      <span className={r.retentionYears >= 30 ? "text-destructive font-semibold" : ""}>
-                        {r.retentionYears} 年{r.retentionYears >= 30 && "（GSP）"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">{r.archiveAfter}</td>
-                    <td className="px-4 py-3 text-xs font-mono text-muted-foreground">{r.destination}</td>
-                    <td className="px-4 py-3 uppercase text-xs">{r.encryption}</td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={meta.status} size="sm" label={meta.label} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <Button variant="outline" size="sm">编辑</Button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </Card>
+          }
+        />
       )}
 
       {tab === "jobs" && (
-        <Card className="p-0 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs text-muted-foreground text-left bg-muted/40 border-b">
-                <th className="px-4 py-2 font-medium">数据范围</th>
-                <th className="px-4 py-2 font-medium">开始时间</th>
-                <th className="px-4 py-2 font-medium">耗时</th>
-                <th className="px-4 py-2 font-medium">归档记录数</th>
-                <th className="px-4 py-2 font-medium">归档大小</th>
-                <th className="px-4 py-2 font-medium">状态</th>
-                <th className="px-4 py-2 font-medium">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {MOCK_JOBS.map((j) => {
-                const meta = STATUS_MAP[j.status];
-                return (
-                  <tr key={j.id} className="border-b last:border-b-0 hover:bg-accent/40">
-                    <td className="px-4 py-3 font-mono text-xs">{j.scope}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{j.startedAt}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{j.duration}</td>
-                    <td className="px-4 py-3 font-mono">{j.recordCount.toLocaleString()}</td>
-                    <td className="px-4 py-3">{j.size}</td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={meta.status} size="sm" label={meta.label} />
-                    </td>
-                    <td className="px-4 py-3">
-                      {j.status === "failed" && <Button variant="outline" size="sm">重试</Button>}
-                      {j.status === "completed" && <Button variant="link" size="sm" className="px-0">查看日志</Button>}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </Card>
+        <DataTable columns={jobColumns} data={MOCK_JOBS} rowKey={(j) => j.id} />
       )}
     </div>
   );

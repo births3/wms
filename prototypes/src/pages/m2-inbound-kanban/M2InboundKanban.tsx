@@ -9,7 +9,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { KanbanBoard, type KanbanColumn } from "@/components/business";
+import { KanbanBoard, PageHeader, type KanbanColumn } from "@/components/business";
 import { RefreshCw, Maximize2 } from "lucide-react";
 
 const COLUMNS: KanbanColumn[] = [
@@ -71,24 +71,16 @@ const COLUMNS: KanbanColumn[] = [
 export function M2InboundKanban() {
   return (
     <div className="w-[1400px] min-h-[800px] bg-muted/30 border rounded-xl p-6 font-sans">
-      <header className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="text-xl font-semibold">收货进度看板</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            M2-008 · 实时刷新 · 共 {COLUMNS.reduce((a, c) => a + c.items.length, 0)} 个 ASN · 最近刷新 2 秒前
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm">
-            <RefreshCw className="size-3.5" />
-            手动刷新
-          </Button>
-          <Button variant="outline" size="sm">
-            <Maximize2 className="size-3.5" />
-            全屏大屏
-          </Button>
-        </div>
-      </header>
+      <PageHeader
+        title="收货进度看板"
+        subtitle={`M2-008 · 实时刷新 · 共 ${COLUMNS.reduce((a, c) => a + c.items.length, 0)} 个 ASN · 最近刷新 2 秒前`}
+        actions={
+          <>
+            <Button variant="outline" size="sm"><RefreshCw className="size-3.5" />手动刷新</Button>
+            <Button variant="outline" size="sm"><Maximize2 className="size-3.5" />全屏大屏</Button>
+          </>
+        }
+      />
 
       {/* 筛选栏 */}
       <Card className="p-3 mb-4">

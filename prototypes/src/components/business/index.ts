@@ -10,7 +10,6 @@ export { StepFlow } from "./StepFlow";
 export type { StepFlowProps, Step } from "./StepFlow";
 export { DiffPanel } from "./DiffPanel";
 export type { DiffPanelProps } from "./DiffPanel";
-// 批次 2
 export { DualSignPanel } from "./DualSignPanel";
 export type { DualSignPanelProps, DualSignPolicy, DualSignSlot } from "./DualSignPanel";
 export { ApprovalFlow } from "./ApprovalFlow";
@@ -25,3 +24,10 @@ export { RuleEditor } from "./RuleEditor";
 export type { RuleEditorProps, RuleGroup, RuleCondition, RuleAction } from "./RuleEditor";
 export { TempChart } from "./TempChart";
 export type { TempChartProps, TempPoint } from "./TempChart";
+// 批次 3（管理页通用骨架）
+export { PageHeader } from "./PageHeader";
+export type { PageHeaderProps } from "./PageHeader";
+export { DataTable } from "./DataTable";
+export type { DataTableProps, DataTableColumn } from "./DataTable";
+export { EmptyState } from "./EmptyState";
+export type { EmptyStateProps } from "./EmptyState";

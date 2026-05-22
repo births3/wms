@@ -1,7 +1,13 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { StatusBadge } from "@/components/business";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import {
+  StatusBadge,
+  PageHeader,
+  DataTable,
+  type DataTableColumn,
+} from "@/components/business";
 import { AlertCircle, Clock, Smartphone, Monitor, ScanLine } from "lucide-react";
 
 interface Session {
@@ -28,53 +34,74 @@ const DEVICE_META = {
 };
 
 /**
- * H1TokenLogout — Token 失效与登出
+ * H1TokenLogout — 登录会话与登出
  *
  * 层级：Layer 3 页面级
- * 关联故事：US-H1-005（token 过期 / 主动登出 / 历史会话清理）
- * Wave：Wave 0.5（P0 必交付）
- * 业务约束：JWT 默认 8 小时；Refresh Token 7 天；登出 = 加入服务端黑名单
+ * 关联故事：US-H1-005
+ * Wave：Wave 0.5（P0）
+ * 业务约束：JWT 默认 8h；Refresh Token 7 天；登出 = 加入服务端黑名单
  *
  * @example
- *   <H1TokenLogout />
  *   <H1TokenLogout showExpireDialog />
  */
 export function H1TokenLogout({ showExpireDialog = false }: { showExpireDialog?: boolean } = {}) {
   const [sessions, setSessions] = useState(MOCK_SESSIONS);
+  const [open, setOpen] = useState(showExpireDialog);
 
-  const handleRevoke = (id: string) => {
-    setSessions(sessions.filter((s) => s.id !== id));
-  };
+  const columns: DataTableColumn<Session>[] = [
+    {
+      key: "device",
+      header: "设备",
+      render: (s) => {
+        const D = DEVICE_META[s.device];
+        return <span className="inline-flex items-center gap-1.5"><D.icon className="size-3.5 text-muted-foreground" />{D.label}</span>;
+      },
+    },
+    { key: "client", header: "客户端" },
+    { key: "ip", header: "IP", mono: true },
+    {
+      key: "loginAt",
+      header: "登录时间",
+      render: (s) => <span className="inline-flex items-center gap-1.5"><Clock className="size-3 text-muted-foreground" />{s.loginAt}</span>,
+    },
+    { key: "expiresAt", header: "过期时间", render: (s) => <span className="text-muted-foreground">{s.expiresAt}</span> },
+    {
+      key: "action",
+      header: "操作",
+      render: (s) =>
+        s.current ? (
+          <StatusBadge status="in_progress" size="sm" label="当前会话" />
+        ) : (
+          <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setSessions(sessions.filter((x) => x.id !== s.id)); }}>
+            强制登出
+          </Button>
+        ),
+    },
+  ];
 
   return (
     <div className="w-[1280px] min-h-[800px] bg-muted/40 border rounded-xl p-6 font-sans">
-      <header className="mb-6">
-        <h1 className="text-xl font-semibold">登录会话与登出</h1>
-        <p className="text-sm text-muted-foreground mt-1">H1-005 / Token 黑名单 + 多设备会话管理</p>
-      </header>
+      <PageHeader title="登录会话与登出" subtitle="H1-005 / Token 黑名单 + 多设备会话管理" />
 
-      {/* Token 过期弹窗（条件渲染） */}
-      {showExpireDialog && (
-        <div className="fixed inset-0 bg-foreground/30 flex items-center justify-center z-50">
-          <Card className="w-[420px] p-6 space-y-4 shadow-xl">
-            <div className="flex items-center gap-3">
-              <AlertCircle className="size-6 text-destructive" />
-              <h3 className="text-lg font-semibold">登录已过期</h3>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              你的 token 已于 <span className="font-mono">2026-05-22 17:14</span> 过期。
-              <br />
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="size-5 text-destructive" />
+              登录已过期
+            </DialogTitle>
+            <DialogDescription>
+              你的 token 已于 <span className="font-mono">2026-05-22 17:14</span> 过期。<br />
               为保障操作安全，请重新登录。已暂存 3 条未提交操作（重登后自动恢复）。
-            </p>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" size="sm">取消（保留页面 5 分钟）</Button>
-              <Button size="sm">重新登录</Button>
-            </div>
-          </Card>
-        </div>
-      )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setOpen(false)}>取消（保留 5 分钟）</Button>
+            <Button size="sm">重新登录</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {/* 当前会话信息 */}
       <Card className="p-6 mb-4">
         <h2 className="text-base font-semibold mb-4">当前会话</h2>
         <div className="grid grid-cols-2 gap-x-12 gap-y-3 text-sm">
@@ -88,60 +115,17 @@ export function H1TokenLogout({ showExpireDialog = false }: { showExpireDialog?:
           <Row label="Refresh Token" v="2026-05-29 09:14（剩 6 天 23h）" />
         </div>
         <div className="mt-6 pt-4 border-t flex justify-between items-center">
-          <p className="text-xs text-muted-foreground">登出 = token 加入服务端黑名单（GSP 审计：actor + 时间 + IP）</p>
+          <p className="text-xs text-muted-foreground">登出 = token 加入服务端黑名单（GSP 审计）</p>
           <Button variant="destructive" size="sm">登出</Button>
         </div>
       </Card>
 
-      {/* 历史会话列表 */}
       <Card className="p-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-base font-semibold">活跃会话（{sessions.length}）</h2>
           <Button variant="outline" size="sm">登出全部其他会话</Button>
         </div>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-xs text-muted-foreground text-left bg-muted/40 border-b">
-              <th className="px-4 py-2 font-medium">设备</th>
-              <th className="px-4 py-2 font-medium">客户端</th>
-              <th className="px-4 py-2 font-medium">IP</th>
-              <th className="px-4 py-2 font-medium">登录时间</th>
-              <th className="px-4 py-2 font-medium">过期时间</th>
-              <th className="px-4 py-2 font-medium">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sessions.map((s) => {
-              const D = DEVICE_META[s.device];
-              return (
-                <tr key={s.id} className="border-b last:border-b-0 hover:bg-accent/40">
-                  <td className="px-4 py-3">
-                    <span className="inline-flex items-center gap-1.5">
-                      <D.icon className="size-3.5 text-muted-foreground" />
-                      {D.label}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">{s.client}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{s.ip}</td>
-                  <td className="px-4 py-3 inline-flex items-center gap-1.5">
-                    <Clock className="size-3 text-muted-foreground" />
-                    {s.loginAt}
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">{s.expiresAt}</td>
-                  <td className="px-4 py-3">
-                    {s.current ? (
-                      <StatusBadge status="in_progress" size="sm" label="当前会话" />
-                    ) : (
-                      <Button variant="outline" size="sm" onClick={() => handleRevoke(s.id)}>
-                        强制登出
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <DataTable columns={columns} data={sessions} rowKey={(s) => s.id} />
       </Card>
     </div>
   );
@@ -149,11 +133,9 @@ export function H1TokenLogout({ showExpireDialog = false }: { showExpireDialog?:
 
 function Row({ label, v, mono }: { label: string; v: string; mono?: boolean }) {
   return (
-    <>
-      <div className="flex">
-        <span className="text-muted-foreground w-24 shrink-0">{label}</span>
-        <span className={mono ? "font-mono text-xs" : ""}>{v}</span>
-      </div>
-    </>
+    <div className="flex">
+      <span className="text-muted-foreground w-24 shrink-0">{label}</span>
+      <span className={mono ? "font-mono text-xs" : ""}>{v}</span>
+    </div>
   );
 }

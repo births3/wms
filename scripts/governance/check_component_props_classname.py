@@ -34,6 +34,8 @@ HTML_ATTRS_RE = re.compile(r"(HTMLAttributes|SVGAttributes|ButtonHTMLAttributes|
 CLASSNAME_FIELD_RE = re.compile(r"\bclassName\s*\??\s*:")
 FORWARD_REF_RE = re.compile(r"React\.forwardRef|forwardRef<")
 DISPLAY_NAME_RE = re.compile(r"\.displayName\s*=")
+# 泛型函数组件（React forwardRef 不支持泛型，社区惯用 export function Name<T>）
+GENERIC_FUNC_RE = re.compile(r"export\s+function\s+\w+\s*<\s*\w")
 SKIP_TAG = "@governance: skip-classname"
 
 
@@ -43,28 +45,26 @@ def _check_file(path: Path) -> list[str]:
     if SKIP_TAG in text[:500]:
         return []
 
-    # 至少一个 Props 接口存在
     matches = list(PROPS_INTERFACE_RE.finditer(text))
     if not matches:
-        # 没有显式 Props 接口的子组件可能是辅助函数，跳过
         return []
 
     for m in matches:
         name = m.group(1)
         extends_part = m.group(2)
         body = m.group(3)
-        # 满足任一即可：1) extends HTMLAttributes 系列 2) body 含 className?: string
         has_html_attrs = bool(HTML_ATTRS_RE.search(extends_part))
         has_classname = bool(CLASSNAME_FIELD_RE.search(body))
         if not (has_html_attrs or has_classname):
             issues.append(f"接口 {name} 既未继承 HTMLAttributes 也未声明 className")
 
-    # forwardRef 检查
-    if not FORWARD_REF_RE.search(text):
-        issues.append("未使用 React.forwardRef")
-    # displayName 检查
-    if not DISPLAY_NAME_RE.search(text):
-        issues.append("未设置 displayName")
+    # 泛型函数组件：React forwardRef 不支持泛型 → 豁免 forwardRef + displayName
+    is_generic_fn = bool(GENERIC_FUNC_RE.search(text))
+    if not is_generic_fn:
+        if not FORWARD_REF_RE.search(text):
+            issues.append("未使用 React.forwardRef")
+        if not DISPLAY_NAME_RE.search(text):
+            issues.append("未设置 displayName")
 
     return issues
 

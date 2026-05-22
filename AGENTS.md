@@ -444,6 +444,8 @@
 - size 三档对齐 shadcn：`sm | default | lg`（禁止 md）
 - 状态枚举必须对齐 `docs/prototypes/component-registry.md §4.3`
 - PDA 端组件触控 ≥ 48pt / 字号 ≥ 16pt（usability-baseline §2.1）
+- **单页面 `.tsx` < 300 行**（≥ 300 警告，≥ 500 PR 门禁，加 `@governance: skip-page-size` 注释豁免）
+- **流程类组件按决策树选型**（StepFlow 通用进度 / AuditTimeline 历史事件 / ApprovalFlow 审批 / DualSignPanel 双人签字特例）
 - 新增 Layer 2 组件 PR 必须在 component-registry.md §3.1 注册
 
 ### 前端治理脚本（T1 自动跑）
@@ -454,6 +456,7 @@
 | `check_component_no_inline_style.py` | 业务复合无静态 inline style（动态值豁免） |
 | `check_component_props_classname.py` | Props 接口含 className + forwardRef + displayName |
 | `check_component_registry_consistency.py` | 注册表 ↔ 实际目录一致（区分"已开发"/"待开发"） |
+| `check_page_size.py` | 页面 < 300 行通过 / 300-499 警告 / ≥ 500 门禁 |
 | `check_prototype_index_consistency.py` | 原型 index.toml 字段合法 |
 | `check_prototype_story_sync.py` | 原型 ↔ 故事文件同步 |
 | `check_prototype_freshness.py` | 原型走查时效（90 天） |

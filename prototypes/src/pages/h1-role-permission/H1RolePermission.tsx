@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { StatusBadge } from "@/components/business";
+import { StatusBadge, PageHeader } from "@/components/business";
 import { Plus, Copy, Search, Users, ChevronDown, ChevronRight } from "lucide-react";
 
 interface Role {
@@ -130,22 +130,16 @@ export function H1RolePermission() {
 
   return (
     <div className="w-[1280px] min-h-[800px] bg-muted/40 border rounded-xl p-6 font-sans">
-      <header className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-xl font-semibold">角色与权限管理</h1>
-          <p className="text-sm text-muted-foreground mt-1">H1-002 / M1-006 · 权限码层级 · 内置角色不可删</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm">
-            <Copy className="size-4" />
-            复制为新角色
-          </Button>
-          <Button size="sm">
-            <Plus className="size-4" />
-            新建角色
-          </Button>
-        </div>
-      </header>
+      <PageHeader
+        title="角色与权限管理"
+        subtitle="H1-002 / M1-006 · 权限码层级 · 内置角色不可删"
+        actions={
+          <>
+            <Button variant="outline" size="sm"><Copy className="size-4" />复制为新角色</Button>
+            <Button size="sm"><Plus className="size-4" />新建角色</Button>
+          </>
+        }
+      />
 
       <div className="grid grid-cols-[260px_1fr_300px] gap-4">
         {/* 左：角色列表 */}

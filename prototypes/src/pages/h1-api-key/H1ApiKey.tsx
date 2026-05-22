@@ -10,7 +10,12 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { StatusBadge } from "@/components/business";
+import {
+  StatusBadge,
+  PageHeader,
+  DataTable,
+  type DataTableColumn,
+} from "@/components/business";
 import { Plus, Copy, Eye, EyeOff, Key } from "lucide-react";
 
 interface ApiKey {
@@ -43,31 +48,56 @@ const STATUS_MAP = {
  * H1ApiKey — API Key 生命周期管理
  *
  * 层级：Layer 3 页面级
- * 关联故事：US-H1-006（创建 / 吊销 / 重置 / 审计）
- * Wave：Wave 0.5（P0 必交付）
- * 业务约束：密钥仅在创建时全文返回一次；其后只展示前缀；吊销不可恢复
+ * 关联故事：US-H1-006
+ * Wave：Wave 0.5（P0）
+ * 业务约束：密钥仅创建时全文返回一次；其后只展示前缀；吊销不可恢复
  *
  * @example
- *   <H1ApiKey />
  *   <H1ApiKey showCreated />
  */
 export function H1ApiKey({ showCreated = false }: { showCreated?: boolean } = {}) {
   const [revealCreated, setRevealCreated] = useState(false);
 
+  const columns: DataTableColumn<ApiKey>[] = [
+    { key: "name", header: "名称", className: "font-medium" },
+    { key: "prefix", header: "前缀", mono: true },
+    { key: "scope", header: "权限范围", className: "text-xs text-muted-foreground" },
+    {
+      key: "createdBy",
+      header: "创建",
+      render: (k) => <div className="text-xs"><div>{k.createdBy}</div><div className="text-muted-foreground">{k.createdAt}</div></div>,
+    },
+    { key: "lastUsedAt", header: "最近使用", className: "text-xs text-muted-foreground" },
+    { key: "expiresAt", header: "过期", className: "text-xs text-muted-foreground" },
+    {
+      key: "status",
+      header: "状态",
+      render: (k) => {
+        const m = STATUS_MAP[k.status];
+        return <StatusBadge status={m.status} size="sm" label={m.label} />;
+      },
+    },
+    {
+      key: "action",
+      header: "操作",
+      render: (k) => {
+        if (k.status === "active") return <Button variant="outline" size="sm">吊销</Button>;
+        if (k.status === "expired") return <Button variant="outline" size="sm">续期</Button>;
+        return <span className="text-xs text-muted-foreground">—</span>;
+      },
+    },
+  ];
+
+  const counts = MOCK_KEYS.reduce((acc, k) => ({ ...acc, [k.status]: (acc[k.status] ?? 0) + 1 }), {} as Record<string, number>);
+
   return (
     <div className="w-[1280px] min-h-[800px] bg-muted/40 border rounded-xl p-6 font-sans">
-      <header className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-xl font-semibold">API Key 管理</h1>
-          <p className="text-sm text-muted-foreground mt-1">H1-006 / 外部系统对接密钥</p>
-        </div>
-        <Button>
-          <Plus className="size-4" />
-          创建 API Key
-        </Button>
-      </header>
+      <PageHeader
+        title="API Key 管理"
+        subtitle="H1-006 / 外部系统对接密钥"
+        actions={<Button><Plus className="size-4" />创建 API Key</Button>}
+      />
 
-      {/* 创建成功的 banner（仅一次性展示） */}
       {showCreated && (
         <Card className="p-4 mb-4 border-wms-warning bg-orange-50/50">
           <div className="flex items-start gap-3">
@@ -79,23 +109,18 @@ export function H1ApiKey({ showCreated = false }: { showCreated?: boolean } = {}
               </p>
               <div className="mt-3 flex items-center gap-2">
                 <code className="flex-1 px-3 py-2 bg-background rounded font-mono text-xs break-all">
-                  {revealCreated
-                    ? "wms_live_a3F2k9X7m1Z5p8Q4r6T2v0W8y3Z7"
-                    : "wms_live_a3F2…••••••••••••••••"}
+                  {revealCreated ? "wms_live_a3F2k9X7m1Z5p8Q4r6T2v0W8y3Z7" : "wms_live_a3F2…••••••••••••••••"}
                 </code>
                 <Button variant="outline" size="sm" onClick={() => setRevealCreated(!revealCreated)}>
                   {revealCreated ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 </Button>
-                <Button variant="outline" size="sm">
-                  <Copy className="size-4" />
-                </Button>
+                <Button variant="outline" size="sm"><Copy className="size-4" /></Button>
               </div>
             </div>
           </div>
         </Card>
       )}
 
-      {/* 创建表单 */}
       <Card className="p-6 mb-4">
         <h2 className="text-sm font-medium mb-3">创建新密钥</h2>
         <div className="grid grid-cols-3 gap-4 items-end">
@@ -131,58 +156,12 @@ export function H1ApiKey({ showCreated = false }: { showCreated?: boolean } = {}
         </div>
       </Card>
 
-      {/* 列表 */}
-      <Card className="p-0 overflow-hidden">
-        <div className="px-6 py-3 text-xs text-muted-foreground bg-muted/40 border-b">
-          共 {MOCK_KEYS.length} 个密钥 · 启用 {MOCK_KEYS.filter((k) => k.status === "active").length} · 已过期 {MOCK_KEYS.filter((k) => k.status === "expired").length} · 已吊销 {MOCK_KEYS.filter((k) => k.status === "revoked").length}
-        </div>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-xs text-muted-foreground text-left bg-muted/40 border-b">
-              <th className="px-4 py-2 font-medium">名称</th>
-              <th className="px-4 py-2 font-medium">前缀</th>
-              <th className="px-4 py-2 font-medium">权限范围</th>
-              <th className="px-4 py-2 font-medium">创建</th>
-              <th className="px-4 py-2 font-medium">最近使用</th>
-              <th className="px-4 py-2 font-medium">过期</th>
-              <th className="px-4 py-2 font-medium">状态</th>
-              <th className="px-4 py-2 font-medium">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {MOCK_KEYS.map((k) => {
-              const meta = STATUS_MAP[k.status];
-              return (
-                <tr key={k.id} className="border-b last:border-b-0 hover:bg-accent/40">
-                  <td className="px-4 py-3 font-medium">{k.name}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{k.prefix}</td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{k.scope}</td>
-                  <td className="px-4 py-3 text-xs">
-                    <div>{k.createdBy}</div>
-                    <div className="text-muted-foreground">{k.createdAt}</div>
-                  </td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{k.lastUsedAt}</td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{k.expiresAt}</td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={meta.status} size="sm" label={meta.label} />
-                  </td>
-                  <td className="px-4 py-3">
-                    {k.status === "active" && (
-                      <Button variant="outline" size="sm">吊销</Button>
-                    )}
-                    {k.status === "expired" && (
-                      <Button variant="outline" size="sm">续期</Button>
-                    )}
-                    {k.status === "revoked" && (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </Card>
+      <DataTable
+        columns={columns}
+        data={MOCK_KEYS}
+        rowKey={(k) => k.id}
+        caption={`共 ${MOCK_KEYS.length} 个密钥 · 启用 ${counts.active ?? 0} · 已过期 ${counts.expired ?? 0} · 已吊销 ${counts.revoked ?? 0}`}
+      />
     </div>
   );
 }
