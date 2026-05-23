@@ -16,12 +16,12 @@ notes = "v3 起 viewport 高度足够装下页面真实高度；check_visual_reg
 [[snapshots]]
 tab = "gallery"
 url_hash = "#gallery"
-viewport = "1700x2800"
+viewport = "1700x6500"
 file = "gallery.png"
 reviewed_by = "项目主人"
 reviewed_at = "2026-05-23"
-expected_keywords = ["StatusBadge", "ScanInput", "StepFlow", "FieldTable", "DiffPanel", "PrintPreview", "TempChart"]
-related_story = "ComponentsGallery（组件库走查页）"
+expected_keywords = ["StatusBadge", "ScanInput", "StepFlow", "FieldTable", "DiffPanel", "PrintPreview", "TempChart", "DualSignPanel", "ApprovalFlow", "AuditTimeline", "KanbanBoard", "RuleEditor", "PageHeader", "DataTable", "EmptyState"]
+related_story = "ComponentsGallery（组件库走查页 · 16 个组件全展示）"
 
 [[snapshots]]
 tab = "h1-login-pda"
@@ -46,7 +46,7 @@ related_story = "US-H1-001 PC 登录"
 [[snapshots]]
 tab = "h1-token"
 url_hash = "#h1-token"
-viewport = "1700x1300"
+viewport = "1700x2200"
 file = "h1-token.png"
 reviewed_by = "项目主人"
 reviewed_at = "2026-05-23"
@@ -56,7 +56,7 @@ related_story = "US-H1-005 Token 失效与登出"
 [[snapshots]]
 tab = "h1-apikey"
 url_hash = "#h1-apikey"
-viewport = "1700x1300"
+viewport = "1700x2400"
 file = "h1-apikey.png"
 reviewed_by = "项目主人"
 reviewed_at = "2026-05-23"
@@ -96,7 +96,7 @@ related_story = "US-H2-004 / US-H2-006 数据归档"
 [[snapshots]]
 tab = "h3-swagger"
 url_hash = "#h3-swagger"
-viewport = "1700x1100"
+viewport = "1700x1500"
 file = "h3-swagger.png"
 reviewed_by = "项目主人"
 reviewed_at = "2026-05-23"
@@ -126,7 +126,7 @@ related_story = "US-M1-002 供应商资质档案"
 [[snapshots]]
 tab = "m1-locations"
 url_hash = "#m1-locations"
-viewport = "1700x1200"
+viewport = "1700x1500"
 file = "m1-locations.png"
 reviewed_by = "项目主人"
 reviewed_at = "2026-05-23"
