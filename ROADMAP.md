@@ -46,11 +46,12 @@ M11 监管 EDI 已移除：码上放心由 M-TC 承接，药监 EDI 由 ERP/H8 �
 **周期**：2 周
 **目标**：组件库骨架 + P0 原型（Wave 1 涉及的 9 个页面）+ 技术 Spike 验证。
 
-- [ ] Design Tokens + wms-theme.css + Storybook 配置
-- [ ] Layer 2 业务复合组件 Top 5（ScanInput / StepFlow / StatusBadge / FieldTable / OfflineIndicator）
-- [ ] Layer 2 剩余组件（DualSignPanel / AuditTimeline / KanbanBoard / PrintPreview / TempChart / RuleEditor / ApprovalFlow）
-- [ ] P0 原型页（9 个：H1 登录/权限/登出/API Key + H2 审计查询/归档/生命周期 + H3 API 文档）
-- [ ] 技术 Spike：Axum+JWT / H2 append-only / utoipa→OpenAPI→TS 全链路 / SQLx offline / RN 扫枪
+- [x] Design Tokens + wms-theme.css + Storybook 配置
+- [x] Layer 2 业务复合组件 Top 5（ScanInput / StepFlow / StatusBadge / FieldTable / OfflineIndicator）
+- [x] Layer 2 剩余组件（DualSignPanel / AuditTimeline / KanbanBoard / PrintPreview / TempChart / RuleEditor / ApprovalFlow）
+- [x] P0 原型页（9 个：H1 登录/权限/登出/API Key + H2 审计查询/归档/生命周期 + H3 API 文档）
+- [x] 技术 Spike 计划落盘（`docs/spikes/` 5 项 + README，状态=起草）
+- [ ] 技术 Spike 验证：SPIKE-001 Axum+JWT / 002 H2 append-only / 003 utoipa→OpenAPI→TS / 004 SQLx offline / 005 RN 扫枪 — 状态需进入 accepted/rejected/deferred
 
 **完成标准**：Storybook 可运行；P0 原型 ≥1 次走查 approved；Spike 结论记录到 `docs/spikes/`。
 
