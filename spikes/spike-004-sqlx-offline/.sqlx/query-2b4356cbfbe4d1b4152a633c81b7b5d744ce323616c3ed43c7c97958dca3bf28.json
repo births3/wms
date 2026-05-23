@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE items\n        SET stock = stock + $2\n        WHERE code = $1\n        RETURNING stock\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "stock",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "2b4356cbfbe4d1b4152a633c81b7b5d744ce323616c3ed43c7c97958dca3bf28"
+}

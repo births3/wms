@@ -180,9 +180,98 @@ wms 是一个**医药冷链 GSP 合规仓储管理系统**，需求特点：
 
 ---
 
+## 附录：SQLx 实践规范（v0.2，2026-05-24，由 SPIKE-004 验证）
+
+SPIKE-004 验证了 SQLx 0.8.6 在 wms 项目的 6 项核心假设全部成立（详见 `docs/spikes/spike-004-sqlx-offline.md`）。本附录把验证结论固化为编码规范。
+
+### A. 工具链锁定
+
+```toml
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid", "json", "migrate"] }
+```
+
+CLI：`cargo install sqlx-cli --no-default-features --features postgres,rustls --version "^0.8"`
+
+### B. 编码模板
+
+| 场景 | 写法 | 备注 |
+|------|------|------|
+| 普通 INSERT/UPDATE | `sqlx::query!("INSERT ... VALUES ($1, $2)", a, b).execute(pool).await?` | 编译期校验 SQL + 参数类型 |
+| SELECT 多行 | `sqlx::query_as!(Item, "SELECT ... FROM items WHERE ...", arg).fetch_all(pool).await?` | Item 必须 `#[derive(sqlx::FromRow)]` |
+| SELECT 单行 | `... .fetch_one(pool).await?` | 0 行返回 `RowNotFound` 错误 |
+| SELECT 可选 | `... .fetch_optional(pool).await?` | 返回 `Option<T>` |
+| SELECT COUNT | `sqlx::query_scalar!("SELECT COUNT(*) as \"count!: i64\" ...")` | **必须 `as "name!: type"`** 否则推导成 Option |
+
+### C. 离线编译流（强制）
+
+1. **dev 环境改 query!**：
+   ```bash
+   cd backend && export DATABASE_URL=$(cat .env | grep DATABASE_URL | cut -d= -f2)
+   cargo sqlx prepare       # 重生 .sqlx/
+   git add .sqlx/           # 入 git
+   ```
+2. **CI 校验**：`cargo sqlx prepare --check`（diff 触发：改 *.rs 必须同步更新 .sqlx/）
+3. **CI build**：`cargo build --offline`（无需 DATABASE_URL）
+
+`.sqlx/` 入 git，是 deterministic JSON（按 query 内容 hash 命名）。
+
+### D. Migration 规范
+
+- 路径：`backend/migrations/<timestamp>_<verb>_<noun>.sql`（如 `20260601000000_create_items.sql`）
+- timestamp 格式：`YYYYMMDDHHMMSS`（14 位）
+- 不写 down migration（PG 业务表 down 风险高于收益；Wave 4+ 评估）
+- 使用 `sqlx migrate run` 或 `sqlx::migrate!()` 自动加载
+- **schema 变更必须串行**（ROADMAP 节奏铁律 §7）
+
+### E. 测试规范
+
+```rust
+#[sqlx::test]
+async fn test_xxx(pool: PgPool) {
+    // 自动：建临时 db + 跑 migrations + 测试结束 drop db
+    // 不需要清理；不会污染其他测试
+}
+```
+
+并发安全：每个 `#[sqlx::test]` 独立临时 db，可并行执行（cargo test 默认）。
+
+### F. 集中维护原则
+
+- **所有 `query!` / `query_as!` / `query_scalar!` 集中在单 crate**（如 `wms-infra`）
+- 其他 crate 调用 `wms-infra` 暴露的 async 函数；**避免多 crate 各自有 .sqlx/**
+- 防止：多 crate 改同一 query → .sqlx/ 文件冲突 / merge 噪声
+
+### G. 治理脚本（Wave 1 W1.A 启动时新增）
+
+`scripts/governance/check_sqlx_prepared.py`（T2 治理）：
+- diff 触发：改 `*.rs` 中含 `query!` / `query_as!` / `query_scalar!` 的文件 → 必须同步更新 `.sqlx/`
+- CI 实测：`cargo sqlx prepare --check`（spike-004 实测 0.37s）
+
+### H. justfile 入口（Wave 1 W1.A 启动时加）
+
+```makefile
+db-up:
+    sudo docker compose -f deploy/docker-compose.dev.yml up -d postgres
+
+db-migrate:
+    cd backend && sqlx migrate run
+
+db-prepare:
+    cd backend && cargo sqlx prepare
+
+db-prepare-check:
+    cd backend && cargo sqlx prepare --check
+
+db-reset:
+    cd backend && sqlx database drop -y && sqlx database create && sqlx migrate run
+```
+
+---
+
 ## 参考
 
 - 治理总文档：`docs/governance.md`
 - 仓库结构决策：`docs/adr/0002-monorepo-structure.md`
 - 治理模型决策：`docs/adr/0003-governance-model.md`
 - 阶段路线决策：`docs/adr/0004-phase-roadmap.md`
+- **SQLx 实践验证**：`docs/spikes/spike-004-sqlx-offline.md`

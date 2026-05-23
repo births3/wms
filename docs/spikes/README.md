@@ -12,7 +12,7 @@
 | 1 | [SPIKE-001](spike-001-axum-jwt.md) | Axum + JWT + 多租户 middleware | W1.A 权限/多租户 | **accepted** | 2 天（用 ~3h） | ADR-0001 / 产出 ADR-0024（Proposed） |
 | 2 | [SPIKE-002](spike-002-h2-append-only.md) | PostgreSQL append-only 审计 | W1.B 审计追踪 | 起草 | 2 天 | ADR-0001 / 拟产出 ADR-0025 |
 | 3 | [SPIKE-003](spike-003-utoipa-openapi-ts-pipeline.md) | utoipa → OpenAPI → TS 全链路 | W1.C OpenAPI 工具链 | **accepted** | 1.5 天（用 ~4h） | ADR-0001 / 产出 ADR-0026（Proposed） |
-| 4 | [SPIKE-004](spike-004-sqlx-offline.md) | SQLx offline 编译模式 | 跨 W1.A/B（基础设施） | 起草 | 1 天 | ADR-0001 |
+| 4 | [SPIKE-004](spike-004-sqlx-offline.md) | SQLx offline 编译模式 | 跨 W1.A/B（基础设施） | **accepted** | 1 天（用 ~1.5h） | ADR-0001 §SQLx 附录（已更新 v0.2） |
 | 5 | [SPIKE-005](spike-005-rn-scanner.md) | RN 扫枪 + 离线队列 | Wave 1 PDA 离线 / W3.A | 起草 | 2 天 | ADR-0015 / 拟产出 ADR-0027 |
 
 合计上限：8.5 天。**任何 Spike 超出时间盒 50% 必须 escalate**：要么承认走错路（reject + 重新设计），要么承认低估（写新 spike 接力，原 spike 关闭）。不允许"再多花 1 天试试"无限延期。

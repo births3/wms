@@ -1,11 +1,11 @@
 # SPIKE-004: SQLx offline 编译模式
 
-- 状态：起草
+- 状态：accepted
 - 时间盒：1 天（8 小时）
 - Owner：项目主人
-- 起始：— 完成：—
+- 起始：2026-05-24  完成：2026-05-24（约 1.5 小时实际工时；远低于 8h 时间盒）
 - 关联 Wave 任务：跨 W1.A / W1.B / W1.C（基础设施层）；任何 SQLx 使用前的前置
-- 关联 ADR：ADR-0001（SQLx 已选定）
+- 关联 ADR：ADR-0001（SQLx 已选定）；产出 ADR-0001 §SQLx 附录（更新原 ADR）
 
 ---
 
@@ -157,9 +157,61 @@ async fn test_audit_trigger(pool: PgPool) { ... }
 
 ## 7. 决策记录
 
-> spike 完成后填写。
+- 日期：2026-05-24
+- 结论：**accept**
+- 时间盒消耗：约 1.5 小时（远低于 8h 上限）
 
-- 日期：—
-- 结论：—
-- 关键发现：—
-- 后续动作：—
+### 7.1 假设验证结果
+
+| ID | 假设 | 状态 | 证据 |
+|----|------|------|------|
+| H1 | `cargo sqlx prepare` 生成 .sqlx/ 缓存 | ✓ | 5 个 `.sqlx/query-<hash>.json` 文件落盘（每个 `query!` / `query_as!` / `query_scalar!` 一个） |
+| H2 | 无 DATABASE_URL 也能 `cargo build --offline` | ✓ | unset DATABASE_URL + cargo clean → cargo build --offline 0.69s 成功 |
+| H3 | schema 漂移检测错误信息明确 | ✓ | 加引用不存在列的 query → `error: set DATABASE_URL to use query macros online, or run cargo sqlx prepare to update the query cache` |
+| H4 | sqlx-cli migrate 满足需求 | ✓ | 2 个 migrations/<timestamp>_<name>.sql 自动加载，实测 t1-t5 全过 |
+| H5 | `#[sqlx::test]` per-test 临时 db + migrations + 隔离 | ✓ | 5 个并发测试 0.85s 完成；t2_isolated_db_per_test 验证空 db |
+| H6 | CI 用 `cargo sqlx prepare --check` | ✓ | 0.37s 通过（仅 cargo check + 验证 .sqlx/ 与 query 一致） |
+
+### 7.2 关键发现
+
+1. **sqlx 0.8 的 `query_scalar!` 需要类型注解**：`SELECT COUNT(*)` 如果不写 `as "count!: i64"`，会推导成 `Option<i64>`（因为 PG `COUNT(*)` 理论可空）。spike-004 用 `as "count!: i64"` 强制非空。这是 Wave 1 编码模板需要的小知识。
+
+2. **.sqlx/ 缓存是 deterministic JSON**（按 query 内容 hash 命名）：
+   - 同一 query 多次 prepare 生成相同 hash
+   - 改 query 内容会生成新文件，旧文件需要 prepare 时清理（默认会清）
+   - 可放心入 git，diff 友好
+
+3. **cargo sqlx prepare 耗时 ~36s（首次）/ ~5s（后续 incremental）**：
+   - 含完整 `cargo check` + 每个 query 连 DB 校验
+   - Wave 1 起步约 50 query → 约 1 分钟；Wave 2-3 业务铺开后可能 2-3 分钟
+   - CI 上是可接受（远低于 cargo build/test 总耗时）
+
+4. **cargo build --offline + 缓存命中 ≈ 0.69s**（与无 query! 版本基本一致）：编译期校验是 zero-runtime-cost。
+
+5. **sqlx::test 真好用**：每个测试一个临时 db，自动跑 migrations，测试天然隔离。Wave 1+ TDD 节奏强制（ADR-0006），sqlx::test 是关键基础设施。
+
+6. **spike-004 不与 spike-002 联动测试**（原文档 §4 步骤 6 计划）：spike-002 是独立 spike，audit trigger 测试在 spike-002 内做更合适。本 spike 聚焦 sqlx 自身工具链。
+
+### 7.3 后续动作
+
+1. **更新 ADR-0001 §数据访问 段**（追加 SQLx 实践规范）—— 见 ADR-0001 修订
+2. **Wave 1 W1.A/B 实施清单**：
+   - Cargo workspace 含 `wms-infra` 集中所有 query!（避免多 crate .sqlx/ 冲突）
+   - root justfile 加 `just db-prepare` / `just db-migrate-up` / `just db-reset` 入口
+   - CI 加 `cargo sqlx prepare --check` 步骤（diff 触发：改 .rs 改了 query!）
+   - DATABASE_URL 走 `.env.example`，dev 环境 `.env`（gitignore）
+   - 加治理脚本 `check_sqlx_prepared.py`：T2 治理，diff 触发改 .rs 必须更新 .sqlx/
+3. **传染给 SPIKE-002**：
+   - audit_event 表的 SQL 用 sqlx::query!()
+   - audit trigger SQL 在 migrations/ 文件
+   - .sqlx/ 缓存在 spike-002 单独维护（与 spike-004 隔离）
+
+### 7.4 拒绝清单
+
+| 候选 | 不验证理由 |
+|------|-----------|
+| Diesel | 同步为主、async 体验差；ADR-0001 已否决 |
+| SeaORM | 抽象偏重；起步过度设计；如未来需要 ActiveRecord 可重新评估 |
+| refinery（替代 sqlx-migrate） | sqlx-migrate 已满足；少一个依赖 |
+| testcontainers（每测试一容器） | 内置 sqlx::test 已满足；多容器启动 overhead 大 |
+| 升级 sqlx 0.9（如发布） | 当前 0.8.6 稳定，无升级动机；写新 ADR 评估

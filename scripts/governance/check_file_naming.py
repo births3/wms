@@ -44,8 +44,10 @@ SNAKE_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 KEBAB_RE = re.compile(r"^[a-z][a-z0-9\-]*$")
 # PascalCase: 大写开头，字母数字
 PASCAL_RE = re.compile(r"^[A-Z][a-zA-Z0-9]*$")
-# 迁移文件: NNNN_<desc>.sql 或 NNNN_<desc>.down.sql
-MIGRATION_RE = re.compile(r"^\d{4}_[a-z][a-z0-9_]*\.(down\.)?sql$")
+# 迁移文件: NNNN_<desc>.sql 或 NNNN_<desc>.down.sql 或 NNNNNNNNNNNNNN_<desc>.sql（sqlx 标准）
+# - 简短数字：4-6 位（refinery 风格）
+# - 完整 timestamp：14 位 YYYYMMDDHHMMSS（sqlx-cli 默认；ADR-0001 §D 锁定）
+MIGRATION_RE = re.compile(r"^\d{4,14}_[a-z][a-z0-9_]*\.(down\.)?sql$")
 # ADR: NNNN-<slug>.md
 ADR_RE = re.compile(r"^\d{4}-[a-z0-9][a-z0-9\-]*\.md$")
 # Retro: wave-N-retro.md 或 wave-N.M-retro.md（如 wave-0.5-retro.md）
@@ -107,7 +109,7 @@ def check_file(rel_path: str) -> Violation | None:
     # --- SQL 迁移 ---
     if "migrations" in parts and filename.endswith(".sql"):
         if not MIGRATION_RE.match(filename):
-            return Violation(rel_path, "migration-naming", f"Migration must be NNNN_<desc>.sql: '{filename}'")
+            return Violation(rel_path, "migration-naming", f"Migration must be NNNN_<desc>.sql or NNNNNNNNNNNNNN_<desc>.sql (sqlx 14-digit timestamp): '{filename}'")
         return None
 
     # --- 治理脚本 ---
