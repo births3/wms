@@ -93,6 +93,9 @@ export function H2AuditQuery() {
           subtitle="H2 / append-only · GSP 法定台账"
           actions={
             <>
+              <Button size="sm" variant="ghost" onClick={() => (window.location.hash = "#m6-custom")} title="另存为自定义报表">
+                ⇲ 另存为报表
+              </Button>
               <Button size="sm" variant="outline">导出 CSV</Button>
               <Button size="sm" variant="outline">导出 PDF</Button>
               <Button size="sm">追溯码反查</Button>

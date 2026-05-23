@@ -55,6 +55,9 @@ export function M4Manifest() {
         subtitle="M4-005 · 单号 SO-2026-0042 · GSP 法定文件 · A4 模板"
         actions={
           <>
+            <Button size="sm" variant="ghost" onClick={() => (window.location.hash = "#m6-custom")} title="另存为自定义报表">
+              ⇲ 另存为报表
+            </Button>
             <Button variant="outline" size="sm">
               <Mail className="h-4 w-4 mr-1" /> 邮件发送
             </Button>

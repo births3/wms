@@ -31,6 +31,7 @@ import { M6Cold } from "./pages/m6-cold";
 import { M6Expiry } from "./pages/m6-expiry";
 import { M6Custom } from "./pages/m6-custom";
 import { M6Special } from "./pages/m6-special";
+import { M6Subscriptions } from "./pages/m6-subscriptions";
 import { M2Asn } from "./pages/m2-asn";
 import { M2Hours } from "./pages/m2-hours";
 import { M8StorageFeeRules } from "./pages/m8-storage-fee";
@@ -168,6 +169,8 @@ export const TABS: TabDef[] = [
     render: () => wrap(<M6Custom />) },
   { value: "m6-special", label: "特殊药品台账", group: "M6 GSP 报表", device: ["pc"],
     render: () => wrap(<M6Special />) },
+  { value: "m6-subscriptions", label: "报表订阅", group: "M6 GSP 报表", device: ["pc"],
+    render: () => wrap(<M6Subscriptions />) },
 
   // M8 计费 / M10 TMS
   { value: "m8-storage-fee", label: "仓储费规则", group: "M8 计费 / M10 TMS", device: ["pc"],

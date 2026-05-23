@@ -173,6 +173,9 @@ export function M1Items() {
         subtitle="M1-001 · 含 UDI / 资质 / 特管标签 / 多批号配置"
         actions={
           <>
+            <Button size="sm" variant="ghost" onClick={() => (window.location.hash = "#m6-custom")} title="另存为自定义报表">
+              ⇲ 另存为报表
+            </Button>
             <Button variant="outline" size="sm">
               <Upload className="h-4 w-4 mr-1" /> 导入 Excel
             </Button>

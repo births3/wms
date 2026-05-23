@@ -372,3 +372,13 @@ reviewed_by = "项目主人"
 reviewed_at = "2026-05-23"
 expected_keywords = ["M6-004", "GSP", "P-002001", "20260101N", "u001", "u002"]
 related_story = "US-M6-004 特殊管理药品台账（麻精/放射/血液）"
+
+[[snapshots]]
+tab = "m6-subscriptions"
+url_hash = "#m6-subscriptions"
+viewport = "1700x1500"
+file = "m6-subscriptions.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-05-23"
+expected_keywords = ["M6-005", "SMTP", "PDF", "Excel"]
+related_story = "US-M6-005 报表订阅（定时+邮件+历史）"

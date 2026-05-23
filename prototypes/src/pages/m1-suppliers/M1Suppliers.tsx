@@ -170,6 +170,9 @@ export function M1Suppliers() {
         subtitle="M1-002 · GSP 证 + 营业执照 + 经营范围 + 质量评分"
         actions={
           <>
+            <Button size="sm" variant="ghost" onClick={() => (window.location.hash = "#m6-custom")} title="另存为自定义报表">
+              ⇲ 另存为报表
+            </Button>
             <Button variant="outline" size="sm">导出名册</Button>
             <Button size="sm">
               <Plus className="h-4 w-4 mr-1" /> 新增供应商

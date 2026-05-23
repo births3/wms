@@ -159,6 +159,9 @@ export function M3Inventory() {
         subtitle="M3-001 · 多维筛选 + 实时占用 + 效期预警"
         actions={
           <>
+            <Button size="sm" variant="ghost" onClick={() => (window.location.hash = "#m6-custom")} title="另存为自定义报表">
+              ⇲ 另存为报表
+            </Button>
             <Button variant="outline" size="sm">
               <Download className="h-4 w-4 mr-1" /> 导出
             </Button>
