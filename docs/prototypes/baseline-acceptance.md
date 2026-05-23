@@ -21,6 +21,7 @@
 | B2 | small | mean_diff ≤ 5 + pixel_ratio < 30% | 自动接受 |
 | B3 | medium | 5 < mean_diff ≤ 30 | 必须 `--confirm-medium` |
 | B4 | major | mean_diff > 30 或 pixel_ratio > 30% | 必须 `--force-major`（人工确认后） |
+| B5 | resize | baseline 与 candidate 尺寸不同（manifest viewport 改了但 PNG 未跟上） | 必须 `--accept-resize`（人工确认 viewport 是预期变化） |
 
 ### C. 签字（强制）
 
@@ -59,6 +60,9 @@ python3 scripts/governance/accept_baseline.py --apply --reviewer="<name>" --conf
 
 # 5. 大变化（B4） → 浏览器逐张确认后加 --force-major
 python3 scripts/governance/accept_baseline.py --apply --reviewer="<name>" --force-major
+
+# 5b. 尺寸变化（B5，manifest viewport 改了 + PNG 未跟上） → 加 --accept-resize
+python3 scripts/governance/accept_baseline.py --apply --reviewer="<name>" --accept-resize
 
 # 6. 单 tab：加 --tab=NAME
 python3 scripts/governance/accept_baseline.py --apply --reviewer="<name>" --tab=h2-audit

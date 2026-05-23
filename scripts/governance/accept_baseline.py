@@ -203,7 +203,16 @@ def _evaluate_one(snap: dict, args) -> tuple[bool, list[str], list[str], dict]:
             info["pixel_ratio"] = round(pixel_ratio, 4)
             info["phash"] = phash_dist
             if mean_diff < 0:
-                errors.append(f"B: baseline 与 candidate 尺寸不同")
+                # 尺寸变化（baseline 与 candidate 维度不一致）
+                # 通常发生在 manifest viewport 调整后但 PNG 未跟上
+                # 必须 --accept-resize 显式确认（视为 major 级变化）
+                info["change"] = "resize"
+                if not args.accept_resize:
+                    errors.append(
+                        f"B: baseline 与 candidate 尺寸不同（"
+                        f"通常是 manifest viewport 改了但 PNG 未跟上）"
+                        f"；如确认是预期请加 --accept-resize"
+                    )
             else:
                 # 三指标联合判定：mean_diff 像素均值差 + pixel_ratio 像素差比例 + phash 感知哈希距离
                 # phash 比 mean_diff 对 layout 结构变化更敏感
@@ -246,6 +255,7 @@ def main() -> int:
     parser.add_argument("--reviewer", help="C: review 人姓名（应用时必填）")
     parser.add_argument("--confirm-medium", action="store_true", help="B2: 接受中等变化（mean_diff 5-30）")
     parser.add_argument("--force-major", action="store_true", help="B3: 接受大变化（mean_diff > 30）")
+    parser.add_argument("--accept-resize", action="store_true", help="B: 接受尺寸变化（baseline 与 candidate 维度不同；通常是 manifest viewport 改了）")
     args = parser.parse_args()
 
     if not MANIFEST_TOML.exists():
