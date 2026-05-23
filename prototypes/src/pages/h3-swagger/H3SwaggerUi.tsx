@@ -1,7 +1,7 @@
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { StatusBadge, PageHeader } from "@/components/business";
+import { Card } from "@wms/ui";
+import { Button } from "@wms/ui";
+import { Input } from "@wms/ui";
+import { StatusBadge, PageHeader } from "@wms/ui";
 import { ChevronRight, FileJson, Search, Lock, Globe } from "lucide-react";
 
 interface ApiEndpoint {

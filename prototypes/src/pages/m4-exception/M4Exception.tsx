@@ -1,12 +1,12 @@
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card } from "@wms/ui";
+import { Button } from "@wms/ui";
 import { ChevronLeft, AlertTriangle, FileX, Package, Shuffle } from "lucide-react";
 import {
   StatusBadge,
   OfflineIndicator,
   FieldTable,
   type FieldRow,
-} from "@/components/business";
+} from "@wms/ui";
 
 /**
  * M4Exception — M4-006 异常拣货

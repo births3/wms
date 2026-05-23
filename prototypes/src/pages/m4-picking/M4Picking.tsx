@@ -1,5 +1,5 @@
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card } from "@wms/ui";
+import { Button } from "@wms/ui";
 import { useState } from "react";
 import { ChevronLeft, MapPin, Package, AlertTriangle } from "lucide-react";
 import {
@@ -7,7 +7,7 @@ import {
   OfflineIndicator,
   ScanInput,
   StepFlow,
-} from "@/components/business";
+} from "@wms/ui";
 
 /**
  * M4Picking — M4-003 PDA 拣货

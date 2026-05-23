@@ -1,5 +1,5 @@
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card } from "@wms/ui";
+import { Button } from "@wms/ui";
 import { useState } from "react";
 import { ChevronLeft, AlertTriangle } from "lucide-react";
 import {
@@ -9,7 +9,7 @@ import {
   StepFlow,
   FieldTable,
   type FieldRow,
-} from "@/components/business";
+} from "@wms/ui";
 
 /**
  * M2InboundAccept — M2-003 PDA 14 步验收

@@ -1,7 +1,7 @@
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card } from "@wms/ui";
+import { Button } from "@wms/ui";
 import { Search, ArrowRight, Package } from "lucide-react";
-import { StatusBadge, OfflineIndicator } from "@/components/business";
+import { StatusBadge, OfflineIndicator } from "@wms/ui";
 
 /**
  * M2InboundTasks — M2-002 PDA 待收货任务列表

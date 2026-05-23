@@ -1,5 +1,5 @@
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card } from "@wms/ui";
+import { Button } from "@wms/ui";
 import { useState } from "react";
 import {
   PageHeader,
@@ -7,7 +7,7 @@ import {
   StatusBadge,
   type RuleGroup,
   type RuleAction,
-} from "@/components/business";
+} from "@wms/ui";
 import { Plus, PlayCircle, History, FileCheck } from "lucide-react";
 
 /**

@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card } from "@wms/ui";
+import { Button } from "@wms/ui";
 import {
   PageHeader,
   StatusBadge,
   TempChart,
   type TempPoint,
-} from "@/components/business";
+} from "@wms/ui";
 import { MapPin, Truck, AlertTriangle, Snowflake, Phone } from "lucide-react";
 
 /**

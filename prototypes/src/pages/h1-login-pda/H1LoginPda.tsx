@@ -12,10 +12,10 @@ import {
   SelectValue,
   SelectContent,
   SelectItem,
-} from "@/components/ui";
-import { OfflineIndicator } from "@/components/business";
-import { ScanInput } from "@/components/business";
-import { StatusBadge } from "@/components/business";
+} from "@wms/ui";
+import { OfflineIndicator } from "@wms/ui";
+import { ScanInput } from "@wms/ui";
+import { StatusBadge } from "@wms/ui";
 
 type LoginMode = "badge" | "password";
 

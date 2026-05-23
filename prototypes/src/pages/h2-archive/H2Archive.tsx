@@ -1,21 +1,21 @@
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Card } from "@wms/ui";
+import { Button } from "@wms/ui";
+import { Input } from "@wms/ui";
+import { Label } from "@wms/ui";
 import {
   Select,
   SelectTrigger,
   SelectValue,
   SelectContent,
   SelectItem,
-} from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+} from "@wms/ui";
+import { Tabs, TabsList, TabsTrigger } from "@wms/ui";
 import {
   StatusBadge,
   PageHeader,
   DataTable,
   type DataTableColumn,
-} from "@/components/business";
+} from "@wms/ui";
 import { Database, Archive, Plus } from "lucide-react";
 import { useState } from "react";
 

@@ -147,9 +147,9 @@ def check_file(rel_path: str) -> Violation | None:
         # 测试文件特殊处理
         if TS_TEST_RE.match(filename):
             return None
-        # shadcn/ui 原子组件用 kebab-case（如 components/ui/button.tsx）
+        # shadcn/ui 原子组件用 kebab-case（典型路径：components/ui/ 或 packages/ui/src/ui/）
         # 这是 shadcn CLI 标准，跟 React 生态对齐
-        if "/components/ui/" in rel_path:
+        if "/components/ui/" in rel_path or rel_path.startswith("packages/ui/src/ui/"):
             if not KEBAB_RE.match(stem):
                 return Violation(rel_path, "ui-kebab", f"shadcn UI atom file must be kebab-case: '{filename}'")
             return None

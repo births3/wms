@@ -6,8 +6,8 @@
 // 复杂度"动机不适用。
 import { useState } from "react";
 import { Lock, WifiOff } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card } from "@wms/ui";
+import { Button } from "@wms/ui";
 import {
   StatusBadge,
   type StatusKey,
@@ -26,7 +26,7 @@ import {
   PageHeader,
   DataTable,
   EmptyState,
-} from "@/components/business";
+} from "@wms/ui";
 
 /**
  * ComponentsGallery — 业务复合组件库展示页

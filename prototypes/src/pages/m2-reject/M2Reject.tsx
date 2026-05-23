@@ -1,5 +1,5 @@
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card } from "@wms/ui";
+import { Button } from "@wms/ui";
 import { useState } from "react";
 import { ChevronLeft, Camera, FileX } from "lucide-react";
 import {
@@ -8,7 +8,7 @@ import {
   DiffPanel,
   FieldTable,
   type FieldRow,
-} from "@/components/business";
+} from "@wms/ui";
 
 /**
  * M2Reject — M2-006 PDA 拒收

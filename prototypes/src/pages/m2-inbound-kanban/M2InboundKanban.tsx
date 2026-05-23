@@ -1,15 +1,15 @@
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Card } from "@wms/ui";
+import { Button } from "@wms/ui";
+import { Input } from "@wms/ui";
+import { Label } from "@wms/ui";
 import {
   Select,
   SelectTrigger,
   SelectValue,
   SelectContent,
   SelectItem,
-} from "@/components/ui/select";
-import { KanbanBoard, PageHeader, type KanbanColumn } from "@/components/business";
+} from "@wms/ui";
+import { KanbanBoard, PageHeader, type KanbanColumn } from "@wms/ui";
 import { RefreshCw, Maximize2 } from "lucide-react";
 
 const COLUMNS: KanbanColumn[] = [

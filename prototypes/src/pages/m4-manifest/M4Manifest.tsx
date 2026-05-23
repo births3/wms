@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Button } from "@wms/ui";
+import { Card } from "@wms/ui";
 import {
   PageHeader,
   PrintPreview,
-} from "@/components/business";
+} from "@wms/ui";
 import { Printer, Download, Mail, FileText } from "lucide-react";
 
 /**

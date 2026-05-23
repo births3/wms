@@ -3,7 +3,7 @@
 
 类别：6. 原型治理
 Tier：T1（< 10s）
-输入：docs/prototypes/component-registry.md + prototypes/src/components/business/
+输入：docs/prototypes/component-registry.md + packages/ui/src/business/
 输出：人类可读 + --json
 退出码：0 通过 / 1 违规 / 2 脚本错误
 
@@ -23,7 +23,7 @@ from pathlib import Path
 _THIS = Path(__file__).resolve()
 REPO_ROOT = _THIS.parent.parent.parent
 REGISTRY_MD = REPO_ROOT / "docs" / "prototypes" / "component-registry.md"
-BUSINESS_DIR = REPO_ROOT / "prototypes" / "src" / "components" / "business"
+BUSINESS_DIR = REPO_ROOT / "packages" / "ui" / "src" / "business"
 CHECK_DATA_TOML = REPO_ROOT / "governance" / "check-data.toml"
 
 # 匹配 markdown 表格行：| # | **<Name>** | 端 | 职责 | 故事 | 状态 |

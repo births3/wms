@@ -1,12 +1,12 @@
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card } from "@wms/ui";
+import { Button } from "@wms/ui";
 import {
   StatusBadge,
   OfflineIndicator,
   StepFlow,
   DualSignPanel,
   FieldTable,
-} from "@/components/business";
+} from "@wms/ui";
 
 /**
  * M2DualSign — M2-004 PDA 双人验收签字页

@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { StatusBadge, PageHeader } from "@/components/business";
+import { Card } from "@wms/ui";
+import { Button } from "@wms/ui";
+import { Input } from "@wms/ui";
+import { Checkbox } from "@wms/ui";
+import { StatusBadge, PageHeader } from "@wms/ui";
 import { Plus, Copy, Search, Users, ChevronDown, ChevronRight } from "lucide-react";
 
 interface Role {

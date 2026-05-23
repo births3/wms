@@ -1,19 +1,19 @@
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Card } from "@wms/ui";
+import { Button } from "@wms/ui";
+import { Input } from "@wms/ui";
 import {
   Select,
   SelectTrigger,
   SelectValue,
   SelectContent,
   SelectItem,
-} from "@/components/ui/select";
+} from "@wms/ui";
 import { useState } from "react";
 import {
   PageHeader,
   DataTable,
   type DataTableColumn,
-} from "@/components/business";
+} from "@wms/ui";
 import {
   Save, Star, BarChart3, LineChart, PieChart, AreaChart, Table as TableIcon,
   Download, Trash2, ExternalLink, GripVertical, X, Plus, Database,

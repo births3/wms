@@ -3,7 +3,7 @@
 
 类别：6. 原型治理
 Tier：T1（< 10s）
-输入：prototypes/src/components/business/**/*.tsx
+输入：packages/ui/src/business/**/*.tsx
 输出：人类可读 + --json
 退出码：0 通过 / 1 违规 / 2 脚本错误
 
@@ -23,7 +23,7 @@ from pathlib import Path
 
 _THIS = Path(__file__).resolve()
 REPO_ROOT = _THIS.parent.parent.parent
-BUSINESS_DIR = REPO_ROOT / "prototypes" / "src" / "components" / "business"
+BUSINESS_DIR = REPO_ROOT / "packages" / "ui" / "src" / "business"
 
 # 匹配 style={{ ... 或 style={  （JSX 内联 style 对象）
 INLINE_STYLE_RE = re.compile(r"\bstyle\s*=\s*\{\s*\{")

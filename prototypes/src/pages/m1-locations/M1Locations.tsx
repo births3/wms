@@ -1,9 +1,9 @@
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card } from "@wms/ui";
+import { Button } from "@wms/ui";
 import {
   PageHeader,
   StatusBadge,
-} from "@/components/business";
+} from "@wms/ui";
 import { Plus, Thermometer, MapPin, Package } from "lucide-react";
 
 interface Zone {

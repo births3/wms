@@ -1,21 +1,21 @@
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Button } from "@wms/ui";
+import { Input } from "@wms/ui";
+import { Label } from "@wms/ui";
 import {
   Select,
   SelectTrigger,
   SelectValue,
   SelectContent,
   SelectItem,
-} from "@/components/ui/select";
+} from "@wms/ui";
 import {
   StatusBadge,
   DiffPanel,
   PageHeader,
   DataTable,
   type DataTableColumn,
-} from "@/components/business";
+} from "@wms/ui";
 
 interface AuditEvent {
   id: string;

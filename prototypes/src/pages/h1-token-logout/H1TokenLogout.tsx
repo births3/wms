@@ -1,13 +1,13 @@
 import { useState } from "react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Card } from "@wms/ui";
+import { Button } from "@wms/ui";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@wms/ui";
 import {
   StatusBadge,
   PageHeader,
   DataTable,
   type DataTableColumn,
-} from "@/components/business";
+} from "@wms/ui";
 import { AlertCircle, Clock, Smartphone, Monitor, ScanLine } from "lucide-react";
 
 interface Session {

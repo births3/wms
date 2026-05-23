@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Button, Input, Label, Card, Checkbox, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui";
-import { StatusBadge } from "@/components/business";
+import { Button, Input, Label, Card, Checkbox, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@wms/ui";
+import { StatusBadge } from "@wms/ui";
 import { CheckCircle2 } from "lucide-react";
 
 /**

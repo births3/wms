@@ -1,5 +1,5 @@
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card } from "@wms/ui";
+import { Button } from "@wms/ui";
 import { useState } from "react";
 import { ChevronLeft, CheckCircle2 } from "lucide-react";
 import {
@@ -9,7 +9,7 @@ import {
   FieldTable,
   DiffPanel,
   type FieldRow,
-} from "@/components/business";
+} from "@wms/ui";
 
 /**
  * M4Review — M4-004 PDA 复核

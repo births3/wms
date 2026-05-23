@@ -1,19 +1,19 @@
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Card } from "@wms/ui";
+import { Button } from "@wms/ui";
+import { Input } from "@wms/ui";
 import {
   Select,
   SelectTrigger,
   SelectValue,
   SelectContent,
   SelectItem,
-} from "@/components/ui/select";
+} from "@wms/ui";
 import {
   StatusBadge,
   PageHeader,
   DataTable,
   type DataTableColumn,
-} from "@/components/business";
+} from "@wms/ui";
 import { Search, Download, AlertTriangle, Package, Snowflake, Lock } from "lucide-react";
 
 interface InvRow {
