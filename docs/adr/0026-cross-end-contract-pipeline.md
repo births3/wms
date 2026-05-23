@@ -1,7 +1,8 @@
 # ADR-0026：跨端契约管线（utoipa → OpenAPI → openapi-typescript → openapi-fetch）
 
-- 状态：Proposed
+- 状态：Accepted
 - 决策日期：2026-05-23
+- 修订日期：2026-05-24（review 通过，无内容修订）
 - 决策人：项目主人
 - 来源：SPIKE-003 验证结果（accept）
 - 关联：ADR-0001（技术栈）/ ADR-0002（monorepo 结构）/ ADR-0028（packages/ui 抽离）

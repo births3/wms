@@ -1,7 +1,8 @@
 # ADR-0024：鉴权模型（JWT + AuthContext + 多租户隔离）
 
-- 状态：Proposed
+- 状态：Accepted
 - 决策日期：2026-05-24
+- 修订日期：2026-05-24（v0.2，修 review 标注风险 1+2）
 - 决策人：项目主人
 - 来源：SPIKE-001 验证结果（accept，10/10 测试通过）
 - 关联：ADR-0001（技术栈）/ ADR-0010（错误码模式）/ ADR-0011（可观测）/ ADR-0013（配置/密钥）/ ADR-0026（跨端契约）
@@ -25,20 +26,58 @@ SPIKE-001 通过最小可行实现验证 5 个核心假设（H1-H5 全 accept）
 ```rust
 pub struct Claims {
     pub sub: String,         // user_id (UUID)，标准字段
-    pub exp: usize,          // 过期时间，Unix 秒，标准字段
+    pub iat: usize,          // 签发时间（Unix 秒），标准字段；权限失效检测必需
+    pub exp: usize,          // 过期时间（Unix 秒），标准字段
     pub jti: String,         // token unique ID（UUID v4），用于 blacklist 撤销
     pub owner_id: String,    // 货主 UUID（多租户隔离）
     pub user_name: String,   // 审计 actor 用
-    pub permissions: Vec<String>,  // 权限码列表
+    pub permissions: Vec<String>,  // 权限码列表（内嵌；配 Redis 失效机制，见 §2.1.1）
 }
 ```
 
 **字段选型理由**：
 - `sub` 用 user_id 不用 user_name：user_name 可改，user_id 不变；审计追溯靠 user_id 主键
+- `iat` 必填：用于检测 token 签发后是否权限被改（详见 §2.1.1 混合失效模式）
 - `jti` 必填：撤销机制依赖；不允许"无 jti 的 token"通过验签
 - `owner_id` 内嵌 token：避免每次 API 查 user→owner 关系（性能 + 撤销与登录原子）
-- `permissions` 内嵌 token：避免 RBAC 表查询 N 次；权限变更需要等 token 自然过期或主动撤销
+- `permissions` 内嵌 token + Redis 失效双保险：见 §2.1.1
 - **不内嵌 user 详细信息**（部门 / 工号等）：变化频繁；前端按需查 /me
+
+### 2.1.1 permissions 混合失效模式（v0.2 修订加入）
+
+**问题**：spike-001 验证了 permissions 内嵌可行（性能优秀），但带来"权限变更后必须等 token 自然过期或主动撤销"的滞后。GSP 合规对"撤职 / 转岗 / 撤换权限"敏感（仓库主管被撤换的极端场景）。
+
+**纯 stateless 方案** A（access TTL 缩到 5 分钟）= 12x 刷 token 请求开销，否决。
+**完全不内嵌** 方案 B（每次查 RBAC 表）= 每请求 1 次 SQL，性能损 ~10%，否决。
+**混合方案 C**（采纳）：
+
+```
+正常态：
+  - JWT 内嵌 permissions（性能）
+  - access TTL = 1h（既有设计）
+
+权限变更（H1 故事，admin 改用户角色 / 撤销账号 / 转岗）：
+  - 应用层：UPDATE 用户 RBAC 表
+  - SAME txn：SET Redis key  user:{user_id}:permissions_changed_at = now_unix
+  - 可选：Redis pub/sub 通知所有 axum 实例（W1.A 评估，spike 范围外）
+
+AuthContext extractor 增加一步（在 §2.4 验签后、blacklist 检查前）：
+  IF redis.get("user:" + claims.sub + ":permissions_changed_at") > claims.iat:
+    → 拒绝，返 401 AUTH-009 PermissionsRevoked
+    → 前端必须重新登录（新 token 得新 permissions）
+```
+
+**Trade-off**：
+
+| 场景 | 性能 | 实时性 |
+|------|------|--------|
+| 正常请求 | 1 次 Redis GET（< 1ms 局域网）| 0 滞后 |
+| 权限变更后下次请求 | 同上 + 1 次 401 + 重登 | < 1 秒 |
+| Redis 故障 | 跳过此检查（降级，见 §2.3）| 退化到 max 1h 滞后 |
+
+**与 §2.3 blacklist 共用 Redis 连接**：单次请求最多 2 次 Redis GET（jti blacklist + permissions_changed_at），可以合并到一个 pipeline 调用。
+
+**实施细节留 Wave 1 W1.A**：Redis key TTL 设 access TTL × 2（覆盖最长 token 寿命）+ 自动清理过期 key。
 
 ### 2.2 双 token + PDA 离线策略
 
@@ -64,6 +103,38 @@ PC 端不需要状态机（始终在线，access 过期就重定向到登录）�
   - 管理端"踢下线"按钮（H1 故事）
   - 密码改/工号改/转岗（业务事件 → 撤销该 user 的所有 jti）
   - 长期未活跃自动撤销（Wave 4+ 评估）
+
+#### 2.3.1 Redis 故障降级策略（v0.2 修订加入）
+
+**风险**：blacklist + permissions_changed_at 都存 Redis，Redis 不可用 → 登录全停 = 不可接受。
+
+**降级策略**：
+
+```
+extractor 拿到 jwt 验签通过的 claims 后：
+  IF redis available (健康探针 / 上次操作 < 5s):
+    1. GET user:{sub}:permissions_changed_at （§2.1.1）
+       → 若 > claims.iat 则 401 AUTH-009
+    2. SISMEMBER blacklist {jti} （§2.3）
+       → 若命中则 401 AUTH-004
+  ELSE:
+    1. 跳过两项 Redis 检查
+    2. 接受最长 access TTL（1h）的滞后窗口期
+       - permissions 变更：等 token 自然过期
+       - 已撤销 jti：等 token 自然过期或 admin 重启 Redis 后追溯
+    3. 记录 WARN log + ADR-0011 可观测告警 P1
+    4. 业务正常服务
+```
+
+**为什么接受 1h 滞后**：
+- Redis 故障应是分钟级（哨兵自愈）/ 小时级（人工介入）罕见事件
+- "停服 Redis 修好" 比"接受 1h 撤销窗口" 对业务影响大得多（GSP 仓库不能停业作业）
+- 1h 窗口期内被撤换岗位的极端用户能做的破坏，远小于"全停服"的损失
+
+**Redis HA 仍是 Wave 1 W1.A 优先**：本降级策略是"故障兜底"，不是"放任 Redis 单点"。Wave 1 W1.A 实施时：
+- Redis 配 Sentinel 或 Cluster（运维层）
+- 应用层用 redis-rs 内置连接池 + 重试 + 健康探针
+- 告警阈值：连续 3 次失败 / 5s 无响应触发 P1
 
 ### 2.4 AuthContext extractor
 
@@ -125,6 +196,7 @@ async fn list_items(
 | AUTH-006 | 403 | 跨货主越权 |
 | AUTH-007 | 401 | refresh_token 无效或过期（spike-001 未实现 refresh，留 Wave 1） |
 | AUTH-008 | 401 | 密码错（统一返 AUTH-003 防用户枚举？待业务方决定） |
+| AUTH-009 | 401 | permissions 已失效（用户权限变更后旧 token 仍持旧 permissions；客户端必须重新登录）|
 
 ### 2.7 多租户隔离边界
 
@@ -232,3 +304,31 @@ async fn list_items(
 - [ADR-0011 可观测](0011-observability.md)
 - [ADR-0013 配置/密钥](0013-config-secrets.md)
 - [ADR-0026 跨端契约](0026-cross-end-contract-pipeline.md)（同期产出，spike 链上下游）
+
+
+---
+
+## 7. 修订记录
+
+### v0.2 — 2026-05-24（review 后修风险 1+2）
+
+针对 Wave 0.5 退出前的集中 review 标注的两处风险（详 retro 与 commit f2614bb 后的 review 报告）：
+
+**风险 1：permissions 内嵌 → 权限变更滞后**
+- 修：§2.1 Claims 加 `iat` 字段；§2.1.1 新增"混合失效模式"段
+  - JWT 仍内嵌 permissions（性能）
+  - 权限变更时 SET Redis `user:{user_id}:permissions_changed_at = now`（与 RBAC 表 UPDATE 同事务）
+  - extractor 检查该值 > claims.iat 则 401 AUTH-009 PermissionsRevoked
+  - 与 §2.3 blacklist 共用 Redis 连接，pipeline 优化
+- 加 §2.6 错误码表新增 AUTH-009
+
+**风险 2：Redis 是 critical path**
+- 修：§2.3.1 新增"Redis 故障降级策略"段
+  - Redis 不可用时跳过 blacklist + permissions_changed_at 检查
+  - 接受 ≤ 1h（access TTL）滞后窗口期；记录 WARN log + ADR-0011 P1 告警
+  - 业务正常服务（不停服）
+- Redis HA（Sentinel/Cluster）+ 连接池 + 健康探针仍是 W1.A 优先
+
+### v0.1 — 2026-05-24（初版，SPIKE-001 验证后产出）
+
+详见 §1-§6。

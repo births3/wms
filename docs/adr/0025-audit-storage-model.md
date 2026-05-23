@@ -1,7 +1,8 @@
 # ADR-0025：审计存储模型（PostgreSQL append-only + 月分区 + JSONB diff + 哈希链）
 
-- 状态：Proposed
+- 状态：Accepted
 - 决策日期：2026-05-24
+- 修订日期：2026-05-24（v0.2，修 review 标注风险 3）
 - 决策人：项目主人
 - 来源：SPIKE-002 验证结果（accept，7/7 测试通过）
 - 关联：ADR-0001（PG）/ ADR-0014（数据迁移）/ ADR-0024（鉴权与 actor 字段）/ ADR-0026（跨端契约）
@@ -119,6 +120,25 @@ CREATE TABLE audit_chain_seal (
     seal_signature TEXT                       -- 可选：用 KMS / HSM 加签
 );
 ```
+
+#### 2.4.1 并发场景未在 spike 验证（v0.2 修订加入）
+
+**风险**：spike-002 H4 仅做单线程 timing（2.17ms/条），并发场景下「同日内多 INSERT 抢同一行 SELECT FOR UPDATE 锁住当日链头」未实测。1k QPS 真并发可能：
+- chain head 行成为热点，序列化所有 INSERT
+- P99 延迟从单线程 2.17ms 升到 10-100ms 量级（仍远低于 200ms 假设阈值，但需实测）
+
+**fallback 决策**：
+- **W1.B 退出条件之一已含**「wrk 1k QPS × 1 小时压测 P99 < 200ms」（§4 实施 checklist）— 这是并发场景的真验证关口
+- **若 P99 不达标**：启动 spike-002b 评估替代方案：
+  - 候选 a：专用 sequence + 顺序号（`audit_chain_seq` 序列每条 +1，prev_hash 改为查"当日内 seq - 1"，避免 SELECT FOR UPDATE）
+  - 候选 b：弱一致 — 接受 prev_hash 短期错链，每日 02:00 cron 修补
+  - 候选 c：每小时封档（24 chain → 1440 chain，单 chain 锁竞争更小）
+- **spike-002b 启动条件**：W1.B 实测 P99 > 200ms，或同日内并发 INSERT 出现死锁/超时
+
+**为什么不在 spike-002 阶段做**：
+- spike 时间盒已超满（4/5 spike 实工 10.5h vs 8.5d 时间盒 → 10x 加速比是非常态）
+- 并发问题本质是 W1.B 实施细节，不是"是否能用 hash chain"的核心假设证伪
+- W1.B 退出条件已留兜底口子；若问题暴露，spike-002b 是合理后备
 
 ### 2.5 索引
 
@@ -258,3 +278,25 @@ pub async fn append_event(pool: &PgPool, req: &AuditWriteRequest) -> AuditResult
 - [ADR-0024 鉴权模型](0024-auth-model.md)（actor 字段来源）
 - [ADR-0026 跨端契约](0026-cross-end-contract-pipeline.md)（前端类型生成）
 - [ADR-0011 可观测](0011-observability.md)（request_id 关联 + cron 告警）
+
+
+---
+
+## 7. 修订记录
+
+### v0.2 — 2026-05-24（review 后修风险 3）
+
+针对 Wave 0.5 退出前的集中 review 标注的"hash chain 并发场景未在 spike 验证"风险：
+
+- 修：§2.4 末尾新增 §2.4.1 "并发场景未在 spike 验证"段
+  - 明示 spike-002 H4 仅做单线程 timing（2.17ms/条）
+  - W1.B 退出条件已含「wrk 1k QPS × 1 小时压测 P99 < 200ms」作硬关口
+  - 若 P99 不达标 → 启动 spike-002b 评估 3 个候选方案：
+    a. 专用 sequence + 顺序号
+    b. 弱一致 prev_hash + 每日 cron 修补
+    c. 每小时封档（chain 数从 365/年 → 8760/年，单 chain 锁竞争更小）
+  - 说明 spike 阶段不做并发验证的理由（时间盒已超满 + W1.B 退出兜底）
+
+### v0.1 — 2026-05-24（初版，SPIKE-002 验证后产出）
+
+详见 §1-§6。
