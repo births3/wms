@@ -9,7 +9,7 @@
 
 | # | ID | 标题 | 关联 Wave 任务 | 状态 | 时间盒 | 关联 ADR |
 |---|-----|------|-------------|------|------|---------|
-| 1 | [SPIKE-001](spike-001-axum-jwt.md) | Axum + JWT + 多租户 middleware | W1.A 权限/多租户 | 起草 | 2 天 | ADR-0001 / 拟产出 ADR-0024 |
+| 1 | [SPIKE-001](spike-001-axum-jwt.md) | Axum + JWT + 多租户 middleware | W1.A 权限/多租户 | **accepted** | 2 天（用 ~3h） | ADR-0001 / 产出 ADR-0024（Proposed） |
 | 2 | [SPIKE-002](spike-002-h2-append-only.md) | PostgreSQL append-only 审计 | W1.B 审计追踪 | 起草 | 2 天 | ADR-0001 / 拟产出 ADR-0025 |
 | 3 | [SPIKE-003](spike-003-utoipa-openapi-ts-pipeline.md) | utoipa → OpenAPI → TS 全链路 | W1.C OpenAPI 工具链 | **accepted** | 1.5 天（用 ~4h） | ADR-0001 / 产出 ADR-0026（Proposed） |
 | 4 | [SPIKE-004](spike-004-sqlx-offline.md) | SQLx offline 编译模式 | 跨 W1.A/B（基础设施） | 起草 | 1 天 | ADR-0001 |

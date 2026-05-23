@@ -48,8 +48,9 @@
 | [ADR-0022](0022-prototype-component-spec.md) | 原型组件规范 | Accepted | 三层架构（ui/business/pages）+ cva variants + tailwind + forwardRef + 文档头规范 + 4 治理脚本规划 |
 | [ADR-0023](0023-business-report-strategy.md) | 业务报表方案选型 | Accepted | 混合方案：A. GSP 法定后端实现 + B. 业务报表 Metabase 嵌入（Wave 5）+ C. 业务页快捷入口 + D. 订阅 WMS 自实现 |
 | [ADR-0028](0028-component-library-extraction.md) | 组件库抽离至 packages/ui | Accepted | 16 业务组件 + 9 shadcn primitive + 设计 token + cn 工具从 prototypes/src/components 抽到 packages/ui/src，构成 @wms/ui 共享包；prototypes 与未来 apps/web-admin 共用；commit e3ce5a0 实施 |
+| [ADR-0024](0024-auth-model.md) | 鉴权模型（JWT+AuthContext+多租户）| Proposed | SPIKE-001 验证 accept；JWT claims (sub/exp/jti/owner_id/user_name/permissions) + 双 token (access 1h / refresh 24h) + Redis blacklist + handler 模板（ctx: AuthContext 自动注入 owner_id 过滤）+ AUTH-001..008 错误码 |
 | [ADR-0026](0026-cross-end-contract-pipeline.md) | 跨端契约管线 | Proposed | utoipa→OpenAPI→openapi-typescript→openapi-fetch 全链路；SPIKE-003 验证 accept；Wave 1 W1.C 实施 checklist；含数据类型映射表 + utoipa 编码约束 + CI sync 治理 |
-| ADR-0024 / 0025 / 0027 | Spike 拟产出 | 待写 | 0024 鉴权模型（SPIKE-001）/ 0025 审计存储（SPIKE-002）/ 0027 PDA 离线（SPIKE-005） |
+| ADR-0025 / 0027 | Spike 拟产出 | 待写 | 0025 审计存储（SPIKE-002）/ 0027 PDA 离线（SPIKE-005） |
 | ADR-0029+ | 未分配 | 后续按需新建 |
 
 > 编号永不复用。空缺编号必须在此表登记原因。
