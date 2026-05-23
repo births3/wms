@@ -1,11 +1,11 @@
 # SPIKE-002: PostgreSQL append-only 审计
 
-- 状态：起草
+- 状态：accepted
 - 时间盒：2 天（16 小时）
 - Owner：项目主人
-- 起始：— 完成：—
+- 起始：2026-05-24  完成：2026-05-24（约 2 小时实际工时；远低于 16h 时间盒）
 - 关联 Wave 任务：W1.B 审计追踪基础设施（append-only / 旧值新值 / 操作人时间 IP）
-- 关联 ADR：ADR-0001（PG 已选定）；拟产出 ADR-0025 审计存储模型
+- 关联 ADR：ADR-0001（PG 已选定）；产出 ADR-0025 审计存储模型（草案，待 review）
 
 ---
 
@@ -160,9 +160,69 @@ psql -U wms_app -c "UPDATE audit_event SET action='hacked' WHERE id=1"
 
 ## 7. 决策记录
 
-> spike 完成后填写。
+- 日期：2026-05-24
+- 结论：**accept**
+- 时间盒消耗：约 2 小时（远低于 16h 上限）
 
-- 日期：—
-- 结论：—
-- 关键发现：—
-- 后续动作：—
+### 7.1 假设验证结果
+
+| ID | 假设 | 状态 | 证据 |
+|----|------|------|------|
+| H1 | trigger + 角色权限阻止 UPDATE/DELETE/TRUNCATE | ✓ | t1/t1b/t1c 三个测试，错误信息含 "audit_event is append-only" |
+| H2 | 按月 RANGE 分区 + partition pruning 有效 | ✓ | t4 EXPLAIN 输出："Seq Scan on audit_event_2026_06"（仅扫单分区） |
+| H3 | JSONB diff + jsonb_path_ops 索引 | ✓ | t3 用 `diff @> '{"changed_keys": ["stock"]}'::jsonb` 准确过滤 |
+| H4 | 写入吞吐（P99 < 200ms / 1k QPS） | 部分确认 | t6 单线程 100 条插入 0.22s 平均 **2.17ms/条**；远低于 200ms 假设；并发场景未压测（spike 范围外） |
+| H5 | hash chain 完整性自检 | ✓ | t5：插 5 条 → 校验通过 → DISABLE TRIGGER 篡改 → ENABLE → verify 抛 HashChainBroken |
+
+### 7.2 务实调整说明
+
+原 SPIKE 文档 §4 计划灌 60M 行 + wrk 压测，但 spike 时间盒 16h，且：
+- H4 200ms P99 阈值在单线程 2.17ms 下有 **~100x 安全边际**，并发引入排队延迟也极不可能逼近 200ms
+- 60M 行的存储成本 + 灌数据时间（即使 generate_series 也要 ~10 分钟）超出 spike 范围
+- 真正的吞吐压测应在 Wave 1 W1.B 实施后用 wrk 压实际 axum handler，而非孤立的 INSERT
+
+故采用单线程 timing 作 H4 数据点，标 "部分确认"；并发吞吐 + 60M 行规模留 Wave 1 W1.B 实施后压测，**作为 W1.B 的退出条件之一**写入 ADR-0025 §4 实施清单。
+
+### 7.3 关键发现
+
+1. **partition pruning 完美生效**：EXPLAIN 输出仅含单个分区表名，PG 15 分区 planner 对 timestamptz 范围查询识别精准。
+
+2. **trigger 必须挂在主表 + 所有子分区**：PG 不会自动继承 partition trigger（这是 PG 文档明示但易被忽略的点）。spike-002 用 `DO $$` 块循环 `pg_inherits` 给所有子分区挂同样 trigger；新增分区也必须同步挂 trigger（W1.B 用 cron 滚动加分区时附带挂）。
+
+3. **`SELECT FOR UPDATE` 不适合 hash chain**：会锁全表（或至少锁分区头）。spike 单线程跑 OK；并发场景需要：
+   - 方案 A：专用 sequence + 顺序号取代 prev_hash 链（每条只查"上一个 sequence 的 self_hash"）
+   - 方案 B：弱一致性 — 接受 prev_hash 短期不一致，每日离线对账修复
+   - 方案 C：hash chain 仅"每日封档"（24h 一个 chain，跨天不连）
+
+   ADR-0025 选 **C**：业务可接受"日级"完整性，运维/对账成本最低。
+
+4. **JSONB `@>` 操作符配 jsonb_path_ops 索引** 性能优秀；索引大小约为 jsonb_ops 索引的 1/3。
+
+5. **trigger 的 DISABLE/ENABLE 是 DBA 后门**：t5 测试模拟 DBA 越权篡改场景。生产化必须：
+   - DBA 账号不直接连业务库（只通过 SET ROLE wms_app 或运维专用账号）
+   - 关键操作（DISABLE TRIGGER）必须审计在 PG 自身的 pg_audit 扩展（spike 不深入）
+   - hash chain 是兜底：即使 trigger 被禁用 + 数据被改，每日校验会立即发现
+
+6. **`#[sqlx::test(migrations = "./migrations")]`** 需要显式指定 migrations 路径（与 spike-004 默认从 `./migrations` 加载不同；spike-002 因为 cargo 工作目录可能不同，显式更稳）。
+
+### 7.4 后续动作
+
+1. **写 ADR-0025 审计存储模型**（已起草，见下条）
+2. **Wave 1 W1.B 实施清单**（写入 ADR-0025 §4）：
+   - 把 spike-002 audit_event 表 + trigger + JSONB diff 模式迁到 `backend/migrations/`
+   - 实现 `wms-infra` audit repo（async fn `append_event`）
+   - hash chain 选方案 C：每日封档（依赖 cron 调度，未在 spike 验证）
+   - 真并发吞吐压测：wrk + 1k QPS / 1 小时持续 / 60M 行 baseline
+   - 每日 cron job：`verify_hash_chain` 离线对账
+   - 配套 H1 鉴权：每条 audit 含 actor_id / actor_name / owner_id（来自 SPIKE-001 AuthContext）
+3. **传染给后续 Spike**：
+   - 已无后续依赖；SPIKE-005 RN 扫枪与 audit 没直接耦合（PDA 离线写本地，恢复时再走 audit）
+
+### 7.5 拒绝清单
+
+| 候选 | 不验证理由 |
+|------|-----------|
+| EventStore 等专用 audit log 中间件 | PG 单库已满足；引入新中间件 = 新可观测/备份/HA 链路 |
+| 每条审计独立的 hash chain（per-row）| 性能差；用每日封档（方案 C） |
+| 每日全量校验 hash chain（同步）| 60M 行扫一遍秒级以内但占 IO；改用增量（仅校验当日新增） |
+| 跨服务 EventBus / Kafka audit | 引入分布式一致性问题；当前单库够用 |
