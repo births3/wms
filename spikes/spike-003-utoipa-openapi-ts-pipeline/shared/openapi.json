@@ -1,0 +1,514 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "WMS API",
+    "description": "SPIKE-003 utoipa → OpenAPI → openapi-typescript 全链路验证",
+    "license": {
+      "name": ""
+    },
+    "version": "0.0.1-spike-003"
+  },
+  "paths": {
+    "/api/v1/audit/events/{id}": {
+      "get": {
+        "tags": [
+          "audit"
+        ],
+        "summary": "GET /api/v1/audit/events/{id} — 审计事件详情",
+        "operationId": "get_audit_event",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "审计事件 UUID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Audit"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "未找到",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cold-chain/points": {
+      "get": {
+        "tags": [
+          "cold-chain"
+        ],
+        "summary": "GET /api/v1/cold-chain/points — 冷链温度时序",
+        "operationId": "list_cold_chain_points",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "description": "起始时间 RFC3339",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "结束时间 RFC3339",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ColdChainPoint"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/items": {
+      "get": {
+        "tags": [
+          "items"
+        ],
+        "summary": "GET /api/v1/items — 分页列表",
+        "operationId": "list_items",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码（默认 1）",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页大小（默认 20，最大 100）",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedItems"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/items/{id}": {
+      "get": {
+        "tags": [
+          "items"
+        ],
+        "summary": "GET /api/v1/items/{id} — 单条商品查询",
+        "operationId": "get_item",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "商品 UUID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Item"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "未找到",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/items/{id}/isolate": {
+      "post": {
+        "tags": [
+          "items"
+        ],
+        "summary": "POST /api/v1/items/{id}/isolate — 隔离（演示 tagged union 写入）",
+        "operationId": "isolate_item",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "商品 UUID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryStatus"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Item"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Audit": {
+        "type": "object",
+        "description": "审计事件（H2-001 append-only）\n\ndiff 字段存任意 JSON：utoipa 应当能识别 serde_json::Value 并映射为 OpenAPI\n的 `additionalProperties: true` 或 `type: object`（具体生成形式留给 spike 验证）",
+        "required": [
+          "id",
+          "occurred_at",
+          "actor_id",
+          "actor_name",
+          "action",
+          "diff"
+        ],
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "actor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "actor_name": {
+            "type": "string"
+          },
+          "diff": {
+            "type": "object",
+            "description": "任意 JSON diff（before / after / changed_keys）"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ColdChainPoint": {
+        "type": "object",
+        "description": "冷链温度采样点（M5-002 冷链监控）",
+        "required": [
+          "t",
+          "v",
+          "out_of_range"
+        ],
+        "properties": {
+          "out_of_range": {
+            "type": "boolean",
+            "description": "是否超阈"
+          },
+          "t": {
+            "type": "string",
+            "format": "date-time",
+            "description": "采样时间（UTC）"
+          },
+          "v": {
+            "type": "number",
+            "format": "double",
+            "description": "温度（摄氏度）"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "description": "错误响应（统一格式；ADR-0010 错误码模式）",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "错误码（如 M1-001-VR-014）"
+          },
+          "message": {
+            "type": "string",
+            "description": "错误消息（中文）"
+          }
+        }
+      },
+      "InventoryStatus": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "Qualified"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "description": "隔离（含原因）",
+                "required": [
+                  "reason"
+                ],
+                "properties": {
+                  "reason": {
+                    "type": "string"
+                  }
+                }
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "Isolated"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "Quarantined"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "description": "销毁待审批",
+                "required": [
+                  "approver_id"
+                ],
+                "properties": {
+                  "approver_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "PendingDestruction"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "库存状态（tagged union — 验证 utoipa 对带数据 enum 的支持）\n\nserde 默认外部 tag：\"Qualified\" / { \"Isolated\": { \"reason\": \"...\" } }\n可通过 #[serde(tag = \"type\")] 改为内部 tag（可读性更好但需测试）",
+        "discriminator": {
+          "propertyName": "type"
+        }
+      },
+      "Item": {
+        "type": "object",
+        "description": "商品档案（M1-001 商品档案最小集）",
+        "required": [
+          "id",
+          "code",
+          "name",
+          "expiry",
+          "stock",
+          "status"
+        ],
+        "properties": {
+          "batch_no": {
+            "type": "string",
+            "description": "批号（部分商品无批号）",
+            "nullable": true
+          },
+          "code": {
+            "type": "string",
+            "description": "商品编码（如 P-001234）"
+          },
+          "expiry": {
+            "type": "string",
+            "format": "date",
+            "description": "有效期（NaiveDate；时区由仓库默认时区决定）"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "商品唯一 ID（UUID v4）"
+          },
+          "name": {
+            "type": "string",
+            "description": "品名"
+          },
+          "status": {
+            "$ref": "#/components/schemas/InventoryStatus"
+          },
+          "stock": {
+            "type": "integer",
+            "format": "int32",
+            "description": "库存数量",
+            "minimum": 0
+          }
+        }
+      },
+      "PaginatedItems": {
+        "type": "object",
+        "description": "分页结果（包装 Item 列表）\n\n注：utoipa 对泛型类型的支持需要 #[aliases] + lifetime bound（utoipa 4.2\n的 ToSchema trait 带 lifetime）。本 spike 直接用非泛型版本，避免 spike\n复杂度过高；Wave 1 落地时如有大量分页类型可再评估泛型方案。",
+        "required": [
+          "data",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Item"
+            },
+            "description": "数据列表"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "description": "当前页（从 1 起）",
+            "minimum": 0
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int32",
+            "description": "每页大小",
+            "minimum": 0
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "description": "总数",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "items",
+      "description": "商品档案与库存"
+    },
+    {
+      "name": "audit",
+      "description": "审计追踪"
+    },
+    {
+      "name": "cold-chain",
+      "description": "冷链温度"
+    }
+  ]
+}

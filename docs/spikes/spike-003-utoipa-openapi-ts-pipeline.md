@@ -1,11 +1,11 @@
 # SPIKE-003: utoipa → OpenAPI → openapi-typescript 全链路
 
-- 状态：起草
+- 状态：accepted
 - 时间盒：1.5 天（12 小时）
 - Owner：项目主人
-- 起始：— 完成：—
+- 起始：2026-05-23  完成：2026-05-23（约 4 小时实际工时；远低于 12h 时间盒）
 - 关联 Wave 任务：W1.C OpenAPI 契约工具链
-- 关联 ADR：ADR-0001（utoipa + openapi-typescript 已选定）；拟产出 ADR-0026 跨端契约管线
+- 关联 ADR：ADR-0001（utoipa + openapi-typescript 已选定）；产出 ADR-0026 跨端契约管线（草案，待 review）
 
 ---
 
@@ -158,9 +158,59 @@ data?.batch_no  // ← 改后端 utoipa schema 删除 batch_no 后此行 tsc 报
 
 ## 7. 决策记录
 
-> spike 完成后填写。
+- 日期：2026-05-23
+- 结论：**accept**
+- 时间盒消耗：约 4 小时（远低于 12h 上限）
 
-- 日期：—
-- 结论：—
-- 关键发现：—
-- 后续动作：—
+### 7.1 假设验证结果
+
+| ID | 假设 | 状态 | 证据 |
+|----|------|------|------|
+| H1 | utoipa 对 5 种典型类型支持完整 | ✓ | `cargo run --bin openapi-export` 成功，13487 字节，6 schemas 全在 |
+| H2 | binary 不启服务直接导出 | ✓ | `crates/openapi-export` 是纯静态 println!；编译 0.60s |
+| H3 | openapi-typescript 转 TS 后 tsc strict 全过 | ✓ | schema.ts 374 行，`tsc --noEmit` exit=0 |
+| H4 | 删后端字段 → 前端 tsc 立刻报错 | ✓ | 删 `Item.batch_no` → tsc 报 `TS2339: Property 'batch_no' does not exist` |
+| H5 | openapi-fetch 类型推导 path/query/body/response 全程 type-safe | ✓ | demo.ts 5 个业务场景全过 strict 校验，含 tagged union narrowing |
+| H6 | dev hot-reload 端到端 < 5s | 部分确认 | `cargo build` 增量 0.6s + `openapi-typescript` 45ms = < 1s；未做 cargo watch 长跑测试 |
+
+### 7.2 关键发现
+
+1. **utoipa 4.2 泛型支持有 lifetime 噪声**：`Paginated<T>` 需要 `for<'a> ToSchema<'a>` 或 `#[aliases]` 配合，复杂度高。Spike 直接用具体化 `PaginatedItems` 非泛型版本。Wave 1 落地时如有大量分页类型可重新评估（候选：升级 utoipa 5.x，或写小宏自动展开）。
+
+2. **utoipa::path 宏的 Path 参数必须带 description**：缺 description 会编译报错（错误信息隐晦：`expected ',' `）。这是 utoipa 4.2 的 macro 设计限制；Wave 1 编码模板里强制每个 Path 参数加 description。
+
+3. **serde tagged union 与前端 discriminated union 天然对齐**：
+   - Rust 端：`#[serde(tag = "type", content = "data")] enum InventoryStatus { Qualified, Isolated { reason: String } }`
+   - OpenAPI：`oneOf` 含 `type` 区分字段
+   - TypeScript：`{ type: "Qualified" } | { type: "Isolated"; data: { reason: string } }`
+   - 前端 `switch (status.type)` 自动 narrowing
+   不需要额外约定或运行时 schema validator。
+
+4. **`serde_json::Value` 必须显式 `#[schema(value_type = Object)]`**：否则 utoipa 不知道怎么生成。前端会得到 `unknown` 类型，必须用 zod / valibot 运行时校验。这与 Audit diff 字段的实际需求（任意 JSON）一致。
+
+5. **`pnpm install --ignore-workspace` 是 spike 代码隔离的关键**：spike-003 frontend 不进 root workspace，避免 spike 代码污染生产 monorepo。Wave 1 的 `apps/web-admin/` 自然进 root workspace。
+
+6. **CI sync 检查可以非常轻量**：cargo run + jq normalize + difflib unified_diff = 126 行 Python，端到端 < 5s（包括 cargo 编译）。`scripts/governance/check_openapi_in_sync.py` 已落盘，Wave 1 W1.C 启动时改路径即可进入 T2 治理。
+
+### 7.3 后续动作
+
+1. **写 ADR-0026 跨端契约管线**（本次 spike 配套产出，已起草，见下条）
+2. **Wave 1 W1.C 实施清单**：
+   - 把 `spikes/spike-003-utoipa-openapi-ts-pipeline/crates/{domain,api,openapi-export}` 的模式迁到 `backend/crates/{domain,api,openapi-export}`
+   - `shared/openapi/openapi.json` 入仓
+   - `packages/api-client/` 新建：`openapi-typescript` 生成 + `openapi-fetch` 封装
+   - `check_openapi_in_sync.py` BACKEND_DIR 改指 `backend/`，加入 T2 治理
+   - `justfile` 加 `just openapi-sync` / `just openapi-check` 入口
+3. **不在本 spike 范围**：utoipa 5.x 升级评估、cargo watch 实战、orval 替代 openapi-fetch 评估 → 全部留 Wave 1 W1.C 实施时再决定
+4. **传染给后续 Spike**：
+   - SPIKE-001 Axum + JWT：handler 直接复用 utoipa::path 注解模式
+   - SPIKE-005 RN 扫枪：PDA 端复用 packages/api-client 的 schema.ts（虽然 openapi-fetch 在 RN 是否兼容需 spike-005 验证）
+
+### 7.4 拒绝清单（非本 spike 验证 / 留作未来评估）
+
+| 候选 | 不验证理由 |
+|------|-----------|
+| paperclip / utoipa 5.x | utoipa 4.2 已满足需求；升级风险待 Wave 1 实操中评估 |
+| orval（替代 openapi-fetch） | openapi-fetch 0.13.8 已满足类型推导，体积更小；orval 生成代码冗余对小项目过重 |
+| zod / valibot 运行时校验 | spike-003 是契约层，运行时校验属业务层；Wave 1 在前端 packages/utils 决定 |
+| 手写 OpenAPI YAML | 已被 ADR-0001 否决，本 spike 重新确认 |
