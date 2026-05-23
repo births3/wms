@@ -50,7 +50,7 @@ export function H1LoginPc({ withCaptcha = false }: { withCaptcha?: boolean } = {
             <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4" /> 多货主隔离 · 3PL / 连锁 / 自营三态支持</li>
             <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4" /> 冷链温控接入 · 自动批次隔离</li>
             <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4" /> append-only 审计 · 满足 GSP 法定台账</li>
-            <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4" /> 码上放心 · 追溯码全链路</li>
+            <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4" /> 批次 / 效期 FIFO · 双人验收双签</li>
           </ul>
           <div className="text-xs opacity-70">© 2026 WMS · v1.0.0 · ADR-0021</div>
         </div>
@@ -58,7 +58,8 @@ export function H1LoginPc({ withCaptcha = false }: { withCaptcha?: boolean } = {
         {/* 右侧表单 */}
         <div className="px-14 py-16 flex flex-col justify-center">
           <h2 className="text-2xl font-semibold mb-2">登录</h2>
-          <p className="text-sm text-muted-foreground mb-7">使用工号 / 手机号登录管理端</p>
+          <p className="text-sm text-muted-foreground mb-1">使用工号 / 手机号登录管理端</p>
+          <p className="text-xs text-muted-foreground/70 mb-7">演示账号：u001 / u002 · 仅原型环境可见</p>
 
           <div className="space-y-4">
             <div className="space-y-1.5">

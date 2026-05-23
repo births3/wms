@@ -167,7 +167,7 @@ export function M1Suppliers() {
     <div className="w-full max-w-[1400px] bg-background rounded-lg border shadow-sm">
       <PageHeader
         title="供应商资质档案"
-        subtitle="M1-002 · GSP 证 + 营业执照 + 经营范围 + 质量评分"
+        subtitle="M1-002 · GSP 证（如 GSP-BJ-2026-0001）+ 营业执照 + 经营范围 + 质量评分 · 维护 u001"
         actions={
           <>
             <Button size="sm" variant="ghost" onClick={() => (window.location.hash = "#m6-custom")} title="另存为自定义报表">

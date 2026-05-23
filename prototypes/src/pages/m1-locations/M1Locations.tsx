@@ -53,7 +53,7 @@ export function M1Locations() {
     <div className="w-full max-w-[1400px] bg-background rounded-lg border shadow-sm">
       <PageHeader
         title="仓库与库位管理"
-        subtitle="W001 北京天竺仓 · 6 个温区 · 936 个库位"
+        subtitle="W001 北京天竺仓 · 6 个温区 · 936 个库位 · GSP 温区规范"
         actions={
           <>
             <Button variant="outline" size="sm">温区配置</Button>
@@ -163,7 +163,7 @@ export function M1Locations() {
           </div>
           <div className="text-xs text-muted-foreground mt-3 flex items-center gap-3">
             <MapPin className="h-3 w-3" />
-            <span>共 96 个库位（4 排 × 24 列）· hover 显示编码 / 点击查看库存</span>
+            <span>共 96 个库位（8 排 × 12 列）· hover 显示编码 / 点击查看库存</span>
             <span className="ml-auto flex items-center gap-1">
               <Package className="h-3 w-3" /> 当前占用 53 / 96
             </span>

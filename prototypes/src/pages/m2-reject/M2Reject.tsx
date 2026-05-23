@@ -139,7 +139,7 @@ export function M2Reject() {
             <div className="text-muted-foreground mt-1">
               · 通知采购员 + 供应商（企微）<br />
               · 触发供应商质量评分扣分<br />
-              · 创建 H2 审计事件（不可撤销）
+              · 创建 H2 审计事件（不可撤销）· GSP §73 拒收档案
             </div>
           </div>
         </div>

@@ -93,7 +93,7 @@ export function M2DualSign() {
       <div className="flex-1" />
       <div className="bg-background border-t px-4 py-3 space-y-2">
         <p className="text-xs text-muted-foreground text-center">
-          请第二人扫工牌登录后点击"签字确认"
+          请第二人（如 u002 李四）扫工牌登录后点击"签字确认" · GSP §44 双签
         </p>
         <div className="flex gap-2">
           <Button variant="outline" className="flex-1 h-12">驳回</Button>

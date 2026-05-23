@@ -32,9 +32,9 @@ const MOCK_ENDPOINTS: Record<string, ApiEndpoint[]> = {
     { method: "GET", path: "/api/v1/audit/events/{id}", summary: "审计事件详情（含 diff）", module: "H2", auth: "jwt" },
   ],
   "M-TC 追溯码（部分公开）": [
-    { method: "POST", path: "/api/v1/trace/report", summary: "码上放心上报", module: "M-TC", auth: "apikey" },
-    { method: "POST", path: "/api/v1/trace/callback", summary: "国家平台回调（已弃用 → /v2）", module: "M-TC", auth: "apikey", deprecated: true },
-    { method: "GET", path: "/health/trace", summary: "上报通道健康检查", module: "M-TC", auth: "public" },
+    { method: "GET", path: "/api/v1/trace/events", summary: "追溯码事件查询（供 ERP 上报使用）", module: "M-TC", auth: "apikey" },
+    { method: "POST", path: "/api/v1/trace/callback", summary: "回调 webhook（已迁 v2）", module: "M-TC", auth: "apikey", deprecated: true },
+    { method: "GET", path: "/health/trace", summary: "追溯码服务健康检查", module: "M-TC", auth: "public" },
   ],
 };
 

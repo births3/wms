@@ -34,7 +34,7 @@ const MOCK_RULES: ArchiveRule[] = [
   { id: "r2", scope: "inventory_movement（M3 库存流水）", retentionYears: 5, archiveAfter: "365 天后归档", destination: "S3 冷存储 (cn-northwest-1)", encryption: "aes256", status: "enabled" },
   { id: "r3", scope: "inbound_record（M2 入库记录）", retentionYears: 5, archiveAfter: "365 天后归档", destination: "PostgreSQL 归档分区", encryption: "aes256", status: "enabled" },
   { id: "r4", scope: "cold_chain_temp（M5 冷链温控）", retentionYears: 5, archiveAfter: "90 天后归档", destination: "TimescaleDB 压缩块", encryption: "aes256", status: "enabled" },
-  { id: "r5", scope: "trace_code_event（M-TC 码上放心）", retentionYears: 5, archiveAfter: "180 天后归档", destination: "S3 冷存储 (cn-northwest-1)", encryption: "aes256", status: "disabled" },
+  { id: "r5", scope: "trace_code_event（M-TC 追溯码原始事件）", retentionYears: 5, archiveAfter: "180 天后归档", destination: "S3 冷存储 (cn-northwest-1)", encryption: "aes256", status: "disabled" },
 ];
 
 interface ArchiveJob {

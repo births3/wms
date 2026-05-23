@@ -84,10 +84,12 @@ export function H1LoginPda({ offlineMode, errorState }: H1LoginPdaProps = {}) {
               onScan={setScanned}
               error={errorState ? "工牌已停用，请联系仓库主管" : undefined}
             />
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              扫码 = 工号 + 设备指纹，无需输入密码。<br />
-              工牌丢失？请切换"账号密码"模式。
-            </p>
+            {!errorState && (
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                扫码 = 工号 + 设备指纹，无需输入密码。<br />
+                工牌丢失？请切换"账号密码"模式。
+              </p>
+            )}
           </div>
         ) : (
           <>

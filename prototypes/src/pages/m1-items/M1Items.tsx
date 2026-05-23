@@ -170,7 +170,7 @@ export function M1Items() {
     <div className="w-full max-w-[1400px] bg-background rounded-lg border shadow-sm">
       <PageHeader
         title="商品档案管理"
-        subtitle="M1-001 · 含 UDI / 资质 / 特管标签 / 多批号配置"
+        subtitle="M1-001 · 含 UDI / 资质 / 特管标签 / 多批号配置 · GSP 合规"
         actions={
           <>
             <Button size="sm" variant="ghost" onClick={() => (window.location.hash = "#m6-custom")} title="另存为自定义报表">

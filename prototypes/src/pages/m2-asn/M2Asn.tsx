@@ -90,7 +90,7 @@ export function M2Asn() {
     <div className="w-full max-w-[1400px] bg-background rounded-lg border shadow-sm">
       <PageHeader
         title="ASN 接收单"
-        subtitle="M2-001 · 采购入库流程入口 · 触发 PDA 收货任务"
+        subtitle="M2-001 · 采购入库流程入口 · 触发 PDA 收货任务 · GSP §82 ASN 准入"
         actions={
           <>
             <Button variant="outline" size="sm">

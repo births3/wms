@@ -72,7 +72,7 @@ export function M2InboundAccept() {
 
       {/* 步骤指示器（纵向） */}
       <div className="bg-background px-3 py-3 border-b">
-        <div className="text-xs text-muted-foreground mb-2">流程进度</div>
+        <div className="text-xs text-muted-foreground mb-2">流程进度（GSP 法定 14 步）</div>
         <StepFlow
           orientation="vertical"
           current={5}

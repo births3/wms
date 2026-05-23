@@ -32,7 +32,7 @@ interface ApiKey {
 
 const MOCK_KEYS: ApiKey[] = [
   { id: "k1", name: "ERP 集成主密钥", prefix: "wms_live_a3F2…", scope: "M1.read + M2.write + H8.acl", createdBy: "李四 (u002)", createdAt: "2026-04-12", expiresAt: "2026-10-12", lastUsedAt: "5 分钟前", status: "active" },
-  { id: "k2", name: "码上放心上报", prefix: "wms_live_b9X7…", scope: "M-TC.report-only", createdBy: "张三 (u001)", createdAt: "2026-03-01", expiresAt: "2027-03-01", lastUsedAt: "2 小时前", status: "active" },
+  { id: "k2", name: "码上放心数据导出（ERP 用）", prefix: "wms_live_b9X7…", scope: "M-TC.export-only", createdBy: "张三 (u001)", createdAt: "2026-03-01", expiresAt: "2027-03-01", lastUsedAt: "2 小时前", status: "active" },
   { id: "k3", name: "TMS 调度回调", prefix: "wms_test_c1K0…", scope: "M10.callback", createdBy: "王五 (u003)", createdAt: "2026-05-01", expiresAt: "2026-06-01", lastUsedAt: "昨日 14:30", status: "active" },
   { id: "k4", name: "旧版打印服务（已弃用）", prefix: "wms_live_d4M2…", scope: "H9.print-only", createdBy: "赵六 (u004)", createdAt: "2025-09-15", expiresAt: "2026-03-15", lastUsedAt: "30 天前", status: "expired" },
   { id: "k5", name: "测试 - 张三个人", prefix: "wms_test_e7N5…", scope: "M3.read", createdBy: "张三 (u001)", createdAt: "2026-01-10", expiresAt: "—", lastUsedAt: "—", status: "revoked" },
@@ -135,7 +135,7 @@ export function H1ApiKey({ showCreated = false }: { showCreated?: boolean } = {}
               <SelectContent>
                 <SelectItem value="readonly">只读（read.*）</SelectItem>
                 <SelectItem value="erp">ERP 集成（M1+M2+H8）</SelectItem>
-                <SelectItem value="trace">码上放心（M-TC.report-only）</SelectItem>
+                <SelectItem value="trace">码上放心数据导出（M-TC.export-only）</SelectItem>
                 <SelectItem value="custom">自定义...</SelectItem>
               </SelectContent>
             </Select>

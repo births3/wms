@@ -95,7 +95,7 @@ export function M2Putaway() {
 
       {/* 推荐库位 */}
       <div className="flex-1 overflow-y-auto bg-muted/30 px-3 py-3">
-        <div className="text-xs text-muted-foreground mb-2">② 选择库位</div>
+        <div className="text-xs text-muted-foreground mb-2">② 选择库位（GSP 温区匹配 + FIFO）</div>
 
         <div className="space-y-2 mb-3">
           {SUGGESTED.map((loc) => (
