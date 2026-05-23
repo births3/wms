@@ -70,6 +70,7 @@ plugins:
 # 导航树
 nav:
   - 首页: index.md
+  - 系统蓝图: wms-blueprint-outline.md
   - 业务故事:
     - M1 基础档案:
       - 商品/供应商/客户: domain/user-stories-m1-master-data-product.md
