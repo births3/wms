@@ -1,11 +1,11 @@
 # SPIKE-005: React Native 扫枪 + 离线队列
 
-- 状态：起草
-- 时间盒：2 天（16 小时）
+- 状态：deferred
+- 时间盒：2 天（16 小时）— 推迟到启动条件满足时重新计时
 - Owner：项目主人
-- 起始：— 完成：—
+- 起始：— 完成：— （未启动；推迟原因见 §7）
 - 关联 Wave 任务：Wave 1 PDA 离线策略；W3.A M2 入库 PDA 端启动前置
-- 关联 ADR：ADR-0015 多端规则；ADR-0001（RN 已选定）；拟产出 ADR-0027 PDA 离线模型
+- 关联 ADR：ADR-0015 多端规则；ADR-0001（RN 已选定）；拟产出 ADR-0027 PDA 离线模型（推迟随 spike）
 
 ---
 
@@ -155,9 +155,60 @@ type Task = {
 
 ## 7. 决策记录
 
-> spike 完成后填写。
+- 日期：2026-05-24
+- 结论：**deferred**（推迟到启动条件满足时重启）
+- 时间盒消耗：0（未启动）
 
-- 日期：—
-- 结论：—
-- 关键发现：—
-- 后续动作：—
+### 7.1 推迟理由
+
+本 Spike 涉及 **物理硬件 + 真机环境**，在当前 Wave 0.5 范围内强行跑会得到不可靠结论：
+
+| 项 | 在当前环境跑的问题 |
+|----|----------|
+| H1 vision-camera 扫码延迟 < 500ms | 需要 Android 真机 + 实物条码 / 二维码；emulator 模拟摄像头无意义 |
+| H2 实体扫码键 KeyEvent | 需要 Honeywell EDA / 优博讯 i6310 等真 PDA 设备；不同厂商 keycode 不同；当前无可借测设备 |
+| H3 离线队列（mmkv + idempotency_key） | 可在不连真 PDA 时验证逻辑，但需结合 H1/H2 才有完整业务场景 |
+| H4 JWT 离线缓存（与 SPIKE-001 衔接） | SPIKE-001 已定型双 token + 5 状态机文档（pda-offline-state.md），代码实施在 PDA 端，需要 H1/H2 验证后才能写 |
+| H5 Bare RN + monorepo 集成 | 可纯前端验证，但 RN bare 项目骨架装包成本高（约 800 包），强行跑会污染主项目 pnpm workspace |
+| H6 jest + Maestro / Detox E2E | 需要 H1-H5 的代码基础 |
+
+更深的原因：**推迟才符合 ADR-0021 高保真原型策略 §约束 4** —— "Wave N 启动前，N 涉及的 UI 故事必须有高保真原型 + ≥1 次走查 approved"。
+SPIKE-005 是 PDA 实施前的技术验证（不是原型），按 ROADMAP 应在 **Wave 3 W3.A M2 PDA 入库** 启动前的 0.5 周内做（与 Wave 3 启动同期）。
+
+### 7.2 启动条件（任一满足即可重启）
+
+1. **业务方采购 / 借测至少 1 款 PDA 设备**（Honeywell EDA52 / 优博讯 i6310 / Zebra TC52 之一）
+2. **Wave 3 进入启动期**（W3.A M2 PDA 入库前 0.5 周）
+3. **SPIKE-001 ADR-0024 鉴权模型已 Accepted 落地到 backend/**（即 Wave 1 W1.A 完成）+ packages/api-client 可用（Wave 1 W1.C 完成）—— 否则 PDA 写不出真接 token + API 的 demo
+
+启动时**重新计时 2 天时间盒**，本 §7 决策记录追加 v0.2 修订段，不删原文。
+
+### 7.3 不阻塞 Wave 0.5 退出的理由
+
+按 docs/spikes/README.md §6 Wave 0.5 退出条件：
+> 5 个 Spike 全部进入 accepted / rejected / deferred 三态之一（不能停在"起草"或"进行中"）
+
+`deferred` 与 `accepted` 一样是合法终态。SPIKE-005 推迟不影响 Wave 1 启动，因为：
+- Wave 1 W1.A/B/C 全是后端 + PC 前端工作（鉴权 / 审计 / OpenAPI 工具链 / packages/api-client）
+- PDA 端 Wave 1 仅有"PDA 登录"故事（H1-001 PDA），且原型已交付（h1-login-pda）
+- 真 PDA 业务实施在 Wave 3 W3.A M2 入库时；SPIKE-005 与 Wave 3 启动同期最经济
+
+### 7.4 backlog 归属
+
+写入 ROADMAP §"v25 后续波次 backlog"段（与"放射性药品 30 年保留"等同列）：
+
+```
+| SPIKE-005 RN 扫枪验证 | Wave 3 W3.A 启动前 0.5 周 | 业务方采购/借测 PDA 设备 + W1.A/W1.C 完成（鉴权 + api-client 可用）|
+```
+
+### 7.5 关联文档保留
+
+本 spike 文档（5 假设 + 实施路径 + 风险表）**完整保留**，启动时按既有结构填 §7 v0.2 修订记录。pda-offline-state.md（已在 spike-001 落盘）继续作为 PDA 端 token 状态机参考，本 spike 启动时直接复用。
+
+### 7.6 拒绝清单（spike 完成后追加；当前为预设）
+
+| 候选 | 拒绝/推迟理由（spike 启动时再确认）|
+|------|-----------|
+| Expo managed | RN bare 已是预设方向；spike 启动时如发现 Expo 也能装 native module（实体扫码键），可重新评估 |
+| flipper / Reactotron 调试 | spike 范围外，工程化决策延到 Wave 3 |
+| OTA 热更新（CodePush 等）| GSP 监管考虑：app 升级须留痕 + 可审计；当前不引入 |

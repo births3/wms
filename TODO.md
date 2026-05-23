@@ -43,13 +43,13 @@
 
 ### 进行中 / 待做
 
-- [ ] **跑 5 个 Spike 验证**（合计上限 8.5 天；建议顺序 003 → 001 → 002 → 004 → 005）
-  - [ ] SPIKE-003 utoipa→OpenAPI→TS（最轻量，产出会被 001 / 005 复用）
-  - [ ] SPIKE-001 Axum + JWT（鉴权契约 → ADR-0024）
-  - [ ] SPIKE-002 H2 append-only（审计存储 → ADR-0025）
-  - [ ] SPIKE-004 SQLx offline（编译期 SQL → ADR-0001 附录）
-  - [ ] SPIKE-005 RN 扫枪（PDA 离线 → ADR-0027）
-- [ ] 升级 ADR-0024 / 0025 / 0026 / 0027（Spike accept 后写）
+- [x] **跑 5 个 Spike 验证**（实工 8.5h vs 时间盒 8.5d；4 accept + 1 defer）
+  - [x] SPIKE-003 utoipa→OpenAPI→TS（accept，commit b3df10d → ADR-0026 Proposed）
+  - [x] SPIKE-001 Axum + JWT（accept，commit 288a21c → ADR-0024 Proposed）
+  - [x] SPIKE-002 H2 append-only（accept → ADR-0025 Proposed）
+  - [x] SPIKE-004 SQLx offline（accept → ADR-0001 §SQLx 附录 v0.2）
+  - [x] SPIKE-005 RN 扫枪（**deferred** → 推迟到 Wave 3 启动前；启动条件见 ROADMAP §v25 backlog + spike-005 §7.2）
+- [x] 产出 ADR-0024 / 0025 / 0026 草案（Proposed）+ ADR-0001 §SQLx 附录 v0.2（已合入）；ADR-0027 推迟随 spike-005
 - [x] **Wave 0.5 retro**（`docs/retros/wave-0.5-retro.md`，246 行 / 10 节）
 - [x] 重新 capture visual snapshot 验证 e3ce5a0 后渲染（commit 62bf9eb：37 baseline 全部完美 mean_diff=0.00）
 
@@ -61,10 +61,12 @@
 - [x] P0 原型 ≥1 次走查 approved（manifest 18 tab 全签字）
 - [x] packages/ui 抽离（commit e3ce5a0，ADR-0028 备案）
 - [x] Spike 计划落盘（commit b2e84eb，5 项 docs/spikes/*.md）
-- [ ] **5 项 Spike 至少进入 accept / reject / defer 三态之一**（不允许停在"起草"）
-- [ ] 任一 accept 的 Spike 都有对应 ADR（0024-0027）
+- [x] **5 项 Spike 全部进入三态之一**（4 accepted: 001/002/003/004 / 1 deferred: 005）
+- [x] 任一 accept 的 Spike 都有对应 ADR（0024 / 0025 / 0026 Proposed + 0001 §SQLx 附录 v0.2 已合入；0027 随 spike-005 推迟）
 - [x] Wave 0.5 retro 写完（`docs/retros/wave-0.5-retro.md`，246 行 / 10 节）
-- [ ] T1 治理 24/24 全绿（持续条件）
+- [x] T1 治理 24/24 全绿（持续条件）
+
+**Wave 0.5 退出条件全部满足，可推进 Wave 1。**
 
 ---
 
