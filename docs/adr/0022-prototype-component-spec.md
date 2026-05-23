@@ -26,13 +26,18 @@ ADR-0021 §2 决定 Layer 1 用 shadcn/ui，Layer 2 业务复合自制。批次 
 ### §1 三层架构
 
 ```
-prototypes/src/components/
-├── ui/              # Layer 1: shadcn/ui 基础原子（Button/Input/Select/...）
-└── business/        # Layer 2: 业务复合（StatusBadge/ScanInput/...）
-prototypes/src/pages/  # Layer 3: 页面级
+packages/ui/src/                 # 跨包共享（@wms/ui，prototypes 与未来 apps/* 共用）
+├── ui/                          # Layer 1: shadcn/ui 基础原子（button/input/select/...）
+├── business/                    # Layer 2: 业务复合（StatusBadge/ScanInput/...）
+├── lib/utils.ts                 # cn() 工具
+└── styles/globals.css           # 设计 token CSS 变量
+prototypes/src/pages/             # Layer 3: 业务方走查页面（仅 prototypes）
+apps/web-admin/src/pages/         # Layer 3: PC + PAD 真业务页面（Wave 1+）
 ```
 
 新增组件按层级归位，**禁止跨层依赖反向**（business 可依赖 ui，ui 不依赖 business）。
+Layer 1 + 2 抽到 packages/ui 的决策见 ADR-0028。
+本 ADR v0.1 原写 `prototypes/src/components/{ui,business}` 已由 e3ce5a0 commit 迁移；见本文末"修订记录"。
 
 ### §2 命名规范
 
@@ -131,3 +136,25 @@ prototypes/src/pages/  # Layer 3: 页面级
 - 增加 4 个治理脚本进 T1
 - Wave 1 启动时业务复合可直接复用，无重写
 - 新人接手成本下降（统一接口 + 文档头 + 注册流程）
+
+---
+
+## 修订记录
+
+### v0.2 — 2026-05-23（commit e3ce5a0）
+
+**变更**：Layer 1 + Layer 2 + lib/utils + globals.css 从 `prototypes/src/components/` 抽离至 `packages/ui/src/`，构成 `@wms/ui` 共享包。
+
+**触发**：用户要求"前端复用原型工作"（C 步骤 1）。原型本身仍在 `prototypes/`（业务方走查），但底层组件成为跨包共享，避免 Wave 1 启动 `apps/web-admin/` 时重画。
+
+**与本 ADR 的关系**：
+- 本 ADR 的"三层架构"语义不变（Layer 1 / 2 / 3 仍是有效抽象）
+- 路径载体改变：Layer 1 + 2 在 `packages/ui/src/`；Layer 3（页面）仍按消费方分布（prototypes / apps/* 各自的 `src/pages/`）
+- 治理约束（命名、Props、风格、文档头）全部继续生效
+- 路径决策详细背景见 ADR-0028
+
+**实施细节**：
+- 153 处 `@/components/(ui|business)/*` import 改为 `@wms/ui`
+- shadcn primitive 文件名仍 kebab-case（`button.tsx`）；治理脚本 `check_file_naming.py` 已扩展识别 `packages/ui/src/ui/` 路径
+- Tailwind 配置抽出 `packages/ui/tailwind-preset.cjs`，消费方 `presets: [preset]`
+- 设计 token CSS 变量统一在 `packages/ui/src/styles/globals.css`

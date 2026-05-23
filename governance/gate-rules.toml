@@ -123,7 +123,7 @@ tier = "T1"
 
 # Layer 2 业务复合组件 + 页面级文件触发组件治理
 [[rules]]
-match = "prototypes/src/components/business/**"
+match = "packages/ui/src/business/**"
 checks = ["check_component_doc_header", "check_component_no_inline_style", "check_component_props_classname", "check_component_registry_consistency"]
 tier = "T1"
 

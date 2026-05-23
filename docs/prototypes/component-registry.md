@@ -8,11 +8,15 @@
 
 ## 1. Design Tokens（Layer 0）
 
-| Token 类别 | 文件 | 说明 |
+设计 token 以 CSS 变量形式定义在 `packages/ui/src/styles/globals.css`，由 `packages/ui/tailwind-preset.cjs` 暴露给消费方使用。
+
+| Token 类别 | 位置 | 说明 |
 |---|---|---|
-| 颜色 | `prototypes/src/tokens/colors.ts` | 主色/危险/警告/成功/中性灰 |
-| 字号 | `prototypes/src/tokens/typography.ts` | PDA: 16/18/20/24pt; PC: 12/14/16/20px |
-| 间距 | `prototypes/src/tokens/spacing.ts` | 4px 基准（4/8/12/16/24/32） |
+| 颜色 CSS 变量 | `packages/ui/src/styles/globals.css` `:root {}` | shadcn 标准 + WMS 业务色（`--wms-warning` / `--wms-success` / `--wms-cold`）|
+| Tailwind 颜色映射 | `packages/ui/tailwind-preset.cjs` | `bg-primary` / `text-wms-cold` 等 utility |
+| 字号 | tailwind 默认（`text-xs/sm/base/lg/...`） | PDA 业务硬约束见 §1.2 |
+| 间距 | tailwind 默认（4px 基准 `p-1/p-2/...`） | 不引入自定义 token |
+| 字体栈 | `packages/ui/tailwind-preset.cjs` `fontFamily.sans` | 中文字体 PingFang SC / Microsoft YaHei 兜底 |
 
 ### 1.1 颜色规范
 
@@ -39,24 +43,24 @@
 
 ## 2. 主题覆盖（Layer 1）
 
-文件：`prototypes/src/theme/wms-theme.css`
+文件：`packages/ui/src/styles/globals.css`（消费方在应用入口 `import "@wms/ui/styles/globals.css"`）
 
-基于 shadcn/ui 默认主题，仅覆盖 CSS variables：
+shadcn/ui 标准 CSS 变量 + WMS 自定义业务色，一处定义两端共用：
 
 ```css
 :root {
-  --radius: 0.375rem;          /* 6px PC */
-  --primary: 217 84% 53%;     /* #2563EB blue-600 */
-  --destructive: 0 72% 51%;   /* #DC2626 red-600 */
-}
+  --radius: 0.5rem;
+  --primary: 217 84% 53%;            /* #2563EB blue-600 */
+  --destructive: 0 72% 51%;           /* #DC2626 red-600 */
 
-[data-device="pda"] {
-  --radius: 0.5rem;            /* 8px PDA */
-  font-size: 16pt;
+  /* WMS 业务色 */
+  --wms-warning: 32 95% 44%;          /* 近效期/异常 */
+  --wms-success: 142 71% 45%;         /* 合格/通过 */
+  --wms-cold:    189 94% 43%;         /* 冷链 */
 }
 ```
 
-不新增组件库，**直接用 shadcn/ui 原生组件**。
+不新增组件库，**直接用 shadcn/ui 原生组件**（已迁至 `packages/ui/src/ui/`）。
 
 ---
 
@@ -152,3 +156,5 @@ interface PdaComponentProps extends WmsComponentProps {
 | 日期 | 变更 |
 |---|---|
 | 2026-05-22 | 初版：12 个组件 + Design Tokens + 主题规范 |
+| 2026-05-23 | 扩到 16 个组件（+ DiffPanel / PageHeader / DataTable / EmptyState） |
+| 2026-05-23 | **路径迁移**：Layer 0/1/2 全部从 `prototypes/src/` 抽离至 `packages/ui/src/`（commit e3ce5a0），构成 `@wms/ui` 共享包；详见 ADR-0022 v0.2 修订记录 + ADR-0028 |

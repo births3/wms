@@ -47,7 +47,9 @@
 | [ADR-0021](0021-high-fidelity-prototype-strategy.md) | 高保真原型策略 | Accepted | Storybook + shadcn/ui 真组件；Wave N 前必须有原型 + 走查；5 个治理脚本 |
 | [ADR-0022](0022-prototype-component-spec.md) | 原型组件规范 | Accepted | 三层架构（ui/business/pages）+ cva variants + tailwind + forwardRef + 文档头规范 + 4 治理脚本规划 |
 | [ADR-0023](0023-business-report-strategy.md) | 业务报表方案选型 | Accepted | 混合方案：A. GSP 法定后端实现 + B. 业务报表 Metabase 嵌入（Wave 5）+ C. 业务页快捷入口 + D. 订阅 WMS 自实现 |
-| ADR-0020+ | 未分配 | 后续按需新建 |
+| [ADR-0028](0028-component-library-extraction.md) | 组件库抽离至 packages/ui | Accepted | 16 业务组件 + 9 shadcn primitive + 设计 token + cn 工具从 prototypes/src/components 抽到 packages/ui/src，构成 @wms/ui 共享包；prototypes 与未来 apps/web-admin 共用；commit e3ce5a0 实施 |
+| ADR-0024..0027 | Spike 拟产出 | 待写 | 5 项 Spike accept 后写：0024 鉴权模型 / 0025 审计存储 / 0026 跨端契约 / 0027 PDA 离线 |
+| ADR-0029+ | 未分配 | 后续按需新建 |
 
 > 编号永不复用。空缺编号必须在此表登记原因。
 
