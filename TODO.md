@@ -6,55 +6,71 @@
 
 ---
 
-## 当前 Wave：Wave 0 — 治理骨架
+## 当前 Wave：Wave 0.5 — 原型 + 技术 Spike + 组件库抽离
 
-**目标**：治理体系、文档、配置、脚本骨架就位。
+**目标**：组件库骨架 + P0 原型 + 技术 Spike 验证 + Wave 1 复用准备。
 
 ### 已完成
 
-- [x] 目录骨架（docs/{adr,domain,compliance}, scripts/governance, governance/baselines, apps/{web-admin,pda-mobile}, backend/crates, packages, shared/openapi）
-- [x] Git 仓库初始化（main 分支、禁用 GPG 签名）
-- [x] `.gitignore` `.editorconfig` `.gitattributes`
-- [x] `docs/governance.md` v0.2
-- [x] ADR-0001 技术栈
-- [x] ADR-0002 仓库结构
-- [x] ADR-0003 治理模型（含 L1-L4 → T1-T4 重命名 + TDD 集成小节）
-- [x] ADR-0004 v0.2 波次路线（已由 ADR-0007 取代）
-- [x] ADR-0007 v0.3 路线边界对齐
-- [x] ADR-0006 TDD + 11 层测试维度
-- [x] `docs/architecture-dependencies.md` 依赖图
-- [x] `justfile`（T1-T4 入口）
-- [x] `lefthook.yml`（pre-commit / commit-msg / pre-push 三钩子）
-- [x] 治理脚本：`_baseline.py`、`_diff.py`、4 个起步脚本（环境 / 链接 / ADR / 提交）、2 个调度脚本（governance_checks / task_check）
-- [x] `governance/gate-rules.toml` + `governance/baselines/README.md`
-- [x] `README.md` / `ROADMAP.md` / 本 `TODO.md`
-- [x] `docs/adr/README.md` 索引
+#### 治理 / 文档（Wave 0 续）
+- [x] T1 治理脚本扩到 24 个（含 component-* 4 个 + visual-* 3 个 + prototype-* 5 个）
+- [x] `governance/gate-rules.toml` 路径触发表（含 prototypes/* 与 packages/ui/src/business/**）
+- [x] `governance/baselines/` baseline 机制
+- [x] ADR-0021..0023, 0028 起 7 份新 ADR（含 ADR-0008 Odoo 借鉴 / ADR-0019 货主自定义）
+
+#### 高保真原型（ADR-0021）
+- [x] `prototypes/` Vite + React + TS + shadcn/ui 工程骨架
+- [x] **38 个高保真页面**（M1/M2/M3/M4/M5/M6/M8/M10 + H1/H2/H3，远超 ROADMAP P0 9 页）
+- [x] **16 个 Layer 2 业务复合组件**（StatusBadge / ScanInput / DualSignPanel / AuditTimeline / ApprovalFlow / KanbanBoard / PrintPreview / RuleEditor / TempChart / OfflineIndicator / FieldTable / StepFlow / DiffPanel / PageHeader / DataTable / EmptyState）
+- [x] **9 个 shadcn primitive**（Button / Input / Label / Card / Tabs / Select / Checkbox / Table / Dialog）
+- [x] **16 个组件 Stories.tsx**（与组件 1:1）+ Storybook 8.6 接入（build 通过 7.65s）
+- [x] 视觉基线治理：`accept_baseline.py` + `manifest.toml` + 18 个 baseline 全签字
+- [x] OCR 关键字校验（`check_visual_keywords.py`）
+
+#### 跨包共享（ADR-0028 / commit e3ce5a0）
+- [x] **packages/ui 抽离**：16 业务组件 + 9 shadcn primitive + lib/utils + globals.css → `@wms/ui`
+- [x] 仓库根 `pnpm-workspace.yaml`（packages/* + prototypes + apps/*）
+- [x] Tailwind preset 化（`packages/ui/tailwind-preset.cjs`）
+- [x] 153 处 import 改为 `@wms/ui`，治理脚本路径同步
+
+#### 技术 Spike 计划（commit b2e84eb）
+- [x] `docs/spikes/README.md` + 流程规范（accept/reject/defer 三态、时间盒、与 ADR 的关系）
+- [x] SPIKE-001 Axum + JWT（2 天，关联 W1.A）
+- [x] SPIKE-002 H2 append-only（2 天，关联 W1.B）
+- [x] SPIKE-003 utoipa → OpenAPI → TS（1.5 天，关联 W1.C）
+- [x] SPIKE-004 SQLx offline（1 天）
+- [x] SPIKE-005 RN 扫枪（2 天，关联 PDA）
 
 ### 进行中 / 待做
 
-- [x] `CHANGELOG.md` 初始版本（v3.1 [Unreleased] Added/Changed/Removed 完整）
-- [x] ~~工作区根 README 登记 wms 项目~~（实质已被 README.md 自描述满足，关闭于 v3.1）
-- [x] 本地验证：跑 `validate_environment.py` / `check_doc_links.py` / `validate_adr_index.py` / `check_commit_convention.py`（T1 14/14 全过）
-- [x] 首次 commit（拆为 7 个 conventional commits，覆盖治理脚本 / AGENTS.md / 治理规范 / GSP 合规 / 用户故事 / 基础设施 / 站点）
-- [x] 哲学自检（v3.1 retro §10 已含）
+- [ ] **跑 5 个 Spike 验证**（合计上限 8.5 天；建议顺序 003 → 001 → 002 → 004 → 005）
+  - [ ] SPIKE-003 utoipa→OpenAPI→TS（最轻量，产出会被 001 / 005 复用）
+  - [ ] SPIKE-001 Axum + JWT（鉴权契约 → ADR-0024）
+  - [ ] SPIKE-002 H2 append-only（审计存储 → ADR-0025）
+  - [ ] SPIKE-004 SQLx offline（编译期 SQL → ADR-0001 附录）
+  - [ ] SPIKE-005 RN 扫枪（PDA 离线 → ADR-0027）
+- [ ] 升级 ADR-0024 / 0025 / 0026 / 0027（Spike accept 后写）
+- [ ] **Wave 0.5 retro**（`docs/retros/wave-0.5-retro.md`）
+- [ ] 重新 capture visual snapshot 验证 e3ce5a0 后渲染与 baseline 0 差异（需 vite dev 起 + chromium）
 
 ---
 
-## Wave 0 退出条件（Wave 1 准入）
+## Wave 0.5 退出条件（Wave 1 准入）
 
-- [x] 所有 Wave 0 ADR 状态 = Accepted（0001/0002/0003/0006/0007 = Accepted；0004 = Superseded by 0007）
-- [x] `python3 scripts/governance/governance_checks.py --tier T1` 全绿（14/14，~1.4s）
-- [x] `validate_environment.py` 报告必需工具就绪（含 gitleaks）
-- [x] 首次 commit 通过 lefthook 钩子（7 个 commit 全过 pre-commit + commit-msg）
-- [x] 完成 Wave 0 retro（v0.2 + v3.1 持续演进 §10）
-
-**Wave 0 退出条件全部满足，可推进 Wave 1。**
+- [x] Storybook 可运行（commit 8cce777，build 通过）
+- [x] P0 原型 ≥1 次走查 approved（manifest 18 tab 全签字）
+- [x] packages/ui 抽离（commit e3ce5a0，ADR-0028 备案）
+- [x] Spike 计划落盘（commit b2e84eb，5 项 docs/spikes/*.md）
+- [ ] **5 项 Spike 至少进入 accept / reject / defer 三态之一**（不允许停在"起草"）
+- [ ] 任一 accept 的 Spike 都有对应 ADR（0024-0027）
+- [ ] Wave 0.5 retro 写完
+- [ ] T1 治理 24/24 全绿（持续条件）
 
 ---
 
 ## 后续 Wave 预告（不在当前 TODO，仅参考）
 
-- **Wave 1**：H1 权限/多租户、H2 审计追踪、H3 OpenAPI 工具链 + 外部资质并行启动
+- **Wave 1**：H1 权限/多租户、H2 审计追踪、H3 OpenAPI 工具链；`apps/web-admin/` 启动复用 `@wms/ui`；`packages/api-client/` 自动生成
 - **Wave 2**：M1.a 基础档案 + M2 入库 schema + M6 报表骨架
 - **Wave 3**：M2/M3 业务规则 + M5 冷链 schema + M9 计费账户
 

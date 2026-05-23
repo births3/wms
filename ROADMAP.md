@@ -44,16 +44,20 @@ M11 监管 EDI 已移除：码上放心由 M-TC 承接，药监 EDI 由 ERP/H8 �
 ## Wave 0.5：原型 + 技术 Spike（进行中）
 
 **周期**：2 周
-**目标**：组件库骨架 + P0 原型（Wave 1 涉及的 9 个页面）+ 技术 Spike 验证。
+**目标**：组件库骨架 + P0 原型（Wave 1 涉及的 9 个页面）+ 技术 Spike 验证 + 组件库抽离（Wave 1 复用准备）。
 
-- [x] Design Tokens + wms-theme.css + Storybook 配置
+- [x] Design Tokens（CSS 变量 + Tailwind preset）+ globals.css + Storybook 8.6 接入
 - [x] Layer 2 业务复合组件 Top 5（ScanInput / StepFlow / StatusBadge / FieldTable / OfflineIndicator）
-- [x] Layer 2 剩余组件（DualSignPanel / AuditTimeline / KanbanBoard / PrintPreview / TempChart / RuleEditor / ApprovalFlow）
-- [x] P0 原型页（9 个：H1 登录/权限/登出/API Key + H2 审计查询/归档/生命周期 + H3 API 文档）
+- [x] Layer 2 剩余 11 个组件（DualSignPanel / AuditTimeline / KanbanBoard / PrintPreview / TempChart / RuleEditor / ApprovalFlow / DiffPanel / PageHeader / DataTable / EmptyState）
+- [x] P0 原型页（9 个：H1 登录/权限/登出/API Key + H2 审计查询/归档/生命周期 + H3 API 文档）— 实际交付 38 个高保真页（M1-M6/M8/M10/H 全覆盖）
+- [x] 16 个组件 Stories.tsx 全覆盖（Storybook build 通过）
+- [x] 视觉基线治理（accept_baseline.py + manifest.toml + 18 个 baseline 签字）
+- [x] **组件库抽离至 packages/ui**（commit e3ce5a0，决策见 ADR-0028）— 为 Wave 1 `apps/web-admin/` 复用 `@wms/ui` 准备就绪
 - [x] 技术 Spike 计划落盘（`docs/spikes/` 5 项 + README，状态=起草）
 - [ ] 技术 Spike 验证：SPIKE-001 Axum+JWT / 002 H2 append-only / 003 utoipa→OpenAPI→TS / 004 SQLx offline / 005 RN 扫枪 — 状态需进入 accepted/rejected/deferred
+- [ ] Wave 0.5 retro（`docs/retros/wave-0.5-retro.md`）
 
-**完成标准**：Storybook 可运行；P0 原型 ≥1 次走查 approved；Spike 结论记录到 `docs/spikes/`。
+**完成标准**：Storybook 可运行 ✓；P0 原型 ≥1 次走查 approved ✓；Spike 结论记录到 `docs/spikes/`（计划已落盘，验证待执行）；packages/ui 抽离完成 ✓。
 
 ---
 
