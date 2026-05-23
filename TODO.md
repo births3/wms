@@ -50,8 +50,8 @@
   - [ ] SPIKE-004 SQLx offline（编译期 SQL → ADR-0001 附录）
   - [ ] SPIKE-005 RN 扫枪（PDA 离线 → ADR-0027）
 - [ ] 升级 ADR-0024 / 0025 / 0026 / 0027（Spike accept 后写）
-- [ ] **Wave 0.5 retro**（`docs/retros/wave-0.5-retro.md`）
-- [ ] 重新 capture visual snapshot 验证 e3ce5a0 后渲染与 baseline 0 差异（需 vite dev 起 + chromium）
+- [x] **Wave 0.5 retro**（`docs/retros/wave-0.5-retro.md`，246 行 / 10 节）
+- [x] 重新 capture visual snapshot 验证 e3ce5a0 后渲染（commit 62bf9eb：37 baseline 全部完美 mean_diff=0.00）
 
 ---
 
@@ -63,7 +63,7 @@
 - [x] Spike 计划落盘（commit b2e84eb，5 项 docs/spikes/*.md）
 - [ ] **5 项 Spike 至少进入 accept / reject / defer 三态之一**（不允许停在"起草"）
 - [ ] 任一 accept 的 Spike 都有对应 ADR（0024-0027）
-- [ ] Wave 0.5 retro 写完
+- [x] Wave 0.5 retro 写完（`docs/retros/wave-0.5-retro.md`，246 行 / 10 节）
 - [ ] T1 治理 24/24 全绿（持续条件）
 
 ---

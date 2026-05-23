@@ -48,8 +48,8 @@ PASCAL_RE = re.compile(r"^[A-Z][a-zA-Z0-9]*$")
 MIGRATION_RE = re.compile(r"^\d{4}_[a-z][a-z0-9_]*\.(down\.)?sql$")
 # ADR: NNNN-<slug>.md
 ADR_RE = re.compile(r"^\d{4}-[a-z0-9][a-z0-9\-]*\.md$")
-# Retro: wave-N-retro.md
-RETRO_RE = re.compile(r"^wave-\d+-retro\.md$")
+# Retro: wave-N-retro.md 或 wave-N.M-retro.md（如 wave-0.5-retro.md）
+RETRO_RE = re.compile(r"^wave-\d+(?:\.\d+)?-retro\.md$")
 # 合规文档: gsp-<topic>.md
 COMPLIANCE_RE = re.compile(r"^gsp-[a-z0-9][a-z0-9\-]*\.md$")
 # 治理脚本: snake_case.py（公共库 _前缀）
@@ -125,7 +125,7 @@ def check_file(rel_path: str) -> Violation | None:
     # --- Retro ---
     if "docs/retros" in rel_path and filename.endswith(".md") and filename != "README.md":
         if not RETRO_RE.match(filename):
-            return Violation(rel_path, "retro-naming", f"Retro must be wave-N-retro.md: '{filename}'")
+            return Violation(rel_path, "retro-naming", f"Retro must be wave-N-retro.md or wave-N.M-retro.md: '{filename}'")
         return None
 
     # --- 合规文档 ---
