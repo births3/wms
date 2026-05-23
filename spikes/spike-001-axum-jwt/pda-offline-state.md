@@ -153,6 +153,13 @@
 
 ## 6. 服务端配套
 
+> **v0.2 补充**（ADR-0024 v0.2 修订）：access_token 内的 JWT claims 含 `iat`
+> 字段（标准字段，issued at unix 秒）。PDA 端**不主动**解析或使用 iat（token 仍
+> 当 opaque Bearer 字符串塞 Authorization 头）；服务端 extractor 用 iat 配合
+> Redis `user:{user_id}:permissions_changed_at` 检测权限变更，命中则 401
+> AUTH-009 PermissionsRevoked，PDA 收到后视作"refresh 也无救"按 §3 S5 锁定
+> 处理（重登）。
+
 ### 6.1 /auth/login
 
 ```

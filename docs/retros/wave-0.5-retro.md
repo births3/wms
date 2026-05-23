@@ -244,3 +244,70 @@ Wave 0.5 在 2 天内产出 36 个 commit（含 5 份 ADR、4 个 Spike 计划�
 - ⚠️ 节奏不可外推：2 天 36 commit 不是 Wave 1 业务代码节奏的预测值
 
 **结论**：Wave 0.5 工程纪律基本到位。可推进 Spike → ADR → Wave 1。
+
+
+---
+
+## 11. Wave 0.5 持续演进（2026-05-24，retro 写完之后）
+
+> 原 retro 写于 2026-05-24 commit 96bb477（Wave 0.5 retro 任务点）。
+> retro 后又有 ~5 个 commit 进入 Wave 0.5 范畴（Spike 验证 + ADR review + 修风险）；
+> 仿照 wave-0-retro.md §10 的"持续演进"模式记录补记。
+
+### 11.1 Spike 验证 4 轮（实工 ~10.5h vs 时间盒 8.5d）
+
+| commit | Spike | 实工 | 关键产出 |
+|--------|-------|------|---------|
+| b3df10d | SPIKE-003 utoipa→OpenAPI→TS | ~4h | ADR-0026 Proposed |
+| 288a21c | SPIKE-001 Axum + JWT | ~3h | ADR-0024 Proposed + pda-offline-state.md |
+| (合入) | SPIKE-004 SQLx offline | ~1.5h | ADR-0001 §SQLx 附录 v0.2 |
+| (合入) | SPIKE-002 H2 append-only | ~2h | ADR-0025 Proposed |
+| f2614bb | SPIKE-005 RN 扫枪 deferred | 0h | 推迟到 Wave 3，启动条件入 ROADMAP |
+
+10x 加速比的真实原因：spike 性质（小而集中、不写生产代码、复用现成 PG/cargo/pnpm 工具链）+ AI 协作 + mock 数据。
+**节奏不可外推到 Wave 1 业务代码**（已在 §8 反复强调，本节再确认）。
+
+### 11.2 review-then-fix 周期 ×2 轮
+
+**第 1 轮**（commit a781f70）—— 4 份 ADR Proposed 集中 review：
+- 标注 3 处风险（permissions 滞后 / Redis 单点 / hash chain 并发未验证）
+- 修法：ADR-0024 §2.1.1 混合失效模式 + §2.3.1 故障降级 / ADR-0025 §2.4.1 spike-002b fallback
+- 4 份 ADR Proposed → Accepted（0024/0025 v0.2，0026 直接 Accepted）
+
+**第 2 轮**（本 commit）—— Accepted 后再 review：
+- 标注 4 处漏项（docs/error-codes.md 缺 AUTH-001..009 / ADR-0024 §2.8 引用不存在的 SPIKE-006 / pda-offline-state.md 没引 iat / retro 没记 review 周期）
+- 修法：本 commit 全修
+
+**经验**：Accept 不等于 done。Wave 1 起每个大节点（ADR 落地 / Wave 退出前）都应跑两轮 review：
+- 第 1 轮：决策合理性（spike 假设是否覆盖、风险是否识别）
+- 第 2 轮：现实一致性（ADR 互引是否真存在、文档暗示的事是否真做了、命名是否笔误）
+
+### 11.3 隐藏漏项的反思
+
+第 2 轮 review 揭示的"我说做了但没做"模式：
+- ADR-0024 §2.6 标题"（入 docs/error-codes.md）"是承诺，但仅写了承诺没真做
+- ADR-0024 §2.8 引用 SPIKE-006 是笔误，没人审就过 Accepted
+
+**改进**：
+- 类似的"暗示已做"必须显式验证（grep / ls / curl）；写在 ADR review 流程里
+- 治理脚本 `check_doc_links.py` 是文件链接级别，不能检测"§2.6 标题写了 docs/error-codes.md 但内容没加"。Wave 1 起评估扩展：ADR 承诺类语句（"入 X" / "加到 Y"）必须有对应实证文件改动（diff 触发）
+
+### 11.4 Wave 0.5 真正完整退出 commit 链（按时间序）
+
+```
+8704578 文档(原型): ADR-0021 高保真原型策略 + Wave 0.5 + 治理脚本 5 个   <- 起点
+... (35 commit 原型 + 治理 + Spike 计划)
+e3ce5a0 重构(原型,治理): 抽 packages/ui 共享包，prototypes 改用 @wms/ui
+e45da12 文档(治理): 路径漂移修复 + ADR-0028 备案 packages/ui 抽离
+95122c0 文档(文档): ROADMAP / TODO 同步 Wave 0.5 实际进度
+62bf9eb 构建(治理,原型): 视觉基线全量重新接受 + accept_baseline 加 --accept-resize
+96bb477 文档(治理): Wave 0.5 retrospective + retro 命名扩展支持小数 Wave   <- retro 写完
+b3df10d 功能(接口): SPIKE-003 utoipa→OpenAPI→TS 全链路验证 accept + ADR-0026
+288a21c 功能(接口): SPIKE-001 Axum+JWT+多租户验证 accept + ADR-0024
+(SPIKE-004 / SPIKE-002 commit)
+f2614bb 文档(治理): SPIKE-005 deferred + Wave 0.5 退出条件全达成
+a781f70 文档(治理): ADR-0024/0025/0026 review 修风险 + Proposed → Accepted
+本 commit 文档(治理): 修 review 第二轮 4 处漏项                            <- 真正退出
+```
+
+**最终 Wave 0.5 退出条件 8/8 全 ✅**（详见 §7 与本节 §11.4）。

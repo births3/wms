@@ -110,11 +110,36 @@
 docs/error-codes.md（本文档，单一事实之源）
   │
   ├─→ docs/adr/0010-error-codes.md         （决策依据）
+  ├─→ docs/adr/0024-auth-model.md §2.6     （AUTH-XXX 短编码定义）
   ├─→ docs/coding-standards.md §4         （命名规范继承）
   ├─→ docs/compliance/gsp-field-traceability.md §6  （字段关联）
   ├─→ docs/domain/user-stories-*.md        （故事关联）
   └─→ scripts/governance/check_error_codes.py（治理校验）
 ```
+
+### 5.1 AUTH-XXX 短编码速查（ADR-0024 / spike-001 实测）
+
+ADR-0024 §2.6 定义 9 个 AUTH-XXX 短编码，用于前端按 code 切换提示（与 Stripe API 风格一致）。
+本表是面向前端的 UX 速查；治理脚本字典（§6 yaml）使用 `H1_AUTH_*` 长编码。
+
+| 短码 | HTTP | 触发 | 对应 H1_* 长编码 |
+|---|---|---|---|
+| AUTH-001 | 401 | 缺 Authorization 头 | `H1_AUTH_HEADER_MISSING` （Wave 1 W1.A 加 §6 yaml） |
+| AUTH-002 | 401 | Authorization 格式错（非 Bearer xxx） | `H1_AUTH_HEADER_MALFORMED` （同上） |
+| AUTH-003 | 401 | token 无效 / 已过期 / 解析失败 | `H1_AUTH_TOKEN_EXPIRED` + `H1_AUTH_TOKEN_INVALID`（已在 §6） |
+| AUTH-004 | 401 | token 已撤销（blacklist 命中） | `H1_AUTH_TOKEN_REVOKED` （Wave 1 W1.A 加） |
+| AUTH-005 | 403 | 权限不足（permissions 缺所需 code） | `H1_AUTH_INSUFFICIENT_PERMISSION`（已在 §6） |
+| AUTH-006 | 403 | 跨货主越权 | `H1_TENANT_MISMATCH`（已在 §6） |
+| AUTH-007 | 401 | refresh_token 无效或过期 | `H1_AUTH_REFRESH_TOKEN_INVALID` （Wave 1 W1.A 加） |
+| AUTH-008 | 401 | 密码错（业务方可决定合并到 AUTH-003 防用户枚举） | `H1_AUTH_PASSWORD_INVALID` （Wave 1 W1.A 加） |
+| AUTH-009 | 401 | permissions 已失效（v0.2 新增；token 内 permissions 过时，需重新登录） | `H1_AUTH_PERMISSIONS_REVOKED` （Wave 1 W1.A 加） |
+
+**实施约束**（Wave 1 W1.A）：
+- 5 个"Wave 1 W1.A 加"的 H1_* 长编码必须在 W1.A 落地前补到 §6 yaml（治理脚本依赖）
+- 后端 IntoResponse 序列化 `code: "AUTH-XXX"` + `message: "中文提示"` 到 HTTP body（spike-001 实测可行）
+- 前端 `packages/api-client` 错误处理 switch case 用本表的 9 个短码
+
+修改本表必须同步 ADR-0024 §2.6（双向一致是治理硬约束）。
 
 ---
 

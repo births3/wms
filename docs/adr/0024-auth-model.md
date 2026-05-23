@@ -212,12 +212,12 @@ async fn list_items(
 - W1.A 单元测试模板含"跨 owner 访问应 403"
 - Wave 2+ 评估 PostgreSQL RLS（写新 ADR）
 
-### 2.8 与 SPIKE-002 / SPIKE-006 衔接
+### 2.8 与 SPIKE-002 / docs/error-codes.md / ADR-0026 衔接
 
-| Spike | 衔接点 |
+| 关联 | 衔接点 |
 |-------|--------|
 | SPIKE-002 H2 审计 | audit_event 表必含 `actor_id` `actor_name` `owner_id` `jti` 字段；来源全是 AuthContext |
-| SPIKE-006 错误码（拟） | AUTH-001..008 进 docs/error-codes.md（统一注册），前端按 code 切换提示 |
+| docs/error-codes.md | AUTH-001..009 短编码进 §5.1 速查表（前端按 code 切换提示）；对应的 H1_AUTH_* 长编码进 §6 yaml 字典作治理脚本输入；本 ADR §2.6 与 docs/error-codes.md §5.1 双向一致是硬约束 |
 | ADR-0026 跨端契约 | LoginRequest / LoginResponse 用 utoipa::ToSchema；前端 packages/api-client 自动生成类型 |
 
 ---
