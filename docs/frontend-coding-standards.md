@@ -428,7 +428,7 @@ StatusBadge.displayName = "StatusBadge";
 - 本规范遵循 ADR-0022 决策；如规则修订需新建 ADR
 - 新增治理脚本须加入 `gate-rules.toml` + `governance_checks.py` T1
 - 反模式发现新案例时，回写到 §10
-- Wave 1 启动后，本文件适用范围扩展到 `apps/web-admin/`，可能新增"路由约定 / 状态管理 / API 调用"等章节
+- Wave 1 启动后，本文件适用范围扩展到 `apps/web-admin/`；生产页迁移规则见 §13
 
 ---
 
@@ -501,7 +501,38 @@ python3 scripts/governance/check_visual_regression.py          # 3. 对比 basel
 | 脚本 | Tier | 作用 |
 |---|---|---|
 | `check_baseline_completeness.py` | T1 | Tabs.tsx ↔ manifest.toml ↔ baseline PNG 三者一致（强制） |
+| `check_prototype_navigation.py` | T1 | 原型预览导航必须保持领域 / 模块 / 页面三层结构 |
 | `capture_visual_snapshots.py` | 工具 | chrome headless 截图（按 manifest.toml 配置） |
 | `check_visual_regression.py` | T3 | MD5 + 像素 + 64×64 感知差异 + 底部截断检测 |
 
+## 13. 前端原型先行与生产迁移（ADR-0029）
 
+### 13.1 三个前端层的职责
+
+| 位置 | 职责 | 禁止 |
+|---|---|---|
+| `prototypes/` | 高保真原型、业务走查、mock 流程、视觉 baseline | 生产 API 调用、真实权限判断、持久化写操作 |
+| `packages/ui` | 共享 primitive / 业务复合组件 / design tokens / stories | 页面级编排、API 调用、领域规则 |
+| `apps/web-admin` | 生产 PC/PAD 前端：路由、权限门控、API client、TanStack Query | 未确认原型、mock-only 逻辑、裸 `fetch` |
+
+### 13.2 新原型页规则
+
+1. 必须关联用户故事；没有故事覆盖时先走缺口确认流程。
+2. mock 数据字段必须来自用户故事字段表或 OpenAPI 草案，禁止为展示随意发明字段。
+3. 复用 `@wms/ui`，跨 3 个页面以上复用的交互必须提取到 Layer 2 组件。
+4. 必须执行 §12.3 的 Tabs.tsx / manifest.toml / baseline PNG 三同步。
+5. 原型走查 approved 后，才能进入生产迁移。
+
+### 13.3 原型转生产规则
+
+迁移到 `apps/web-admin` 或 `apps/pda-mobile` 前，必须完成 `docs/prototypes/prototype-to-production.md` checklist。
+
+生产页必须：
+
+- 使用 `@wms/api-client` 和 TanStack Query，禁止裸 `fetch`。
+- 使用 H1 权限门控页面入口、按钮和数据范围。
+- 写操作明确 H2 审计事件或豁免理由。
+- 写操作覆盖 ADR-0006 必备维度：L4 错误、L5 数据一致、L8 权限、L11 幂等。
+- 删除原型专用 mock、演示账号、演示说明和假交互。
+
+禁止把 `prototypes/src/pages/*` 直接复制到 `apps/web-admin` 后只改 import；页面必须按生产路由、API 契约和 TDD 测试重新落地。

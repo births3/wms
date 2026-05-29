@@ -265,6 +265,7 @@ wms 是一个**医药冷链 GSP 合规仓储管理系统**，目标是支撑：
 | docs/architecture.md | L3 | docs/ | 系统架构总览（Wave 1 后创建） |
 | docs/domain/*.md | L3 | docs/domain/ | 各限界上下文领域模型 |
 | docs/compliance/*.md | L3 | docs/compliance/ | GSP 条款 → 功能映射 |
+| docs/prototypes/*.md | L3 | docs/prototypes/ | 原型治理、组件注册、原型转生产清单 |
 | README.md | L4 | 根 | 简介、快速开始、目录索引 |
 | ROADMAP.md | L4 | 根 | 长期路线图（波次状态） |
 | TODO.md | L4 | 根 | 当前 Wave 任务 |
@@ -290,6 +291,29 @@ wms 是一个**医药冷链 GSP 合规仓储管理系统**，目标是支撑：
 - **起步阶段**：CI 检测但不强卡，靠 baseline 渐进收紧
 - **必备维度判定**：见 ADR-0006 §2.3（写操作必须含 L4+L5+L8+L11）
 - **测试组织目录**：见 ADR-0006 §2.4，禁止自由命名（治理脚本依赖）
+
+### 3.6.1 前端原型先行流程（ADR-0029）
+
+Wave 1 起，涉及一线操作或复杂业务流程的前端页面采用"前端原型先行，确认后迁移生产"：
+
+```text
+用户故事
+→ 概念审计
+→ 模式提炼
+→ 领域模型 / API 草案
+→ 前端高保真原型
+→ 业务走查确认
+→ 领域模型 / API 契约冻结
+→ outside-in TDD 生产实现
+```
+
+强制边界：
+
+- `prototypes/` 是业务走查工具，允许 mock 数据和演示交互，不承载生产 API 调用。
+- `packages/ui` 是原型与生产前端共享的组件库，禁止放页面级业务编排。
+- `apps/web-admin` 是生产 PC/PAD 前端，必须通过 OpenAPI 生成的 API client 接口访问后端。
+- 原型页不得直接复制成生产页；迁移必须通过 `docs/prototypes/prototype-to-production.md` checklist。
+- 新增原型页仍需 Tabs.tsx / manifest.toml / baseline PNG 三同步，并通过 T1；PR 前按风险跑 T3 视觉回归。
 
 ### 3.7 安全与敏感信息
 
@@ -461,3 +485,4 @@ docs/governance.md（本文档，规则源头）
 | 2026-05-17 | v0.4 | 治理体系审计修复（11 项）：(P0) task_check 加 --strict 模式；§3.5.1 表格 gsp-field 时机更正；§1 加 diff 触发理念落地说明；(P1) 新增 check_baseline_health.py（T1）+ Python 包依赖检查 + 路径硬编码迁出到 governance/check-data.toml + 12 个治理脚本 smoke + core_logic 测试（共 81 项）；(P2) §4.6 加 Tier 启动 SOP + wave-1-ready 加门 + just tier-timing 落地 + glossary 词边界检测扩展到 ASCII + structure 输出补语义说明 |
 | 2026-05-17 | v0.4.1 | v0.4 review 二轮修复（5 项）：gate-rules.toml ↔ §4.6 Wave 时序统一（OpenAPI Wave 2 / handler Wave 1 / cold-chain Wave 3）；§4.6 表格加"对应 gate-rules 规则"列 + "事实之源约定"段；check_baseline_health 默认仅检测不改 working tree（--update-snapshot 才写）；task_check.py docstring 加 --strict 启用时机说明；governance/baselines/README.md 加治理元数据文件入库说明 |
 | 2026-05-17 | v0.4.2 | v0.4.1 review 三轮修复（4 项 + 2 验证）：(P0) §7 补 v0.4.1 变更记录；(P1) 新增 check_governance_consistency.py（元检查 §4.6 ↔ gate-rules.toml 一致性）；(P2) wave-1-ready 加 baseline-health 初始化 + --strict 启用提醒；测试加 v0.4.1 行为回归；baselines/README.md 标题改为"治理债务与元数据" |
+| 2026-05-24 | v0.5 | 接受 ADR-0029 前端原型先行工作流：§3.6.1 增加"用户故事 → 原型走查 → 契约冻结 → TDD 生产实现"流程；文档清单加入 `docs/prototypes/*.md`；原型转生产必须走 checklist |

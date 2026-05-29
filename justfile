@@ -199,7 +199,7 @@ wave-1-ready:
     @python3 scripts/governance/validate_adr_index.py
     @python3 scripts/governance/check_doc_links.py
     @echo "  ── T1 全套 ──"
-    @python3 scripts/governance/governance_checks.py --tier T1 > /dev/null && echo "  ✓ T1 14 项全部通过" || (echo "  ✘ T1 失败"; exit 1)
+    @python3 scripts/governance/governance_checks.py --tier T1 > /dev/null && echo "  ✓ T1 24 项全部通过" || (echo "  ✘ T1 失败"; exit 1)
     @echo "  ── pytest 治理脚本测试 ──"
     @python3 -m pytest scripts/governance/tests/ -q 2>&1 | tail -3
     @echo "  ── Wave 1 应当新增的治理脚本 ──"

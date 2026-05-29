@@ -9,7 +9,7 @@
 
 ## 背景
 
-169 个用户故事中 133 个涉及 UI 交互（PDA 35 / PC 105 / PAD 21 / H5 10）。PDA 端操作密集（14 步验收、双人签字、离线模式），不做原型直接写 React Native 代码，返工成本极高。
+169 个用户故事中，按 `docs/prototypes/prototype-matrix-r3.md` 当前矩阵统计，137 个故事行涉及 UI 交互；按端展开后形成 167 个必做原型页（PC 111 / PDA 30 / PAD 20 / H5 6）。PDA 端操作密集（14 步验收、双人签字、离线模式），不做原型直接写 React Native 代码，返工成本极高。
 
 ## 决策
 
@@ -32,7 +32,7 @@
 
 ### 治理
 
-- 真相源：`docs/prototypes/index.toml`（全量 133 条，按 P0-P4 渐进交付）
+- 真相源：`docs/prototypes/index.toml`（全量 167 个 story/end 原型页，按 P0-P4 渐进交付）
 - 治理脚本：5 个（index_consistency / story_sync / freshness / usability_baseline / review_signoff）
 - 节奏铁律 9：涉及一线高频操作的 UI 页面，进入实现 Wave 前必须有高保真原型
 
@@ -46,4 +46,4 @@
 
 - 增加 Wave 0.5（2 周）专门做组件库 + P0 原型
 - 每波尾增加 0.5 周原型交付窗口
-- 总原型工时 ≈ 1000h（25 周/1 人），分摊到 5 个 Wave
+- 矩阵估算总原型工时 ≈ 963h（约 24 周/1 人），分摊到 5 个 Wave；当前通过 37 个手工高保真页 + 167 个全量矩阵页形成 204 个可走查 tab

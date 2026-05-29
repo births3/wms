@@ -20,11 +20,11 @@
 
 #### 高保真原型（ADR-0021）
 - [x] `prototypes/` Vite + React + TS + shadcn/ui 工程骨架
-- [x] **38 个高保真页面**（M1/M2/M3/M4/M5/M6/M8/M10 + H1/H2/H3，远超 ROADMAP P0 9 页）
+- [x] **全量高保真原型覆盖**：37 个手工高保真页 + 167 个全量矩阵页，共 204 个可走查 tab
 - [x] **16 个 Layer 2 业务复合组件**（StatusBadge / ScanInput / DualSignPanel / AuditTimeline / ApprovalFlow / KanbanBoard / PrintPreview / RuleEditor / TempChart / OfflineIndicator / FieldTable / StepFlow / DiffPanel / PageHeader / DataTable / EmptyState）
 - [x] **9 个 shadcn primitive**（Button / Input / Label / Card / Tabs / Select / Checkbox / Table / Dialog）
 - [x] **16 个组件 Stories.tsx**（与组件 1:1）+ Storybook 8.6 接入（build 通过 7.65s）
-- [x] 视觉基线治理：`accept_baseline.py` + `manifest.toml` + 18 个 baseline 全签字
+- [x] 视觉基线治理：`accept_baseline.py` + `manifest.toml` + 204 个 baseline 全签字
 - [x] OCR 关键字校验（`check_visual_keywords.py`）
 
 #### 跨包共享（ADR-0028 / commit e3ce5a0）
@@ -50,20 +50,22 @@
   - [x] SPIKE-004 SQLx offline（accept → ADR-0001 §SQLx 附录 v0.2）
   - [x] SPIKE-005 RN 扫枪（**deferred** → 推迟到 Wave 3 启动前；启动条件见 ROADMAP §v25 backlog + spike-005 §7.2）
 - [x] 产出 ADR-0024 (Accepted v0.2) / 0025 (Accepted v0.2) / 0026 (Accepted)+ ADR-0001 §SQLx 附录 v0.2（已合入）；ADR-0027 推迟随 spike-005
-- [x] **Wave 0.5 retro**（`docs/retros/wave-0.5-retro.md`，246 行 / 10 节）
+- [x] **Wave 0.5 retro**（`docs/retros/wave-0.5-retro.md`，含 §11 持续演进补记）
 - [x] 重新 capture visual snapshot 验证 e3ce5a0 后渲染（commit 62bf9eb：37 baseline 全部完美 mean_diff=0.00）
+- [x] **前端原型先行工作流**：ADR-0029 + `docs/prototypes/prototype-to-production.md` 落地，确认原型可先行但不得直接复制为生产页
+- [x] **全量矩阵原型补齐**：`docs/prototypes/index.toml` 167 个 required 原型页，`Tabs.tsx` + `manifest.toml` + baseline PNG 三同步，T3 视觉回归 204/204 通过
 
 ---
 
 ## Wave 0.5 退出条件（Wave 1 准入）
 
 - [x] Storybook 可运行（commit 8cce777，build 通过）
-- [x] P0 原型 ≥1 次走查 approved（manifest 18 tab 全签字）
+- [x] 原型 ≥1 次走查 approved（manifest 204 tab 全签字）
 - [x] packages/ui 抽离（commit e3ce5a0，ADR-0028 备案）
 - [x] Spike 计划落盘（commit b2e84eb，5 项 docs/spikes/*.md）
 - [x] **5 项 Spike 全部进入三态之一**（4 accepted: 001/002/003/004 / 1 deferred: 005）
 - [x] 任一 accept 的 Spike 都有对应 ADR（0024 (Accepted v0.2) / 0025 (Accepted v0.2) / 0026 (Accepted) + 0001 §SQLx 附录 v0.2 已合入；0027 随 spike-005 推迟）
-- [x] Wave 0.5 retro 写完（`docs/retros/wave-0.5-retro.md`，246 行 / 10 节）
+- [x] Wave 0.5 retro 写完（`docs/retros/wave-0.5-retro.md`，含 §11 持续演进补记）
 - [x] T1 治理 24/24 全绿（持续条件）
 
 **Wave 0.5 退出条件全部满足，可推进 Wave 1。**
@@ -72,7 +74,8 @@
 
 ## 后续 Wave 预告（不在当前 TODO，仅参考）
 
-- **Wave 1**：H1 权限/多租户、H2 审计追踪、H3 OpenAPI 工具链；`apps/web-admin/` 启动复用 `@wms/ui`；`packages/api-client/` 自动生成
+- **Wave 1**：H1 权限/多租户、H2 审计追踪、H3 OpenAPI 工具链；`apps/web-admin/` 壳工程启动并复用 `@wms/ui`；`packages/api-client/` 自动生成
+- **Wave 1 前端边界**：业务页从 `prototypes/` 迁移生产必须走 ADR-0029 checklist
 - **Wave 2**：M1.a 基础档案 + M2 入库 schema + M6 报表骨架
 - **Wave 3**：M2/M3 业务规则 + M5 冷链 schema + M9 计费账户
 

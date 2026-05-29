@@ -30,16 +30,26 @@
    → 识别"多模块共用的能力"和"用户不操作但系统必须有的能力"
    → 输出：基础设施清单 → 和用户确认 → docs/infra/technical-specs.md
    
-4. 领域模型设计
+4. 领域模型 / API 草案
    → 实体/值对象/聚合根/状态机/领域事件
-   → 输出：docs/domain/domain-model.md
+   → API 定义/模块间事件契约草案
+   → 输出：docs/domain/domain-model.md + docs/api/ 或 OpenAPI 草案
 
-5. 接口契约设计
-   → API 定义/模块间事件契约
-   → 输出：docs/api/ 或 OpenAPI spec
+5. 前端高保真原型（ADR-0029）
+   → 用 React 前端表达流程，复用 @wms/ui，mock 字段对齐故事/API 草案
+   → 输出：prototypes/src/pages/* + Tabs.tsx + manifest.toml + baseline PNG
 
-6. 代码实现（TDD）
+6. 业务走查确认
+   → 业务方确认流程、字段、交互和异常路径
+   → 输出：reviewed baseline / clarifications.md / 必要 ADR
+
+7. 领域模型 / API 契约冻结
+   → 根据走查反馈冻结领域边界和 OpenAPI 契约
+   → 输出：正式 OpenAPI spec / ADR / domain 文档
+
+8. 代码实现（TDD）
    → outside-in：先写失败测试再写代码
+   → 原型转生产必须走 docs/prototypes/prototype-to-production.md checklist
 ```
 
 ### 概念审计的方法
@@ -352,12 +362,14 @@
 4. [docs/adr/0006-tdd-and-test-layers.md](docs/adr/0006-tdd-and-test-layers.md) — TDD + 11 层测试
 5. [docs/adr/0021-high-fidelity-prototype-strategy.md](docs/adr/0021-high-fidelity-prototype-strategy.md) — 高保真原型策略（shadcn/ui + Storybook 工具链）
 6. [docs/adr/0022-prototype-component-spec.md](docs/adr/0022-prototype-component-spec.md) — 原型组件规范（三层架构 + cva + forwardRef + 文档头）
-7. [docs/architecture-dependencies.md](docs/architecture-dependencies.md) — 模块依赖图（当前模块清单 + 5 波次）
-8. [docs/adr/README.md](docs/adr/README.md) — 所有架构决策索引
-9. [docs/infra/technical-specs.md](docs/infra/technical-specs.md) — 基础设施技术规格（H6 状态机 / H7 导入导出 / H8 ERP 防腐层 / H9 打印 / H10 备份恢复）
-10. [docs/concept-audit.md](docs/concept-audit.md) — 概念审计报告（8 镜头扫描结果 + 数据量评估）
-11. [docs/domain/clarifications.md](docs/domain/clarifications.md) — 业务澄清记录（42 项决策）
-12. [docs/glossary.md](docs/glossary.md) — 术语表（54 个，含禁用词）
+7. [docs/adr/0029-frontend-as-prototype-workflow.md](docs/adr/0029-frontend-as-prototype-workflow.md) — 前端原型先行工作流（prototype → checklist → production）
+8. [docs/prototypes/prototype-to-production.md](docs/prototypes/prototype-to-production.md) — 原型转生产迁移清单
+9. [docs/architecture-dependencies.md](docs/architecture-dependencies.md) — 模块依赖图（当前模块清单 + 5 波次）
+10. [docs/adr/README.md](docs/adr/README.md) — 所有架构决策索引
+11. [docs/infra/technical-specs.md](docs/infra/technical-specs.md) — 基础设施技术规格（H6 状态机 / H7 导入导出 / H8 ERP 防腐层 / H9 打印 / H10 备份恢复）
+12. [docs/concept-audit.md](docs/concept-audit.md) — 概念审计报告（8 镜头扫描结果 + 数据量评估）
+13. [docs/domain/clarifications.md](docs/domain/clarifications.md) — 业务澄清记录（42 项决策）
+14. [docs/glossary.md](docs/glossary.md) — 术语表（54 个，含禁用词）
 
 ## 业务文档索引
 
@@ -412,6 +424,8 @@
 | [docs/adr/0015-multi-end-rules.md](docs/adr/0015-multi-end-rules.md) | **多端业务规则放置**（A/B/C 三级 + OpenAPI 共享 schema）|
 | [docs/adr/0016-deployment.md](docs/adr/0016-deployment.md) | **部署形态**（docker-compose / k8s 双轨 + Migration 4 步走）|
 | [docs/error-codes.md](docs/error-codes.md) | **错误码字典**（v3.1 初版 50 项，单一事实之源）|
+| [docs/adr/0029-frontend-as-prototype-workflow.md](docs/adr/0029-frontend-as-prototype-workflow.md) | **前端原型先行工作流**（原型走查后经 checklist 迁移生产；禁止原型页直接复制为生产页）|
+| [docs/prototypes/prototype-to-production.md](docs/prototypes/prototype-to-production.md) | **原型转生产迁移清单**（用户故事 / API 契约 / 权限 / 审计 / 幂等 / 视觉基线）|
 | [docs/retros/wave-0-retro.md](docs/retros/wave-0-retro.md) | Wave 0 回顾 |
 | [docs/reviews/user-stories-audit-2026-05-16.md](docs/reviews/user-stories-audit-2026-05-16.md) | 用户故事 5 维度审计（116 故事 / 22 模块）|
 | [docs/reviews/software-design-audit-2026-05-18.md](docs/reviews/software-design-audit-2026-05-18.md) | **软件设计 12 维度审计**（v3.1，识别 6 P0 / 4 P1 / 3 P2 共 13 项缺口；指引 Wave 1 启动前需补 5+ ADR）|
@@ -448,6 +462,7 @@
 - **流程类组件按决策树选型**（StepFlow 通用进度 / AuditTimeline 历史事件 / ApprovalFlow 审批 / DualSignPanel 双人签字特例）
 - 新增 Layer 2 组件 PR 必须在 component-registry.md §3.1 注册
 - **加新原型页强制三同步**（page → Tabs.tsx → manifest.toml → baseline PNG），跑一次 `capture_visual_snapshots.py` + 人工 review 截图无截断/偏移；`check_baseline_completeness.py` 强制阻断（参前端规范 §12.3）
+- **原型转生产必须走 checklist**：`prototypes/src/pages/*` 不得直接复制进 `apps/web-admin`；迁移前完成 `docs/prototypes/prototype-to-production.md`（参 ADR-0029）
 
 ### 前端治理脚本（T1 自动跑）
 
@@ -468,4 +483,4 @@
 
 ## 当前阶段
 
-Wave 0 治理骨架收尾中。完成 TODO.md 的退出条件后进入 Wave 1 横向底座（H1 权限 / H2 审计 / H3 OpenAPI）。
+Wave 0.5 已完成，Wave 1 准入就绪。下一步启动 Wave 1 横向底座（H1 权限 / H2 审计 / H3 OpenAPI），按 outside-in TDD 推进。

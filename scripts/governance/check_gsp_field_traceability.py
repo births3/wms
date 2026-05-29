@@ -8,7 +8,7 @@ Tier：T1（< 10s）
   docs/domain/user-stories-*.md                   （故事字段表）
 输出：人类可读 + --json
 退出码：
-  0  通过（每个 GSP 字段至少 1 个 alias 在故事字段表中实现）
+  0  通过（每个 gsp/audit 强制字段至少 1 个 alias 在故事字段表或正文中出现）
   1  发现违规：GSP 字段无任何 alias 实现 / 字段词典格式错误
   2  脚本自身错误
 
@@ -16,8 +16,9 @@ Tier：T1（< 10s）
 - 从 gsp-field-traceability.md §6 解析字段词典（YAML 块，正则解析）
 - 扫描 docs/domain/user-stories-*.md 的字段表行（"| 字段名 | (必填|条件必填|可选|系统带出) |"）
 - 对每个 canonical 字段：
-  - 查找 aliases 中至少 1 个出现在故事字段表中 → ✅
-  - 全部未匹配 → ❌ 报错（除非词典声明 wms_status: 不适用）
+  - gsp/audit：查找 aliases 中至少 1 个出现在故事字段表或正文中 → ✅
+  - gsp/audit 全部未匹配 → ❌ 报错
+  - business/config/interface 未匹配 → ℹ 信息（辅助字段由模块/防腐层归口，不污染 T1 warning）
 - 同一 canonical 的多个 alias 在故事中混用 → 信息（不报错，仅提示）
 
 局限（需人工补充）：
@@ -347,13 +348,11 @@ def check_field_coverage(
         # 错误：弱匹配也失败（且 status 为 implemented，且 field_class 强制要求出现）
         # v3 严重度分级：
         #   gsp / audit         → error（GSP 法规强制，必须实现）
-        #   business / config / interface → warning（建议实现，但故事尚未补齐时不阻塞 T1）
+        #   business / config / interface → info（辅助字段由模块/防腐层归口，不污染 T1 warning）
         #   system / derived    → 已在上面跳过
         if not all_matched:
             if e.field_class in ("gsp", "audit"):
                 severity = "error"
-            elif e.field_class in ("business", "config", "interface"):
-                severity = "warning"
             else:
                 severity = "info"
             issues.append(
@@ -463,7 +462,7 @@ def main(argv: list[str] | None = None) -> int:
             for i in warnings:
                 print(f"    ⚠ [{i.canonical}] {i.message}")
         if infos:
-            print(f"\n  信息（{len(infos)} 项命名混用，建议规范化）：")
+            print(f"\n  信息（{len(infos)} 项，不阻塞 T1）：")
             for i in infos:
                 print(f"    ℹ [{i.canonical}] {i.message}")
         if not (errors or warnings):

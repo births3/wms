@@ -27,6 +27,7 @@ from pathlib import Path
 _THIS = Path(__file__).resolve()
 REPO_ROOT = _THIS.parent.parent.parent
 TABS_FILE = REPO_ROOT / "prototypes" / "src" / "Tabs.tsx"
+FULL_MATRIX_SPECS_FILE = REPO_ROOT / "prototypes" / "src" / "prototype-kit" / "full-matrix-specs.ts"
 MANIFEST_TOML = REPO_ROOT / "governance" / "visual-baselines" / "manifest.toml"
 BASELINE_DIR = REPO_ROOT / "governance" / "visual-baselines"
 
@@ -50,6 +51,12 @@ def _extract_tab_values_from_tabs_tsx(content: str) -> list[str]:
     return pattern.findall(content)
 
 
+def _extract_tab_values_from_full_matrix_specs(content: str) -> list[str]:
+    """抽取数据驱动全量矩阵 tab 的 slug 字符串。"""
+    pattern = re.compile(r'^\s*slug:\s*"([a-z0-9-]+)"', re.MULTILINE)
+    return pattern.findall(content)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--json", action="store_true")
@@ -68,9 +75,13 @@ def main() -> int:
                 print(f"  - {e}")
         return 1
 
-    tabs_tsx_values = _extract_tab_values_from_tabs_tsx(
-        TABS_FILE.read_text(encoding="utf-8")
-    )
+    tabs_tsx_values = _extract_tab_values_from_tabs_tsx(TABS_FILE.read_text(encoding="utf-8"))
+    if FULL_MATRIX_SPECS_FILE.exists():
+        tabs_tsx_values.extend(
+            _extract_tab_values_from_full_matrix_specs(
+                FULL_MATRIX_SPECS_FILE.read_text(encoding="utf-8")
+            )
+        )
     if not tabs_tsx_values:
         errors.append(f"Tabs.tsx 解析失败：未找到任何 tab value")
 

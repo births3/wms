@@ -88,3 +88,7 @@ scripts/governance/.cache/
 
 # mkdocs 构建产物
 site/
+
+# ---- Kiro CLI 本地工具配置（agent / commander / skill 定义） ----
+# kiro-cli 用，不是项目资产。每个开发机各自维护本地 .kiro/。
+.kiro/

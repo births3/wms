@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
-"""check_page_size.py — 页面级文件大小约束（300 警告 / 500 门禁）
+"""check_page_size.py — 页面/原型支撑组件文件大小约束（300 警告 / 500 门禁）
 
 类别：6. 原型治理
 Tier：T1（< 10s）
-输入：prototypes/src/pages/**/*.tsx
+输入：prototypes/src/pages/**/*.tsx + prototypes/src/prototype-kit/**/*.tsx
 输出：人类可读 + --json
 退出码：0 通过 / 1 违规（≥ 500 行）/ 2 脚本错误
 
 校验项（对照 docs/frontend-coding-standards.md §页面级大小约束）：
 - 单页面文件 ≥ 300 行 → warning（提示提取组件）
 - 单页面文件 ≥ 500 行 → error（强制提取组件）
+- 原型运行时支撑组件同样受约束，防止 UniversalPrototypePage 类模板绕过治理
 
 豁免方式：文件顶部加 `@governance: skip-page-size` 注释 + 理由
 
@@ -27,6 +28,7 @@ from pathlib import Path
 _THIS = Path(__file__).resolve()
 REPO_ROOT = _THIS.parent.parent.parent
 PAGES_DIR = REPO_ROOT / "prototypes" / "src" / "pages"
+PROTOTYPE_KIT_DIR = REPO_ROOT / "prototypes" / "src" / "prototype-kit"
 
 WARN_THRESHOLD = 300
 ERROR_THRESHOLD = 500
@@ -57,9 +59,12 @@ def run() -> tuple[list[str], list[str]]:
     """Returns (errors, warnings)"""
     errors: list[str] = []
     warnings: list[str] = []
-    if not PAGES_DIR.exists():
-        return (errors, warnings)
-    for f in sorted(PAGES_DIR.rglob("*.tsx")):
+    files: list[Path] = []
+    if PAGES_DIR.exists():
+        files.extend(PAGES_DIR.rglob("*.tsx"))
+    if PROTOTYPE_KIT_DIR.exists():
+        files.extend(PROTOTYPE_KIT_DIR.rglob("*.tsx"))
+    for f in sorted(files):
         if ".stories." in f.name or ".spec." in f.name or ".test." in f.name:
             continue
         lines, severity, is_error = _check_file(f)
