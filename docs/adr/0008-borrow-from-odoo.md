@@ -278,6 +278,8 @@ field_type = "regulatory_code"
 
 **Rust + TS 共享解析**：定义统一的 pattern matcher（前端 PDA 扫码也用同一算法）。
 
+> **边界澄清（2026-05-29）**：pattern matcher 是**通用条码解析基础设施**，并非追溯码专属。M-TC 是其首个/主要消费方，但 GS1-128 商品条码解析（如 M2 验收扫码取 GTIN/批号/效期）等**非追溯码场景同样复用同一 matcher**。表名 `trace_code_*` 为历史命名，实施时若非追溯码消费方增多，可将 nomenclature/rule 表与解析器泛化（去 `trace_code_` 前缀）；当前评估缺口仅命名级，不单列横向能力（见横向能力挖掘评估：H-SCAN 不够格独立）。其余扫码对象（容器 LPN / 库位码 / 单号）为唯一 ID 或固定结构，由 M-CG 生成 + 各模块查库，不经本 matcher。
+
 **成本**：2 周（数据模型 3 天 + Rust matcher 5 天 + TS 解析器 3 天 + M-TC 故事更新 1 天）。
 **实施 Wave**：Wave 4（M-TC 实施时）。
 
