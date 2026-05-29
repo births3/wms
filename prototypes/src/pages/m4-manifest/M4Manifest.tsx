@@ -59,13 +59,13 @@ export function M4Manifest() {
               ⇲ 另存为报表
             </Button>
             <Button variant="outline" size="sm">
-              <Mail className="h-4 w-4 mr-1" /> 邮件发送
+              <Mail data-icon="inline-start" /> 邮件发送
             </Button>
             <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-1" /> 下载 PDF
+              <Download data-icon="inline-start" /> 下载 PDF
             </Button>
             <Button size="sm">
-              <Printer className="h-4 w-4 mr-1" /> 打印
+              <Printer data-icon="inline-start" /> 打印
             </Button>
           </>
         }
@@ -169,7 +169,7 @@ export function M4Manifest() {
             <div className="mt-6 pt-4 border-t border-gray-400 flex items-center justify-between text-xs text-gray-600">
               <div>
                 <div>追溯码二维码：</div>
-                <div className="mt-1 w-16 h-16 bg-gray-300 inline-block flex items-center justify-center text-[10px]">
+                <div className="mt-1 size-16 bg-gray-300 inline-block flex items-center justify-center text-[10px]">
                   [QR]
                 </div>
               </div>
@@ -183,12 +183,12 @@ export function M4Manifest() {
         </PrintPreview>
 
         {/* 右侧：打印参数 + 法规说明 */}
-        <div className="space-y-4">
+        <div className="flex flex-col gap-4">
           <Card className="p-4">
             <div className="text-sm font-semibold mb-3 flex items-center gap-2">
-              <FileText className="h-4 w-4" /> 打印设置
+              <FileText data-icon="inline-start" /> 打印设置
             </div>
-            <div className="space-y-2 text-xs">
+            <div className="flex flex-col gap-2 text-xs">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">模板</span>
                 <span className="font-medium">A4 标准（210×297mm）</span>
@@ -210,7 +210,7 @@ export function M4Manifest() {
 
           <Card className="p-4">
             <div className="text-sm font-semibold mb-3">GSP 合规要点</div>
-            <ul className="text-xs space-y-1.5 text-muted-foreground">
+            <ul className="text-xs flex flex-col gap-1.5 text-muted-foreground">
               <li>✓ 含批号 / 生产日期 / 效期</li>
               <li>✓ 含生产企业 / 经营企业</li>
               <li>✓ 双方盖章位预留</li>

@@ -106,15 +106,15 @@ export function M1Suppliers() {
         const isExpiring = daysLeft < 90 && daysLeft > 0;
         const isExpired = daysLeft <= 0;
         return (
-          <div className="text-xs space-y-0.5">
+          <div className="text-xs flex flex-col gap-0.5">
             <div className="flex items-center gap-1">
-              <Calendar className="h-3 w-3 text-muted-foreground" />
+              <Calendar className="size-3 text-muted-foreground" />
               <span className={isExpired ? "text-destructive font-medium" : isExpiring ? "text-wms-warning font-medium" : ""}>
                 GSP {r.gspExpiresAt} ({isExpired ? "已过期" : `剩 ${daysLeft} 天`})
               </span>
             </div>
             <div className="flex items-center gap-1 text-muted-foreground">
-              <FileText className="h-3 w-3" />
+              <FileText className="size-3" />
               <span>营 {r.bizExpiresAt}</span>
             </div>
           </div>
@@ -128,7 +128,7 @@ export function M1Suppliers() {
         const color = r.score >= 90 ? "text-wms-success" : r.score >= 80 ? "text-wms-warning" : "text-destructive";
         return (
           <div className="flex items-center gap-1">
-            <Star className={`h-3.5 w-3.5 ${color} fill-current`} />
+            <Star className={`size-3.5 ${color} fill-current`} />
             <span className={`text-sm font-semibold ${color}`}>{r.score}</span>
             {r.recentIssues > 0 && (
               <span className="ml-1 text-[11px] text-destructive">异常 {r.recentIssues}</span>
@@ -175,7 +175,7 @@ export function M1Suppliers() {
             </Button>
             <Button variant="outline" size="sm">导出名册</Button>
             <Button size="sm">
-              <Plus className="h-4 w-4 mr-1" /> 新增供应商
+              <Plus data-icon="inline-start" /> 新增供应商
             </Button>
           </>
         }
@@ -183,7 +183,7 @@ export function M1Suppliers() {
 
       {/* 资质告警栏 */}
       <div className="mx-6 mt-4 p-3 bg-wms-warning/10 border border-wms-warning/30 rounded-md flex items-start gap-2">
-        <AlertTriangle className="h-4 w-4 text-wms-warning flex-shrink-0 mt-0.5" />
+        <AlertTriangle className="size-4 text-wms-warning flex-shrink-0 mt-0.5" />
         <div className="text-xs flex-1">
           <span className="font-medium text-wms-warning">证照预警</span>
           <span className="text-muted-foreground ml-2">
@@ -198,7 +198,7 @@ export function M1Suppliers() {
         <div>
           <label className="text-xs text-muted-foreground mb-1 block">搜索</label>
           <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
             <Input className="pl-9" placeholder="编码 / 公司名 / 法人" />
           </div>
         </div>

@@ -104,7 +104,7 @@ export function M6Purchase() {
         actions={
           <>
             <Button variant="outline" size="sm">
-              <Database className="h-4 w-4 mr-1" /> 数据签名验证
+              <Database data-icon="inline-start" /> 数据签名验证
             </Button>
             <Button size="sm">报表配置</Button>
           </>
@@ -144,7 +144,7 @@ export function M6Purchase() {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm">重置</Button>
-          <Button size="sm"><Search className="h-3.5 w-3.5 mr-1" /> 查询</Button>
+          <Button size="sm"><Search data-icon="inline-start" /> 查询</Button>
         </div>
       </div>
 
@@ -190,23 +190,23 @@ export function M6Purchase() {
         </div>
 
         {/* 右侧：导出 + 审计 + 合规 */}
-        <div className="space-y-4">
+        <div className="flex flex-col gap-4">
           <Card className="p-4">
             <div className="text-sm font-semibold mb-3 flex items-center gap-2">
-              <Download className="h-4 w-4" /> 导出报表
+              <Download data-icon="inline-start" /> 导出报表
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Button variant="outline" size="sm" className="w-full justify-start">
-                <FileText className="h-4 w-4 mr-2" /> 导出 PDF（含签字位）
+                <FileText data-icon="inline-start" /> 导出 PDF（含签字位）
               </Button>
               <Button variant="outline" size="sm" className="w-full justify-start">
-                <FileSpreadsheet className="h-4 w-4 mr-2" /> 导出 Excel（明细）
+                <FileSpreadsheet data-icon="inline-start" /> 导出 Excel（明细）
               </Button>
               <Button variant="outline" size="sm" className="w-full justify-start">
-                <Database className="h-4 w-4 mr-2" /> 导出 JSON（监管报送）
+                <Database data-icon="inline-start" /> 导出 JSON（监管报送）
               </Button>
             </div>
-            <div className="mt-3 pt-3 border-t text-xs text-muted-foreground space-y-1">
+            <div className="mt-3 pt-3 border-t text-xs text-muted-foreground flex flex-col gap-1">
               <div className="flex justify-between"><span>含明细</span><span>✓</span></div>
               <div className="flex justify-between"><span>含 MD5 签名</span><span>✓</span></div>
               <div className="flex justify-between"><span>双方盖章位</span><span>仅 PDF</span></div>
@@ -215,9 +215,9 @@ export function M6Purchase() {
 
           <Card className="p-4 bg-muted/30">
             <div className="text-sm font-semibold mb-2 flex items-center gap-2">
-              <Shield className="h-4 w-4" /> GSP 合规
+              <Shield data-icon="inline-start" /> GSP 合规
             </div>
-            <ul className="text-xs text-muted-foreground space-y-1">
+            <ul className="text-xs text-muted-foreground flex flex-col gap-1">
               <li>· 查询/导出写 H2 审计</li>
               <li>· MD5 签名防篡改</li>
               <li>· 留存 5 年（§95）</li>

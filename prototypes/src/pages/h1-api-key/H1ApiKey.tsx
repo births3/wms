@@ -95,11 +95,11 @@ export function H1ApiKey({ showCreated = false }: { showCreated?: boolean } = {}
       <PageHeader
         title="API Key 管理"
         subtitle="H1-006 / 外部系统对接密钥"
-        actions={<Button><Plus className="size-4" />创建 API Key</Button>}
+        actions={<Button><Plus data-icon="inline-start" />创建 API Key</Button>}
       />
 
       {showCreated && (
-        <Card className="p-4 mb-4 border-wms-warning bg-orange-50/50">
+        <Card className="p-4 mb-4 border-wms-warning bg-wms-warning/10">
           <div className="flex items-start gap-3">
             <Key className="size-5 text-wms-warning shrink-0 mt-0.5" />
             <div className="flex-1">
@@ -112,7 +112,7 @@ export function H1ApiKey({ showCreated = false }: { showCreated?: boolean } = {}
                   {revealCreated ? "wms_live_a3F2k9X7m1Z5p8Q4r6T2v0W8y3Z7" : "wms_live_a3F2…••••••••••••••••"}
                 </code>
                 <Button variant="outline" size="sm" onClick={() => setRevealCreated(!revealCreated)}>
-                  {revealCreated ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  {revealCreated ? <EyeOff data-icon="inline-start" /> : <Eye data-icon="inline-start" />}
                 </Button>
                 <Button variant="outline" size="sm"><Copy className="size-4" /></Button>
               </div>
@@ -124,11 +124,11 @@ export function H1ApiKey({ showCreated = false }: { showCreated?: boolean } = {}
       <Card className="p-6 mb-4">
         <h2 className="text-sm font-medium mb-3">创建新密钥</h2>
         <div className="grid grid-cols-3 gap-4 items-end">
-          <div className="space-y-1">
+          <div className="flex flex-col gap-1">
             <Label className="text-xs">名称</Label>
             <Input placeholder="如：ERP 集成主密钥" />
           </div>
-          <div className="space-y-1">
+          <div className="flex flex-col gap-1">
             <Label className="text-xs">权限范围</Label>
             <Select defaultValue="custom">
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -140,7 +140,7 @@ export function H1ApiKey({ showCreated = false }: { showCreated?: boolean } = {}
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1">
+          <div className="flex flex-col gap-1">
             <Label className="text-xs">有效期</Label>
             <Select defaultValue="180">
               <SelectTrigger><SelectValue /></SelectTrigger>

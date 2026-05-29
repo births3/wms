@@ -144,11 +144,11 @@ export function M1Items() {
       render: (r) =>
         r.qualDocsValid ? (
           <span className="text-xs text-wms-success flex items-center gap-1">
-            <FileText className="h-3 w-3" /> 完整
+            <FileText data-icon="inline-start" /> 完整
           </span>
         ) : (
           <span className="text-xs text-destructive flex items-center gap-1">
-            <FileText className="h-3 w-3" /> 缺失
+            <FileText data-icon="inline-start" /> 缺失
           </span>
         ),
     },
@@ -177,13 +177,13 @@ export function M1Items() {
               ⇲ 另存为报表
             </Button>
             <Button variant="outline" size="sm">
-              <Upload className="h-4 w-4 mr-1" /> 导入 Excel
+              <Upload data-icon="inline-start" /> 导入 Excel
             </Button>
             <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-1" /> 导出
+              <Download data-icon="inline-start" /> 导出
             </Button>
             <Button size="sm">
-              <Plus className="h-4 w-4 mr-1" /> 新增商品
+              <Plus data-icon="inline-start" /> 新增商品
             </Button>
           </>
         }
@@ -194,7 +194,7 @@ export function M1Items() {
         <div>
           <label className="text-xs text-muted-foreground mb-1 block">关键字搜索</label>
           <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
             <Input className="pl-9" placeholder="编码 / 品名 / 生产企业" />
           </div>
         </div>

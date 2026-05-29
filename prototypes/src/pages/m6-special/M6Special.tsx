@@ -113,10 +113,10 @@ export function M6Special() {
         actions={
           <>
             <Button variant="outline" size="sm">
-              <AlertOctagon className="h-4 w-4 mr-1" /> 缺签预警
+              <AlertOctagon data-icon="inline-start" /> 缺签预警
             </Button>
             <Button size="sm">
-              <Database className="h-4 w-4 mr-1" /> 上报 ERP
+              <Database data-icon="inline-start" /> 上报 ERP
             </Button>
           </>
         }
@@ -142,7 +142,7 @@ export function M6Special() {
 
       {/* 法规说明 */}
       <div className={`mx-6 mt-4 p-3 border rounded-md flex items-start gap-2 ${meta.color}`}>
-        <AlertOctagon className="h-4 w-4 flex-shrink-0 mt-0.5 text-destructive" />
+        <AlertOctagon className="size-4 flex-shrink-0 mt-0.5 text-destructive" />
         <div className="text-xs flex-1">
           <span className="font-medium">{meta.label} · {meta.clause}</span>
           <span className="text-muted-foreground ml-2">{meta.desc}</span>
@@ -171,7 +171,7 @@ export function M6Special() {
           </SelectContent></Select></div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm">重置</Button>
-          <Button size="sm"><Search className="h-3.5 w-3.5 mr-1" /> 查询</Button>
+          <Button size="sm"><Search data-icon="inline-start" /> 查询</Button>
         </div>
       </div>
 
@@ -215,28 +215,28 @@ export function M6Special() {
             5 笔记录全部含双人签字 ✓ · 月底已盘点 · 已上报 ERP（药监 EDI）
           </div>
         </div>
-        <div className="space-y-4">
+        <div className="flex flex-col gap-4">
           <Card className="p-4">
             <div className="text-sm font-semibold mb-3 flex items-center gap-2">
-              <Download className="h-4 w-4" /> 监管报送
+              <Download data-icon="inline-start" /> 监管报送
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Button variant="outline" size="sm" className="w-full justify-start">
-                <FileText className="h-4 w-4 mr-2" /> PDF（红色台账）
+                <FileText data-icon="inline-start" /> PDF（红色台账）
               </Button>
               <Button variant="outline" size="sm" className="w-full justify-start">
-                <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel
+                <FileSpreadsheet data-icon="inline-start" /> Excel
               </Button>
               <Button variant="outline" size="sm" className="w-full justify-start">
-                <Database className="h-4 w-4 mr-2" /> JSON（药监 EDI）
+                <Database data-icon="inline-start" /> JSON（药监 EDI）
               </Button>
             </div>
           </Card>
           <Card className="p-4 bg-muted/30">
             <div className="text-sm font-semibold mb-2 flex items-center gap-2">
-              <Shield className="h-4 w-4" /> 合规要点
+              <Shield data-icon="inline-start" /> 合规要点
             </div>
-            <ul className="text-xs text-muted-foreground space-y-1">
+            <ul className="text-xs text-muted-foreground flex flex-col gap-1">
               <li>· 双人签字强制（u001 + u002）</li>
               <li>· 月底必须盘点（5/30 已完成）</li>
               <li>· 上报 ERP → 国家药监</li>

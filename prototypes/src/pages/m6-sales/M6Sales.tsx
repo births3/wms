@@ -77,7 +77,7 @@ export function M6Sales() {
         subtitle="M6-002b · GSP §85 · 月度查询 + 多格式导出 · 一货一单留底"
         actions={
           <Button variant="outline" size="sm">
-            <Database className="h-4 w-4 mr-1" /> 数据签名验证
+            <Database data-icon="inline-start" /> 数据签名验证
           </Button>
         }
       />
@@ -103,7 +103,7 @@ export function M6Sales() {
           </SelectContent></Select></div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm">重置</Button>
-          <Button size="sm"><Search className="h-3.5 w-3.5 mr-1" /> 查询</Button>
+          <Button size="sm"><Search data-icon="inline-start" /> 查询</Button>
         </div>
       </div>
 
@@ -140,28 +140,28 @@ export function M6Sales() {
           <div className="mt-3 text-xs text-muted-foreground">显示 5 / 38 条 · 完整明细通过导出查看</div>
         </div>
 
-        <div className="space-y-4">
+        <div className="flex flex-col gap-4">
           <Card className="p-4">
             <div className="text-sm font-semibold mb-3 flex items-center gap-2">
-              <Download className="h-4 w-4" /> 导出
+              <Download data-icon="inline-start" /> 导出
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Button variant="outline" size="sm" className="w-full justify-start">
-                <FileText className="h-4 w-4 mr-2" /> 导出 PDF
+                <FileText data-icon="inline-start" /> 导出 PDF
               </Button>
               <Button variant="outline" size="sm" className="w-full justify-start">
-                <FileSpreadsheet className="h-4 w-4 mr-2" /> 导出 Excel
+                <FileSpreadsheet data-icon="inline-start" /> 导出 Excel
               </Button>
               <Button variant="outline" size="sm" className="w-full justify-start">
-                <Database className="h-4 w-4 mr-2" /> 导出 JSON（监管报送）
+                <Database data-icon="inline-start" /> 导出 JSON（监管报送）
               </Button>
             </div>
           </Card>
           <Card className="p-4 bg-muted/30">
             <div className="text-sm font-semibold mb-2 flex items-center gap-2">
-              <Shield className="h-4 w-4" /> GSP §85 合规
+              <Shield data-icon="inline-start" /> GSP §85 合规
             </div>
-            <ul className="text-xs text-muted-foreground space-y-1">
+            <ul className="text-xs text-muted-foreground flex flex-col gap-1">
               <li>· 出库时同步生成随货同行单</li>
               <li>· 含批号 / 效期 / 生产企业</li>
               <li>· 留存 5 年</li>

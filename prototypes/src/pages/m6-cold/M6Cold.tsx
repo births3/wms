@@ -75,7 +75,7 @@ export function M6Cold() {
         subtitle="M6-002d · GSP §64 · 月度温度记录 + 偏差登记 + 全程合规率"
         actions={
           <Button variant="outline" size="sm">
-            <Database className="h-4 w-4 mr-1" /> 数据签名
+            <Database data-icon="inline-start" /> 数据签名
           </Button>
         }
       />
@@ -102,7 +102,7 @@ export function M6Cold() {
           </SelectContent></Select></div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm">重置</Button>
-          <Button size="sm"><Search className="h-3.5 w-3.5 mr-1" /> 查询</Button>
+          <Button size="sm"><Search data-icon="inline-start" /> 查询</Button>
         </div>
       </div>
 
@@ -135,7 +135,7 @@ export function M6Cold() {
         <div className="flex items-center justify-between mb-3">
           <div>
             <div className="text-sm font-semibold flex items-center gap-2">
-              <Snowflake className="h-4 w-4 text-wms-cold" /> C 冷藏区 · 月度温度趋势
+              <Snowflake className="size-4 text-wms-cold" /> C 冷藏区 · 月度温度趋势
             </div>
             <div className="text-xs text-muted-foreground mt-0.5">每日均值 30 个 · 阈值 2-8℃</div>
           </div>
@@ -151,28 +151,28 @@ export function M6Cold() {
           </div>
           <DataTable columns={cols} data={EXCURSION_DATA} rowKey={(r) => r.time} />
         </div>
-        <div className="space-y-4">
+        <div className="flex flex-col gap-4">
           <Card className="p-4">
             <div className="text-sm font-semibold mb-3 flex items-center gap-2">
-              <Download className="h-4 w-4" /> 导出
+              <Download data-icon="inline-start" /> 导出
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Button variant="outline" size="sm" className="w-full justify-start">
-                <FileText className="h-4 w-4 mr-2" /> PDF（含温度曲线）
+                <FileText data-icon="inline-start" /> PDF（含温度曲线）
               </Button>
               <Button variant="outline" size="sm" className="w-full justify-start">
-                <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel（含原始 86400 点）
+                <FileSpreadsheet data-icon="inline-start" /> Excel（含原始 86400 点）
               </Button>
               <Button variant="outline" size="sm" className="w-full justify-start">
-                <Database className="h-4 w-4 mr-2" /> JSON（药监 EDI）
+                <Database data-icon="inline-start" /> JSON（药监 EDI）
               </Button>
             </div>
           </Card>
           <Card className="p-4 bg-muted/30">
             <div className="text-sm font-semibold mb-2 flex items-center gap-2">
-              <Shield className="h-4 w-4" /> GSP §64 合规
+              <Shield data-icon="inline-start" /> GSP §64 合规
             </div>
-            <ul className="text-xs text-muted-foreground space-y-1">
+            <ul className="text-xs text-muted-foreground flex flex-col gap-1">
               <li>· 每 5 分钟采样</li>
               <li>· 偏差登记 + 通知货主</li>
               <li>· 全程台账留 5 年</li>

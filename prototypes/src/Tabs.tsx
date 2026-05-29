@@ -36,6 +36,9 @@ import { M2Asn } from "./pages/m2-asn";
 import { M2Hours } from "./pages/m2-hours";
 import { M8StorageFeeRules } from "./pages/m8-storage-fee";
 import { M10InTransitTemp } from "./pages/m10-in-transit-temp";
+import { FULL_MATRIX_SPECS } from "./prototype-kit/full-matrix-specs";
+import type { MatrixPrototypeSpec } from "./prototype-kit/types";
+import { UniversalPrototypePage } from "./prototype-kit/UniversalPrototypePage";
 
 /**
  * tabs.tsx — 原型 tab 注册表（数据驱动）
@@ -44,8 +47,37 @@ import { M10InTransitTemp } from "./pages/m10-in-transit-temp";
  * 与 governance/visual-baselines/manifest.toml 的 tab 列表一一对应
  */
 
-export type Device = "pc" | "pda" | "pad" | "shared";
-export type Group = "组件" | "H1 权限审计" | "H2/H3 治理" | "M1 基础数据" | "M2 采购入库" | "M3 库存核心" | "M4 销售出库" | "M5 冷链监控" | "M6 GSP 报表" | "M8 计费 / M10 TMS";
+export type Device = "pc" | "pda" | "pad" | "h5" | "shared";
+export type Group =
+  | "组件"
+  | "H1 权限审计"
+  | "H2/H3 治理"
+  | "H4/H5 协同"
+  | "H-AL 告警"
+  | "H-DOCK 月台"
+  | "H-Driver 司机端"
+  | "H-Store 门店端"
+  | "M1 基础数据"
+  | "M2 采购入库"
+  | "M3 库存核心"
+  | "M4 销售出库"
+  | "M5 冷链监控"
+  | "M6 GSP 报表"
+  | "M8 连锁"
+  | "M9 计费"
+  | "M10 TMS"
+  | "M-TE 任务引擎"
+  | "M-RP 补货"
+  | "M-PK 包装站"
+  | "M-VR 规则"
+  | "M-QL 质量联系单"
+  | "M-SA 报损报溢"
+  | "M-RC 对账"
+  | "M-DI 药检单"
+  | "M-BA 批号调整"
+  | "M-TC 追溯码"
+  | "M-PM 参数对照"
+  | "M8 计费 / M10 TMS";
 
 export interface TabDef {
   value: string;
@@ -83,7 +115,7 @@ const stack = (top: ReactNode, topLabel: string, bottom: ReactNode, bottomLabel:
   </div>
 );
 
-export const TABS: TabDef[] = [
+const HAND_BUILT_TABS: TabDef[] = [
   // 组件
   { value: "gallery", label: "组件库", group: "组件", device: ["shared"],
     render: () => <ComponentsGallery /> },
@@ -179,10 +211,139 @@ export const TABS: TabDef[] = [
     render: () => wrap(<M10InTransitTemp />) },
 ];
 
+const HAND_BUILT_BY_VALUE = new Map(HAND_BUILT_TABS.map((tab) => [tab.value, tab]));
+
+const GROUP_BY_MODULE: Record<string, Group> = {
+  H1: "H1 权限审计",
+  H2: "H2/H3 治理",
+  H3: "H2/H3 治理",
+  H4: "H4/H5 协同",
+  H5: "H4/H5 协同",
+  AL: "H-AL 告警",
+  DOCK: "H-DOCK 月台",
+  DR: "H-Driver 司机端",
+  ST: "H-Store 门店端",
+  M1: "M1 基础数据",
+  M2: "M2 采购入库",
+  M3: "M3 库存核心",
+  M4: "M4 销售出库",
+  M5: "M5 冷链监控",
+  M6: "M6 GSP 报表",
+  M8: "M8 连锁",
+  M9: "M9 计费",
+  M10: "M10 TMS",
+  TE: "M-TE 任务引擎",
+  RP: "M-RP 补货",
+  PK: "M-PK 包装站",
+  VR: "M-VR 规则",
+  QL: "M-QL 质量联系单",
+  SA: "M-SA 报损报溢",
+  RC: "M-RC 对账",
+  DI: "M-DI 药检单",
+  BA: "M-BA 批号调整",
+  TC: "M-TC 追溯码",
+  MPM: "M-PM 参数对照",
+};
+
+const LEGACY_SLUGS: Record<string, string> = {
+  "pc-us-h1-001": "h1-login-pc",
+  "pda-us-h1-001": "h1-login-pda",
+  "pc-us-h1-002": "h1-role",
+  "pc-us-h1-005": "h1-token",
+  "pc-us-h1-006": "h1-apikey",
+  "pc-us-h2-002": "h2-audit",
+  "pc-us-h2-004": "h2-archive",
+  "pc-us-h2-006": "h2-archive",
+  "pc-us-h3-004": "h3-swagger",
+  "pc-us-m1-001": "m1-items",
+  "pc-us-m1-002": "m1-suppliers",
+  "pc-us-m1-004": "m1-locations",
+  "pc-us-m1-006": "h1-role",
+  "pc-us-m2-001": "m2-asn",
+  "pda-us-m2-002": "m2-tasks",
+  "pda-us-m2-003": "m2-accept",
+  "pda-us-m2-004": "m2-dual-sign",
+  "pda-us-m2-005": "m2-putaway",
+  "pda-us-m2-006": "m2-reject",
+  "pc-us-m2-008": "m2-kanban",
+  "pad-us-m2-008": "m2-kanban",
+  "pc-us-m2-009": "m2-hours",
+  "pc-us-m3-001": "m3-inventory",
+  "pda-us-m3-005": "m3-stocktake",
+  "pda-us-m4-003": "m4-picking",
+  "pda-us-m4-004": "m4-review",
+  "pc-us-m4-005": "m4-manifest",
+  "pda-us-m4-008": "m4-exception",
+  "pc-us-m5-002": "m5-cold",
+  "pc-us-m6-001": "m6-purchase",
+  "pc-us-m6-002": "m6-custom",
+  "pc-us-m6-003": "m6-custom",
+  "pc-us-m6-004": "m6-special",
+  "pc-us-m8-001": "m8-storage-fee",
+  "pc-us-m10-002": "m10-in-transit",
+};
+
+function legacyKeyFor(spec: MatrixPrototypeSpec) {
+  return `${spec.end}-${spec.storyId.toLowerCase()}`;
+}
+
+function MergedPrototypeNotice(props: {
+  spec: MatrixPrototypeSpec;
+  reusedSlug: string;
+  reusedLabel: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="rounded-md border bg-primary/5 px-4 py-3 flex items-center gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="text-xs font-mono text-primary">
+            {props.spec.storyId} · {props.spec.moduleCode} · GSP · merged prototype
+          </div>
+          <div className="text-sm font-medium truncate">
+            复用 {props.reusedLabel}
+          </div>
+          <div className="text-xs text-muted-foreground truncate">
+            矩阵备注：{props.spec.reason} · #{props.spec.slug} → #{props.reusedSlug}
+          </div>
+        </div>
+      </div>
+      {props.children}
+    </div>
+  );
+}
+
+function renderGeneratedTab(spec: MatrixPrototypeSpec) {
+  const reusedSlug = LEGACY_SLUGS[legacyKeyFor(spec)];
+  const reusedTab = reusedSlug ? HAND_BUILT_BY_VALUE.get(reusedSlug) : undefined;
+
+  if (reusedSlug && reusedTab) {
+    return () => wrap(
+      <MergedPrototypeNotice spec={spec} reusedSlug={reusedSlug} reusedLabel={reusedTab.label}>
+        {reusedTab.render()}
+      </MergedPrototypeNotice>
+    );
+  }
+
+  return () => wrap(<UniversalPrototypePage spec={spec} />);
+}
+
+const generatedTabs: TabDef[] = FULL_MATRIX_SPECS
+  .map((spec) => ({
+    value: spec.slug,
+    label: `${spec.storyId.replace("US-", "")} ${spec.title}`,
+    group: GROUP_BY_MODULE[spec.moduleCode] ?? "M-PM 参数对照",
+    device: [spec.end],
+    render: renderGeneratedTab(spec),
+  }));
+
+export const TABS: TabDef[] = [...HAND_BUILT_TABS, ...generatedTabs];
+
 export const DEVICE_META: Record<Device, { label: string; color: string }> = {
   pc: { label: "PC", color: "bg-primary/10 text-primary border-primary/20" },
   pda: { label: "PDA", color: "bg-wms-warning/10 text-wms-warning border-wms-warning/30" },
   pad: { label: "PAD", color: "bg-wms-cold/10 text-wms-cold border-wms-cold/30" },
+  h5: { label: "H5", color: "bg-wms-success/10 text-wms-success border-wms-success/30" },
   shared: { label: "通用", color: "bg-muted text-muted-foreground border-input" },
 };
 
@@ -190,11 +351,30 @@ export const GROUP_ORDER: Group[] = [
   "组件",
   "H1 权限审计",
   "H2/H3 治理",
+  "H4/H5 协同",
+  "H-AL 告警",
+  "H-DOCK 月台",
+  "H-Driver 司机端",
+  "H-Store 门店端",
   "M1 基础数据",
   "M2 采购入库",
   "M3 库存核心",
   "M4 销售出库",
   "M5 冷链监控",
   "M6 GSP 报表",
+  "M8 连锁",
+  "M9 计费",
+  "M10 TMS",
+  "M-TE 任务引擎",
+  "M-RP 补货",
+  "M-PK 包装站",
+  "M-VR 规则",
+  "M-QL 质量联系单",
+  "M-SA 报损报溢",
+  "M-RC 对账",
+  "M-DI 药检单",
+  "M-BA 批号调整",
+  "M-TC 追溯码",
+  "M-PM 参数对照",
   "M8 计费 / M10 TMS",
 ];

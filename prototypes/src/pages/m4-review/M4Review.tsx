@@ -42,8 +42,8 @@ export function M4Review() {
 
       {/* 顶栏 */}
       <div className="bg-background px-3 py-2 border-b flex items-center gap-2">
-        <Button variant="ghost" size="icon" className="h-8 w-8">
-          <ChevronLeft className="h-5 w-5" />
+        <Button variant="ghost" size="icon" className="size-8">
+          <ChevronLeft className="size-5" />
         </Button>
         <div className="flex-1">
           <div className="text-xs text-muted-foreground">M4-004 PDA 复核 · 第 1 行 / 共 11 行</div>
@@ -63,7 +63,7 @@ export function M4Review() {
         />
         {scanned && (
           <div className="mt-2 flex items-center gap-2 text-xs text-wms-success">
-            <CheckCircle2 className="h-4 w-4" />
+            <CheckCircle2 className="size-4" />
             <span>追溯码匹配 · 与拣货记录一致</span>
           </div>
         )}
@@ -96,7 +96,7 @@ export function M4Review() {
             }}
           />
           <div className="mt-3 flex items-center gap-2 text-xs text-wms-success">
-            <CheckCircle2 className="h-4 w-4" />
+            <CheckCircle2 className="size-4" />
             <span>本行复核通过 · 无差异</span>
           </div>
         </Card>

@@ -200,7 +200,7 @@ export function H2AuditQuery() {
 
 function FilterField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-1">
+    <div className="flex flex-col gap-1">
       <Label className="text-xs text-muted-foreground">{label}</Label>
       {children}
     </div>

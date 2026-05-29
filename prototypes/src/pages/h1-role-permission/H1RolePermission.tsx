@@ -135,8 +135,8 @@ export function H1RolePermission() {
         subtitle="H1-002 / M1-006 · 权限码层级 · 内置角色不可删"
         actions={
           <>
-            <Button variant="outline" size="sm"><Copy className="size-4" />复制为新角色</Button>
-            <Button size="sm"><Plus className="size-4" />新建角色</Button>
+            <Button variant="outline" size="sm"><Copy data-icon="inline-start" />复制为新角色</Button>
+            <Button size="sm"><Plus data-icon="inline-start" />新建角色</Button>
           </>
         }
       />
@@ -206,7 +206,7 @@ export function H1RolePermission() {
                     className="w-full px-4 py-2.5 bg-muted/20 hover:bg-muted/40 flex items-center justify-between text-left"
                   >
                     <div className="flex items-center gap-2">
-                      {open ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+                      {open ? <ChevronDown data-icon="inline-start" /> : <ChevronRight data-icon="inline-start" />}
                       <span className="text-sm font-medium">{g.module}</span>
                       <span className="text-xs text-muted-foreground">— {g.description}</span>
                     </div>

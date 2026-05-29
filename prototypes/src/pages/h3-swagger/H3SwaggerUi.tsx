@@ -73,7 +73,7 @@ export function H3SwaggerUi() {
         subtitle={`H3-004 · OpenAPI 3.1 · v1.0.0 · 共 ${total} 个端点 · ${deprecated} 个已弃用`}
         actions={
           <>
-            <Button variant="outline" size="sm"><FileJson className="size-4" />下载 openapi.json</Button>
+            <Button variant="outline" size="sm"><FileJson data-icon="inline-start" />下载 openapi.json</Button>
             <Button variant="outline" size="sm">Postman 导出</Button>
             <Button size="sm">尝试调用</Button>
           </>
@@ -112,7 +112,7 @@ export function H3SwaggerUi() {
         </Card>
 
         {/* 右侧端点列表 */}
-        <div className="space-y-4">
+        <div className="flex flex-col gap-4">
           {Object.entries(MOCK_ENDPOINTS).map(([group, items]) => (
             <Card key={group} className="p-0 overflow-hidden">
               <div className="px-4 py-3 bg-muted/40 border-b flex items-center justify-between">

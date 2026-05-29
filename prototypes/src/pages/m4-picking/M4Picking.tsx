@@ -59,8 +59,8 @@ export function M4Picking() {
 
       {/* 顶栏 */}
       <div className="bg-background px-3 py-2 border-b flex items-center gap-2">
-        <Button variant="ghost" size="icon" className="h-8 w-8">
-          <ChevronLeft className="h-5 w-5" />
+        <Button variant="ghost" size="icon" className="size-8">
+          <ChevronLeft className="size-5" />
         </Button>
         <div className="flex-1">
           <div className="text-xs text-muted-foreground">M4-003 PDA 拣货 · 单 SO-2026-0042</div>
@@ -108,7 +108,7 @@ export function M4Picking() {
               </div>
               <div>
                 <div className="text-muted-foreground flex items-center gap-1">
-                  <MapPin className="h-3 w-3" /> 库位
+                  <MapPin data-icon="inline-start" /> 库位
                 </div>
                 <div className="font-mono mt-0.5 text-primary font-semibold">{currentItem.location}</div>
               </div>
@@ -132,7 +132,7 @@ export function M4Picking() {
           <span>拣货清单（按 FIFO 排序）</span>
           <span className="font-mono">SO-2026-0042 · 11 件</span>
         </div>
-        <div className="space-y-1.5">
+        <div className="flex flex-col gap-1.5">
           {PICK_LIST.map((item) => (
             <Card
               key={item.line}
@@ -172,10 +172,10 @@ export function M4Picking() {
       {/* 底部 */}
       <div className="bg-background px-3 py-2 border-t flex gap-2">
         <Button variant="outline" className="flex-1 h-10">
-          <AlertTriangle className="h-4 w-4 mr-1" /> 异常
+          <AlertTriangle data-icon="inline-start" /> 异常
         </Button>
         <Button variant="outline" className="flex-1 h-10">
-          <Package className="h-4 w-4 mr-1" /> 短拣
+          <Package data-icon="inline-start" /> 短拣
         </Button>
         <Button className="flex-[2] h-10">提交本行</Button>
       </div>

@@ -71,8 +71,8 @@ export function M4Exception() {
 
       {/* 顶栏 */}
       <div className="bg-background px-3 py-2 border-b flex items-center gap-2">
-        <Button variant="ghost" size="icon" className="h-8 w-8">
-          <ChevronLeft className="h-5 w-5" />
+        <Button variant="ghost" size="icon" className="size-8">
+          <ChevronLeft className="size-5" />
         </Button>
         <div className="flex-1">
           <div className="text-xs text-muted-foreground">M4-006 异常处理</div>
@@ -83,7 +83,7 @@ export function M4Exception() {
 
       {/* 异常说明 */}
       <div className="bg-destructive/10 px-3 py-3 border-b border-destructive/30 flex items-start gap-2">
-        <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+        <AlertTriangle className="size-4 text-destructive flex-shrink-0 mt-0.5" />
         <div className="text-xs flex-1">
           <div className="font-semibold text-destructive">推荐库位 C-01-01-08 无货</div>
           <div className="text-muted-foreground mt-0.5">
@@ -101,7 +101,7 @@ export function M4Exception() {
       {/* 处理选项 */}
       <div className="flex-1 overflow-y-auto bg-muted/30 px-3 py-3">
         <div className="text-sm font-semibold mb-2">处理方式 <span className="text-destructive">*</span></div>
-        <div className="space-y-2">
+        <div className="flex flex-col gap-2">
           {RESOLUTIONS.map((r) => {
             const Icon = r.icon;
             const isPrimary = r.color === "primary";
@@ -125,7 +125,7 @@ export function M4Exception() {
                   />
                   <div className="flex-1">
                     <div className="flex items-center gap-1.5 mb-1">
-                      <Icon className={`h-4 w-4 ${
+                      <Icon className={`size-4 ${
                         isPrimary ? "text-primary" :
                         isDestructive ? "text-destructive" :
                         "text-muted-foreground"

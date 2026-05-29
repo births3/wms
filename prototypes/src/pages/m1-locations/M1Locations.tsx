@@ -59,7 +59,7 @@ export function M1Locations() {
             <Button variant="outline" size="sm">温区配置</Button>
             <Button variant="outline" size="sm">库位导入</Button>
             <Button size="sm">
-              <Plus className="h-4 w-4 mr-1" /> 新增库位
+              <Plus data-icon="inline-start" /> 新增库位
             </Button>
           </>
         }
@@ -83,7 +83,7 @@ export function M1Locations() {
                       </span>
                     </div>
                     <div className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Thermometer className="h-3 w-3" />
+                      <Thermometer className="size-3" />
                       <span>设定 {z.tempRange}</span>
                     </div>
                   </div>
@@ -129,15 +129,15 @@ export function M1Locations() {
           <div className="text-sm font-semibold">A 常温区 — 平面图（示意）</div>
           <div className="flex items-center gap-3 text-xs">
             <div className="flex items-center gap-1">
-              <span className="w-3 h-3 rounded bg-muted/50 border" />
+              <span className="size-3 rounded bg-muted/50 border" />
               <span>空闲</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="w-3 h-3 rounded bg-primary/30 border" />
+              <span className="size-3 rounded bg-primary/30 border" />
               <span>有货</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="w-3 h-3 rounded bg-destructive/30 border" />
+              <span className="size-3 rounded bg-destructive/30 border" />
               <span>满</span>
             </div>
           </div>
@@ -162,10 +162,10 @@ export function M1Locations() {
             })}
           </div>
           <div className="text-xs text-muted-foreground mt-3 flex items-center gap-3">
-            <MapPin className="h-3 w-3" />
+            <MapPin className="size-3" />
             <span>共 96 个库位（8 排 × 12 列）· hover 显示编码 / 点击查看库存</span>
             <span className="ml-auto flex items-center gap-1">
-              <Package className="h-3 w-3" /> 当前占用 53 / 96
+              <Package data-icon="inline-start" /> 当前占用 53 / 96
             </span>
           </div>
         </Card>

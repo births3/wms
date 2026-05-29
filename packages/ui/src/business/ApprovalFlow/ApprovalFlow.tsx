@@ -40,7 +40,7 @@ const STATUS_TO_BADGE: Record<ApprovalNodeStatus, { status: StatusKey; label: st
 export const ApprovalFlow = React.forwardRef<HTMLDivElement, ApprovalFlowProps>(
   ({ nodes, className, ...rest }, ref) => {
     return (
-      <div ref={ref} className={cn("space-y-3 font-sans", className)} {...rest}>
+      <div ref={ref} className={cn("flex flex-col gap-3 font-sans", className)} {...rest}>
         {nodes.map((n, i) => {
           const meta = STATUS_TO_BADGE[n.status];
           const isLast = i === nodes.length - 1;

@@ -94,13 +94,13 @@ export function M2Asn() {
         actions={
           <>
             <Button variant="outline" size="sm">
-              <Upload className="h-4 w-4 mr-1" /> 导入 EDI
+              <Upload data-icon="inline-start" /> 导入 EDI
             </Button>
             <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-1" /> 导出
+              <Download data-icon="inline-start" /> 导出
             </Button>
             <Button size="sm">
-              <Plus className="h-4 w-4 mr-1" /> 新建 ASN
+              <Plus data-icon="inline-start" /> 新建 ASN
             </Button>
           </>
         }
@@ -108,7 +108,7 @@ export function M2Asn() {
 
       {/* 提醒 */}
       <div className="mx-6 mt-4 p-3 bg-wms-warning/10 border border-wms-warning/30 rounded-md flex items-start gap-2">
-        <FileWarning className="h-4 w-4 text-wms-warning flex-shrink-0 mt-0.5" />
+        <FileWarning className="size-4 text-wms-warning flex-shrink-0 mt-0.5" />
         <div className="text-xs flex-1">
           <span className="font-medium text-wms-warning">2 张 ASN 提交超 24 小时未收货</span>
           <span className="text-muted-foreground ml-2">PO-2026-0026 / PO-2026-0029 · 请联系供应商或下发 PDA</span>
@@ -120,7 +120,7 @@ export function M2Asn() {
         <div className="col-span-2">
           <label className="text-xs text-muted-foreground mb-1 block">关键字</label>
           <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
             <Input className="pl-9" placeholder="ASN / 采购单号 / 供应商" />
           </div>
         </div>

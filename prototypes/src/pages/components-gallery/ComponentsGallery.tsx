@@ -44,7 +44,7 @@ import {
  */
 export function ComponentsGallery() {
   return (
-    <div className="max-w-[1280px] mx-auto space-y-6">
+    <div className="max-w-[1280px] mx-auto flex flex-col gap-6">
       <header className="bg-background border rounded-xl p-6">
         <h1 className="text-2xl font-semibold">业务复合组件库</h1>
         <p className="text-sm text-muted-foreground mt-1">
@@ -97,7 +97,7 @@ export function ComponentsGallery() {
         stories="覆盖：全部 PDA 故事"
       >
         <Subsection title="离线模式（含待同步计数）">
-          <div className="space-y-2">
+          <div className="flex flex-col gap-2">
             <OfflineIndicator state="online" pendingCount={3} />
             <OfflineIndicator state="offline" pendingCount={12} />
             <OfflineIndicator state="syncing" pendingCount={12} syncProgress={45} />
@@ -505,20 +505,20 @@ function Showcase({
   children: React.ReactNode;
 }) {
   return (
-    <Card className="p-6 space-y-4">
+    <Card className="p-6 flex flex-col gap-4">
       <div className="flex items-baseline gap-3 flex-wrap">
         <h2 className="text-lg font-semibold">{title}</h2>
         <span className="text-sm text-muted-foreground">{desc}</span>
         <span className="text-xs text-muted-foreground/80 ml-auto">{stories}</span>
       </div>
-      <div className="space-y-3">{children}</div>
+      <div className="flex flex-col gap-3">{children}</div>
     </Card>
   );
 }
 
 function Subsection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-2">
+    <div className="flex flex-col gap-2">
       <p className="text-xs font-medium text-muted-foreground">{title}</p>
       {children}
     </div>
@@ -529,7 +529,7 @@ function ScanInputDemo() {
   const [last, setLast] = useState<string>();
   const [mode, setMode] = useState<"scanner" | "camera" | "manual">("scanner");
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col gap-3">
       <Subsection title="完整交互（点'扫枪'按钮切换模式）">
         <div className="max-w-md">
           <ScanInput

@@ -87,16 +87,16 @@ export function M6Subscriptions() {
     },
     { key: "schedule", header: "周期",
       render: (r) => <div className="flex items-center gap-1 text-xs">
-        <Clock className="h-3 w-3 text-muted-foreground" />
+        <Clock className="size-3 text-muted-foreground" />
         {r.schedule}
       </div>
     },
     { key: "recipients", header: "收件人",
       render: (r) => (
-        <div className="text-xs space-y-0.5">
+        <div className="text-xs flex flex-col gap-0.5">
           {r.recipients.slice(0, 2).map((e) => (
             <div key={e} className="flex items-center gap-1">
-              <Mail className="h-3 w-3 text-muted-foreground" />
+              <Mail className="size-3 text-muted-foreground" />
               <span className="font-mono">{e}</span>
             </div>
           ))}
@@ -128,13 +128,13 @@ export function M6Subscriptions() {
       render: (r) => (
         <div className="flex gap-1">
           <Button variant="ghost" size="sm" className="h-7 px-2">
-            <Edit className="h-3 w-3" />
+            <Edit className="size-3" />
           </Button>
           <Button variant="ghost" size="sm" className="h-7 px-2">
-            {r.enabled ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+            {r.enabled ? <Pause data-icon="inline-start" /> : <Play data-icon="inline-start" />}
           </Button>
           <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive">
-            <Trash2 className="h-3 w-3" />
+            <Trash2 className="size-3" />
           </Button>
         </div>
       ),
@@ -165,7 +165,7 @@ export function M6Subscriptions() {
         subtitle="M6-005 · 定时触发 + 邮件分发 + 历史记录 · 含数据签名"
         actions={
           <Button size="sm">
-            <Plus className="h-4 w-4 mr-1" /> 新建订阅
+            <Plus data-icon="inline-start" /> 新建订阅
           </Button>
         }
       />
@@ -205,9 +205,9 @@ export function M6Subscriptions() {
         {/* 新建订阅表单（侧栏）*/}
         <Card className="p-4">
           <div className="text-sm font-semibold mb-3 flex items-center gap-2">
-            <Plus className="h-4 w-4" /> 新建订阅
+            <Plus data-icon="inline-start" /> 新建订阅
           </div>
-          <div className="space-y-2.5">
+          <div className="flex flex-col gap-2.5">
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">报表 *</label>
               <Select defaultValue="purchase">
@@ -267,7 +267,7 @@ export function M6Subscriptions() {
       <div className="px-6 py-4 border-t">
         <div className="flex items-center justify-between mb-2">
           <div className="text-sm font-semibold flex items-center gap-2">
-            <History className="h-4 w-4" /> 运行历史（最近 7 条）
+            <History data-icon="inline-start" /> 运行历史（最近 7 条）
           </div>
           <span className="text-xs text-muted-foreground">保留 30 天 · 含数据签名</span>
         </div>

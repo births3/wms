@@ -69,13 +69,13 @@ export function M8StorageFeeRules() {
         actions={
           <>
             <Button variant="outline" size="sm">
-              <PlayCircle className="h-4 w-4 mr-1" /> 测试运行
+              <PlayCircle data-icon="inline-start" /> 测试运行
             </Button>
             <Button variant="outline" size="sm">
-              <History className="h-4 w-4 mr-1" /> 历史版本
+              <History data-icon="inline-start" /> 历史版本
             </Button>
             <Button size="sm">
-              <Plus className="h-4 w-4 mr-1" /> 新增规则
+              <Plus data-icon="inline-start" /> 新增规则
             </Button>
           </>
         }
@@ -164,13 +164,13 @@ export function M8StorageFeeRules() {
         </div>
 
         {/* 右侧：历史版本 + 测试 */}
-        <div className="space-y-4">
+        <div className="flex flex-col gap-4">
           <Card className="p-4">
             <div className="text-sm font-semibold mb-3 flex items-center gap-2">
-              <FileCheck className="h-4 w-4" /> 测试运行
+              <FileCheck data-icon="inline-start" /> 测试运行
             </div>
             <div className="text-xs text-muted-foreground mb-3">用 2026-04 数据预演</div>
-            <div className="space-y-2 text-xs">
+            <div className="flex flex-col gap-2 text-xs">
               <div className="flex justify-between"><span className="text-muted-foreground">总计费货主</span><span>86</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">常温计费</span><span>¥1.42M</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">冷链计费</span><span className="text-wms-cold">¥0.44M</span></div>
@@ -183,7 +183,7 @@ export function M8StorageFeeRules() {
 
           <Card className="p-4">
             <div className="text-sm font-semibold mb-3">版本历史</div>
-            <div className="space-y-2.5 text-xs">
+            <div className="flex flex-col gap-2.5 text-xs">
               {HISTORY.map((h) => (
                 <div key={h.ver} className={`p-2 rounded border ${
                   h.status === "active" ? "border-primary/40 bg-primary/5" : ""

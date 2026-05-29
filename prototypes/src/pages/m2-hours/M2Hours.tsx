@@ -80,7 +80,7 @@ export function M2Hours() {
         subtitle="M2-009 · 月度工时分析 + 效率排行 + 异常追溯"
         actions={
           <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-1" /> 导出 Excel
+            <Download data-icon="inline-start" /> 导出 Excel
           </Button>
         }
       />
@@ -130,27 +130,27 @@ export function M2Hours() {
       <div className="px-6 py-4 border-b grid grid-cols-4 gap-3">
         <Card className="p-3">
           <div className="text-xs text-muted-foreground flex items-center gap-1">
-            <Package className="h-3 w-3" /> 总收货件数
+            <Package data-icon="inline-start" /> 总收货件数
           </div>
           <div className="text-2xl font-bold mt-1">28,640</div>
           <div className="text-[11px] text-wms-success mt-0.5">
-            <TrendingUp className="h-3 w-3 inline" /> +12.4% vs 上月
+            <TrendingUp className="size-3 inline" /> +12.4% vs 上月
           </div>
         </Card>
         <Card className="p-3">
           <div className="text-xs text-muted-foreground flex items-center gap-1">
-            <Clock className="h-3 w-3" /> 总工时
+            <Clock data-icon="inline-start" /> 总工时
           </div>
           <div className="text-2xl font-bold mt-1">126.8 <span className="text-sm font-normal">h</span></div>
           <div className="text-[11px] text-muted-foreground mt-0.5">31 个工作日</div>
         </Card>
         <Card className="p-3">
           <div className="text-xs text-muted-foreground flex items-center gap-1">
-            <Users className="h-3 w-3" /> 平均效率
+            <Users data-icon="inline-start" /> 平均效率
           </div>
           <div className="text-2xl font-bold mt-1">226 <span className="text-sm font-normal text-muted-foreground">件/h</span></div>
           <div className="text-[11px] text-wms-success mt-0.5">
-            <TrendingUp className="h-3 w-3 inline" /> +8.2%
+            <TrendingUp className="size-3 inline" /> +8.2%
           </div>
         </Card>
         <Card className="p-3">

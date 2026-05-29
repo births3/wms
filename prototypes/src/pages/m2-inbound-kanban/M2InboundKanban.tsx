@@ -76,8 +76,8 @@ export function M2InboundKanban() {
         subtitle={`M2-008 · 实时刷新 · 共 ${COLUMNS.reduce((a, c) => a + c.items.length, 0)} 个 ASN · 最近刷新 2 秒前 · GSP §73 收货全流程`}
         actions={
           <>
-            <Button variant="outline" size="sm"><RefreshCw className="size-3.5" />手动刷新</Button>
-            <Button variant="outline" size="sm"><Maximize2 className="size-3.5" />全屏大屏</Button>
+            <Button variant="outline" size="sm"><RefreshCw data-icon="inline-start" />手动刷新</Button>
+            <Button variant="outline" size="sm"><Maximize2 data-icon="inline-start" />全屏大屏</Button>
           </>
         }
       />
@@ -85,7 +85,7 @@ export function M2InboundKanban() {
       {/* 筛选栏 */}
       <Card className="p-3 mb-4">
         <div className="grid grid-cols-[200px_200px_200px_1fr_auto] gap-3 items-end">
-          <div className="space-y-1">
+          <div className="flex flex-col gap-1">
             <Label className="text-xs">货主</Label>
             <Select defaultValue="all">
               <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
@@ -96,7 +96,7 @@ export function M2InboundKanban() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1">
+          <div className="flex flex-col gap-1">
             <Label className="text-xs">月台</Label>
             <Select defaultValue="all">
               <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
@@ -107,7 +107,7 @@ export function M2InboundKanban() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1">
+          <div className="flex flex-col gap-1">
             <Label className="text-xs">优先级</Label>
             <Select defaultValue="all">
               <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>

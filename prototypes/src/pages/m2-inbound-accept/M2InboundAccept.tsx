@@ -60,8 +60,8 @@ export function M2InboundAccept() {
 
       {/* 顶栏 */}
       <div className="bg-background px-3 py-2 border-b flex items-center gap-2">
-        <Button variant="ghost" size="icon" className="h-8 w-8">
-          <ChevronLeft className="h-5 w-5" />
+        <Button variant="ghost" size="icon" className="size-8">
+          <ChevronLeft className="size-5" />
         </Button>
         <div className="flex-1">
           <div className="text-xs text-muted-foreground">M2-003 PDA 验收（步骤 6/14）</div>
@@ -109,7 +109,7 @@ export function M2InboundAccept() {
 
         {/* 异常提示 */}
         <div className="mt-3 flex items-start gap-2 p-3 bg-wms-warning/10 rounded-md border border-wms-warning/30">
-          <AlertTriangle className="h-4 w-4 text-wms-warning flex-shrink-0 mt-0.5" />
+          <AlertTriangle className="size-4 text-wms-warning flex-shrink-0 mt-0.5" />
           <div className="text-xs">
             <div className="font-medium text-wms-warning">效期 &lt; 12 个月</div>
             <div className="text-muted-foreground mt-0.5">需双人复核签字，自动跳转 M2-004</div>

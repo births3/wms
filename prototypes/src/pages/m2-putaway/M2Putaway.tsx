@@ -49,8 +49,8 @@ export function M2Putaway() {
 
       {/* 顶栏 */}
       <div className="bg-background px-3 py-2 border-b flex items-center gap-2">
-        <Button variant="ghost" size="icon" className="h-8 w-8">
-          <ChevronLeft className="h-5 w-5" />
+        <Button variant="ghost" size="icon" className="size-8">
+          <ChevronLeft className="size-5" />
         </Button>
         <div className="flex-1">
           <div className="text-xs text-muted-foreground">M2-005 PDA 上架</div>
@@ -97,7 +97,7 @@ export function M2Putaway() {
       <div className="flex-1 overflow-y-auto bg-muted/30 px-3 py-3">
         <div className="text-xs text-muted-foreground mb-2">② 选择库位（GSP 温区匹配 + FIFO）</div>
 
-        <div className="space-y-2 mb-3">
+        <div className="flex flex-col gap-2 mb-3">
           {SUGGESTED.map((loc) => (
             <Card
               key={loc.code}
@@ -108,7 +108,7 @@ export function M2Putaway() {
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-primary" />
+                  <MapPin className="size-4 text-primary" />
                   <span className="font-mono text-sm font-semibold">{loc.code}</span>
                   {loc.recommended && (
                     <span className="text-[11px] px-1.5 py-0.5 bg-wms-success/10 text-wms-success rounded font-medium">
@@ -121,7 +121,7 @@ export function M2Putaway() {
               <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1.5">
                 <span>{loc.area}</span>
                 <span className="flex items-center gap-1">
-                  <Thermometer className="h-3 w-3" />
+                  <Thermometer className="size-3" />
                   {loc.zone}
                 </span>
               </div>

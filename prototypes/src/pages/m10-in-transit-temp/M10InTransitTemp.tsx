@@ -80,7 +80,7 @@ export function M10InTransitTemp() {
         actions={
           <>
             <Button variant="outline" size="sm">
-              <Phone className="h-4 w-4 mr-1" /> 联系司机
+              <Phone data-icon="inline-start" /> 联系司机
             </Button>
             <Button variant="outline" size="sm">导出温度记录</Button>
           </>
@@ -115,7 +115,7 @@ export function M10InTransitTemp() {
                   )}
                 </div>
                 <div className="flex items-baseline gap-2 mt-2">
-                  <Snowflake className="h-4 w-4 text-wms-cold flex-shrink-0" />
+                  <Snowflake className="size-4 text-wms-cold flex-shrink-0" />
                   <span className={`text-2xl font-bold ${
                     s.status === "warning" ? "text-wms-warning" : "text-wms-cold"
                   }`}>{s.current}</span>
@@ -123,11 +123,11 @@ export function M10InTransitTemp() {
                   <span className="ml-auto text-[11px] text-muted-foreground">阈值 {s.min}-{s.max}℃</span>
                 </div>
                 <div className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
-                  <MapPin className="h-3 w-3" />
+                  <MapPin className="size-3" />
                   <span className="truncate">{s.route}</span>
                 </div>
                 <div className="text-[11px] text-muted-foreground mt-1 flex items-center gap-2">
-                  <Truck className="h-3 w-3" />
+                  <Truck className="size-3" />
                   <span>出发 {s.startAt}</span>
                   <span>ETA {s.eta}</span>
                 </div>
@@ -149,7 +149,7 @@ export function M10InTransitTemp() {
           {ship.status === "warning" && (
             <div className="flex items-center gap-2">
               <span className="text-xs text-wms-warning flex items-center gap-1">
-                <AlertTriangle className="h-3 w-3" /> 1 次偏差，需登记
+                <AlertTriangle data-icon="inline-start" /> 1 次偏差，需登记
               </span>
               <Button variant="outline" size="sm">登记偏差</Button>
             </div>
@@ -167,7 +167,7 @@ export function M10InTransitTemp() {
       <div className="px-6 py-4 grid grid-cols-2 gap-4">
         <Card className="p-4 bg-muted/30">
           <div className="text-sm font-semibold mb-2">GSP 第 64 条 · 全程台账</div>
-          <ul className="text-xs text-muted-foreground space-y-1">
+          <ul className="text-xs text-muted-foreground flex flex-col gap-1">
             <li>· 全程温度记录（每 5 分钟一点）</li>
             <li>· 出发-到货完整时段</li>
             <li>· 偏差需登记 + 通知货主</li>
@@ -178,7 +178,7 @@ export function M10InTransitTemp() {
 
         <Card className="p-4 border-wms-warning/40 bg-wms-warning/5">
           <div className="text-sm font-semibold mb-2 text-wms-warning">本月偏差汇总</div>
-          <div className="text-xs space-y-1.5">
+          <div className="text-xs flex flex-col gap-1.5">
             <div className="flex justify-between">
               <span className="text-muted-foreground">在途偏差次数</span>
               <span className="font-semibold">3 次</span>

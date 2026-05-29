@@ -131,8 +131,8 @@ export function H2Archive() {
         subtitle="H2-004 审计归档 / H2-006 业务数据生命周期 · GSP 法定保留"
         actions={
           <>
-            <Button variant="outline" size="sm"><Archive className="size-4" />手动触发归档</Button>
-            <Button size="sm"><Plus className="size-4" />新建规则</Button>
+            <Button variant="outline" size="sm"><Archive data-icon="inline-start" />手动触发归档</Button>
+            <Button size="sm"><Plus data-icon="inline-start" />新建规则</Button>
           </>
         }
       />
@@ -159,7 +159,7 @@ export function H2Archive() {
           rowKey={(r) => r.id}
           caption={
             <div className="grid grid-cols-4 gap-4 items-end">
-              <div className="space-y-1">
+              <div className="flex flex-col gap-1">
                 <Label className="text-xs">数据范围</Label>
                 <Select defaultValue="all">
                   <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
@@ -170,7 +170,7 @@ export function H2Archive() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1">
+              <div className="flex flex-col gap-1">
                 <Label className="text-xs">保留年限</Label>
                 <Select defaultValue="all">
                   <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
@@ -181,7 +181,7 @@ export function H2Archive() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1">
+              <div className="flex flex-col gap-1">
                 <Label className="text-xs">状态</Label>
                 <Select defaultValue="all">
                   <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>

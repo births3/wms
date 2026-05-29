@@ -48,7 +48,7 @@ export const DualSignPanel = React.forwardRef<HTMLDivElement, DualSignPanelProps
     ].filter((s) => s.show);
 
     return (
-      <div ref={ref} className={cn("space-y-3 font-sans", className)} {...rest}>
+      <div ref={ref} className={cn("flex flex-col gap-3 font-sans", className)} {...rest}>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <UserCheck className="size-3.5" />
           <span>签字策略：{POLICY_LABEL[policy]}</span>
@@ -82,7 +82,7 @@ function Slot({ label, slot }: { label: string; slot?: DualSignSlot }) {
         )}
       </div>
       {signed && slot ? (
-        <div className="mt-2 space-y-1">
+        <div className="mt-2 flex flex-col gap-1">
           <div className="flex items-center gap-1.5 text-sm font-medium">
             <Check className="size-3.5 text-wms-success" />
             {slot.user}

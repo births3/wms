@@ -76,10 +76,10 @@ export function M5ColdMonitor() {
         actions={
           <>
             <Button variant="outline" size="sm">
-              <Bell className="h-4 w-4 mr-1" /> 告警配置
+              <Bell data-icon="inline-start" /> 告警配置
             </Button>
             <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-1" /> 导出温度记录
+              <Download data-icon="inline-start" /> 导出温度记录
             </Button>
           </>
         }
@@ -102,7 +102,7 @@ export function M5ColdMonitor() {
               <div className="flex items-start justify-between mb-2">
                 <div>
                   <div className="flex items-center gap-1.5">
-                    <Snowflake className="h-4 w-4 text-wms-cold" />
+                    <Snowflake className="size-4 text-wms-cold" />
                     <span className="font-semibold text-base">{z.name}</span>
                     <span className="text-[11px] px-1.5 py-0.5 bg-background border rounded font-medium">{z.type}</span>
                   </div>
@@ -158,13 +158,13 @@ export function M5ColdMonitor() {
           <div className="text-sm font-semibold">最近 24 小时温度事件</div>
           <span className="text-xs text-muted-foreground">3 条 · 全部已确认</span>
         </div>
-        <div className="space-y-2">
+        <div className="flex flex-col gap-2">
           {ALERTS.map((alert, i) => (
             <Card key={i} className={`p-3 ${
               alert.severity === "warning" ? "border-wms-warning/30 bg-wms-warning/5" : ""
             }`}>
               <div className="flex items-start gap-3">
-                <AlertTriangle className={`h-4 w-4 flex-shrink-0 mt-0.5 ${
+                <AlertTriangle className={`size-4 flex-shrink-0 mt-0.5 ${
                   alert.severity === "warning" ? "text-wms-warning" : "text-muted-foreground"
                 }`} />
                 <div className="flex-1">

@@ -57,11 +57,11 @@ const OP_LABEL: Record<RuleCondition["op"], string> = {
 export const RuleEditor = React.forwardRef<HTMLDivElement, RuleEditorProps>(
   ({ groups, actions, readOnly, className, ...rest }, ref) => {
     return (
-      <div ref={ref} className={cn("space-y-4 font-sans", className)} {...rest}>
+      <div ref={ref} className={cn("flex flex-col gap-4 font-sans", className)} {...rest}>
         {/* 条件区 */}
         <div>
           <div className="text-xs text-muted-foreground mb-2 font-medium uppercase tracking-wide">条件（IF）</div>
-          <div className="space-y-2">
+          <div className="flex flex-col gap-2">
             {groups.map((g, gi) => (
               <React.Fragment key={gi}>
                 <div className="rounded-md border bg-background p-3">
@@ -73,7 +73,7 @@ export const RuleEditor = React.forwardRef<HTMLDivElement, RuleEditorProps>(
                       </Button>
                     )}
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="flex flex-col gap-1.5">
                     {g.conditions.map((c, ci) => (
                       <div key={ci} className="flex items-center gap-2 text-sm">
                         {ci > 0 && (
@@ -113,7 +113,7 @@ export const RuleEditor = React.forwardRef<HTMLDivElement, RuleEditorProps>(
         {/* 动作区 */}
         <div>
           <div className="text-xs text-muted-foreground mb-2 font-medium uppercase tracking-wide">动作（THEN）</div>
-          <div className="space-y-2">
+          <div className="flex flex-col gap-2">
             {actions.map((a, i) => (
               <div key={i} className="rounded-md border bg-background p-3">
                 <div className="flex items-center justify-between">

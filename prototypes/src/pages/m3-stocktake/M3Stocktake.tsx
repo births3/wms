@@ -42,8 +42,8 @@ export function M3Stocktake() {
 
       {/* 顶栏 */}
       <div className="bg-background px-3 py-2 border-b flex items-center gap-2">
-        <Button variant="ghost" size="icon" className="h-8 w-8">
-          <ChevronLeft className="h-5 w-5" />
+        <Button variant="ghost" size="icon" className="size-8">
+          <ChevronLeft className="size-5" />
         </Button>
         <div className="flex-1">
           <div className="text-xs text-muted-foreground">M3-005 PDA 盘点 · 第 8 / 24 库位</div>
@@ -69,7 +69,7 @@ export function M3Stocktake() {
       {/* 当前库位 */}
       <div className="bg-background px-3 py-3 border-b">
         <div className="flex items-center gap-2 mb-3">
-          <MapPin className="h-5 w-5 text-primary" />
+          <MapPin className="size-5 text-primary" />
           <div className="font-mono text-base font-semibold">A-01-02-03</div>
           <span className="text-[11px] px-1.5 py-0.5 bg-muted rounded text-muted-foreground">
             常温区 22.3℃
@@ -129,7 +129,7 @@ export function M3Stocktake() {
         {/* 双盘信息 */}
         <Card className="p-3 mt-3">
           <div className="text-sm font-semibold mb-2">双盘记录</div>
-          <div className="text-xs space-y-1.5">
+          <div className="text-xs flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">第一盘 · 张三 (u001)</span>
               <span className="font-medium">478 瓶 · 10:15:42</span>

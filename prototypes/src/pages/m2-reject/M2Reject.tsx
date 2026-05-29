@@ -49,8 +49,8 @@ export function M2Reject() {
 
       {/* 顶栏 */}
       <div className="bg-background px-3 py-2 border-b flex items-center gap-2">
-        <Button variant="ghost" size="icon" className="h-8 w-8">
-          <ChevronLeft className="h-5 w-5" />
+        <Button variant="ghost" size="icon" className="size-8">
+          <ChevronLeft className="size-5" />
         </Button>
         <div className="flex-1">
           <div className="text-xs text-muted-foreground">M2-006 拒收登记</div>
@@ -67,7 +67,7 @@ export function M2Reject() {
       {/* 拒收原因 */}
       <div className="bg-background px-3 py-3 border-b">
         <div className="text-sm font-semibold mb-2">拒收原因 <span className="text-destructive">*</span></div>
-        <div className="space-y-1.5">
+        <div className="flex flex-col gap-1.5">
           {REJECT_REASONS.map((r) => (
             <label
               key={r.code}
@@ -110,7 +110,7 @@ export function M2Reject() {
             <span className="text-xs text-muted-foreground">📷 2</span>
           </Card>
           <Card className="aspect-square flex items-center justify-center border-dashed cursor-pointer">
-            <Camera className="h-6 w-6 text-muted-foreground" />
+            <Camera className="size-6 text-muted-foreground" />
           </Card>
         </div>
         <div className="text-xs text-muted-foreground mt-2">已拍 {photos}/2 张 ✓</div>
@@ -133,7 +133,7 @@ export function M2Reject() {
           }}
         />
         <div className="mt-3 flex items-start gap-2 p-3 bg-destructive/10 rounded-md border border-destructive/30">
-          <FileX className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+          <FileX className="size-4 text-destructive flex-shrink-0 mt-0.5" />
           <div className="text-xs">
             <div className="font-medium text-destructive">提交后将自动</div>
             <div className="text-muted-foreground mt-1">

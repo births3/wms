@@ -163,7 +163,7 @@ export function M3Inventory() {
               ⇲ 另存为报表
             </Button>
             <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-1" /> 导出
+              <Download data-icon="inline-start" /> 导出
             </Button>
             <Button size="sm">高级查询</Button>
           </>
@@ -174,7 +174,7 @@ export function M3Inventory() {
       <div className="px-6 py-4 border-b grid grid-cols-5 gap-3">
         <Card className="p-3">
           <div className="text-xs text-muted-foreground flex items-center gap-1">
-            <Package className="h-3 w-3" /> 总品规
+            <Package data-icon="inline-start" /> 总品规
           </div>
           <div className="text-xl font-bold mt-1">2,348</div>
         </Card>
@@ -184,19 +184,19 @@ export function M3Inventory() {
         </Card>
         <Card className="p-3 border-wms-warning/40 bg-wms-warning/5">
           <div className="text-xs text-wms-warning flex items-center gap-1">
-            <AlertTriangle className="h-3 w-3" /> 近效期
+            <AlertTriangle data-icon="inline-start" /> 近效期
           </div>
           <div className="text-xl font-bold mt-1 text-wms-warning">42</div>
         </Card>
         <Card className="p-3 border-destructive/40 bg-destructive/5">
           <div className="text-xs text-destructive flex items-center gap-1">
-            <Lock className="h-3 w-3" /> 隔离/不合格
+            <Lock data-icon="inline-start" /> 隔离/不合格
           </div>
           <div className="text-xl font-bold mt-1 text-destructive">8</div>
         </Card>
         <Card className="p-3 border-wms-cold/40 bg-wms-cold/5">
           <div className="text-xs text-wms-cold flex items-center gap-1">
-            <Snowflake className="h-3 w-3" /> 冷链占比
+            <Snowflake data-icon="inline-start" /> 冷链占比
           </div>
           <div className="text-xl font-bold mt-1 text-wms-cold">7.9%</div>
         </Card>
@@ -207,7 +207,7 @@ export function M3Inventory() {
         <div className="col-span-2">
           <label className="text-xs text-muted-foreground mb-1 block">关键字</label>
           <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
             <Input className="pl-9" placeholder="品名 / 编码 / 批号 / 库位" />
           </div>
         </div>

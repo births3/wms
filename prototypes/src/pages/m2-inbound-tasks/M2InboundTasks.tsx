@@ -101,7 +101,7 @@ export function M2InboundTasks() {
       {/* 搜索栏 */}
       <div className="bg-background px-4 py-2 border-b">
         <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
           <input
             placeholder="搜索 ASN / 供应商"
             className="w-full pl-9 pr-3 py-2 text-sm rounded-md border bg-background"
@@ -110,7 +110,7 @@ export function M2InboundTasks() {
       </div>
 
       {/* 任务列表 */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-2">
+      <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
         {TASKS.map((task) => (
           <Card
             key={task.asn}
@@ -143,7 +143,7 @@ export function M2InboundTasks() {
 
             <div className="flex items-center gap-3 text-xs text-muted-foreground mt-2">
               <div className="flex items-center gap-1">
-                <Package className="h-3 w-3" />
+                <Package className="size-3" />
                 <span>{task.itemCount} 项 · {task.totalQty} 件</span>
               </div>
               <div className={task.isOverdue ? "text-destructive font-medium" : ""}>
@@ -157,7 +157,7 @@ export function M2InboundTasks() {
               className="w-full mt-3 h-9"
             >
               {task.status === "in_progress" ? "继续收货" : "开始收货"}
-              <ArrowRight className="h-4 w-4 ml-1" />
+              <ArrowRight className="size-4 ml-1" />
             </Button>
           </Card>
         ))}

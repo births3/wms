@@ -38,7 +38,7 @@ export const AuditTimeline = React.forwardRef<HTMLDivElement, AuditTimelineProps
       <div ref={ref} className={cn("relative font-sans", className)} {...rest}>
         {/* 竖线 */}
         <div className="absolute left-[15px] top-2 bottom-2 w-px bg-border" aria-hidden />
-        <ol className="space-y-4">
+        <ol className="flex flex-col gap-4">
           {events.map((e) => {
             const expanded = expandedId === e.id;
             return (

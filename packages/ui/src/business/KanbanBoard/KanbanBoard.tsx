@@ -69,7 +69,7 @@ export const KanbanBoard = React.forwardRef<HTMLDivElement, KanbanBoardProps>(
                 {col.count ?? col.items.length}
               </span>
             </div>
-            <div className="flex-1 p-2 space-y-2 overflow-auto">
+            <div className="flex-1 p-2 flex flex-col gap-2 overflow-auto">
               {col.items.map((card) => (
                 <button
                   key={card.id}

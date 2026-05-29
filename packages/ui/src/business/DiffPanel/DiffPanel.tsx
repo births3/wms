@@ -43,7 +43,7 @@ export const DiffPanel = React.forwardRef<HTMLDivElement, DiffPanelProps>(
 
     if (layout === "stacked") {
       return (
-        <div ref={ref} className={cn("space-y-1", className)} {...rest}>
+        <div ref={ref} className={cn("flex flex-col gap-1", className)} {...rest}>
           {allKeys.map((k) => {
             const isChanged = changed(k);
             return (
@@ -52,7 +52,7 @@ export const DiffPanel = React.forwardRef<HTMLDivElement, DiffPanelProps>(
                 className={cn(
                   "rounded-sm px-3 py-1.5 text-sm",
                   highlightChanged && isChanged
-                    ? "bg-orange-50 border-l-[3px] border-wms-warning"
+                    ? "bg-wms-warning/10 border-l-[3px] border-wms-warning"
                     : "bg-muted border-l-[3px] border-transparent"
                 )}
               >
@@ -100,7 +100,7 @@ function DiffPane({
     <div
       className={cn(
         "rounded-md border p-3 text-xs",
-        isBefore ? "bg-red-50 border-destructive/40" : "bg-green-50 border-wms-success/40"
+        isBefore ? "bg-destructive/10 border-destructive/40" : "bg-wms-success/10 border-wms-success/40"
       )}
     >
       <div className="font-medium text-foreground/80 mb-1.5">{title}</div>
