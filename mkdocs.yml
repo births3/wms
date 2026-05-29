@@ -67,10 +67,15 @@ plugins:
         - zh
         - en
 
+# Hooks
+hooks:
+  - scripts/mkdocs_copy_md_hook.py
+
 # 导航树
 nav:
   - 首页: index.md
   - 系统蓝图: wms-blueprint-outline.md
+  - 功能范围说明书: wms-scope-spec.md
   - 业务故事:
     - M1 基础档案:
       - 商品/供应商/客户: domain/user-stories-m1-master-data-product.md
@@ -132,6 +137,15 @@ nav:
     - ADR-0016 部署形态: adr/0016-deployment.md
     - ADR-0018 弹性工程: adr/0018-resilience-engineering.md
     - ADR-0019 货主自定义属性: adr/0019-tenant-custom-fields.md
+    - ADR-0021 高保真原型策略: adr/0021-high-fidelity-prototype-strategy.md
+    - ADR-0022 原型组件规范: adr/0022-prototype-component-spec.md
+    - ADR-0023 业务报表策略: adr/0023-business-report-strategy.md
+    - ADR-0028 组件库抽离: adr/0028-component-library-extraction.md
+    - ADR-0029 前端原型先行: adr/0029-frontend-as-prototype-workflow.md
+    - ADR-0030 统一外部集成能力: adr/0030-integration-capability.md
+    - ADR-0031 H-FILE 附件能力: adr/0031-file-attachment-capability.md
+    - ADR-0032 H-APV 审批引擎: adr/0032-approval-engine.md
+    - ADR-0033 H-SCH 调度引擎: adr/0033-scheduler-engine.md
   - 架构与领域:
     - 模块依赖图: architecture-dependencies.md
     - 概念审计: concept-audit.md
@@ -166,6 +180,9 @@ nav:
   - 治理:
     - 治理总文档: governance.md
     - 编码规范: coding-standards.md
+    - 前端编码规范: frontend-coding-standards.md
+    - 原型组件注册表: prototypes/component-registry.md
+    - 原型转生产清单: prototypes/prototype-to-production.md
 
 # 额外配置
 extra:
@@ -184,3 +201,6 @@ exclude_docs: |
 extra_javascript:
   - https://unpkg.com/mermaid@10.6.1/dist/mermaid.min.js
   - js/mermaid-init.js
+
+extra_css:
+  - css/print.css

@@ -52,6 +52,7 @@ TIER_SCRIPTS: dict[str, list[str]] = {
         "check_gsp_field_traceability.py",
         "check_baseline_health.py",
         "check_governance_consistency.py",
+        "check_integration_contract.py",
         "check_commit_convention.py",
         "check_prototype_index_consistency.py",
         "check_prototype_story_sync.py",
@@ -62,6 +63,8 @@ TIER_SCRIPTS: dict[str, list[str]] = {
         "check_component_props_classname.py",
         "check_component_registry_consistency.py",
         "check_page_size.py",
+        "check_prototype_fidelity.py",
+        "check_prototype_navigation.py",
         "check_baseline_completeness.py",
     ],
     "T2": [

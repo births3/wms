@@ -14,7 +14,7 @@ M11 监管 EDI 已移除：码上放心由 M-TC 承接，药监 EDI 由 ERP/H8 �
 
 ---
 
-## Wave 0：治理骨架（进行中）
+## Wave 0：治理骨架（已完成）
 
 **周期**：1 周
 **目标**：项目结构、Git、文档、ADR、治理脚本骨架就位，可跑 `just quick-check`。
@@ -34,14 +34,14 @@ M11 监管 EDI 已移除：码上放心由 M-TC 承接，药监 EDI 由 ERP/H8 �
 - [x] 治理脚本（公共库 + 4 起步脚本 + 2 调度）
 - [x] gate-rules.toml + baseline 占位
 - [x] README / ROADMAP / TODO / CHANGELOG / ADR 索引
-- [ ] 工作区根 README 登记
-- [ ] 本地验证 + 首次 commit
+- [x] 工作区根 README 登记
+- [x] 本地验证 + 首次 commit
 
 **完成标准**：所有 Wave 0 ADR Accepted；`just quick-check` 跑通；`validate_environment.py` 报告环境就绪。
 
 ---
 
-## Wave 0.5：原型 + 技术 Spike（进行中）
+## Wave 0.5：原型 + 技术 Spike（已完成）
 
 **周期**：2 周
 **目标**：组件库骨架 + P0 原型（Wave 1 涉及的 9 个页面）+ 技术 Spike 验证 + 组件库抽离（Wave 1 复用准备）。
@@ -49,15 +49,15 @@ M11 监管 EDI 已移除：码上放心由 M-TC 承接，药监 EDI 由 ERP/H8 �
 - [x] Design Tokens（CSS 变量 + Tailwind preset）+ globals.css + Storybook 8.6 接入
 - [x] Layer 2 业务复合组件 Top 5（ScanInput / StepFlow / StatusBadge / FieldTable / OfflineIndicator）
 - [x] Layer 2 剩余 11 个组件（DualSignPanel / AuditTimeline / KanbanBoard / PrintPreview / TempChart / RuleEditor / ApprovalFlow / DiffPanel / PageHeader / DataTable / EmptyState）
-- [x] P0 原型页（9 个：H1 登录/权限/登出/API Key + H2 审计查询/归档/生命周期 + H3 API 文档）— 实际交付 38 个高保真页（M1-M6/M8/M10/H 全覆盖）
+- [x] P0 原型页（9 个：H1 登录/权限/登出/API Key + H2 审计查询/归档/生命周期 + H3 API 文档）— 实际交付 37 个手工高保真页 + 167 个全量矩阵页，共 204 个可走查 tab
 - [x] 16 个组件 Stories.tsx 全覆盖（Storybook build 通过）
-- [x] 视觉基线治理（accept_baseline.py + manifest.toml + 18 个 baseline 签字）
+- [x] 视觉基线治理（accept_baseline.py + manifest.toml + 204 个 baseline 签字）
 - [x] **组件库抽离至 packages/ui**（commit e3ce5a0，决策见 ADR-0028）— 为 Wave 1 `apps/web-admin/` 复用 `@wms/ui` 准备就绪
 - [x] 技术 Spike 计划落盘（`docs/spikes/` 5 项 + README，状态=起草）
-- [ ] 技术 Spike 验证：SPIKE-001 Axum+JWT / 002 H2 append-only / 003 utoipa→OpenAPI→TS / 004 SQLx offline / 005 RN 扫枪 — 状态需进入 accepted/rejected/deferred
-- [ ] Wave 0.5 retro（`docs/retros/wave-0.5-retro.md`）
+- [x] 技术 Spike 验证：SPIKE-001 / 002 / 003 / 004 accepted，SPIKE-005 deferred
+- [x] Wave 0.5 retro（`docs/retros/wave-0.5-retro.md`）
 
-**完成标准**：Storybook 可运行 ✓；P0 原型 ≥1 次走查 approved ✓；Spike 结论记录到 `docs/spikes/`（计划已落盘，验证待执行）；packages/ui 抽离完成 ✓。
+**完成标准**：Storybook 可运行 ✓；P0 原型 ≥1 次走查 approved ✓；Spike 结论已记录到 `docs/spikes/`；packages/ui 抽离完成 ✓。
 
 ---
 
@@ -72,11 +72,15 @@ M11 监管 EDI 已移除：码上放心由 M-TC 承接，药监 EDI 由 ERP/H8 �
 - W1.B：H2 审计追踪基础设施（append-only / 旧值新值 / 操作人时间 IP）
 - W1.C：H3 OpenAPI 契约工具链（utoipa 注解 / openapi.json 生成 / openapi-typescript 消费）
 - W1.D：治理脚本扩展 — `check_feature_flags.py`（与 ADR-0016 灰度链路同步上线；校验 Feature Flag owner / 创建日期 / 90 天清理期；过期未清理 PR 不予合并）
+- W1.E：`apps/web-admin` 壳工程启动（只接 H1/H2/H3；复用 `@wms/ui`；原型迁移按 ADR-0029 checklist，不提前实现业务模块生产页）
+- W1.F：H-INT 统一外部集成能力 — **仅契约段**（确立"所有外部对接必须复用 ADR-0018 弹性 + M-PM 规整 + ADR-0013 凭证 + H2 审计"的接入契约，纯文档约束，不写运行时代码；详见 ADR-0030）。可选配套治理脚本 `check_integration_contract.py`。引擎段延后，启动条件见 ADR-0030 第二段。
+- W1.G：H-APV 审批引擎 — **仅契约段**（确立"所有审批经统一审批端口 + 留痕携带 approval_source/approval_id + 复用 H4 通道 + H6 状态机"的接入契约，纯文档约束；详见 ADR-0032）。引擎段延后，启动条件见 ADR-0032 第二段。
+- W1.H：H-SCH 调度引擎 — **仅契约段**（确立"所有系统级定时任务在 H-SCH 统一注册 + 防重 + 复用 ADR-0018 重试/H-AL 告警/H2 审计"的接入契约，纯文档约束；不接管 M-TE 作业调度与 H10 备份；详见 ADR-0033）。引擎段延后且优先级最低，启动条件见 ADR-0033 第二段。
 
 **外部资质并行启动**：
 - "码上放心"账号开通
 
-**完成标准**：任意业务 handler 可挂 H1；任意写操作经 H2；后端注解可生成 OpenAPI，前端 `@wms/api-client` 可消费；**文件版灰度链路（环境变量 / `deploy/feature_flags.toml` 后端）+ 自动回滚链路在 dev / staging 环境验证可用（参 ADR-0016 §灰度发布策略 v3.1.3；Wave 1 不涉真业务上线，仅验证链路就绪；配置中心版验证留到 W2.G）**；`check_feature_flags.py` 进入 T1 治理脚本集。
+**完成标准**：任意业务 handler 可挂 H1；任意写操作经 H2；后端注解可生成 OpenAPI，前端 `@wms/api-client` 可消费；`apps/web-admin` 壳工程可复用 `@wms/ui` 并接入 H1/H2/H3 基础链路；**文件版灰度链路（环境变量 / `deploy/feature_flags.toml` 后端）+ 自动回滚链路在 dev / staging 环境验证可用（参 ADR-0016 §灰度发布策略 v3.1.3；Wave 1 不涉真业务上线，仅验证链路就绪；配置中心版验证留到 W2.G）**；`check_feature_flags.py` 进入 T1 治理脚本集。**四横向契约联合评审（W1.F/G/H + H-INT）**：W1.F H-INT / W1.G H-APV / W1.H H-SCH 三契约 + H-FILE 附件契约在 Wave 1 完成前须做一次联合评审，确认字段/审计/留痕约束无冲突（重点核对 H-APV 审批留痕 approval_source 与 H-INT 外部对接审计、H-SCH 调度审计三者在 H2 审计表的字段不冲突），结论记入 Wave 1 retro。
 
 ---
 

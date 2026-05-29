@@ -1,6 +1,6 @@
 # 文件存储 / 附件方案
 
-> 定位：基础设施层文档
+> 定位：基础设施层文档；本方案已登记为正式横向能力 **H-FILE**（见 [ADR-0031](../adr/0031-file-attachment-capability.md) + architecture-dependencies.md §1.1）
 > 关联：模式提炼报告 §5.2 缺口 #3（5 个故事文件需要文件存储）；ADR-0001 技术栈；ADR-0013 配置
 > 文档层级：L2 规范
 

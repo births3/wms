@@ -38,6 +38,22 @@ match = "docs/adr/**"
 checks = ["validate_adr_index", "check_doc_links"]
 tier = "T1"
 
+# H-INT 统一外部集成能力：三处真相源(ADR-0030/依赖图/ROADMAP)登记一致性
+[[rules]]
+match = "docs/adr/0030-integration-capability.md"
+checks = ["check_integration_contract"]
+tier = "T1"
+
+[[rules]]
+match = "docs/architecture-dependencies.md"
+checks = ["check_integration_contract"]
+tier = "T1"
+
+[[rules]]
+match = "ROADMAP.md"
+checks = ["check_integration_contract"]
+tier = "T1"
+
 [[rules]]
 match = "*.md"
 checks = ["check_doc_links"]
@@ -118,7 +134,7 @@ tier = "T1"
 
 [[rules]]
 match = "prototypes/**"
-checks = ["check_prototype_index_consistency", "check_prototype_story_sync"]
+checks = ["check_prototype_index_consistency", "check_prototype_story_sync", "check_prototype_fidelity", "check_prototype_navigation"]
 tier = "T1"
 
 # Layer 2 业务复合组件 + 页面级文件触发组件治理
@@ -132,10 +148,21 @@ match = "prototypes/src/pages/**"
 checks = ["check_component_doc_header", "check_page_size", "check_baseline_completeness"]
 tier = "T1"
 
+[[rules]]
+match = "prototypes/src/prototype-kit/**"
+checks = ["check_page_size", "check_prototype_fidelity", "check_baseline_completeness"]
+tier = "T1"
+
 # baseline 完整性：Tabs.tsx ↔ manifest.toml ↔ baseline PNG 三者一致
 [[rules]]
 match = "prototypes/src/Tabs.tsx"
-checks = ["check_baseline_completeness"]
+checks = ["check_prototype_navigation", "check_baseline_completeness"]
+tier = "T1"
+
+# 原型导航层次：领域 → 模块 → 页面，避免回退到扁平列表
+[[rules]]
+match = "prototypes/src/App.tsx"
+checks = ["check_prototype_navigation"]
 tier = "T1"
 
 [[rules]]
