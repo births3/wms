@@ -100,6 +100,10 @@
 - 批量确认："3-6 统一用你的建议"
 - 单独展开："7 详细探讨"
 
+### 回复语言
+
+- **AI 回复必须使用中文。**
+
 ## 发现缺口时的确认流程
 
 > **核心原则：AI 不能自行决定新增模块/故事/基础设施，必须和用户确认。**
@@ -423,10 +427,12 @@
 | [docs/adr/0014-data-migration.md](docs/adr/0014-data-migration.md) | **数据迁移策略**（CDC + 双写 + 货主级灰度 + 4 维校验）|
 | [docs/adr/0015-multi-end-rules.md](docs/adr/0015-multi-end-rules.md) | **多端业务规则放置**（A/B/C 三级 + OpenAPI 共享 schema）|
 | [docs/adr/0016-deployment.md](docs/adr/0016-deployment.md) | **部署形态**（docker-compose / k8s 双轨 + Migration 4 步走）|
+| [docs/adr/0024-auth-model.md](docs/adr/0024-auth-model.md) | **鉴权模型**（JWT + AuthContext + Access Token 1h / Refresh Token 24h + Redis blacklist / permissions_changed_at + owner_id 隔离）|
 | [docs/error-codes.md](docs/error-codes.md) | **错误码字典**（v3.1 初版 50 项，单一事实之源）|
 | [docs/adr/0029-frontend-as-prototype-workflow.md](docs/adr/0029-frontend-as-prototype-workflow.md) | **前端原型先行工作流**（原型走查后经 checklist 迁移生产；禁止原型页直接复制为生产页）|
 | [docs/prototypes/prototype-to-production.md](docs/prototypes/prototype-to-production.md) | **原型转生产迁移清单**（用户故事 / API 契约 / 权限 / 审计 / 幂等 / 视觉基线）|
 | [docs/retros/wave-0-retro.md](docs/retros/wave-0-retro.md) | Wave 0 回顾 |
+| [docs/runbooks/wave-1-runtime-evidence.md](docs/runbooks/wave-1-runtime-evidence.md) | Wave 1 预发布 runtime 证据采集手册（H2 PG 压测/封档 + W1.D 自动回滚）|
 | [docs/reviews/user-stories-audit-2026-05-16.md](docs/reviews/user-stories-audit-2026-05-16.md) | 用户故事 5 维度审计（116 故事 / 22 模块）|
 | [docs/reviews/software-design-audit-2026-05-18.md](docs/reviews/software-design-audit-2026-05-18.md) | **软件设计 12 维度审计**（v3.1，识别 6 P0 / 4 P1 / 3 P2 共 13 项缺口；指引 Wave 1 启动前需补 5+ ADR）|
 | [docs/compliance/README.md](docs/compliance/README.md) | **GSP 合规追溯矩阵总索引**（v11 建立，按章节拆分追溯条款 → 用户故事）|
@@ -483,4 +489,4 @@
 
 ## 当前阶段
 
-Wave 0.5 已完成，Wave 1 准入就绪。下一步启动 Wave 1 横向底座（H1 权限 / H2 审计 / H3 OpenAPI），按 outside-in TDD 推进。
+Wave 1 横向底座开发完成。H1 / H2 / H3 / W1.D static/runtime 运行资产 / W1.E / W1.F-G-H 契约均通过 `just wave-1-complete-check`；真实 H2 dev PostgreSQL 压测 + 7 天封档证据、W1.D dev/staging 自动回滚证据后移为预发布 gate，按 `docs/runbooks/wave-1-runtime-evidence.md` 补齐。

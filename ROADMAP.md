@@ -61,10 +61,11 @@ M11 监管 EDI 已移除：码上放心由 M-TC 承接，药监 EDI 由 ERP/H8 �
 
 ---
 
-## Wave 1：横向底座（H 层）
+## Wave 1：横向底座（H 层，开发完成）
 
 **周期**：4-6 周（个人）
 **目标**：所有业务模块的基础设施就绪。
+**当前状态**：开发完成；`just wave-1-complete-check` 为 Wave 1 开发完成门禁。当前尚无稳定 dev/staging，H2 压测/封档与 W1.D 自动回滚真实 runtime evidence 后移为预发布 gate，按 `docs/runbooks/wave-1-runtime-evidence.md` 补齐。
 
 并行任务：
 
@@ -77,10 +78,12 @@ M11 监管 EDI 已移除：码上放心由 M-TC 承接，药监 EDI 由 ERP/H8 �
 - W1.G：H-APV 审批引擎 — **仅契约段**（确立"所有审批经统一审批端口 + 留痕携带 approval_source/approval_id + 复用 H4 通道 + H6 状态机"的接入契约，纯文档约束；详见 ADR-0032）。引擎段延后，启动条件见 ADR-0032 第二段。
 - W1.H：H-SCH 调度引擎 — **仅契约段**（确立"所有系统级定时任务在 H-SCH 统一注册 + 防重 + 复用 ADR-0018 重试/H-AL 告警/H2 审计"的接入契约，纯文档约束；不接管 M-TE 作业调度与 H10 备份；详见 ADR-0033）。引擎段延后且优先级最低，启动条件见 ADR-0033 第二段。
 
-**外部资质并行启动**：
-- "码上放心"账号开通
+**外部资质并行跟踪**：
+- "码上放心"账号开通（不阻塞 Wave 1 开发完成；外部依赖状态见本文"外部依赖追踪"）
 
-**完成标准**：任意业务 handler 可挂 H1；任意写操作经 H2；后端注解可生成 OpenAPI，前端 `@wms/api-client` 可消费；`apps/web-admin` 壳工程可复用 `@wms/ui` 并接入 H1/H2/H3 基础链路；**文件版灰度链路（环境变量 / `deploy/feature_flags.toml` 后端）+ 自动回滚链路在 dev / staging 环境验证可用（参 ADR-0016 §灰度发布策略 v3.1.3；Wave 1 不涉真业务上线，仅验证链路就绪；配置中心版验证留到 W2.G）**；`check_feature_flags.py` 进入 T1 治理脚本集。**四横向契约联合评审（W1.F/G/H + H-INT）**：W1.F H-INT / W1.G H-APV / W1.H H-SCH 三契约 + H-FILE 附件契约在 Wave 1 完成前须做一次联合评审，确认字段/审计/留痕约束无冲突（重点核对 H-APV 审批留痕 approval_source 与 H-INT 外部对接审计、H-SCH 调度审计三者在 H2 审计表的字段不冲突），结论记入 Wave 1 retro。
+**开发完成标准**：任意业务 handler 可挂 H1；任意写操作经 H2；后端注解可生成 OpenAPI，前端 `@wms/api-client` 可消费；`apps/web-admin` 壳工程可复用 `@wms/ui` 并接入 H1/H2/H3 基础链路；文件版灰度链路（环境变量 / `deploy/feature_flags.toml` 后端）+ 自动回滚运行资产就绪，缺真实 dev/staging 信号时不伪造证据；`check_feature_flags.py` 进入 T1 治理脚本集。**四横向契约联合评审（W1.F/G/H + H-INT）**：W1.F H-INT / W1.G H-APV / W1.H H-SCH 三契约 + H-FILE 附件契约在 Wave 1 完成前须做一次联合评审，确认字段/审计/留痕约束无冲突（重点核对 H-APV 审批留痕 approval_source 与 H-INT 外部对接审计、H-SCH 调度审计三者在 H2 审计表的字段不冲突），结论记入 Wave 1 retro。
+
+**预发布 gate**：真实 dev PostgreSQL 60M baseline + wrk 1k QPS × 1 小时 + P99 < 200ms + 7 天封档 cron 0 失败；真实 dev/staging smoke gate 或 Prometheus 信号触发自动回滚成功。两份证据必须通过 `just wave-1-runtime-evidence-validate`，不得使用 localhost / stub / mock / fake / example 边界。
 
 ---
 

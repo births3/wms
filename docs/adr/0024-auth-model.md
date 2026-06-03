@@ -2,7 +2,7 @@
 
 - 状态：Accepted
 - 决策日期：2026-05-24
-- 修订日期：2026-05-24（v0.2，修 review 标注风险 1+2）
+- 修订日期：2026-06-02（v0.3，修 H1 故事与 ADR 口径漂移）
 - 决策人：项目主人
 - 来源：SPIKE-001 验证结果（accept，10/10 测试通过）
 - 关联：ADR-0001（技术栈）/ ADR-0010（错误码模式）/ ADR-0011（可观测）/ ADR-0013（配置/密钥）/ ADR-0026（跨端契约）
@@ -283,13 +283,13 @@ async fn list_items(
 ### 负面
 
 - **handler 漏写 `ctx.owner_id` 过滤会越权**：必须靠模板 + 测试 + 审计三重保护
-- **token 内嵌 permissions 导致权限变更滞后**：用户改权限后需要等 access 过期或主动撤销才生效；缓解：高频权限变更场景缩短 access TTL（5 分钟）
+- **token 内嵌 permissions 依赖 Redis 失效链路**：正常路径由 `permissions_changed_at` 让旧 token 下次请求即 401 `AUTH-009`；Redis 故障时按 §2.3.1 fail-open，接受最长 access TTL（1h）窗口并触发 P1 告警
 - **JWT secret 是单点**：泄露后所有 token 失效；缓解：走配置中心 + 轮换流程（ADR-0013 + ADR-0014）
 
 ### 风险
 
 - **handler 不用 ctx 直接拿 owner_id 而用 query 参数 owner_id** → 越权写入：W1.A 编码模板 + grep 治理脚本（禁止 query 接收 owner_id）
-- **Redis 故障导致登录失败**：Redis 是 critical path；ADR-0011 可观测体系必须监控 + 告警 P1
+- **Redis 故障导致撤销/权限失效实时性下降**：Redis 不可用时不阻断业务请求，但 blacklist 与 `permissions_changed_at` 退化到最长 access TTL（1h）窗口；ADR-0011 可观测体系必须监控 + 告警 P1
 - **PDA mmkv 失窃裸露 token**：丢机风险；缓解：mmkv 加密 + S5 锁定快速生效（24h 内）
 
 ---
@@ -309,6 +309,12 @@ async fn list_items(
 ---
 
 ## 7. 修订记录
+
+### v0.3 — 2026-06-02（修 H1 故事与 ADR 口径漂移）
+
+- 明确 §5 不再保留 v0.1 的"权限变更需等 access 过期"表述；正常路径以 §2.1.1 `permissions_changed_at` + `AUTH-009` 为准
+- 明确 Redis 故障不是登录全停，而是按 §2.3.1 fail-open，接受最长 access TTL（1h）窗口并触发 P1 告警
+- 与 `docs/domain/user-stories-h1-auth-tenant.md` 对齐：Access Token 1h、Refresh Token 24h、Wave 1 使用 `AuthContext.owner_id` 过滤，PostgreSQL RLS 延后评估
 
 ### v0.2 — 2026-05-24（review 后修风险 1+2）
 

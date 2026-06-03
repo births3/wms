@@ -6,7 +6,30 @@
 
 ---
 
-## 当前 Wave：Wave 0.5 — 原型 + 技术 Spike + 组件库抽离
+## 当前 Wave：Wave 1 — 横向底座收口（开发完成）
+
+**目标**：H1 权限 / H2 审计 / H3 OpenAPI / 文件版 Feature Flag + 自动回滚 / web-admin 壳工程 / W1.F-G-H + H-FILE 契约联合评审全部通过出口检查。
+
+### 已完成（静态证据）
+
+- [x] W1.A H1：`AuthContext`、JWT claims、`owner_id` 隔离、Redis blacklist、`permissions_changed_at`、AUTH-004 / AUTH-009 单测
+- [x] W1.B H2：`audit_event` migration、append-only trigger、真实 PostgreSQL `append_event`、链头锁、封档 helper、真实 PostgreSQL append/seal 集成测试
+- [x] W1.C H3：`openapi-export` → `shared/openapi/openapi.json` → `@wms/api-client` 类型生成
+- [x] W1.D static：`deploy/feature_flags.toml` + 后端文件版 reader + `check_feature_flags.py` 进入 T1
+- [x] W1.E：`apps/web-admin` 壳工程复用 `@wms/ui` 与 `@wms/api-client`，接入 H1/H2/H3 展示
+- [x] W1.F/G/H + H-FILE：ADR-0030/0031/0032/0033 Accepted，依赖图与 retro 已登记联合评审
+
+### 后续跟踪（不计入 Wave 1 开发完成）
+
+- W1.B pre-release runtime gate：有稳定 dev 环境后，按 [Wave 1 Pre-release Runtime Evidence Runbook](docs/runbooks/wave-1-runtime-evidence.md) 在真实 dev PostgreSQL 采集 60M baseline + wrk 1k QPS × 1 小时 + P99 < 200ms + 7 天封档 cron 0 失败，写入 `docs/retros/wave-1-h2-runtime-evidence.json`
+- W1.D pre-release runtime gate：有稳定 dev/staging 后，按 [Wave 1 Pre-release Runtime Evidence Runbook](docs/runbooks/wave-1-runtime-evidence.md) 用真实 smoke gate 或 Prometheus 信号触发回滚成功，写入 `docs/retros/wave-1-runtime-evidence.json`
+- W1-external：人工确认“码上放心”账号外部开通状态；外部依赖仍按 [ROADMAP.md](ROADMAP.md) 的外部依赖追踪表跟进
+
+当前 Wave 1 开发完成状态以 `just wave-1-complete-check` 为准；上述 runtime gate 在预发布前用 `just wave-1-runtime-evidence-validate` 单独验证，禁止用 localhost / stub / mock / fake / example 代替。
+
+---
+
+## 已归档：Wave 0.5 — 原型 + 技术 Spike + 组件库抽离
 
 **目标**：组件库骨架 + P0 原型 + 技术 Spike 验证 + Wave 1 复用准备。
 
@@ -69,6 +92,24 @@
 - [x] T1 治理 24/24 全绿（持续条件）
 
 **Wave 0.5 退出条件全部满足，可推进 Wave 1。**
+
+---
+
+## 原型前端检查遗留项（2026-05-31）
+
+> 本次原型检查中**已完成且验证**的修复：
+> - prototype-kit 7 个 tsc 类型错误已清零
+> - 表格 / 看板类页面 mock 语义错位已修复（命中关键字的列）
+>
+> 以下两项为**已知、推迟**的技术债，留待后续有前端权限的执行者处理。
+
+- [ ] 【低优】**原型 mock 占位数据语义错位**（`prototypes/src/prototype-kit/prototype-model.ts`）
+  - 现状：`sampleValue` 采用"列名关键字猜测"生成占位值；部分列名（货主 / 控制属性 / 承运商 / 周转箱 / 客户门店 / 波次号 等）未命中关键字，回落到示例池，导致列头与单元格语义不符（如货主列显示商品名）。
+  - 根治方案：将 `MODULE_BLUEPRINTS` 的列定义从 `string[]` 升级为"列名 + 示例值同源"结构（约 30 个 blueprint）。
+  - 影响范围：仅原型占位数据，不影响布局 / 控件 / 业务流；转生产阶段会被真实样例替换。
+- [ ] 【中优】**m4-manifest 随货同行单 PDF 中文竖排**（`prototypes/src/pages/m4-manifest/M4Manifest.tsx`）
+  - 现状：商品明细表 9 列在 A4 画布内被挤压，中文品名 / 生产企业逐字竖排堆叠（已加 `table-fixed` + 百分比列宽未见改善）。
+  - 处理方向：单独重构 `PrintPreview` 布局或缩字号。GSP 法定打印件，视觉要求高。
 
 ---
 

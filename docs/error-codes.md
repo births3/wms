@@ -151,6 +151,30 @@ ADR-0024 §2.6 定义 9 个 AUTH-XXX 短编码，用于前端按 code 切换提�
 ```yaml
 error_codes:
   # ========== H1 鉴权与多租户 ==========
+  - code: H1_AUTH_HEADER_MISSING
+    module: H1
+    category: AUTH
+    detail: HEADER_MISSING
+    http_status: 401
+    severity: warning
+    message_zh: '缺少 Authorization 头'
+    message_en: 'Authorization header missing'
+    related_fields: []
+    related_stories: [US-H1-001]
+    introduced_in: v3.1
+
+  - code: H1_AUTH_HEADER_MALFORMED
+    module: H1
+    category: AUTH
+    detail: HEADER_MALFORMED
+    http_status: 401
+    severity: warning
+    message_zh: 'Authorization 格式错误'
+    message_en: 'Authorization header malformed'
+    related_fields: []
+    related_stories: [US-H1-001]
+    introduced_in: v3.1
+
   - code: H1_AUTH_TOKEN_EXPIRED
     module: H1
     category: AUTH
@@ -175,6 +199,18 @@ error_codes:
     related_stories: [US-H1-001]
     introduced_in: v3.1
 
+  - code: H1_AUTH_TOKEN_REVOKED
+    module: H1
+    category: AUTH
+    detail: TOKEN_REVOKED
+    http_status: 401
+    severity: warning
+    message_zh: 'token 已撤销，请重新登录'
+    message_en: 'Token revoked, please re-login'
+    related_fields: []
+    related_stories: [US-H1-001, US-H1-004]
+    introduced_in: v3.1
+
   - code: H1_AUTH_INSUFFICIENT_PERMISSION
     module: H1
     category: AUTH
@@ -197,6 +233,42 @@ error_codes:
     message_en: 'Cross-tenant access denied'
     related_fields: [tenant_id, owner_id]
     related_stories: [US-H1-002]
+    introduced_in: v3.1
+
+  - code: H1_AUTH_REFRESH_TOKEN_INVALID
+    module: H1
+    category: AUTH
+    detail: REFRESH_TOKEN_INVALID
+    http_status: 401
+    severity: warning
+    message_zh: 'refresh_token 无效或过期'
+    message_en: 'Refresh token invalid or expired'
+    related_fields: []
+    related_stories: [US-H1-001]
+    introduced_in: v3.1
+
+  - code: H1_AUTH_PASSWORD_INVALID
+    module: H1
+    category: AUTH
+    detail: PASSWORD_INVALID
+    http_status: 401
+    severity: warning
+    message_zh: '密码错误'
+    message_en: 'Password invalid'
+    related_fields: []
+    related_stories: [US-H1-001]
+    introduced_in: v3.1
+
+  - code: H1_AUTH_PERMISSIONS_REVOKED
+    module: H1
+    category: AUTH
+    detail: PERMISSIONS_REVOKED
+    http_status: 401
+    severity: warning
+    message_zh: 'permissions 已失效，请重新登录'
+    message_en: 'Permissions revoked, please re-login'
+    related_fields: []
+    related_stories: [US-H1-002, US-H1-003]
     introduced_in: v3.1
 
   - code: H1_LOGIN_LOCKED
