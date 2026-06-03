@@ -1,8 +1,8 @@
-# ADR-0034：Wave 3 业务表 PostgreSQL 持久化模型（草案）
+# ADR-0034：Wave 3 业务表 PostgreSQL 持久化模型
 
-- 状态：Proposed
+- 状态：Accepted
 - 决策日期：2026-06-03
-- 决策人：待项目主人确认
+- 决策人：项目主人
 - 起草人：AI 助手
 - 关联：ADR-0001 / ADR-0018 / ADR-0024 / ADR-0025 / ADR-0026 / ADR-0030 / Wave 3 M2/M3/M5/M9 用户故事
 
@@ -19,7 +19,7 @@ Wave 3 第一批后端切片已经完成内存服务与 OpenAPI 契约：
 
 当前代码仍使用 in-memory store。若继续推进 PostgreSQL repository，必须先冻结最小业务表结构，否则会在实现迁移时同时做数据模型取舍，违反“有风险必须确认”的协作约束。
 
-本 ADR 只覆盖 Wave 3 第一批 repository 的表结构草案，不直接落地 migration。
+本 ADR 只覆盖 Wave 3 第一批 repository 的表结构，不扩展到 Wave 3 后续故事。
 
 ### 已有约束
 
@@ -78,9 +78,17 @@ Wave 3 第一批后端切片已经完成内存服务与 OpenAPI 契约：
 
 ## 决策
 
-拟采用方案 A：**最小规范化业务表 + 共享幂等表**。
+采用方案 A：**最小规范化业务表 + 共享幂等表**。
 
-该决策在用户确认前保持 Proposed。确认后才允许新增 PostgreSQL migration 和 SQLx repository。
+### 已确认取舍
+
+| # | 问题 | 决策 |
+|---|------|------|
+| 1 | M2 收货闭环记录基数 | 一单一次闭环，`receiving_order_receipts` 加 `unique(receiving_order_id)` |
+| 2 | M2 上架与 M3 库存事务 | 同事务写 `receiving_putaways` + `inventory_batches` + `inventory_movements` |
+| 3 | M9 规则生效期字段 | 现在补 `effective_from` / `effective_to` 到 API 和表 |
+| 4 | GSP 资质有效期校验来源 | 先做接口占位，完成门禁前确认 M1 本地表或 ERP/H8 校验端口 |
+| 5 | M5 温控读数分区 | 普通表 + 索引，暂不按月分区 |
 
 ### 设计原则
 
@@ -118,8 +126,7 @@ Wave 3 第一批后端切片已经完成内存服务与 OpenAPI 契约：
 | `receiving_inspection_signatures` | 验收签字记录 | `receiving_order_id`, `dual_required`, `first_signer_id`, `second_signer_id`, `strategy_rule_id`, `signed_at`; `second_signer_id <> first_signer_id` when second exists |
 | `receiving_putaways` | 上架记录 | `receiving_order_id`, `batch_no`, `product_code`, `qty`, `location_id`, `location_code`, `quality_status`, `occurred_at`; `qty > 0` |
 
-待确认：
-- `receiving_order_receipts` 是否一单只允许一次收货闭环。如果确认“一次闭环”，加 `unique(receiving_order_id)`；如果允许分批到货，只依赖幂等键和明细级闭环。
+确认：一单一次收货闭环，`receiving_order_receipts` 必须加 `unique(receiving_order_id)`。
 
 ### 3. M3 库存
 
@@ -158,12 +165,9 @@ Wave 3 第一批后端切片已经完成内存服务与 OpenAPI 契约：
 |----|------|-----------------|
 | `billing_accounts` | 计费账户 | `account_code`, `account_name`, `status`; `unique(owner_id, account_code)` |
 | `billing_contracts` | 计费合同 | `account_id`, `contract_no`, `valid_from`, `valid_to`, `status`; `unique(owner_id, contract_no)`, `valid_to >= valid_from` |
-| `billing_rules` | 计费规则 | `contract_id`, `charge_item`, `unit`, `unit_price_cents`, `billing_cycle`, `created_at`; `unit_price_cents >= 0` |
+| `billing_rules` | 计费规则 | `contract_id`, `charge_item`, `unit`, `unit_price_cents`, `billing_cycle`, `effective_from`, `effective_to`, `created_at`; `unit_price_cents >= 0`, `effective_to >= effective_from` |
 
-待确认：
-- M9 用户故事要求“规则生效日期冲突”校验，但当前 Wave 3 第一批 OpenAPI request 尚未包含 `effective_from/effective_to`。确认后可选择：
-  - 现在扩展 `CreateBillingRuleRequest` 和表字段；
-  - 或本次只落账户/合同/规则基础模型，把生效期留到 M9 自动计费前补。
+确认：M9 用户故事要求“规则生效日期冲突”校验，因此本次同步扩展 `CreateBillingRuleRequest` 与 `BillingRule`，新增 `effective_from` / `effective_to`。
 
 ---
 
@@ -194,7 +198,7 @@ Wave 3 第一批后端切片已经完成内存服务与 OpenAPI 契约：
 6. 写 `audit_event`。
 7. 提交事务。
 
-待确认：若本阶段还不实现 M2 与 M3 的同事务编排，可先让 M2 putaway 只写上架记录，M3 putaway 独立 API 后续补偿。但这会短期存在“上架记录已写、库存未增加”的一致性窗口。
+确认：M2 上架与 M3 库存必须同事务编排，不接受“上架记录已写、库存未增加”的一致性窗口。
 
 ### M3 status change
 
@@ -240,7 +244,7 @@ Wave 3 第一批后端切片已经完成内存服务与 OpenAPI 契约：
 |------|------|------|
 | M2 收货闭环到底是一单一次还是可多次分批 | 唯一键不同，影响补货/短少处理 | 本 ADR 列为待确认，确认前不加 `unique(receiving_order_id)` |
 | M2 putaway 与 M3 inventory 分开事务 | 上架记录和库存余额可能短期不一致 | 推荐同事务编排；若拆分必须有补偿事件和告警 |
-| M9 规则生效期缺失 | 未来无法校验“规则生效日期冲突” | 待确认是否现在扩 API |
+| M9 规则生效期缺失 | 未来无法校验“规则生效日期冲突” | 已确认现在扩 API 与表字段 |
 | GSP 资质有效期校验来源未冻结 | W3 完成门禁可能仍缺供应商/商品资质校验 | 单独确认 M1 本地资质表或 ERP 校验端口 |
 | M5 外部 API Key 未接入 | 外部推送鉴权不完整 | 按 ADR-0013 / ADR-0030 后续落 H-INT API Key，不在业务表保存 secret |
 
@@ -248,7 +252,7 @@ Wave 3 第一批后端切片已经完成内存服务与 OpenAPI 契约：
 
 ## 实施约束
 
-确认本 ADR 后按以下顺序实施：
+按以下顺序实施：
 
 1. 新增 migration：`backend/migrations/YYYYMMDDHHMM_wave3_core_tables.sql`。
 2. 为 migration 增加真实 PostgreSQL 测试，覆盖唯一键、数量约束、owner 隔离、幂等去重。
@@ -256,18 +260,6 @@ Wave 3 第一批后端切片已经完成内存服务与 OpenAPI 契约：
 4. handler 从 in-memory state 切换到 PgPool/repository。
 5. 补 L4/L5/L8/L11 测试：业务错误不写审计，成功写业务表 + audit_event，同一 Idempotency-Key 返回首次结果。
 6. 通过 `cargo test`、`just gov-t1`、`task_check T2 --strict`。
-
----
-
-## 待确认事项
-
-| # | 问题 | 选项/说明 | 建议 |
-|---|------|---------|------|
-| 1 | M2 收货闭环记录基数 | A) 一单一次闭环，加 `unique(receiving_order_id)` B) 支持分批到货，多条 receipt | 建议 A，符合当前 service 与“实到+短少+拒收=预报”闭环 |
-| 2 | M2 上架与 M3 库存是否同事务 | A) 同事务写 `receiving_putaways` + `inventory_batches` + `inventory_movements` B) 先分开 API，后续补偿 | 建议 A，避免上架和库存余额不一致 |
-| 3 | M9 规则是否现在补生效期字段 | A) 现在扩 `effective_from/effective_to` 到 API 和表 B) 暂不扩，M9 自动计费前再补 | 建议 A，故事已要求生效日期冲突校验 |
-| 4 | GSP 资质有效期校验来源 | A) M1 本地资质表校验 B) 调 ERP/H8 校验端口 C) 先做接口占位，完成门禁前确认 | 建议 C，本 ADR 不混入 M1/H8 新边界 |
-| 5 | M5 温控读数是否立即分区 | A) 普通表 + 索引 B) 按 `captured_at` 月分区 | 建议 A，先满足 1 年缓存查询，真实容量证据出来后再分区 |
 
 ---
 

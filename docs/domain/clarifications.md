@@ -436,3 +436,17 @@
 - **校验通过**：使用该批号上架，保留原效期/生产日期/生产厂家
 - **校验失败（批号不存在）= 异常**：进隔离区 + M-QL 质量联系单（类型=退货批号异常）→ 主管决定处置
 - **不新增 `is_returned` 字段**：因为批号是 ERP 给的且校验已有，不存在"退货独立批次"概念，退货回来就是原批次
+
+---
+
+## Wave 3 PostgreSQL 持久化模型决策（2026-06-03）
+
+> 背景：ADR-0034 起草 Wave 3 第一批 M2/M3/M5/M9 PostgreSQL 业务表与 repository 事务边界。用户确认“接受建议”。
+
+| # | 问题 | 答案 |
+|---|------|------|
+| 61 | M2 收货闭环记录基数 | 一单一次闭环，`receiving_order_receipts` 加 `unique(receiving_order_id)` |
+| 62 | M2 上架与 M3 库存事务 | 同事务写 `receiving_putaways` + `inventory_batches` + `inventory_movements`，不接受上架和库存余额不一致窗口 |
+| 63 | M9 规则生效期字段 | 现在补 `effective_from` / `effective_to` 到 API 和 PostgreSQL 表，支撑规则生效日期冲突校验 |
+| 64 | GSP 资质有效期校验来源 | 先做接口占位，完成门禁前确认 M1 本地资质表或 ERP/H8 校验端口 |
+| 65 | M5 温控读数分区 | 先用普通表 + 索引，不按月分区；真实容量证据出来后再评估分区 |

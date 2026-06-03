@@ -57,7 +57,7 @@
 | [ADR-0031](0031-file-attachment-capability.md) | H-FILE 统一附件/文件能力 | Accepted | 将 infra/file-storage.md（MinIO/S3 + attachments 表 + presigned URL）提升登记为横向能力 H-FILE + 接入契约；复核 15 命中→9 真需求模块；成本最低 |
 | [ADR-0032](0032-approval-engine.md) | H-APV 审批引擎（契约先行） | Accepted | 审批编排确立横向能力（复用 M3-003 approval_source 锚点 + H4 通道 + H6 状态机）；复核 27 命中→22 真需求（多走 M-QL→企微审批→回写链路）；引擎延后 |
 | [ADR-0033](0033-scheduler-engine.md) | H-SCH 调度引擎（契约先行） | Accepted | 定时/周期触发统一注册（复用 ADR-0018 重试 + H-AL 告警 + H2 审计）；复核 25 命中→14 真定时需求；不接管 M-TE 作业调度/H10 备份；引擎延后，优先级最低 |
-| [ADR-0034](0034-wave-3-operational-postgres-schema.md) | Proposed | Wave 3 第一批 M2/M3/M5/M9 PostgreSQL 业务表与 repository 事务边界草案；确认后才允许落 migration |
+| [ADR-0034](0034-wave-3-operational-postgres-schema.md) | Accepted | Wave 3 第一批 M2/M3/M5/M9 PostgreSQL 业务表、共享幂等表与 repository 事务边界 |
 | ADR-0035+ | 未分配 | 后续按需新建 |
 
 > 编号永不复用。空缺编号必须在此表登记原因。
