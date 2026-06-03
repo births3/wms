@@ -2,6 +2,14 @@
 #
 # 由 docs/prototypes/prototype-matrix-r3.md 逐行展开：非豁免 UI 故事按端生成一个 required 条目。
 # priority: P0=Wave 0.5 / P1=Wave 1.5 / P2=Wave 2.5 / P3=Wave 3.5 / P4=Wave 4.5
+#
+# prototype_slug 命名规则：<端>-<模块码小写>-<序号3位>
+#   端       = pc / pda / pad / h5
+#   模块码   = 见 docs/architecture-dependencies.md §1.0（如 m2 / h1 / mpm）
+#   序号     = 该端该模块下的原型序号，3 位补零（001 起）；
+#              若对应故事是拆分子故事（如 US-M1-004a），序号沿用故事号可带字母后缀（004a）
+#   示例     = pc-m2-001（PC 端 M2 采购入库第 1 个原型）、pda-h1-001、pc-m1-004a（US-M1-004a 子故事）
+#   注：手工精品页可另用语义 slug（如 m1-items），经 Tabs.tsx 的 LEGACY_SLUGS 映射。
 
 [meta]
 current_wave = "5"

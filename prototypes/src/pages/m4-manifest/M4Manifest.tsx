@@ -114,18 +114,18 @@ export function M4Manifest() {
             </table>
 
             {/* 商品明细 */}
-            <table className="w-full text-xs mb-4 border border-gray-400">
+            <table className="w-full text-xs mb-4 border border-gray-400 table-fixed">
               <thead>
                 <tr className="bg-gray-100">
                   <th className="border border-gray-400 px-2 py-1.5 w-8">序</th>
-                  <th className="border border-gray-400 px-2 py-1.5 text-left">品名</th>
-                  <th className="border border-gray-400 px-2 py-1.5 text-left">规格</th>
-                  <th className="border border-gray-400 px-2 py-1.5 text-left">生产企业</th>
-                  <th className="border border-gray-400 px-2 py-1.5">批号</th>
-                  <th className="border border-gray-400 px-2 py-1.5">效期</th>
-                  <th className="border border-gray-400 px-2 py-1.5">数量</th>
-                  <th className="border border-gray-400 px-2 py-1.5">单价</th>
-                  <th className="border border-gray-400 px-2 py-1.5">金额</th>
+                  <th className="border border-gray-400 px-2 py-1.5 text-left w-[20%]">品名</th>
+                  <th className="border border-gray-400 px-2 py-1.5 text-left w-[14%]">规格</th>
+                  <th className="border border-gray-400 px-2 py-1.5 text-left w-[18%]">生产企业</th>
+                  <th className="border border-gray-400 px-2 py-1.5 w-[12%]">批号</th>
+                  <th className="border border-gray-400 px-2 py-1.5 w-[10%]">效期</th>
+                  <th className="border border-gray-400 px-2 py-1.5 w-[8%]">数量</th>
+                  <th className="border border-gray-400 px-2 py-1.5 w-[8%]">单价</th>
+                  <th className="border border-gray-400 px-2 py-1.5 w-[10%]">金额</th>
                 </tr>
               </thead>
               <tbody>

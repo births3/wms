@@ -7,6 +7,7 @@ import {
   StatusBadge,
   type DataTableColumn,
   type KanbanColumn,
+  type StatusKey,
 } from "@wms/ui";
 import {
   Bell,
@@ -215,7 +216,7 @@ function kanbanItem(row: PrototypeRow, model: StoryPrototypeModel) {
     id: row.id,
     title: row.c0 ?? model.primaryObject,
     subtitle: row.c1 ?? model.moduleName,
-    priority: row.status === "异常" ? "urgent" : "normal",
+    priority: (row.status === "异常" ? "urgent" : "normal") as "urgent" | "normal",
     status: statusFor(row.status),
     meta: [
       { label: model.columns[2]?.header ?? "对象", value: row.c2 ?? "-" },
@@ -224,7 +225,7 @@ function kanbanItem(row: PrototypeRow, model: StoryPrototypeModel) {
   };
 }
 
-function statusFor(status: string) {
+function statusFor(status: string): StatusKey {
   if (/异常|失败|不合格/.test(status)) return "unqualified";
   if (/完成|归档/.test(status)) return "completed";
   if (/复核|审批|待/.test(status)) return "pending";

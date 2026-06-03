@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
-import { Boxes, Search, ShieldCheck, Store, Warehouse, Workflow } from "lucide-react";
+import { Boxes, ChevronDown, PanelLeft, PanelLeftClose, Search, ShieldCheck, Store, Warehouse, Workflow } from "lucide-react";
 import { TABS, DEVICE_META, GROUP_ORDER, type Device, type Group, type TabDef } from "./Tabs";
 
 /**
@@ -79,6 +79,15 @@ const DOMAIN_BY_GROUP = DOMAINS.reduce((acc, domain) => {
   return acc;
 }, {} as Partial<Record<Group, DomainId>>);
 
+// 仓储主线序号：复用 architecture-dependencies.md §1.0 的 M1..M6 业务流顺序（收→存→发→报表）
+const WAREHOUSE_SEQ = (DOMAINS.find((domain) => domain.id === "warehouse")?.groups ?? []).reduce(
+  (acc, group, index) => {
+    acc[group] = index + 1;
+    return acc;
+  },
+  {} as Partial<Record<Group, number>>,
+);
+
 function domainForGroup(group: Group): DomainId {
   return DOMAIN_BY_GROUP[group] ?? "extensions";
 }
@@ -111,6 +120,15 @@ export function App() {
   const [deviceFilter, setDeviceFilter] = useState<Device | "all">("all");
   const [activeDomain, setActiveDomain] = useState<DomainId>(domainForGroup(initialTab.group));
   const [query, setQuery] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<Group>>(new Set());
+
+  const toggleGroup = (group: Group) =>
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      next.has(group) ? next.delete(group) : next.add(group);
+      return next;
+    });
 
   const currentTab = TABS.find((tab) => tab.value === tabValue) ?? TABS[0];
 
@@ -146,6 +164,12 @@ export function App() {
       .filter((section) => section.tabs.length > 0);
   }, [activeDomain, baseFilteredTabs]);
 
+  const allCollapsed =
+    navigationSections.length > 0 && navigationSections.every((section) => collapsedGroups.has(section.group));
+
+  const toggleAllGroups = () =>
+    setCollapsedGroups(allCollapsed ? new Set() : new Set(navigationSections.map((section) => section.group)));
+
   const switchTab = (value: string) => {
     const nextTab = TABS.find((tab) => tab.value === value);
     setTabValue(value);
@@ -157,6 +181,15 @@ export function App() {
     <div className="min-h-screen bg-muted/30 font-sans">
       <header className="h-[72px] bg-background border-b sticky top-0 z-20">
         <div className="h-full px-6 flex items-center gap-6">
+          <button
+            onClick={() => setSidebarOpen((open) => !open)}
+            aria-label={sidebarOpen ? "隐藏导航栏" : "显示导航栏"}
+            aria-pressed={sidebarOpen}
+            className="size-9 shrink-0 rounded-md border border-input flex items-center justify-center hover:bg-muted transition-colors"
+          >
+            {sidebarOpen ? <PanelLeftClose className="size-4" /> : <PanelLeft className="size-4" />}
+          </button>
+
           <div className="min-w-[240px]">
             <h1 className="text-lg font-semibold">WMS 原型预览</h1>
             <p className="text-xs text-muted-foreground">
@@ -194,6 +227,7 @@ export function App() {
       </header>
 
       <div className="flex">
+        {sidebarOpen && (
         <aside className="w-[360px] shrink-0 bg-background border-r sticky top-[72px] self-start max-h-[calc(100vh-72px)] overflow-y-auto">
           <div className="p-3 border-b">
             <div className="grid grid-cols-2 gap-1.5">
@@ -222,12 +256,34 @@ export function App() {
             </div>
           </div>
 
+          <div className="px-3 py-1.5 border-b flex items-center justify-between">
+            <span className="text-[11px] text-muted-foreground">{navigationSections.length} 个分组</span>
+            <button
+              onClick={toggleAllGroups}
+              disabled={navigationSections.length === 0}
+              className="text-xs px-2 py-1 rounded-md border border-input hover:bg-muted transition-colors disabled:opacity-50"
+            >
+              {allCollapsed ? "全部展开" : "全部折叠"}
+            </button>
+          </div>
+
           <nav className="pb-4">
             {navigationSections.map((section) => {
               const devices = tabDevices(section.tabs);
+              const collapsed = collapsedGroups.has(section.group);
               return (
                 <section key={section.group} className="border-b last:border-b-0">
-                  <div className="px-3 py-2 bg-muted/35 flex items-center gap-2">
+                  <button
+                    onClick={() => toggleGroup(section.group)}
+                    aria-expanded={!collapsed}
+                    className="w-full px-3 py-2 bg-muted/35 flex items-center gap-2 text-left hover:bg-muted/60 transition-colors"
+                  >
+                    <ChevronDown className={`size-3.5 shrink-0 text-muted-foreground transition-transform ${collapsed ? "-rotate-90" : ""}`} />
+                    {WAREHOUSE_SEQ[section.group] && (
+                      <span className="size-5 shrink-0 rounded-full bg-primary/10 text-primary text-[11px] font-mono font-semibold flex items-center justify-center">
+                        {WAREHOUSE_SEQ[section.group]}
+                      </span>
+                    )}
                     <div className="min-w-0 flex-1">
                       <div className="text-xs font-semibold truncate">{section.group}</div>
                       <div className="text-[11px] text-muted-foreground">
@@ -241,7 +297,8 @@ export function App() {
                         </span>
                       ))}
                     </div>
-                  </div>
+                  </button>
+                  {!collapsed && (
                   <div className="py-1">
                     {section.tabs.map((tab) => (
                       <button
@@ -267,6 +324,7 @@ export function App() {
                       </button>
                     ))}
                   </div>
+                  )}
                 </section>
               );
             })}
@@ -278,7 +336,7 @@ export function App() {
             )}
           </nav>
         </aside>
-
+        )}
         <main className="flex-1 p-6 min-w-0">
           <div className="mb-4 flex items-center gap-3">
             <h2 className="text-base font-medium truncate">{currentTab.label}</h2>

@@ -45,6 +45,7 @@ import { UniversalPrototypePage } from "./prototype-kit/UniversalPrototypePage";
  *
  * 加新 tab 只需追加一项；App.tsx 自动渲染左侧 sidebar 分组
  * 与 governance/visual-baselines/manifest.toml 的 tab 列表一一对应
+ * 分组（Group）顺序与模块编码：见 docs/architecture-dependencies.md §1.0 / §1
  */
 
 export type Device = "pc" | "pda" | "pad" | "h5" | "shared";
