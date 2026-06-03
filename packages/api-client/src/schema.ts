@@ -1788,7 +1788,12 @@ export interface operations {
     ingest_temperature_excursion: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description 外部系统生成的幂等键 */
+                "Idempotency-Key": string;
+                /** @description 外部冷链系统 API Key */
+                "X-WMS-API-Key": string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -1807,7 +1812,16 @@ export interface operations {
                     "application/json": components["schemas"]["TemperatureExcursionEvent"];
                 };
             };
-            /** @description 未登录 */
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 外部系统 API Key 缺失或无效 */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -1821,7 +1835,12 @@ export interface operations {
     ingest_temperature_reading: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description 外部系统生成的幂等键 */
+                "Idempotency-Key": string;
+                /** @description 外部冷链系统 API Key */
+                "X-WMS-API-Key": string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -1840,7 +1859,16 @@ export interface operations {
                     "application/json": components["schemas"]["TemperatureReading"];
                 };
             };
-            /** @description 未登录 */
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 外部系统 API Key 缺失或无效 */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -2222,7 +2250,10 @@ export interface operations {
     inspect_receiving_order: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
             path: {
                 /** @description 收货单 ID */
                 id: string;
@@ -2244,6 +2275,15 @@ export interface operations {
                     "application/json": components["schemas"]["ReceivingInspectionRecord"];
                 };
             };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description 未登录 */
             401: {
                 headers: {
@@ -2258,7 +2298,10 @@ export interface operations {
     putaway_receiving_order: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
             path: {
                 /** @description 收货单 ID */
                 id: string;
@@ -2280,6 +2323,15 @@ export interface operations {
                     "application/json": components["schemas"]["PutawayRecord"];
                 };
             };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description 未登录 */
             401: {
                 headers: {
@@ -2294,7 +2346,10 @@ export interface operations {
     receive_receiving_order: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
             path: {
                 /** @description 收货单 ID */
                 id: string;
@@ -2316,6 +2371,15 @@ export interface operations {
                     "application/json": components["schemas"]["ReceivingOrderReceipt"];
                 };
             };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description 未登录 */
             401: {
                 headers: {
@@ -2330,7 +2394,10 @@ export interface operations {
     sign_receiving_order_inspection: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
             path: {
                 /** @description 收货单 ID */
                 id: string;
@@ -2350,6 +2417,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InspectionSignatureRecord"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description 未登录 */
@@ -2428,7 +2504,10 @@ export interface operations {
     change_inventory_batch_status: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -2445,6 +2524,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InventoryBatch"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description 未登录 */

@@ -261,19 +261,19 @@ fn update_receiving_order() {}
 #[allow(dead_code)]
 fn delete_receiving_order() {}
 
-#[utoipa::path(post, path = "/api/v1/inbound/receiving-orders/{id}/receive", tag = "inbound", params(("id" = uuid::Uuid, Path, description = "收货单 ID")), request_body = ReceiveReceivingOrderRequest, responses((status = 200, description = "PDA 收货闭环记录", body = ReceivingOrderReceipt), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(post, path = "/api/v1/inbound/receiving-orders/{id}/receive", tag = "inbound", params(("id" = uuid::Uuid, Path, description = "收货单 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = ReceiveReceivingOrderRequest, responses((status = 200, description = "PDA 收货闭环记录", body = ReceivingOrderReceipt), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 fn receive_receiving_order() {}
 
-#[utoipa::path(post, path = "/api/v1/inbound/receiving-orders/{id}/inspect", tag = "inbound", params(("id" = uuid::Uuid, Path, description = "收货单 ID")), request_body = InspectReceivingOrderRequest, responses((status = 200, description = "PDA 验收记录", body = ReceivingInspectionRecord), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(post, path = "/api/v1/inbound/receiving-orders/{id}/inspect", tag = "inbound", params(("id" = uuid::Uuid, Path, description = "收货单 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = InspectReceivingOrderRequest, responses((status = 200, description = "PDA 验收记录", body = ReceivingInspectionRecord), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 fn inspect_receiving_order() {}
 
-#[utoipa::path(post, path = "/api/v1/inbound/receiving-orders/{id}/sign", tag = "inbound", params(("id" = uuid::Uuid, Path, description = "收货单 ID")), request_body = SignInspectionRequest, responses((status = 200, description = "双人验收签字记录", body = InspectionSignatureRecord), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(post, path = "/api/v1/inbound/receiving-orders/{id}/sign", tag = "inbound", params(("id" = uuid::Uuid, Path, description = "收货单 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = SignInspectionRequest, responses((status = 200, description = "双人验收签字记录", body = InspectionSignatureRecord), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 fn sign_receiving_order_inspection() {}
 
-#[utoipa::path(post, path = "/api/v1/inbound/receiving-orders/{id}/putaway", tag = "inbound", params(("id" = uuid::Uuid, Path, description = "收货单 ID")), request_body = PutawayRequest, responses((status = 200, description = "PDA 上架记录", body = PutawayRecord), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(post, path = "/api/v1/inbound/receiving-orders/{id}/putaway", tag = "inbound", params(("id" = uuid::Uuid, Path, description = "收货单 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = PutawayRequest, responses((status = 200, description = "PDA 上架记录", body = PutawayRecord), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 fn putaway_receiving_order() {}
 
@@ -285,7 +285,7 @@ fn list_inventory_batches() {}
 #[allow(dead_code)]
 fn putaway_inventory_batch() {}
 
-#[utoipa::path(post, path = "/api/v1/inventory/batches/status", tag = "inventory", request_body = ChangeInventoryStatusRequest, responses((status = 200, description = "库存状态变更", body = InventoryBatch), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(post, path = "/api/v1/inventory/batches/status", tag = "inventory", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = ChangeInventoryStatusRequest, responses((status = 200, description = "库存状态变更", body = InventoryBatch), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 fn change_inventory_batch_status() {}
 
@@ -329,11 +329,11 @@ fn archive_feature_flag_file_source() {}
 #[allow(dead_code)]
 fn create_cold_chain_device() {}
 
-#[utoipa::path(post, path = "/api/v1/cold-chain/readings", tag = "cold-chain", request_body = IngestTemperatureReadingRequest, responses((status = 200, description = "接收外部温控数据", body = TemperatureReading), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(post, path = "/api/v1/cold-chain/readings", tag = "cold-chain", params(("Idempotency-Key" = String, Header, description = "外部系统生成的幂等键"), ("X-WMS-API-Key" = String, Header, description = "外部冷链系统 API Key")), request_body = IngestTemperatureReadingRequest, responses((status = 200, description = "接收外部温控数据", body = TemperatureReading), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "外部系统 API Key 缺失或无效", body = ErrorResponse)))]
 #[allow(dead_code)]
 fn ingest_temperature_reading() {}
 
-#[utoipa::path(post, path = "/api/v1/cold-chain/excursions", tag = "cold-chain", request_body = IngestTemperatureExcursionRequest, responses((status = 200, description = "接收外部温度超标事件", body = TemperatureExcursionEvent), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(post, path = "/api/v1/cold-chain/excursions", tag = "cold-chain", params(("Idempotency-Key" = String, Header, description = "外部系统生成的幂等键"), ("X-WMS-API-Key" = String, Header, description = "外部冷链系统 API Key")), request_body = IngestTemperatureExcursionRequest, responses((status = 200, description = "接收外部温度超标事件", body = TemperatureExcursionEvent), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "外部系统 API Key 缺失或无效", body = ErrorResponse)))]
 #[allow(dead_code)]
 fn ingest_temperature_excursion() {}
 

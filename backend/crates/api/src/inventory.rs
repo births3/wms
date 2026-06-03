@@ -162,7 +162,7 @@ impl InventoryStore {
     }
 }
 
-fn allowed_transition(from: &str, to: &str, source: &str) -> bool {
+pub(crate) fn allowed_transition(from: &str, to: &str, source: &str) -> bool {
     let normalized_source = source.trim();
     match (from, to) {
         (STATUS_QUALIFIED, STATUS_QUARANTINED) => matches!(

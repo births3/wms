@@ -1,14 +1,15 @@
-use chrono::{TimeZone, Utc};
+use chrono::{Duration, NaiveDate, TimeZone, Utc};
 use sqlx::PgPool;
 use uuid::Uuid;
 use wms_api::{
     auth::AuthContext,
-    inventory::STATUS_QUALIFIED,
+    inventory::{STATUS_QUALIFIED, STATUS_QUARANTINED},
     wave3_repository::{PgWave3Repository, Wave3RepositoryError},
 };
 use wms_domain::{
-    CreateBillingAccountRequest, CreateBillingContractRequest, CreateBillingRuleRequest,
-    CreateReceivingOrderRequest, PutawayRequest, ReceiveReceivingOrderRequest, ReceivingOrderLine,
+    ChangeInventoryStatusRequest, CreateBillingAccountRequest, CreateBillingContractRequest,
+    CreateBillingRuleRequest, CreateReceivingOrderRequest, PutawayRequest,
+    ReceiveReceivingOrderRequest, ReceivingOrderLine,
 };
 
 fn ctx(owner_id: Uuid) -> AuthContext {
@@ -109,6 +110,54 @@ async fn receiving_receipt_is_single_closure_and_idempotent(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn concurrent_same_idempotency_key_replays_first_receipt(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let ctx = ctx(owner_id);
+    let repo = PgWave3Repository::new(pool.clone());
+    let now = Utc
+        .with_ymd_and_hms(2026, 6, 4, 10, 30, 0)
+        .single()
+        .expect("valid time");
+
+    let order = repo
+        .create_receiving_order(&ctx, receiving_order_req("ASN-PG-RACE-001"), now)
+        .await
+        .expect("create receiving order");
+    repo.release_receiving_order(&ctx, order.id, now)
+        .await
+        .expect("release receiving order");
+
+    let req = ReceiveReceivingOrderRequest {
+        actual_qty: 8,
+        shortage_qty: 2,
+        rejected_qty: 0,
+        arrival_temperature_celsius: Some(4.8),
+        exception_note: None,
+    };
+    let (left, right) = tokio::join!(
+        repo.receive_receiving_order(&ctx, order.id, req.clone(), now, "idem-receive-race"),
+        repo.receive_receiving_order(&ctx, order.id, req, now, "idem-receive-race"),
+    );
+    let left = left.expect("left request should succeed");
+    let right = right.expect("right request should replay");
+
+    assert_eq!(left.id, right.id);
+    let counts: (i64, i64) = sqlx::query_as(
+        r#"
+        SELECT
+            (SELECT COUNT(*) FROM receiving_order_receipts WHERE receiving_order_id = $1),
+            (SELECT COUNT(*) FROM idempotency_request WHERE owner_id = $2 AND idempotency_key = 'idem-receive-race')
+        "#,
+    )
+    .bind(order.id)
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("counts");
+    assert_eq!(counts, (1, 1));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn putaway_commits_receiving_inventory_and_movement_in_one_transaction(pool: PgPool) {
     let owner_id = Uuid::new_v4();
     let ctx = ctx(owner_id);
@@ -164,6 +213,90 @@ async fn putaway_commits_receiving_inventory_and_movement_in_one_transaction(poo
     .await
     .expect("counts");
     assert_eq!(counts, (1, 1, 1, "completed".to_string()));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn expired_idempotency_key_is_not_replayed(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let ctx = ctx(owner_id);
+    let repo = PgWave3Repository::new(pool.clone());
+    let now = Utc
+        .with_ymd_and_hms(2026, 6, 4, 11, 30, 0)
+        .single()
+        .expect("valid time");
+    let batch_id = Uuid::new_v4();
+    sqlx::query(
+        r#"
+        INSERT INTO inventory_batches (
+            id, owner_id, product_code, batch_no, production_date, expiry_date,
+            qty_on_hand, qty_locked, quality_status, location_id, location_code,
+            recall_flag, created_at, updated_at
+        )
+        VALUES ($1, $2, 'P-001', 'B202606', $3, $4, 10, 0, $5, $6, 'A-01-01', FALSE, $7, $7)
+        "#,
+    )
+    .bind(batch_id)
+    .bind(owner_id)
+    .bind(NaiveDate::from_ymd_opt(2026, 1, 1).expect("valid date"))
+    .bind(NaiveDate::from_ymd_opt(2028, 1, 1).expect("valid date"))
+    .bind(STATUS_QUALIFIED)
+    .bind(Uuid::new_v4())
+    .bind(now)
+    .execute(&pool)
+    .await
+    .expect("seed inventory batch");
+
+    let req = ChangeInventoryStatusRequest {
+        batch_id,
+        target_status: STATUS_QUARANTINED.to_string(),
+        reason: "temperature exception".to_string(),
+        approval_source: "温度超标事件".to_string(),
+        approval_id: "TEMP-001".to_string(),
+    };
+    let first = repo
+        .change_inventory_status_with_audit(&ctx, req.clone(), now, "idem-status-ttl", None)
+        .await
+        .expect("first status change should succeed");
+    assert!(!first.replayed);
+    assert_eq!(first.value.quality_status, STATUS_QUARANTINED);
+
+    sqlx::query(
+        r#"
+        UPDATE idempotency_request
+           SET expires_at = $3,
+               response_body = jsonb_set(response_body, '{quality_status}', '"stale"'::jsonb)
+         WHERE owner_id = $1 AND idempotency_key = $2
+        "#,
+    )
+    .bind(owner_id)
+    .bind("idem-status-ttl")
+    .bind(now - Duration::minutes(1))
+    .execute(&pool)
+    .await
+    .expect("expire and poison idempotency response");
+
+    let retry = repo
+        .change_inventory_status_with_audit(
+            &ctx,
+            req,
+            now + Duration::minutes(1),
+            "idem-status-ttl",
+            None,
+        )
+        .await
+        .expect("expired idempotency key should allow a fresh execution");
+
+    assert!(!retry.replayed);
+    assert_eq!(retry.value.quality_status, STATUS_QUARANTINED);
+    let stored_status: String = sqlx::query_scalar(
+        "SELECT response_body->>'quality_status' FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = $2",
+    )
+    .bind(owner_id)
+    .bind("idem-status-ttl")
+    .fetch_one(&pool)
+    .await
+    .expect("stored status");
+    assert_eq!(stored_status, STATUS_QUARANTINED);
 }
 
 #[sqlx::test(migrations = "../../migrations")]

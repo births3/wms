@@ -7,7 +7,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use sqlx::{FromRow, PgPool};
+use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use crate::auth::AuthContext;
@@ -342,11 +342,25 @@ pub async fn append_event(
         .begin()
         .await
         .map_err(|error| AuditError::Database(error.to_string()))?;
+
+    let inserted = append_event_in_tx(&mut tx, req).await?;
+
+    tx.commit()
+        .await
+        .map_err(|error| AuditError::Database(error.to_string()))?;
+
+    Ok(inserted)
+}
+
+pub async fn append_event_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    req: &AuditWriteRequest,
+) -> Result<AuditEventRecord, AuditError> {
     let chain_lock_key = format!("audit_event:{}", req.occurred_at.date_naive());
 
     sqlx::query("SELECT pg_advisory_xact_lock(hashtext($1))")
         .bind(chain_lock_key)
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await
         .map_err(|error| AuditError::Database(error.to_string()))?;
 
@@ -362,7 +376,7 @@ pub async fn append_event(
         "#,
     )
     .bind(req.occurred_at)
-    .fetch_optional(&mut *tx)
+    .fetch_optional(&mut **tx)
     .await
     .map_err(|error| AuditError::Database(error.to_string()))?;
 
@@ -432,13 +446,9 @@ pub async fn append_event(
     .bind(&req.user_agent)
     .bind(&prev_hash)
     .bind(&self_hash)
-    .fetch_one(&mut *tx)
+    .fetch_one(&mut **tx)
     .await
     .map_err(|error| AuditError::Database(error.to_string()))?;
-
-    tx.commit()
-        .await
-        .map_err(|error| AuditError::Database(error.to_string()))?;
 
     inserted.into_record()
 }
