@@ -52,6 +52,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/billing/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create_billing_account"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/contracts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create_billing_contract"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create_billing_rule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cold-chain/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create_cold_chain_device"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cold-chain/excursions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ingest_temperature_excursion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cold-chain/readings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ingest_temperature_reading"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/config-center/feature-flags/archive-file-source": {
         parameters: {
             query?: never;
@@ -194,6 +290,118 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["update_receiving_order"];
+        trace?: never;
+    };
+    "/api/v1/inbound/receiving-orders/{id}/inspect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["inspect_receiving_order"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inbound/receiving-orders/{id}/putaway": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["putaway_receiving_order"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inbound/receiving-orders/{id}/receive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["receive_receiving_order"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inbound/receiving-orders/{id}/sign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["sign_receiving_order_inspection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/batches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_inventory_batches"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/batches/putaway": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["putaway_inventory_batch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/batches/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["change_inventory_batch_status"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/master-data/customers": {
@@ -495,6 +703,68 @@ export interface components {
             /** @description 下一页游标；为空表示无更多数据。 */
             next_cursor?: string | null;
         };
+        BillingAccount: {
+            account_code: string;
+            account_name: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            status: string;
+        };
+        BillingContract: {
+            /** Format: uuid */
+            account_id: string;
+            contract_no: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            status: string;
+            valid_from: string;
+            valid_to: string;
+        };
+        BillingRule: {
+            billing_cycle: string;
+            charge_item: string;
+            /** Format: uuid */
+            contract_id: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            unit: string;
+            /** Format: int64 */
+            unit_price_cents: number;
+        };
+        ChangeInventoryStatusRequest: {
+            approval_id: string;
+            approval_source: string;
+            /** Format: uuid */
+            batch_id: string;
+            reason: string;
+            target_status: string;
+        };
+        ColdChainDevice: {
+            /** Format: date-time */
+            calibration_due_at?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            device_code: string;
+            device_type: string;
+            /** Format: uuid */
+            id: string;
+            installed_at_location_code?: string | null;
+            /** Format: uuid */
+            owner_id: string;
+            status: string;
+        };
         /** @description M1-008 配置中心条目。 */
         ConfigEntry: {
             config_key: string;
@@ -510,6 +780,33 @@ export interface components {
             updated_at: string;
             /** Format: int64 */
             version: number;
+        };
+        CreateBillingAccountRequest: {
+            account_code: string;
+            account_name: string;
+        };
+        CreateBillingContractRequest: {
+            /** Format: uuid */
+            account_id: string;
+            contract_no: string;
+            valid_from: string;
+            valid_to: string;
+        };
+        CreateBillingRuleRequest: {
+            billing_cycle: string;
+            charge_item: string;
+            /** Format: uuid */
+            contract_id: string;
+            unit: string;
+            /** Format: int64 */
+            unit_price_cents: number;
+        };
+        CreateColdChainDeviceRequest: {
+            /** Format: date-time */
+            calibration_due_at?: string | null;
+            device_code: string;
+            device_type: string;
+            installed_at_location_code?: string | null;
         };
         CreateCustomerRequest: {
             customer_code: string;
@@ -699,6 +996,99 @@ export interface components {
             /** @description 契约版本。 */
             version: string;
         };
+        IngestTemperatureExcursionRequest: {
+            affected_batch_ids: string[];
+            device_code: string;
+            /** Format: date-time */
+            ended_at?: string | null;
+            external_event_id: string;
+            location_code?: string | null;
+            /** Format: double */
+            max_temperature_celsius?: number | null;
+            /** Format: double */
+            min_temperature_celsius?: number | null;
+            /** Format: date-time */
+            started_at: string;
+        };
+        IngestTemperatureReadingRequest: {
+            /** Format: date-time */
+            captured_at: string;
+            device_code: string;
+            external_report_url?: string | null;
+            /** Format: double */
+            humidity_percent?: number | null;
+            out_of_range: boolean;
+            /** Format: double */
+            temperature_celsius: number;
+        };
+        InspectReceivingOrderRequest: {
+            /** Format: int64 */
+            accepted_qty: number;
+            batch_no: string;
+            expiry_date: string;
+            production_date: string;
+            quality_status: string;
+            /** Format: int64 */
+            rejected_qty: number;
+            trace_codes: string[];
+        };
+        InspectionSignatureRecord: {
+            /** Format: uuid */
+            first_signer_id: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: uuid */
+            receiving_order_id: string;
+            /** Format: uuid */
+            second_signer_id?: string | null;
+            /** Format: date-time */
+            signed_at: string;
+        };
+        InventoryBatch: {
+            batch_no: string;
+            /** Format: date-time */
+            created_at: string;
+            expiry_date: string;
+            /** Format: uuid */
+            id: string;
+            location_code: string;
+            /** Format: uuid */
+            location_id: string;
+            /** Format: uuid */
+            owner_id: string;
+            product_code: string;
+            production_date: string;
+            /** Format: int64 */
+            qty_locked: number;
+            /** Format: int64 */
+            qty_on_hand: number;
+            quality_status: string;
+            recall_flag: boolean;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        InventoryBatchListResponse: {
+            data: components["schemas"]["InventoryBatch"][];
+            page: components["schemas"]["PageMeta"];
+        };
+        InventoryMovement: {
+            /** Format: uuid */
+            batch_id: string;
+            /** Format: uuid */
+            id: string;
+            movement_type: string;
+            /** Format: date-time */
+            occurred_at: string;
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: int64 */
+            qty_delta: number;
+            /** Format: uuid */
+            source_document_id: string;
+            source_document_type: string;
+        };
         /** @description 库位基础档案。 */
         Location: {
             /** Format: date-time */
@@ -852,6 +1242,74 @@ export interface components {
             data: components["schemas"]["Product"][];
             page: components["schemas"]["PageMeta"];
         };
+        PutawayInventoryRequest: {
+            batch_no: string;
+            expiry_date: string;
+            location_code: string;
+            /** Format: uuid */
+            location_id: string;
+            product_code: string;
+            production_date: string;
+            /** Format: int64 */
+            qty: number;
+            quality_status: string;
+            /** Format: uuid */
+            source_receiving_order_id: string;
+        };
+        PutawayRecord: {
+            batch_no: string;
+            /** Format: uuid */
+            id: string;
+            location_code: string;
+            /** Format: uuid */
+            location_id: string;
+            /** Format: date-time */
+            occurred_at: string;
+            /** Format: uuid */
+            owner_id: string;
+            product_code: string;
+            /** Format: int64 */
+            qty: number;
+            /** Format: uuid */
+            receiving_order_id: string;
+        };
+        PutawayRequest: {
+            batch_no: string;
+            location_code: string;
+            /** Format: uuid */
+            location_id: string;
+            product_code: string;
+            /** Format: int64 */
+            qty: number;
+            quality_status: string;
+        };
+        ReceiveReceivingOrderRequest: {
+            /** Format: int64 */
+            actual_qty: number;
+            /** Format: double */
+            arrival_temperature_celsius?: number | null;
+            exception_note?: string | null;
+            /** Format: int64 */
+            rejected_qty: number;
+            /** Format: int64 */
+            shortage_qty: number;
+        };
+        ReceivingInspectionRecord: {
+            /** Format: int64 */
+            accepted_qty: number;
+            batch_no: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            occurred_at: string;
+            /** Format: uuid */
+            owner_id: string;
+            quality_status: string;
+            /** Format: uuid */
+            receiving_order_id: string;
+            /** Format: int64 */
+            rejected_qty: number;
+        };
         /** @description 收货单。 */
         ReceivingOrder: {
             /** Format: date-time */
@@ -890,6 +1348,22 @@ export interface components {
             data: components["schemas"]["ReceivingOrder"][];
             page: components["schemas"]["PageMeta"];
         };
+        ReceivingOrderReceipt: {
+            /** Format: int64 */
+            actual_qty: number;
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            occurred_at: string;
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: uuid */
+            receiving_order_id: string;
+            /** Format: int64 */
+            rejected_qty: number;
+            /** Format: int64 */
+            shortage_qty: number;
+        };
         ReportQueryRequest: {
             /** @description 自由结构 JSON 对象。 */
             filters: {
@@ -912,6 +1386,13 @@ export interface components {
             values: {
                 [key: string]: unknown;
             };
+        };
+        SignInspectionRequest: {
+            dual_required: boolean;
+            /** Format: uuid */
+            first_signer_id: string;
+            /** Format: uuid */
+            second_signer_id?: string | null;
         };
         /** @description 特殊药品分类字典。 */
         SpecialDrugCategory: {
@@ -951,6 +1432,42 @@ export interface components {
         SupplierListResponse: {
             data: components["schemas"]["Supplier"][];
             page: components["schemas"]["PageMeta"];
+        };
+        TemperatureExcursionEvent: {
+            affected_batch_ids: string[];
+            /** Format: date-time */
+            created_at: string;
+            device_code: string;
+            /** Format: date-time */
+            ended_at?: string | null;
+            external_event_id: string;
+            /** Format: uuid */
+            id: string;
+            location_code?: string | null;
+            /** Format: double */
+            max_temperature_celsius?: number | null;
+            /** Format: double */
+            min_temperature_celsius?: number | null;
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: date-time */
+            started_at: string;
+            status: string;
+        };
+        TemperatureReading: {
+            /** Format: date-time */
+            captured_at: string;
+            device_code: string;
+            external_report_url?: string | null;
+            /** Format: double */
+            humidity_percent?: number | null;
+            /** Format: uuid */
+            id: string;
+            out_of_range: boolean;
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: double */
+            temperature_celsius: number;
         };
         UpdateCustomerRequest: {
             customer_name?: string | null;
@@ -1119,6 +1636,204 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CurrentUser"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_billing_account: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateBillingAccountRequest"];
+            };
+        };
+        responses: {
+            /** @description 创建计费账户 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillingAccount"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_billing_contract: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateBillingContractRequest"];
+            };
+        };
+        responses: {
+            /** @description 创建计费合同 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillingContract"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_billing_rule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateBillingRuleRequest"];
+            };
+        };
+        responses: {
+            /** @description 创建计费规则 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillingRule"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_cold_chain_device: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateColdChainDeviceRequest"];
+            };
+        };
+        responses: {
+            /** @description 创建冷链设备台账 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ColdChainDevice"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    ingest_temperature_excursion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IngestTemperatureExcursionRequest"];
+            };
+        };
+        responses: {
+            /** @description 接收外部温度超标事件 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemperatureExcursionEvent"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    ingest_temperature_reading: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IngestTemperatureReadingRequest"];
+            };
+        };
+        responses: {
+            /** @description 接收外部温控数据 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemperatureReading"];
                 };
             };
             /** @description 未登录 */
@@ -1487,6 +2202,245 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReceivingOrder"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    inspect_receiving_order: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 收货单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InspectReceivingOrderRequest"];
+            };
+        };
+        responses: {
+            /** @description PDA 验收记录 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceivingInspectionRecord"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    putaway_receiving_order: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 收货单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PutawayRequest"];
+            };
+        };
+        responses: {
+            /** @description PDA 上架记录 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PutawayRecord"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    receive_receiving_order: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 收货单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReceiveReceivingOrderRequest"];
+            };
+        };
+        responses: {
+            /** @description PDA 收货闭环记录 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceivingOrderReceipt"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    sign_receiving_order_inspection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 收货单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignInspectionRequest"];
+            };
+        };
+        responses: {
+            /** @description 双人验收签字记录 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InspectionSignatureRecord"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_inventory_batches: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 库存批次列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryBatchListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    putaway_inventory_batch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PutawayInventoryRequest"];
+            };
+        };
+        responses: {
+            /** @description 入库上架增加库存 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryBatch"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    change_inventory_batch_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeInventoryStatusRequest"];
+            };
+        };
+        responses: {
+            /** @description 库存状态变更 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryBatch"];
                 };
             };
             /** @description 未登录 */

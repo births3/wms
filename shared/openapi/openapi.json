@@ -2,11 +2,11 @@
   "openapi": "3.0.3",
   "info": {
     "title": "WMS API",
-    "description": "Wave 2 业务底座与 schema 先行契约",
+    "description": "Wave 3 核心业务规则与业务模型契约",
     "license": {
       "name": ""
     },
-    "version": "0.0.2-wave-2-schema"
+    "version": "0.0.3-wave-3-core-rules"
   },
   "paths": {
     "/api/v1/audit/events": {
@@ -159,6 +159,246 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CurrentUser"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/billing/accounts": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "operationId": "create_billing_account",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBillingAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "创建计费账户",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingAccount"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/billing/contracts": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "operationId": "create_billing_contract",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBillingContractRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "创建计费合同",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingContract"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/billing/rules": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "operationId": "create_billing_rule",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBillingRuleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "创建计费规则",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingRule"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cold-chain/devices": {
+      "post": {
+        "tags": [
+          "cold-chain"
+        ],
+        "operationId": "create_cold_chain_device",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateColdChainDeviceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "创建冷链设备台账",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ColdChainDevice"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cold-chain/excursions": {
+      "post": {
+        "tags": [
+          "cold-chain"
+        ],
+        "operationId": "ingest_temperature_excursion",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IngestTemperatureExcursionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "接收外部温度超标事件",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemperatureExcursionEvent"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cold-chain/readings": {
+      "post": {
+        "tags": [
+          "cold-chain"
+        ],
+        "operationId": "ingest_temperature_reading",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IngestTemperatureReadingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "接收外部温控数据",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemperatureReading"
                 }
               }
             }
@@ -589,6 +829,324 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ReceivingOrder"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/inbound/receiving-orders/{id}/inspect": {
+      "post": {
+        "tags": [
+          "inbound"
+        ],
+        "operationId": "inspect_receiving_order",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "收货单 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InspectReceivingOrderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "PDA 验收记录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceivingInspectionRecord"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/inbound/receiving-orders/{id}/putaway": {
+      "post": {
+        "tags": [
+          "inbound"
+        ],
+        "operationId": "putaway_receiving_order",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "收货单 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutawayRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "PDA 上架记录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PutawayRecord"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/inbound/receiving-orders/{id}/receive": {
+      "post": {
+        "tags": [
+          "inbound"
+        ],
+        "operationId": "receive_receiving_order",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "收货单 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReceiveReceivingOrderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "PDA 收货闭环记录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceivingOrderReceipt"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/inbound/receiving-orders/{id}/sign": {
+      "post": {
+        "tags": [
+          "inbound"
+        ],
+        "operationId": "sign_receiving_order_inspection",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "收货单 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignInspectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "双人验收签字记录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InspectionSignatureRecord"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/inventory/batches": {
+      "get": {
+        "tags": [
+          "inventory"
+        ],
+        "operationId": "list_inventory_batches",
+        "responses": {
+          "200": {
+            "description": "库存批次列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryBatchListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/inventory/batches/putaway": {
+      "post": {
+        "tags": [
+          "inventory"
+        ],
+        "operationId": "putaway_inventory_batch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutawayInventoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "入库上架增加库存",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryBatch"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/inventory/batches/status": {
+      "post": {
+        "tags": [
+          "inventory"
+        ],
+        "operationId": "change_inventory_batch_status",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeInventoryStatusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "库存状态变更",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryBatch"
                 }
               }
             }
@@ -1838,6 +2396,198 @@
           }
         }
       },
+      "BillingAccount": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "account_code",
+          "account_name",
+          "status",
+          "created_at"
+        ],
+        "properties": {
+          "account_code": {
+            "type": "string"
+          },
+          "account_name": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "BillingContract": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "account_id",
+          "contract_no",
+          "valid_from",
+          "valid_to",
+          "status",
+          "created_at"
+        ],
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "contract_no": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "valid_from": {
+            "type": "string"
+          },
+          "valid_to": {
+            "type": "string"
+          }
+        }
+      },
+      "BillingRule": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "contract_id",
+          "charge_item",
+          "unit",
+          "unit_price_cents",
+          "billing_cycle",
+          "created_at"
+        ],
+        "properties": {
+          "billing_cycle": {
+            "type": "string"
+          },
+          "charge_item": {
+            "type": "string"
+          },
+          "contract_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "unit_price_cents": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ChangeInventoryStatusRequest": {
+        "type": "object",
+        "required": [
+          "batch_id",
+          "target_status",
+          "reason",
+          "approval_source",
+          "approval_id"
+        ],
+        "properties": {
+          "approval_id": {
+            "type": "string"
+          },
+          "approval_source": {
+            "type": "string"
+          },
+          "batch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "target_status": {
+            "type": "string"
+          }
+        }
+      },
+      "ColdChainDevice": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "device_code",
+          "device_type",
+          "status",
+          "created_at"
+        ],
+        "properties": {
+          "calibration_due_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "device_code": {
+            "type": "string"
+          },
+          "device_type": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "installed_at_location_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
       "ConfigEntry": {
         "type": "object",
         "description": "M1-008 配置中心条目。",
@@ -1873,6 +2623,98 @@
           "version": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "CreateBillingAccountRequest": {
+        "type": "object",
+        "required": [
+          "account_code",
+          "account_name"
+        ],
+        "properties": {
+          "account_code": {
+            "type": "string"
+          },
+          "account_name": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateBillingContractRequest": {
+        "type": "object",
+        "required": [
+          "account_id",
+          "contract_no",
+          "valid_from",
+          "valid_to"
+        ],
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "contract_no": {
+            "type": "string"
+          },
+          "valid_from": {
+            "type": "string"
+          },
+          "valid_to": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateBillingRuleRequest": {
+        "type": "object",
+        "required": [
+          "contract_id",
+          "charge_item",
+          "unit",
+          "unit_price_cents",
+          "billing_cycle"
+        ],
+        "properties": {
+          "billing_cycle": {
+            "type": "string"
+          },
+          "charge_item": {
+            "type": "string"
+          },
+          "contract_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "unit_price_cents": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "CreateColdChainDeviceRequest": {
+        "type": "object",
+        "required": [
+          "device_code",
+          "device_type"
+        ],
+        "properties": {
+          "calibration_due_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "device_code": {
+            "type": "string"
+          },
+          "device_type": {
+            "type": "string"
+          },
+          "installed_at_location_code": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -2456,6 +3298,297 @@
           }
         }
       },
+      "IngestTemperatureExcursionRequest": {
+        "type": "object",
+        "required": [
+          "external_event_id",
+          "device_code",
+          "started_at",
+          "affected_batch_ids"
+        ],
+        "properties": {
+          "affected_batch_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "device_code": {
+            "type": "string"
+          },
+          "ended_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "external_event_id": {
+            "type": "string"
+          },
+          "location_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "max_temperature_celsius": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "min_temperature_celsius": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "IngestTemperatureReadingRequest": {
+        "type": "object",
+        "required": [
+          "device_code",
+          "temperature_celsius",
+          "captured_at",
+          "out_of_range"
+        ],
+        "properties": {
+          "captured_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "device_code": {
+            "type": "string"
+          },
+          "external_report_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "humidity_percent": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "out_of_range": {
+            "type": "boolean"
+          },
+          "temperature_celsius": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "InspectReceivingOrderRequest": {
+        "type": "object",
+        "required": [
+          "batch_no",
+          "accepted_qty",
+          "rejected_qty",
+          "production_date",
+          "expiry_date",
+          "quality_status",
+          "trace_codes"
+        ],
+        "properties": {
+          "accepted_qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "batch_no": {
+            "type": "string"
+          },
+          "expiry_date": {
+            "type": "string"
+          },
+          "production_date": {
+            "type": "string"
+          },
+          "quality_status": {
+            "type": "string"
+          },
+          "rejected_qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "trace_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "InspectionSignatureRecord": {
+        "type": "object",
+        "required": [
+          "id",
+          "receiving_order_id",
+          "owner_id",
+          "first_signer_id",
+          "signed_at"
+        ],
+        "properties": {
+          "first_signer_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "receiving_order_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "second_signer_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "signed_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "InventoryBatch": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "product_code",
+          "batch_no",
+          "production_date",
+          "expiry_date",
+          "qty_on_hand",
+          "qty_locked",
+          "quality_status",
+          "location_id",
+          "location_code",
+          "recall_flag",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "batch_no": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiry_date": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "location_code": {
+            "type": "string"
+          },
+          "location_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "production_date": {
+            "type": "string"
+          },
+          "qty_locked": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "qty_on_hand": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "quality_status": {
+            "type": "string"
+          },
+          "recall_flag": {
+            "type": "boolean"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "InventoryBatchListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventoryBatch"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "InventoryMovement": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "batch_id",
+          "movement_type",
+          "qty_delta",
+          "source_document_type",
+          "source_document_id",
+          "occurred_at"
+        ],
+        "properties": {
+          "batch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "movement_type": {
+            "type": "string"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "qty_delta": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "source_document_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source_document_type": {
+            "type": "string"
+          }
+        }
+      },
       "Location": {
         "type": "object",
         "description": "库位基础档案。",
@@ -2836,6 +3969,210 @@
           }
         }
       },
+      "PutawayInventoryRequest": {
+        "type": "object",
+        "required": [
+          "product_code",
+          "batch_no",
+          "production_date",
+          "expiry_date",
+          "qty",
+          "quality_status",
+          "location_id",
+          "location_code",
+          "source_receiving_order_id"
+        ],
+        "properties": {
+          "batch_no": {
+            "type": "string"
+          },
+          "expiry_date": {
+            "type": "string"
+          },
+          "location_code": {
+            "type": "string"
+          },
+          "location_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "production_date": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "quality_status": {
+            "type": "string"
+          },
+          "source_receiving_order_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "PutawayRecord": {
+        "type": "object",
+        "required": [
+          "id",
+          "receiving_order_id",
+          "owner_id",
+          "batch_no",
+          "product_code",
+          "qty",
+          "location_id",
+          "location_code",
+          "occurred_at"
+        ],
+        "properties": {
+          "batch_no": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "location_code": {
+            "type": "string"
+          },
+          "location_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "receiving_order_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "PutawayRequest": {
+        "type": "object",
+        "required": [
+          "batch_no",
+          "product_code",
+          "qty",
+          "location_id",
+          "location_code",
+          "quality_status"
+        ],
+        "properties": {
+          "batch_no": {
+            "type": "string"
+          },
+          "location_code": {
+            "type": "string"
+          },
+          "location_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "quality_status": {
+            "type": "string"
+          }
+        }
+      },
+      "ReceiveReceivingOrderRequest": {
+        "type": "object",
+        "required": [
+          "actual_qty",
+          "shortage_qty",
+          "rejected_qty"
+        ],
+        "properties": {
+          "actual_qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "arrival_temperature_celsius": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "exception_note": {
+            "type": "string",
+            "nullable": true
+          },
+          "rejected_qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "shortage_qty": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ReceivingInspectionRecord": {
+        "type": "object",
+        "required": [
+          "id",
+          "receiving_order_id",
+          "owner_id",
+          "batch_no",
+          "accepted_qty",
+          "rejected_qty",
+          "quality_status",
+          "occurred_at"
+        ],
+        "properties": {
+          "accepted_qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "batch_no": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quality_status": {
+            "type": "string"
+          },
+          "receiving_order_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rejected_qty": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "ReceivingOrder": {
         "type": "object",
         "description": "收货单。",
@@ -2956,6 +4293,48 @@
           }
         }
       },
+      "ReceivingOrderReceipt": {
+        "type": "object",
+        "required": [
+          "id",
+          "receiving_order_id",
+          "owner_id",
+          "actual_qty",
+          "shortage_qty",
+          "rejected_qty",
+          "occurred_at"
+        ],
+        "properties": {
+          "actual_qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "receiving_order_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rejected_qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "shortage_qty": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "ReportQueryRequest": {
         "type": "object",
         "required": [
@@ -3017,6 +4396,27 @@
             "type": "object",
             "description": "自由结构 JSON 对象。",
             "additionalProperties": true
+          }
+        }
+      },
+      "SignInspectionRequest": {
+        "type": "object",
+        "required": [
+          "first_signer_id",
+          "dual_required"
+        ],
+        "properties": {
+          "dual_required": {
+            "type": "boolean"
+          },
+          "first_signer_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "second_signer_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
           }
         }
       },
@@ -3145,6 +4545,116 @@
           },
           "page": {
             "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "TemperatureExcursionEvent": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "external_event_id",
+          "device_code",
+          "started_at",
+          "affected_batch_ids",
+          "status",
+          "created_at"
+        ],
+        "properties": {
+          "affected_batch_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "device_code": {
+            "type": "string"
+          },
+          "ended_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "external_event_id": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "location_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "max_temperature_celsius": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "min_temperature_celsius": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "TemperatureReading": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "device_code",
+          "temperature_celsius",
+          "captured_at",
+          "out_of_range"
+        ],
+        "properties": {
+          "captured_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "device_code": {
+            "type": "string"
+          },
+          "external_report_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "humidity_percent": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "out_of_range": {
+            "type": "boolean"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "temperature_celsius": {
+            "type": "number",
+            "format": "double"
           }
         }
       },
@@ -3382,7 +4892,11 @@
     },
     {
       "name": "inbound",
-      "description": "M2 入库 schema"
+      "description": "M2 入库业务规则"
+    },
+    {
+      "name": "inventory",
+      "description": "M3 库存批次与状态"
     },
     {
       "name": "reports",
@@ -3395,6 +4909,14 @@
     {
       "name": "config-center",
       "description": "M1-008 配置中心"
+    },
+    {
+      "name": "cold-chain",
+      "description": "M5 外部冷链数据接入"
+    },
+    {
+      "name": "billing",
+      "description": "M9 计费账户与合同"
     }
   ]
 }
