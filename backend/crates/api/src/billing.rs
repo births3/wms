@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use uuid::Uuid;
 use wms_domain::{
     BillingAccount, BillingContract, BillingRule, CreateBillingAccountRequest,
@@ -17,6 +17,8 @@ pub enum BillingError {
     DuplicateAccountCode(String),
     DuplicateContractNo(String),
     InvalidRate,
+    InvalidEffectiveWindow,
+    BillingRuleConflict,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -66,13 +68,18 @@ impl BillingStore {
         }) {
             return Err(BillingError::DuplicateContractNo(req.contract_no));
         }
+        let valid_from = parse_date(&req.valid_from)?;
+        let valid_to = parse_date(&req.valid_to)?;
+        if valid_to < valid_from {
+            return Err(BillingError::InvalidEffectiveWindow);
+        }
         let contract = BillingContract {
             id: Uuid::new_v4(),
             owner_id: ctx.owner_id,
             account_id: account.id,
             contract_no: req.contract_no,
-            valid_from: req.valid_from,
-            valid_to: req.valid_to,
+            valid_from: valid_from.to_string(),
+            valid_to: valid_to.to_string(),
             status: "active".to_string(),
             created_at: now,
         };
@@ -94,6 +101,26 @@ impl BillingStore {
             .get(&req.contract_id)
             .filter(|contract| contract.owner_id == ctx.owner_id)
             .ok_or(BillingError::NotFound)?;
+        let effective_from = parse_date(&req.effective_from)?;
+        let effective_to = parse_date(&req.effective_to)?;
+        if effective_to < effective_from {
+            return Err(BillingError::InvalidEffectiveWindow);
+        }
+        for existing in self.rules.values() {
+            if existing.owner_id != ctx.owner_id
+                || existing.contract_id != contract.id
+                || existing.charge_item != req.charge_item
+                || existing.unit != req.unit
+                || existing.billing_cycle != req.billing_cycle
+            {
+                continue;
+            }
+            let existing_from = parse_date(&existing.effective_from)?;
+            let existing_to = parse_date(&existing.effective_to)?;
+            if existing_from <= effective_to && existing_to >= effective_from {
+                return Err(BillingError::BillingRuleConflict);
+            }
+        }
         let rule = BillingRule {
             id: Uuid::new_v4(),
             owner_id: ctx.owner_id,
@@ -102,8 +129,8 @@ impl BillingStore {
             unit: req.unit,
             unit_price_cents: req.unit_price_cents,
             billing_cycle: req.billing_cycle,
-            effective_from: req.effective_from,
-            effective_to: req.effective_to,
+            effective_from: effective_from.to_string(),
+            effective_to: effective_to.to_string(),
             created_at: now,
         };
         self.rules.insert(rule.id, rule.clone());
@@ -117,6 +144,10 @@ impl BillingStore {
             .cloned()
             .collect()
     }
+}
+
+fn parse_date(value: &str) -> Result<NaiveDate, BillingError> {
+    NaiveDate::parse_from_str(value, "%Y-%m-%d").map_err(|_| BillingError::InvalidEffectiveWindow)
 }
 
 #[cfg(test)]
@@ -239,5 +270,103 @@ mod tests {
         );
 
         assert!(matches!(result, Err(BillingError::InvalidRate)));
+    }
+
+    #[test]
+    fn billing_effective_windows_reject_invalid_or_overlapping_ranges() {
+        let now = Utc
+            .with_ymd_and_hms(2026, 6, 4, 15, 0, 0)
+            .single()
+            .expect("valid time");
+        let ctx = ctx(Uuid::new_v4());
+        let mut store = BillingStore::default();
+        let account = store
+            .create_account(
+                &ctx,
+                CreateBillingAccountRequest {
+                    account_code: "OWNER-A-BILL".to_string(),
+                    account_name: "Owner A Billing".to_string(),
+                },
+                now,
+            )
+            .expect("account");
+
+        let invalid_contract = store.create_contract(
+            &ctx,
+            CreateBillingContractRequest {
+                account_id: account.id,
+                contract_no: "CONTRACT-INVALID".to_string(),
+                valid_from: "2027-01-01".to_string(),
+                valid_to: "2026-01-01".to_string(),
+            },
+            now,
+        );
+        assert!(matches!(
+            invalid_contract,
+            Err(BillingError::InvalidEffectiveWindow)
+        ));
+
+        let contract = store
+            .create_contract(
+                &ctx,
+                CreateBillingContractRequest {
+                    account_id: account.id,
+                    contract_no: "CONTRACT-VALID".to_string(),
+                    valid_from: "2026-06-01".to_string(),
+                    valid_to: "2027-05-31".to_string(),
+                },
+                now,
+            )
+            .expect("contract");
+        store
+            .create_rule(
+                &ctx,
+                CreateBillingRuleRequest {
+                    contract_id: contract.id,
+                    charge_item: "storage".to_string(),
+                    unit: "pallet_day".to_string(),
+                    unit_price_cents: 100,
+                    billing_cycle: "monthly".to_string(),
+                    effective_from: "2026-06-01".to_string(),
+                    effective_to: "2026-06-30".to_string(),
+                },
+                now,
+            )
+            .expect("first rule");
+
+        let overlapping = store.create_rule(
+            &ctx,
+            CreateBillingRuleRequest {
+                contract_id: contract.id,
+                charge_item: "storage".to_string(),
+                unit: "pallet_day".to_string(),
+                unit_price_cents: 110,
+                billing_cycle: "monthly".to_string(),
+                effective_from: "2026-06-15".to_string(),
+                effective_to: "2026-07-15".to_string(),
+            },
+            now,
+        );
+        assert!(matches!(
+            overlapping,
+            Err(BillingError::BillingRuleConflict)
+        ));
+
+        let next_window = store
+            .create_rule(
+                &ctx,
+                CreateBillingRuleRequest {
+                    contract_id: contract.id,
+                    charge_item: "storage".to_string(),
+                    unit: "pallet_day".to_string(),
+                    unit_price_cents: 120,
+                    billing_cycle: "monthly".to_string(),
+                    effective_from: "2026-07-01".to_string(),
+                    effective_to: "2026-07-31".to_string(),
+                },
+                now,
+            )
+            .expect("next window");
+        assert_eq!(next_window.unit_price_cents, 120);
     }
 }
