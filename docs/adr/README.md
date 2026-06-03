@@ -27,7 +27,7 @@
 | [ADR-0013](0013-config-secrets.md) | 配置与 secrets 管理 | Accepted | 三层配置（编译/环境/运行时）+ Vault/k8s Secret + 90 天密钥轮换 + check_secrets.py 治理 |
 | [ADR-0014](0014-data-migration.md) | 数据迁移策略（legacy → wms）| Accepted | Debezium CDC + 双写 + 货主级灰度 + 4 维校验 + 30 分钟回滚 RTO |
 | [ADR-0015](0015-multi-end-rules.md) | 多端业务规则放置 | Accepted | A/B/C 三级规则分类 + OpenAPI schema 单一事实之源 + PDA 离线扩展 + check_multi_end_consistency.py 治理 |
-| [ADR-0016](0016-deployment.md) | 部署形态（Docker / k8s）| Accepted | docker-compose（小型 3PL）+ Kubernetes（大型连锁）双轨 + Dockerfile 模板 + Migration 4 步走 |
+| [ADR-0016](0016-deployment.md) | 部署形态（Docker / k8s）| Accepted | docker-compose / Kubernetes 双轨 + Migration 4 步走 + Feature Flag 配置中心迁移 v3.2 |
 
 ## 已取代
 

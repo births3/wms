@@ -6,26 +6,27 @@
 
 ---
 
-## 当前 Wave：Wave 1 — 横向底座收口（开发完成）
+## 当前 Wave：Wave 2 — 业务底座 + Schema 先行（开发完成）
 
-**目标**：H1 权限 / H2 审计 / H3 OpenAPI / 文件版 Feature Flag + 自动回滚 / web-admin 壳工程 / W1.F-G-H + H-FILE 契约联合评审全部通过出口检查。
+**目标**：M1 基础档案、M2 入库收货单 schema、M6 报表骨架、M-PM 参数对照、M1-008 配置中心版 Feature Flag 迁移链路全部通过出口检查。
 
 ### 已完成（静态证据）
 
-- [x] W1.A H1：`AuthContext`、JWT claims、`owner_id` 隔离、Redis blacklist、`permissions_changed_at`、AUTH-004 / AUTH-009 单测
-- [x] W1.B H2：`audit_event` migration、append-only trigger、真实 PostgreSQL `append_event`、链头锁、封档 helper、真实 PostgreSQL append/seal 集成测试
-- [x] W1.C H3：`openapi-export` → `shared/openapi/openapi.json` → `@wms/api-client` 类型生成
-- [x] W1.D static：`deploy/feature_flags.toml` + 后端文件版 reader + `check_feature_flags.py` 进入 T1
-- [x] W1.E：`apps/web-admin` 壳工程复用 `@wms/ui` 与 `@wms/api-client`，接入 H1/H2/H3 展示
-- [x] W1.F/G/H + H-FILE：ADR-0030/0031/0032/0033 Accepted，依赖图与 retro 已登记联合评审
+- [x] W2.A：M1.a 商品 / 供应商 / 客户 / 仓库 / 库位 / 特殊药品分类 schema + 基础 CRUD
+- [x] W2.B：M2 收货单 schema + 基础 CRUD 骨架（不写业务规则）
+- [x] W2.C：M6 报表查询接口骨架
+- [x] W2.E：M-PM 参数对照服务覆盖字典 / 规则 / 待映射队列 / 执行 API / 反向追溯
+- [x] W2.G static：M1-008 配置中心版 Feature Flag 覆盖迁移 / 导出 / 批量导入 / 对账 / 切换读取源 / 旧文件归档
+- [x] H3 同步：`shared/openapi/openapi.json` 与 `packages/api-client/src/schema.ts` 已反映 Wave 2 完整 schema
+- [x] 治理：`check_openapi_contract.py` 要求 Wave 2 path/schema；`report_wave2_completion.py` + `just wave-2-complete-check` 落地
 
-### 后续跟踪（不计入 Wave 1 开发完成）
+### 后续跟踪（不计入 Wave 2 开发完成）
 
-- W1.B pre-release runtime gate：有稳定 dev 环境后，按 [Wave 1 Pre-release Runtime Evidence Runbook](docs/runbooks/wave-1-runtime-evidence.md) 在真实 dev PostgreSQL 采集 60M baseline + wrk 1k QPS × 1 小时 + P99 < 200ms + 7 天封档 cron 0 失败，写入 `docs/retros/wave-1-h2-runtime-evidence.json`
-- W1.D pre-release runtime gate：有稳定 dev/staging 后，按 [Wave 1 Pre-release Runtime Evidence Runbook](docs/runbooks/wave-1-runtime-evidence.md) 用真实 smoke gate 或 Prometheus 信号触发回滚成功，写入 `docs/retros/wave-1-runtime-evidence.json`
-- W1-external：人工确认“码上放心”账号外部开通状态；外部依赖仍按 [ROADMAP.md](ROADMAP.md) 的外部依赖追踪表跟进
+- W2.G pre-release runtime gate：有稳定 dev/staging 后，按 [Wave 2 Pre-release Runtime Evidence Runbook](docs/runbooks/wave-2-runtime-evidence.md) 验证配置中心版 Feature Flag 迁移、对账、切源、旧文件归档和 smoke，写入 `docs/retros/wave-2-runtime-evidence.json`
+- W1.B / W1.D pre-release runtime gate：仍按 [Wave 1 Pre-release Runtime Evidence Runbook](docs/runbooks/wave-1-runtime-evidence.md) 在真实环境补齐
+- W2-external：人工确认“码上放心”账号外部开通状态；外部依赖仍按 [ROADMAP.md](ROADMAP.md) 的外部依赖追踪表跟进
 
-当前 Wave 1 开发完成状态以 `just wave-1-complete-check` 为准；上述 runtime gate 在预发布前用 `just wave-1-runtime-evidence-validate` 单独验证，禁止用 localhost / stub / mock / fake / example 代替。
+当前 Wave 2 开发完成状态以 `just wave-2-complete-check` 为准；上述 runtime gate 在预发布前用 `just wave-2-runtime-evidence-validate` 单独验证，禁止用 localhost / stub / mock / fake / example 代替。
 
 ---
 

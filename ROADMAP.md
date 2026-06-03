@@ -87,10 +87,11 @@ M11 监管 EDI 已移除：码上放心由 M-TC 承接，药监 EDI 由 ERP/H8 �
 
 ---
 
-## Wave 2：业务底座 + Schema 先行
+## Wave 2：业务底座 + Schema 先行（开发完成）
 
 **周期**：3-4 周
 **目标**：核心 schema 落地，基础 CRUD 可用。
+**当前状态**：开发完成；`just wave-2-complete-check` 为 Wave 2 开发完成门禁。当前尚无稳定 dev/staging，配置中心版灰度链路真实 runtime evidence 后移为预发布 gate，按 `docs/runbooks/wave-2-runtime-evidence.md` 补齐。
 
 并行任务：
 
@@ -98,9 +99,11 @@ M11 监管 EDI 已移除：码上放心由 M-TC 承接，药监 EDI 由 ERP/H8 �
 - W2.B：M2 入库 schema 设计（不写业务规则）
 - W2.C：M6 报表查询接口骨架
 - W2.E：**M-PM 参数对照模块**（v24 新增）：字典 / 规则 / 待映射队列 / 执行 API / 反向追溯，作为 M1 接收 ERP 不规则字段的前置依赖
-- W2.G：Feature Flag 存储后端从 W1 文件版迁移到 M1-008 配置中心（含导出 / 批量导入 / 对账 / 切换读取源 / 旧文件归档；具体脚本路径 / 命名 / 审批主体由本任务实施时定义并回写 ADR-0016 v3.2+；参 ADR-0016 §Feature Flag 治理 v3.1.3）
+- W2.G：Feature Flag 存储后端从 W1 文件版迁移到 M1-008 配置中心（含导出 / 批量导入 / 对账 / 切换读取源 / 旧文件归档；实施口径已回写 ADR-0016 v3.2；参 ADR-0016 §Feature Flag 治理）
 
-**完成标准**：核心 schema 落地；商品 / 供应商 / 收货单基础 CRUD 可用；M-PM 可处理 ERP 推送的不规则字段；OpenAPI 反映完整 schema；**配置中心版灰度链路（M1-008 后端）在 dev / staging 验证可用**；W1 文件版 flag 已迁移至 M1-008 且对账通过。
+**开发完成标准**：核心 schema 落地；商品 / 供应商 / 收货单基础 CRUD 可用；M-PM 可处理 ERP 推送的不规则字段；OpenAPI 反映完整 schema；配置中心版 Feature Flag 后端覆盖迁移 / 导出 / 批量导入 / 对账 / 切换读取源 / 旧文件归档；`just wave-2-complete-check` 通过。
+
+**预发布 gate**：配置中心版灰度链路（M1-008 后端）必须在真实 dev / staging 验证可用；W1 文件版 flag 迁移至 M1-008 且对账通过；证据写入 `docs/retros/wave-2-runtime-evidence.json` 并通过 `just wave-2-runtime-evidence-validate`。不得使用 localhost / stub / mock / fake / example 边界。
 
 ---
 

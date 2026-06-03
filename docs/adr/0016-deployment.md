@@ -308,6 +308,17 @@ if feature_flags.is_enabled("m4_outbound_v2_picker", &owner_id, &user_id) {
     3. 应用切换读取源（feature flag SDK 改 backend）；灰度部署验证
     4. 旧 TOML 文件归档（具体归档路径与命名约定 W2 实施时定）；环境变量从 docker-compose / k8s manifest 删除
     5. 迁移脚本（W2 实施时新建，路径与脚本名待定；运行需双人审批，**审批主体（运维 / 仓库主管 / DBA / 业务方）由 W2 实施任务定义并回写**）
+- **Wave 2 v3.2 实施回写**：
+  - 配置中心 Feature Flag API 由 `wms-api` OpenAPI 暴露：
+    - `POST /api/v1/config-center/feature-flags/migrate`
+    - `POST /api/v1/config-center/feature-flags/import`
+    - `GET /api/v1/config-center/feature-flags/export`
+    - `GET /api/v1/config-center/feature-flags/reconcile`
+    - `POST /api/v1/config-center/feature-flags/source`
+    - `POST /api/v1/config-center/feature-flags/archive-file-source`
+  - 开发完成静态证据由 `just wave-2-complete-check` 校验；该检查覆盖 M1-008 迁移、批量导入、导出、对账、切换读取源、旧文件归档和 OpenAPI schema。
+  - 真实 dev/staging 灰度证据按 `docs/runbooks/wave-2-runtime-evidence.md` 采集，写入 `docs/retros/wave-2-runtime-evidence.json`，并由 `just wave-2-runtime-evidence-validate` 作为预发布 gate 校验。
+  - 当前若没有稳定 dev/staging，不得用 localhost / mock / fake / example 证据替代；只能标记为预发布 gate。
 - **生命周期**：每个 flag 必须有 **owner + 创建日期 + 计划清理日期**；默认 90 天后必须清理（要么全量启用，要么删功能）
 - **审计**：flag 状态变更纳入 H2 审计追踪（actor / before / after / approval_source）
 - **治理脚本**（与灰度链路同步落地于 Wave 1，参 ROADMAP W1.D）：`check_feature_flags.py` 校验过期 flag 必须清理
@@ -381,3 +392,4 @@ if feature_flags.is_enabled("m4_outbound_v2_picker", &owner_id, &user_id) {
 | 2026-05-18 | v3.1.1 | Feature Flag 治理修订：存储分波次降级（Wave 1 用环境变量/TOML 文件，Wave 2 起迁配置中心 M1-008）；治理脚本 `check_feature_flags.py` 落地波次从 Wave 2 提前到 Wave 1（与灰度链路同步，参 ROADMAP W1.D）|
 | 2026-05-18 | v3.1.2 | 补 Wave 1 → Wave 2 Feature Flag 迁移路径：5 步走 + 迁移脚本 `feature_flags_w1_to_w2.py` + 双人审批（关联 ADR-0014 数据迁移策略；ADR-0013 v1.1 同步加 cross-ref）|
 | 2026-05-18 | v3.1.3 | §灰度发布策略顶部加「ADR 性质声明」明示方向性 ADR + 实施级细节由 W1.D / W2 迁移任务回写；修订迁移路径段去掉具体脚本名 / 目录 / 审批主体（B1-B3 修），改"参 ADR-0014"为"对账思路对齐 ADR-0014 §数据校验规则"避免过度引用 |
+| 2026-06-03 | v3.2 | Wave 2 W2.G 实施回写：配置中心 Feature Flag API 路径、`just wave-2-complete-check` 静态完成门禁、`docs/runbooks/wave-2-runtime-evidence.md` + `just wave-2-runtime-evidence-validate` 预发布 runtime evidence 门禁；明确无稳定 dev/staging 时不得伪造证据 |
