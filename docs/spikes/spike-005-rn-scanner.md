@@ -212,3 +212,13 @@ SPIKE-005 是 PDA 实施前的技术验证（不是原型），按 ROADMAP 应�
 | Expo managed | RN bare 已是预设方向；spike 启动时如发现 Expo 也能装 native module（实体扫码键），可重新评估 |
 | flipper / Reactotron 调试 | spike 范围外，工程化决策延到 Wave 3 |
 | OTA 热更新（CodePush 等）| GSP 监管考虑：app 升级须留痕 + 可审计；当前不引入 |
+
+### 7.7 Wave 3 readiness 决策（2026-06-03）
+
+用户确认：先落 readiness/runbook，不引入 RN 依赖，不创建 `apps/pda-mobile` 生产 app。
+
+执行口径：
+
+- 以 [Wave 3 PDA Readiness Runbook](../runbooks/wave-3-pda-readiness.md) 作为 SPIKE-005 启动前置。
+- SPIKE-005 继续保持 deferred；真 PDA 和 dev/staging 到位后重新计时 2 天。
+- RN bare / 实体扫码键 / 离线队列持久化 / ADR-0027 均等 SPIKE-005 启动后再落。
