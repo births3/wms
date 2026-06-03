@@ -18,14 +18,15 @@
 - [x] W3.D backend：M9 计费账户 / 合同 / 规则模型与基础校验
 - [x] W3 handler shell：Wave 3 第一批 Axum handler 组合已接入权限检查、错误响应与 H2 审计写入；覆盖 M2 workflow / M3 inventory / M5 cold-chain / M9 billing
 - [x] W3 repository design：ADR-0034 已 Accepted，确认 Wave 3 第一批 PostgreSQL 表结构与事务边界
+- [x] W3 repository first slice：新增 Wave 3 core tables migration；M2 收货闭环一单一次 + 幂等、M2 上架与 M3 库存/流水同事务、M9 生效期冲突均有真实 PostgreSQL 测试覆盖
 - [x] H3 同步：`shared/openapi/openapi.json` 与 `packages/api-client/src/schema.ts` 已反映 Wave 3 第一批 path/schema
 - [x] 治理：`check_openapi_contract.py` 要求 Wave 3 第一批 path/schema
 
 ### 进行中 / 待做
 
 - [ ] W3.A PDA 端：`apps/pda-mobile` 目前只有 `.gitkeep`，生产 PDA app 未启动；SPIKE-005 RN 扫枪仍需按 ROADMAP 启动条件重开
-- [ ] W3.A repository / idempotency：把 M2 workflow handler 接入 PostgreSQL repository、HTTP-level 幂等键、H2 PostgreSQL 审计落库
-- [ ] W3.B repository：把 M3 库存服务接入 PostgreSQL repository，补 L3-L5/L8/L11 关键路径测试
+- [ ] W3.A handler persistence：把 M2 workflow handler 从 in-memory state 切到 PostgreSQL repository，并把成功 mutation 写入 H2 PostgreSQL 审计表
+- [ ] W3.B repository：补 M3 状态变更 / 查询 repository，补 L3-L5/L8/L11 关键路径测试
 - [ ] W3.C external auth：外部冷链系统 API Key 接入、H-INT 契约与 PostgreSQL 审计落库
 - [ ] W3.D 后续：M9 自动计费与账单管理仍在 Wave 5；当前只完成账户/合同/规则模型
 - [ ] W3 完成门禁：M2 / M3 关键路径 11 层测试覆盖；GSP 资质有效期校验生效
