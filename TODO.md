@@ -17,6 +17,7 @@
 - [x] W3.C backend：M5 外部温控数据/超标事件接入 schema 与幂等服务；保持 WMS 不采集、不判定超标的边界
 - [x] W3.D backend：M9 计费账户 / 合同 / 规则模型与基础校验
 - [x] W3 handler shell：Wave 3 第一批 Axum handler 组合已接入权限检查、错误响应与 H2 审计写入；覆盖 M2 workflow / M3 inventory / M5 cold-chain / M9 billing
+- [x] W3 repository design：ADR-0034（Proposed）已起草 Wave 3 第一批 PostgreSQL 表结构与事务边界，待用户确认后落 migration
 - [x] H3 同步：`shared/openapi/openapi.json` 与 `packages/api-client/src/schema.ts` 已反映 Wave 3 第一批 path/schema
 - [x] 治理：`check_openapi_contract.py` 要求 Wave 3 第一批 path/schema
 

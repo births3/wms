@@ -428,6 +428,7 @@
 | [docs/adr/0015-multi-end-rules.md](docs/adr/0015-multi-end-rules.md) | **多端业务规则放置**（A/B/C 三级 + OpenAPI 共享 schema）|
 | [docs/adr/0016-deployment.md](docs/adr/0016-deployment.md) | **部署形态**（docker-compose / k8s 双轨 + Migration 4 步走）|
 | [docs/adr/0024-auth-model.md](docs/adr/0024-auth-model.md) | **鉴权模型**（JWT + AuthContext + Access Token 1h / Refresh Token 24h + Redis blacklist / permissions_changed_at + owner_id 隔离）|
+| [docs/adr/0034-wave-3-operational-postgres-schema.md](docs/adr/0034-wave-3-operational-postgres-schema.md) | **Wave 3 PostgreSQL 持久化模型草案**（M2/M3/M5/M9 首批业务表 + 幂等表 + repository 事务边界，Proposed）|
 | [docs/error-codes.md](docs/error-codes.md) | **错误码字典**（v3.1 初版 50 项，单一事实之源）|
 | [docs/adr/0029-frontend-as-prototype-workflow.md](docs/adr/0029-frontend-as-prototype-workflow.md) | **前端原型先行工作流**（原型走查后经 checklist 迁移生产；禁止原型页直接复制为生产页）|
 | [docs/prototypes/prototype-to-production.md](docs/prototypes/prototype-to-production.md) | **原型转生产迁移清单**（用户故事 / API 契约 / 权限 / 审计 / 幂等 / 视觉基线）|
