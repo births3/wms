@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""check_openapi_contract.py — Wave 1 OpenAPI 合同最小校验
+"""check_openapi_contract.py — Wave 1/2 OpenAPI 合同最小校验
 
 类别：5. 接口契约治理
 Tier：T2（< 10s）
@@ -27,12 +27,93 @@ REQUIRED_PATHS = (
     "/api/v1/auth/login",
     "/api/v1/auth/me",
     "/api/v1/audit/events",
+    "/api/v1/master-data/products",
+    "/api/v1/master-data/products/{id}",
+    "/api/v1/master-data/suppliers",
+    "/api/v1/master-data/suppliers/{id}",
+    "/api/v1/master-data/customers",
+    "/api/v1/master-data/customers/{id}",
+    "/api/v1/master-data/warehouses",
+    "/api/v1/master-data/warehouses/{id}",
+    "/api/v1/master-data/locations",
+    "/api/v1/master-data/locations/{id}",
+    "/api/v1/master-data/special-drug-categories",
+    "/api/v1/master-data/special-drug-categories/{id}",
+    "/api/v1/inbound/receiving-orders",
+    "/api/v1/inbound/receiving-orders/{id}",
+    "/api/v1/reports/query",
+    "/api/v1/parameter-mapping/execute",
+    "/api/v1/parameter-mapping/traces/{execution_id}",
+    "/api/v1/config-center/feature-flags/migrate",
+    "/api/v1/config-center/feature-flags/reconcile",
+    "/api/v1/config-center/feature-flags/export",
+    "/api/v1/config-center/feature-flags/import",
+    "/api/v1/config-center/feature-flags/source",
+    "/api/v1/config-center/feature-flags/archive-file-source",
+)
+REQUIRED_SCHEMAS = (
+    "Product",
+    "CreateProductRequest",
+    "UpdateProductRequest",
+    "ProductListResponse",
+    "Supplier",
+    "CreateSupplierRequest",
+    "UpdateSupplierRequest",
+    "SupplierListResponse",
+    "Customer",
+    "CreateCustomerRequest",
+    "UpdateCustomerRequest",
+    "CustomerListResponse",
+    "Warehouse",
+    "CreateWarehouseRequest",
+    "UpdateWarehouseRequest",
+    "WarehouseListResponse",
+    "Location",
+    "CreateLocationRequest",
+    "UpdateLocationRequest",
+    "LocationListResponse",
+    "SpecialDrugCategory",
+    "CreateSpecialDrugCategoryRequest",
+    "UpdateSpecialDrugCategoryRequest",
+    "SpecialDrugCategoryListResponse",
+    "ReceivingOrder",
+    "ReceivingOrderLine",
+    "CreateReceivingOrderRequest",
+    "UpdateReceivingOrderRequest",
+    "ReceivingOrderListResponse",
+    "ReportQueryRequest",
+    "ReportQueryResponse",
+    "ReportRow",
+    "MappingDictionary",
+    "MappingRule",
+    "MappingQueueItem",
+    "ExecuteMappingRequest",
+    "ExecuteMappingResponse",
+    "MappingTraceResponse",
+    "ConfigEntry",
+    "FeatureFlagArchiveRequest",
+    "FeatureFlagArchiveResult",
+    "FeatureFlagBatchImportRequest",
+    "FeatureFlagBatchImportResult",
+    "FeatureFlagConfig",
+    "FeatureFlagExportResponse",
+    "FeatureFlagMigrationResult",
+    "FeatureFlagReconcileReport",
+    "FeatureFlagSourceSwitchRequest",
+    "FeatureFlagSourceSwitchResponse",
 )
 HTTP_METHODS = {"get", "post", "put", "patch", "delete", "options", "head"}
 ERROR_RESPONSE_REF = "#/components/schemas/ErrorResponse"
 REQUIRED_FREE_FORM_PROPERTIES = {
     "AuditEvent": ("diff",),
+    "ConfigEntry": ("config_value",),
     "ErrorResponse": ("details",),
+    "ExecuteMappingRequest": ("raw_payload",),
+    "ExecuteMappingResponse": ("normalized_payload",),
+    "MappingQueueItem": ("raw_payload",),
+    "MappingTraceResponse": ("raw_payload", "normalized_payload"),
+    "ReportQueryRequest": ("filters",),
+    "ReportRow": ("values",),
 }
 
 
@@ -114,10 +195,17 @@ def check_openapi_contract(data: object) -> tuple[list[Issue], dict[str, object]
     stats = {
         "required_paths": list(REQUIRED_PATHS),
         "present_paths": present_paths,
+        "required_schemas": list(REQUIRED_SCHEMAS),
         "required_free_form_properties": {
             key: list(value) for key, value in REQUIRED_FREE_FORM_PROPERTIES.items()
         },
     }
+    if isinstance(schemas, dict):
+        present_schemas = set(schemas)
+        for schema_name in REQUIRED_SCHEMAS:
+            if schema_name not in present_schemas:
+                issues.append(Issue("missing_schema", f"缺少必需 schema: {schema_name}"))
+
     return issues, stats
 
 
@@ -125,6 +213,7 @@ def load_and_check_contract(path: Path = OPENAPI_JSON) -> tuple[list[Issue], dic
     if not path.exists():
         return [Issue("missing", f"缺少 {path.relative_to(REPO_ROOT)}")], {
             "required_paths": list(REQUIRED_PATHS),
+            "required_schemas": list(REQUIRED_SCHEMAS),
             "present_paths": [],
             "path": str(path.relative_to(REPO_ROOT)),
         }
@@ -134,6 +223,7 @@ def load_and_check_contract(path: Path = OPENAPI_JSON) -> tuple[list[Issue], dic
     except json.JSONDecodeError as e:
         return [Issue("invalid_json", f"JSON 解析失败: {e}")], {
             "required_paths": list(REQUIRED_PATHS),
+            "required_schemas": list(REQUIRED_SCHEMAS),
             "present_paths": [],
             "path": str(path.relative_to(REPO_ROOT)),
         }
@@ -164,7 +254,7 @@ def main(argv: list[str] | None = None) -> int:
         print("check_openapi_contract (T2, 接口契约治理)")
         print(f"  · path: {stats.get('path', 'shared/openapi/openapi.json')}")
         if ok:
-            print("  ✓ Wave 1 必需 path 与 401 ErrorResponse 约束均满足")
+            print("  ✓ Wave 1/2 必需 path、schema 与 401 ErrorResponse 约束均满足")
         else:
             print(f"  ✘ 发现 {len(issues)} 个合同问题:")
             for issue in issues:

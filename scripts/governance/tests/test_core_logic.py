@@ -2163,6 +2163,26 @@ def test_check_openapi_contract_requires_free_form_json_properties():
     assert any(issue.kind == "missing_free_form_object" for issue in issues)
 
 
+def test_check_openapi_contract_requires_wave2_paths_and_schemas():
+    """Wave 2 核心 schema 先行合同缺失时必须失败。"""
+    from check_openapi_contract import check_openapi_contract
+
+    issues, stats = check_openapi_contract({
+        "paths": {
+            "/api/v1/healthz": {"get": {"responses": {"200": {"description": "ok"}}}},
+            "/api/v1/auth/login": {"post": {"responses": {"200": {"description": "ok"}}}},
+            "/api/v1/auth/me": {"get": {"responses": {"200": {"description": "ok"}}}},
+            "/api/v1/audit/events": {"get": {"responses": {"200": {"description": "ok"}}}},
+        },
+        "components": {"schemas": {"ErrorResponse": {"properties": {}}}},
+    })
+
+    assert "/api/v1/master-data/products" in stats["required_paths"]
+    assert "Product" in stats["required_schemas"]
+    assert any(issue.kind == "missing_path" for issue in issues)
+    assert any(issue.kind == "missing_schema" for issue in issues)
+
+
 def test_openapi_in_sync_strict_cargo_timeout_fails(tmp_path, monkeypatch, capsys):
     """严格模式下 cargo 超时不能被当作同步通过。"""
     import json

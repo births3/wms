@@ -193,6 +193,18 @@ wave-1-status:
 wave-1-complete-check:
     @python3 scripts/governance/report_wave1_completion.py --strict
 
+# 报告 Wave 2 完成度（默认不阻塞；出口检查用 --strict）
+wave-2-status:
+    @python3 scripts/governance/report_wave2_completion.py
+
+# Wave 2 开发完成出口检查（真实 dev/staging runtime evidence 作为预发布 gate 单独验证）
+wave-2-complete-check:
+    @python3 scripts/governance/report_wave2_completion.py --strict
+
+# Wave 2 配置中心 Feature Flag runtime evidence 预发布验证
+wave-2-runtime-evidence-validate:
+    @python3 scripts/governance/report_wave2_completion.py --strict --require-runtime-evidence
+
 # 定向验证两份 Wave 1 runtime evidence JSON（不检查其他静态完成项）
 wave-1-runtime-evidence-validate:
     @python3 scripts/governance/validate_wave1_runtime_evidence.py --kind all
