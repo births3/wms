@@ -1,0 +1,20 @@
+# Wave 1 file-backed Feature Flag registry.
+#
+# Runtime flags are intentionally empty until a Wave task introduces a real
+# guarded rollout. Each future flag must include:
+#   key, owner, created_at, cleanup_by, enabled
+# and cleanup_by must be within 90 days of created_at.
+#
+# Example:
+# [[flags]]
+# key = "h1_auth_login_v1"
+# owner = "platform"
+# created_at = 2026-06-02
+# cleanup_by = 2026-08-31
+# enabled = false
+
+flags = []
+
+[meta]
+schema_version = "1"
+source = "wave1-file"
