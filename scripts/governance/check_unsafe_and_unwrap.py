@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""check_unsafe_and_unwrap.py — Rust unsafe / unwrap 禁用校验
+"""check_unsafe_and_unwrap.py — Rust unsafe / panic shortcut 禁用校验
 
 类别：2. 代码治理
 Tier：T2（< 10s）
@@ -7,12 +7,12 @@ Tier：T2（< 10s）
 输出：人类可读 + --json
 退出码：
   0  通过
-  1  发现 unsafe 或 unwrap
+  1  发现 unsafe / unwrap / expect / panic
   2  脚本自身错误
 
 说明：
-- 仅检查 `unsafe` 与 `.unwrap()`
-- `expect(...)` 目前允许
+- 生产路径禁止 `unsafe` / `.unwrap()` / `.expect()` / `panic!()`
+- 测试代码允许 `.unwrap()` / `.expect()` / `panic!()`
 """
 from __future__ import annotations
 
@@ -30,6 +30,10 @@ BACKEND_CRATES = REPO_ROOT / "backend" / "crates"
 
 UNSAFE_RE = re.compile(r"\bunsafe\b")
 UNWRAP_RE = re.compile(r"\.unwrap\s*\(")
+EXPECT_RE = re.compile(r"\.expect\s*\(")
+PANIC_RE = re.compile(r"\bpanic!\s*\(")
+TEST_ATTR_RE = re.compile(r"#\s*\[\s*(?:test|tokio::test|sqlx::test)\b")
+CFG_TEST_RE = re.compile(r"#\s*\[\s*cfg\s*\(\s*test\s*\)\s*\]")
 
 
 @dataclass
@@ -128,8 +132,48 @@ def strip_rust_comments_and_strings(text: str) -> str:
     return "".join(out)
 
 
+def _is_test_file(path: str) -> bool:
+    normalized = path.replace("\\", "/")
+    return "/tests/" in normalized or normalized.startswith("tests/")
+
+
+def test_code_lines(text: str, *, path: str) -> set[int]:
+    lines = text.splitlines()
+    if _is_test_file(path):
+        return set(range(1, len(lines) + 1))
+
+    test_lines: set[int] = set()
+    pending_test_attr = False
+    test_block_depth: int | None = None
+
+    for lineno, line in enumerate(lines, start=1):
+        if test_block_depth is not None:
+            test_lines.add(lineno)
+            test_block_depth += line.count("{") - line.count("}")
+            if test_block_depth <= 0:
+                test_block_depth = None
+            continue
+
+        if CFG_TEST_RE.search(line) or TEST_ATTR_RE.search(line):
+            test_lines.add(lineno)
+            pending_test_attr = True
+            continue
+
+        if pending_test_attr:
+            test_lines.add(lineno)
+            if "{" in line:
+                test_block_depth = line.count("{") - line.count("}")
+                if test_block_depth <= 0:
+                    test_block_depth = None
+                pending_test_attr = False
+            continue
+
+    return test_lines
+
+
 def find_unsafe_unwrap_issues(text: str, *, path: str) -> list[Issue]:
     sanitized = strip_rust_comments_and_strings(text)
+    test_lines = test_code_lines(text, path=path)
     issues: list[Issue] = []
     for lineno, line in enumerate(sanitized.splitlines(), start=1):
         if not line.strip():
@@ -141,12 +185,28 @@ def find_unsafe_unwrap_issues(text: str, *, path: str) -> list[Issue]:
                 kind="unsafe",
                 detail="禁止使用 unsafe",
             ))
+        if lineno in test_lines:
+            continue
         if UNWRAP_RE.search(line):
             issues.append(Issue(
                 path=path,
                 line=lineno,
                 kind="unwrap",
                 detail="禁止使用 .unwrap()",
+            ))
+        if EXPECT_RE.search(line):
+            issues.append(Issue(
+                path=path,
+                line=lineno,
+                kind="expect",
+                detail="生产路径禁止使用 .expect()",
+            ))
+        if PANIC_RE.search(line):
+            issues.append(Issue(
+                path=path,
+                line=lineno,
+                kind="panic",
+                detail="生产路径禁止使用 panic!()",
             ))
     return issues
 
@@ -183,12 +243,12 @@ def main(argv: list[str] | None = None) -> int:
         print("check_unsafe_and_unwrap (T2, 代码治理)")
         print(f"  · scanned: {scanned_files} file(s)")
         if ok:
-            print("  ✓ 未发现 unsafe 或 .unwrap()")
+            print("  ✓ 未发现 unsafe / 生产路径 .unwrap() / .expect() / panic!()")
         else:
             print(f"  ✘ 发现 {len(issues)} 处违规:")
             for issue in issues:
                 print(f"    [{issue.kind}] {issue.path}:{issue.line} {issue.detail}")
-            print("  · 说明：本脚本仅检查 unsafe 与 .unwrap()，不限制 expect(...)")
+            print("  · 说明：测试代码允许 .unwrap() / .expect() / panic!()")
 
     return 0 if ok else 1
 

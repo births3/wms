@@ -270,7 +270,7 @@ impl IntoResponse for AppError {
 - api crate：负责把 domain error / anyhow error 转为 HTTP 响应
 - **禁止**：生产路径使用 `.unwrap()` / `.expect()` / `panic!()`
 - **禁止**：吞掉错误（`let _ = fallible_fn();`）
-- **允许**：测试代码中使用 `.unwrap()`
+- **允许**：测试代码中使用 `.unwrap()` / `.expect()` / `panic!()`
 
 ### 1.4 API Handler 模式
 

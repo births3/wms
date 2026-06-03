@@ -3,9 +3,8 @@
 use utoipa::OpenApi;
 use wms_api::ApiDoc;
 
-fn main() {
-    let json = ApiDoc::openapi()
-        .to_pretty_json()
-        .expect("OpenAPI 序列化失败");
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let json = ApiDoc::openapi().to_pretty_json()?;
     println!("{json}");
+    Ok(())
 }

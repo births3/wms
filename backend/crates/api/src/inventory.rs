@@ -65,7 +65,7 @@ impl InventoryStore {
             .map(|batch| batch.id);
 
         let batch = if let Some(id) = existing_id {
-            let batch = self.batches.get_mut(&id).expect("existing batch id");
+            let batch = self.batches.get_mut(&id).ok_or(InventoryError::NotFound)?;
             batch.qty_on_hand += req.qty;
             batch.updated_at = now;
             batch.clone()

@@ -1943,15 +1943,23 @@ def test_layer_dependency_detects_forbidden_refs():
     assert [issue.kind for issue in issues] == ["api", "axum", "sqlx", "infra"]
 
 
-def test_unsafe_and_unwrap_ignores_comments_and_expect():
-    """注释中的 unsafe/unwrap 与 expect(...) 不应误报。"""
+def test_unsafe_and_unwrap_ignores_comments_and_test_shortcuts():
+    """注释中的关键字不误报，测试代码允许 unwrap/expect/panic。"""
     from check_unsafe_and_unwrap import find_unsafe_unwrap_issues
 
     issues = find_unsafe_unwrap_issues(
         "\n".join([
             "// unsafe { ptr.read() }",
-            "let value = result.expect(\"unsafe unwrap message only\");",
             "/* another unwrap() mention */",
+            "#[cfg(test)]",
+            "mod tests {",
+            "  #[test]",
+            "  fn allows_test_shortcuts() {",
+            "    let value = result.expect(\"test setup\");",
+            "    let other = option.unwrap();",
+            "    panic!(\"expected test failure\");",
+            "  }",
+            "}",
         ]),
         path="backend/crates/api/src/lib.rs",
     )
@@ -1959,19 +1967,21 @@ def test_unsafe_and_unwrap_ignores_comments_and_expect():
     assert issues == []
 
 
-def test_unsafe_and_unwrap_detects_real_usage():
-    """真实 unsafe / unwrap 必须报错。"""
+def test_unsafe_and_unwrap_detects_real_production_usage():
+    """生产路径 unsafe / unwrap / expect / panic 必须报错。"""
     from check_unsafe_and_unwrap import find_unsafe_unwrap_issues
 
     issues = find_unsafe_unwrap_issues(
         "\n".join([
             "unsafe { core::ptr::read(p) };",
             "let value = option.unwrap();",
+            "let value = result.expect(\"must exist\");",
+            "panic!(\"unreachable\");",
         ]),
         path="backend/crates/api/src/lib.rs",
     )
 
-    assert [issue.kind for issue in issues] == ["unsafe", "unwrap"]
+    assert [issue.kind for issue in issues] == ["unsafe", "unwrap", "expect", "panic"]
 
 
 def test_handler_test_coverage_extracts_unique_paths():
