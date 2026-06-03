@@ -448,5 +448,5 @@
 | 61 | M2 收货闭环记录基数 | 一单一次闭环，`receiving_order_receipts` 加 `unique(receiving_order_id)` |
 | 62 | M2 上架与 M3 库存事务 | 同事务写 `receiving_putaways` + `inventory_batches` + `inventory_movements`，不接受上架和库存余额不一致窗口 |
 | 63 | M9 规则生效期字段 | 现在补 `effective_from` / `effective_to` 到 API 和 PostgreSQL 表，支撑规则生效日期冲突校验 |
-| 64 | GSP 资质有效期校验来源 | 先做接口占位，完成门禁前确认 M1 本地资质表或 ERP/H8 校验端口 |
+| 64 | GSP 资质有效期校验来源 | 继续保留接口占位，暂不冻结 M1 本地资质表或 ERP/H8 校验端口；Wave 3 不因此标记完成 |
 | 65 | M5 温控读数分区 | 先用普通表 + 索引，不按月分区；真实容量证据出来后再评估分区 |
