@@ -2483,6 +2483,8 @@
           "unit",
           "unit_price_cents",
           "billing_cycle",
+          "effective_from",
+          "effective_to",
           "created_at"
         ],
         "properties": {
@@ -2499,6 +2501,12 @@
           "created_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "effective_from": {
+            "type": "string"
+          },
+          "effective_to": {
+            "type": "string"
           },
           "id": {
             "type": "string",
@@ -2672,7 +2680,9 @@
           "charge_item",
           "unit",
           "unit_price_cents",
-          "billing_cycle"
+          "billing_cycle",
+          "effective_from",
+          "effective_to"
         ],
         "properties": {
           "billing_cycle": {
@@ -2684,6 +2694,12 @@
           "contract_id": {
             "type": "string",
             "format": "uuid"
+          },
+          "effective_from": {
+            "type": "string"
+          },
+          "effective_to": {
+            "type": "string"
           },
           "unit": {
             "type": "string"

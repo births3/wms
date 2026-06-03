@@ -735,6 +735,8 @@ export interface components {
             contract_id: string;
             /** Format: date-time */
             created_at: string;
+            effective_from: string;
+            effective_to: string;
             /** Format: uuid */
             id: string;
             /** Format: uuid */
@@ -797,6 +799,8 @@ export interface components {
             charge_item: string;
             /** Format: uuid */
             contract_id: string;
+            effective_from: string;
+            effective_to: string;
             unit: string;
             /** Format: int64 */
             unit_price_cents: number;
