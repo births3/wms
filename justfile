@@ -201,6 +201,14 @@ wave-2-status:
 wave-2-complete-check:
     @python3 scripts/governance/report_wave2_completion.py --strict
 
+# 报告 Wave 3 完成度（默认不阻塞；出口检查用 --strict）
+wave-3-status:
+    @python3 scripts/governance/report_wave3_completion.py
+
+# Wave 3 开发完成出口检查
+wave-3-complete-check:
+    @python3 scripts/governance/report_wave3_completion.py --strict
+
 # Wave 2 配置中心 Feature Flag runtime evidence 预发布验证
 wave-2-runtime-evidence-validate:
     @python3 scripts/governance/report_wave2_completion.py --strict --require-runtime-evidence
