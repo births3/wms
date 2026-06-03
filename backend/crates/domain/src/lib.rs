@@ -857,6 +857,8 @@ pub struct BillingRule {
     pub unit: String,
     pub unit_price_cents: i64,
     pub billing_cycle: String,
+    pub effective_from: String,
+    pub effective_to: String,
     pub created_at: DateTime<Utc>,
 }
 
@@ -867,4 +869,6 @@ pub struct CreateBillingRuleRequest {
     pub unit: String,
     pub unit_price_cents: i64,
     pub billing_cycle: String,
+    pub effective_from: String,
+    pub effective_to: String,
 }

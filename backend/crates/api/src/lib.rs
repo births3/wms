@@ -12,6 +12,7 @@ pub mod master_data;
 pub mod parameter_mapping;
 pub mod reports;
 pub mod wave3_handlers;
+pub mod wave3_repository;
 
 use utoipa::OpenApi;
 use wms_domain::{

@@ -102,6 +102,8 @@ impl BillingStore {
             unit: req.unit,
             unit_price_cents: req.unit_price_cents,
             billing_cycle: req.billing_cycle,
+            effective_from: req.effective_from,
+            effective_to: req.effective_to,
             created_at: now,
         };
         self.rules.insert(rule.id, rule.clone());
@@ -179,6 +181,8 @@ mod tests {
                     unit: "order".to_string(),
                     unit_price_cents: 100,
                     billing_cycle: "monthly".to_string(),
+                    effective_from: "2026-06-01".to_string(),
+                    effective_to: "2026-06-30".to_string(),
                 },
                 now,
             )
@@ -228,6 +232,8 @@ mod tests {
                 unit: "pallet_day".to_string(),
                 unit_price_cents: -1,
                 billing_cycle: "monthly".to_string(),
+                effective_from: "2026-06-01".to_string(),
+                effective_to: "2026-06-30".to_string(),
             },
             now,
         );
