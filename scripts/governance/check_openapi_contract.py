@@ -1,0 +1,181 @@
+#!/usr/bin/env python3
+"""check_openapi_contract.py — Wave 1 OpenAPI 合同最小校验
+
+类别：5. 接口契约治理
+Tier：T2（< 10s）
+输入：shared/openapi/openapi.json
+输出：人类可读 + --json
+退出码：
+  0  通过
+  1  合同缺失或 401 ErrorResponse 约束不满足
+  2  脚本自身错误
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from dataclasses import asdict, dataclass
+from pathlib import Path
+
+
+_THIS = Path(__file__).resolve()
+REPO_ROOT = _THIS.parent.parent.parent
+OPENAPI_JSON = REPO_ROOT / "shared" / "openapi" / "openapi.json"
+REQUIRED_PATHS = (
+    "/api/v1/healthz",
+    "/api/v1/auth/login",
+    "/api/v1/auth/me",
+    "/api/v1/audit/events",
+)
+HTTP_METHODS = {"get", "post", "put", "patch", "delete", "options", "head"}
+ERROR_RESPONSE_REF = "#/components/schemas/ErrorResponse"
+REQUIRED_FREE_FORM_PROPERTIES = {
+    "AuditEvent": ("diff",),
+    "ErrorResponse": ("details",),
+}
+
+
+@dataclass
+class Issue:
+    kind: str
+    detail: str
+
+
+def _has_error_response(operation: object) -> bool:
+    if not isinstance(operation, dict):
+        return False
+    responses = operation.get("responses")
+    if not isinstance(responses, dict):
+        return False
+    resp_401 = responses.get("401")
+    if not isinstance(resp_401, dict):
+        return False
+    content = resp_401.get("content")
+    if not isinstance(content, dict):
+        return False
+    app_json = content.get("application/json")
+    if not isinstance(app_json, dict):
+        return False
+    schema = app_json.get("schema")
+    return isinstance(schema, dict) and schema.get("$ref") == ERROR_RESPONSE_REF
+
+
+def check_openapi_contract(data: object) -> tuple[list[Issue], dict[str, object]]:
+    issues: list[Issue] = []
+    if not isinstance(data, dict):
+        return [Issue("invalid_type", "openapi.json 顶层必须是 JSON object")], {
+            "required_paths": list(REQUIRED_PATHS),
+            "present_paths": [],
+        }
+
+    paths = data.get("paths")
+    if not isinstance(paths, dict):
+        return [Issue("missing_paths", "缺少 paths object")], {
+            "required_paths": list(REQUIRED_PATHS),
+            "present_paths": [],
+        }
+
+    present_paths = sorted(paths.keys())
+    for required_path in REQUIRED_PATHS:
+        if required_path not in paths:
+            issues.append(Issue("missing_path", f"缺少必需 path: {required_path}"))
+
+    for path, path_item in paths.items():
+        if path == "/api/v1/healthz" or not isinstance(path_item, dict):
+            continue
+        for method, operation in path_item.items():
+            if method.lower() not in HTTP_METHODS:
+                continue
+            if not _has_error_response(operation):
+                issues.append(Issue(
+                    "missing_401_error_response",
+                    f"{path} {method.upper()} 缺少 401 ErrorResponse",
+                ))
+
+    components = data.get("components")
+    schemas = components.get("schemas") if isinstance(components, dict) else {}
+    if isinstance(schemas, dict):
+        for schema_name, property_names in REQUIRED_FREE_FORM_PROPERTIES.items():
+            schema = schemas.get(schema_name)
+            properties = schema.get("properties") if isinstance(schema, dict) else {}
+            for property_name in property_names:
+                prop = properties.get(property_name) if isinstance(properties, dict) else None
+                if not (
+                    isinstance(prop, dict)
+                    and prop.get("type") == "object"
+                    and prop.get("additionalProperties") is True
+                ):
+                    issues.append(Issue(
+                        "missing_free_form_object",
+                        f"{schema_name}.{property_name} 必须是 type=object + additionalProperties=true",
+                    ))
+
+    stats = {
+        "required_paths": list(REQUIRED_PATHS),
+        "present_paths": present_paths,
+        "required_free_form_properties": {
+            key: list(value) for key, value in REQUIRED_FREE_FORM_PROPERTIES.items()
+        },
+    }
+    return issues, stats
+
+
+def load_and_check_contract(path: Path = OPENAPI_JSON) -> tuple[list[Issue], dict[str, object]]:
+    if not path.exists():
+        return [Issue("missing", f"缺少 {path.relative_to(REPO_ROOT)}")], {
+            "required_paths": list(REQUIRED_PATHS),
+            "present_paths": [],
+            "path": str(path.relative_to(REPO_ROOT)),
+        }
+
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        return [Issue("invalid_json", f"JSON 解析失败: {e}")], {
+            "required_paths": list(REQUIRED_PATHS),
+            "present_paths": [],
+            "path": str(path.relative_to(REPO_ROOT)),
+        }
+
+    issues, stats = check_openapi_contract(data)
+    stats["path"] = str(path.relative_to(REPO_ROOT))
+    return issues, stats
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--json", action="store_true", help="输出 JSON")
+    args = parser.parse_args(argv)
+
+    issues, stats = load_and_check_contract()
+    ok = not issues
+
+    if args.json:
+        print(json.dumps({
+            "check": "check_openapi_contract",
+            "tier": "T2",
+            "category": "接口契约治理",
+            **stats,
+            "issues": [asdict(i) for i in issues],
+            "ok": ok,
+        }, ensure_ascii=False, indent=2))
+    else:
+        print("check_openapi_contract (T2, 接口契约治理)")
+        print(f"  · path: {stats.get('path', 'shared/openapi/openapi.json')}")
+        if ok:
+            print("  ✓ Wave 1 必需 path 与 401 ErrorResponse 约束均满足")
+        else:
+            print(f"  ✘ 发现 {len(issues)} 个合同问题:")
+            for issue in issues:
+                print(f"    [{issue.kind}] {issue.detail}")
+
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception as e:  # noqa: BLE001
+        print(f"script error: {e}", file=sys.stderr)
+        sys.exit(2)

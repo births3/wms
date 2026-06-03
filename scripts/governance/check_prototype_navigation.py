@@ -124,6 +124,7 @@ def main() -> int:
         print(json.dumps({
             "status": "fail" if issues else "pass",
             "issues": [asdict(issue) for issue in issues],
+            "ok": not issues,
         }, ensure_ascii=False, indent=2))
     else:
         if issues:

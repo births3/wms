@@ -52,7 +52,13 @@ class ScriptResult:
     duration_ms: int
 
 
-def run_one(check_name: str, json_mode: bool) -> ScriptResult:
+# task_check --strict 时，这些脚本自身也必须以严格语义执行。
+STRICT_SCRIPT_ARGS = {
+    "check_openapi_in_sync": ["--strict"],
+}
+
+
+def run_one(check_name: str, json_mode: bool, *, strict_mode: bool = False) -> ScriptResult:
     import time
 
     script = SCRIPTS_DIR / f"{check_name}.py"
@@ -61,6 +67,8 @@ def run_one(check_name: str, json_mode: bool) -> ScriptResult:
             name=check_name, matched_files=0, exit_code=-1, duration_ms=0
         )
     cmd = [sys.executable, str(script)]
+    if strict_mode:
+        cmd.extend(STRICT_SCRIPT_ARGS.get(check_name, []))
     if json_mode:
         cmd.append("--json")
     start = time.perf_counter()
@@ -111,7 +119,7 @@ def main(argv: list[str] | None = None) -> int:
     results: list[ScriptResult] = []
     for check_name, files in triggered.items():
         print(f"  · running {check_name}  (matched {len(files)} files)")
-        r = run_one(check_name, json_mode=args.json)
+        r = run_one(check_name, json_mode=args.json, strict_mode=args.strict)
         r.matched_files = len(files)
         if r.exit_code == -1:
             # 脚本未实现：根据 --strict 决定是阻塞还是降级

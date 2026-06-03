@@ -74,6 +74,12 @@ match = "governance/gate-rules.toml"
 checks = ["validate_environment"]
 tier = "T1"
 
+# Wave 1 W1.D：文件版 Feature Flag 必须登记 owner / 创建日期 / 90 天清理期
+[[rules]]
+match = "deploy/feature_flags.toml"
+checks = ["check_feature_flags"]
+tier = "T1"
+
 # v25 字段追溯矩阵：相关变更触发字段一致性核对
 [[rules]]
 match = "docs/compliance/gsp-field-traceability.md"
@@ -203,10 +209,25 @@ match = "docs/compliance/gsp-business-rules-registry.md"
 checks = ["check_business_rules_registry"]
 tier = "T1"
 
-# Wave 2 启用：检查 OpenAPI 契约
+# Wave 1 W1.C 启用：检查 OpenAPI 契约同步
 [[rules]]
 match = "shared/openapi/openapi.json"
-checks = ["validate_openapi_artifacts", "check_openapi_contract"]
+checks = ["check_openapi_in_sync", "validate_openapi_artifacts", "check_openapi_contract"]
+tier = "T2"
+
+[[rules]]
+match = "backend/crates/api/**"
+checks = ["check_openapi_in_sync", "validate_openapi_artifacts", "check_openapi_contract"]
+tier = "T2"
+
+[[rules]]
+match = "backend/crates/domain/**"
+checks = ["check_openapi_in_sync", "validate_openapi_artifacts", "check_openapi_contract"]
+tier = "T2"
+
+[[rules]]
+match = "packages/api-client/src/schema.ts"
+checks = ["check_openapi_in_sync", "validate_openapi_artifacts", "check_openapi_contract"]
 tier = "T2"
 
 # Wave 3 启用：审计追踪覆盖（库存变更必须经 audit 层）

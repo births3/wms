@@ -33,9 +33,8 @@ TABS_FILE = REPO_ROOT / "prototypes" / "src" / "Tabs.tsx"
 MATRIX_FILE = REPO_ROOT / "docs" / "prototypes" / "prototype-matrix-r3.md"
 
 GENERIC_FIELDS = {"故事", "对象", "单据号", "批号", "数量", "审计"}
-MODULE_RE = re.compile(r'^\s*([A-Z0-9]+):\s*\{(?P<body>.*)\},?\s*$', re.MULTILINE)
 ARRAY_RE_TEMPLATE = r'{name}:\s*\[(.*?)\]'
-STRING_RE = re.compile(r'"([^"]+)"')
+STRING_RE = re.compile(r'"([^"\\]*(?:\\.[^"\\]*)*)"')
 SPEC_BLOCK_RE = re.compile(r'\{\s*storyId:\s*"[^"]+".*?\n\s*\},?', re.DOTALL)
 SPEC_PROP_RE = re.compile(r'(storyId|title|end|reason|group|moduleCode|slug):\s*"([^"]*)"')
 PROFILE_RE = re.compile(r'if\s*\(/(.+?)/([a-z]*)\.test\(text\)\)\s*\{.*?return\s*\{(.*?)\};', re.DOTALL)
@@ -96,6 +95,98 @@ def _string_values_from_array(body: str, name: str) -> list[str]:
     return STRING_RE.findall(m.group(1))
 
 
+def _matching_brace(text: str, open_index: int) -> int | None:
+    depth = 0
+    in_string: str | None = None
+    escaped = False
+    in_line_comment = False
+    in_block_comment = False
+
+    i = open_index
+    while i < len(text):
+        ch = text[i]
+        nxt = text[i + 1] if i + 1 < len(text) else ""
+
+        if in_line_comment:
+            if ch == "\n":
+                in_line_comment = False
+            i += 1
+            continue
+
+        if in_block_comment:
+            if ch == "*" and nxt == "/":
+                in_block_comment = False
+                i += 2
+                continue
+            i += 1
+            continue
+
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == in_string:
+                in_string = None
+            i += 1
+            continue
+
+        if ch == "/" and nxt == "/":
+            in_line_comment = True
+            i += 2
+            continue
+        if ch == "/" and nxt == "*":
+            in_block_comment = True
+            i += 2
+            continue
+        if ch in {'"', "'", "`"}:
+            in_string = ch
+            i += 1
+            continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return i
+        i += 1
+
+    return None
+
+
+def _object_body_after(text: str, marker: str) -> str:
+    marker_index = text.find(marker)
+    if marker_index < 0:
+        return ""
+    open_index = text.find("{", marker_index)
+    if open_index < 0:
+        return ""
+    close_index = _matching_brace(text, open_index)
+    if close_index is None:
+        return ""
+    return text[open_index + 1:close_index]
+
+
+def _top_level_object_entries(body: str) -> dict[str, str]:
+    entries: dict[str, str] = {}
+    pos = 0
+    key_re = re.compile(r"\b([A-Z0-9]+)\s*:\s*\{")
+
+    while True:
+        match = key_re.search(body, pos)
+        if not match:
+            break
+        code = match.group(1)
+        open_index = match.end() - 1
+        close_index = _matching_brace(body, open_index)
+        if close_index is None:
+            break
+        entries[code] = body[open_index + 1:close_index]
+        pos = close_index + 1
+
+    return entries
+
+
 def _module_codes_from_specs() -> set[str]:
     if not SPECS_FILE.exists():
         return set()
@@ -143,9 +234,8 @@ def _blueprints() -> dict[str, dict[str, list[str]]]:
         return {}
     text = MODEL_FILE.read_text(encoding="utf-8")
     out: dict[str, dict[str, list[str]]] = {}
-    for m in MODULE_RE.finditer(text):
-        code = m.group(1)
-        body = m.group("body")
+    body_by_code = _top_level_object_entries(_object_body_after(text, "MODULE_BLUEPRINTS"))
+    for code, body in body_by_code.items():
         out[code] = {
             "fields": _string_values_from_array(body, "fields"),
             "steps": _string_values_from_array(body, "steps"),
@@ -315,6 +405,7 @@ def main() -> int:
         print(json.dumps({
             "status": "fail" if issues else "pass",
             "issues": [asdict(i) for i in issues],
+            "ok": not issues,
         }, ensure_ascii=False, indent=2))
     else:
         if issues:

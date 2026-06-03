@@ -67,7 +67,7 @@ _t2-banner:
 
 _t2-diff-checks:
     @echo "  · diff-driven governance checks"
-    @python3 scripts/governance/task_check.py --tier T2 || true
+    @python3 scripts/governance/task_check.py --tier T2 --strict
 
 _t2-unit-tests:
     @echo "  · L1 unit tests (placeholder, [WAVE-2])"
@@ -163,6 +163,15 @@ gov-t1:
 gov-t2:
     @python3 scripts/governance/governance_checks.py --tier T2
 
+# 生成主仓 OpenAPI JSON 并刷新 @wms/api-client 类型
+openapi-sync:
+    @cd backend && cargo run --quiet --bin openapi-export > ../shared/openapi/openapi.json
+    @pnpm --filter @wms/api-client gen:schema
+
+# 检查主仓 OpenAPI JSON 与后端 utoipa 定义同步
+openapi-check:
+    @python3 scripts/governance/check_openapi_in_sync.py --strict
+
 # ============================================================
 # 工作流辅助
 # ============================================================
@@ -175,6 +184,100 @@ status:
     @echo "  worktree: $(git rev-parse --git-common-dir 2>/dev/null || echo 'no-git')"
     @echo ""
     @if [ -f TODO.md ]; then echo "── TODO.md ──"; head -20 TODO.md; fi
+
+# 报告 Wave 1 完成度（默认不阻塞；出口检查用 --strict）
+wave-1-status:
+    @python3 scripts/governance/report_wave1_completion.py
+
+# Wave 1 出口检查（未完成返回非零）
+wave-1-complete-check:
+    @python3 scripts/governance/report_wave1_completion.py --strict
+
+# 定向验证两份 Wave 1 runtime evidence JSON（不检查其他静态完成项）
+wave-1-runtime-evidence-validate:
+    @python3 scripts/governance/validate_wave1_runtime_evidence.py --kind all
+
+# Wave 1 runtime evidence 前置检查：H2 dev PostgreSQL + wrk 输入边界
+wave-1-runtime-prereq-h2:
+    @python3 scripts/governance/check_wave1_runtime_evidence_prereqs.py --mode h2
+
+# Wave 1 H2 DB readiness：跑 1 小时 wrk 前先确认 dev DB 基线与封档已满足
+wave-1-h2-runtime-readiness:
+    @python3 scripts/governance/check_wave1_runtime_evidence_prereqs.py --mode h2 && \
+      python3 scripts/governance/check_wave1_h2_runtime_readiness.py \
+        --database-url "$WAVE1_H2_DATABASE_URL"
+
+# Wave 1 runtime evidence 前置检查：k8s 自动回滚输入边界
+wave-1-runtime-prereq-rollback-k8s:
+    @python3 scripts/governance/check_wave1_runtime_evidence_prereqs.py --mode rollback-k8s
+
+# Wave 1 W1.D readiness：校验 k8s 自动回滚边界，不触发 rollback、不写 evidence
+wave-1-rollback-runtime-readiness-k8s:
+    @python3 scripts/governance/check_wave1_runtime_evidence_prereqs.py --mode rollback-k8s && \
+      deploy/scripts/wave1_auto_rollback_probe.sh \
+        --check-only \
+        --environment "$WAVE1_ROLLBACK_ENVIRONMENT" \
+        --target k8s \
+        --deployment "${WAVE1_K8S_DEPLOYMENT:-wms-api}" \
+        --context "$WAVE1_K8S_CONTEXT" \
+        --namespace "$WAVE1_K8S_NAMESPACE" \
+        --evidence-file docs/retros/wave-1-runtime-evidence.json \
+        --rollback-log-ref "$WAVE1_ROLLBACK_LOG_REF" \
+        --external-log-ref "$WAVE1_EXTERNAL_LOG_REF"
+
+# Wave 1 runtime evidence 前置检查：docker-compose 自动回滚输入边界
+wave-1-runtime-prereq-rollback-compose:
+    @python3 scripts/governance/check_wave1_runtime_evidence_prereqs.py --mode rollback-compose
+
+# Wave 1 W1.D readiness：校验 docker-compose 自动回滚边界，不触发 rollback、不写 evidence
+wave-1-rollback-runtime-readiness-compose:
+    @python3 scripts/governance/check_wave1_runtime_evidence_prereqs.py --mode rollback-compose && \
+      deploy/scripts/wave1_auto_rollback_probe.sh \
+        --check-only \
+        --environment "$WAVE1_ROLLBACK_ENVIRONMENT" \
+        --target docker-compose \
+        --previous-version "$WAVE1_PREVIOUS_VERSION" \
+        --compose-file "$WAVE1_COMPOSE_FILE" \
+        --evidence-file docs/retros/wave-1-runtime-evidence.json \
+        --rollback-log-ref "$WAVE1_ROLLBACK_LOG_REF" \
+        --external-log-ref "$WAVE1_EXTERNAL_LOG_REF"
+
+# 采集 Wave 1 H2 runtime 证据：必须在真实 dev PostgreSQL + wrk 压测完成后运行
+wave-1-h2-runtime-evidence:
+    @python3 scripts/governance/check_wave1_runtime_evidence_prereqs.py --mode h2 --require-wrk-output && \
+      python3 scripts/governance/collect_wave1_h2_runtime_evidence.py \
+        --database-url "$WAVE1_H2_DATABASE_URL" \
+        --wrk-output "$WAVE1_H2_WRK_OUTPUT" \
+        --benchmark-log-ref "$WAVE1_H2_BENCHMARK_LOG_REF" \
+        --cron-log-ref "$WAVE1_H2_CRON_LOG_REF" \
+        --duration-seconds "${WAVE1_H2_DURATION_SECONDS:-3600}" \
+        --target-qps "${WAVE1_H2_TARGET_QPS:-1000}" \
+        --seal-failure-count "${WAVE1_H2_SEAL_FAILURE_COUNT:-0}"
+
+# 采集 Wave 1 k8s 自动回滚 runtime 证据：SMOKE_URL 或 PROMETHEUS_URL + PROMETHEUS_QUERY 必须指向真实 dev/staging
+wave-1-rollback-runtime-evidence-k8s:
+    @python3 scripts/governance/check_wave1_runtime_evidence_prereqs.py --mode rollback-k8s && \
+      deploy/scripts/wave1_auto_rollback_probe.sh \
+        --environment "$WAVE1_ROLLBACK_ENVIRONMENT" \
+        --target k8s \
+        --deployment "${WAVE1_K8S_DEPLOYMENT:-wms-api}" \
+        --context "$WAVE1_K8S_CONTEXT" \
+        --namespace "$WAVE1_K8S_NAMESPACE" \
+        --evidence-file docs/retros/wave-1-runtime-evidence.json \
+        --rollback-log-ref "$WAVE1_ROLLBACK_LOG_REF" \
+        --external-log-ref "$WAVE1_EXTERNAL_LOG_REF"
+
+# 采集 Wave 1 docker-compose 自动回滚 runtime 证据：SMOKE_URL 或 PROMETHEUS_URL + PROMETHEUS_QUERY 必须指向真实 dev/staging
+wave-1-rollback-runtime-evidence-compose:
+    @python3 scripts/governance/check_wave1_runtime_evidence_prereqs.py --mode rollback-compose && \
+      deploy/scripts/wave1_auto_rollback_probe.sh \
+        --environment "$WAVE1_ROLLBACK_ENVIRONMENT" \
+        --target docker-compose \
+        --previous-version "$WAVE1_PREVIOUS_VERSION" \
+        --compose-file "$WAVE1_COMPOSE_FILE" \
+        --evidence-file docs/retros/wave-1-runtime-evidence.json \
+        --rollback-log-ref "$WAVE1_ROLLBACK_LOG_REF" \
+        --external-log-ref "$WAVE1_EXTERNAL_LOG_REF"
 
 # 列出所有治理脚本
 gov-list:

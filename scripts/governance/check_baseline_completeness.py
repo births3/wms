@@ -156,6 +156,7 @@ def main() -> int:
         print(json.dumps({
             "status": "fail" if errors else "pass",
             "errors": errors,
+            "ok": not errors,
             "tabs_in_code": sorted(set_tabs),
             "tabs_in_manifest": sorted(set_manifest),
         }))

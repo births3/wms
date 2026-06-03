@@ -85,10 +85,14 @@ def parse_doc_section() -> dict[str, str]:
 
 
 def parse_gate_rules() -> dict[str, str]:
-    """从 gate-rules.toml 解析 {check_name: tier}（仅占位规则，跳过已实现脚本）。"""
+    """从 gate-rules.toml 的 Wave 计划段解析 {check_name: tier}。"""
     if not GATE_RULES.exists():
         return {}
     text = GATE_RULES.read_text(encoding="utf-8")
+    start = text.find("# 占位规则")
+    end = text.find("# 兜底规则", start)
+    if start != -1 and end != -1:
+        text = text[start:end]
 
     try:
         import tomllib
@@ -98,13 +102,9 @@ def parse_gate_rules() -> dict[str, str]:
         data = tomli.loads(text)
 
     scripts: dict[str, str] = {}
-    scripts_dir = REPO_ROOT / "scripts" / "governance"
     for r in data.get("rules", []):
         tier = r.get("tier", "T2")
         for c in r.get("checks", []):
-            # 跳过当前已实现的脚本（不算"占位"）
-            if (scripts_dir / f"{c}.py").exists():
-                continue
             # 同一脚本在多规则出现时，取首次的 tier
             if c not in scripts:
                 scripts[c] = tier

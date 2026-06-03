@@ -90,6 +90,7 @@ def main():
             "status": "fail" if errors else "pass",
             "errors": errors,
             "warnings": warnings,
+            "ok": not errors,
         }))
     else:
         if errors:

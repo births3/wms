@@ -70,3 +70,16 @@ tier = "T2"
     assert rules[0].tier == "T1"
     assert rules[1].match == "tests/**"
     assert rules[1].tier == "T2"
+
+
+def test_wave1_openapi_rules_cover_domain_and_generated_schema():
+    """domain schema 与生成 TS 类型变更都必须触发 OpenAPI 同步检查。"""
+    rules = [r for r in load_gate_rules() if r.tier == "T2"]
+    triggered = match_rules([
+        "backend/crates/domain/src/lib.rs",
+        "packages/api-client/src/schema.ts",
+    ], rules)
+
+    assert "check_openapi_in_sync" in triggered
+    assert "backend/crates/domain/src/lib.rs" in triggered["check_openapi_in_sync"]
+    assert "packages/api-client/src/schema.ts" in triggered["check_openapi_in_sync"]

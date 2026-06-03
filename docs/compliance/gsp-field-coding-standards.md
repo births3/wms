@@ -50,6 +50,7 @@
 | 短文本（编码、状态）| `VARCHAR(N)` | `String` | N ≤ 32 |
 | 长文本（描述、备注）| `TEXT` | `String` | 无长度限制 |
 | 整数 ID | `BIGINT` | `i64` | 不用 `INT`（防止溢出）|
+| 有界计数 / 配置阈值 | `INT` | `i32` | 仅限非 ID 字段，必须有范围校验 |
 | 数量 | `NUMERIC(15,3)` | `Decimal` | 整数 12 位 + 小数 3 位 |
 | 金额 | `NUMERIC(15,2)` | `Decimal` | 不用 `FLOAT` / `DOUBLE`（精度问题）|
 | 温度 | `NUMERIC(5,2)` | `Decimal` | 范围 `-99.99 ~ 999.99` |
@@ -63,7 +64,7 @@
 ### 3.2 禁用类型
 
 - ❌ `FLOAT` / `DOUBLE`：财务、数量类不允许（精度损失）
-- ❌ `INT` / `SERIAL`：主键统一 `BIGINT` / `BIGSERIAL`（防止 21 亿行溢出）
+- ❌ ID 类字段使用 `INT` / `SERIAL`：主键统一 `BIGINT` / `BIGSERIAL`（防止 21 亿行溢出）；非 ID 的有界计数 / 配置阈值可用 `INT`，但必须声明范围校验
 - ❌ `TIMESTAMP`（不带时区）：必须 `TIMESTAMPTZ`
 - ❌ `CHAR(N)` 定长：用 `VARCHAR(N)` 或 `TEXT`
 - ❌ 数组类型 `ARRAY[]`：除非有明确不可变集合语义（如 `经营范围 TEXT[]`）

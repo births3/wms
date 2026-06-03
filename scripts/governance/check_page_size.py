@@ -95,6 +95,7 @@ def main():
             "status": "fail" if errors else "pass",
             "errors": errors,
             "warnings": warnings,
+            "ok": not errors,
             "thresholds": {"warning": WARN_THRESHOLD, "error": ERROR_THRESHOLD},
         }))
     else:

@@ -50,9 +50,12 @@ TIER_SCRIPTS: dict[str, list[str]] = {
         "check_config_center_consistency.py",
         "check_pda_story_completeness.py",
         "check_gsp_field_traceability.py",
+        "check_field_coding_standards.py",
+        "check_business_rules_registry.py",
         "check_baseline_health.py",
         "check_governance_consistency.py",
         "check_integration_contract.py",
+        "check_feature_flags.py",
         "check_commit_convention.py",
         "check_prototype_index_consistency.py",
         "check_prototype_story_sync.py",
@@ -68,8 +71,11 @@ TIER_SCRIPTS: dict[str, list[str]] = {
         "check_baseline_completeness.py",
     ],
     "T2": [
-        # T1 + diff 驱动（由 task_check.py 处理）
-        # 这里只追加 T2 专属脚本，未来 Wave 2+ 加入
+        # T1 + diff 驱动（task_check.py）之外，T2 全量入口也要跑
+        # 影响跨端契约的同步检查，避免非 diff 场景漏掉生成物漂移。
+        "check_openapi_in_sync.py",
+        "validate_openapi_artifacts.py",
+        "check_openapi_contract.py",
         "check_prototype_review_signoff.py",
     ],
     "T3": [
@@ -84,6 +90,11 @@ TIER_SCRIPTS: dict[str, list[str]] = {
     ],
 }
 
+# 单脚本附加参数：全量 Tier 入口必须用严格语义运行关键契约检查。
+SCRIPT_ARGS: dict[str, list[str]] = {
+    "check_openapi_in_sync.py": ["--strict"],
+}
+
 
 @dataclass
 class ScriptResult:
@@ -95,7 +106,7 @@ class ScriptResult:
 def run_script(name: str, *, json_mode: bool) -> ScriptResult:
     import time
 
-    cmd = [sys.executable, str(SCRIPTS_DIR / name)]
+    cmd = [sys.executable, str(SCRIPTS_DIR / name), *SCRIPT_ARGS.get(name, [])]
     if json_mode:
         cmd.append("--json")
     start = time.perf_counter()

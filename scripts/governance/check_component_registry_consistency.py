@@ -95,7 +95,7 @@ def main():
         sys.exit(2)
 
     if args.json:
-        print(json.dumps({"status": "fail" if errors else "pass", "errors": errors}))
+        print(json.dumps({"status": "fail" if errors else "pass", "errors": errors, "ok": not errors}))
     else:
         if errors:
             print(f"✗ check_component_registry_consistency: {len(errors)} 项违规")
