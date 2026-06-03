@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""check_openapi_contract.py — Wave 1/2 OpenAPI 合同最小校验
+"""check_openapi_contract.py — Wave 1/2/3 OpenAPI 合同最小校验
 
 类别：5. 接口契约治理
 Tier：T2（< 10s）
@@ -41,6 +41,13 @@ REQUIRED_PATHS = (
     "/api/v1/master-data/special-drug-categories/{id}",
     "/api/v1/inbound/receiving-orders",
     "/api/v1/inbound/receiving-orders/{id}",
+    "/api/v1/inbound/receiving-orders/{id}/receive",
+    "/api/v1/inbound/receiving-orders/{id}/inspect",
+    "/api/v1/inbound/receiving-orders/{id}/sign",
+    "/api/v1/inbound/receiving-orders/{id}/putaway",
+    "/api/v1/inventory/batches",
+    "/api/v1/inventory/batches/putaway",
+    "/api/v1/inventory/batches/status",
     "/api/v1/reports/query",
     "/api/v1/parameter-mapping/execute",
     "/api/v1/parameter-mapping/traces/{execution_id}",
@@ -50,6 +57,12 @@ REQUIRED_PATHS = (
     "/api/v1/config-center/feature-flags/import",
     "/api/v1/config-center/feature-flags/source",
     "/api/v1/config-center/feature-flags/archive-file-source",
+    "/api/v1/cold-chain/devices",
+    "/api/v1/cold-chain/readings",
+    "/api/v1/cold-chain/excursions",
+    "/api/v1/billing/accounts",
+    "/api/v1/billing/contracts",
+    "/api/v1/billing/rules",
 )
 REQUIRED_SCHEMAS = (
     "Product",
@@ -81,6 +94,19 @@ REQUIRED_SCHEMAS = (
     "CreateReceivingOrderRequest",
     "UpdateReceivingOrderRequest",
     "ReceivingOrderListResponse",
+    "ReceiveReceivingOrderRequest",
+    "ReceivingOrderReceipt",
+    "InspectReceivingOrderRequest",
+    "ReceivingInspectionRecord",
+    "SignInspectionRequest",
+    "InspectionSignatureRecord",
+    "PutawayRequest",
+    "PutawayRecord",
+    "InventoryBatch",
+    "InventoryBatchListResponse",
+    "PutawayInventoryRequest",
+    "ChangeInventoryStatusRequest",
+    "InventoryMovement",
     "ReportQueryRequest",
     "ReportQueryResponse",
     "ReportRow",
@@ -101,6 +127,18 @@ REQUIRED_SCHEMAS = (
     "FeatureFlagReconcileReport",
     "FeatureFlagSourceSwitchRequest",
     "FeatureFlagSourceSwitchResponse",
+    "ColdChainDevice",
+    "CreateColdChainDeviceRequest",
+    "TemperatureReading",
+    "IngestTemperatureReadingRequest",
+    "TemperatureExcursionEvent",
+    "IngestTemperatureExcursionRequest",
+    "BillingAccount",
+    "CreateBillingAccountRequest",
+    "BillingContract",
+    "CreateBillingContractRequest",
+    "BillingRule",
+    "CreateBillingRuleRequest",
 )
 HTTP_METHODS = {"get", "post", "put", "patch", "delete", "options", "head"}
 ERROR_RESPONSE_REF = "#/components/schemas/ErrorResponse"
@@ -254,7 +292,7 @@ def main(argv: list[str] | None = None) -> int:
         print("check_openapi_contract (T2, 接口契约治理)")
         print(f"  · path: {stats.get('path', 'shared/openapi/openapi.json')}")
         if ok:
-            print("  ✓ Wave 1/2 必需 path、schema 与 401 ErrorResponse 约束均满足")
+            print("  ✓ Wave 1/2/3 必需 path、schema 与 401 ErrorResponse 约束均满足")
         else:
             print(f"  ✘ 发现 {len(issues)} 个合同问题:")
             for issue in issues:

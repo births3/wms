@@ -2163,8 +2163,8 @@ def test_check_openapi_contract_requires_free_form_json_properties():
     assert any(issue.kind == "missing_free_form_object" for issue in issues)
 
 
-def test_check_openapi_contract_requires_wave2_paths_and_schemas():
-    """Wave 2 核心 schema 先行合同缺失时必须失败。"""
+def test_check_openapi_contract_requires_wave2_and_wave3_paths_and_schemas():
+    """Wave 2/3 核心合同缺失时必须失败。"""
     from check_openapi_contract import check_openapi_contract
 
     issues, stats = check_openapi_contract({
@@ -2178,7 +2178,14 @@ def test_check_openapi_contract_requires_wave2_paths_and_schemas():
     })
 
     assert "/api/v1/master-data/products" in stats["required_paths"]
+    assert "/api/v1/inbound/receiving-orders/{id}/receive" in stats["required_paths"]
+    assert "/api/v1/inventory/batches/status" in stats["required_paths"]
+    assert "/api/v1/cold-chain/excursions" in stats["required_paths"]
+    assert "/api/v1/billing/contracts" in stats["required_paths"]
     assert "Product" in stats["required_schemas"]
+    assert "InventoryBatch" in stats["required_schemas"]
+    assert "TemperatureExcursionEvent" in stats["required_schemas"]
+    assert "BillingContract" in stats["required_schemas"]
     assert any(issue.kind == "missing_path" for issue in issues)
     assert any(issue.kind == "missing_schema" for issue in issues)
 
