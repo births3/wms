@@ -600,3 +600,271 @@ pub struct FeatureFlagArchiveResult {
     pub archive_ref: String,
     pub archived_at: DateTime<Utc>,
 }
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ReceiveReceivingOrderRequest {
+    pub actual_qty: i64,
+    pub shortage_qty: i64,
+    pub rejected_qty: i64,
+    pub arrival_temperature_celsius: Option<f64>,
+    pub exception_note: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ReceivingOrderReceipt {
+    pub id: Uuid,
+    pub receiving_order_id: Uuid,
+    pub owner_id: Uuid,
+    pub actual_qty: i64,
+    pub shortage_qty: i64,
+    pub rejected_qty: i64,
+    pub occurred_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct InspectReceivingOrderRequest {
+    pub batch_no: String,
+    pub accepted_qty: i64,
+    pub rejected_qty: i64,
+    pub production_date: String,
+    pub expiry_date: String,
+    pub quality_status: String,
+    pub trace_codes: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ReceivingInspectionRecord {
+    pub id: Uuid,
+    pub receiving_order_id: Uuid,
+    pub owner_id: Uuid,
+    pub batch_no: String,
+    pub accepted_qty: i64,
+    pub rejected_qty: i64,
+    pub quality_status: String,
+    pub occurred_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct SignInspectionRequest {
+    pub first_signer_id: Uuid,
+    pub second_signer_id: Option<Uuid>,
+    pub dual_required: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct InspectionSignatureRecord {
+    pub id: Uuid,
+    pub receiving_order_id: Uuid,
+    pub owner_id: Uuid,
+    pub first_signer_id: Uuid,
+    pub second_signer_id: Option<Uuid>,
+    pub signed_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct PutawayRequest {
+    pub batch_no: String,
+    pub product_code: String,
+    pub qty: i64,
+    pub location_id: Uuid,
+    pub location_code: String,
+    pub quality_status: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct PutawayRecord {
+    pub id: Uuid,
+    pub receiving_order_id: Uuid,
+    pub owner_id: Uuid,
+    pub batch_no: String,
+    pub product_code: String,
+    pub qty: i64,
+    pub location_id: Uuid,
+    pub location_code: String,
+    pub occurred_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct InventoryBatch {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub product_code: String,
+    pub batch_no: String,
+    pub production_date: String,
+    pub expiry_date: String,
+    pub qty_on_hand: i64,
+    pub qty_locked: i64,
+    pub quality_status: String,
+    pub location_id: Uuid,
+    pub location_code: String,
+    pub recall_flag: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct InventoryBatchListResponse {
+    pub data: Vec<InventoryBatch>,
+    pub page: PageMeta,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct PutawayInventoryRequest {
+    pub product_code: String,
+    pub batch_no: String,
+    pub production_date: String,
+    pub expiry_date: String,
+    pub qty: i64,
+    pub quality_status: String,
+    pub location_id: Uuid,
+    pub location_code: String,
+    pub source_receiving_order_id: Uuid,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ChangeInventoryStatusRequest {
+    pub batch_id: Uuid,
+    pub target_status: String,
+    pub reason: String,
+    pub approval_source: String,
+    pub approval_id: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct InventoryMovement {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub batch_id: Uuid,
+    pub movement_type: String,
+    pub qty_delta: i64,
+    pub source_document_type: String,
+    pub source_document_id: Uuid,
+    pub occurred_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ColdChainDevice {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub device_code: String,
+    pub device_type: String,
+    pub installed_at_location_code: Option<String>,
+    pub calibration_due_at: Option<DateTime<Utc>>,
+    pub status: String,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CreateColdChainDeviceRequest {
+    pub device_code: String,
+    pub device_type: String,
+    pub installed_at_location_code: Option<String>,
+    pub calibration_due_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct TemperatureReading {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub device_code: String,
+    pub temperature_celsius: f64,
+    pub humidity_percent: Option<f64>,
+    pub captured_at: DateTime<Utc>,
+    pub external_report_url: Option<String>,
+    pub out_of_range: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct IngestTemperatureReadingRequest {
+    pub device_code: String,
+    pub temperature_celsius: f64,
+    pub humidity_percent: Option<f64>,
+    pub captured_at: DateTime<Utc>,
+    pub external_report_url: Option<String>,
+    pub out_of_range: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct TemperatureExcursionEvent {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub external_event_id: String,
+    pub device_code: String,
+    pub location_code: Option<String>,
+    pub started_at: DateTime<Utc>,
+    pub ended_at: Option<DateTime<Utc>>,
+    pub min_temperature_celsius: Option<f64>,
+    pub max_temperature_celsius: Option<f64>,
+    pub affected_batch_ids: Vec<Uuid>,
+    pub status: String,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct IngestTemperatureExcursionRequest {
+    pub external_event_id: String,
+    pub device_code: String,
+    pub location_code: Option<String>,
+    pub started_at: DateTime<Utc>,
+    pub ended_at: Option<DateTime<Utc>>,
+    pub min_temperature_celsius: Option<f64>,
+    pub max_temperature_celsius: Option<f64>,
+    pub affected_batch_ids: Vec<Uuid>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct BillingAccount {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub account_code: String,
+    pub account_name: String,
+    pub status: String,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CreateBillingAccountRequest {
+    pub account_code: String,
+    pub account_name: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct BillingContract {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub account_id: Uuid,
+    pub contract_no: String,
+    pub valid_from: String,
+    pub valid_to: String,
+    pub status: String,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CreateBillingContractRequest {
+    pub account_id: Uuid,
+    pub contract_no: String,
+    pub valid_from: String,
+    pub valid_to: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct BillingRule {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub contract_id: Uuid,
+    pub charge_item: String,
+    pub unit: String,
+    pub unit_price_cents: i64,
+    pub billing_cycle: String,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CreateBillingRuleRequest {
+    pub contract_id: Uuid,
+    pub charge_item: String,
+    pub unit: String,
+    pub unit_price_cents: i64,
+    pub billing_cycle: String,
+}

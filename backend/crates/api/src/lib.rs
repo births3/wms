@@ -2,27 +2,37 @@
 
 pub mod audit;
 pub mod auth;
+pub mod billing;
+pub mod cold_chain;
 pub mod config_center;
 pub mod feature_flags;
 pub mod inbound;
+pub mod inventory;
 pub mod master_data;
 pub mod parameter_mapping;
 pub mod reports;
 
 use utoipa::OpenApi;
 use wms_domain::{
-    AuditActor, AuditEvent, AuditEventListResponse, ConfigEntry, CreateCustomerRequest,
-    CreateLocationRequest, CreateProductRequest, CreateReceivingOrderRequest,
-    CreateSpecialDrugCategoryRequest, CreateSupplierRequest, CreateWarehouseRequest, CurrentUser,
-    Customer, CustomerListResponse, ErrorResponse, ExecuteMappingRequest, ExecuteMappingResponse,
-    FeatureFlagArchiveRequest, FeatureFlagArchiveResult, FeatureFlagBatchImportRequest,
-    FeatureFlagBatchImportResult, FeatureFlagConfig, FeatureFlagExportResponse,
-    FeatureFlagMigrationResult, FeatureFlagReconcileReport, FeatureFlagSourceSwitchRequest,
-    FeatureFlagSourceSwitchResponse, HealthzResponse, Location, LocationListResponse, LoginRequest,
+    AuditActor, AuditEvent, AuditEventListResponse, BillingAccount, BillingContract, BillingRule,
+    ChangeInventoryStatusRequest, ColdChainDevice, ConfigEntry, CreateBillingAccountRequest,
+    CreateBillingContractRequest, CreateBillingRuleRequest, CreateColdChainDeviceRequest,
+    CreateCustomerRequest, CreateLocationRequest, CreateProductRequest,
+    CreateReceivingOrderRequest, CreateSpecialDrugCategoryRequest, CreateSupplierRequest,
+    CreateWarehouseRequest, CurrentUser, Customer, CustomerListResponse, ErrorResponse,
+    ExecuteMappingRequest, ExecuteMappingResponse, FeatureFlagArchiveRequest,
+    FeatureFlagArchiveResult, FeatureFlagBatchImportRequest, FeatureFlagBatchImportResult,
+    FeatureFlagConfig, FeatureFlagExportResponse, FeatureFlagMigrationResult,
+    FeatureFlagReconcileReport, FeatureFlagSourceSwitchRequest, FeatureFlagSourceSwitchResponse,
+    HealthzResponse, IngestTemperatureExcursionRequest, IngestTemperatureReadingRequest,
+    InspectReceivingOrderRequest, InspectionSignatureRecord, InventoryBatch,
+    InventoryBatchListResponse, InventoryMovement, Location, LocationListResponse, LoginRequest,
     LoginResponse, MappingDictionary, MappingQueueItem, MappingRule, MappingTraceResponse,
-    PageMeta, Product, ProductListResponse, ReceivingOrder, ReceivingOrderLine,
-    ReceivingOrderListResponse, ReportQueryRequest, ReportQueryResponse, ReportRow,
-    SpecialDrugCategory, SpecialDrugCategoryListResponse, Supplier, SupplierListResponse,
+    PageMeta, Product, ProductListResponse, PutawayInventoryRequest, PutawayRecord, PutawayRequest,
+    ReceiveReceivingOrderRequest, ReceivingInspectionRecord, ReceivingOrder, ReceivingOrderLine,
+    ReceivingOrderListResponse, ReceivingOrderReceipt, ReportQueryRequest, ReportQueryResponse,
+    ReportRow, SignInspectionRequest, SpecialDrugCategory, SpecialDrugCategoryListResponse,
+    Supplier, SupplierListResponse, TemperatureExcursionEvent, TemperatureReading,
     UpdateCustomerRequest, UpdateLocationRequest, UpdateProductRequest,
     UpdateReceivingOrderRequest, UpdateSpecialDrugCategoryRequest, UpdateSupplierRequest,
     UpdateWarehouseRequest, Warehouse, WarehouseListResponse,
@@ -249,6 +259,34 @@ fn update_receiving_order() {}
 #[allow(dead_code)]
 fn delete_receiving_order() {}
 
+#[utoipa::path(post, path = "/api/v1/inbound/receiving-orders/{id}/receive", tag = "inbound", params(("id" = uuid::Uuid, Path, description = "收货单 ID")), request_body = ReceiveReceivingOrderRequest, responses((status = 200, description = "PDA 收货闭环记录", body = ReceivingOrderReceipt), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn receive_receiving_order() {}
+
+#[utoipa::path(post, path = "/api/v1/inbound/receiving-orders/{id}/inspect", tag = "inbound", params(("id" = uuid::Uuid, Path, description = "收货单 ID")), request_body = InspectReceivingOrderRequest, responses((status = 200, description = "PDA 验收记录", body = ReceivingInspectionRecord), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn inspect_receiving_order() {}
+
+#[utoipa::path(post, path = "/api/v1/inbound/receiving-orders/{id}/sign", tag = "inbound", params(("id" = uuid::Uuid, Path, description = "收货单 ID")), request_body = SignInspectionRequest, responses((status = 200, description = "双人验收签字记录", body = InspectionSignatureRecord), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn sign_receiving_order_inspection() {}
+
+#[utoipa::path(post, path = "/api/v1/inbound/receiving-orders/{id}/putaway", tag = "inbound", params(("id" = uuid::Uuid, Path, description = "收货单 ID")), request_body = PutawayRequest, responses((status = 200, description = "PDA 上架记录", body = PutawayRecord), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn putaway_receiving_order() {}
+
+#[utoipa::path(get, path = "/api/v1/inventory/batches", tag = "inventory", responses((status = 200, description = "库存批次列表", body = InventoryBatchListResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn list_inventory_batches() {}
+
+#[utoipa::path(post, path = "/api/v1/inventory/batches/putaway", tag = "inventory", request_body = PutawayInventoryRequest, responses((status = 200, description = "入库上架增加库存", body = InventoryBatch), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn putaway_inventory_batch() {}
+
+#[utoipa::path(post, path = "/api/v1/inventory/batches/status", tag = "inventory", request_body = ChangeInventoryStatusRequest, responses((status = 200, description = "库存状态变更", body = InventoryBatch), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn change_inventory_batch_status() {}
+
 #[utoipa::path(post, path = "/api/v1/reports/query", tag = "reports", request_body = ReportQueryRequest, responses((status = 200, description = "报表查询结果", body = ReportQueryResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 fn query_report() {}
@@ -285,12 +323,36 @@ fn switch_feature_flag_source() {}
 #[allow(dead_code)]
 fn archive_feature_flag_file_source() {}
 
+#[utoipa::path(post, path = "/api/v1/cold-chain/devices", tag = "cold-chain", request_body = CreateColdChainDeviceRequest, responses((status = 200, description = "创建冷链设备台账", body = ColdChainDevice), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn create_cold_chain_device() {}
+
+#[utoipa::path(post, path = "/api/v1/cold-chain/readings", tag = "cold-chain", request_body = IngestTemperatureReadingRequest, responses((status = 200, description = "接收外部温控数据", body = TemperatureReading), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn ingest_temperature_reading() {}
+
+#[utoipa::path(post, path = "/api/v1/cold-chain/excursions", tag = "cold-chain", request_body = IngestTemperatureExcursionRequest, responses((status = 200, description = "接收外部温度超标事件", body = TemperatureExcursionEvent), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn ingest_temperature_excursion() {}
+
+#[utoipa::path(post, path = "/api/v1/billing/accounts", tag = "billing", request_body = CreateBillingAccountRequest, responses((status = 200, description = "创建计费账户", body = BillingAccount), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn create_billing_account() {}
+
+#[utoipa::path(post, path = "/api/v1/billing/contracts", tag = "billing", request_body = CreateBillingContractRequest, responses((status = 200, description = "创建计费合同", body = BillingContract), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn create_billing_contract() {}
+
+#[utoipa::path(post, path = "/api/v1/billing/rules", tag = "billing", request_body = CreateBillingRuleRequest, responses((status = 200, description = "创建计费规则", body = BillingRule), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn create_billing_rule() {}
+
 #[derive(OpenApi)]
 #[openapi(
     info(
         title = "WMS API",
-        version = "0.0.2-wave-2-schema",
-        description = "Wave 2 业务底座与 schema 先行契约",
+        version = "0.0.3-wave-3-core-rules",
+        description = "Wave 3 核心业务规则与业务模型契约",
     ),
     paths(
         healthz,
@@ -327,6 +389,13 @@ fn archive_feature_flag_file_source() {}
         get_receiving_order,
         update_receiving_order,
         delete_receiving_order,
+        receive_receiving_order,
+        inspect_receiving_order,
+        sign_receiving_order_inspection,
+        putaway_receiving_order,
+        list_inventory_batches,
+        putaway_inventory_batch,
+        change_inventory_batch_status,
         query_report,
         execute_mapping,
         trace_mapping,
@@ -336,12 +405,27 @@ fn archive_feature_flag_file_source() {}
         import_feature_flags,
         switch_feature_flag_source,
         archive_feature_flag_file_source,
+        create_cold_chain_device,
+        ingest_temperature_reading,
+        ingest_temperature_excursion,
+        create_billing_account,
+        create_billing_contract,
+        create_billing_rule,
     ),
     components(schemas(
         AuditActor,
         AuditEvent,
         AuditEventListResponse,
+        BillingAccount,
+        BillingContract,
+        BillingRule,
+        ChangeInventoryStatusRequest,
+        ColdChainDevice,
         ConfigEntry,
+        CreateBillingAccountRequest,
+        CreateBillingContractRequest,
+        CreateBillingRuleRequest,
+        CreateColdChainDeviceRequest,
         CreateCustomerRequest,
         CreateLocationRequest,
         CreateProductRequest,
@@ -366,6 +450,13 @@ fn archive_feature_flag_file_source() {}
         FeatureFlagSourceSwitchRequest,
         FeatureFlagSourceSwitchResponse,
         HealthzResponse,
+        IngestTemperatureExcursionRequest,
+        IngestTemperatureReadingRequest,
+        InspectReceivingOrderRequest,
+        InspectionSignatureRecord,
+        InventoryBatch,
+        InventoryBatchListResponse,
+        InventoryMovement,
         Location,
         LocationListResponse,
         LoginRequest,
@@ -377,16 +468,25 @@ fn archive_feature_flag_file_source() {}
         PageMeta,
         Product,
         ProductListResponse,
+        PutawayInventoryRequest,
+        PutawayRecord,
+        PutawayRequest,
+        ReceiveReceivingOrderRequest,
+        ReceivingInspectionRecord,
         ReceivingOrder,
         ReceivingOrderLine,
         ReceivingOrderListResponse,
+        ReceivingOrderReceipt,
         ReportQueryRequest,
         ReportQueryResponse,
         ReportRow,
+        SignInspectionRequest,
         SpecialDrugCategory,
         SpecialDrugCategoryListResponse,
         Supplier,
         SupplierListResponse,
+        TemperatureExcursionEvent,
+        TemperatureReading,
         UpdateCustomerRequest,
         UpdateLocationRequest,
         UpdateProductRequest,
@@ -402,10 +502,13 @@ fn archive_feature_flag_file_source() {}
         (name = "auth", description = "鉴权与会话"),
         (name = "audit", description = "审计追踪"),
         (name = "master-data", description = "M1 基础档案"),
-        (name = "inbound", description = "M2 入库 schema"),
+        (name = "inbound", description = "M2 入库业务规则"),
+        (name = "inventory", description = "M3 库存批次与状态"),
         (name = "reports", description = "M6 报表查询"),
         (name = "parameter-mapping", description = "M-PM 参数对照"),
         (name = "config-center", description = "M1-008 配置中心"),
+        (name = "cold-chain", description = "M5 外部冷链数据接入"),
+        (name = "billing", description = "M9 计费账户与合同"),
     ),
 )]
 pub struct ApiDoc;
@@ -440,6 +543,13 @@ mod tests {
             "/api/v1/master-data/special-drug-categories/{id}",
             "/api/v1/inbound/receiving-orders",
             "/api/v1/inbound/receiving-orders/{id}",
+            "/api/v1/inbound/receiving-orders/{id}/receive",
+            "/api/v1/inbound/receiving-orders/{id}/inspect",
+            "/api/v1/inbound/receiving-orders/{id}/sign",
+            "/api/v1/inbound/receiving-orders/{id}/putaway",
+            "/api/v1/inventory/batches",
+            "/api/v1/inventory/batches/putaway",
+            "/api/v1/inventory/batches/status",
             "/api/v1/reports/query",
             "/api/v1/parameter-mapping/execute",
             "/api/v1/parameter-mapping/traces/{execution_id}",
@@ -449,6 +559,12 @@ mod tests {
             "/api/v1/config-center/feature-flags/import",
             "/api/v1/config-center/feature-flags/source",
             "/api/v1/config-center/feature-flags/archive-file-source",
+            "/api/v1/cold-chain/devices",
+            "/api/v1/cold-chain/readings",
+            "/api/v1/cold-chain/excursions",
+            "/api/v1/billing/accounts",
+            "/api/v1/billing/contracts",
+            "/api/v1/billing/rules",
         ] {
             assert!(
                 json.contains(required_path),
@@ -465,6 +581,10 @@ mod tests {
             "\"Product\"",
             "\"Supplier\"",
             "\"ReceivingOrder\"",
+            "\"ReceiveReceivingOrderRequest\"",
+            "\"InventoryBatch\"",
+            "\"ColdChainDevice\"",
+            "\"BillingContract\"",
             "\"ExecuteMappingRequest\"",
             "\"FeatureFlagBatchImportRequest\"",
             "\"FeatureFlagReconcileReport\"",
