@@ -52,6 +52,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/config-center/feature-flags/archive-file-source": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["archive_feature_flag_file_source"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/config-center/feature-flags/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["export_feature_flags"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/config-center/feature-flags/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["import_feature_flags"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/config-center/feature-flags/migrate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["migrate_feature_flags"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/config-center/feature-flags/reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["reconcile_feature_flags"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/config-center/feature-flags/source": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["switch_feature_flag_source"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/healthz": {
         parameters: {
             query?: never;
@@ -62,6 +158,278 @@ export interface paths {
         get: operations["healthz"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inbound/receiving-orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_receiving_orders"];
+        put?: never;
+        post: operations["create_receiving_order"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inbound/receiving-orders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_receiving_order"];
+        put?: never;
+        post?: never;
+        delete: operations["delete_receiving_order"];
+        options?: never;
+        head?: never;
+        patch: operations["update_receiving_order"];
+        trace?: never;
+    };
+    "/api/v1/master-data/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_customers"];
+        put?: never;
+        post: operations["create_customer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/master-data/customers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["delete_customer"];
+        options?: never;
+        head?: never;
+        patch: operations["update_customer"];
+        trace?: never;
+    };
+    "/api/v1/master-data/locations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_locations"];
+        put?: never;
+        post: operations["create_location"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/master-data/locations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["delete_location"];
+        options?: never;
+        head?: never;
+        patch: operations["update_location"];
+        trace?: never;
+    };
+    "/api/v1/master-data/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_products"];
+        put?: never;
+        post: operations["create_product"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/master-data/products/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_product"];
+        put?: never;
+        post?: never;
+        delete: operations["delete_product"];
+        options?: never;
+        head?: never;
+        patch: operations["update_product"];
+        trace?: never;
+    };
+    "/api/v1/master-data/special-drug-categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_special_drug_categories"];
+        put?: never;
+        post: operations["create_special_drug_category"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/master-data/special-drug-categories/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["delete_special_drug_category"];
+        options?: never;
+        head?: never;
+        patch: operations["update_special_drug_category"];
+        trace?: never;
+    };
+    "/api/v1/master-data/suppliers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_suppliers"];
+        put?: never;
+        post: operations["create_supplier"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/master-data/suppliers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["delete_supplier"];
+        options?: never;
+        head?: never;
+        patch: operations["update_supplier"];
+        trace?: never;
+    };
+    "/api/v1/master-data/warehouses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_warehouses"];
+        put?: never;
+        post: operations["create_warehouse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/master-data/warehouses/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["delete_warehouse"];
+        options?: never;
+        head?: never;
+        patch: operations["update_warehouse"];
+        trace?: never;
+    };
+    "/api/v1/parameter-mapping/execute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["execute_mapping"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/parameter-mapping/traces/{execution_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["trace_mapping"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/query": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["query_report"];
         delete?: never;
         options?: never;
         head?: never;
@@ -127,6 +495,73 @@ export interface components {
             /** @description 下一页游标；为空表示无更多数据。 */
             next_cursor?: string | null;
         };
+        /** @description M1-008 配置中心条目。 */
+        ConfigEntry: {
+            config_key: string;
+            /** @description 自由结构 JSON 对象。 */
+            config_value: {
+                [key: string]: unknown;
+            };
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: int64 */
+            version: number;
+        };
+        CreateCustomerRequest: {
+            customer_code: string;
+            customer_name: string;
+            license_no?: string | null;
+        };
+        CreateLocationRequest: {
+            location_code: string;
+            location_name: string;
+            /** Format: uuid */
+            warehouse_id: string;
+        };
+        /** @description 创建商品请求。 */
+        CreateProductRequest: {
+            approval_no?: string | null;
+            /** @description 自由结构 JSON 对象。 */
+            attrs: {
+                [key: string]: unknown;
+            };
+            dosage_form?: string | null;
+            manufacturer?: string | null;
+            product_code: string;
+            product_name: string;
+            spec?: string | null;
+            special_drug_category_code?: string | null;
+        };
+        CreateReceivingOrderRequest: {
+            /** Format: date-time */
+            expected_arrival_at?: string | null;
+            external_ref?: string | null;
+            lines: components["schemas"]["ReceivingOrderLine"][];
+            receipt_no: string;
+            /** Format: uuid */
+            supplier_id?: string | null;
+            /** Format: uuid */
+            warehouse_id: string;
+        };
+        CreateSpecialDrugCategoryRequest: {
+            category_code: string;
+            category_name: string;
+            requires_dual_sign: boolean;
+        };
+        CreateSupplierRequest: {
+            contact_name?: string | null;
+            license_no?: string | null;
+            supplier_code: string;
+            supplier_name: string;
+        };
+        CreateWarehouseRequest: {
+            warehouse_code: string;
+            warehouse_name: string;
+        };
         /** @description 当前登录用户摘要。 */
         CurrentUser: {
             /** @description 展示名。 */
@@ -150,6 +585,25 @@ export interface components {
             /** @description 用户名。 */
             username: string;
         };
+        /** @description 客户基础档案。 */
+        Customer: {
+            /** Format: date-time */
+            created_at: string;
+            customer_code: string;
+            customer_name: string;
+            /** Format: uuid */
+            id: string;
+            license_no?: string | null;
+            /** Format: uuid */
+            owner_id: string;
+            status: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        CustomerListResponse: {
+            data: components["schemas"]["Customer"][];
+            page: components["schemas"]["PageMeta"];
+        };
         /** @description 统一错误响应。 */
         ErrorResponse: {
             /** @description 业务错误码。 */
@@ -167,6 +621,72 @@ export interface components {
             /** @description 链路追踪 ID。 */
             trace_id: string;
         };
+        ExecuteMappingRequest: {
+            /** @description 自由结构 JSON 对象。 */
+            raw_payload: {
+                [key: string]: unknown;
+            };
+            source_system: string;
+        };
+        ExecuteMappingResponse: {
+            /** Format: uuid */
+            execution_id: string;
+            /** @description 自由结构 JSON 对象。 */
+            normalized_payload: {
+                [key: string]: unknown;
+            };
+            /** Format: uuid */
+            queue_item_id?: string | null;
+            unresolved_fields: string[];
+        };
+        FeatureFlagArchiveRequest: {
+            archive_ref: string;
+        };
+        FeatureFlagArchiveResult: {
+            archive_ref: string;
+            /** Format: date-time */
+            archived_at: string;
+            archived_source: string;
+        };
+        FeatureFlagBatchImportRequest: {
+            flags: components["schemas"]["FeatureFlagConfig"][];
+        };
+        FeatureFlagBatchImportResult: {
+            /** Format: int32 */
+            imported_count: number;
+            target: string;
+        };
+        /** @description 配置中心版 Feature Flag。 */
+        FeatureFlagConfig: {
+            cleanup_by: string;
+            created_at: string;
+            enabled: boolean;
+            key: string;
+            owner: string;
+            source: string;
+        };
+        FeatureFlagExportResponse: {
+            flags: components["schemas"]["FeatureFlagConfig"][];
+            source: string;
+        };
+        FeatureFlagMigrationResult: {
+            /** Format: int32 */
+            migrated_count: number;
+            source: string;
+            target: string;
+        };
+        FeatureFlagReconcileReport: {
+            /** Format: int32 */
+            matched: number;
+            mismatched: string[];
+            missing_in_config_center: string[];
+        };
+        FeatureFlagSourceSwitchRequest: {
+            source: string;
+        };
+        FeatureFlagSourceSwitchResponse: {
+            active_source: string;
+        };
         /** @description 健康检查响应。 */
         HealthzResponse: {
             /**
@@ -178,6 +698,26 @@ export interface components {
             status: string;
             /** @description 契约版本。 */
             version: string;
+        };
+        /** @description 库位基础档案。 */
+        Location: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            location_code: string;
+            location_name: string;
+            /** Format: uuid */
+            owner_id: string;
+            status: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            warehouse_id: string;
+        };
+        LocationListResponse: {
+            data: components["schemas"]["Location"][];
+            page: components["schemas"]["PageMeta"];
         };
         /** @description 登录请求。 */
         LoginRequest: {
@@ -200,6 +740,284 @@ export interface components {
             /** @description token 类型。 */
             token_type: string;
             user: components["schemas"]["CurrentUser"];
+        };
+        /** @description M-PM 参数对照字典。 */
+        MappingDictionary: {
+            /** Format: date-time */
+            created_at: string;
+            dictionary_code: string;
+            dictionary_name: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+        };
+        /** @description M-PM 待映射队列项。 */
+        MappingQueueItem: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            /** @description 自由结构 JSON 对象。 */
+            raw_payload: {
+                [key: string]: unknown;
+            };
+            source_system: string;
+            status: string;
+        };
+        /** @description M-PM 字段映射规则。 */
+        MappingRule: {
+            canonical_field: string;
+            /** Format: date-time */
+            created_at: string;
+            external_field: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            source_system: string;
+            transform: string;
+        };
+        MappingTraceResponse: {
+            applied_rule_ids: string[];
+            /** Format: uuid */
+            execution_id: string;
+            /** @description 自由结构 JSON 对象。 */
+            normalized_payload: {
+                [key: string]: unknown;
+            };
+            /** @description 自由结构 JSON 对象。 */
+            raw_payload: {
+                [key: string]: unknown;
+            };
+            source_system: string;
+            unresolved_fields: string[];
+        };
+        /** @description 分页信息。 */
+        PageMeta: {
+            /**
+             * Format: int32
+             * @description 本页数量。
+             */
+            count: number;
+            /** @description 下一页游标；为空表示无更多数据。 */
+            next_cursor?: string | null;
+        };
+        /** @description 商品基础档案。 */
+        Product: {
+            /** @description 批准文号。 */
+            approval_no?: string | null;
+            /** @description 自由结构 JSON 对象。 */
+            attrs: {
+                [key: string]: unknown;
+            };
+            /**
+             * Format: date-time
+             * @description 创建时间。
+             */
+            created_at: string;
+            /** @description 剂型。 */
+            dosage_form?: string | null;
+            /**
+             * Format: uuid
+             * @description 商品 ID。
+             */
+            id: string;
+            /** @description 生产企业。 */
+            manufacturer?: string | null;
+            /**
+             * Format: uuid
+             * @description 货主 ID。
+             */
+            owner_id: string;
+            /** @description 商品编码。 */
+            product_code: string;
+            /** @description 商品名称。 */
+            product_name: string;
+            /** @description 规格。 */
+            spec?: string | null;
+            /** @description 特殊药品分类编码。 */
+            special_drug_category_code?: string | null;
+            /** @description 启停状态。 */
+            status: string;
+            /**
+             * Format: date-time
+             * @description 更新时间。
+             */
+            updated_at: string;
+        };
+        ProductListResponse: {
+            data: components["schemas"]["Product"][];
+            page: components["schemas"]["PageMeta"];
+        };
+        /** @description 收货单。 */
+        ReceivingOrder: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            expected_arrival_at?: string | null;
+            external_ref?: string | null;
+            /** Format: uuid */
+            id: string;
+            lines: components["schemas"]["ReceivingOrderLine"][];
+            /** Format: uuid */
+            owner_id: string;
+            receipt_no: string;
+            status: string;
+            /** Format: uuid */
+            supplier_id?: string | null;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            warehouse_id: string;
+        };
+        /** @description 收货单明细。 */
+        ReceivingOrderLine: {
+            batch_no?: string | null;
+            /** Format: int64 */
+            expected_qty: number;
+            expiry_date?: string | null;
+            /** Format: int32 */
+            line_no: number;
+            product_code: string;
+            /** Format: uuid */
+            product_id?: string | null;
+            production_date?: string | null;
+        };
+        ReceivingOrderListResponse: {
+            data: components["schemas"]["ReceivingOrder"][];
+            page: components["schemas"]["PageMeta"];
+        };
+        ReportQueryRequest: {
+            /** @description 自由结构 JSON 对象。 */
+            filters: {
+                [key: string]: unknown;
+            };
+            /** Format: int32 */
+            limit?: number | null;
+            report_code: string;
+        };
+        ReportQueryResponse: {
+            /** Format: date-time */
+            generated_at: string;
+            page: components["schemas"]["PageMeta"];
+            report_code: string;
+            rows: components["schemas"]["ReportRow"][];
+        };
+        /** @description M6 报表行。 */
+        ReportRow: {
+            /** @description 自由结构 JSON 对象。 */
+            values: {
+                [key: string]: unknown;
+            };
+        };
+        /** @description 特殊药品分类字典。 */
+        SpecialDrugCategory: {
+            category_code: string;
+            category_name: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            requires_dual_sign: boolean;
+            status: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        SpecialDrugCategoryListResponse: {
+            data: components["schemas"]["SpecialDrugCategory"][];
+            page: components["schemas"]["PageMeta"];
+        };
+        /** @description 供应商基础档案。 */
+        Supplier: {
+            contact_name?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            license_no?: string | null;
+            /** Format: uuid */
+            owner_id: string;
+            status: string;
+            supplier_code: string;
+            supplier_name: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        SupplierListResponse: {
+            data: components["schemas"]["Supplier"][];
+            page: components["schemas"]["PageMeta"];
+        };
+        UpdateCustomerRequest: {
+            customer_name?: string | null;
+            license_no?: string | null;
+            status?: string | null;
+        };
+        UpdateLocationRequest: {
+            location_name?: string | null;
+            status?: string | null;
+        };
+        /** @description 更新商品请求。 */
+        UpdateProductRequest: {
+            approval_no?: string | null;
+            /** @description 自由结构 JSON 对象。 */
+            attrs?: {
+                [key: string]: unknown;
+            };
+            dosage_form?: string | null;
+            manufacturer?: string | null;
+            product_name?: string | null;
+            spec?: string | null;
+            special_drug_category_code?: string | null;
+            status?: string | null;
+        };
+        UpdateReceivingOrderRequest: {
+            /** Format: date-time */
+            expected_arrival_at?: string | null;
+            external_ref?: string | null;
+            lines?: components["schemas"]["ReceivingOrderLine"][] | null;
+            status?: string | null;
+            /** Format: uuid */
+            supplier_id?: string | null;
+            /** Format: uuid */
+            warehouse_id?: string | null;
+        };
+        UpdateSpecialDrugCategoryRequest: {
+            category_name?: string | null;
+            requires_dual_sign?: boolean | null;
+            status?: string | null;
+        };
+        UpdateSupplierRequest: {
+            contact_name?: string | null;
+            license_no?: string | null;
+            status?: string | null;
+            supplier_name?: string | null;
+        };
+        UpdateWarehouseRequest: {
+            status?: string | null;
+            warehouse_name?: string | null;
+        };
+        /** @description 仓库基础档案。 */
+        Warehouse: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            status: string;
+            /** Format: date-time */
+            updated_at: string;
+            warehouse_code: string;
+            warehouse_name: string;
+        };
+        WarehouseListResponse: {
+            data: components["schemas"]["Warehouse"][];
+            page: components["schemas"]["PageMeta"];
         };
     };
     responses: never;
@@ -314,6 +1132,192 @@ export interface operations {
             };
         };
     };
+    archive_feature_flag_file_source: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeatureFlagArchiveRequest"];
+            };
+        };
+        responses: {
+            /** @description 归档 W1 文件版 Feature Flag */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeatureFlagArchiveResult"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    export_feature_flags: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 导出配置中心 Feature Flag */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeatureFlagExportResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    import_feature_flags: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeatureFlagBatchImportRequest"];
+            };
+        };
+        responses: {
+            /** @description 批量导入配置中心 Feature Flag */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeatureFlagBatchImportResult"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    migrate_feature_flags: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 迁移文件版 Feature Flag */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeatureFlagMigrationResult"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    reconcile_feature_flags: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Feature Flag 对账报告 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeatureFlagReconcileReport"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    switch_feature_flag_source: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeatureFlagSourceSwitchRequest"];
+            };
+        };
+        responses: {
+            /** @description 切换 Feature Flag 读取源 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeatureFlagSourceSwitchResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     healthz: {
         parameters: {
             query?: never;
@@ -330,6 +1334,1078 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthzResponse"];
+                };
+            };
+        };
+    };
+    list_receiving_orders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 收货单列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceivingOrderListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_receiving_order: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateReceivingOrderRequest"];
+            };
+        };
+        responses: {
+            /** @description 创建收货单 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceivingOrder"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_receiving_order: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 收货单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 收货单详情 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceivingOrder"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_receiving_order: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 收货单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 删除收货单 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceivingOrder"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_receiving_order: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 收货单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateReceivingOrderRequest"];
+            };
+        };
+        responses: {
+            /** @description 更新收货单 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceivingOrder"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_customers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 客户列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_customer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCustomerRequest"];
+            };
+        };
+        responses: {
+            /** @description 创建客户 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Customer"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_customer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 客户 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 删除客户 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Customer"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_customer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 客户 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCustomerRequest"];
+            };
+        };
+        responses: {
+            /** @description 更新客户 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Customer"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_locations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 库位列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_location: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateLocationRequest"];
+            };
+        };
+        responses: {
+            /** @description 创建库位 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Location"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_location: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 库位 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 删除库位 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Location"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_location: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 库位 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLocationRequest"];
+            };
+        };
+        responses: {
+            /** @description 更新库位 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Location"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_products: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 商品列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_product: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateProductRequest"];
+            };
+        };
+        responses: {
+            /** @description 创建商品 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Product"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_product: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 商品 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 商品详情 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Product"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_product: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 商品 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 删除商品 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Product"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_product: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 商品 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProductRequest"];
+            };
+        };
+        responses: {
+            /** @description 更新商品 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Product"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_special_drug_categories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 特殊药品分类列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpecialDrugCategoryListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_special_drug_category: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSpecialDrugCategoryRequest"];
+            };
+        };
+        responses: {
+            /** @description 创建特殊药品分类 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpecialDrugCategory"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_special_drug_category: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 特殊药品分类 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 删除特殊药品分类 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpecialDrugCategory"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_special_drug_category: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 特殊药品分类 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSpecialDrugCategoryRequest"];
+            };
+        };
+        responses: {
+            /** @description 更新特殊药品分类 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpecialDrugCategory"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_suppliers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 供应商列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_supplier: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSupplierRequest"];
+            };
+        };
+        responses: {
+            /** @description 创建供应商 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Supplier"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_supplier: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 供应商 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 删除供应商 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Supplier"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_supplier: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 供应商 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSupplierRequest"];
+            };
+        };
+        responses: {
+            /** @description 更新供应商 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Supplier"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_warehouses: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 仓库列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_warehouse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateWarehouseRequest"];
+            };
+        };
+        responses: {
+            /** @description 创建仓库 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Warehouse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_warehouse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 仓库 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 删除仓库 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Warehouse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_warehouse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 仓库 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateWarehouseRequest"];
+            };
+        };
+        responses: {
+            /** @description 更新仓库 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Warehouse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    execute_mapping: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExecuteMappingRequest"];
+            };
+        };
+        responses: {
+            /** @description 执行参数对照 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExecuteMappingResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    trace_mapping: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 执行 ID */
+                execution_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 参数对照反向追溯 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MappingTraceResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    query_report: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportQueryRequest"];
+            };
+        };
+        responses: {
+            /** @description 报表查询结果 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportQueryResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

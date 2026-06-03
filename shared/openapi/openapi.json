@@ -2,11 +2,11 @@
   "openapi": "3.0.3",
   "info": {
     "title": "WMS API",
-    "description": "Wave 1 W1.C 主仓 OpenAPI 契约骨架",
+    "description": "Wave 2 业务底座与 schema 先行契约",
     "license": {
       "name": ""
     },
-    "version": "0.0.1-wave-1-skeleton"
+    "version": "0.0.2-wave-2-schema"
   },
   "paths": {
     "/api/v1/audit/events": {
@@ -176,6 +176,216 @@
         }
       }
     },
+    "/api/v1/config-center/feature-flags/archive-file-source": {
+      "post": {
+        "tags": [
+          "config-center"
+        ],
+        "operationId": "archive_feature_flag_file_source",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeatureFlagArchiveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "归档 W1 文件版 Feature Flag",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeatureFlagArchiveResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/config-center/feature-flags/export": {
+      "get": {
+        "tags": [
+          "config-center"
+        ],
+        "operationId": "export_feature_flags",
+        "responses": {
+          "200": {
+            "description": "导出配置中心 Feature Flag",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeatureFlagExportResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/config-center/feature-flags/import": {
+      "post": {
+        "tags": [
+          "config-center"
+        ],
+        "operationId": "import_feature_flags",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeatureFlagBatchImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "批量导入配置中心 Feature Flag",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeatureFlagBatchImportResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/config-center/feature-flags/migrate": {
+      "post": {
+        "tags": [
+          "config-center"
+        ],
+        "operationId": "migrate_feature_flags",
+        "responses": {
+          "200": {
+            "description": "迁移文件版 Feature Flag",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeatureFlagMigrationResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/config-center/feature-flags/reconcile": {
+      "get": {
+        "tags": [
+          "config-center"
+        ],
+        "operationId": "reconcile_feature_flags",
+        "responses": {
+          "200": {
+            "description": "Feature Flag 对账报告",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeatureFlagReconcileReport"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/config-center/feature-flags/source": {
+      "post": {
+        "tags": [
+          "config-center"
+        ],
+        "operationId": "switch_feature_flag_source",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeatureFlagSourceSwitchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "切换 Feature Flag 读取源",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeatureFlagSourceSwitchResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/healthz": {
       "get": {
         "tags": [
@@ -189,6 +399,1328 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HealthzResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/inbound/receiving-orders": {
+      "get": {
+        "tags": [
+          "inbound"
+        ],
+        "operationId": "list_receiving_orders",
+        "responses": {
+          "200": {
+            "description": "收货单列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceivingOrderListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "inbound"
+        ],
+        "operationId": "create_receiving_order",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateReceivingOrderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "创建收货单",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceivingOrder"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/inbound/receiving-orders/{id}": {
+      "get": {
+        "tags": [
+          "inbound"
+        ],
+        "operationId": "get_receiving_order",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "收货单 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "收货单详情",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceivingOrder"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "inbound"
+        ],
+        "operationId": "delete_receiving_order",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "收货单 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "删除收货单",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceivingOrder"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "inbound"
+        ],
+        "operationId": "update_receiving_order",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "收货单 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateReceivingOrderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "更新收货单",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceivingOrder"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/master-data/customers": {
+      "get": {
+        "tags": [
+          "master-data"
+        ],
+        "operationId": "list_customers",
+        "responses": {
+          "200": {
+            "description": "客户列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "master-data"
+        ],
+        "operationId": "create_customer",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCustomerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "创建客户",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Customer"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/master-data/customers/{id}": {
+      "delete": {
+        "tags": [
+          "master-data"
+        ],
+        "operationId": "delete_customer",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "客户 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "删除客户",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Customer"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "master-data"
+        ],
+        "operationId": "update_customer",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "客户 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCustomerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "更新客户",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Customer"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/master-data/locations": {
+      "get": {
+        "tags": [
+          "master-data"
+        ],
+        "operationId": "list_locations",
+        "responses": {
+          "200": {
+            "description": "库位列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "master-data"
+        ],
+        "operationId": "create_location",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLocationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "创建库位",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Location"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/master-data/locations/{id}": {
+      "delete": {
+        "tags": [
+          "master-data"
+        ],
+        "operationId": "delete_location",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "库位 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "删除库位",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Location"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "master-data"
+        ],
+        "operationId": "update_location",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "库位 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLocationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "更新库位",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Location"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/master-data/products": {
+      "get": {
+        "tags": [
+          "master-data"
+        ],
+        "operationId": "list_products",
+        "responses": {
+          "200": {
+            "description": "商品列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "master-data"
+        ],
+        "operationId": "create_product",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProductRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "创建商品",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Product"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/master-data/products/{id}": {
+      "get": {
+        "tags": [
+          "master-data"
+        ],
+        "operationId": "get_product",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "商品 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "商品详情",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Product"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "master-data"
+        ],
+        "operationId": "delete_product",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "商品 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "删除商品",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Product"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "master-data"
+        ],
+        "operationId": "update_product",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "商品 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProductRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "更新商品",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Product"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/master-data/special-drug-categories": {
+      "get": {
+        "tags": [
+          "master-data"
+        ],
+        "operationId": "list_special_drug_categories",
+        "responses": {
+          "200": {
+            "description": "特殊药品分类列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpecialDrugCategoryListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "master-data"
+        ],
+        "operationId": "create_special_drug_category",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSpecialDrugCategoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "创建特殊药品分类",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpecialDrugCategory"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/master-data/special-drug-categories/{id}": {
+      "delete": {
+        "tags": [
+          "master-data"
+        ],
+        "operationId": "delete_special_drug_category",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "特殊药品分类 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "删除特殊药品分类",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpecialDrugCategory"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "master-data"
+        ],
+        "operationId": "update_special_drug_category",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "特殊药品分类 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSpecialDrugCategoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "更新特殊药品分类",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpecialDrugCategory"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/master-data/suppliers": {
+      "get": {
+        "tags": [
+          "master-data"
+        ],
+        "operationId": "list_suppliers",
+        "responses": {
+          "200": {
+            "description": "供应商列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "master-data"
+        ],
+        "operationId": "create_supplier",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSupplierRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "创建供应商",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Supplier"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/master-data/suppliers/{id}": {
+      "delete": {
+        "tags": [
+          "master-data"
+        ],
+        "operationId": "delete_supplier",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "供应商 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "删除供应商",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Supplier"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "master-data"
+        ],
+        "operationId": "update_supplier",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "供应商 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSupplierRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "更新供应商",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Supplier"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/master-data/warehouses": {
+      "get": {
+        "tags": [
+          "master-data"
+        ],
+        "operationId": "list_warehouses",
+        "responses": {
+          "200": {
+            "description": "仓库列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WarehouseListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "master-data"
+        ],
+        "operationId": "create_warehouse",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWarehouseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "创建仓库",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Warehouse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/master-data/warehouses/{id}": {
+      "delete": {
+        "tags": [
+          "master-data"
+        ],
+        "operationId": "delete_warehouse",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "仓库 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "删除仓库",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Warehouse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "master-data"
+        ],
+        "operationId": "update_warehouse",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "仓库 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWarehouseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "更新仓库",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Warehouse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/parameter-mapping/execute": {
+      "post": {
+        "tags": [
+          "parameter-mapping"
+        ],
+        "operationId": "execute_mapping",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecuteMappingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "执行参数对照",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecuteMappingResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/parameter-mapping/traces/{execution_id}": {
+      "get": {
+        "tags": [
+          "parameter-mapping"
+        ],
+        "operationId": "trace_mapping",
+        "parameters": [
+          {
+            "name": "execution_id",
+            "in": "path",
+            "description": "执行 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "参数对照反向追溯",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MappingTraceResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/query": {
+      "post": {
+        "tags": [
+          "reports"
+        ],
+        "operationId": "query_report",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportQueryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "报表查询结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportQueryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -306,6 +1838,219 @@
           }
         }
       },
+      "ConfigEntry": {
+        "type": "object",
+        "description": "M1-008 配置中心条目。",
+        "required": [
+          "id",
+          "owner_id",
+          "config_key",
+          "config_value",
+          "version",
+          "updated_at"
+        ],
+        "properties": {
+          "config_key": {
+            "type": "string"
+          },
+          "config_value": {
+            "type": "object",
+            "description": "自由结构 JSON 对象。",
+            "additionalProperties": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "CreateCustomerRequest": {
+        "type": "object",
+        "required": [
+          "customer_code",
+          "customer_name"
+        ],
+        "properties": {
+          "customer_code": {
+            "type": "string"
+          },
+          "customer_name": {
+            "type": "string"
+          },
+          "license_no": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "CreateLocationRequest": {
+        "type": "object",
+        "required": [
+          "warehouse_id",
+          "location_code",
+          "location_name"
+        ],
+        "properties": {
+          "location_code": {
+            "type": "string"
+          },
+          "location_name": {
+            "type": "string"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "CreateProductRequest": {
+        "type": "object",
+        "description": "创建商品请求。",
+        "required": [
+          "product_code",
+          "product_name",
+          "attrs"
+        ],
+        "properties": {
+          "approval_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "attrs": {
+            "type": "object",
+            "description": "自由结构 JSON 对象。",
+            "additionalProperties": true
+          },
+          "dosage_form": {
+            "type": "string",
+            "nullable": true
+          },
+          "manufacturer": {
+            "type": "string",
+            "nullable": true
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "product_name": {
+            "type": "string"
+          },
+          "spec": {
+            "type": "string",
+            "nullable": true
+          },
+          "special_drug_category_code": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "CreateReceivingOrderRequest": {
+        "type": "object",
+        "required": [
+          "receipt_no",
+          "warehouse_id",
+          "lines"
+        ],
+        "properties": {
+          "expected_arrival_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "external_ref": {
+            "type": "string",
+            "nullable": true
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReceivingOrderLine"
+            }
+          },
+          "receipt_no": {
+            "type": "string"
+          },
+          "supplier_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "CreateSpecialDrugCategoryRequest": {
+        "type": "object",
+        "required": [
+          "category_code",
+          "category_name",
+          "requires_dual_sign"
+        ],
+        "properties": {
+          "category_code": {
+            "type": "string"
+          },
+          "category_name": {
+            "type": "string"
+          },
+          "requires_dual_sign": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CreateSupplierRequest": {
+        "type": "object",
+        "required": [
+          "supplier_code",
+          "supplier_name"
+        ],
+        "properties": {
+          "contact_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "license_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "supplier_code": {
+            "type": "string"
+          },
+          "supplier_name": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateWarehouseRequest": {
+        "type": "object",
+        "required": [
+          "warehouse_code",
+          "warehouse_name"
+        ],
+        "properties": {
+          "warehouse_code": {
+            "type": "string"
+          },
+          "warehouse_name": {
+            "type": "string"
+          }
+        }
+      },
       "CurrentUser": {
         "type": "object",
         "description": "当前登录用户摘要。",
@@ -357,6 +2102,68 @@
           }
         }
       },
+      "Customer": {
+        "type": "object",
+        "description": "客户基础档案。",
+        "required": [
+          "id",
+          "owner_id",
+          "customer_code",
+          "customer_name",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "customer_code": {
+            "type": "string"
+          },
+          "customer_name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "license_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CustomerListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Customer"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
       "ErrorResponse": {
         "type": "object",
         "description": "统一错误响应。",
@@ -396,6 +2203,235 @@
           }
         }
       },
+      "ExecuteMappingRequest": {
+        "type": "object",
+        "required": [
+          "source_system",
+          "raw_payload"
+        ],
+        "properties": {
+          "raw_payload": {
+            "type": "object",
+            "description": "自由结构 JSON 对象。",
+            "additionalProperties": true
+          },
+          "source_system": {
+            "type": "string"
+          }
+        }
+      },
+      "ExecuteMappingResponse": {
+        "type": "object",
+        "required": [
+          "execution_id",
+          "normalized_payload",
+          "unresolved_fields"
+        ],
+        "properties": {
+          "execution_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "normalized_payload": {
+            "type": "object",
+            "description": "自由结构 JSON 对象。",
+            "additionalProperties": true
+          },
+          "queue_item_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "unresolved_fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "FeatureFlagArchiveRequest": {
+        "type": "object",
+        "required": [
+          "archive_ref"
+        ],
+        "properties": {
+          "archive_ref": {
+            "type": "string"
+          }
+        }
+      },
+      "FeatureFlagArchiveResult": {
+        "type": "object",
+        "required": [
+          "archived_source",
+          "archive_ref",
+          "archived_at"
+        ],
+        "properties": {
+          "archive_ref": {
+            "type": "string"
+          },
+          "archived_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "archived_source": {
+            "type": "string"
+          }
+        }
+      },
+      "FeatureFlagBatchImportRequest": {
+        "type": "object",
+        "required": [
+          "flags"
+        ],
+        "properties": {
+          "flags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeatureFlagConfig"
+            }
+          }
+        }
+      },
+      "FeatureFlagBatchImportResult": {
+        "type": "object",
+        "required": [
+          "imported_count",
+          "target"
+        ],
+        "properties": {
+          "imported_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "target": {
+            "type": "string"
+          }
+        }
+      },
+      "FeatureFlagConfig": {
+        "type": "object",
+        "description": "配置中心版 Feature Flag。",
+        "required": [
+          "key",
+          "owner",
+          "created_at",
+          "cleanup_by",
+          "enabled",
+          "source"
+        ],
+        "properties": {
+          "cleanup_by": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "key": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          }
+        }
+      },
+      "FeatureFlagExportResponse": {
+        "type": "object",
+        "required": [
+          "source",
+          "flags"
+        ],
+        "properties": {
+          "flags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeatureFlagConfig"
+            }
+          },
+          "source": {
+            "type": "string"
+          }
+        }
+      },
+      "FeatureFlagMigrationResult": {
+        "type": "object",
+        "required": [
+          "migrated_count",
+          "source",
+          "target"
+        ],
+        "properties": {
+          "migrated_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "source": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          }
+        }
+      },
+      "FeatureFlagReconcileReport": {
+        "type": "object",
+        "required": [
+          "matched",
+          "missing_in_config_center",
+          "mismatched"
+        ],
+        "properties": {
+          "matched": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "mismatched": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "missing_in_config_center": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "FeatureFlagSourceSwitchRequest": {
+        "type": "object",
+        "required": [
+          "source"
+        ],
+        "properties": {
+          "source": {
+            "type": "string"
+          }
+        }
+      },
+      "FeatureFlagSourceSwitchResponse": {
+        "type": "object",
+        "required": [
+          "active_source"
+        ],
+        "properties": {
+          "active_source": {
+            "type": "string"
+          }
+        }
+      },
       "HealthzResponse": {
         "type": "object",
         "description": "健康检查响应。",
@@ -417,6 +2453,69 @@
           "version": {
             "type": "string",
             "description": "契约版本。"
+          }
+        }
+      },
+      "Location": {
+        "type": "object",
+        "description": "库位基础档案。",
+        "required": [
+          "id",
+          "owner_id",
+          "warehouse_id",
+          "location_code",
+          "location_name",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "location_code": {
+            "type": "string"
+          },
+          "location_name": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "LocationListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Location"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
           }
         }
       },
@@ -470,6 +2569,797 @@
             "$ref": "#/components/schemas/CurrentUser"
           }
         }
+      },
+      "MappingDictionary": {
+        "type": "object",
+        "description": "M-PM 参数对照字典。",
+        "required": [
+          "id",
+          "owner_id",
+          "dictionary_code",
+          "dictionary_name",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "dictionary_code": {
+            "type": "string"
+          },
+          "dictionary_name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "MappingQueueItem": {
+        "type": "object",
+        "description": "M-PM 待映射队列项。",
+        "required": [
+          "id",
+          "owner_id",
+          "source_system",
+          "raw_payload",
+          "status",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "raw_payload": {
+            "type": "object",
+            "description": "自由结构 JSON 对象。",
+            "additionalProperties": true
+          },
+          "source_system": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "MappingRule": {
+        "type": "object",
+        "description": "M-PM 字段映射规则。",
+        "required": [
+          "id",
+          "owner_id",
+          "source_system",
+          "external_field",
+          "canonical_field",
+          "transform",
+          "created_at"
+        ],
+        "properties": {
+          "canonical_field": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "external_field": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source_system": {
+            "type": "string"
+          },
+          "transform": {
+            "type": "string"
+          }
+        }
+      },
+      "MappingTraceResponse": {
+        "type": "object",
+        "required": [
+          "execution_id",
+          "source_system",
+          "raw_payload",
+          "normalized_payload",
+          "applied_rule_ids",
+          "unresolved_fields"
+        ],
+        "properties": {
+          "applied_rule_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "execution_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "normalized_payload": {
+            "type": "object",
+            "description": "自由结构 JSON 对象。",
+            "additionalProperties": true
+          },
+          "raw_payload": {
+            "type": "object",
+            "description": "自由结构 JSON 对象。",
+            "additionalProperties": true
+          },
+          "source_system": {
+            "type": "string"
+          },
+          "unresolved_fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "PageMeta": {
+        "type": "object",
+        "description": "分页信息。",
+        "required": [
+          "count"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "本页数量。",
+            "minimum": 0
+          },
+          "next_cursor": {
+            "type": "string",
+            "description": "下一页游标；为空表示无更多数据。",
+            "nullable": true
+          }
+        }
+      },
+      "Product": {
+        "type": "object",
+        "description": "商品基础档案。",
+        "required": [
+          "id",
+          "owner_id",
+          "product_code",
+          "product_name",
+          "status",
+          "attrs",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "approval_no": {
+            "type": "string",
+            "description": "批准文号。",
+            "nullable": true
+          },
+          "attrs": {
+            "type": "object",
+            "description": "自由结构 JSON 对象。",
+            "additionalProperties": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "创建时间。"
+          },
+          "dosage_form": {
+            "type": "string",
+            "description": "剂型。",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "商品 ID。"
+          },
+          "manufacturer": {
+            "type": "string",
+            "description": "生产企业。",
+            "nullable": true
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "货主 ID。"
+          },
+          "product_code": {
+            "type": "string",
+            "description": "商品编码。"
+          },
+          "product_name": {
+            "type": "string",
+            "description": "商品名称。"
+          },
+          "spec": {
+            "type": "string",
+            "description": "规格。",
+            "nullable": true
+          },
+          "special_drug_category_code": {
+            "type": "string",
+            "description": "特殊药品分类编码。",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "description": "启停状态。"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "更新时间。"
+          }
+        }
+      },
+      "ProductListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Product"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "ReceivingOrder": {
+        "type": "object",
+        "description": "收货单。",
+        "required": [
+          "id",
+          "owner_id",
+          "receipt_no",
+          "warehouse_id",
+          "status",
+          "lines",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expected_arrival_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "external_ref": {
+            "type": "string",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReceivingOrderLine"
+            }
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "receipt_no": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "supplier_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "ReceivingOrderLine": {
+        "type": "object",
+        "description": "收货单明细。",
+        "required": [
+          "line_no",
+          "product_code",
+          "expected_qty"
+        ],
+        "properties": {
+          "batch_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "expected_qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expiry_date": {
+            "type": "string",
+            "nullable": true
+          },
+          "line_no": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "production_date": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "ReceivingOrderListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReceivingOrder"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "ReportQueryRequest": {
+        "type": "object",
+        "required": [
+          "report_code",
+          "filters"
+        ],
+        "properties": {
+          "filters": {
+            "type": "object",
+            "description": "自由结构 JSON 对象。",
+            "additionalProperties": true
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true,
+            "minimum": 0
+          },
+          "report_code": {
+            "type": "string"
+          }
+        }
+      },
+      "ReportQueryResponse": {
+        "type": "object",
+        "required": [
+          "report_code",
+          "generated_at",
+          "rows",
+          "page"
+        ],
+        "properties": {
+          "generated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          },
+          "report_code": {
+            "type": "string"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportRow"
+            }
+          }
+        }
+      },
+      "ReportRow": {
+        "type": "object",
+        "description": "M6 报表行。",
+        "required": [
+          "values"
+        ],
+        "properties": {
+          "values": {
+            "type": "object",
+            "description": "自由结构 JSON 对象。",
+            "additionalProperties": true
+          }
+        }
+      },
+      "SpecialDrugCategory": {
+        "type": "object",
+        "description": "特殊药品分类字典。",
+        "required": [
+          "id",
+          "owner_id",
+          "category_code",
+          "category_name",
+          "requires_dual_sign",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "category_code": {
+            "type": "string"
+          },
+          "category_name": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requires_dual_sign": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SpecialDrugCategoryListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SpecialDrugCategory"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "Supplier": {
+        "type": "object",
+        "description": "供应商基础档案。",
+        "required": [
+          "id",
+          "owner_id",
+          "supplier_code",
+          "supplier_name",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "contact_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "license_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "supplier_code": {
+            "type": "string"
+          },
+          "supplier_name": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SupplierListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Supplier"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "UpdateCustomerRequest": {
+        "type": "object",
+        "properties": {
+          "customer_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "license_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "UpdateLocationRequest": {
+        "type": "object",
+        "properties": {
+          "location_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "UpdateProductRequest": {
+        "type": "object",
+        "description": "更新商品请求。",
+        "properties": {
+          "approval_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "attrs": {
+            "type": "object",
+            "description": "自由结构 JSON 对象。",
+            "additionalProperties": true
+          },
+          "dosage_form": {
+            "type": "string",
+            "nullable": true
+          },
+          "manufacturer": {
+            "type": "string",
+            "nullable": true
+          },
+          "product_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "spec": {
+            "type": "string",
+            "nullable": true
+          },
+          "special_drug_category_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "UpdateReceivingOrderRequest": {
+        "type": "object",
+        "properties": {
+          "expected_arrival_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "external_ref": {
+            "type": "string",
+            "nullable": true
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReceivingOrderLine"
+            },
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "supplier_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        }
+      },
+      "UpdateSpecialDrugCategoryRequest": {
+        "type": "object",
+        "properties": {
+          "category_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "requires_dual_sign": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "UpdateSupplierRequest": {
+        "type": "object",
+        "properties": {
+          "contact_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "license_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "supplier_name": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "UpdateWarehouseRequest": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "warehouse_name": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "Warehouse": {
+        "type": "object",
+        "description": "仓库基础档案。",
+        "required": [
+          "id",
+          "owner_id",
+          "warehouse_code",
+          "warehouse_name",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "warehouse_code": {
+            "type": "string"
+          },
+          "warehouse_name": {
+            "type": "string"
+          }
+        }
+      },
+      "WarehouseListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Warehouse"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
       }
     }
   },
@@ -485,6 +3375,26 @@
     {
       "name": "audit",
       "description": "审计追踪"
+    },
+    {
+      "name": "master-data",
+      "description": "M1 基础档案"
+    },
+    {
+      "name": "inbound",
+      "description": "M2 入库 schema"
+    },
+    {
+      "name": "reports",
+      "description": "M6 报表查询"
+    },
+    {
+      "name": "parameter-mapping",
+      "description": "M-PM 参数对照"
+    },
+    {
+      "name": "config-center",
+      "description": "M1-008 配置中心"
     }
   ]
 }
