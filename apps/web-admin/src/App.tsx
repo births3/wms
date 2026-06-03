@@ -1,26 +1,34 @@
 import { Card, CardContent, StatusBadge } from "@wms/ui";
 import { Activity, ClipboardList, KeyRound, ShieldCheck } from "lucide-react";
 
+import { apiBaseUrl, wave1ContractPaths } from "./lib/api";
+
 const foundations = [
   {
     id: "h1",
     title: "H1 权限与多租户",
     description: "AuthContext、JWT、多货主隔离和权限门控的生产入口。",
-    status: "pending" as const,
+    status: "completed" as const,
+    label: "已接入",
+    meta: "登录 / 当前用户",
     icon: ShieldCheck,
   },
   {
     id: "h2",
     title: "H2 审计追踪",
     description: "写操作接入 append-only 审计事件和审计查询链路。",
-    status: "pending" as const,
+    status: "completed" as const,
+    label: "已接入",
+    meta: "审计事件查询",
     icon: ClipboardList,
   },
   {
     id: "h3",
     title: "H3 OpenAPI 契约",
     description: "后端 utoipa 生成 OpenAPI，前端通过 api-client 消费。",
-    status: "pending" as const,
+    status: "completed" as const,
+    label: "已接入",
+    meta: `${wave1ContractPaths.length} 条基础路径`,
     icon: KeyRound,
   },
 ];
@@ -52,11 +60,12 @@ export function App() {
                     <div className="flex size-10 items-center justify-center rounded-md bg-primary/10 text-primary">
                       <Icon className="size-5" aria-hidden />
                     </div>
-                    <StatusBadge status={item.status} label="待接入" size="sm" />
+                    <StatusBadge status={item.status} label={item.label} size="sm" />
                   </div>
                   <div>
                     <h2 className="text-lg font-semibold tracking-normal">{item.title}</h2>
                     <p className="mt-2 text-sm leading-6 text-muted-foreground">{item.description}</p>
+                    <p className="mt-3 text-xs font-medium text-muted-foreground">{item.meta}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -74,6 +83,9 @@ export function App() {
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 此壳工程不复制 prototypes 页面、不保留 mock-only 流程、不绕过 OpenAPI。业务页迁移时按
                 docs/prototypes/prototype-to-production.md 验收。
+              </p>
+              <p className="mt-3 text-xs font-medium text-muted-foreground">
+                API 基址：{apiBaseUrl || "当前域名"}
               </p>
             </div>
           </CardContent>

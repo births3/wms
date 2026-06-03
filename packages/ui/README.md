@@ -49,7 +49,7 @@ import { Button, StatusBadge, cn } from "@wms/ui";
 ## 不在本包内
 
 - 业务页面（在 `apps/web-admin/src/pages/`）
-- API 客户端（在 `packages/api-client/`，未来 Wave 1 W1.C 创建）
+- API 客户端（在 `packages/api-client/`，Wave 1 W1.C 骨架已创建）
 - 业务类型（在 `packages/domain-types/`，未来）
 
 ## 治理

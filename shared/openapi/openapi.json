@@ -1,0 +1,490 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "WMS API",
+    "description": "Wave 1 W1.C 主仓 OpenAPI 契约骨架",
+    "license": {
+      "name": ""
+    },
+    "version": "0.0.1-wave-1-skeleton"
+  },
+  "paths": {
+    "/api/v1/audit/events": {
+      "get": {
+        "tags": [
+          "audit"
+        ],
+        "operationId": "list_audit_events",
+        "parameters": [
+          {
+            "name": "resource_type",
+            "in": "query",
+            "description": "按资源类型过滤",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "actor_id",
+            "in": "query",
+            "description": "按操作者过滤",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "开始时间（RFC3339）",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "nullable": true
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "结束时间（RFC3339）",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "nullable": true
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "每页条数",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "分页游标",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "审计事件列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEventListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "登录成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "认证失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "me",
+        "responses": {
+          "200": {
+            "description": "当前登录用户",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentUser"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/healthz": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "operationId": "healthz",
+        "responses": {
+          "200": {
+            "description": "服务健康",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthzResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AuditActor": {
+        "type": "object",
+        "description": "审计事件操作者摘要。",
+        "required": [
+          "actor_id",
+          "actor_name",
+          "owner_id",
+          "jti"
+        ],
+        "properties": {
+          "actor_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "操作者 ID。"
+          },
+          "actor_name": {
+            "type": "string",
+            "description": "操作者名称。"
+          },
+          "jti": {
+            "type": "string",
+            "description": "JWT jti，用于追溯登录态。"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "操作者所属货主 ID。"
+          }
+        }
+      },
+      "AuditEvent": {
+        "type": "object",
+        "description": "审计事件。",
+        "required": [
+          "id",
+          "owner_id",
+          "resource_type",
+          "resource_id",
+          "action",
+          "trace_id",
+          "occurred_at",
+          "actor",
+          "diff"
+        ],
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "事件动作。"
+          },
+          "actor": {
+            "$ref": "#/components/schemas/AuditActor"
+          },
+          "diff": {
+            "type": "object",
+            "description": "变更详情。",
+            "additionalProperties": true
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "审计事件 ID。"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "发生时间。"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "被审计记录所属货主 ID。"
+          },
+          "resource_id": {
+            "type": "string",
+            "description": "资源实例 ID。"
+          },
+          "resource_type": {
+            "type": "string",
+            "description": "资源类型。"
+          },
+          "trace_id": {
+            "type": "string",
+            "description": "审计 trace ID。"
+          }
+        }
+      },
+      "AuditEventListResponse": {
+        "type": "object",
+        "description": "审计事件分页响应。",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditEvent"
+            },
+            "description": "事件列表。"
+          },
+          "next_cursor": {
+            "type": "string",
+            "description": "下一页游标；为空表示无更多数据。",
+            "nullable": true
+          }
+        }
+      },
+      "CurrentUser": {
+        "type": "object",
+        "description": "当前登录用户摘要。",
+        "required": [
+          "user_id",
+          "owner_id",
+          "owner_code",
+          "username",
+          "display_name",
+          "roles",
+          "permissions"
+        ],
+        "properties": {
+          "display_name": {
+            "type": "string",
+            "description": "展示名。"
+          },
+          "owner_code": {
+            "type": "string",
+            "description": "货主编码。"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "货主 ID。"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "当前权限码列表。"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "当前角色列表。"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "用户 ID。"
+          },
+          "username": {
+            "type": "string",
+            "description": "用户名。"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "description": "统一错误响应。",
+        "required": [
+          "code",
+          "message",
+          "severity",
+          "details",
+          "trace_id"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "业务错误码。"
+          },
+          "details": {
+            "type": "object",
+            "description": "关联详情。",
+            "additionalProperties": true
+          },
+          "message": {
+            "type": "string",
+            "description": "中文错误消息。"
+          },
+          "retry_hint": {
+            "type": "string",
+            "description": "重试提示。",
+            "nullable": true
+          },
+          "severity": {
+            "type": "string",
+            "description": "严重度。"
+          },
+          "trace_id": {
+            "type": "string",
+            "description": "链路追踪 ID。"
+          }
+        }
+      },
+      "HealthzResponse": {
+        "type": "object",
+        "description": "健康检查响应。",
+        "required": [
+          "status",
+          "version",
+          "generated_at"
+        ],
+        "properties": {
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "文档生成时间。"
+          },
+          "status": {
+            "type": "string",
+            "description": "服务状态。"
+          },
+          "version": {
+            "type": "string",
+            "description": "契约版本。"
+          }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "description": "登录请求。",
+        "required": [
+          "owner_code",
+          "username",
+          "password"
+        ],
+        "properties": {
+          "owner_code": {
+            "type": "string",
+            "description": "货主编码。"
+          },
+          "password": {
+            "type": "string",
+            "description": "登录密码。"
+          },
+          "username": {
+            "type": "string",
+            "description": "登录账号。"
+          }
+        }
+      },
+      "LoginResponse": {
+        "type": "object",
+        "description": "登录成功响应。",
+        "required": [
+          "access_token",
+          "token_type",
+          "expires_at",
+          "user"
+        ],
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "description": "Bearer token。"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "过期时间。"
+          },
+          "token_type": {
+            "type": "string",
+            "description": "token 类型。"
+          },
+          "user": {
+            "$ref": "#/components/schemas/CurrentUser"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "system",
+      "description": "系统探针"
+    },
+    {
+      "name": "auth",
+      "description": "鉴权与会话"
+    },
+    {
+      "name": "audit",
+      "description": "审计追踪"
+    }
+  ]
+}

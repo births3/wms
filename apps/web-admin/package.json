@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@wms/api-client": "workspace:*",
     "@wms/ui": "workspace:*",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
