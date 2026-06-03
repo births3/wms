@@ -87,7 +87,7 @@ Wave 3 第一批后端切片已经完成内存服务与 OpenAPI 契约：
 | 1 | M2 收货闭环记录基数 | 一单一次闭环，`receiving_order_receipts` 加 `unique(receiving_order_id)` |
 | 2 | M2 上架与 M3 库存事务 | 同事务写 `receiving_putaways` + `inventory_batches` + `inventory_movements` |
 | 3 | M9 规则生效期字段 | 现在补 `effective_from` / `effective_to` 到 API 和表 |
-| 4 | GSP 资质有效期校验来源 | 继续保留接口占位，暂不冻结 M1 本地表或 ERP/H8 校验端口；Wave 3 不因此标记完成 |
+| 4 | GSP 资质有效期校验来源 | 冻结为 M1 本地资质档案 + M-VR 校验规则执行；ERP/API 作为供应商资质同步来源，不作为入库运行时资质有效期校验的唯一事实源 |
 | 5 | M5 温控读数分区 | 普通表 + 索引，暂不按月分区 |
 
 ### 设计原则
@@ -245,7 +245,7 @@ Wave 3 第一批后端切片已经完成内存服务与 OpenAPI 契约：
 | M2 收货闭环到底是一单一次还是可多次分批 | 唯一键不同，影响补货/短少处理 | 已确认一单一次并落 `unique(receiving_order_id)`；未来如改分批需新 ADR + migration |
 | M2 putaway 与 M3 inventory 分开事务 | 上架记录和库存余额可能短期不一致 | 已确认同事务写 `receiving_putaways` + `inventory_batches` + `inventory_movements` |
 | M9 规则生效期缺失 | 未来无法校验“规则生效日期冲突” | 已扩 API 与表字段，并有 PostgreSQL 冲突测试 |
-| GSP 资质有效期校验来源未冻结 | W3 完成门禁仍缺供应商/商品资质校验 | 已确认继续保留接口占位；后续需另行决策 M1 本地资质表或 ERP/H8 校验端口 |
+| GSP 资质有效期来源与 ERP 边界混淆 | 可能把供应商资质有效期、经营范围、特殊药品经营资质混成同一校验来源 | 已冻结供应商资质有效期由 M1 本地资质档案 + M-VR 执行；ERP/API 只作为同步来源；经营范围/特殊药品经营资质仍按既有边界由 ERP 校验 |
 | M5 外部 API Key 未接入 | 外部推送鉴权不完整 | 已按 ADR-0013 / ADR-0030 落 `X-WMS-API-Key` hash 配置，不在业务表保存 secret |
 
 ---

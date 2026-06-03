@@ -6,7 +6,7 @@
 
 ---
 
-## 当前 Wave：Wave 3 — 核心业务规则铺开（进行中）
+## 当前 Wave：Wave 3 — 核心业务规则铺开（开发完成）
 
 **目标**：M2 入库业务规则、M3 库存模型与状态规则、M5 外部冷链数据接入 schema、M9 计费账户/合同模型逐步落地。
 
@@ -24,15 +24,18 @@
 - [x] W3.C external auth：M5 外部冷链 readings/excursions 使用 `X-WMS-API-Key` + `Idempotency-Key`，接 PostgreSQL repository、`idempotency_request` 与 H2 `audit_event`，并有真实 PostgreSQL handler 测试覆盖
 - [x] H3 同步：`shared/openapi/openapi.json` 与 `packages/api-client/src/schema.ts` 已反映 Wave 3 第一批 path/schema
 - [x] 治理：`check_openapi_contract.py` 要求 Wave 3 第一批 path/schema
+- [x] W3 completion report：新增 `report_wave3_completion.py` 与 `just wave-3-complete-check`，汇总 M2/M3 11 层证据和 Wave 3 阻塞项
+- [x] W3.A PDA readiness：按 SPIKE-005 先落设备清单与 runbook，不引入 RN 依赖，不创建生产 app
+- [x] W3 完成门禁：M2 / M3 关键路径 L1-L6/L8-L11 已有静态证据，L7 为预发布 gate；GSP 资质有效期校验来源冻结为 M1 本地资质档案 + M-VR 校验规则执行
 
-### 进行中 / 待做
+### 后续 / 不阻塞 Wave 3 开发完成
 
-- [ ] W3.A PDA 端：`apps/pda-mobile` 目前只有 `.gitkeep`，生产 PDA app 未启动；SPIKE-005 RN 扫枪仍需按 ROADMAP 启动条件重开
-- [ ] W3.D 后续：M9 自动计费与账单管理仍在 Wave 5；当前只完成账户/合同/规则模型
-- [ ] W3 完成门禁：M2 / M3 关键路径 11 层测试覆盖；GSP 资质有效期校验继续接口占位，来源未冻结，Wave 3 暂不标记完成
+- [ ] W3.A PDA 生产端：`apps/pda-mobile` 目前只有 `.gitkeep`，生产 app 等真 PDA 与 SPIKE-005 验证后启动，作为预发布 gate 跟踪
+- [ ] W3.D 后续：M9 自动计费与账单管理仍在 Wave 5；当前 Wave 3 只完成账户/合同/规则模型
 
 ### 后续跟踪（不计入 Wave 3 开发完成）
 
+- W3 L7 pre-release gate：有稳定 dev/staging + 真 PDA 后，按 [Wave 3 PDA Readiness Runbook](docs/runbooks/wave-3-pda-readiness.md) 启动 SPIKE-005，采集 M2/M3 性能/易用性证据
 - W2.G pre-release runtime gate：有稳定 dev/staging 后，按 [Wave 2 Pre-release Runtime Evidence Runbook](docs/runbooks/wave-2-runtime-evidence.md) 验证配置中心版 Feature Flag 迁移、对账、切源、旧文件归档和 smoke，写入 `docs/retros/wave-2-runtime-evidence.json`
 - W1.B / W1.D pre-release runtime gate：仍按 [Wave 1 Pre-release Runtime Evidence Runbook](docs/runbooks/wave-1-runtime-evidence.md) 在真实环境补齐
 - W2-external：人工确认“码上放心”账号外部开通状态；外部依赖仍按 [ROADMAP.md](ROADMAP.md) 的外部依赖追踪表跟进

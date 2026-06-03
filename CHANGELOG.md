@@ -21,6 +21,8 @@
 - Wave 3 handler persistence：M2 receive/inspect/sign/putaway handler 接入 PostgreSQL repository；业务表、`idempotency_request` 与 H2 `audit_event` 同事务落库，OpenAPI 标出 `Idempotency-Key`。
 - Wave 3 M3 repository：库存查询与状态变更 handler 接入 PostgreSQL repository；状态变更写 `inventory_status_changes`、`idempotency_request` 与 H2 `audit_event`。
 - Wave 3 M5 external auth：外部冷链 readings/excursions 接入 `X-WMS-API-Key` + `Idempotency-Key`，并写入 PostgreSQL 业务表、`idempotency_request` 与 H2 `audit_event`。
+- Wave 3 completion report：新增 `report_wave3_completion.py` / `just wave-3-complete-check`，汇总 M2/M3 11 层证据；L7 性能/易用性证据作为预发布 gate，PDA 先落 SPIKE-005 readiness/runbook。
+- Wave 3 GSP qualification gate：供应商资质有效期校验来源冻结为 M1 本地资质档案 + M-VR 校验规则执行，ERP/API 作为资质同步来源。
 - 概念审计独立文档（docs/concept-audit.md）：8 镜头扫描结果 + 数据量评估（3 年 164M 行 / 30GB / PG 单机足够）。
 - 业务澄清记录（docs/domain/clarifications.md）：47 项业务决策含 v3.1 #47（C1 PDA 离线 / C6 盘点期间出库 / C7 退货批号 ERP 校验）。
 - 字段词典 v3.1（docs/compliance/gsp-field-traceability.md）：163 个字段（80 GSP + 40 business + 8 system + 15 config + 10 derived + 10 interface），新增 10 个 P0 GSP canonical（country_of_origin / USCC×6 / shipment_doc_no / operation_type / delivery_time）+ 31 个 legacy 英文 alias 补充。
