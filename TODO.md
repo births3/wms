@@ -6,27 +6,35 @@
 
 ---
 
-## 当前 Wave：Wave 2 — 业务底座 + Schema 先行（开发完成）
+## 当前 Wave：Wave 3 — 核心业务规则铺开（进行中）
 
-**目标**：M1 基础档案、M2 入库收货单 schema、M6 报表骨架、M-PM 参数对照、M1-008 配置中心版 Feature Flag 迁移链路全部通过出口检查。
+**目标**：M2 入库业务规则、M3 库存模型与状态规则、M5 外部冷链数据接入 schema、M9 计费账户/合同模型逐步落地。
 
-### 已完成（静态证据）
+### 已完成（Wave 3 第一批后端切片）
 
-- [x] W2.A：M1.a 商品 / 供应商 / 客户 / 仓库 / 库位 / 特殊药品分类 schema + 基础 CRUD
-- [x] W2.B：M2 收货单 schema + 基础 CRUD 骨架（不写业务规则）
-- [x] W2.C：M6 报表查询接口骨架
-- [x] W2.E：M-PM 参数对照服务覆盖字典 / 规则 / 待映射队列 / 执行 API / 反向追溯
-- [x] W2.G static：M1-008 配置中心版 Feature Flag 覆盖迁移 / 导出 / 批量导入 / 对账 / 切换读取源 / 旧文件归档
-- [x] H3 同步：`shared/openapi/openapi.json` 与 `packages/api-client/src/schema.ts` 已反映 Wave 2 完整 schema
-- [x] 治理：`check_openapi_contract.py` 要求 Wave 2 path/schema；`report_wave2_completion.py` + `just wave-2-complete-check` 落地
+- [x] W3.A backend：M2 收货闭环校验、验收效期校验、双人签字、上架记录服务与单测
+- [x] W3.B backend：M3 库存批次模型、入库上架增加库存、可用库存、状态机审批源约束与单测
+- [x] W3.C backend：M5 外部温控数据/超标事件接入 schema 与幂等服务；保持 WMS 不采集、不判定超标的边界
+- [x] W3.D backend：M9 计费账户 / 合同 / 规则模型与基础校验
+- [x] H3 同步：`shared/openapi/openapi.json` 与 `packages/api-client/src/schema.ts` 已反映 Wave 3 第一批 path/schema
+- [x] 治理：`check_openapi_contract.py` 要求 Wave 3 第一批 path/schema
 
-### 后续跟踪（不计入 Wave 2 开发完成）
+### 进行中 / 待做
+
+- [ ] W3.A PDA 端：`apps/pda-mobile` 目前只有 `.gitkeep`，生产 PDA app 未启动；SPIKE-005 RN 扫枪仍需按 ROADMAP 启动条件重开
+- [ ] W3.A handler：把 M2 workflow service 接入真实 Axum handler + 权限 + 审计 + 幂等
+- [ ] W3.B handler/repository：把 M3 库存服务接入 PostgreSQL repository，补 L3-L5/L8/L11 关键路径测试
+- [ ] W3.C handler：外部冷链系统 API Key 接入、H-INT 契约、H2 审计
+- [ ] W3.D 后续：M9 自动计费与账单管理仍在 Wave 5；当前只完成账户/合同/规则模型
+- [ ] W3 完成门禁：M2 / M3 关键路径 11 层测试覆盖；GSP 资质有效期校验生效
+
+### 后续跟踪（不计入 Wave 3 开发完成）
 
 - W2.G pre-release runtime gate：有稳定 dev/staging 后，按 [Wave 2 Pre-release Runtime Evidence Runbook](docs/runbooks/wave-2-runtime-evidence.md) 验证配置中心版 Feature Flag 迁移、对账、切源、旧文件归档和 smoke，写入 `docs/retros/wave-2-runtime-evidence.json`
 - W1.B / W1.D pre-release runtime gate：仍按 [Wave 1 Pre-release Runtime Evidence Runbook](docs/runbooks/wave-1-runtime-evidence.md) 在真实环境补齐
 - W2-external：人工确认“码上放心”账号外部开通状态；外部依赖仍按 [ROADMAP.md](ROADMAP.md) 的外部依赖追踪表跟进
 
-当前 Wave 2 开发完成状态以 `just wave-2-complete-check` 为准；上述 runtime gate 在预发布前用 `just wave-2-runtime-evidence-validate` 单独验证，禁止用 localhost / stub / mock / fake / example 代替。
+Wave 1 / Wave 2 开发完成状态仍分别以 `just wave-1-complete-check` / `just wave-2-complete-check` 为准；上述 runtime gate 在预发布前单独验证，禁止用 localhost / stub / mock / fake / example 代替。
 
 ---
 

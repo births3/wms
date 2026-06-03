@@ -13,6 +13,8 @@
 - Wave 1 runtime evidence 工具链：H2 runtime 采集器、W1.D 自动回滚 probe、runtime evidence 前置检查和 validator；真实 runtime evidence 后移为预发布 gate，不用 localhost / stub / mock / fake / example 代替。
 - Wave 2 业务底座开发完成：M1 基础档案 schema + 基础 CRUD、M2 收货单 schema + CRUD 骨架、M6 报表查询骨架、M-PM 参数对照执行/追溯、M1-008 配置中心版 Feature Flag 迁移链路。
 - Wave 2 契约与治理：OpenAPI / `@wms/api-client` 同步到 Wave 2 schema；`check_openapi_contract.py` 覆盖 Wave 2 path/schema；新增 `report_wave2_completion.py`、`just wave-2-complete-check`、`docs/runbooks/wave-2-runtime-evidence.md`。
+- Wave 3 第一批后端切片：M2 收货闭环/验收/双签/上架规则、M3 库存批次与状态机、M5 外部冷链数据/超标事件接入 schema、M9 计费账户/合同/规则模型。
+- Wave 3 契约同步：OpenAPI / `@wms/api-client` 同步到 Wave 3 第一批 path/schema；`check_openapi_contract.py` 扩展覆盖 M2 workflow、M3 inventory、M5 cold-chain、M9 billing。
 - 概念审计独立文档（docs/concept-audit.md）：8 镜头扫描结果 + 数据量评估（3 年 164M 行 / 30GB / PG 单机足够）。
 - 业务澄清记录（docs/domain/clarifications.md）：47 项业务决策含 v3.1 #47（C1 PDA 离线 / C6 盘点期间出库 / C7 退货批号 ERP 校验）。
 - 字段词典 v3.1（docs/compliance/gsp-field-traceability.md）：163 个字段（80 GSP + 40 business + 8 system + 15 config + 10 derived + 10 interface），新增 10 个 P0 GSP canonical（country_of_origin / USCC×6 / shipment_doc_no / operation_type / delivery_time）+ 31 个 legacy 英文 alias 补充。
@@ -42,5 +44,5 @@
 
 ---
 
-> 当前项目处于 Wave 2 业务底座开发完成阶段；预发布前仍需补齐真实 dev/staging runtime evidence gate。
+> 当前项目处于 Wave 3 核心业务规则进行中阶段；Wave 1 / Wave 2 预发布前仍需补齐真实 dev/staging runtime evidence gate。
 > 第一个标签版本建议在预发布 runtime gate 通过后发布为 `v0.1.0-foundation`。
