@@ -102,6 +102,10 @@ impl FeatureFlagRegistry {
         self.flags.is_empty()
     }
 
+    pub fn flags(&self) -> impl Iterator<Item = &FeatureFlag> {
+        self.flags.values()
+    }
+
     pub fn is_enabled(&self, key: &str) -> bool {
         self.is_enabled_with_env(key, |name| env::var(name).ok())
     }
