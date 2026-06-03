@@ -16,15 +16,16 @@
 - [x] W3.B backend：M3 库存批次模型、入库上架增加库存、可用库存、状态机审批源约束与单测
 - [x] W3.C backend：M5 外部温控数据/超标事件接入 schema 与幂等服务；保持 WMS 不采集、不判定超标的边界
 - [x] W3.D backend：M9 计费账户 / 合同 / 规则模型与基础校验
+- [x] W3 handler shell：Wave 3 第一批 Axum handler 组合已接入权限检查、错误响应与 H2 审计写入；覆盖 M2 workflow / M3 inventory / M5 cold-chain / M9 billing
 - [x] H3 同步：`shared/openapi/openapi.json` 与 `packages/api-client/src/schema.ts` 已反映 Wave 3 第一批 path/schema
 - [x] 治理：`check_openapi_contract.py` 要求 Wave 3 第一批 path/schema
 
 ### 进行中 / 待做
 
 - [ ] W3.A PDA 端：`apps/pda-mobile` 目前只有 `.gitkeep`，生产 PDA app 未启动；SPIKE-005 RN 扫枪仍需按 ROADMAP 启动条件重开
-- [ ] W3.A handler：把 M2 workflow service 接入真实 Axum handler + 权限 + 审计 + 幂等
-- [ ] W3.B handler/repository：把 M3 库存服务接入 PostgreSQL repository，补 L3-L5/L8/L11 关键路径测试
-- [ ] W3.C handler：外部冷链系统 API Key 接入、H-INT 契约、H2 审计
+- [ ] W3.A repository / idempotency：把 M2 workflow handler 接入 PostgreSQL repository、HTTP-level 幂等键、H2 PostgreSQL 审计落库
+- [ ] W3.B repository：把 M3 库存服务接入 PostgreSQL repository，补 L3-L5/L8/L11 关键路径测试
+- [ ] W3.C external auth：外部冷链系统 API Key 接入、H-INT 契约与 PostgreSQL 审计落库
 - [ ] W3.D 后续：M9 自动计费与账单管理仍在 Wave 5；当前只完成账户/合同/规则模型
 - [ ] W3 完成门禁：M2 / M3 关键路径 11 层测试覆盖；GSP 资质有效期校验生效
 
