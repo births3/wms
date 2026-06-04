@@ -79,6 +79,20 @@
 ## 验证命令
 
 ```bash
+just wave-5-tms-evidence-record \
+  --environment staging \
+  --tms-system-ref '<真实 TMS dev/staging 系统引用>' \
+  --dispatch-push-log-ref '<WMS 推送日志引用>' \
+  --callback-log-ref '<TMS 回调日志引用>' \
+  --failure-retry-log-ref '<失败重试日志引用>' \
+  --audit-event-query-ref '<audit_event 查询证据>' \
+  --credential-ref 'vault://wms/staging/tms/vendor-a' \
+  --dispatches-received 1 \
+  --callbacks-received 1 \
+  --failed-callbacks-exercised 1 \
+  --retry-succeeded \
+  --audit-event-verified
+
 just wave-5-tms-evidence-validate
 ```
 

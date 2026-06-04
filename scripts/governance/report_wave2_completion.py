@@ -23,11 +23,14 @@ from typing import Any
 
 _THIS = Path(__file__).resolve()
 REPO_ROOT = _THIS.parent.parent.parent
+DEFAULT_RUNTIME_EVIDENCE = REPO_ROOT / "docs/retros/wave-2-runtime-evidence.json"
 
 PROVED_BY_STATIC_FILES = "PROVED_BY_STATIC_FILES"
 PROVED_BY_RUNTIME_EVIDENCE = "PROVED_BY_RUNTIME_EVIDENCE"
 MISSING = "MISSING"
 PRE_RELEASE_GATE = "PRE_RELEASE_GATE"
+
+BLOCKED_RUNTIME_REF_TOKENS = ("localhost", "127.0.0.1", "example.com", "prod", "production")
 
 
 @dataclass
@@ -81,16 +84,7 @@ def openapi_has(paths: list[str], schemas: list[str]) -> bool:
     return all(path in openapi_paths for path in paths) and all(schema in openapi_schemas for schema in schemas)
 
 
-def valid_wave2_runtime_evidence() -> tuple[bool, str]:
-    path = REPO_ROOT / "docs/retros/wave-2-runtime-evidence.json"
-    if not path.exists():
-        return False, "缺少 docs/retros/wave-2-runtime-evidence.json 真实 dev/staging 配置中心灰度证据"
-
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as error:
-        return False, f"docs/retros/wave-2-runtime-evidence.json JSON 无效：{error}"
-
+def validate_wave2_runtime_payload(data: object) -> tuple[bool, str]:
     if not isinstance(data, dict):
         return False, "runtime evidence 顶层必须是 object"
 
@@ -98,9 +92,11 @@ def valid_wave2_runtime_evidence() -> tuple[bool, str]:
     if environment not in {"dev", "staging"}:
         return False, "environment 必须是真实 dev 或 staging，不能是 local/prod/example"
 
-    target = " ".join(str(data.get(key, "")) for key in ("service_url", "smoke_log_ref", "reconcile_log_ref")).lower()
-    blocked_tokens = ("localhost", "127.0.0.1", "example.com", "prod", "production")
-    if any(token in target for token in blocked_tokens):
+    target = " ".join(
+        str(data.get(key, ""))
+        for key in ("service_url", "smoke_log_ref", "reconcile_log_ref")
+    ).lower()
+    if any(token in target for token in BLOCKED_RUNTIME_REF_TOKENS):
         return False, "证据引用不能指向 local/example/prod"
 
     if data.get("source_switched_to") != "config_center":
@@ -116,6 +112,19 @@ def valid_wave2_runtime_evidence() -> tuple[bool, str]:
         return False, "必须记录 smoke_log_ref 与 reconcile_log_ref"
 
     return True, "docs/retros/wave-2-runtime-evidence.json 记录真实 dev/staging 配置中心灰度证据"
+
+
+def valid_wave2_runtime_evidence() -> tuple[bool, str]:
+    path = DEFAULT_RUNTIME_EVIDENCE
+    if not path.exists():
+        return False, "缺少 docs/retros/wave-2-runtime-evidence.json 真实 dev/staging 配置中心灰度证据"
+
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        return False, f"docs/retros/wave-2-runtime-evidence.json JSON 无效：{error}"
+
+    return validate_wave2_runtime_payload(data)
 
 
 def collect_items() -> list[EvidenceItem]:

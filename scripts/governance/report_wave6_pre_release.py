@@ -25,6 +25,50 @@ PROVED_BY_RUNTIME_EVIDENCE = "PROVED_BY_RUNTIME_EVIDENCE"
 MISSING_OR_NEEDS_EXTERNAL_STATE = "MISSING_OR_NEEDS_EXTERNAL_STATE"
 NEEDS_VALIDATOR = "NEEDS_VALIDATOR"
 
+WAVE6_TOOLING_FILES = [
+    "docs/runbooks/wave-1-runtime-evidence.md",
+    "docs/runbooks/wave-2-runtime-evidence.md",
+    "docs/runbooks/wave-3-pda-readiness.md",
+    "docs/runbooks/wave-4-external-dependencies.md",
+    "docs/runbooks/wave-5-hardware-evidence.md",
+    "docs/runbooks/wave-5-tms-evidence.md",
+    "docs/runbooks/wave-6-deploy-evidence.md",
+    "docs/runbooks/wave-6-closeout.md",
+    "scripts/governance/validate_wave1_runtime_evidence.py",
+    "scripts/governance/record_wave2_runtime_evidence.py",
+    "scripts/governance/validate_wave3_pda_runtime_evidence.py",
+    "scripts/governance/record_wave3_pda_runtime_evidence.py",
+    "scripts/governance/record_wave4_external_dependencies.py",
+    "scripts/governance/validate_wave4_external_dependencies.py",
+    "scripts/governance/record_wave5_hardware_evidence.py",
+    "scripts/governance/validate_wave5_hardware_evidence.py",
+    "scripts/governance/record_wave5_tms_evidence.py",
+    "scripts/governance/validate_wave5_tms_evidence.py",
+    "scripts/governance/record_wave6_deploy_evidence.py",
+    "scripts/governance/validate_wave6_deploy_evidence.py",
+]
+
+WAVE6_JUST_ENTRIES = [
+    "wave-1-runtime-evidence-validate",
+    "wave-1-h2-runtime-evidence",
+    "wave-1-rollback-runtime-evidence-k8s",
+    "wave-1-rollback-runtime-evidence-compose",
+    "wave-2-runtime-evidence-record",
+    "wave-2-runtime-evidence-validate",
+    "wave-3-pda-runtime-evidence-record",
+    "wave-3-pda-runtime-evidence-validate",
+    "wave-4-external-dependencies-record",
+    "wave-4-external-dependencies-validate",
+    "wave-5-hardware-evidence-record",
+    "wave-5-hardware-evidence-validate",
+    "wave-5-tms-evidence-record",
+    "wave-5-tms-evidence-validate",
+    "wave-6-deploy-evidence-record",
+    "wave-6-deploy-evidence-validate",
+    "wave-6-status",
+    "wave-6-complete-check",
+]
+
 
 @dataclass
 class EvidenceItem:
@@ -72,6 +116,31 @@ def run_validator(*args: str) -> tuple[bool, str]:
     return result.returncode == 0, output or f"exit={result.returncode}"
 
 
+def wave6_tooling_gaps() -> list[str]:
+    gaps: list[str] = []
+    missing_files = [path for path in WAVE6_TOOLING_FILES if not file_exists(path)]
+    if missing_files:
+        gaps.append(f"缺少 Wave 6 tooling 文件: {', '.join(missing_files)}")
+
+    missing_just_entries = [
+        entry
+        for entry in WAVE6_JUST_ENTRIES
+        if not file_contains("justfile", entry)
+    ]
+    if missing_just_entries:
+        gaps.append(f"justfile 缺少 Wave 6 evidence 入口: {', '.join(missing_just_entries)}")
+
+    closeout_needles = (
+        "just wave-6-complete-check",
+        "docs/retros/wave-6-retro.md",
+        "Wave 6 完成需要以下全部条件成立",
+    )
+    if not file_contains("docs/runbooks/wave-6-closeout.md", *closeout_needles):
+        gaps.append("Wave 6 closeout runbook 缺少最终关闭命令或 retro 要求")
+
+    return gaps
+
+
 def collect_items() -> list[EvidenceItem]:
     items: list[EvidenceItem] = []
 
@@ -92,6 +161,16 @@ def collect_items() -> list[EvidenceItem]:
             "docs/adr/0035-wave-6-pre-release-evidence-closeout.md",
         ] if startup_ok else [],
         [] if startup_ok else ["需要同步 TODO / ROADMAP / dependency graph / ADR-0035"],
+        strict_blocking=True,
+    ))
+
+    tooling_gaps = wave6_tooling_gaps()
+    items.append(EvidenceItem(
+        "W6-tooling",
+        "Wave 6 evidence record / validate / closeout 工具链齐备",
+        PROVED_BY_STATIC_FILES if not tooling_gaps else MISSING_OR_NEEDS_EXTERNAL_STATE,
+        WAVE6_TOOLING_FILES + ["justfile"] if not tooling_gaps else [],
+        tooling_gaps,
         strict_blocking=True,
     ))
 

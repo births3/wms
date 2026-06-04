@@ -213,6 +213,10 @@ wave-3-complete-check:
 wave-3-pda-runtime-evidence-validate:
     @python3 scripts/governance/validate_wave3_pda_runtime_evidence.py
 
+# 记录 Wave 3 真 PDA + L7 runtime evidence；参数透传给 record_wave3_pda_runtime_evidence.py
+wave-3-pda-runtime-evidence-record *args:
+    @python3 scripts/governance/record_wave3_pda_runtime_evidence.py {{args}}
+
 # 报告 Wave 4 完成度（默认不阻塞；出口检查用 --strict）
 wave-4-status:
     @python3 scripts/governance/report_wave4_completion.py
@@ -252,9 +256,17 @@ wave-5-complete-check:
 wave-5-hardware-evidence-validate:
     @python3 scripts/governance/validate_wave5_hardware_evidence.py
 
+# 记录 Wave 5 M-PK 真实硬件 evidence；参数透传给 record_wave5_hardware_evidence.py
+wave-5-hardware-evidence-record *args:
+    @python3 scripts/governance/record_wave5_hardware_evidence.py {{args}}
+
 # Wave 5 M10 TMS+ 真实 dev/staging evidence 预发布验证
 wave-5-tms-evidence-validate:
     @python3 scripts/governance/validate_wave5_tms_evidence.py
+
+# 记录 Wave 5 M10 TMS+ evidence；参数透传给 record_wave5_tms_evidence.py
+wave-5-tms-evidence-record *args:
+    @python3 scripts/governance/record_wave5_tms_evidence.py {{args}}
 
 # 报告 Wave 6 预发布证据收口状态（默认不阻塞；出口检查用 --strict）
 wave-6-status:
@@ -268,9 +280,17 @@ wave-6-complete-check:
 wave-6-deploy-evidence-validate:
     @python3 scripts/governance/validate_wave6_deploy_evidence.py
 
+# 记录 Wave 6 灰度发布 evidence；参数透传给 record_wave6_deploy_evidence.py
+wave-6-deploy-evidence-record *args:
+    @python3 scripts/governance/record_wave6_deploy_evidence.py {{args}}
+
 # Wave 2 配置中心 Feature Flag runtime evidence 预发布验证
 wave-2-runtime-evidence-validate:
     @python3 scripts/governance/report_wave2_completion.py --strict --require-runtime-evidence
+
+# 记录 Wave 2 配置中心 Feature Flag runtime evidence；参数透传给 record_wave2_runtime_evidence.py
+wave-2-runtime-evidence-record *args:
+    @python3 scripts/governance/record_wave2_runtime_evidence.py {{args}}
 
 # 定向验证两份 Wave 1 runtime evidence JSON（不检查其他静态完成项）
 wave-1-runtime-evidence-validate:

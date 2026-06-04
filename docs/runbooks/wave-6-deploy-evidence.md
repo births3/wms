@@ -90,6 +90,27 @@
 ## 验证命令
 
 ```bash
+just wave-6-deploy-evidence-record \
+  --environment staging \
+  --deployment-mode kubernetes \
+  --release-version '<发布版本>' \
+  --release-plan-ref '<release plan 归档引用>' \
+  --artifact-ref '<构建产物引用>' \
+  --canary-config-ref '<灰度配置引用>' \
+  --smoke-gate-ref '<smoke gate 结果引用>' \
+  --observability-dashboard-ref '<dashboard 或监控查询引用>' \
+  --rollback-drill-log-ref '<回滚演练日志引用>' \
+  --approval-record-ref '<双人审批记录引用>' \
+  --audit-event-query-ref '<audit_event 查询证据>' \
+  --canary-stages-exercised 1 \
+  --smoke-checks-passed 1 \
+  --rollback-drills-exercised 1 \
+  --canary-used \
+  --full-release-blocked \
+  --rollback-verified \
+  --audit-event-verified \
+  --dual-approval-recorded
+
 just wave-6-deploy-evidence-validate
 ```
 

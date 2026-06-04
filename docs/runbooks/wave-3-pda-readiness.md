@@ -108,6 +108,32 @@
 执行验证：
 
 ```bash
+just wave-3-pda-runtime-evidence-record \
+  --environment staging \
+  --pda-model '<真实 PDA 型号>' \
+  --android-version '<Android 版本>' \
+  --scan-input-method '<实体扫码键输入方式>' \
+  --pda-device-ref '<PDA 设备资产引用>' \
+  --spike005-result-ref '<SPIKE-005 实测结果引用>' \
+  --m2-scan-log-ref '<M2 扫码日志引用>' \
+  --m3-scan-log-ref '<M3 扫码日志引用>' \
+  --offline-replay-log-ref '<离线重放日志引用>' \
+  --idempotency-replay-log-ref '<幂等 replay 日志引用>' \
+  --audit-event-query-ref '<audit_event 查询证据>' \
+  --l7-run-ref '<L7 执行记录引用>' \
+  --usability-review-ref '<易用性走查记录引用>' \
+  --barcode-samples-scanned 1 \
+  --m2-operations-exercised 1 \
+  --m3-operations-exercised 1 \
+  --offline-replays-exercised 1 \
+  --idempotency-replays-exercised 1 \
+  --real-pda-used \
+  --physical-scan-key-verified \
+  --dev-or-staging-service-verified \
+  --audit-event-verified \
+  --l7-review-completed \
+  --usability-review-completed
+
 just wave-3-pda-runtime-evidence-validate
 ```
 

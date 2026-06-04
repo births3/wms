@@ -31,9 +31,18 @@
 5. 调用 `POST /api/v1/config-center/feature-flags/source`，请求 `config_center` 读取源。
 6. 跑一次真实 smoke：至少覆盖一个已迁移 flag 的启用读取和一个未命中 flag 的 fail-closed 行为。
 7. 调用 `POST /api/v1/config-center/feature-flags/archive-file-source`，记录旧文件归档引用。
-8. 写入 `docs/retros/wave-2-runtime-evidence.json`，再运行：
+8. 用记录脚本写入 `docs/retros/wave-2-runtime-evidence.json`，再运行验证：
 
 ```bash
+just wave-2-runtime-evidence-record \
+  --environment dev \
+  --service-url '<真实 dev/staging 服务地址>' \
+  --migrated-count 1 \
+  --reconcile-matched 1 \
+  --smoke-log-ref '<真实 smoke 日志引用>' \
+  --reconcile-log-ref '<真实 reconcile 日志引用>' \
+  --archive-ref '<旧文件归档引用>'
+
 just wave-2-runtime-evidence-validate
 ```
 

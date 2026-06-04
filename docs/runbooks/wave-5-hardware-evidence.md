@@ -82,6 +82,24 @@
 ## 验证命令
 
 ```bash
+just wave-5-hardware-evidence-record \
+  --environment staging \
+  --station-code '<真实包装工位编号>' \
+  --scale-device-ref '<电子秤设备引用>' \
+  --bluetooth-printer-ref '<蓝牙打印机设备引用>' \
+  --waybill-printer-ref '<面单打印设备引用>' \
+  --calibration-record-ref '<设备校准记录引用>' \
+  --scale-reading-log-ref '<电子秤读数日志引用>' \
+  --bluetooth-print-log-ref '<蓝牙标签打印日志引用>' \
+  --waybill-print-log-ref '<面单打印日志引用>' \
+  --audit-event-query-ref '<audit_event 查询证据>' \
+  --scale-readings-recorded 1 \
+  --bluetooth-labels-printed 1 \
+  --waybills-printed 1 \
+  --hardware-connected \
+  --print-artifacts-reviewed \
+  --audit-event-verified
+
 just wave-5-hardware-evidence-validate
 ```
 
