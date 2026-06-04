@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -30,7 +31,24 @@ PROVED_BY_RUNTIME_EVIDENCE = "PROVED_BY_RUNTIME_EVIDENCE"
 MISSING = "MISSING"
 PRE_RELEASE_GATE = "PRE_RELEASE_GATE"
 
-BLOCKED_RUNTIME_REF_TOKENS = ("localhost", "127.0.0.1", "example.com", "prod", "production")
+BLOCKED_RUNTIME_REF_TOKENS = (
+    "localhost",
+    "127.0.0.1",
+    "0.0.0.0",
+    "example",
+    "prod",
+    "production",
+    "mock",
+    "fake",
+    "stub",
+)
+
+
+def contains_environment_token(value: str, environment: str) -> bool:
+    return re.search(
+        rf"(^|[^0-9a-z]){re.escape(environment)}([^0-9a-z]|$)",
+        value.lower(),
+    ) is not None
 
 
 @dataclass
@@ -90,14 +108,20 @@ def validate_wave2_runtime_payload(data: object) -> tuple[bool, str]:
 
     environment = str(data.get("environment", "")).lower()
     if environment not in {"dev", "staging"}:
-        return False, "environment 必须是真实 dev 或 staging，不能是 local/prod/example"
+        return False, "environment 必须是真实 dev 或 staging，不能是 local/prod/mock/fake/stub/example"
 
-    target = " ".join(
-        str(data.get(key, ""))
-        for key in ("service_url", "smoke_log_ref", "reconcile_log_ref")
-    ).lower()
+    ref_keys = ("service_url", "smoke_log_ref", "reconcile_log_ref", "archive_ref")
+    target = " ".join(str(data.get(key, "")) for key in ref_keys).lower()
     if any(token in target for token in BLOCKED_RUNTIME_REF_TOKENS):
-        return False, "证据引用不能指向 local/example/prod"
+        return False, "证据引用不能指向 local/prod/mock/fake/stub/example"
+
+    missing_environment_refs = [
+        key
+        for key in ref_keys
+        if data.get(key) and not contains_environment_token(str(data.get(key, "")), environment)
+    ]
+    if missing_environment_refs:
+        return False, f"证据引用必须包含 environment 标记 {environment}: {', '.join(missing_environment_refs)}"
 
     if data.get("source_switched_to") != "config_center":
         return False, "source_switched_to 必须为 config_center"
@@ -108,8 +132,8 @@ def validate_wave2_runtime_payload(data: object) -> tuple[bool, str]:
     if reconcile.get("missing_in_config_center") or reconcile.get("mismatched"):
         return False, "对账结果仍有 missing_in_config_center 或 mismatched"
 
-    if not data.get("smoke_log_ref") or not data.get("reconcile_log_ref"):
-        return False, "必须记录 smoke_log_ref 与 reconcile_log_ref"
+    if not data.get("smoke_log_ref") or not data.get("reconcile_log_ref") or not data.get("archive_ref"):
+        return False, "必须记录 smoke_log_ref、reconcile_log_ref 与 archive_ref"
 
     return True, "docs/retros/wave-2-runtime-evidence.json 记录真实 dev/staging 配置中心灰度证据"
 

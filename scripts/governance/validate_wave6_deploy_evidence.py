@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -49,6 +50,13 @@ def _bad_ref(value: str, *, allow_example_refs: bool) -> bool:
     return any(token in lowered for token in blocked)
 
 
+def _has_environment_token(value: str, environment: str) -> bool:
+    return re.search(
+        rf"(^|[^0-9a-z]){re.escape(environment)}([^0-9a-z]|$)",
+        value.lower(),
+    ) is not None
+
+
 def _positive_int(payload: dict[str, object], key: str) -> bool:
     value = payload.get(key)
     return isinstance(value, int) and value >= 1
@@ -81,6 +89,14 @@ def validate_wave6_deploy_payload(
     ref_values = [str(payload.get(key, "")) for key in REQUIRED_REFS]
     if any(_bad_ref(value, allow_example_refs=allow_example_refs) for value in ref_values):
         return False, "证据引用不能指向 local/prod/mock/fake/stub/example 边界"
+
+    missing_environment_refs = [
+        key
+        for key in REQUIRED_REFS
+        if not _has_environment_token(str(payload.get(key, "")), environment)
+    ]
+    if missing_environment_refs:
+        return False, f"证据引用必须包含 environment 标记 {environment}: {', '.join(missing_environment_refs)}"
 
     required_counts = (
         "canary_stages_exercised",

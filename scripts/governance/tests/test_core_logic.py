@@ -2544,6 +2544,15 @@ def test_validate_wave4_external_dependencies_rejects_fake_or_secret_refs(tmp_pa
     assert ok is False
     assert "vault://" in message
 
+    evidence["credential_ref"] = "vault://wms/staging/traceability/masxf"
+    evidence["success_report_log_ref"] = "ci/wave4-traceability-success/123"
+    path.write_text(json.dumps(evidence), encoding="utf-8")
+
+    ok, message = validator.validate_one(path, allow_example_refs=False)
+
+    assert ok is False
+    assert "environment 标记 staging" in message
+
 
 def test_record_wave4_external_dependencies_writes_valid_evidence(tmp_path):
     """记录脚本生成的 evidence 必须能被同一 validator 接受。"""
@@ -2672,6 +2681,58 @@ def test_record_wave2_runtime_evidence_rejects_invalid_refs_before_write(tmp_pat
 
     assert not output.exists()
 
+    assert recorder.main([
+        "--output", str(output),
+        "--environment", "staging",
+        "--service-url", "https://wms-staging.example.internal",
+        "--migrated-count", "1",
+        "--reconcile-matched", "1",
+        "--smoke-log-ref", "ci/staging/wave2-feature-flags-smoke/123",
+        "--reconcile-log-ref", "ci/staging/wave2-feature-flags-reconcile/123",
+        "--archive-ref", "s3://wms-staging-audit/feature-flags/feature_flags.toml",
+    ]) == 1
+
+    assert not output.exists()
+
+    assert recorder.main([
+        "--output", str(output),
+        "--environment", "staging",
+        "--service-url", "http://0.0.0.0:8080",
+        "--migrated-count", "1",
+        "--reconcile-matched", "1",
+        "--smoke-log-ref", "ci/staging/wave2-feature-flags-smoke/123",
+        "--reconcile-log-ref", "ci/staging/wave2-feature-flags-reconcile/123",
+        "--archive-ref", "s3://wms-staging-audit/feature-flags/feature_flags.toml",
+    ]) == 1
+
+    assert not output.exists()
+
+    assert recorder.main([
+        "--output", str(output),
+        "--environment", "staging",
+        "--service-url", "https://wms-staging.internal",
+        "--migrated-count", "1",
+        "--reconcile-matched", "1",
+        "--smoke-log-ref", "ci/staging/wave2-feature-flags-smoke/mock-run",
+        "--reconcile-log-ref", "ci/staging/wave2-feature-flags-reconcile/123",
+        "--archive-ref", "s3://wms-staging-audit/feature-flags/feature_flags.toml",
+    ]) == 1
+
+    assert not output.exists()
+
+    assert recorder.main([
+        "--output", str(output),
+        "--environment", "staging",
+        "--service-url", "https://wms.internal",
+        "--migrated-count", "1",
+        "--reconcile-matched", "1",
+        "--smoke-log-ref", "ci/staging/wave2-feature-flags-smoke/123",
+        "--reconcile-log-ref", "ci/staging/wave2-feature-flags-reconcile/123",
+        "--archive-ref", "s3://wms-staging-audit/feature-flags/feature_flags.toml",
+    ]) == 1
+
+    assert not output.exists()
+
 
 def test_record_wave3_pda_runtime_evidence_writes_valid_evidence(tmp_path):
     """Wave 3 PDA 记录脚本生成的 evidence 必须能被 validator 接受。"""
@@ -2687,7 +2748,7 @@ def test_record_wave3_pda_runtime_evidence_writes_valid_evidence(tmp_path):
         "--android-version", "Android 11",
         "--scan-input-method", "physical-scan-key-intent",
         "--pda-device-ref", "asset://wms-staging/pda/honeywell-eda52-01",
-        "--spike005-result-ref", "docs/spikes/spike-005-rn-scanner.md#runtime-20260604",
+        "--spike005-result-ref", "s3://wms-staging-evidence/wave3/pda/spike-005-runtime-20260604.md",
         "--m2-scan-log-ref", "ci/staging/wave3-pda-m2-scan/123",
         "--m3-scan-log-ref", "ci/staging/wave3-pda-m3-scan/123",
         "--offline-replay-log-ref", "ci/staging/wave3-pda-offline-replay/123",
@@ -2794,7 +2855,7 @@ def test_record_wave6_deploy_evidence_writes_valid_evidence(tmp_path):
         "--smoke-gate-ref", "ci/staging/wave6-smoke-gate/123",
         "--observability-dashboard-ref", "grafana/staging/wave6-release/123",
         "--rollback-drill-log-ref", "ci/staging/wave6-rollback-drill/123",
-        "--approval-record-ref", "ticket://release-approval/WMS-20260604",
+        "--approval-record-ref", "ticket://staging-release-approval/WMS-20260604",
         "--audit-event-query-ref", "ci/staging/wave6-deploy-audit/123",
         "--canary-stages-exercised", "1",
         "--smoke-checks-passed", "1",
@@ -2829,7 +2890,7 @@ def test_record_wave6_deploy_evidence_rejects_full_release_before_write(tmp_path
         "--smoke-gate-ref", "ci/staging/wave6-smoke-gate/123",
         "--observability-dashboard-ref", "grafana/staging/wave6-release/123",
         "--rollback-drill-log-ref", "ci/staging/wave6-rollback-drill/123",
-        "--approval-record-ref", "ticket://release-approval/WMS-20260604",
+        "--approval-record-ref", "ticket://staging-release-approval/WMS-20260604",
         "--audit-event-query-ref", "ci/staging/wave6-deploy-audit/123",
         "--canary-stages-exercised", "1",
         "--smoke-checks-passed", "1",
@@ -3119,6 +3180,15 @@ def test_validate_wave5_hardware_evidence_rejects_fake_or_prod_refs(tmp_path):
     assert ok is False
     assert "prod/mock/fake/stub/example" in message
 
+    evidence["scale_device_ref"] = "asset://wms-staging/hardware/scale-01"
+    evidence["audit_event_query_ref"] = "ci/wave5-hardware-audit/123"
+    path.write_text(json.dumps(evidence), encoding="utf-8")
+
+    ok, message = validator.validate_one(path, allow_example_refs=False)
+
+    assert ok is False
+    assert "environment 标记 staging" in message
+
 
 def test_validate_wave5_tms_evidence_accepts_real_staging_payload(tmp_path):
     """Wave 5 TMS 证据必须能接受真实 staging 推送、回调和重试引用。"""
@@ -3181,6 +3251,15 @@ def test_validate_wave5_tms_evidence_rejects_fake_refs_or_plain_credentials(tmp_
 
     assert ok is False
     assert "vault://" in message
+
+    evidence["credential_ref"] = "vault://wms/staging/tms/vendor-a"
+    evidence["callback_log_ref"] = "ci/wave5-tms-callback/123"
+    path.write_text(json.dumps(evidence), encoding="utf-8")
+
+    ok, message = validator.validate_one(path, allow_example_refs=False)
+
+    assert ok is False
+    assert "environment 标记 staging" in message
 
 
 def test_wave6_report_uses_wave5_validators_when_evidence_is_missing(monkeypatch):
@@ -3272,6 +3351,138 @@ def test_wave6_tooling_item_blocks_when_record_script_is_missing(monkeypatch):
     assert missing in " ".join(item.gaps)
 
 
+def test_wave6_retro_item_blocks_when_retro_is_missing(monkeypatch):
+    """Wave 6 complete-check 必须把收口 retro 作为独立阻塞项。"""
+    import report_wave6_pre_release as report
+
+    existing_files = set(report.WAVE6_TOOLING_FILES)
+
+    monkeypatch.setattr(report, "file_exists", lambda path: path in existing_files)
+    monkeypatch.setattr(report, "file_contains", lambda _path, *_needles: True)
+    monkeypatch.setattr(report, "run_validator", lambda *_args: (True, "ok"))
+
+    item = {item.item_id: item for item in report.collect_items()}["W6-retro"]
+
+    assert item.status == report.MISSING_OR_NEEDS_EXTERNAL_STATE
+    assert item.blocks_strict is True
+    assert "wave-6-retro.md" in " ".join(item.gaps)
+
+
+def test_wave6_evidence_only_mode_ignores_retro_but_complete_check_does_not(monkeypatch, capsys):
+    """写 retro 前可只检查 evidence gate；最终 complete-check 仍必须要求 retro。"""
+    import report_wave6_pre_release as report
+
+    existing_files = set(report.WAVE6_TOOLING_FILES)
+
+    monkeypatch.setattr(report, "file_exists", lambda path: path in existing_files)
+    monkeypatch.setattr(report, "file_contains", lambda _path, *_needles: True)
+    monkeypatch.setattr(report, "run_validator", lambda *_args: (True, "ok"))
+
+    assert report.main(["--strict", "--evidence-only"]) == 0
+    evidence_only_output = capsys.readouterr().out
+    assert "W6-retro" in evidence_only_output
+    assert "evidence-only 不阻塞" in evidence_only_output
+    assert "缺少 docs/retros/wave-6-retro.md" not in evidence_only_output
+
+    assert report.main(["--strict"]) == 1
+    complete_output = capsys.readouterr().out
+    assert "缺少 docs/retros/wave-6-retro.md" in complete_output
+
+
+def test_wave6_evidence_only_mode_still_blocks_missing_evidence(monkeypatch):
+    """evidence-only 只忽略 retro，不能忽略任一真实 evidence gate。"""
+    import report_wave6_pre_release as report
+
+    existing_files = set(report.WAVE6_TOOLING_FILES)
+
+    def fake_run_validator(*args):
+        if "validate_wave3_pda_runtime_evidence.py" in " ".join(args):
+            return False, "missing file: docs/retros/wave-3-pda-runtime-evidence.json"
+        return True, "ok"
+
+    monkeypatch.setattr(report, "file_exists", lambda path: path in existing_files)
+    monkeypatch.setattr(report, "file_contains", lambda _path, *_needles: True)
+    monkeypatch.setattr(report, "run_validator", fake_run_validator)
+
+    assert report.main(["--strict", "--evidence-only"]) == 1
+
+
+def test_wave6_retro_item_requires_evidence_paths_and_risk_statement(monkeypatch):
+    """Wave 6 retro 必须列出 8 个 evidence 文件、验证命令结果和剩余风险。"""
+    import report_wave6_pre_release as report
+
+    existing_files = set(report.WAVE6_TOOLING_FILES) | {report.WAVE6_RETRO_FILE}
+    incomplete_retro = "\n".join([
+        "docs/retros/wave-1-h2-runtime-evidence.json",
+        *report.WAVE6_VALIDATION_COMMANDS,
+        "验证结果",
+        "没有使用 local/mock/fake/stub/example/prod",
+    ])
+
+    def fake_file_contains(path, *needles):
+        if path == report.WAVE6_RETRO_FILE:
+            return all(needle in incomplete_retro for needle in needles)
+        return True
+
+    monkeypatch.setattr(report, "file_exists", lambda path: path in existing_files)
+    monkeypatch.setattr(report, "file_contains", fake_file_contains)
+    monkeypatch.setattr(report, "run_validator", lambda *_args: (True, "ok"))
+
+    item = {item.item_id: item for item in report.collect_items()}["W6-retro"]
+
+    assert item.status == report.MISSING_OR_NEEDS_EXTERNAL_STATE
+    assert "wave-2-runtime-evidence.json" in " ".join(item.gaps)
+    assert "剩余风险" in " ".join(item.gaps)
+
+    complete_retro = "\n".join([
+        *report.WAVE6_EVIDENCE_FILES,
+        *report.WAVE6_VALIDATION_COMMANDS,
+        "验证结果",
+        "剩余风险",
+        "没有使用 local/mock/fake/stub/example/prod",
+    ])
+
+    def complete_file_contains(path, *needles):
+        if path == report.WAVE6_RETRO_FILE:
+            return all(needle in complete_retro for needle in needles)
+        return True
+
+    monkeypatch.setattr(report, "file_contains", complete_file_contains)
+
+    item = {item.item_id: item for item in report.collect_items()}["W6-retro"]
+
+    assert item.status == report.PROVED_BY_STATIC_FILES
+    assert item.blocks_strict is False
+
+
+def test_wave6_retro_item_requires_all_validation_commands(monkeypatch):
+    """Wave 6 retro 不能漏掉最终 T1/T2/diff 或任一 evidence validator 结果。"""
+    import report_wave6_pre_release as report
+
+    existing_files = set(report.WAVE6_TOOLING_FILES) | {report.WAVE6_RETRO_FILE}
+    retro_without_task_check = "\n".join([
+        *report.WAVE6_EVIDENCE_FILES,
+        *(command for command in report.WAVE6_VALIDATION_COMMANDS if command != "just task-check"),
+        "验证结果",
+        "剩余风险",
+        "没有使用 local/mock/fake/stub/example/prod",
+    ])
+
+    def fake_file_contains(path, *needles):
+        if path == report.WAVE6_RETRO_FILE:
+            return all(needle in retro_without_task_check for needle in needles)
+        return True
+
+    monkeypatch.setattr(report, "file_exists", lambda path: path in existing_files)
+    monkeypatch.setattr(report, "file_contains", fake_file_contains)
+    monkeypatch.setattr(report, "run_validator", lambda *_args: (True, "ok"))
+
+    item = {item.item_id: item for item in report.collect_items()}["W6-retro"]
+
+    assert item.status == report.MISSING_OR_NEEDS_EXTERNAL_STATE
+    assert "just task-check" in " ".join(item.gaps)
+
+
 def test_validate_wave3_pda_runtime_evidence_accepts_real_staging_payload(tmp_path):
     """Wave 3 PDA runtime 证据必须接受真 PDA + staging 日志引用。"""
     import validate_wave3_pda_runtime_evidence as validator
@@ -3282,7 +3493,7 @@ def test_validate_wave3_pda_runtime_evidence_accepts_real_staging_payload(tmp_pa
         "android_version": "Android 11",
         "scan_input_method": "physical-scan-key-intent",
         "pda_device_ref": "asset://wms-staging/pda/honeywell-eda52-01",
-        "spike005_result_ref": "docs/spikes/spike-005-rn-scanner.md#runtime-20260604",
+        "spike005_result_ref": "s3://wms-staging-evidence/wave3/pda/spike-005-runtime-20260604.md",
         "m2_scan_log_ref": "ci/staging/wave3-pda-m2-scan/123",
         "m3_scan_log_ref": "ci/staging/wave3-pda-m3-scan/123",
         "offline_replay_log_ref": "ci/staging/wave3-pda-offline-replay/123",
@@ -3321,7 +3532,7 @@ def test_validate_wave3_pda_runtime_evidence_rejects_simulator_or_fake_refs(tmp_
         "android_version": "Android 11",
         "scan_input_method": "browser-camera",
         "pda_device_ref": "asset://wms-staging/pda/honeywell-eda52-01",
-        "spike005_result_ref": "docs/spikes/spike-005-rn-scanner.md#runtime-20260604",
+        "spike005_result_ref": "s3://wms-staging-evidence/wave3/pda/spike-005-runtime-20260604.md",
         "m2_scan_log_ref": "ci/staging/wave3-pda-m2-scan/123",
         "m3_scan_log_ref": "ci/staging/wave3-pda-m3-scan/123",
         "offline_replay_log_ref": "ci/staging/wave3-pda-offline-replay/123",
@@ -3358,6 +3569,15 @@ def test_validate_wave3_pda_runtime_evidence_rejects_simulator_or_fake_refs(tmp_
     assert ok is False
     assert "prod/mock/fake/stub/example" in message
 
+    evidence["pda_device_ref"] = "asset://wms-staging/pda/honeywell-eda52-01"
+    evidence["m2_scan_log_ref"] = "ci/wave3-pda-m2-scan/123"
+    path.write_text(json.dumps(evidence), encoding="utf-8")
+
+    ok, message = validator.validate_one(path, allow_example_refs=False)
+
+    assert ok is False
+    assert "environment 标记 staging" in message
+
 
 def test_validate_wave6_deploy_evidence_accepts_real_staging_payload(tmp_path):
     """Wave 6 灰度发布证据必须接受真实 staging 灰度、回滚和审批引用。"""
@@ -3373,7 +3593,7 @@ def test_validate_wave6_deploy_evidence_accepts_real_staging_payload(tmp_path):
         "smoke_gate_ref": "ci/staging/wave6-smoke-gate/123",
         "observability_dashboard_ref": "grafana/staging/wave6-release/123",
         "rollback_drill_log_ref": "ci/staging/wave6-rollback-drill/123",
-        "approval_record_ref": "ticket://release-approval/WMS-20260604",
+        "approval_record_ref": "ticket://staging-release-approval/WMS-20260604",
         "audit_event_query_ref": "ci/staging/wave6-deploy-audit/123",
         "canary_stages_exercised": 1,
         "smoke_checks_passed": 1,
@@ -3407,7 +3627,7 @@ def test_validate_wave6_deploy_evidence_rejects_prod_refs_or_full_release(tmp_pa
         "smoke_gate_ref": "ci/staging/wave6-smoke-gate/123",
         "observability_dashboard_ref": "grafana/staging/wave6-release/123",
         "rollback_drill_log_ref": "ci/staging/wave6-rollback-drill/123",
-        "approval_record_ref": "ticket://release-approval/WMS-20260604",
+        "approval_record_ref": "ticket://staging-release-approval/WMS-20260604",
         "audit_event_query_ref": "ci/staging/wave6-deploy-audit/123",
         "canary_stages_exercised": 1,
         "smoke_checks_passed": 1,
@@ -3434,6 +3654,15 @@ def test_validate_wave6_deploy_evidence_rejects_prod_refs_or_full_release(tmp_pa
 
     assert ok is False
     assert "full_release_blocked" in message
+
+    evidence["full_release_blocked"] = True
+    evidence["approval_record_ref"] = "ticket://release-approval/WMS-20260604"
+    path.write_text(json.dumps(evidence), encoding="utf-8")
+
+    ok, message = validator.validate_one(path, allow_example_refs=False)
+
+    assert ok is False
+    assert "environment 标记 staging" in message
 
 
 def test_wave6_report_uses_pda_and_deploy_validators_when_evidence_is_missing(monkeypatch):

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -50,6 +51,13 @@ def _bad_ref(value: str, *, allow_example_refs: bool) -> bool:
     return any(token in lowered for token in blocked)
 
 
+def _has_environment_token(value: str, environment: str) -> bool:
+    return re.search(
+        rf"(^|[^0-9a-z]){re.escape(environment)}([^0-9a-z]|$)",
+        value.lower(),
+    ) is not None
+
+
 def validate_wave4_external_dependency_payload(
     payload: object,
     *,
@@ -76,6 +84,14 @@ def validate_wave4_external_dependency_payload(
     credential_ref = str(payload.get("credential_ref", ""))
     if not credential_ref.startswith("vault://"):
         return False, "credential_ref 必须是 vault:// 引用，不能写入明文凭证"
+
+    missing_environment_refs = [
+        key
+        for key in REQUIRED_REFS
+        if not _has_environment_token(str(payload.get(key, "")), environment)
+    ]
+    if missing_environment_refs:
+        return False, f"证据引用必须包含 environment 标记 {environment}: {', '.join(missing_environment_refs)}"
 
     reported_events = payload.get("reported_events")
     if not isinstance(reported_events, int) or reported_events < 1:

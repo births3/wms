@@ -65,9 +65,40 @@ WAVE6_JUST_ENTRIES = [
     "wave-5-tms-evidence-validate",
     "wave-6-deploy-evidence-record",
     "wave-6-deploy-evidence-validate",
+    "wave-6-evidence-check",
     "wave-6-status",
     "wave-6-complete-check",
 ]
+
+WAVE6_EVIDENCE_FILES = [
+    "docs/retros/wave-1-h2-runtime-evidence.json",
+    "docs/retros/wave-1-runtime-evidence.json",
+    "docs/retros/wave-2-runtime-evidence.json",
+    "docs/retros/wave-3-pda-runtime-evidence.json",
+    "docs/retros/wave-4-external-dependencies.json",
+    "docs/retros/wave-5-hardware-evidence.json",
+    "docs/retros/wave-5-tms-evidence.json",
+    "docs/retros/wave-6-deploy-evidence.json",
+]
+
+WAVE6_VALIDATION_COMMANDS = [
+    "just wave-1-runtime-evidence-validate",
+    "just wave-2-runtime-evidence-validate",
+    "just wave-3-pda-runtime-evidence-validate",
+    "just wave-4-external-dependencies-validate",
+    "just wave-5-hardware-evidence-validate",
+    "just wave-5-tms-evidence-validate",
+    "just wave-6-deploy-evidence-validate",
+    "just wave-6-evidence-check",
+    "just wave-6-status",
+    "just wave-6-complete-check",
+    "just gov-t1",
+    "just task-check",
+    "git diff --check",
+]
+
+WAVE6_RETRO_FILE = "docs/retros/wave-6-retro.md"
+WAVE6_RETRO_ITEM_ID = "W6-retro"
 
 
 @dataclass
@@ -139,6 +170,27 @@ def wave6_tooling_gaps() -> list[str]:
         gaps.append("Wave 6 closeout runbook 缺少最终关闭命令或 retro 要求")
 
     return gaps
+
+
+def wave6_retro_gaps() -> list[str]:
+    if not file_exists(WAVE6_RETRO_FILE):
+        return [f"缺少 {WAVE6_RETRO_FILE} Wave 6 收口回顾"]
+
+    required_needles = [
+        *WAVE6_EVIDENCE_FILES,
+        *WAVE6_VALIDATION_COMMANDS,
+        "验证结果",
+        "剩余风险",
+        "没有使用 local/mock/fake/stub/example/prod",
+    ]
+    missing = [
+        needle
+        for needle in required_needles
+        if not file_contains(WAVE6_RETRO_FILE, needle)
+    ]
+    if missing:
+        return [f"{WAVE6_RETRO_FILE} 缺少必需收口内容: {', '.join(missing)}"]
+    return []
 
 
 def collect_items() -> list[EvidenceItem]:
@@ -334,6 +386,16 @@ def collect_items() -> list[EvidenceItem]:
         deploy_gaps,
     ))
 
+    retro_gaps = wave6_retro_gaps()
+    items.append(EvidenceItem(
+        WAVE6_RETRO_ITEM_ID,
+        "Wave 6 收口回顾记录 8 个 gate 的真实 evidence、验证结果和剩余风险",
+        PROVED_BY_STATIC_FILES if not retro_gaps else MISSING_OR_NEEDS_EXTERNAL_STATE,
+        [WAVE6_RETRO_FILE] if not retro_gaps else [],
+        retro_gaps,
+        strict_blocking=True,
+    ))
+
     return items
 
 
@@ -341,10 +403,25 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--json", action="store_true", help="输出 JSON")
     parser.add_argument("--strict", action="store_true", help="Wave 6 出口检查，阻塞缺口返回非零")
+    parser.add_argument(
+        "--evidence-only",
+        action="store_true",
+        help="只检查 8 个真实 evidence gate，忽略写 retro 前必然缺失的 W6-retro",
+    )
     args = parser.parse_args(argv)
 
     items = collect_items()
-    blocking = [item for item in items if item.blocks_strict]
+    ignored_item_ids = {WAVE6_RETRO_ITEM_ID} if args.evidence_only else set()
+    blocking = [
+        item
+        for item in items
+        if item.blocks_strict and item.item_id not in ignored_item_ids
+    ]
+    ignored = [
+        item
+        for item in items
+        if item.blocks_strict and item.item_id in ignored_item_ids
+    ]
     ok = not blocking
 
     if args.json:
@@ -352,20 +429,27 @@ def main(argv: list[str] | None = None) -> int:
             "report": "wave6_pre_release",
             "tier": "manual",
             "category": "流程治理",
+            "mode": "evidence_only" if args.evidence_only else "complete",
             "items": [asdict(item) for item in items],
             "blocking_gaps": [asdict(item) for item in blocking],
+            "ignored_gaps": [asdict(item) for item in ignored],
             "ok": ok,
         }, ensure_ascii=False, indent=2))
     else:
         print("report_wave6_pre_release (流程治理，预发布证据收口报告)")
         for item in items:
-            mark = "✓" if item.complete else "✘"
+            ignored_in_mode = item.item_id in ignored_item_ids and item.blocks_strict
+            mark = "!" if ignored_in_mode else ("✓" if item.complete else "✘")
             print(f"  {mark} {item.item_id}: {item.requirement}")
-            print(f"    status: {item.status}")
+            status = f"{item.status} (evidence-only 不阻塞)" if ignored_in_mode else item.status
+            print(f"    status: {status}")
             for evidence in item.evidence:
                 print(f"    evidence: {evidence}")
-            for gap in item.gaps:
-                print(f"    gap: {gap}")
+            if ignored_in_mode:
+                print("    ignored: 写 retro 前只检查真实 evidence gate；最终 complete-check 仍要求本项")
+            else:
+                for gap in item.gaps:
+                    print(f"    gap: {gap}")
         if blocking:
             print(f"\n阻塞缺口: {len(blocking)}")
 

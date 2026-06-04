@@ -276,6 +276,10 @@ wave-6-status:
 wave-6-complete-check:
     @python3 scripts/governance/report_wave6_pre_release.py --strict
 
+# Wave 6 写 retro 前检查：8 个真实 evidence gate 必须全过，但暂不要求 wave-6-retro.md
+wave-6-evidence-check:
+    @python3 scripts/governance/report_wave6_pre_release.py --strict --evidence-only
+
 # Wave 6 灰度发布 evidence 预发布验证
 wave-6-deploy-evidence-validate:
     @python3 scripts/governance/validate_wave6_deploy_evidence.py
