@@ -160,43 +160,99 @@ def collect_items() -> list[EvidenceItem]:
     ))
 
     pda_validator_ok = file_exists("scripts/governance/validate_wave3_pda_runtime_evidence.py")
-    pda_evidence_ok = file_exists("docs/retros/wave-3-pda-runtime-evidence.json")
+    if pda_validator_ok:
+        pda_evidence_ok, pda_output = run_validator(
+            "python3",
+            "scripts/governance/validate_wave3_pda_runtime_evidence.py",
+        )
+        pda_status = (
+            PROVED_BY_RUNTIME_EVIDENCE
+            if pda_evidence_ok
+            else MISSING_OR_NEEDS_EXTERNAL_STATE
+        )
+        pda_gaps = [] if pda_evidence_ok else [pda_output]
+    else:
+        pda_evidence_ok = False
+        pda_status = NEEDS_VALIDATOR
+        pda_gaps = ["缺少 Wave 3 真 PDA/L7 evidence validator 或真实 evidence 文件"]
     items.append(EvidenceItem(
         "W6.D-wave3-pda-l7",
         "Wave 3 真 PDA + L7 性能 / 易用性 runtime evidence",
-        PROVED_BY_RUNTIME_EVIDENCE if pda_validator_ok and pda_evidence_ok else NEEDS_VALIDATOR,
+        pda_status,
         ["docs/retros/wave-3-pda-runtime-evidence.json"] if pda_validator_ok and pda_evidence_ok else [],
-        [] if pda_validator_ok and pda_evidence_ok else ["缺少 Wave 3 真 PDA/L7 evidence validator 或真实 evidence 文件"],
+        pda_gaps,
     ))
 
     hardware_validator_ok = file_exists("scripts/governance/validate_wave5_hardware_evidence.py")
-    hardware_evidence_ok = file_exists("docs/retros/wave-5-hardware-evidence.json")
+    if hardware_validator_ok:
+        hardware_evidence_ok, hardware_output = run_validator(
+            "python3",
+            "scripts/governance/validate_wave5_hardware_evidence.py",
+        )
+        hardware_status = (
+            PROVED_BY_RUNTIME_EVIDENCE
+            if hardware_evidence_ok
+            else MISSING_OR_NEEDS_EXTERNAL_STATE
+        )
+        hardware_gaps = [] if hardware_evidence_ok else [hardware_output]
+    else:
+        hardware_evidence_ok = False
+        hardware_status = NEEDS_VALIDATOR
+        hardware_gaps = ["缺少 Wave 5 hardware evidence runbook / validator / 真实 evidence"]
     items.append(EvidenceItem(
         "W6.F-wave5-hardware",
         "Wave 5 M-PK 电子秤 / 蓝牙打印机 / 面单打印真实硬件 evidence",
-        PROVED_BY_RUNTIME_EVIDENCE if hardware_validator_ok and hardware_evidence_ok else NEEDS_VALIDATOR,
+        hardware_status,
         ["docs/retros/wave-5-hardware-evidence.json"] if hardware_validator_ok and hardware_evidence_ok else [],
-        [] if hardware_validator_ok and hardware_evidence_ok else ["缺少 Wave 5 hardware evidence runbook / validator / 真实 evidence"],
+        hardware_gaps,
     ))
 
     tms_validator_ok = file_exists("scripts/governance/validate_wave5_tms_evidence.py")
-    tms_evidence_ok = file_exists("docs/retros/wave-5-tms-evidence.json")
+    if tms_validator_ok:
+        tms_evidence_ok, tms_output = run_validator(
+            "python3",
+            "scripts/governance/validate_wave5_tms_evidence.py",
+        )
+        tms_status = (
+            PROVED_BY_RUNTIME_EVIDENCE
+            if tms_evidence_ok
+            else MISSING_OR_NEEDS_EXTERNAL_STATE
+        )
+        tms_gaps = [] if tms_evidence_ok else [tms_output]
+    else:
+        tms_evidence_ok = False
+        tms_status = NEEDS_VALIDATOR
+        tms_gaps = ["缺少 Wave 5 TMS evidence runbook / validator / 真实 evidence"]
     items.append(EvidenceItem(
         "W6.G-wave5-tms",
         "Wave 5 M10 TMS+ 真实 dev/staging 推送、回调、失败重试和 audit_event 查询 evidence",
-        PROVED_BY_RUNTIME_EVIDENCE if tms_validator_ok and tms_evidence_ok else NEEDS_VALIDATOR,
+        tms_status,
         ["docs/retros/wave-5-tms-evidence.json"] if tms_validator_ok and tms_evidence_ok else [],
-        [] if tms_validator_ok and tms_evidence_ok else ["缺少 Wave 5 TMS evidence runbook / validator / 真实 evidence"],
+        tms_gaps,
     ))
 
     deploy_validator_ok = file_exists("scripts/governance/validate_wave6_deploy_evidence.py")
-    deploy_evidence_ok = file_exists("docs/retros/wave-6-deploy-evidence.json")
+    if deploy_validator_ok:
+        deploy_evidence_ok, deploy_output = run_validator(
+            "python3",
+            "scripts/governance/validate_wave6_deploy_evidence.py",
+        )
+        deploy_status = (
+            PROVED_BY_RUNTIME_EVIDENCE
+            if deploy_evidence_ok
+            else MISSING_OR_NEEDS_EXTERNAL_STATE
+        )
+        deploy_gaps = [] if deploy_evidence_ok else [deploy_output]
+    else:
+        deploy_evidence_ok = False
+        deploy_status = NEEDS_VALIDATOR
+        deploy_gaps = ["缺少 Wave 6 灰度发布 evidence validator 或真实 evidence 文件"]
     items.append(EvidenceItem(
         "W6.H-gray-release",
         "首次试运行投产按 ADR-0016 灰度发布链路执行",
-        PROVED_BY_RUNTIME_EVIDENCE if deploy_validator_ok and deploy_evidence_ok else NEEDS_VALIDATOR,
+        deploy_status,
         ["docs/retros/wave-6-deploy-evidence.json"] if deploy_validator_ok and deploy_evidence_ok else [],
-        [] if deploy_validator_ok and deploy_evidence_ok else ["缺少 Wave 6 灰度发布 evidence validator 或真实 evidence 文件"],
+        deploy_gaps,
     ))
 
     return items

@@ -72,6 +72,45 @@
 - 未记录 `Idempotency-Key` 与 H2 `audit_event` 的链路证据
 - 在未完成 SPIKE-005 前引入 RN 生产依赖
 
+## Evidence JSON
+
+真实证据写入 `docs/retros/wave-3-pda-runtime-evidence.json`。clarifications #67 已确认当前不发明本地 L7 阈值，因此本 evidence 只验证真实 PDA、真实 dev/staging、日志引用、审计链路和人工易用性走查是否存在。
+
+```json
+{
+  "environment": "staging",
+  "pda_model": "Honeywell EDA52",
+  "android_version": "Android 11",
+  "scan_input_method": "physical-scan-key-intent",
+  "pda_device_ref": "asset://wms-staging/pda/honeywell-eda52-01",
+  "spike005_result_ref": "docs/spikes/spike-005-rn-scanner.md#runtime-YYYYMMDD",
+  "m2_scan_log_ref": "ci/staging/wave3-pda-m2-scan/123",
+  "m3_scan_log_ref": "ci/staging/wave3-pda-m3-scan/123",
+  "offline_replay_log_ref": "ci/staging/wave3-pda-offline-replay/123",
+  "idempotency_replay_log_ref": "ci/staging/wave3-pda-idempotency-replay/123",
+  "audit_event_query_ref": "ci/staging/wave3-pda-audit/123",
+  "l7_run_ref": "ci/staging/wave3-pda-l7/123",
+  "usability_review_ref": "s3://wms-staging-evidence/wave3/pda/usability-review-YYYYMMDD.md",
+  "barcode_samples_scanned": 1,
+  "m2_operations_exercised": 1,
+  "m3_operations_exercised": 1,
+  "offline_replays_exercised": 1,
+  "idempotency_replays_exercised": 1,
+  "real_pda_used": true,
+  "physical_scan_key_verified": true,
+  "dev_or_staging_service_verified": true,
+  "audit_event_verified": true,
+  "l7_review_completed": true,
+  "usability_review_completed": true
+}
+```
+
+执行验证：
+
+```bash
+just wave-3-pda-runtime-evidence-validate
+```
+
 ## 输出
 
 - SPIKE-005 §7 追加本轮决策与实测结果
