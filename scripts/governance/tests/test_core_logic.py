@@ -2,6 +2,7 @@
 
 不依赖真实仓库内容，使用 fixture 构造测试输入。
 """
+import json
 import sys
 from pathlib import Path
 
@@ -2402,6 +2403,418 @@ def test_wave3_pda_readiness_blocks_strict_when_missing(monkeypatch):
     }["W3.A-PDA-readiness"]
 
     assert readiness.blocks_strict is True
+
+
+def test_wave4_short_pick_decision_blocks_when_pending(monkeypatch):
+    """M4 文档要求 #43 关闭后才能进入 TDD，待定状态必须阻断 Wave 4。"""
+    import report_wave4_completion as report
+
+    monkeypatch.setattr(
+        report,
+        "read_text",
+        lambda _path: "| 43 | 短拣后是否允许少量发货 | 待定，进入 M4 TDD 前必须确认 |",
+    )
+
+    assert report.short_pick_decision_closed() is False
+
+
+def test_wave4_scope_alignment_detects_w4f_mismatch(monkeypatch):
+    """ROADMAP 和依赖图对 W4.F 是否纳入 Wave 4 必须一致。"""
+    import report_wave4_completion as report
+
+    def fake_read_text(path):
+        if path == "ROADMAP.md":
+            return "W4.A W4.B W4.C W4.D W4.E"
+        if path == "docs/architecture-dependencies.md":
+            return "W4.A W4.B W4.C W4.D W4.E W4.F"
+        return ""
+
+    monkeypatch.setattr(report, "read_text", fake_read_text)
+
+    assert report.wave4_scope_aligned() is False
+
+
+def test_wave4_startup_item_blocks_when_todo_not_switched(monkeypatch):
+    """Wave 4 启动前，TODO 和 just 入口缺失不能被报告成完成。"""
+    import report_wave4_completion as report
+
+    monkeypatch.setattr(report, "wave4_todo_started", lambda: False)
+    monkeypatch.setattr(report, "file_contains", lambda _path, *needles: True)
+    monkeypatch.setattr(report, "wave4_scope_aligned", lambda: True)
+    monkeypatch.setattr(report, "short_pick_decision_closed", lambda: True)
+    monkeypatch.setattr(report, "openapi_has", lambda _paths, _schemas: True)
+    monkeypatch.setattr(report, "file_exists", lambda _path: True)
+
+    startup = {
+        item.item_id: item
+        for item in report.collect_items()
+    }["W4-startup"]
+
+    assert startup.blocks_strict is True
+
+
+def test_wave4_traceability_external_contract_blocks_when_unconfirmed(monkeypatch):
+    """M-TC 内部三元组契约不能替代码上放心正式接口确认。"""
+    import report_wave4_completion as report
+
+    def fake_read_text(path):
+        if path == "ROADMAP.md":
+            return '"码上放心"正式接口文档 / 鉴权方式 / 错误码 / 频率限制确认 | M-TC（Wave 4） | Wave 2 启动时 | 未确认 |'
+        if path == "docs/domain/user-stories-mtc-traceability-code.md":
+            return "待接口确认"
+        return ""
+
+    monkeypatch.setattr(report, "read_text", fake_read_text)
+    monkeypatch.setattr(report, "file_exists", lambda _path: True)
+    monkeypatch.setattr(report, "file_contains", lambda _path, *needles: True)
+    monkeypatch.setattr(report, "openapi_has", lambda _paths, _schemas: True)
+    monkeypatch.setattr(report, "wave4_scope_aligned", lambda: True)
+    monkeypatch.setattr(report, "short_pick_decision_closed", lambda: True)
+
+    traceability = {
+        item.item_id: item
+        for item in report.collect_items()
+    }["W4.D-traceability-code-reporting"]
+
+    assert traceability.blocks_strict is True
+    assert "正式接口文档" in " ".join(traceability.gaps)
+    assert "wave-4-external-dependencies.md" in " ".join(traceability.gaps)
+
+
+def test_validate_wave4_external_dependencies_accepts_real_staging_evidence(tmp_path):
+    """Wave 4 外部依赖证据必须来自真实 dev/staging 边界。"""
+    import validate_wave4_external_dependencies as validator
+
+    evidence = {
+        "environment": "staging",
+        "platform": "码上放心",
+        "api_doc_ref": "s3://wms-staging-evidence/wave4/traceability/api-doc.pdf",
+        "auth_doc_ref": "s3://wms-staging-evidence/wave4/traceability/auth.md",
+        "error_code_doc_ref": "s3://wms-staging-evidence/wave4/traceability/error-codes.md",
+        "rate_limit_doc_ref": "s3://wms-staging-evidence/wave4/traceability/rate-limit.md",
+        "credential_ref": "vault://wms/staging/traceability/masxf",
+        "success_report_log_ref": "ci/staging/wave4-traceability-success/123",
+        "failure_retry_log_ref": "ci/staging/wave4-traceability-retry/123",
+        "audit_event_query_ref": "ci/staging/wave4-traceability-audit/123",
+        "reported_events": 1,
+        "failed_events_exercised": 1,
+        "pending_replay_queue_verified": True,
+    }
+    path = tmp_path / "wave-4-external-dependencies.json"
+    path.write_text(json.dumps(evidence), encoding="utf-8")
+
+    ok, message = validator.validate_one(path, allow_example_refs=False)
+
+    assert ok is True
+    assert "内容有效" in message
+
+
+def test_validate_wave4_external_dependencies_rejects_fake_or_secret_refs(tmp_path):
+    """Wave 4 外部依赖证据不能用 prod/mock/example 或明文凭证替代。"""
+    import validate_wave4_external_dependencies as validator
+
+    evidence = {
+        "environment": "staging",
+        "platform": "码上放心",
+        "api_doc_ref": "s3://wms-prod-evidence/wave4/traceability/api-doc.pdf",
+        "auth_doc_ref": "s3://wms-staging-evidence/wave4/traceability/auth.md",
+        "error_code_doc_ref": "s3://wms-staging-evidence/wave4/traceability/error-codes.md",
+        "rate_limit_doc_ref": "s3://wms-staging-evidence/wave4/traceability/rate-limit.md",
+        "credential_ref": "secret-inline-token",
+        "success_report_log_ref": "ci/staging/wave4-traceability-success/123",
+        "failure_retry_log_ref": "ci/staging/wave4-traceability-retry/123",
+        "audit_event_query_ref": "ci/staging/wave4-traceability-audit/123",
+        "reported_events": 1,
+        "failed_events_exercised": 1,
+        "pending_replay_queue_verified": True,
+    }
+    path = tmp_path / "wave-4-external-dependencies.json"
+    path.write_text(json.dumps(evidence), encoding="utf-8")
+
+    ok, message = validator.validate_one(path, allow_example_refs=False)
+
+    assert ok is False
+    assert "prod/mock/fake/stub/example" in message
+
+    evidence["api_doc_ref"] = "s3://wms-staging-evidence/wave4/traceability/api-doc.pdf"
+    path.write_text(json.dumps(evidence), encoding="utf-8")
+
+    ok, message = validator.validate_one(path, allow_example_refs=False)
+
+    assert ok is False
+    assert "vault://" in message
+
+
+def test_record_wave4_external_dependencies_writes_valid_evidence(tmp_path):
+    """记录脚本生成的 evidence 必须能被同一 validator 接受。"""
+    import record_wave4_external_dependencies as recorder
+    import validate_wave4_external_dependencies as validator
+
+    output = tmp_path / "wave-4-external-dependencies.json"
+
+    assert recorder.main([
+        "--output", str(output),
+        "--environment", "staging",
+        "--api-doc-ref", "s3://wms-staging-evidence/wave4/traceability/api-doc.pdf",
+        "--auth-doc-ref", "s3://wms-staging-evidence/wave4/traceability/auth.md",
+        "--error-code-doc-ref", "s3://wms-staging-evidence/wave4/traceability/error-codes.md",
+        "--rate-limit-doc-ref", "s3://wms-staging-evidence/wave4/traceability/rate-limit.md",
+        "--credential-ref", "vault://wms/staging/traceability/masxf",
+        "--success-report-log-ref", "ci/staging/wave4-traceability-success/123",
+        "--failure-retry-log-ref", "ci/staging/wave4-traceability-retry/123",
+        "--audit-event-query-ref", "ci/staging/wave4-traceability-audit/123",
+        "--reported-events", "1",
+        "--failed-events-exercised", "1",
+        "--pending-replay-queue-verified",
+    ]) == 0
+
+    ok, message = validator.validate_one(output, allow_example_refs=False)
+
+    assert ok is True
+    assert "内容有效" in message
+
+
+def test_record_wave4_external_dependencies_rejects_invalid_refs_before_write(tmp_path):
+    """记录脚本不能把 local/prod/mock/example 证据写入仓库。"""
+    import record_wave4_external_dependencies as recorder
+
+    output = tmp_path / "wave-4-external-dependencies.json"
+
+    assert recorder.main([
+        "--output", str(output),
+        "--environment", "staging",
+        "--api-doc-ref", "s3://wms-prod-evidence/wave4/traceability/api-doc.pdf",
+        "--auth-doc-ref", "s3://wms-staging-evidence/wave4/traceability/auth.md",
+        "--error-code-doc-ref", "s3://wms-staging-evidence/wave4/traceability/error-codes.md",
+        "--rate-limit-doc-ref", "s3://wms-staging-evidence/wave4/traceability/rate-limit.md",
+        "--credential-ref", "vault://wms/staging/traceability/masxf",
+        "--success-report-log-ref", "ci/staging/wave4-traceability-success/123",
+        "--failure-retry-log-ref", "ci/staging/wave4-traceability-retry/123",
+        "--audit-event-query-ref", "ci/staging/wave4-traceability-audit/123",
+        "--reported-events", "1",
+        "--failed-events-exercised", "1",
+        "--pending-replay-queue-verified",
+    ]) == 1
+
+    assert not output.exists()
+
+
+def test_record_wave4_external_dependencies_requires_force_to_overwrite(tmp_path):
+    """已存在 evidence 时必须显式 --force 才能覆盖。"""
+    import record_wave4_external_dependencies as recorder
+
+    output = tmp_path / "wave-4-external-dependencies.json"
+    output.write_text("{}", encoding="utf-8")
+
+    args = [
+        "--output", str(output),
+        "--environment", "staging",
+        "--api-doc-ref", "s3://wms-staging-evidence/wave4/traceability/api-doc.pdf",
+        "--auth-doc-ref", "s3://wms-staging-evidence/wave4/traceability/auth.md",
+        "--error-code-doc-ref", "s3://wms-staging-evidence/wave4/traceability/error-codes.md",
+        "--rate-limit-doc-ref", "s3://wms-staging-evidence/wave4/traceability/rate-limit.md",
+        "--credential-ref", "vault://wms/staging/traceability/masxf",
+        "--success-report-log-ref", "ci/staging/wave4-traceability-success/123",
+        "--failure-retry-log-ref", "ci/staging/wave4-traceability-retry/123",
+        "--audit-event-query-ref", "ci/staging/wave4-traceability-audit/123",
+        "--reported-events", "1",
+        "--failed-events-exercised", "1",
+        "--pending-replay-queue-verified",
+    ]
+
+    assert recorder.main(args) == 1
+    assert output.read_text(encoding="utf-8") == "{}"
+
+    assert recorder.main([*args, "--force"]) == 0
+    assert json.loads(output.read_text(encoding="utf-8"))["platform"] == "码上放心"
+
+
+def test_wave4_traceability_external_contract_requires_evidence_json(monkeypatch, tmp_path):
+    """ROADMAP 关闭外部依赖文字后，仍必须有真实 evidence JSON 才能过 W4.D。"""
+    import report_wave4_completion as report
+
+    def fake_read_text(path):
+        if path == "ROADMAP.md":
+            return '"码上放心"正式接口文档 / 鉴权方式 / 错误码 / 频率限制确认 | M-TC（Wave 4） | 已确认 |'
+        if path == "docs/domain/user-stories-mtc-traceability-code.md":
+            return "正式接口已确认"
+        return ""
+
+    monkeypatch.setattr(report, "read_text", fake_read_text)
+    monkeypatch.setattr(report, "WAVE4_EXTERNAL_EVIDENCE", tmp_path / "missing.json")
+
+    assert report.traceability_external_contract_ready() is False
+
+
+def test_wave4_traceability_deferred_decision_allows_completion_without_fake_evidence(monkeypatch):
+    """仅在澄清记录明确延期时，W4.D 可不因外部 evidence 阻塞 Wave 4。"""
+    import report_wave4_completion as report
+
+    monkeypatch.setattr(report, "file_exists", lambda _path: True)
+    monkeypatch.setattr(report, "file_contains", lambda _path, *_needles: True)
+    monkeypatch.setattr(report, "openapi_has", lambda _paths, _schemas: True)
+    monkeypatch.setattr(report, "traceability_external_contract_ready", lambda: False)
+    monkeypatch.setattr(report, "traceability_external_evidence_deferred", lambda: True)
+
+    items = report.collect_items()
+    traceability = next(
+        item for item in items if item.item_id == "W4.D-traceability-code-reporting"
+    )
+
+    assert traceability.status == report.ACCEPTED_DEFERRED
+    assert traceability.complete is True
+    assert traceability.blocks_strict is False
+    assert "不伪造 evidence" in " ".join(traceability.gaps)
+
+
+def test_wave4_traceability_deferred_requires_explicit_clarification(monkeypatch):
+    """没有明确 #50 决策时，不能把缺失 evidence 自动视为延期。"""
+    import report_wave4_completion as report
+
+    monkeypatch.setattr(
+        report,
+        "latest_clarification_row",
+        lambda _question: "| 50 | W4.D 码上放心外部 evidence 延期 | 后续处理 |",
+    )
+
+    assert report.traceability_external_evidence_deferred() is False
+
+
+def test_wave4_traceability_ignores_unrelated_open_external_dependencies(monkeypatch, tmp_path):
+    """W4.D 只检查码上放心两行状态，不能被其他外部依赖的未启动误阻塞。"""
+    import report_wave4_completion as report
+
+    def fake_read_text(path):
+        if path == "ROADMAP.md":
+            return "\n".join([
+                '| "码上放心"账号开通 | M-TC（Wave 4） | Wave 2 启动时 | 已开通 |',
+                '| "码上放心"正式接口文档 / 鉴权方式 / 错误码 / 频率限制确认 | M-TC（Wave 4） | Wave 2 启动时 | 已确认 |',
+                "| 车辆 GPS / 电子地图 API | M10（Wave 5）| Wave 4 启动时 | 未启动 |",
+            ])
+        if path == "docs/domain/user-stories-mtc-traceability-code.md":
+            return "正式接口已确认"
+        return ""
+
+    monkeypatch.setattr(report, "read_text", fake_read_text)
+    monkeypatch.setattr(
+        report,
+        "validate_wave4_external_evidence",
+        lambda _path, *, allow_example_refs: (True, "valid"),
+    )
+
+    assert report.traceability_external_contract_ready() is True
+
+
+def test_notify_wave4_completion_payload_shape():
+    """企微 webhook payload 必须是文本消息，不包含 URL/key。"""
+    import notify_wave4_completion as notify
+
+    payload = json.loads(
+        notify.build_qy_wechat_payload("Wave 4 complete").decode("utf-8")
+    )
+
+    assert payload == {
+        "msgtype": "text",
+        "text": {
+            "content": "Wave 4 complete",
+        },
+    }
+
+
+def test_notify_wave4_completion_skips_when_gate_fails(monkeypatch):
+    """Wave 4 strict gate 未通过时，hook 目标必须不发送 webhook。"""
+    import notify_wave4_completion as notify
+
+    monkeypatch.setattr(
+        notify,
+        "run_completion_check",
+        lambda: notify.CompletionCheck(ok=False, output="阻塞缺口: 1"),
+    )
+
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("webhook must not be sent when Wave 4 is incomplete")
+
+    monkeypatch.setattr(notify, "post_qy_wechat_webhook", fail_if_called)
+
+    assert notify.main([]) == 0
+
+
+def test_notify_wave4_completion_requires_env_when_gate_passes(monkeypatch):
+    """Wave 4 已完成但缺少环境变量时，应失败而不是伪装已通知。"""
+    import notify_wave4_completion as notify
+
+    monkeypatch.setattr(
+        notify,
+        "run_completion_check",
+        lambda: notify.CompletionCheck(ok=True, output="ok"),
+    )
+    monkeypatch.delenv(notify.DEFAULT_WEBHOOK_ENV, raising=False)
+
+    assert notify.main([]) == 1
+
+
+def test_notify_wave4_completion_posts_when_gate_passes(monkeypatch):
+    """Wave 4 strict gate 通过且 env 存在时，才发送企微 webhook。"""
+    import notify_wave4_completion as notify
+
+    sent = {}
+
+    monkeypatch.setattr(
+        notify,
+        "run_completion_check",
+        lambda: notify.CompletionCheck(ok=True, output="ok"),
+    )
+    monkeypatch.setenv(notify.DEFAULT_WEBHOOK_ENV, "https://qyapi.weixin.qq.test/send")
+
+    def fake_post(webhook_url, content, *, timeout_seconds):
+        sent["webhook_url"] = webhook_url
+        sent["content"] = content
+        sent["timeout_seconds"] = timeout_seconds
+        return 200, '{"errcode":0,"errmsg":"ok"}'
+
+    monkeypatch.setattr(notify, "post_qy_wechat_webhook", fake_post)
+
+    assert notify.main(["--message", "done", "--timeout-seconds", "1"]) == 0
+    assert sent == {
+        "webhook_url": "https://qyapi.weixin.qq.test/send",
+        "content": "done",
+        "timeout_seconds": 1.0,
+    }
+
+
+def test_wave5_startup_requires_todo_and_just_targets(monkeypatch):
+    """Wave 5 启动证据必须同时有 TODO 和 just 入口。"""
+    import report_wave5_completion as report
+
+    def fake_read_text(path):
+        if path == "TODO.md":
+            return "当前 Wave：Wave 5\nW5.A\nW5.B\nW5.C\nW5.D\n"
+        if path == "justfile":
+            return "wave-5-status:\nwave-5-complete-check:\n"
+        return ""
+
+    monkeypatch.setattr(report, "read_text", fake_read_text)
+
+    assert report.wave5_todo_started() is True
+    startup = report.collect_items()[0]
+    assert startup.item_id == "W5-startup"
+    assert startup.status == report.PROVED_BY_STATIC_FILES
+
+
+def test_wave5_strict_blocks_when_value_modules_missing(monkeypatch):
+    """W5.A-D 未落地时，strict blocking 必须保留。"""
+    import report_wave5_completion as report
+
+    monkeypatch.setattr(report, "file_contains", lambda _path, *_needles: False)
+    monkeypatch.setattr(report, "file_exists", lambda _path: False)
+    monkeypatch.setattr(report, "openapi_has", lambda _paths, _schemas: False)
+
+    blocking = [item for item in report.collect_items() if item.blocks_strict]
+
+    assert any(item.item_id == "W5.A-packing-station" for item in blocking)
+    assert any(item.item_id == "W5.B-retail-chain" for item in blocking)
+    assert any(item.item_id == "W5.C-billing-rules" for item in blocking)
+    assert any(item.item_id == "W5.D-tms-plus" for item in blocking)
 
 
 def test_task_check_strict_passes_strict_to_openapi(monkeypatch):

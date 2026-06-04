@@ -58,7 +58,8 @@
 | [ADR-0032](0032-approval-engine.md) | H-APV 审批引擎（契约先行） | Accepted | 审批编排确立横向能力（复用 M3-003 approval_source 锚点 + H4 通道 + H6 状态机）；复核 27 命中→22 真需求（多走 M-QL→企微审批→回写链路）；引擎延后 |
 | [ADR-0033](0033-scheduler-engine.md) | H-SCH 调度引擎（契约先行） | Accepted | 定时/周期触发统一注册（复用 ADR-0018 重试 + H-AL 告警 + H2 审计）；复核 25 命中→14 真定时需求；不接管 M-TE 作业调度/H10 备份；引擎延后，优先级最低 |
 | [ADR-0034](0034-wave-3-operational-postgres-schema.md) | Accepted | Wave 3 第一批 M2/M3/M5/M9 PostgreSQL 业务表、共享幂等表与 repository 事务边界；供应商资质有效期来源冻结为 M1 本地资质档案 + M-VR |
-| ADR-0035+ | 未分配 | 后续按需新建 |
+| [ADR-0035](0035-wave-6-pre-release-evidence-closeout.md) | Wave 6 预发布证据与外部依赖收口 | Accepted | Wave 6 不新增业务模块，集中关闭 Wave 1-5 真实 dev/staging、硬件、TMS、码上放心、灰度发布 runtime evidence gate |
+| ADR-0036+ | 未分配 | 后续按需新建 |
 
 > 编号永不复用。空缺编号必须在此表登记原因。
 

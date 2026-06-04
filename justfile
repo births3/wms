@@ -209,6 +209,49 @@ wave-3-status:
 wave-3-complete-check:
     @python3 scripts/governance/report_wave3_completion.py --strict
 
+# 报告 Wave 4 完成度（默认不阻塞；出口检查用 --strict）
+wave-4-status:
+    @python3 scripts/governance/report_wave4_completion.py
+
+# Wave 4 开发完成出口检查
+wave-4-complete-check:
+    @python3 scripts/governance/report_wave4_completion.py --strict
+
+# Wave 4 外部依赖真实证据校验（当前主要覆盖 M-TC 码上放心）
+wave-4-external-dependencies-validate:
+    @python3 scripts/governance/validate_wave4_external_dependencies.py
+
+# 记录 Wave 4 外部依赖真实证据；参数透传给 record_wave4_external_dependencies.py
+wave-4-external-dependencies-record *args:
+    @python3 scripts/governance/record_wave4_external_dependencies.py {{args}}
+
+# Wave 4 完成后通知：未通过 wave-4-complete-check 时不会发送 webhook
+wave-4-notify-if-complete:
+    @python3 scripts/governance/notify_wave4_completion.py
+
+# Wave 4 最终关闭流程：完成门禁 + 成功后通知
+# 注：W4.D 码上放心真实外部 evidence 已按 clarifications #50 延期，
+#     后续仍需单独运行 wave-4-external-dependencies-validate 关闭外部证据。
+wave-4-closeout:
+    @just wave-4-complete-check
+    @just wave-4-notify-if-complete
+
+# 报告 Wave 5 完成度（默认不阻塞；出口检查用 --strict）
+wave-5-status:
+    @python3 scripts/governance/report_wave5_completion.py
+
+# Wave 5 开发完成出口检查
+wave-5-complete-check:
+    @python3 scripts/governance/report_wave5_completion.py --strict
+
+# 报告 Wave 6 预发布证据收口状态（默认不阻塞；出口检查用 --strict）
+wave-6-status:
+    @python3 scripts/governance/report_wave6_pre_release.py
+
+# Wave 6 预发布证据收口出口检查
+wave-6-complete-check:
+    @python3 scripts/governance/report_wave6_pre_release.py --strict
+
 # Wave 2 配置中心 Feature Flag runtime evidence 预发布验证
 wave-2-runtime-evidence-validate:
     @python3 scripts/governance/report_wave2_completion.py --strict --require-runtime-evidence

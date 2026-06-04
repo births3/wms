@@ -345,20 +345,36 @@ W2.E 必须在 W2.A 之前（M1 商品档案接收 ERP 不规则字段时调用 
 | W4.A | M4 出库（订单/拣选/复核/打印） | W3.B |
 | W4.B | M5 冷链业务规则 | W3.B, W3.C |
 | W4.C | M6 报表实现（消费各业务流水） | W3.A, W3.B, W4.A |
-| W4.D | M-TC 码上放心平台上报 | W2.D, W3.A, W4.A |
+| W4.D | M-TC 码上放心平台上报（内部契约/待补报/审计已纳入 Wave 4；真实 dev/staging evidence 按 clarifications #50 后续关闭） | W2.D, W3.A, W4.A |
 | W4.E | H-Driver / H-Store 主动故事落地 | W4.A, H1 |
-| W4.F | M-PK 包装站基础能力 | W3.B, W4.A, W4.B |
 
 ### Wave 5：增值模块全面铺开
 
 | 编号 | 任务 | 依赖 |
 |-----|------|------|
-| W5.A | M-PK 包装站增强（电子秤/打印/复杂合箱） | W4.F |
+| W5.A | M-PK 包装站基础 + 增强（装箱/电子秤/打印/复杂合箱） | W3.B, W4.A, W4.B |
 | W5.B | M8 连锁专有 | W2.A, W4.A |
 | W5.C | M9 3PL 计费业务规则 | W3.A, W3.B, W4.A, W3.D |
 | W5.D | M10 TMS+ | W4.A, W4.B |
 
 **注意**：Wave 5 理论上 4 个 worktree 可同时并行。**实际个人节奏建议最多 3 个并行**，避免认知负荷过载。
+
+### Wave 6：预发布证据与外部依赖收口
+
+> Wave 6 是证据收口波次，不新增业务模块。范围定义见 ADR-0035。
+
+| 编号 | 任务 | 依赖 |
+|-----|------|------|
+| W6.A | Wave 1 H2 真实 dev PostgreSQL 压测 + 封档 evidence | Wave 1 开发完成；稳定 dev PostgreSQL |
+| W6.B | Wave 1 W1.D 自动回滚 evidence | Wave 1 开发完成；稳定 dev/staging + smoke/Prometheus 信号 |
+| W6.C | Wave 2 配置中心 Feature Flag runtime evidence | Wave 2 开发完成；稳定 dev/staging |
+| W6.D | Wave 3 真 PDA + L7 evidence | Wave 3 开发完成；真 PDA + 稳定 dev/staging |
+| W6.E | Wave 4 M-TC “码上放心”外部 evidence | Wave 4 开发完成；码上放心 dev/staging 资料和账号 |
+| W6.F | Wave 5 M-PK 硬件 evidence | Wave 5 开发完成；电子秤 / 蓝牙打印机 / 面单打印设备到位 |
+| W6.G | Wave 5 M10 TMS+ 外部 evidence | Wave 5 开发完成；TMS dev/staging 接口和回调鉴权到位 |
+| W6.H | ADR-0016 灰度发布 evidence | Wave 1-5 开发完成；部署环境和回滚链路到位 |
+
+**注意**：Wave 6 的并行边界取决于外部资源，不按业务模块 worktree 并行。能本地推进的是 runbook / validator / evidence 格式；真实 gate 必须由 dev/staging、硬件或外部系统证明。
 
 ---
 

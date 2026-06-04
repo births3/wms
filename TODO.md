@@ -6,7 +6,113 @@
 
 ---
 
-## 当前 Wave：Wave 3 — 核心业务规则铺开（开发完成）
+## 当前 Wave：Wave 6 — 预发布证据与外部依赖收口（启动中）
+
+**目标**：不新增业务模块，集中关闭 Wave 1-5 后移的真实 dev/staging、硬件、TMS、码上放心和灰度发布 evidence gate。范围定义见 [ADR-0035](docs/adr/0035-wave-6-pre-release-evidence-closeout.md)。
+
+### 当前阻塞 / 外部依赖
+
+- [ ] 稳定 dev/staging 环境仍未就绪；Wave 6 的真实 runtime evidence 不能用 localhost / stub / mock / fake / example 替代
+- [ ] M-PK 电子秤 / 蓝牙打印机 / 面单打印真实设备未接入
+- [ ] 外部 TMS dev/staging 接口、回调鉴权、调度结果格式仍需确认
+- [ ] “码上放心”账号、正式接口文档、鉴权方式、错误码、频率限制和 dev/staging 回执仍需补齐
+- [ ] 首次试运行投产灰度发布环境和回滚链路需按 ADR-0016 准备
+
+### 进行中 / 待做
+
+- [x] W6 scope：ADR-0035 已定义 Wave 6 为预发布证据收口波次，不新增业务功能
+- [x] W6 status / complete check：建立 Wave 6 证据收口报告与 `just wave-6-status` / `just wave-6-complete-check`
+- [ ] W6.A Wave 1 H2 runtime evidence：按 [Wave 1 Pre-release Runtime Evidence Runbook](docs/runbooks/wave-1-runtime-evidence.md) 采集 `docs/retros/wave-1-h2-runtime-evidence.json`，通过 `just wave-1-runtime-evidence-validate`
+- [ ] W6.B Wave 1 W1.D 自动回滚 evidence：按同一 runbook 采集 `docs/retros/wave-1-runtime-evidence.json`，通过 `just wave-1-runtime-evidence-validate`
+- [ ] W6.C Wave 2 配置中心 Feature Flag evidence：按 [Wave 2 Pre-release Runtime Evidence Runbook](docs/runbooks/wave-2-runtime-evidence.md) 采集 `docs/retros/wave-2-runtime-evidence.json`，通过 `just wave-2-runtime-evidence-validate`
+- [ ] W6.D Wave 3 真 PDA + L7 evidence：按 [Wave 3 PDA Readiness Runbook](docs/runbooks/wave-3-pda-readiness.md) 启动 SPIKE-005 与真 PDA 验证
+- [ ] W6.E Wave 4 M-TC “码上放心” external evidence：按 [Wave 4 External Dependency Evidence Runbook](docs/runbooks/wave-4-external-dependencies.md) 补齐 `docs/retros/wave-4-external-dependencies.json`，通过 `just wave-4-external-dependencies-validate`
+- [ ] W6.F Wave 5 M-PK hardware evidence：补真实电子秤、蓝牙打印机、面单打印设备联调 runbook / validator / evidence
+- [ ] W6.G Wave 5 M10 TMS+ evidence：补真实 TMS 推送、回调、失败重试和 audit_event 查询 runbook / validator / evidence
+- [ ] W6.H 首次试运行灰度发布 evidence：按 ADR-0016 灰度链路执行，不允许全量直发
+- [ ] W6 retro：Wave 6 完成后写 `docs/retros/wave-6-retro.md`
+
+### 非范围
+
+- 不新增业务模块
+- 不启动 v26 GSP 字段命名规范化
+- 不补 i18n
+- 不把本地 PostgreSQL runtime test 当作 dev/staging evidence
+
+Wave 1 / Wave 2 / Wave 3 / Wave 4 / Wave 5 开发完成状态仍分别以 `just wave-1-complete-check` / `just wave-2-complete-check` / `just wave-3-complete-check` / `just wave-4-complete-check` / `just wave-5-complete-check` 为准；Wave 6 只关闭预发布 evidence。
+
+---
+
+## 已归档：Wave 5 — 增值模块全面铺开（开发完成）
+
+**目标**：增值业务模块生产可用，覆盖包装站、连锁专有、3PL 计费和 TMS+ 协作。
+
+### 已完成
+
+- [x] W5 completion report：`report_wave5_completion.py` 与 `just wave-5-complete-check` 已建立
+- [x] W5.A M-PK 包装站：工位、装箱、称重、面单打印生产接口、PostgreSQL 表和 OpenAPI 契约已落地
+- [x] W5.B M8 连锁专有：门店水位补货建议、越库作业生产接口、PostgreSQL 表和 OpenAPI 契约已落地
+- [x] W5.C M9 3PL 计费：自动计费、计费明细、月结账单生产接口、PostgreSQL 表和 OpenAPI 契约已落地
+- [x] W5.D M10 TMS+：调度接收、在途温控关联、容器回收生产接口、PostgreSQL 表和 OpenAPI 契约已落地
+- [x] W5 tenant isolation：`wave5_owner_isolation` 真实 PostgreSQL 测试覆盖 M-PK / M8 / M9 / M10 owner_id 隔离
+- [x] W5 chain scenario：`chain_store_replenishment_to_packing_tms_and_billing` 真实 PostgreSQL 测试覆盖门店补货 → 越库 → 装箱 → TMS/快递 → 计费链路
+- [x] W5 H3 同步：`shared/openapi/openapi.json` 与 `packages/api-client/src/schema.ts` 已同步 Wave 5 path/schema
+
+### 验证
+
+- `just wave-5-complete-check`：通过
+- `cargo fmt --check --all`：通过
+- `cargo check --manifest-path backend/Cargo.toml -p wms-api`：通过
+- `cargo test --manifest-path backend/Cargo.toml -p wms-api --lib -- --skip postgres_`：64 passed
+- 临时 PostgreSQL 执行 `cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave5_postgres -- --nocapture`：2 passed
+- `just openapi-check`：通过
+- `python3 -m pytest scripts/governance/tests/test_core_logic.py -q`：112 passed
+- `just gov-t1`：30/30 ok
+- `just task-check`：6/6 ok
+- `git diff --check`：通过
+
+### 后续跟踪（进入 Wave 6）
+
+- W5.A hardware evidence gate：电子秤、蓝牙打印机、面单打印真实设备联调证据
+- W5.D TMS evidence gate：真实 dev/staging TMS 推送、回调、失败重试和 audit_event 查询证据
+
+---
+
+## 已归档：Wave 4 — 完整闭环 + 横向叠加（开发完成）
+
+**目标**：单货主下完整业务闭环（采购入库 → 库存 → 销售出库 → 冷链监控 → GSP 报表）可上线试运行。
+
+### 当前阻塞 / 外部依赖
+
+- [x] Wave 4 开发完成阻塞已关闭；W4.D "码上放心"真实 dev/staging 外部 evidence 按 `docs/domain/clarifications.md` #50 延期，不阻塞 Wave 4，但后续仍必须单独补齐并验证（见下方后续跟踪）
+
+### 进行中 / 待做
+
+- [x] W4 completion report：`report_wave4_completion.py` 与 `just wave-4-complete-check` 已建立，后续随实现更新证据
+- [x] W4 scope：W4.F M-PK 不纳入 Wave 4，已延后到 Wave 5.A（见 `docs/domain/clarifications.md` #48）
+- [x] W4.A 短拣决策：采用 `clarifications.md` #43 C 方案，发货前必须补拣补齐
+- [x] W4.A M4 出库：订单 / 波次 / 拣选 / 复核 / 打印随货同行单 / 发货交接
+- [x] W4.B M5 冷链业务联动：温度超标事件待处置列表 + 主管勾选隔离批次
+- [x] W4.C M6 报表实现：GSP 入库 / 出库 / 库存法定台账
+- [x] W4.D M-TC 码上放心：追溯码出库核销事件实时上报（内部契约、待补报持久化队列、审计与 OpenAPI 已完成；正式平台 evidence 按 #50 后续关闭）
+- [x] W4.E 司机端 / 门店端：主动故事生产接口落地
+- [x] W4 audit invariant：Wave 4 关键写操作保持 H2 append-only 审计不变量
+
+### 后续跟踪（不计入 Wave 4 开发完成）
+
+- W4 pre-release deploy gate：首次试运行投产必须使用 ADR-0016 灰度发布链路，不允许全量直发
+- W4.D external evidence gate："码上放心"账号 / 正式接口文档 / 鉴权方式 / 错误码 / 频率限制 / dev/staging 成功回执 / 失败重试 / audit_event 查询证据后续补齐；使用 `just wave-4-external-dependencies-record ...` 记录，再跑 `just wave-4-external-dependencies-validate`
+- W3 PDA production gate：生产 PDA app 等真 PDA 与 SPIKE-005 验证后启动
+- W3 L7 pre-release gate：有稳定 dev/staging + 真 PDA 后，按 [Wave 3 PDA Readiness Runbook](docs/runbooks/wave-3-pda-readiness.md) 启动 SPIKE-005，采集 M2/M3 性能/易用性证据
+- W2.G pre-release runtime gate：有稳定 dev/staging 后，按 [Wave 2 Pre-release Runtime Evidence Runbook](docs/runbooks/wave-2-runtime-evidence.md) 验证配置中心版 Feature Flag 迁移、对账、切源、旧文件归档和 smoke，写入 `docs/retros/wave-2-runtime-evidence.json`
+- W1.B / W1.D pre-release runtime gate：仍按 [Wave 1 Pre-release Runtime Evidence Runbook](docs/runbooks/wave-1-runtime-evidence.md) 在真实环境补齐
+- W2-external：人工确认“码上放心”账号外部开通状态；外部依赖仍按 [ROADMAP.md](ROADMAP.md) 的外部依赖追踪表跟进
+
+Wave 1 / Wave 2 / Wave 3 开发完成状态仍分别以 `just wave-1-complete-check` / `just wave-2-complete-check` / `just wave-3-complete-check` 为准；上述 runtime gate 在预发布前单独验证，禁止用 localhost / stub / mock / fake / example 代替。
+
+---
+
+## 已归档：Wave 3 — 核心业务规则铺开（开发完成）
 
 **目标**：M2 入库业务规则、M3 库存模型与状态规则、M5 外部冷链数据接入 schema、M9 计费账户/合同模型逐步落地。
 
@@ -32,17 +138,6 @@
 
 - [ ] W3.A PDA 生产端：`apps/pda-mobile` 目前只有 `.gitkeep`，生产 app 等真 PDA 与 SPIKE-005 验证后启动，作为预发布 gate 跟踪
 - [ ] W3.D 后续：M9 自动计费与账单管理仍在 Wave 5；当前 Wave 3 只完成账户/合同/规则模型
-
-### 后续跟踪（不计入 Wave 3 开发完成）
-
-- W3 L7 pre-release gate：有稳定 dev/staging + 真 PDA 后，按 [Wave 3 PDA Readiness Runbook](docs/runbooks/wave-3-pda-readiness.md) 启动 SPIKE-005，采集 M2/M3 性能/易用性证据
-- W2.G pre-release runtime gate：有稳定 dev/staging 后，按 [Wave 2 Pre-release Runtime Evidence Runbook](docs/runbooks/wave-2-runtime-evidence.md) 验证配置中心版 Feature Flag 迁移、对账、切源、旧文件归档和 smoke，写入 `docs/retros/wave-2-runtime-evidence.json`
-- W1.B / W1.D pre-release runtime gate：仍按 [Wave 1 Pre-release Runtime Evidence Runbook](docs/runbooks/wave-1-runtime-evidence.md) 在真实环境补齐
-- W2-external：人工确认“码上放心”账号外部开通状态；外部依赖仍按 [ROADMAP.md](ROADMAP.md) 的外部依赖追踪表跟进
-
-Wave 1 / Wave 2 开发完成状态仍分别以 `just wave-1-complete-check` / `just wave-2-complete-check` 为准；上述 runtime gate 在预发布前单独验证，禁止用 localhost / stub / mock / fake / example 代替。
-
----
 
 ## 已归档：Wave 0.5 — 原型 + 技术 Spike + 组件库抽离
 

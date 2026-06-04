@@ -10,7 +10,7 @@
 完整实现医药冷链 GSP 合规 WMS 的核心业务模块、横向业务能力和横向技术能力。
 M11 监管 EDI 已移除：码上放心由 M-TC 承接，药监 EDI 由 ERP/H8 边界承接。
 
-按依赖图分 5 个波次（Wave 1-5）+ 1 个治理波次（Wave 0），波次内可 worktree 并行，波次间严格依赖。
+按依赖图分 5 个开发波次（Wave 1-5）+ 1 个预发布证据收口波次（Wave 6）+ 1 个治理波次（Wave 0），波次内可 worktree 并行，波次间严格依赖。Wave 6 不是新业务功能波次，定义见 ADR-0035。
 
 ---
 
@@ -124,7 +124,7 @@ M11 监管 EDI 已移除：码上放心由 M-TC 承接，药监 EDI 由 ERP/H8 �
 
 ---
 
-## Wave 4：完整闭环 + 横向叠加
+## Wave 4：完整闭环 + 横向叠加（开发完成）
 
 **周期**：8-10 周
 **目标**：单货主下完整业务闭环可上线试运行。
@@ -134,26 +134,52 @@ M11 监管 EDI 已移除：码上放心由 M-TC 承接，药监 EDI 由 ERP/H8 �
 - W4.A：M4 出库（订单 / 拣选 / 复核 / 打印随货同行单）
 - W4.B：M5 冷链数据接入（接收外部冷链系统数据 + 温度超标事件联动批次隔离）
 - W4.C：M6 报表实现（GSP 法定台账）
-- W4.D：M-TC 码上放心上报（追溯码核销事件实时上报国家平台）
+- W4.D：M-TC 码上放心上报（内部三元组契约、待补报队列、审计与 OpenAPI 完成；真实 dev/staging 外部 evidence 按 clarifications #50 后续关闭）
 - W4.E：**司机/门店用户主动故事补全（v13 P2 决策）** — 司机端 PDA 签收/上报、门店用户端订单查询/电子签收，从被动角色升级为主动 actor 故事
 
 **完成标准**：完整业务闭环（采购入库 → 库存 → 销售出库 → 冷链监控 → 报表）可上线；GSP 法定台账可生成；审计追踪 append-only 不变量验证通过；**首次正式上线（即本波试运行投产）必须使用 ADR-0016 §灰度发布策略链路，不允许全量直发**。
 
 ---
 
-## Wave 5：增值模块全面铺开
+## Wave 5：增值模块全面铺开（开发完成）
 
 **周期**：12-16 周
 **目标**：增值业务模块生产可用。
+**当前状态**：开发完成；`just wave-5-complete-check` 为 Wave 5 开发完成门禁。电子秤 / 蓝牙打印机 / 面单打印真实硬件 evidence、真实 TMS dev/staging evidence，以及 W4.D “码上放心”外部 evidence 不阻塞 Wave 5 开发完成，统一移入 Wave 6 预发布证据收口。
 
 并行任务（最多 3 个 worktree 同时）：
 
-- W5.A：M-PK 包装站增强（电子秤复核 / 打印 / 复杂合箱）
+- W5.A：M-PK 包装站基础 + 增强（装箱 / 电子秤复核 / 打印 / 复杂合箱）
 - W5.B：M8 连锁专有（自动补货 / 越库 / O2O）
 - W5.C：M9 3PL 计费业务规则（仓储费 / 作业费 / 月结账单）
 - W5.D：M10 TMS+（路径优化 / 在途温控数据接入 / 周转箱回收）
 
-**完成标准**：多货主隔离生效；码上放心对接通过测试环境验证；至少一个连锁客户场景跑通。
+**开发完成标准**：M-PK / M8 / M9 / M10 生产接口、PostgreSQL migration、OpenAPI 契约与 owner 隔离证据落地；至少一个连锁客户场景（门店补货 → 出库 → 装箱 → TMS/快递 → 计费）可复跑；`just wave-5-complete-check` 通过。
+
+**预发布 gate**：M-PK 真实硬件、M10 真实 TMS、W4.D “码上放心”真实 dev/staging evidence，以及首次试运行灰度发布 evidence 统一由 Wave 6 收口。不得用 localhost / stub / mock / fake / example 替代真实证据。
+
+---
+
+## Wave 6：预发布证据与外部依赖收口
+
+**周期**：取决于 dev/staging 稳定性、硬件到位、外部系统开通。
+**目标**：把 Wave 1-5 已开发能力推进到可预发布 / 可试运行状态。
+**当前状态**：启动中；范围定义见 ADR-0035。
+
+并行任务：
+
+- W6.A：Wave 1 H2 真实 dev PostgreSQL 60M baseline + wrk 1k QPS × 1 小时 + P99 < 200ms + 7 天封档 runtime evidence
+- W6.B：Wave 1 W1.D 真实 dev/staging 自动回滚 runtime evidence
+- W6.C：Wave 2 配置中心版 Feature Flag 真实 dev/staging runtime evidence
+- W6.D：Wave 3 真 PDA + L7 性能/易用性 runtime evidence
+- W6.E：Wave 4 M-TC “码上放心”真实 dev/staging 外部 evidence
+- W6.F：Wave 5 M-PK 电子秤 / 蓝牙打印机 / 面单打印真实硬件 evidence
+- W6.G：Wave 5 M10 TMS+ 真实 dev/staging 推送、回调、失败重试和 audit_event 查询 evidence
+- W6.H：首次试运行投产按 ADR-0016 灰度发布链路执行，不允许全量直发
+
+**非范围**：不新增业务模块；不启动 v26 GSP 字段命名规范化；不补 i18n；不使用 local / mock / fake / stub / example 证据。
+
+**完成标准**：ADR-0035 列出的 W6.A-H 全部有真实证据并通过对应 validator / runbook；`docs/retros/wave-6-retro.md` 写完。
 
 ---
 
@@ -169,6 +195,7 @@ M11 监管 EDI 已移除：码上放心由 M-TC 承接，药监 EDI 由 ERP/H8 �
 | Wave 3 核心业务 | 数月 |
 | Wave 4 完整闭环 | 数月 |
 | Wave 5 增值模块 | 数月 |
+| Wave 6 预发布证据收口 | 取决于外部依赖 |
 
 时间不含合规审查、硬件采购联调、监管资质对接等非编码工作。
 **不接受"压缩 TDD 节奏"换时间**——本系统错一条数据可能违法，速度必须服从正确性。
@@ -180,11 +207,11 @@ M11 监管 EDI 已移除：码上放心由 M-TC 承接，药监 EDI 由 ERP/H8 �
 | 外部依赖 | 关联 Wave | 启动时机 | 当前状态 |
 |---------|----------|---------|---------|
 | ~~药监局接口资质申请~~ | ~~M11~~（v7 移除：由 ERP 负责） | — | 不需要 |
-| "码上放心"账号开通 | M-TC（Wave 4） | Wave 2 启动时 | 未启动 |
-| "码上放心"正式接口文档 / 鉴权方式 / 错误码 / 频率限制确认 | M-TC（Wave 4） | Wave 2 启动时 | 未确认 |
+| "码上放心"账号开通 | M-TC（Wave 4 / Wave 6 evidence gate） | Wave 2 启动时 | 按 clarifications #50 延期，不阻塞 Wave 4；Wave 6 收口 |
+| "码上放心"正式接口文档 / 鉴权方式 / 错误码 / 频率限制确认 | M-TC（Wave 4 / Wave 6 evidence gate） | Wave 2 启动时 | 按 clarifications #50 延期，不阻塞 Wave 4；Wave 6 收口 |
 | 外部冷链监控系统对接（采集/超标判定由外部）| M5（Wave 4） | Wave 3 启动时确认 SOW | 未启动 |
-| 蓝牙打印机 / 电子秤 | M-PK（Wave 5）| Wave 4 启动时 | 未启动 |
-| 车辆 GPS / 电子地图 API | M10（Wave 5）| Wave 4 启动时 | 未启动 |
+| 蓝牙打印机 / 电子秤 | M-PK（Wave 5 / Wave 6 evidence gate）| Wave 4 启动时 | 未启动；Wave 6 收口 |
+| 车辆 GPS / 电子地图 API | M10（Wave 5 / Wave 6 evidence gate）| Wave 4 启动时 | 未启动；Wave 6 收口 |
 | 法规变更跟踪（GSP 修订） | 所有 Wave | 持续 | — |
 
 ## v25 后续波次 backlog（特殊药品落地 — 业务方确认承运但本期不实施）
