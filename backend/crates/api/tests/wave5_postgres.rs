@@ -613,3 +613,169 @@ async fn chain_store_replenishment_to_packing_tms_and_billing() {
     );
     assert_eq!(audit_count(&pool, owner_id).await, 12);
 }
+
+#[tokio::test]
+async fn wave5_conflicts_and_billing_state_guards() {
+    let pool = migrated_pool().await;
+    let repo = PgWave5Repository::new(pool.clone());
+    let owner_id = Uuid::new_v4();
+    let ctx = ctx(owner_id);
+    let now = Utc
+        .with_ymd_and_hms(2026, 6, 5, 11, 0, 0)
+        .single()
+        .expect("valid time");
+    let contract_id = seed_billing_contract(&pool, owner_id, "packing_operation", 125, now).await;
+
+    let station_req = CreatePackingStationRequest {
+        station_code: format!("PK-GUARD-{}", owner_id.simple()),
+        station_name: "Wave 5 Guard Packing Station".to_string(),
+        printer_code: Some("PRN-W5-GUARD".to_string()),
+        scale_code: Some("SCL-W5-GUARD".to_string()),
+        temperature_zone: "normal".to_string(),
+    };
+    repo.create_packing_station(
+        &ctx,
+        station_req.clone(),
+        now,
+        "wave5-guard-station-1",
+        None,
+    )
+    .await
+    .expect("create station");
+    let duplicate_station = repo
+        .create_packing_station(&ctx, station_req, now, "wave5-guard-station-2", None)
+        .await
+        .expect_err("duplicate station code should be a conflict, not a database 500");
+    assert_eq!(duplicate_station, Wave5RepositoryError::DuplicateCode);
+
+    let charge = repo
+        .calculate_period_charges(
+            &ctx,
+            CalculateBillingChargesRequest {
+                contract_id,
+                period_start: "2026-06-01".to_string(),
+                period_end: "2026-06-30".to_string(),
+                charge_item: "packing_operation".to_string(),
+                quantity: 2,
+                source_refs: vec!["packing_job:guard".to_string()],
+            },
+            now,
+            "wave5-guard-charge",
+            None,
+        )
+        .await
+        .expect("calculate charge")
+        .value;
+
+    let wrong_period_statement = repo
+        .generate_billing_statement(
+            &ctx,
+            GenerateBillingStatementRequest {
+                contract_id,
+                period_start: "2026-07-01".to_string(),
+                period_end: "2026-07-31".to_string(),
+                charge_ids: vec![charge.id],
+            },
+            now,
+            "wave5-guard-wrong-period-statement",
+            None,
+        )
+        .await
+        .expect_err("statement period must match all charge periods");
+    assert_eq!(wrong_period_statement, Wave5RepositoryError::InvalidInput);
+
+    let duplicate_charge_statement = repo
+        .generate_billing_statement(
+            &ctx,
+            GenerateBillingStatementRequest {
+                contract_id,
+                period_start: "2026-06-01".to_string(),
+                period_end: "2026-06-30".to_string(),
+                charge_ids: vec![charge.id, charge.id],
+            },
+            now,
+            "wave5-guard-duplicate-charge-statement",
+            None,
+        )
+        .await
+        .expect_err("statement charge_ids must not contain duplicates");
+    assert_eq!(
+        duplicate_charge_statement,
+        Wave5RepositoryError::InvalidInput
+    );
+
+    let statement = repo
+        .generate_billing_statement(
+            &ctx,
+            GenerateBillingStatementRequest {
+                contract_id,
+                period_start: "2026-06-01".to_string(),
+                period_end: "2026-06-30".to_string(),
+                charge_ids: vec![charge.id],
+            },
+            now,
+            "wave5-guard-statement",
+            None,
+        )
+        .await
+        .expect("generate statement")
+        .value;
+    let confirmed = repo
+        .confirm_billing_statement(
+            &ctx,
+            statement.id,
+            ConfirmBillingStatementRequest {
+                confirmation_note: Some("first confirmation".to_string()),
+            },
+            now,
+            "wave5-guard-confirm",
+            None,
+        )
+        .await
+        .expect("confirm pending statement")
+        .value;
+    assert_eq!(confirmed.status, "confirmed");
+    let audit_after_first_confirm = audit_count(&pool, owner_id).await;
+
+    let duplicate_confirm = repo
+        .confirm_billing_statement(
+            &ctx,
+            statement.id,
+            ConfirmBillingStatementRequest {
+                confirmation_note: Some("duplicate confirmation".to_string()),
+            },
+            now + chrono::Duration::hours(1),
+            "wave5-guard-confirm-duplicate",
+            None,
+        )
+        .await
+        .expect("duplicate confirmation should return current state")
+        .value;
+    assert_eq!(duplicate_confirm.status, "confirmed");
+    assert_eq!(duplicate_confirm.updated_at, confirmed.updated_at);
+    assert_eq!(
+        audit_count(&pool, owner_id).await,
+        audit_after_first_confirm
+    );
+
+    sqlx::query("UPDATE billing_statements SET status = 'settled' WHERE owner_id = $1 AND id = $2")
+        .bind(owner_id)
+        .bind(statement.id)
+        .execute(&pool)
+        .await
+        .expect("mark statement settled");
+    let settled_confirm = repo
+        .confirm_billing_statement(
+            &ctx,
+            statement.id,
+            ConfirmBillingStatementRequest {
+                confirmation_note: Some("should be blocked".to_string()),
+            },
+            now + chrono::Duration::hours(2),
+            "wave5-guard-confirm-settled",
+            None,
+        )
+        .await
+        .expect_err("settled statement must not be confirmed again");
+    assert_eq!(settled_confirm, Wave5RepositoryError::InvalidInput);
+}

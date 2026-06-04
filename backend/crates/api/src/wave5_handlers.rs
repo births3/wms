@@ -75,6 +75,9 @@ impl IntoResponse for Wave5HandlerError {
             Wave5HandlerError::Repository(Wave5RepositoryError::NotFound) => {
                 (StatusCode::NOT_FOUND, "W5-404", "资源不存在")
             }
+            Wave5HandlerError::Repository(Wave5RepositoryError::DuplicateCode) => {
+                (StatusCode::CONFLICT, "W5-409", "业务唯一键冲突")
+            }
             Wave5HandlerError::Repository(Wave5RepositoryError::IdempotencyConflict) => {
                 (StatusCode::CONFLICT, "W5-409", "幂等键已用于不同请求")
             }
@@ -454,7 +457,12 @@ fn audit(
 
 #[cfg(test)]
 mod tests {
-    use axum::{extract::State, http::HeaderMap, Json};
+    use axum::{
+        extract::State,
+        http::{HeaderMap, StatusCode},
+        response::IntoResponse,
+        Json,
+    };
     use sqlx::PgPool;
     use uuid::Uuid;
     use wms_domain::{
@@ -466,6 +474,7 @@ mod tests {
         create_packing_station_handler, wave5_router, Wave5AppState, Wave5HandlerError,
     };
     use crate::auth::{AuthContext, AuthError};
+    use crate::wave5_repository::Wave5RepositoryError;
 
     fn ctx(owner_id: Uuid, permissions: &[&str]) -> AuthContext {
         AuthContext {
@@ -496,6 +505,14 @@ mod tests {
             "/api/v1/tms/transit-temperature-readings",
             "/api/v1/tms/container-recoveries",
         ];
+    }
+
+    #[test]
+    fn duplicate_business_key_maps_to_conflict() {
+        let response =
+            Wave5HandlerError::Repository(Wave5RepositoryError::DuplicateCode).into_response();
+
+        assert_eq!(response.status(), StatusCode::CONFLICT);
     }
 
     #[tokio::test]

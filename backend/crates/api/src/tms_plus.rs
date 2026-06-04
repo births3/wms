@@ -24,10 +24,10 @@ impl TmsPlusService {
             return Err(TmsPlusError::InvalidDispatch);
         }
         match req.delivery_provider_type.as_str() {
-            "own_fleet" if req.vehicle_no.is_none() || req.driver_user_id.is_none() => {
+            "own_fleet" if option_blank(&req.vehicle_no) || req.driver_user_id.is_none() => {
                 Err(TmsPlusError::InvalidDispatch)
             }
-            "third_party_express" if req.carrier_code.is_none() => {
+            "third_party_express" if option_blank(&req.carrier_code) => {
                 Err(TmsPlusError::InvalidDispatch)
             }
             "own_fleet" | "third_party_express" => Ok(()),
@@ -60,6 +60,10 @@ impl TmsPlusService {
     }
 }
 
+fn option_blank(value: &Option<String>) -> bool {
+    value.as_deref().is_none_or(|item| item.trim().is_empty())
+}
+
 #[cfg(test)]
 mod tests {
     use chrono::{TimeZone, Utc};
@@ -81,6 +85,28 @@ mod tests {
             plate_no: Some("浙A12345".to_string()),
             driver_user_id: None,
             carrier_code: None,
+            waybill_no: None,
+            version: 1,
+            scheduled_load_at: None,
+        };
+
+        assert_eq!(
+            service.validate_dispatch(&req),
+            Err(TmsPlusError::InvalidDispatch)
+        );
+    }
+
+    #[test]
+    fn third_party_dispatch_rejects_blank_carrier() {
+        let service = TmsPlusService;
+        let req = ReceiveTmsDispatchRequest {
+            dispatch_no: "DSP-001".to_string(),
+            outbound_order_id: Uuid::new_v4(),
+            delivery_provider_type: "third_party_express".to_string(),
+            vehicle_no: None,
+            plate_no: Some("浙A12345".to_string()),
+            driver_user_id: None,
+            carrier_code: Some(" ".to_string()),
             waybill_no: None,
             version: 1,
             scheduled_load_at: None,

@@ -40,6 +40,7 @@ pub struct IdempotentMutation<T> {
 pub enum Wave5RepositoryError {
     NotFound,
     InvalidInput,
+    DuplicateCode,
     IdempotencyConflict,
     Audit(String),
     Database(String),
@@ -752,7 +753,16 @@ impl PgWave5Repository {
         idempotency_key: &str,
         audit: Option<AuditWriteRequest>,
     ) -> Result<IdempotentMutation<BillingStatement>, Wave5RepositoryError> {
-        if req.charge_ids.is_empty() {
+        if req.charge_ids.is_empty()
+            || has_duplicate_uuids(&req.charge_ids)
+            || req.period_start.is_empty()
+            || req.period_end.is_empty()
+        {
+            return Err(Wave5RepositoryError::InvalidInput);
+        }
+        let period_start = parse_billing_date(&req.period_start)?;
+        let period_end = parse_billing_date(&req.period_end)?;
+        if period_end < period_start {
             return Err(Wave5RepositoryError::InvalidInput);
         }
         let request_hash = request_hash(&serde_json::json!({ "request": req }))?;
@@ -766,9 +776,12 @@ impl PgWave5Repository {
                 replayed: true,
             });
         }
-        let (count, total): (i64, Option<i64>) = sqlx::query_as(
+        let (selected_count, period_count, total): (i64, i64, Option<i64>) = sqlx::query_as(
             r#"
-            SELECT COUNT(*)::BIGINT, SUM(amount_cents)::BIGINT
+            SELECT
+                COUNT(*)::BIGINT,
+                COUNT(*) FILTER (WHERE period_start = $4 AND period_end = $5)::BIGINT,
+                SUM(amount_cents) FILTER (WHERE period_start = $4 AND period_end = $5)::BIGINT
               FROM billing_charge_calculations
              WHERE owner_id = $1 AND contract_id = $2 AND id = ANY($3)
             "#,
@@ -776,11 +789,16 @@ impl PgWave5Repository {
         .bind(ctx.owner_id)
         .bind(req.contract_id)
         .bind(&req.charge_ids)
+        .bind(period_start.to_string())
+        .bind(period_end.to_string())
         .fetch_one(&mut *tx)
         .await
         .map_err(map_db_error)?;
-        if usize::try_from(count).ok() != Some(req.charge_ids.len()) {
+        if usize::try_from(selected_count).ok() != Some(req.charge_ids.len()) {
             return Err(Wave5RepositoryError::NotFound);
+        }
+        if usize::try_from(period_count).ok() != Some(req.charge_ids.len()) {
+            return Err(Wave5RepositoryError::InvalidInput);
         }
         let id = Uuid::new_v4();
         let statement = map_statement(
@@ -798,8 +816,8 @@ impl PgWave5Repository {
             .bind(id)
             .bind(ctx.owner_id)
             .bind(req.contract_id)
-            .bind(&req.period_start)
-            .bind(&req.period_end)
+            .bind(period_start.to_string())
+            .bind(period_end.to_string())
             .bind(total.unwrap_or(0))
             .bind(now)
             .fetch_one(&mut *tx)
@@ -867,6 +885,46 @@ impl PgWave5Repository {
                 replayed: true,
             });
         }
+        let current = sqlx::query_as::<_, BillingStatementRow>(
+            r#"
+            SELECT id, owner_id, contract_id, period_start, period_end, status,
+                   total_amount_cents, created_at, updated_at
+              FROM billing_statements
+             WHERE owner_id = $1 AND id = $2
+             FOR UPDATE
+            "#,
+        )
+        .bind(ctx.owner_id)
+        .bind(statement_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(map_db_error)?
+        .ok_or(Wave5RepositoryError::NotFound)?;
+        let charge_ids = load_statement_charge_ids(&mut tx, ctx.owner_id, statement_id).await?;
+        if current.status == "confirmed" {
+            let statement = map_statement(current, charge_ids);
+            store_idempotency_success(
+                &mut tx,
+                ctx.owner_id,
+                idempotency_key,
+                &request_hash,
+                "POST",
+                "/api/v1/billing/statements/{id}/confirm",
+                "billing_statement",
+                statement.id.to_string(),
+                &statement,
+                now,
+            )
+            .await?;
+            tx.commit().await.map_err(map_db_error)?;
+            return Ok(IdempotentMutation {
+                value: statement,
+                replayed: false,
+            });
+        }
+        if current.status != "pending_confirmation" {
+            return Err(Wave5RepositoryError::InvalidInput);
+        }
         let row = sqlx::query_as::<_, BillingStatementRow>(
             r#"
             UPDATE billing_statements
@@ -885,7 +943,6 @@ impl PgWave5Repository {
         .await
         .map_err(map_db_error)?
         .ok_or(Wave5RepositoryError::NotFound)?;
-        let charge_ids = load_statement_charge_ids(&mut tx, ctx.owner_id, statement_id).await?;
         let statement = map_statement(row, charge_ids);
         finish_mutation(
             tx,
@@ -1395,6 +1452,11 @@ fn parse_billing_date(value: &str) -> Result<NaiveDate, Wave5RepositoryError> {
     NaiveDate::parse_from_str(value, "%Y-%m-%d").map_err(|_| Wave5RepositoryError::InvalidInput)
 }
 
+fn has_duplicate_uuids(values: &[Uuid]) -> bool {
+    let mut seen = std::collections::HashSet::with_capacity(values.len());
+    values.iter().any(|value| !seen.insert(value))
+}
+
 fn idempotency_lock_id(owner_id: Uuid, idempotency_key: &str) -> i64 {
     let mut hasher = Sha256::new();
     hasher.update(owner_id.as_bytes());
@@ -1558,5 +1620,10 @@ fn map_container_recovery(row: ContainerRecoveryRow) -> ContainerRecovery {
 }
 
 fn map_db_error(error: sqlx::Error) -> Wave5RepositoryError {
+    if let sqlx::Error::Database(database_error) = &error {
+        if database_error.is_unique_violation() {
+            return Wave5RepositoryError::DuplicateCode;
+        }
+    }
     Wave5RepositoryError::Database(error.to_string())
 }
