@@ -4,7 +4,7 @@
 - 决策日期：2026-06-04
 - 决策人：项目主人
 - 起草人：AI 助手
-- 关联：ADR-0007 / ADR-0016 / ADR-0025 / ADR-0030 / ROADMAP.md / TODO.md / docs/runbooks/wave-1-runtime-evidence.md / docs/runbooks/wave-2-runtime-evidence.md / docs/runbooks/wave-3-pda-readiness.md / docs/runbooks/wave-4-external-dependencies.md / docs/runbooks/wave-5-hardware-evidence.md / docs/runbooks/wave-5-tms-evidence.md / docs/runbooks/wave-6-deploy-evidence.md
+- 关联：ADR-0007 / ADR-0016 / ADR-0025 / ADR-0030 / ROADMAP.md / TODO.md / docs/runbooks/wave-1-runtime-evidence.md / docs/runbooks/wave-2-runtime-evidence.md / docs/runbooks/wave-3-pda-readiness.md / docs/runbooks/wave-4-external-dependencies.md / docs/runbooks/wave-5-hardware-evidence.md / docs/runbooks/wave-5-tms-evidence.md / docs/runbooks/wave-6-deploy-evidence.md / docs/runbooks/wave-6-closeout.md
 
 ---
 
@@ -145,4 +145,5 @@ Wave 6 不新增业务模块，不扩展用户故事范围，不把 v26 字段�
 - docs/runbooks/wave-5-hardware-evidence.md
 - docs/runbooks/wave-5-tms-evidence.md
 - docs/runbooks/wave-6-deploy-evidence.md
+- docs/runbooks/wave-6-closeout.md
 - docs/domain/clarifications.md #50 / #66 / #67
