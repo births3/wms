@@ -33,6 +33,8 @@
 7. 调用 `POST /api/v1/config-center/feature-flags/archive-file-source`，记录旧文件归档引用。
 8. 用记录脚本写入 `docs/retros/wave-2-runtime-evidence.json`，再运行验证：
 
+所有 `service_url` / log / archive 证据引用必须包含当前 `environment` 标记（`dev` 或 `staging`），并且不能指向 local / prod / mock / fake / stub / example。
+
 ```bash
 just wave-2-runtime-evidence-record \
   --environment dev \
@@ -51,7 +53,7 @@ just wave-2-runtime-evidence-validate
 ```json
 {
   "environment": "dev",
-  "service_url": "https://wms-dev.example.internal",
+  "service_url": "https://wms-dev.internal",
   "source_switched_to": "config_center",
   "migrated_count": 1,
   "reconcile": {
@@ -68,7 +70,7 @@ just wave-2-runtime-evidence-validate
 ## 拒绝边界
 
 - `environment` 不是 `dev` 或 `staging`
-- 任一引用包含 `localhost`、`127.0.0.1`、`example.com`、`prod`、`production`
+- 任一引用包含 `localhost`、`127.0.0.1`、`0.0.0.0`、`prod`、`production`、`mock`、`fake`、`stub`、`example`
 - `source_switched_to` 不是 `config_center`
 - 对账结果存在缺失或不一致
 - 缺少 smoke 或 reconcile 日志引用

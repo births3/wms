@@ -82,6 +82,8 @@
 
 拿到真实 dev/staging 资料和回执后，用记录脚本生成 evidence。脚本会在写文件前复用 `validate_wave4_external_dependencies.py` 的正式校验规则：
 
+所有接口文档、鉴权、错误码、频率限制、Vault、上报、重试和审计证据引用必须包含当前 `environment` 标记（`dev` 或 `staging`），并且不能指向 local / prod / mock / fake / stub / example。
+
 ```bash
 just wave-4-external-dependencies-record \
   --environment staging \

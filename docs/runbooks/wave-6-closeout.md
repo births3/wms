@@ -13,6 +13,8 @@ Wave 6 完成需要以下全部条件成立：
 
 禁止用 `localhost`、`127.0.0.1`、`0.0.0.0`、`prod`、`production`、`mock`、`fake`、`stub`、`example` 证据替代真实 dev/staging 或外部系统证据。
 
+所有 evidence 引用还必须包含当前 `environment` 标记（`dev` 或 `staging`）；缺少环境标记的证据库路径、CI 记录、Vault 引用或审批票据不能关闭 gate。
+
 ## 当前 Gate
 
 | Gate | Evidence 文件 | 记录入口 | 验证入口 |
@@ -115,11 +117,11 @@ just wave-6-deploy-evidence-validate
 
 ## 最终关闭
 
-全部 evidence validator 通过后：
+全部 evidence validator 通过后，先做一次状态与治理检查：
 
 ```bash
 just wave-6-status
-just wave-6-complete-check
+just wave-6-evidence-check
 just gov-t1
 just task-check
 git diff --check
@@ -134,6 +136,7 @@ git diff --check
 写完 retro 后再次运行：
 
 ```bash
+just wave-6-status
 just wave-6-complete-check
 just gov-t1
 just task-check

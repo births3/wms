@@ -107,6 +107,8 @@
 
 执行验证：
 
+所有 PDA 设备、SPIKE、扫描、离线 replay、审计、L7 和易用性证据引用必须包含当前 `environment` 标记（`dev` 或 `staging`），并且不能指向 local / prod / mock / fake / stub / example / browser / simulator。
+
 ```bash
 just wave-3-pda-runtime-evidence-record \
   --environment staging \

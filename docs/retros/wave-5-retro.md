@@ -37,7 +37,7 @@ Wave 5 开发完成。静态完成项、OpenAPI 契约、PostgreSQL migration、
 | `cargo test --manifest-path backend/Cargo.toml -p wms-api --lib -- --skip postgres_` | 66 passed |
 | `cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave5_postgres -- --nocapture` | 3 passed（临时 PostgreSQL） |
 | `just openapi-check` | 通过 |
-| `python3 -m pytest scripts/governance/tests/test_core_logic.py -q` | 132 passed |
+| `python3 -m pytest scripts/governance/tests/test_core_logic.py -q` | 137 passed |
 | `just gov-t1` | 30/30 ok |
 | `just task-check` | 6/6 ok |
 | `git diff --check` | 通过 |

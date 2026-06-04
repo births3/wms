@@ -81,6 +81,8 @@
 
 ## 验证命令
 
+所有设备、校准、打印、称重和审计证据引用必须包含当前 `environment` 标记（`dev` 或 `staging`），并且不能指向 local / prod / mock / fake / stub / example。
+
 ```bash
 just wave-5-hardware-evidence-record \
   --environment staging \

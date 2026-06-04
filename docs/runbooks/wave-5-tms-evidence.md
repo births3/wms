@@ -78,6 +78,8 @@
 
 ## 验证命令
 
+所有 TMS 系统、推送、回调、失败重试、Vault 和审计证据引用必须包含当前 `environment` 标记（`dev` 或 `staging`），并且不能指向 local / prod / mock / fake / stub / example。
+
 ```bash
 just wave-5-tms-evidence-record \
   --environment staging \

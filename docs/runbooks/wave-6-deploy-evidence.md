@@ -89,6 +89,8 @@
 
 ## 验证命令
 
+所有 release plan、构建产物、灰度配置、smoke gate、dashboard、回滚演练、审批和审计证据引用必须包含当前 `environment` 标记（`dev` 或 `staging`），并且不能指向 local / prod / mock / fake / stub / example。
+
 ```bash
 just wave-6-deploy-evidence-record \
   --environment staging \
