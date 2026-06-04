@@ -9,35 +9,57 @@ pub mod feature_flags;
 pub mod inbound;
 pub mod inventory;
 pub mod master_data;
+pub mod outbound;
+pub mod packing_station;
 pub mod parameter_mapping;
 pub mod reports;
+pub mod retail_chain;
+pub mod tms_plus;
+pub mod traceability_code;
 pub mod wave3_handlers;
 pub mod wave3_repository;
+pub mod wave4_handlers;
+pub mod wave4_repository;
+pub mod wave5_handlers;
+pub mod wave5_repository;
 
 use utoipa::OpenApi;
 use wms_domain::{
-    AuditActor, AuditEvent, AuditEventListResponse, BillingAccount, BillingContract, BillingRule,
-    ChangeInventoryStatusRequest, ColdChainDevice, ConfigEntry, CreateBillingAccountRequest,
-    CreateBillingContractRequest, CreateBillingRuleRequest, CreateColdChainDeviceRequest,
-    CreateCustomerRequest, CreateLocationRequest, CreateProductRequest,
-    CreateReceivingOrderRequest, CreateSpecialDrugCategoryRequest, CreateSupplierRequest,
-    CreateWarehouseRequest, CurrentUser, Customer, CustomerListResponse, ErrorResponse,
-    ExecuteMappingRequest, ExecuteMappingResponse, FeatureFlagArchiveRequest,
-    FeatureFlagArchiveResult, FeatureFlagBatchImportRequest, FeatureFlagBatchImportResult,
-    FeatureFlagConfig, FeatureFlagExportResponse, FeatureFlagMigrationResult,
-    FeatureFlagReconcileReport, FeatureFlagSourceSwitchRequest, FeatureFlagSourceSwitchResponse,
-    HealthzResponse, IngestTemperatureExcursionRequest, IngestTemperatureReadingRequest,
-    InspectReceivingOrderRequest, InspectionSignatureRecord, InventoryBatch,
-    InventoryBatchListResponse, InventoryMovement, Location, LocationListResponse, LoginRequest,
-    LoginResponse, MappingDictionary, MappingQueueItem, MappingRule, MappingTraceResponse,
-    PageMeta, Product, ProductListResponse, PutawayInventoryRequest, PutawayRecord, PutawayRequest,
-    ReceiveReceivingOrderRequest, ReceivingInspectionRecord, ReceivingOrder, ReceivingOrderLine,
-    ReceivingOrderListResponse, ReceivingOrderReceipt, ReportQueryRequest, ReportQueryResponse,
-    ReportRow, SignInspectionRequest, SpecialDrugCategory, SpecialDrugCategoryListResponse,
-    Supplier, SupplierListResponse, TemperatureExcursionEvent, TemperatureReading,
-    UpdateCustomerRequest, UpdateLocationRequest, UpdateProductRequest,
+    AuditActor, AuditEvent, AuditEventListResponse, BillingAccount, BillingChargeCalculation,
+    BillingContract, BillingRule, BillingStatement, CalculateBillingChargesRequest,
+    ChangeInventoryStatusRequest, ColdChainDevice, CompletePickTaskRequest, ConfigEntry,
+    ConfirmBillingStatementRequest, ConfirmContainerRecoveryRequest, ContainerRecovery,
+    CreateBillingAccountRequest, CreateBillingContractRequest, CreateBillingRuleRequest,
+    CreateColdChainDeviceRequest, CreateCrossdockPlanRequest, CreateCustomerRequest,
+    CreateLocationRequest, CreateOutboundOrderLineRequest, CreateOutboundOrderRequest,
+    CreateOutboundWaveRequest, CreatePackJobRequest, CreatePackingStationRequest,
+    CreateProductRequest, CreateReceivingOrderRequest, CreateRetailReplenishmentSuggestionRequest,
+    CreateSpecialDrugCategoryRequest, CreateSupplierRequest, CreateWarehouseRequest, CrossdockPlan,
+    CurrentUser, Customer, CustomerListResponse, DisposeTemperatureExcursionRequest, DriverTask,
+    DriverTaskListResponse, ErrorResponse, ExecuteMappingRequest, ExecuteMappingResponse,
+    FeatureFlagArchiveRequest, FeatureFlagArchiveResult, FeatureFlagBatchImportRequest,
+    FeatureFlagBatchImportResult, FeatureFlagConfig, FeatureFlagExportResponse,
+    FeatureFlagMigrationResult, FeatureFlagReconcileReport, FeatureFlagSourceSwitchRequest,
+    FeatureFlagSourceSwitchResponse, GenerateBillingStatementRequest, GspLedgerReport,
+    GspLedgerRow, HealthzResponse, IngestTemperatureExcursionRequest,
+    IngestTemperatureReadingRequest, IngestTransitTemperatureRequest, InspectReceivingOrderRequest,
+    InspectionSignatureRecord, InventoryBatch, InventoryBatchListResponse, InventoryMovement,
+    Location, LocationListResponse, LoginRequest, LoginResponse, MappingDictionary,
+    MappingQueueItem, MappingRule, MappingTraceResponse, OutboundOrder, OutboundOrderLine,
+    OutboundOrderListResponse, OutboundWave, PackJob, PackingStation, PageMeta,
+    PrintWaybillRequest, Product, ProductListResponse, PutawayInventoryRequest, PutawayRecord,
+    PutawayRequest, ReceiveReceivingOrderRequest, ReceiveTmsDispatchRequest,
+    ReceivingInspectionRecord, ReceivingOrder, ReceivingOrderLine, ReceivingOrderListResponse,
+    ReceivingOrderReceipt, ReportQueryRequest, ReportQueryResponse, ReportRow,
+    RetailReplenishmentSuggestion, ReviewOutboundOrderRequest, ShipOutboundOrderRequest,
+    SignInspectionRequest, SpecialDrugCategory, SpecialDrugCategoryListResponse,
+    StoreDashboardResponse, Supplier, SupplierListResponse,
+    TemperatureExcursionDispositionResponse, TemperatureExcursionEvent,
+    TemperatureExcursionEventListResponse, TemperatureReading, TmsDispatch,
+    TraceabilityOutboundReport, TraceabilityOutboundReportRequest, TraceabilityStatusChangeEvent,
+    TransitTemperatureReading, UpdateCustomerRequest, UpdateLocationRequest, UpdateProductRequest,
     UpdateReceivingOrderRequest, UpdateSpecialDrugCategoryRequest, UpdateSupplierRequest,
-    UpdateWarehouseRequest, Warehouse, WarehouseListResponse,
+    UpdateWarehouseRequest, Warehouse, WarehouseListResponse, WeighPackJobRequest,
 };
 
 #[utoipa::path(
@@ -289,9 +311,53 @@ fn putaway_inventory_batch() {}
 #[allow(dead_code)]
 fn change_inventory_batch_status() {}
 
+#[utoipa::path(post, path = "/api/v1/outbound/orders", tag = "outbound", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = CreateOutboundOrderRequest, responses((status = 200, description = "创建出库订单", body = OutboundOrder), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 409, description = "单号或幂等冲突", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn create_outbound_order() {}
+
+#[utoipa::path(post, path = "/api/v1/outbound/waves", tag = "outbound", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = CreateOutboundWaveRequest, responses((status = 200, description = "创建并下发出库波次", body = OutboundWave), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 422, description = "订单状态不可入波次", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn create_outbound_wave() {}
+
+#[utoipa::path(post, path = "/api/v1/outbound/pick-tasks/{id}/complete", tag = "outbound", params(("id" = uuid::Uuid, Path, description = "出库订单 ID；当前最小闭环按订单行完成拣选"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = CompletePickTaskRequest, responses((status = 200, description = "完成拣选任务，短拣时订单进入待补齐状态", body = OutboundOrder), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 422, description = "数量或状态非法", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn complete_outbound_pick_task() {}
+
+#[utoipa::path(post, path = "/api/v1/outbound/orders/{id}/review", tag = "outbound", params(("id" = uuid::Uuid, Path, description = "出库订单 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = ReviewOutboundOrderRequest, responses((status = 200, description = "完成出库复核", body = OutboundOrder), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 422, description = "订单状态不可复核", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn review_outbound_order() {}
+
+#[utoipa::path(post, path = "/api/v1/outbound/orders/{id}/ship", tag = "outbound", params(("id" = uuid::Uuid, Path, description = "出库订单 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = ShipOutboundOrderRequest, responses((status = 200, description = "发货交接并扣减库存", body = OutboundOrder), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 422, description = "短拣未补齐或库存不足", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn ship_outbound_order() {}
+
 #[utoipa::path(post, path = "/api/v1/reports/query", tag = "reports", request_body = ReportQueryRequest, responses((status = 200, description = "报表查询结果", body = ReportQueryResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 fn query_report() {}
+
+#[utoipa::path(post, path = "/api/v1/reports/gsp/inbound-ledger", tag = "reports", request_body = ReportQueryRequest, responses((status = 200, description = "GSP 入库验收台账", body = GspLedgerReport), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn query_gsp_inbound_ledger() {}
+
+#[utoipa::path(post, path = "/api/v1/reports/gsp/outbound-ledger", tag = "reports", request_body = ReportQueryRequest, responses((status = 200, description = "GSP 出库复核台账", body = GspLedgerReport), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn query_gsp_outbound_ledger() {}
+
+#[utoipa::path(post, path = "/api/v1/reports/gsp/inventory-ledger", tag = "reports", request_body = ReportQueryRequest, responses((status = 200, description = "GSP 库存流水台账", body = GspLedgerReport), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn query_gsp_inventory_ledger() {}
+
+#[utoipa::path(post, path = "/api/v1/traceability/outbound-reports", tag = "traceability", request_body = TraceabilityOutboundReportRequest, responses((status = 200, description = "追溯码出库核销待上报记录", body = TraceabilityOutboundReport), (status = 401, description = "未登录", body = ErrorResponse), (status = 422, description = "追溯码状态变更三元组不完整", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn create_traceability_outbound_report() {}
+
+#[utoipa::path(get, path = "/api/v1/driver/tasks/today", tag = "driver", responses((status = 200, description = "司机今日配送任务", body = DriverTaskListResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn list_driver_today_tasks() {}
+
+#[utoipa::path(get, path = "/api/v1/store/dashboard", tag = "store", responses((status = 200, description = "门店首页业务概览", body = StoreDashboardResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn get_store_dashboard() {}
 
 #[utoipa::path(post, path = "/api/v1/parameter-mapping/execute", tag = "parameter-mapping", request_body = ExecuteMappingRequest, responses((status = 200, description = "执行参数对照", body = ExecuteMappingResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
@@ -337,6 +403,14 @@ fn ingest_temperature_reading() {}
 #[allow(dead_code)]
 fn ingest_temperature_excursion() {}
 
+#[utoipa::path(get, path = "/api/v1/cold-chain/excursions/pending-disposition", tag = "cold-chain", responses((status = 200, description = "温度超标待处置列表", body = TemperatureExcursionEventListResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn list_pending_temperature_excursions() {}
+
+#[utoipa::path(post, path = "/api/v1/cold-chain/excursions/{external_event_id}/dispose", tag = "cold-chain", params(("external_event_id" = String, Path, description = "外部冷链系统事件 ID")), request_body = DisposeTemperatureExcursionRequest, responses((status = 200, description = "温度超标处置并隔离批次", body = TemperatureExcursionDispositionResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 404, description = "温度超标事件不存在", body = ErrorResponse), (status = 422, description = "批次不在影响范围或事件状态不可处置", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn dispose_temperature_excursion() {}
+
 #[utoipa::path(post, path = "/api/v1/billing/accounts", tag = "billing", request_body = CreateBillingAccountRequest, responses((status = 200, description = "创建计费账户", body = BillingAccount), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 fn create_billing_account() {}
@@ -349,12 +423,60 @@ fn create_billing_contract() {}
 #[allow(dead_code)]
 fn create_billing_rule() {}
 
+#[utoipa::path(post, path = "/api/v1/packing/stations", tag = "packing", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = CreatePackingStationRequest, responses((status = 200, description = "创建包装工位", body = PackingStation), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 409, description = "工位或幂等冲突", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn create_packing_station() {}
+
+#[utoipa::path(post, path = "/api/v1/packing/jobs", tag = "packing", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = CreatePackJobRequest, responses((status = 200, description = "创建装箱任务", body = PackJob), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 404, description = "出库订单或工位不存在", body = ErrorResponse), (status = 409, description = "装箱任务或幂等冲突", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn create_pack_job() {}
+
+#[utoipa::path(post, path = "/api/v1/packing/jobs/{id}/weigh", tag = "packing", params(("id" = uuid::Uuid, Path, description = "装箱任务 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = WeighPackJobRequest, responses((status = 200, description = "记录装箱称重", body = PackJob), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 404, description = "装箱任务不存在", body = ErrorResponse), (status = 422, description = "称重数据非法", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn weigh_pack_job() {}
+
+#[utoipa::path(post, path = "/api/v1/packing/jobs/{id}/waybill", tag = "packing", params(("id" = uuid::Uuid, Path, description = "装箱任务 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = PrintWaybillRequest, responses((status = 200, description = "记录面单打印结果", body = PackJob), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 404, description = "装箱任务不存在", body = ErrorResponse), (status = 422, description = "面单数据非法", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn print_pack_job_waybill() {}
+
+#[utoipa::path(post, path = "/api/v1/retail/replenishment-suggestions", tag = "retail", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = CreateRetailReplenishmentSuggestionRequest, responses((status = 200, description = "生成门店补货建议", body = RetailReplenishmentSuggestion), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 409, description = "建议或幂等冲突", body = ErrorResponse), (status = 422, description = "补货水位非法", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn create_retail_replenishment_suggestion() {}
+
+#[utoipa::path(post, path = "/api/v1/retail/crossdock-plans", tag = "retail", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = CreateCrossdockPlanRequest, responses((status = 200, description = "创建门店越库计划", body = CrossdockPlan), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 404, description = "出库订单不存在", body = ErrorResponse), (status = 422, description = "越库数量非法", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn create_retail_crossdock_plan() {}
+
+#[utoipa::path(post, path = "/api/v1/billing/charges/calculate", tag = "billing", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = CalculateBillingChargesRequest, responses((status = 200, description = "计算周期计费明细", body = BillingChargeCalculation), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 404, description = "计费合同不存在", body = ErrorResponse), (status = 409, description = "计费明细或幂等冲突", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn calculate_billing_charges() {}
+
+#[utoipa::path(post, path = "/api/v1/billing/statements", tag = "billing", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = GenerateBillingStatementRequest, responses((status = 200, description = "生成月结账单", body = BillingStatement), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 404, description = "计费合同不存在", body = ErrorResponse), (status = 409, description = "账单或幂等冲突", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn generate_billing_statement() {}
+
+#[utoipa::path(post, path = "/api/v1/billing/statements/{id}/confirm", tag = "billing", params(("id" = uuid::Uuid, Path, description = "月结账单 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = ConfirmBillingStatementRequest, responses((status = 200, description = "确认月结账单", body = BillingStatement), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 404, description = "账单不存在", body = ErrorResponse), (status = 422, description = "账单状态不可确认", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn confirm_billing_statement() {}
+
+#[utoipa::path(post, path = "/api/v1/tms/dispatches", tag = "tms", params(("Idempotency-Key" = String, Header, description = "外部 TMS 生成的幂等键")), request_body = ReceiveTmsDispatchRequest, responses((status = 200, description = "接收 TMS 调度", body = TmsDispatch), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 404, description = "出库订单不存在", body = ErrorResponse), (status = 409, description = "调度或幂等冲突", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn receive_tms_dispatch() {}
+
+#[utoipa::path(post, path = "/api/v1/tms/transit-temperature-readings", tag = "tms", params(("Idempotency-Key" = String, Header, description = "外部 TMS 生成的幂等键")), request_body = IngestTransitTemperatureRequest, responses((status = 200, description = "接收在途温控读数", body = TransitTemperatureReading), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 404, description = "TMS 调度不存在", body = ErrorResponse), (status = 422, description = "温控数据非法", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn ingest_transit_temperature() {}
+
+#[utoipa::path(post, path = "/api/v1/tms/container-recoveries", tag = "tms", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = ConfirmContainerRecoveryRequest, responses((status = 200, description = "确认周转容器回收", body = ContainerRecovery), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 404, description = "TMS 调度不存在", body = ErrorResponse), (status = 409, description = "容器回收或幂等冲突", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn confirm_container_recovery() {}
+
 #[derive(OpenApi)]
 #[openapi(
     info(
         title = "WMS API",
-        version = "0.0.3-wave-3-core-rules",
-        description = "Wave 3 核心业务规则与业务模型契约",
+        version = "0.0.5-wave-5-value-added",
+        description = "Wave 5 增值模块与横向能力契约",
     ),
     paths(
         healthz,
@@ -398,7 +520,18 @@ fn create_billing_rule() {}
         list_inventory_batches,
         putaway_inventory_batch,
         change_inventory_batch_status,
+        create_outbound_order,
+        create_outbound_wave,
+        complete_outbound_pick_task,
+        review_outbound_order,
+        ship_outbound_order,
         query_report,
+        query_gsp_inbound_ledger,
+        query_gsp_outbound_ledger,
+        query_gsp_inventory_ledger,
+        create_traceability_outbound_report,
+        list_driver_today_tasks,
+        get_store_dashboard,
         execute_mapping,
         trace_mapping,
         migrate_feature_flags,
@@ -410,34 +543,66 @@ fn create_billing_rule() {}
         create_cold_chain_device,
         ingest_temperature_reading,
         ingest_temperature_excursion,
+        list_pending_temperature_excursions,
+        dispose_temperature_excursion,
         create_billing_account,
         create_billing_contract,
         create_billing_rule,
+        create_packing_station,
+        create_pack_job,
+        weigh_pack_job,
+        print_pack_job_waybill,
+        create_retail_replenishment_suggestion,
+        create_retail_crossdock_plan,
+        calculate_billing_charges,
+        generate_billing_statement,
+        confirm_billing_statement,
+        receive_tms_dispatch,
+        ingest_transit_temperature,
+        confirm_container_recovery,
     ),
     components(schemas(
         AuditActor,
         AuditEvent,
         AuditEventListResponse,
         BillingAccount,
+        BillingChargeCalculation,
         BillingContract,
         BillingRule,
+        BillingStatement,
+        CalculateBillingChargesRequest,
         ChangeInventoryStatusRequest,
         ColdChainDevice,
+        CompletePickTaskRequest,
+        ConfirmBillingStatementRequest,
+        ConfirmContainerRecoveryRequest,
         ConfigEntry,
+        ContainerRecovery,
         CreateBillingAccountRequest,
         CreateBillingContractRequest,
         CreateBillingRuleRequest,
         CreateColdChainDeviceRequest,
+        CreateCrossdockPlanRequest,
         CreateCustomerRequest,
         CreateLocationRequest,
+        CreateOutboundOrderLineRequest,
+        CreateOutboundOrderRequest,
+        CreateOutboundWaveRequest,
+        CreatePackJobRequest,
+        CreatePackingStationRequest,
         CreateProductRequest,
         CreateReceivingOrderRequest,
+        CreateRetailReplenishmentSuggestionRequest,
         CreateSpecialDrugCategoryRequest,
         CreateSupplierRequest,
         CreateWarehouseRequest,
+        CrossdockPlan,
         CurrentUser,
         Customer,
         CustomerListResponse,
+        DriverTask,
+        DriverTaskListResponse,
+        DisposeTemperatureExcursionRequest,
         ErrorResponse,
         ExecuteMappingRequest,
         ExecuteMappingResponse,
@@ -451,9 +616,13 @@ fn create_billing_rule() {}
         FeatureFlagReconcileReport,
         FeatureFlagSourceSwitchRequest,
         FeatureFlagSourceSwitchResponse,
+        GenerateBillingStatementRequest,
+        GspLedgerReport,
+        GspLedgerRow,
         HealthzResponse,
         IngestTemperatureExcursionRequest,
         IngestTemperatureReadingRequest,
+        IngestTransitTemperatureRequest,
         InspectReceivingOrderRequest,
         InspectionSignatureRecord,
         InventoryBatch,
@@ -467,13 +636,21 @@ fn create_billing_rule() {}
         MappingQueueItem,
         MappingRule,
         MappingTraceResponse,
+        OutboundOrder,
+        OutboundOrderLine,
+        OutboundOrderListResponse,
+        OutboundWave,
+        PackJob,
+        PackingStation,
         PageMeta,
+        PrintWaybillRequest,
         Product,
         ProductListResponse,
         PutawayInventoryRequest,
         PutawayRecord,
         PutawayRequest,
         ReceiveReceivingOrderRequest,
+        ReceiveTmsDispatchRequest,
         ReceivingInspectionRecord,
         ReceivingOrder,
         ReceivingOrderLine,
@@ -482,13 +659,24 @@ fn create_billing_rule() {}
         ReportQueryRequest,
         ReportQueryResponse,
         ReportRow,
+        RetailReplenishmentSuggestion,
+        ReviewOutboundOrderRequest,
+        ShipOutboundOrderRequest,
         SignInspectionRequest,
         SpecialDrugCategory,
         SpecialDrugCategoryListResponse,
+        StoreDashboardResponse,
         Supplier,
         SupplierListResponse,
+        TmsDispatch,
+        TemperatureExcursionDispositionResponse,
         TemperatureExcursionEvent,
+        TemperatureExcursionEventListResponse,
         TemperatureReading,
+        TraceabilityOutboundReport,
+        TraceabilityOutboundReportRequest,
+        TraceabilityStatusChangeEvent,
+        TransitTemperatureReading,
         UpdateCustomerRequest,
         UpdateLocationRequest,
         UpdateProductRequest,
@@ -496,6 +684,7 @@ fn create_billing_rule() {}
         UpdateSpecialDrugCategoryRequest,
         UpdateSupplierRequest,
         UpdateWarehouseRequest,
+        WeighPackJobRequest,
         Warehouse,
         WarehouseListResponse,
     )),
@@ -506,11 +695,18 @@ fn create_billing_rule() {}
         (name = "master-data", description = "M1 基础档案"),
         (name = "inbound", description = "M2 入库业务规则"),
         (name = "inventory", description = "M3 库存批次与状态"),
+        (name = "outbound", description = "M4 出库闭环"),
         (name = "reports", description = "M6 报表查询"),
+        (name = "traceability", description = "M-TC 追溯码"),
+        (name = "driver", description = "H-Driver 司机端"),
+        (name = "store", description = "H-Store 门店端"),
         (name = "parameter-mapping", description = "M-PM 参数对照"),
         (name = "config-center", description = "M1-008 配置中心"),
         (name = "cold-chain", description = "M5 外部冷链数据接入"),
-        (name = "billing", description = "M9 计费账户与合同"),
+        (name = "billing", description = "M9 计费账户、规则与月结"),
+        (name = "packing", description = "M-PK 包装站"),
+        (name = "retail", description = "M8 连锁门店"),
+        (name = "tms", description = "M10 TMS+"),
     ),
 )]
 pub struct ApiDoc;
@@ -552,7 +748,18 @@ mod tests {
             "/api/v1/inventory/batches",
             "/api/v1/inventory/batches/putaway",
             "/api/v1/inventory/batches/status",
+            "/api/v1/outbound/orders",
+            "/api/v1/outbound/waves",
+            "/api/v1/outbound/pick-tasks/{id}/complete",
+            "/api/v1/outbound/orders/{id}/review",
+            "/api/v1/outbound/orders/{id}/ship",
             "/api/v1/reports/query",
+            "/api/v1/reports/gsp/inbound-ledger",
+            "/api/v1/reports/gsp/outbound-ledger",
+            "/api/v1/reports/gsp/inventory-ledger",
+            "/api/v1/traceability/outbound-reports",
+            "/api/v1/driver/tasks/today",
+            "/api/v1/store/dashboard",
             "/api/v1/parameter-mapping/execute",
             "/api/v1/parameter-mapping/traces/{execution_id}",
             "/api/v1/config-center/feature-flags/migrate",
@@ -564,9 +771,23 @@ mod tests {
             "/api/v1/cold-chain/devices",
             "/api/v1/cold-chain/readings",
             "/api/v1/cold-chain/excursions",
+            "/api/v1/cold-chain/excursions/pending-disposition",
+            "/api/v1/cold-chain/excursions/{external_event_id}/dispose",
             "/api/v1/billing/accounts",
             "/api/v1/billing/contracts",
             "/api/v1/billing/rules",
+            "/api/v1/packing/stations",
+            "/api/v1/packing/jobs",
+            "/api/v1/packing/jobs/{id}/weigh",
+            "/api/v1/packing/jobs/{id}/waybill",
+            "/api/v1/retail/replenishment-suggestions",
+            "/api/v1/retail/crossdock-plans",
+            "/api/v1/billing/charges/calculate",
+            "/api/v1/billing/statements",
+            "/api/v1/billing/statements/{id}/confirm",
+            "/api/v1/tms/dispatches",
+            "/api/v1/tms/transit-temperature-readings",
+            "/api/v1/tms/container-recoveries",
         ] {
             assert!(
                 json.contains(required_path),
@@ -591,6 +812,45 @@ mod tests {
             "\"FeatureFlagBatchImportRequest\"",
             "\"FeatureFlagReconcileReport\"",
             "\"FeatureFlagArchiveResult\"",
+            "\"CreateOutboundOrderRequest\"",
+            "\"OutboundOrder\"",
+            "\"CreateOutboundWaveRequest\"",
+            "\"OutboundWave\"",
+            "\"CompletePickTaskRequest\"",
+            "\"ReviewOutboundOrderRequest\"",
+            "\"ShipOutboundOrderRequest\"",
+            "\"DisposeTemperatureExcursionRequest\"",
+            "\"TemperatureExcursionDispositionResponse\"",
+            "\"TemperatureExcursionEventListResponse\"",
+            "\"GspLedgerReport\"",
+            "\"GspLedgerRow\"",
+            "\"TraceabilityOutboundReport\"",
+            "\"TraceabilityOutboundReportRequest\"",
+            "\"TraceabilityStatusChangeEvent\"",
+            "\"DriverTask\"",
+            "\"DriverTaskListResponse\"",
+            "\"StoreDashboardResponse\"",
+            "\"PackingStation\"",
+            "\"CreatePackingStationRequest\"",
+            "\"PackJob\"",
+            "\"CreatePackJobRequest\"",
+            "\"WeighPackJobRequest\"",
+            "\"PrintWaybillRequest\"",
+            "\"RetailReplenishmentSuggestion\"",
+            "\"CreateRetailReplenishmentSuggestionRequest\"",
+            "\"CrossdockPlan\"",
+            "\"CreateCrossdockPlanRequest\"",
+            "\"BillingChargeCalculation\"",
+            "\"CalculateBillingChargesRequest\"",
+            "\"BillingStatement\"",
+            "\"GenerateBillingStatementRequest\"",
+            "\"ConfirmBillingStatementRequest\"",
+            "\"TmsDispatch\"",
+            "\"ReceiveTmsDispatchRequest\"",
+            "\"TransitTemperatureReading\"",
+            "\"IngestTransitTemperatureRequest\"",
+            "\"ContainerRecovery\"",
+            "\"ConfirmContainerRecoveryRequest\"",
         ] {
             assert!(
                 json.contains(required_schema),

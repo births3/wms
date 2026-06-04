@@ -5,8 +5,9 @@ use std::collections::BTreeMap;
 use chrono::{DateTime, NaiveDate, Utc};
 use uuid::Uuid;
 use wms_domain::{
-    BillingAccount, BillingContract, BillingRule, CreateBillingAccountRequest,
-    CreateBillingContractRequest, CreateBillingRuleRequest,
+    BillingAccount, BillingChargeCalculation, BillingContract, BillingRule,
+    CalculateBillingChargesRequest, CreateBillingAccountRequest, CreateBillingContractRequest,
+    CreateBillingRuleRequest,
 };
 
 use crate::auth::AuthContext;
@@ -17,6 +18,7 @@ pub enum BillingError {
     DuplicateAccountCode(String),
     DuplicateContractNo(String),
     InvalidRate,
+    InvalidQuantity,
     InvalidEffectiveWindow,
     BillingRuleConflict,
 }
@@ -144,6 +146,65 @@ impl BillingStore {
             .cloned()
             .collect()
     }
+
+    pub fn calculate_period_charges(
+        &self,
+        ctx: &AuthContext,
+        req: CalculateBillingChargesRequest,
+        now: DateTime<Utc>,
+    ) -> Result<BillingChargeCalculation, BillingError> {
+        if req.quantity < 0 {
+            return Err(BillingError::InvalidQuantity);
+        }
+        let period_start = parse_date(&req.period_start)?;
+        let period_end = parse_date(&req.period_end)?;
+        if period_end < period_start {
+            return Err(BillingError::InvalidEffectiveWindow);
+        }
+        let contract = self
+            .contracts
+            .get(&req.contract_id)
+            .filter(|contract| contract.owner_id == ctx.owner_id)
+            .ok_or(BillingError::NotFound)?;
+        let rule = self
+            .rules
+            .values()
+            .filter(|rule| {
+                if rule.owner_id != ctx.owner_id
+                    || rule.contract_id != contract.id
+                    || rule.charge_item != req.charge_item
+                {
+                    return false;
+                }
+                let Ok(effective_from) = parse_date(&rule.effective_from) else {
+                    return false;
+                };
+                let Ok(effective_to) = parse_date(&rule.effective_to) else {
+                    return false;
+                };
+                effective_from <= period_end && effective_to >= period_start
+            })
+            .max_by_key(|rule| rule.created_at)
+            .ok_or(BillingError::NotFound)?;
+        let amount_cents = rule
+            .unit_price_cents
+            .checked_mul(req.quantity)
+            .ok_or(BillingError::InvalidQuantity)?;
+
+        Ok(BillingChargeCalculation {
+            id: Uuid::new_v4(),
+            owner_id: ctx.owner_id,
+            contract_id: contract.id,
+            period_start: period_start.to_string(),
+            period_end: period_end.to_string(),
+            charge_item: req.charge_item,
+            quantity: req.quantity,
+            amount_cents,
+            source_refs: req.source_refs,
+            status: "calculated".to_string(),
+            created_at: now,
+        })
+    }
 }
 
 fn parse_date(value: &str) -> Result<NaiveDate, BillingError> {
@@ -155,7 +216,8 @@ mod tests {
     use chrono::{TimeZone, Utc};
     use uuid::Uuid;
     use wms_domain::{
-        CreateBillingAccountRequest, CreateBillingContractRequest, CreateBillingRuleRequest,
+        CalculateBillingChargesRequest, CreateBillingAccountRequest, CreateBillingContractRequest,
+        CreateBillingRuleRequest,
     };
 
     use super::{BillingError, BillingStore};
@@ -368,5 +430,85 @@ mod tests {
             )
             .expect("next window");
         assert_eq!(next_window.unit_price_cents, 120);
+    }
+
+    #[test]
+    fn calculate_period_charges_uses_owner_scoped_effective_rule() {
+        let now = Utc
+            .with_ymd_and_hms(2026, 6, 4, 15, 0, 0)
+            .single()
+            .expect("valid time");
+        let ctx_a = ctx(Uuid::new_v4());
+        let ctx_b = ctx(Uuid::new_v4());
+        let mut store = BillingStore::default();
+
+        let account = store
+            .create_account(
+                &ctx_a,
+                CreateBillingAccountRequest {
+                    account_code: "OWNER-A-BILL".to_string(),
+                    account_name: "Owner A Billing".to_string(),
+                },
+                now,
+            )
+            .expect("account");
+        let contract = store
+            .create_contract(
+                &ctx_a,
+                CreateBillingContractRequest {
+                    account_id: account.id,
+                    contract_no: "CONTRACT-001".to_string(),
+                    valid_from: "2026-06-01".to_string(),
+                    valid_to: "2027-05-31".to_string(),
+                },
+                now,
+            )
+            .expect("contract");
+        store
+            .create_rule(
+                &ctx_a,
+                CreateBillingRuleRequest {
+                    contract_id: contract.id,
+                    charge_item: "packing_operation".to_string(),
+                    unit: "job".to_string(),
+                    unit_price_cents: 125,
+                    billing_cycle: "monthly".to_string(),
+                    effective_from: "2026-06-01".to_string(),
+                    effective_to: "2026-06-30".to_string(),
+                },
+                now,
+            )
+            .expect("rule");
+
+        let charge = store
+            .calculate_period_charges(
+                &ctx_a,
+                CalculateBillingChargesRequest {
+                    contract_id: contract.id,
+                    period_start: "2026-06-01".to_string(),
+                    period_end: "2026-06-30".to_string(),
+                    charge_item: "packing_operation".to_string(),
+                    quantity: 4,
+                    source_refs: vec!["packing_job:W5-001".to_string()],
+                },
+                now,
+            )
+            .expect("charge");
+        assert_eq!(charge.amount_cents, 500);
+        assert_eq!(charge.source_refs, vec!["packing_job:W5-001"]);
+
+        let cross_owner = store.calculate_period_charges(
+            &ctx_b,
+            CalculateBillingChargesRequest {
+                contract_id: contract.id,
+                period_start: "2026-06-01".to_string(),
+                period_end: "2026-06-30".to_string(),
+                charge_item: "packing_operation".to_string(),
+                quantity: 4,
+                source_refs: vec![],
+            },
+            now,
+        );
+        assert!(matches!(cross_owner, Err(BillingError::NotFound)));
     }
 }

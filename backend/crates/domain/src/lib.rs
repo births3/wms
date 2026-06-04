@@ -440,6 +440,98 @@ pub struct ReceivingOrderListResponse {
     pub page: PageMeta,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CreateOutboundOrderLineRequest {
+    pub line_no: u32,
+    pub product_code: String,
+    pub batch_no: String,
+    pub planned_qty: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct OutboundOrderLine {
+    pub line_no: u32,
+    pub product_code: String,
+    pub batch_no: String,
+    pub planned_qty: i64,
+    pub picked_qty: i64,
+    pub reviewed_qty: i64,
+    pub shipped_qty: i64,
+    pub short_pick_qty: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CreateOutboundOrderRequest {
+    pub wms_order_no: String,
+    pub erp_order_no: Option<String>,
+    pub customer_id: Uuid,
+    pub warehouse_id: Uuid,
+    pub required_ship_at: Option<DateTime<Utc>>,
+    pub lines: Vec<CreateOutboundOrderLineRequest>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct OutboundOrder {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub wms_order_no: String,
+    pub erp_order_no: Option<String>,
+    pub customer_id: Uuid,
+    pub warehouse_id: Uuid,
+    pub required_ship_at: Option<DateTime<Utc>>,
+    pub status: String,
+    pub short_pick: bool,
+    pub lines: Vec<OutboundOrderLine>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct OutboundOrderListResponse {
+    pub data: Vec<OutboundOrder>,
+    pub page: PageMeta,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CreateOutboundWaveRequest {
+    pub wave_no: String,
+    pub order_ids: Vec<Uuid>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct OutboundWave {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub wave_no: String,
+    pub status: String,
+    pub order_ids: Vec<Uuid>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CompletePickTaskRequest {
+    pub line_no: u32,
+    pub picked_qty: i64,
+    pub exception_code: Option<String>,
+    pub exception_note: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ReviewOutboundOrderRequest {
+    pub reviewer_id: Uuid,
+    pub review_mode: String,
+    pub second_reviewer_id: Option<Uuid>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ShipOutboundOrderRequest {
+    pub carrier_type: String,
+    pub handover_to: String,
+    pub package_count: u32,
+    pub shipped_at: Option<DateTime<Utc>>,
+}
+
 /// M6 报表行。
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct ReportRow {
@@ -461,6 +553,83 @@ pub struct ReportQueryResponse {
     pub generated_at: DateTime<Utc>,
     pub rows: Vec<ReportRow>,
     pub page: PageMeta,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct GspLedgerRow {
+    pub ledger_type: String,
+    pub occurred_at: Option<DateTime<Utc>>,
+    pub product_code: Option<String>,
+    pub batch_no: Option<String>,
+    pub quantity_delta: Option<i64>,
+    pub document_type: Option<String>,
+    pub document_no: Option<String>,
+    pub approval_source: Option<String>,
+    pub approval_id: Option<String>,
+    pub operator_id: Option<Uuid>,
+    pub operator_name: Option<String>,
+    #[schema(schema_with = free_form_json_schema)]
+    pub values: serde_json::Value,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct GspLedgerReport {
+    pub ledger_type: String,
+    pub generated_at: DateTime<Utc>,
+    pub rows: Vec<GspLedgerRow>,
+    pub page: PageMeta,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct TraceabilityStatusChangeEvent {
+    pub event_id: Uuid,
+    pub trace_code: String,
+    pub status_change_type: String,
+    pub occurred_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct TraceabilityOutboundReportRequest {
+    pub events: Vec<TraceabilityStatusChangeEvent>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct TraceabilityOutboundReport {
+    pub report_id: Uuid,
+    pub platform: String,
+    pub status: String,
+    pub queued_count: u32,
+    pub generated_at: DateTime<Utc>,
+    pub events: Vec<TraceabilityStatusChangeEvent>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct DriverTask {
+    pub order_no: String,
+    pub customer_name: String,
+    pub delivery_address: String,
+    pub planned_arrival_at: Option<DateTime<Utc>>,
+    pub cold_chain: bool,
+    pub status: String,
+    pub owner_id: Uuid,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct DriverTaskListResponse {
+    pub data: Vec<DriverTask>,
+    pub page: PageMeta,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct StoreDashboardResponse {
+    pub store_id: Option<Uuid>,
+    pub pending_receipt_orders: u32,
+    pub in_transit_orders: u32,
+    pub signed_orders_last_7_days: u32,
+    pub inventory_alert_count: u32,
+    pub returns_this_month: u32,
+    pub exceptions_this_month: u32,
+    pub generated_at: DateTime<Utc>,
 }
 
 /// M-PM 参数对照字典。
@@ -801,6 +970,12 @@ pub struct TemperatureExcursionEvent {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct TemperatureExcursionEventListResponse {
+    pub data: Vec<TemperatureExcursionEvent>,
+    pub page: PageMeta,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct IngestTemperatureExcursionRequest {
     pub external_event_id: String,
     pub device_code: String,
@@ -810,6 +985,18 @@ pub struct IngestTemperatureExcursionRequest {
     pub min_temperature_celsius: Option<f64>,
     pub max_temperature_celsius: Option<f64>,
     pub affected_batch_ids: Vec<Uuid>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct DisposeTemperatureExcursionRequest {
+    pub selected_batch_ids: Vec<Uuid>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct TemperatureExcursionDispositionResponse {
+    pub event: TemperatureExcursionEvent,
+    pub quarantined_batches: Vec<InventoryBatch>,
+    pub approval_source: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -871,4 +1058,261 @@ pub struct CreateBillingRuleRequest {
     pub billing_cycle: String,
     pub effective_from: String,
     pub effective_to: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct PackingStation {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub station_code: String,
+    pub station_name: String,
+    pub printer_code: Option<String>,
+    pub scale_code: Option<String>,
+    pub temperature_zone: String,
+    pub status: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CreatePackingStationRequest {
+    pub station_code: String,
+    pub station_name: String,
+    pub printer_code: Option<String>,
+    pub scale_code: Option<String>,
+    pub temperature_zone: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct PackJob {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub outbound_order_id: Uuid,
+    pub station_id: Option<Uuid>,
+    pub job_no: String,
+    pub pack_mode: String,
+    pub recommended_box_type: String,
+    pub actual_box_type: String,
+    pub adjustment_reason: Option<String>,
+    pub outbound_lpn: String,
+    pub trace_codes: Vec<String>,
+    pub status: String,
+    pub weight_grams: Option<i64>,
+    pub waybill_no: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CreatePackJobRequest {
+    pub outbound_order_id: Uuid,
+    pub station_id: Option<Uuid>,
+    pub job_no: String,
+    pub pack_mode: String,
+    pub recommended_box_type: String,
+    pub actual_box_type: String,
+    pub adjustment_reason: Option<String>,
+    pub outbound_lpn: String,
+    pub trace_codes: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct WeighPackJobRequest {
+    pub actual_weight_grams: i64,
+    pub theoretical_weight_grams: i64,
+    pub tolerance_percent: i32,
+    pub override_reason: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct PrintWaybillRequest {
+    pub carrier_code: String,
+    pub waybill_no: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct RetailReplenishmentSuggestion {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub store_id: Uuid,
+    pub product_code: String,
+    pub period_key: String,
+    pub min_qty: i64,
+    pub max_qty: i64,
+    pub current_qty: i64,
+    pub in_transit_qty: i64,
+    pub daily_sales_avg: i64,
+    pub suggested_qty: i64,
+    pub status: String,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CreateRetailReplenishmentSuggestionRequest {
+    pub store_id: Uuid,
+    pub product_code: String,
+    pub period_key: String,
+    pub min_qty: i64,
+    pub max_qty: i64,
+    pub current_qty: i64,
+    pub in_transit_qty: i64,
+    pub daily_sales_avg: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CrossdockPlan {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub asn_id: Uuid,
+    pub outbound_order_id: Uuid,
+    pub store_id: Uuid,
+    pub product_code: String,
+    pub qty: i64,
+    pub status: String,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CreateCrossdockPlanRequest {
+    pub asn_id: Uuid,
+    pub outbound_order_id: Uuid,
+    pub store_id: Uuid,
+    pub product_code: String,
+    pub qty: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct BillingChargeCalculation {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub contract_id: Uuid,
+    pub period_start: String,
+    pub period_end: String,
+    pub charge_item: String,
+    pub quantity: i64,
+    pub amount_cents: i64,
+    pub source_refs: Vec<String>,
+    pub status: String,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CalculateBillingChargesRequest {
+    pub contract_id: Uuid,
+    pub period_start: String,
+    pub period_end: String,
+    pub charge_item: String,
+    pub quantity: i64,
+    pub source_refs: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct BillingStatement {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub contract_id: Uuid,
+    pub period_start: String,
+    pub period_end: String,
+    pub status: String,
+    pub total_amount_cents: i64,
+    pub charge_ids: Vec<Uuid>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct GenerateBillingStatementRequest {
+    pub contract_id: Uuid,
+    pub period_start: String,
+    pub period_end: String,
+    pub charge_ids: Vec<Uuid>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ConfirmBillingStatementRequest {
+    pub confirmation_note: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct TmsDispatch {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub dispatch_no: String,
+    pub outbound_order_id: Uuid,
+    pub delivery_provider_type: String,
+    pub vehicle_no: Option<String>,
+    pub plate_no: Option<String>,
+    pub driver_user_id: Option<Uuid>,
+    pub carrier_code: Option<String>,
+    pub waybill_no: Option<String>,
+    pub status: String,
+    pub version: i32,
+    pub scheduled_load_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ReceiveTmsDispatchRequest {
+    pub dispatch_no: String,
+    pub outbound_order_id: Uuid,
+    pub delivery_provider_type: String,
+    pub vehicle_no: Option<String>,
+    pub plate_no: Option<String>,
+    pub driver_user_id: Option<Uuid>,
+    pub carrier_code: Option<String>,
+    pub waybill_no: Option<String>,
+    pub version: i32,
+    pub scheduled_load_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct TransitTemperatureReading {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub dispatch_id: Uuid,
+    pub device_code: String,
+    pub plate_no: String,
+    pub measured_at: DateTime<Utc>,
+    pub temperature_celsius: f64,
+    pub humidity_percent: Option<f64>,
+    pub is_exceeded: bool,
+    pub external_trace_url: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct IngestTransitTemperatureRequest {
+    pub dispatch_id: Uuid,
+    pub device_code: String,
+    pub plate_no: String,
+    pub measured_at: DateTime<Utc>,
+    pub temperature_celsius: f64,
+    pub humidity_percent: Option<f64>,
+    pub is_exceeded: bool,
+    pub external_trace_url: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ContainerRecovery {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub container_lpn: String,
+    pub dispatch_id: Option<Uuid>,
+    pub customer_id: Uuid,
+    pub delivery_provider_type: String,
+    pub status: String,
+    pub shipped_at: DateTime<Utc>,
+    pub recovered_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ConfirmContainerRecoveryRequest {
+    pub container_lpn: String,
+    pub dispatch_id: Option<Uuid>,
+    pub customer_id: Uuid,
+    pub delivery_provider_type: String,
+    pub shipped_at: Option<DateTime<Utc>>,
 }

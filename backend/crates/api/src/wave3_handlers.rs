@@ -223,6 +223,7 @@ impl IntoResponse for Wave3HandlerError {
             | Wave3HandlerError::Inventory(InventoryError::InvalidStateTransition { .. })
             | Wave3HandlerError::ColdChain(ColdChainError::FutureTimestamp)
             | Wave3HandlerError::Billing(BillingError::InvalidRate)
+            | Wave3HandlerError::Billing(BillingError::InvalidQuantity)
             | Wave3HandlerError::Billing(BillingError::InvalidEffectiveWindow)
             | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidStatus { .. })
             | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidQuantity)
