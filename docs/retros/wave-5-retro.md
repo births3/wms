@@ -34,10 +34,10 @@ Wave 5 开发完成。静态完成项、OpenAPI 契约、PostgreSQL migration、
 | `just wave-5-complete-check` | 通过 |
 | `cargo fmt --check --all` | 通过 |
 | `cargo check --manifest-path backend/Cargo.toml -p wms-api` | 通过 |
-| `cargo test --manifest-path backend/Cargo.toml -p wms-api --lib -- --skip postgres_` | 64 passed |
-| `cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave5_postgres -- --nocapture` | 2 passed（临时 PostgreSQL） |
+| `cargo test --manifest-path backend/Cargo.toml -p wms-api --lib -- --skip postgres_` | 66 passed |
+| `cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave5_postgres -- --nocapture` | 3 passed（临时 PostgreSQL） |
 | `just openapi-check` | 通过 |
-| `python3 -m pytest scripts/governance/tests/test_core_logic.py -q` | 112 passed |
+| `python3 -m pytest scripts/governance/tests/test_core_logic.py -q` | 123 passed |
 | `just gov-t1` | 30/30 ok |
 | `just task-check` | 6/6 ok |
 | `git diff --check` | 通过 |
@@ -46,12 +46,13 @@ Wave 5 开发完成。静态完成项、OpenAPI 契约、PostgreSQL migration、
 
 ## 4. 运行时发现
 
-真实 PostgreSQL 集成测试暴露并修复了两个问题：
+真实 PostgreSQL 集成测试暴露并修复了三个问题：
 
 1. M9 `calculate_period_charges` 不能用字符串直接与 PostgreSQL `DATE` 字段比较，已改为解析 `NaiveDate` 后绑定。
 2. PostgreSQL `SUM(bigint)` 返回 `NUMERIC`，`generate_billing_statement` 已显式 cast 为 `BIGINT`。
+3. 账单生成和确认需要在真实事务边界下拒绝跨周期费用、重复 charge、非待确认状态重复确认，并保留幂等成功回放。
 
-这说明 Wave 5 的两份 runtime evidence 不是形式检查，确实覆盖了运行期 SQL 类型和事务行为。
+这说明 Wave 5 的三类 runtime evidence 不是形式检查，确实覆盖了运行期 SQL 类型、唯一约束、状态迁移和事务行为。
 
 ---
 

@@ -4,7 +4,7 @@
 - 决策日期：2026-06-04
 - 决策人：项目主人
 - 起草人：AI 助手
-- 关联：ADR-0007 / ADR-0016 / ADR-0025 / ADR-0030 / ROADMAP.md / TODO.md / docs/runbooks/wave-1-runtime-evidence.md / docs/runbooks/wave-2-runtime-evidence.md / docs/runbooks/wave-4-external-dependencies.md
+- 关联：ADR-0007 / ADR-0016 / ADR-0025 / ADR-0030 / ROADMAP.md / TODO.md / docs/runbooks/wave-1-runtime-evidence.md / docs/runbooks/wave-2-runtime-evidence.md / docs/runbooks/wave-3-pda-readiness.md / docs/runbooks/wave-4-external-dependencies.md / docs/runbooks/wave-5-hardware-evidence.md / docs/runbooks/wave-5-tms-evidence.md / docs/runbooks/wave-6-deploy-evidence.md
 
 ---
 
@@ -92,11 +92,11 @@ Wave 6 不新增业务模块，不扩展用户故事范围，不把 v26 字段�
 | W6.A | Wave 1 H2 runtime evidence | `docs/retros/wave-1-h2-runtime-evidence.json` 通过 `just wave-1-runtime-evidence-validate` |
 | W6.B | Wave 1 W1.D 自动回滚 evidence | `docs/retros/wave-1-runtime-evidence.json` 通过 `just wave-1-runtime-evidence-validate` |
 | W6.C | Wave 2 配置中心 Feature Flag evidence | `docs/retros/wave-2-runtime-evidence.json` 通过 `just wave-2-runtime-evidence-validate` |
-| W6.D | Wave 3 真 PDA / L7 evidence | 真 PDA + 稳定 dev/staging 下执行 SPIKE-005 与 L7 验证，证据登记到对应 runbook / retro |
+| W6.D | Wave 3 真 PDA / L7 evidence | `docs/retros/wave-3-pda-runtime-evidence.json` 通过 `just wave-3-pda-runtime-evidence-validate`，证据按 [Wave 3 PDA Readiness Runbook](../runbooks/wave-3-pda-readiness.md) 采集 |
 | W6.E | Wave 4 M-TC “码上放心”外部 evidence | `docs/retros/wave-4-external-dependencies.json` 通过 `just wave-4-external-dependencies-validate` |
-| W6.F | Wave 5 M-PK 硬件 evidence | 电子秤、蓝牙打印机、面单打印真实设备联调证据，禁止用 mock/fake/stub |
-| W6.G | Wave 5 M10 TMS+ evidence | 真实 dev/staging TMS 推送、回调、失败重试和 audit_event 查询证据 |
-| W6.H | 首次试运行发布 evidence | 按 ADR-0016 灰度发布链路执行，禁止全量直发 |
+| W6.F | Wave 5 M-PK 硬件 evidence | `docs/retros/wave-5-hardware-evidence.json` 通过 `just wave-5-hardware-evidence-validate`，证据按 [Wave 5 Hardware Evidence Runbook](../runbooks/wave-5-hardware-evidence.md) 采集 |
+| W6.G | Wave 5 M10 TMS+ evidence | `docs/retros/wave-5-tms-evidence.json` 通过 `just wave-5-tms-evidence-validate`，证据按 [Wave 5 TMS+ Evidence Runbook](../runbooks/wave-5-tms-evidence.md) 采集 |
+| W6.H | 首次试运行发布 evidence | `docs/retros/wave-6-deploy-evidence.json` 通过 `just wave-6-deploy-evidence-validate`，证据按 [Wave 6 Gray Release Evidence Runbook](../runbooks/wave-6-deploy-evidence.md) 采集 |
 
 ### 非范围
 
@@ -142,4 +142,7 @@ Wave 6 不新增业务模块，不扩展用户故事范围，不把 v26 字段�
 - docs/runbooks/wave-2-runtime-evidence.md
 - docs/runbooks/wave-3-pda-readiness.md
 - docs/runbooks/wave-4-external-dependencies.md
+- docs/runbooks/wave-5-hardware-evidence.md
+- docs/runbooks/wave-5-tms-evidence.md
+- docs/runbooks/wave-6-deploy-evidence.md
 - docs/domain/clarifications.md #50 / #66 / #67

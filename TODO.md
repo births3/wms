@@ -25,11 +25,15 @@
 - [ ] W6.A Wave 1 H2 runtime evidence：按 [Wave 1 Pre-release Runtime Evidence Runbook](docs/runbooks/wave-1-runtime-evidence.md) 采集 `docs/retros/wave-1-h2-runtime-evidence.json`，通过 `just wave-1-runtime-evidence-validate`
 - [ ] W6.B Wave 1 W1.D 自动回滚 evidence：按同一 runbook 采集 `docs/retros/wave-1-runtime-evidence.json`，通过 `just wave-1-runtime-evidence-validate`
 - [ ] W6.C Wave 2 配置中心 Feature Flag evidence：按 [Wave 2 Pre-release Runtime Evidence Runbook](docs/runbooks/wave-2-runtime-evidence.md) 采集 `docs/retros/wave-2-runtime-evidence.json`，通过 `just wave-2-runtime-evidence-validate`
-- [ ] W6.D Wave 3 真 PDA + L7 evidence：按 [Wave 3 PDA Readiness Runbook](docs/runbooks/wave-3-pda-readiness.md) 启动 SPIKE-005 与真 PDA 验证
+- [x] W6.D tooling：在 [Wave 3 PDA Readiness Runbook](docs/runbooks/wave-3-pda-readiness.md) 补 evidence schema，建立 `validate_wave3_pda_runtime_evidence.py` 与 `just wave-3-pda-runtime-evidence-validate`
+- [ ] W6.D Wave 3 真 PDA + L7 evidence：按 runbook 补齐 `docs/retros/wave-3-pda-runtime-evidence.json`，通过 `just wave-3-pda-runtime-evidence-validate`
 - [ ] W6.E Wave 4 M-TC “码上放心” external evidence：按 [Wave 4 External Dependency Evidence Runbook](docs/runbooks/wave-4-external-dependencies.md) 补齐 `docs/retros/wave-4-external-dependencies.json`，通过 `just wave-4-external-dependencies-validate`
-- [ ] W6.F Wave 5 M-PK hardware evidence：补真实电子秤、蓝牙打印机、面单打印设备联调 runbook / validator / evidence
-- [ ] W6.G Wave 5 M10 TMS+ evidence：补真实 TMS 推送、回调、失败重试和 audit_event 查询 runbook / validator / evidence
-- [ ] W6.H 首次试运行灰度发布 evidence：按 ADR-0016 灰度链路执行，不允许全量直发
+- [x] W6.F tooling：建立 [Wave 5 Hardware Evidence Runbook](docs/runbooks/wave-5-hardware-evidence.md)、`validate_wave5_hardware_evidence.py` 与 `just wave-5-hardware-evidence-validate`
+- [ ] W6.F Wave 5 M-PK hardware evidence：按 runbook 补齐 `docs/retros/wave-5-hardware-evidence.json`，通过 `just wave-5-hardware-evidence-validate`
+- [x] W6.G tooling：建立 [Wave 5 TMS+ Evidence Runbook](docs/runbooks/wave-5-tms-evidence.md)、`validate_wave5_tms_evidence.py` 与 `just wave-5-tms-evidence-validate`
+- [ ] W6.G Wave 5 M10 TMS+ evidence：按 runbook 补齐 `docs/retros/wave-5-tms-evidence.json`，通过 `just wave-5-tms-evidence-validate`
+- [x] W6.H tooling：建立 [Wave 6 Gray Release Evidence Runbook](docs/runbooks/wave-6-deploy-evidence.md)、`validate_wave6_deploy_evidence.py` 与 `just wave-6-deploy-evidence-validate`
+- [ ] W6.H 首次试运行灰度发布 evidence：按 runbook 补齐 `docs/retros/wave-6-deploy-evidence.json`，通过 `just wave-6-deploy-evidence-validate`
 - [ ] W6 retro：Wave 6 完成后写 `docs/retros/wave-6-retro.md`
 
 ### 非范围
@@ -63,10 +67,10 @@ Wave 1 / Wave 2 / Wave 3 / Wave 4 / Wave 5 开发完成状态仍分别以 `just 
 - `just wave-5-complete-check`：通过
 - `cargo fmt --check --all`：通过
 - `cargo check --manifest-path backend/Cargo.toml -p wms-api`：通过
-- `cargo test --manifest-path backend/Cargo.toml -p wms-api --lib -- --skip postgres_`：64 passed
-- 临时 PostgreSQL 执行 `cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave5_postgres -- --nocapture`：2 passed
+- `cargo test --manifest-path backend/Cargo.toml -p wms-api --lib -- --skip postgres_`：66 passed
+- 临时 PostgreSQL 执行 `cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave5_postgres -- --nocapture`：3 passed
 - `just openapi-check`：通过
-- `python3 -m pytest scripts/governance/tests/test_core_logic.py -q`：112 passed
+- `python3 -m pytest scripts/governance/tests/test_core_logic.py -q`：123 passed
 - `just gov-t1`：30/30 ok
 - `just task-check`：6/6 ok
 - `git diff --check`：通过
