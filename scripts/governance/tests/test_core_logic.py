@@ -2782,8 +2782,8 @@ def test_notify_wave4_completion_posts_when_gate_passes(monkeypatch):
     }
 
 
-def test_wave5_startup_requires_todo_and_just_targets(monkeypatch):
-    """Wave 5 启动证据必须同时有 TODO 和 just 入口。"""
+def test_wave5_startup_accepts_current_todo_and_just_targets(monkeypatch):
+    """Wave 5 启动证据必须同时有当前 TODO 和 just 入口。"""
     import report_wave5_completion as report
 
     def fake_read_text(path):
@@ -2795,7 +2795,26 @@ def test_wave5_startup_requires_todo_and_just_targets(monkeypatch):
 
     monkeypatch.setattr(report, "read_text", fake_read_text)
 
-    assert report.wave5_todo_started() is True
+    assert report.wave5_todo_recorded() is True
+    startup = report.collect_items()[0]
+    assert startup.item_id == "W5-startup"
+    assert startup.status == report.PROVED_BY_STATIC_FILES
+
+
+def test_wave5_startup_accepts_archived_todo_and_just_targets(monkeypatch):
+    """Wave 5 完成后切到下一波时，归档 TODO 仍是有效完成证据。"""
+    import report_wave5_completion as report
+
+    def fake_read_text(path):
+        if path == "TODO.md":
+            return "当前 Wave：Wave 6\n已归档：Wave 5\nW5.A\nW5.B\nW5.C\nW5.D\n"
+        if path == "justfile":
+            return "wave-5-status:\nwave-5-complete-check:\n"
+        return ""
+
+    monkeypatch.setattr(report, "read_text", fake_read_text)
+
+    assert report.wave5_todo_recorded() is True
     startup = report.collect_items()[0]
     assert startup.item_id == "W5-startup"
     assert startup.status == report.PROVED_BY_STATIC_FILES

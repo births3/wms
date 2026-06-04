@@ -80,14 +80,19 @@ def openapi_has(paths: list[str], schemas: list[str]) -> bool:
     )
 
 
-def wave5_todo_started() -> bool:
-    return file_contains(
-        "TODO.md",
-        "当前 Wave：Wave 5",
-        "W5.A",
-        "W5.B",
-        "W5.C",
-        "W5.D",
+def wave5_todo_recorded() -> bool:
+    text = read_text("TODO.md")
+    if not text:
+        return False
+    phase_recorded = "当前 Wave：Wave 5" in text or "已归档：Wave 5" in text
+    return phase_recorded and all(
+        marker in text
+        for marker in (
+            "W5.A",
+            "W5.B",
+            "W5.C",
+            "W5.D",
+        )
     )
 
 
@@ -106,19 +111,19 @@ def wave5_scope_aligned() -> bool:
 def collect_items() -> list[EvidenceItem]:
     items: list[EvidenceItem] = []
 
-    startup_ok = wave5_todo_started() and file_contains(
+    startup_ok = wave5_todo_recorded() and file_contains(
         "justfile",
         "wave-5-status",
         "wave-5-complete-check",
     )
     items.append(EvidenceItem(
         "W5-startup",
-        "Wave 5 当前 TODO 与完成度检查入口已启动",
+        "Wave 5 TODO 记录与完成度检查入口已登记",
         PROVED_BY_STATIC_FILES if startup_ok else MISSING_OR_NEEDS_CONFIRMATION,
         ["TODO.md", "justfile", "scripts/governance/report_wave5_completion.py"]
         if startup_ok
         else [],
-        [] if startup_ok else ["需要把 TODO 切到 Wave 5，并登记 just wave-5-status / wave-5-complete-check"],
+        [] if startup_ok else ["需要在 TODO 登记当前或归档的 Wave 5，并登记 just wave-5-status / wave-5-complete-check"],
     ))
 
     scope_ok = wave5_scope_aligned()
