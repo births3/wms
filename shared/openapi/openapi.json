@@ -2,11 +2,11 @@
   "openapi": "3.0.3",
   "info": {
     "title": "WMS API",
-    "description": "Wave 3 核心业务规则与业务模型契约",
+    "description": "Wave 5 增值模块与横向能力契约",
     "license": {
       "name": ""
     },
-    "version": "0.0.3-wave-3-core-rules"
+    "version": "0.0.5-wave-5-value-added"
   },
   "paths": {
     "/api/v1/audit/events": {
@@ -216,6 +216,87 @@
         }
       }
     },
+    "/api/v1/billing/charges/calculate": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "operationId": "calculate_billing_charges",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalculateBillingChargesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "计算周期计费明细",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingChargeCalculation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "计费合同不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "计费明细或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/billing/contracts": {
       "post": {
         "tags": [
@@ -285,6 +366,178 @@
           },
           "401": {
             "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/billing/statements": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "operationId": "generate_billing_statement",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateBillingStatementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "生成月结账单",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingStatement"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "计费合同不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "账单或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/billing/statements/{id}/confirm": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "operationId": "confirm_billing_statement",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "月结账单 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmBillingStatementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "确认月结账单",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingStatement"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "账单不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "账单状态不可确认",
             "content": {
               "application/json": {
                 "schema": {
@@ -395,6 +648,107 @@
           },
           "401": {
             "description": "外部系统 API Key 缺失或无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cold-chain/excursions/pending-disposition": {
+      "get": {
+        "tags": [
+          "cold-chain"
+        ],
+        "operationId": "list_pending_temperature_excursions",
+        "responses": {
+          "200": {
+            "description": "温度超标待处置列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemperatureExcursionEventListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cold-chain/excursions/{external_event_id}/dispose": {
+      "post": {
+        "tags": [
+          "cold-chain"
+        ],
+        "operationId": "dispose_temperature_excursion",
+        "parameters": [
+          {
+            "name": "external_event_id",
+            "in": "path",
+            "description": "外部冷链系统事件 ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisposeTemperatureExcursionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "温度超标处置并隔离批次",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemperatureExcursionDispositionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "温度超标事件不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "批次不在影响范围或事件状态不可处置",
             "content": {
               "application/json": {
                 "schema": {
@@ -669,6 +1023,36 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/FeatureFlagSourceSwitchResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/driver/tasks/today": {
+      "get": {
+        "tags": [
+          "driver"
+        ],
+        "operationId": "list_driver_today_tasks",
+        "responses": {
+          "200": {
+            "description": "司机今日配送任务",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DriverTaskListResponse"
                 }
               }
             }
@@ -2321,6 +2705,725 @@
         }
       }
     },
+    "/api/v1/outbound/orders": {
+      "post": {
+        "tags": [
+          "outbound"
+        ],
+        "operationId": "create_outbound_order",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOutboundOrderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "创建出库订单",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutboundOrder"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "单号或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/outbound/orders/{id}/review": {
+      "post": {
+        "tags": [
+          "outbound"
+        ],
+        "operationId": "review_outbound_order",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "出库订单 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewOutboundOrderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "完成出库复核",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutboundOrder"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "订单状态不可复核",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/outbound/orders/{id}/ship": {
+      "post": {
+        "tags": [
+          "outbound"
+        ],
+        "operationId": "ship_outbound_order",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "出库订单 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShipOutboundOrderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "发货交接并扣减库存",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutboundOrder"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "短拣未补齐或库存不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/outbound/pick-tasks/{id}/complete": {
+      "post": {
+        "tags": [
+          "outbound"
+        ],
+        "operationId": "complete_outbound_pick_task",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "出库订单 ID；当前最小闭环按订单行完成拣选",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompletePickTaskRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "完成拣选任务，短拣时订单进入待补齐状态",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutboundOrder"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "数量或状态非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/outbound/waves": {
+      "post": {
+        "tags": [
+          "outbound"
+        ],
+        "operationId": "create_outbound_wave",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOutboundWaveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "创建并下发出库波次",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutboundWave"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "订单状态不可入波次",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/packing/jobs": {
+      "post": {
+        "tags": [
+          "packing"
+        ],
+        "operationId": "create_pack_job",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePackJobRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "创建装箱任务",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackJob"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "出库订单或工位不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "装箱任务或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/packing/jobs/{id}/waybill": {
+      "post": {
+        "tags": [
+          "packing"
+        ],
+        "operationId": "print_pack_job_waybill",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "装箱任务 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrintWaybillRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "记录面单打印结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackJob"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "装箱任务不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "面单数据非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/packing/jobs/{id}/weigh": {
+      "post": {
+        "tags": [
+          "packing"
+        ],
+        "operationId": "weigh_pack_job",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "装箱任务 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WeighPackJobRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "记录装箱称重",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackJob"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "装箱任务不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "称重数据非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/packing/stations": {
+      "post": {
+        "tags": [
+          "packing"
+        ],
+        "operationId": "create_packing_station",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePackingStationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "创建包装工位",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackingStation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "工位或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/parameter-mapping/execute": {
       "post": {
         "tags": [
@@ -2403,6 +3506,126 @@
         }
       }
     },
+    "/api/v1/reports/gsp/inbound-ledger": {
+      "post": {
+        "tags": [
+          "reports"
+        ],
+        "operationId": "query_gsp_inbound_ledger",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportQueryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "GSP 入库验收台账",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GspLedgerReport"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/gsp/inventory-ledger": {
+      "post": {
+        "tags": [
+          "reports"
+        ],
+        "operationId": "query_gsp_inventory_ledger",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportQueryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "GSP 库存流水台账",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GspLedgerReport"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/gsp/outbound-ledger": {
+      "post": {
+        "tags": [
+          "reports"
+        ],
+        "operationId": "query_gsp_outbound_ledger",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportQueryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "GSP 出库复核台账",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GspLedgerReport"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/reports/query": {
       "post": {
         "tags": [
@@ -2432,6 +3655,491 @@
           },
           "401": {
             "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/retail/crossdock-plans": {
+      "post": {
+        "tags": [
+          "retail"
+        ],
+        "operationId": "create_retail_crossdock_plan",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCrossdockPlanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "创建门店越库计划",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CrossdockPlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "出库订单不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "越库数量非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/retail/replenishment-suggestions": {
+      "post": {
+        "tags": [
+          "retail"
+        ],
+        "operationId": "create_retail_replenishment_suggestion",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRetailReplenishmentSuggestionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "生成门店补货建议",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetailReplenishmentSuggestion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "建议或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "补货水位非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/store/dashboard": {
+      "get": {
+        "tags": [
+          "store"
+        ],
+        "operationId": "get_store_dashboard",
+        "responses": {
+          "200": {
+            "description": "门店首页业务概览",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreDashboardResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tms/container-recoveries": {
+      "post": {
+        "tags": [
+          "tms"
+        ],
+        "operationId": "confirm_container_recovery",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmContainerRecoveryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "确认周转容器回收",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContainerRecovery"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "TMS 调度不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "容器回收或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tms/dispatches": {
+      "post": {
+        "tags": [
+          "tms"
+        ],
+        "operationId": "receive_tms_dispatch",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "外部 TMS 生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReceiveTmsDispatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "接收 TMS 调度",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TmsDispatch"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "出库订单不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "调度或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tms/transit-temperature-readings": {
+      "post": {
+        "tags": [
+          "tms"
+        ],
+        "operationId": "ingest_transit_temperature",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "外部 TMS 生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IngestTransitTemperatureRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "接收在途温控读数",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransitTemperatureReading"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "TMS 调度不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "温控数据非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/traceability/outbound-reports": {
+      "post": {
+        "tags": [
+          "traceability"
+        ],
+        "operationId": "create_traceability_outbound_report",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TraceabilityOutboundReportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "追溯码出库核销待上报记录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TraceabilityOutboundReport"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "追溯码状态变更三元组不完整",
             "content": {
               "application/json": {
                 "schema": {
@@ -2587,6 +4295,66 @@
           }
         }
       },
+      "BillingChargeCalculation": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "contract_id",
+          "period_start",
+          "period_end",
+          "charge_item",
+          "quantity",
+          "amount_cents",
+          "source_refs",
+          "status",
+          "created_at"
+        ],
+        "properties": {
+          "amount_cents": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "charge_item": {
+            "type": "string"
+          },
+          "contract_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "period_end": {
+            "type": "string"
+          },
+          "period_start": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "source_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
       "BillingContract": {
         "type": "object",
         "required": [
@@ -2682,6 +4450,99 @@
           }
         }
       },
+      "BillingStatement": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "contract_id",
+          "period_start",
+          "period_end",
+          "status",
+          "total_amount_cents",
+          "charge_ids",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "charge_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "contract_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "period_end": {
+            "type": "string"
+          },
+          "period_start": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "total_amount_cents": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CalculateBillingChargesRequest": {
+        "type": "object",
+        "required": [
+          "contract_id",
+          "period_start",
+          "period_end",
+          "charge_item",
+          "quantity",
+          "source_refs"
+        ],
+        "properties": {
+          "charge_item": {
+            "type": "string"
+          },
+          "contract_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "period_end": {
+            "type": "string"
+          },
+          "period_start": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "source_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "ChangeInventoryStatusRequest": {
         "type": "object",
         "required": [
@@ -2753,6 +4614,32 @@
           }
         }
       },
+      "CompletePickTaskRequest": {
+        "type": "object",
+        "required": [
+          "line_no",
+          "picked_qty"
+        ],
+        "properties": {
+          "exception_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "exception_note": {
+            "type": "string",
+            "nullable": true
+          },
+          "line_no": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "picked_qty": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "ConfigEntry": {
         "type": "object",
         "description": "M1-008 配置中心条目。",
@@ -2788,6 +4675,104 @@
           "version": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "ConfirmBillingStatementRequest": {
+        "type": "object",
+        "properties": {
+          "confirmation_note": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "ConfirmContainerRecoveryRequest": {
+        "type": "object",
+        "required": [
+          "container_lpn",
+          "customer_id",
+          "delivery_provider_type"
+        ],
+        "properties": {
+          "container_lpn": {
+            "type": "string"
+          },
+          "customer_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "delivery_provider_type": {
+            "type": "string"
+          },
+          "dispatch_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "shipped_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "ContainerRecovery": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "container_lpn",
+          "customer_id",
+          "delivery_provider_type",
+          "status",
+          "shipped_at",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "container_lpn": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "customer_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "delivery_provider_type": {
+            "type": "string"
+          },
+          "dispatch_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "recovered_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "shipped_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -2891,6 +4876,37 @@
           }
         }
       },
+      "CreateCrossdockPlanRequest": {
+        "type": "object",
+        "required": [
+          "asn_id",
+          "outbound_order_id",
+          "store_id",
+          "product_code",
+          "qty"
+        ],
+        "properties": {
+          "asn_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "outbound_order_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "CreateCustomerRequest": {
         "type": "object",
         "required": [
@@ -2927,6 +4943,163 @@
           "warehouse_id": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "CreateOutboundOrderLineRequest": {
+        "type": "object",
+        "required": [
+          "line_no",
+          "product_code",
+          "batch_no",
+          "planned_qty"
+        ],
+        "properties": {
+          "batch_no": {
+            "type": "string"
+          },
+          "line_no": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "planned_qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "product_code": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateOutboundOrderRequest": {
+        "type": "object",
+        "required": [
+          "wms_order_no",
+          "customer_id",
+          "warehouse_id",
+          "lines"
+        ],
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "erp_order_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateOutboundOrderLineRequest"
+            }
+          },
+          "required_ship_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "wms_order_no": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateOutboundWaveRequest": {
+        "type": "object",
+        "required": [
+          "wave_no",
+          "order_ids"
+        ],
+        "properties": {
+          "order_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "wave_no": {
+            "type": "string"
+          }
+        }
+      },
+      "CreatePackJobRequest": {
+        "type": "object",
+        "required": [
+          "outbound_order_id",
+          "job_no",
+          "pack_mode",
+          "recommended_box_type",
+          "actual_box_type",
+          "outbound_lpn",
+          "trace_codes"
+        ],
+        "properties": {
+          "actual_box_type": {
+            "type": "string"
+          },
+          "adjustment_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "job_no": {
+            "type": "string"
+          },
+          "outbound_lpn": {
+            "type": "string"
+          },
+          "outbound_order_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "pack_mode": {
+            "type": "string"
+          },
+          "recommended_box_type": {
+            "type": "string"
+          },
+          "station_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "trace_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "CreatePackingStationRequest": {
+        "type": "object",
+        "required": [
+          "station_code",
+          "station_name",
+          "temperature_zone"
+        ],
+        "properties": {
+          "printer_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "scale_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "station_code": {
+            "type": "string"
+          },
+          "station_name": {
+            "type": "string"
+          },
+          "temperature_zone": {
+            "type": "string"
           }
         }
       },
@@ -3009,6 +5182,51 @@
           }
         }
       },
+      "CreateRetailReplenishmentSuggestionRequest": {
+        "type": "object",
+        "required": [
+          "store_id",
+          "product_code",
+          "period_key",
+          "min_qty",
+          "max_qty",
+          "current_qty",
+          "in_transit_qty",
+          "daily_sales_avg"
+        ],
+        "properties": {
+          "current_qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "daily_sales_avg": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "in_transit_qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "max_qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "min_qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "period_key": {
+            "type": "string"
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "CreateSpecialDrugCategoryRequest": {
         "type": "object",
         "required": [
@@ -3063,6 +5281,56 @@
           },
           "warehouse_name": {
             "type": "string"
+          }
+        }
+      },
+      "CrossdockPlan": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "asn_id",
+          "outbound_order_id",
+          "store_id",
+          "product_code",
+          "qty",
+          "status",
+          "created_at"
+        ],
+        "properties": {
+          "asn_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "outbound_order_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string"
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },
@@ -3172,6 +5440,76 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Customer"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "DisposeTemperatureExcursionRequest": {
+        "type": "object",
+        "required": [
+          "selected_batch_ids"
+        ],
+        "properties": {
+          "selected_batch_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
+      "DriverTask": {
+        "type": "object",
+        "required": [
+          "order_no",
+          "customer_name",
+          "delivery_address",
+          "cold_chain",
+          "status",
+          "owner_id"
+        ],
+        "properties": {
+          "cold_chain": {
+            "type": "boolean"
+          },
+          "customer_name": {
+            "type": "string"
+          },
+          "delivery_address": {
+            "type": "string"
+          },
+          "order_no": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "planned_arrival_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "DriverTaskListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DriverTask"
             }
           },
           "page": {
@@ -3447,6 +5785,121 @@
           }
         }
       },
+      "GenerateBillingStatementRequest": {
+        "type": "object",
+        "required": [
+          "contract_id",
+          "period_start",
+          "period_end",
+          "charge_ids"
+        ],
+        "properties": {
+          "charge_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "contract_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "period_end": {
+            "type": "string"
+          },
+          "period_start": {
+            "type": "string"
+          }
+        }
+      },
+      "GspLedgerReport": {
+        "type": "object",
+        "required": [
+          "ledger_type",
+          "generated_at",
+          "rows",
+          "page"
+        ],
+        "properties": {
+          "generated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ledger_type": {
+            "type": "string"
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GspLedgerRow"
+            }
+          }
+        }
+      },
+      "GspLedgerRow": {
+        "type": "object",
+        "required": [
+          "ledger_type",
+          "values"
+        ],
+        "properties": {
+          "approval_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "approval_source": {
+            "type": "string",
+            "nullable": true
+          },
+          "batch_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "document_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "document_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "ledger_type": {
+            "type": "string"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "operator_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "operator_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "product_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "quantity_delta": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "values": {
+            "type": "object",
+            "description": "自由结构 JSON 对象。",
+            "additionalProperties": true
+          }
+        }
+      },
       "HealthzResponse": {
         "type": "object",
         "description": "健康检查响应。",
@@ -3545,6 +5998,49 @@
           },
           "out_of_range": {
             "type": "boolean"
+          },
+          "temperature_celsius": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "IngestTransitTemperatureRequest": {
+        "type": "object",
+        "required": [
+          "dispatch_id",
+          "device_code",
+          "plate_no",
+          "measured_at",
+          "temperature_celsius",
+          "is_exceeded"
+        ],
+        "properties": {
+          "device_code": {
+            "type": "string"
+          },
+          "dispatch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "external_trace_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "humidity_percent": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "is_exceeded": {
+            "type": "boolean"
+          },
+          "measured_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "plate_no": {
+            "type": "string"
           },
           "temperature_celsius": {
             "type": "number",
@@ -4026,6 +6522,310 @@
           }
         }
       },
+      "OutboundOrder": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "wms_order_no",
+          "customer_id",
+          "warehouse_id",
+          "status",
+          "short_pick",
+          "lines",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "customer_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "erp_order_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OutboundOrderLine"
+            }
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "required_ship_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "short_pick": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "wms_order_no": {
+            "type": "string"
+          }
+        }
+      },
+      "OutboundOrderLine": {
+        "type": "object",
+        "required": [
+          "line_no",
+          "product_code",
+          "batch_no",
+          "planned_qty",
+          "picked_qty",
+          "reviewed_qty",
+          "shipped_qty",
+          "short_pick_qty"
+        ],
+        "properties": {
+          "batch_no": {
+            "type": "string"
+          },
+          "line_no": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "picked_qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "planned_qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "reviewed_qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "shipped_qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "short_pick_qty": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "OutboundOrderListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OutboundOrder"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "OutboundWave": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "wave_no",
+          "status",
+          "order_ids",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "order_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "wave_no": {
+            "type": "string"
+          }
+        }
+      },
+      "PackJob": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "outbound_order_id",
+          "job_no",
+          "pack_mode",
+          "recommended_box_type",
+          "actual_box_type",
+          "outbound_lpn",
+          "trace_codes",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "actual_box_type": {
+            "type": "string"
+          },
+          "adjustment_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "job_no": {
+            "type": "string"
+          },
+          "outbound_lpn": {
+            "type": "string"
+          },
+          "outbound_order_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "pack_mode": {
+            "type": "string"
+          },
+          "recommended_box_type": {
+            "type": "string"
+          },
+          "station_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "trace_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "waybill_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "weight_grams": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          }
+        }
+      },
+      "PackingStation": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "station_code",
+          "station_name",
+          "temperature_zone",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "printer_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "scale_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "station_code": {
+            "type": "string"
+          },
+          "station_name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "temperature_zone": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "PageMeta": {
         "type": "object",
         "description": "分页信息。",
@@ -4042,6 +6842,21 @@
           "next_cursor": {
             "type": "string",
             "description": "下一页游标；为空表示无更多数据。",
+            "nullable": true
+          }
+        }
+      },
+      "PrintWaybillRequest": {
+        "type": "object",
+        "required": [
+          "carrier_code"
+        ],
+        "properties": {
+          "carrier_code": {
+            "type": "string"
+          },
+          "waybill_no": {
+            "type": "string",
             "nullable": true
           }
         }
@@ -4298,6 +7113,57 @@
           "shortage_qty": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "ReceiveTmsDispatchRequest": {
+        "type": "object",
+        "required": [
+          "dispatch_no",
+          "outbound_order_id",
+          "delivery_provider_type",
+          "version"
+        ],
+        "properties": {
+          "carrier_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "delivery_provider_type": {
+            "type": "string"
+          },
+          "dispatch_no": {
+            "type": "string"
+          },
+          "driver_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "outbound_order_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "plate_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "scheduled_load_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "vehicle_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "waybill_no": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -4572,6 +7438,122 @@
           }
         }
       },
+      "RetailReplenishmentSuggestion": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "store_id",
+          "product_code",
+          "period_key",
+          "min_qty",
+          "max_qty",
+          "current_qty",
+          "in_transit_qty",
+          "daily_sales_avg",
+          "suggested_qty",
+          "status",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "current_qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "daily_sales_avg": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "in_transit_qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "max_qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "min_qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "period_key": {
+            "type": "string"
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "suggested_qty": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ReviewOutboundOrderRequest": {
+        "type": "object",
+        "required": [
+          "reviewer_id",
+          "review_mode"
+        ],
+        "properties": {
+          "review_mode": {
+            "type": "string"
+          },
+          "reviewer_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "second_reviewer_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        }
+      },
+      "ShipOutboundOrderRequest": {
+        "type": "object",
+        "required": [
+          "carrier_type",
+          "handover_to",
+          "package_count"
+        ],
+        "properties": {
+          "carrier_type": {
+            "type": "string"
+          },
+          "handover_to": {
+            "type": "string"
+          },
+          "package_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "shipped_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
       "SignInspectionRequest": {
         "type": "object",
         "required": [
@@ -4655,6 +7637,59 @@
           }
         }
       },
+      "StoreDashboardResponse": {
+        "type": "object",
+        "required": [
+          "pending_receipt_orders",
+          "in_transit_orders",
+          "signed_orders_last_7_days",
+          "inventory_alert_count",
+          "returns_this_month",
+          "exceptions_this_month",
+          "generated_at"
+        ],
+        "properties": {
+          "exceptions_this_month": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "in_transit_orders": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "inventory_alert_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "pending_receipt_orders": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "returns_this_month": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "signed_orders_last_7_days": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        }
+      },
       "Supplier": {
         "type": "object",
         "description": "供应商基础档案。",
@@ -4718,6 +7753,28 @@
           },
           "page": {
             "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "TemperatureExcursionDispositionResponse": {
+        "type": "object",
+        "required": [
+          "event",
+          "quarantined_batches",
+          "approval_source"
+        ],
+        "properties": {
+          "approval_source": {
+            "type": "string"
+          },
+          "event": {
+            "$ref": "#/components/schemas/TemperatureExcursionEvent"
+          },
+          "quarantined_batches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventoryBatch"
+            }
           }
         }
       },
@@ -4787,6 +7844,24 @@
           }
         }
       },
+      "TemperatureExcursionEventListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TemperatureExcursionEvent"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
       "TemperatureReading": {
         "type": "object",
         "required": [
@@ -4824,6 +7899,216 @@
           "owner_id": {
             "type": "string",
             "format": "uuid"
+          },
+          "temperature_celsius": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "TmsDispatch": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "dispatch_no",
+          "outbound_order_id",
+          "delivery_provider_type",
+          "status",
+          "version",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "carrier_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "delivery_provider_type": {
+            "type": "string"
+          },
+          "dispatch_no": {
+            "type": "string"
+          },
+          "driver_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "outbound_order_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "plate_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "scheduled_load_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "vehicle_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "waybill_no": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "TraceabilityOutboundReport": {
+        "type": "object",
+        "required": [
+          "report_id",
+          "platform",
+          "status",
+          "queued_count",
+          "generated_at",
+          "events"
+        ],
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TraceabilityStatusChangeEvent"
+            }
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "platform": {
+            "type": "string"
+          },
+          "queued_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "report_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "TraceabilityOutboundReportRequest": {
+        "type": "object",
+        "required": [
+          "events"
+        ],
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TraceabilityStatusChangeEvent"
+            }
+          }
+        }
+      },
+      "TraceabilityStatusChangeEvent": {
+        "type": "object",
+        "required": [
+          "event_id",
+          "trace_code",
+          "status_change_type",
+          "occurred_at"
+        ],
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status_change_type": {
+            "type": "string"
+          },
+          "trace_code": {
+            "type": "string"
+          }
+        }
+      },
+      "TransitTemperatureReading": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "dispatch_id",
+          "device_code",
+          "plate_no",
+          "measured_at",
+          "temperature_celsius",
+          "is_exceeded",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "device_code": {
+            "type": "string"
+          },
+          "dispatch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "external_trace_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "humidity_percent": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "is_exceeded": {
+            "type": "boolean"
+          },
+          "measured_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "plate_no": {
+            "type": "string"
           },
           "temperature_celsius": {
             "type": "number",
@@ -5043,6 +8328,32 @@
             "$ref": "#/components/schemas/PageMeta"
           }
         }
+      },
+      "WeighPackJobRequest": {
+        "type": "object",
+        "required": [
+          "actual_weight_grams",
+          "theoretical_weight_grams",
+          "tolerance_percent"
+        ],
+        "properties": {
+          "actual_weight_grams": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "override_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "theoretical_weight_grams": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "tolerance_percent": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
       }
     }
   },
@@ -5072,8 +8383,24 @@
       "description": "M3 库存批次与状态"
     },
     {
+      "name": "outbound",
+      "description": "M4 出库闭环"
+    },
+    {
       "name": "reports",
       "description": "M6 报表查询"
+    },
+    {
+      "name": "traceability",
+      "description": "M-TC 追溯码"
+    },
+    {
+      "name": "driver",
+      "description": "H-Driver 司机端"
+    },
+    {
+      "name": "store",
+      "description": "H-Store 门店端"
     },
     {
       "name": "parameter-mapping",
@@ -5089,7 +8416,19 @@
     },
     {
       "name": "billing",
-      "description": "M9 计费账户与合同"
+      "description": "M9 计费账户、规则与月结"
+    },
+    {
+      "name": "packing",
+      "description": "M-PK 包装站"
+    },
+    {
+      "name": "retail",
+      "description": "M8 连锁门店"
+    },
+    {
+      "name": "tms",
+      "description": "M10 TMS+"
     }
   ]
 }

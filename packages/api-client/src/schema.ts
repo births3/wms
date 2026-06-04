@@ -68,6 +68,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/billing/charges/calculate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["calculate_billing_charges"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/billing/contracts": {
         parameters: {
             query?: never;
@@ -100,6 +116,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/billing/statements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["generate_billing_statement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/statements/{id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["confirm_billing_statement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/cold-chain/devices": {
         parameters: {
             query?: never;
@@ -126,6 +174,38 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["ingest_temperature_excursion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cold-chain/excursions/pending-disposition": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_pending_temperature_excursions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cold-chain/excursions/{external_event_id}/dispose": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["dispose_temperature_excursion"];
         delete?: never;
         options?: never;
         head?: never;
@@ -238,6 +318,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["switch_feature_flag_source"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/driver/tasks/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_driver_today_tasks"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -596,6 +692,150 @@ export interface paths {
         patch: operations["update_warehouse"];
         trace?: never;
     };
+    "/api/v1/outbound/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create_outbound_order"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/outbound/orders/{id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["review_outbound_order"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/outbound/orders/{id}/ship": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ship_outbound_order"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/outbound/pick-tasks/{id}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["complete_outbound_pick_task"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/outbound/waves": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create_outbound_wave"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/packing/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create_pack_job"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/packing/jobs/{id}/waybill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["print_pack_job_waybill"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/packing/jobs/{id}/weigh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["weigh_pack_job"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/packing/stations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create_packing_station"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/parameter-mapping/execute": {
         parameters: {
             query?: never;
@@ -628,6 +868,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reports/gsp/inbound-ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["query_gsp_inbound_ledger"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/gsp/inventory-ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["query_gsp_inventory_ledger"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/gsp/outbound-ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["query_gsp_outbound_ledger"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/query": {
         parameters: {
             query?: never;
@@ -638,6 +926,118 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["query_report"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/retail/crossdock-plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create_retail_crossdock_plan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/retail/replenishment-suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create_retail_replenishment_suggestion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/store/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_store_dashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tms/container-recoveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["confirm_container_recovery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tms/dispatches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["receive_tms_dispatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tms/transit-temperature-readings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ingest_transit_temperature"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/traceability/outbound-reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create_traceability_outbound_report"];
         delete?: never;
         options?: never;
         head?: never;
@@ -714,6 +1114,25 @@ export interface components {
             owner_id: string;
             status: string;
         };
+        BillingChargeCalculation: {
+            /** Format: int64 */
+            amount_cents: number;
+            charge_item: string;
+            /** Format: uuid */
+            contract_id: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            period_end: string;
+            period_start: string;
+            /** Format: int64 */
+            quantity: number;
+            source_refs: string[];
+            status: string;
+        };
         BillingContract: {
             /** Format: uuid */
             account_id: string;
@@ -745,6 +1164,34 @@ export interface components {
             /** Format: int64 */
             unit_price_cents: number;
         };
+        BillingStatement: {
+            charge_ids: string[];
+            /** Format: uuid */
+            contract_id: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            period_end: string;
+            period_start: string;
+            status: string;
+            /** Format: int64 */
+            total_amount_cents: number;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        CalculateBillingChargesRequest: {
+            charge_item: string;
+            /** Format: uuid */
+            contract_id: string;
+            period_end: string;
+            period_start: string;
+            /** Format: int64 */
+            quantity: number;
+            source_refs: string[];
+        };
         ChangeInventoryStatusRequest: {
             approval_id: string;
             approval_source: string;
@@ -767,6 +1214,14 @@ export interface components {
             owner_id: string;
             status: string;
         };
+        CompletePickTaskRequest: {
+            exception_code?: string | null;
+            exception_note?: string | null;
+            /** Format: int32 */
+            line_no: number;
+            /** Format: int64 */
+            picked_qty: number;
+        };
         /** @description M1-008 配置中心条目。 */
         ConfigEntry: {
             config_key: string;
@@ -782,6 +1237,40 @@ export interface components {
             updated_at: string;
             /** Format: int64 */
             version: number;
+        };
+        ConfirmBillingStatementRequest: {
+            confirmation_note?: string | null;
+        };
+        ConfirmContainerRecoveryRequest: {
+            container_lpn: string;
+            /** Format: uuid */
+            customer_id: string;
+            delivery_provider_type: string;
+            /** Format: uuid */
+            dispatch_id?: string | null;
+            /** Format: date-time */
+            shipped_at?: string | null;
+        };
+        ContainerRecovery: {
+            container_lpn: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            customer_id: string;
+            delivery_provider_type: string;
+            /** Format: uuid */
+            dispatch_id?: string | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: date-time */
+            recovered_at?: string | null;
+            /** Format: date-time */
+            shipped_at: string;
+            status: string;
+            /** Format: date-time */
+            updated_at: string;
         };
         CreateBillingAccountRequest: {
             account_code: string;
@@ -812,6 +1301,17 @@ export interface components {
             device_type: string;
             installed_at_location_code?: string | null;
         };
+        CreateCrossdockPlanRequest: {
+            /** Format: uuid */
+            asn_id: string;
+            /** Format: uuid */
+            outbound_order_id: string;
+            product_code: string;
+            /** Format: int64 */
+            qty: number;
+            /** Format: uuid */
+            store_id: string;
+        };
         CreateCustomerRequest: {
             customer_code: string;
             customer_name: string;
@@ -822,6 +1322,49 @@ export interface components {
             location_name: string;
             /** Format: uuid */
             warehouse_id: string;
+        };
+        CreateOutboundOrderLineRequest: {
+            batch_no: string;
+            /** Format: int32 */
+            line_no: number;
+            /** Format: int64 */
+            planned_qty: number;
+            product_code: string;
+        };
+        CreateOutboundOrderRequest: {
+            /** Format: uuid */
+            customer_id: string;
+            erp_order_no?: string | null;
+            lines: components["schemas"]["CreateOutboundOrderLineRequest"][];
+            /** Format: date-time */
+            required_ship_at?: string | null;
+            /** Format: uuid */
+            warehouse_id: string;
+            wms_order_no: string;
+        };
+        CreateOutboundWaveRequest: {
+            order_ids: string[];
+            wave_no: string;
+        };
+        CreatePackJobRequest: {
+            actual_box_type: string;
+            adjustment_reason?: string | null;
+            job_no: string;
+            outbound_lpn: string;
+            /** Format: uuid */
+            outbound_order_id: string;
+            pack_mode: string;
+            recommended_box_type: string;
+            /** Format: uuid */
+            station_id?: string | null;
+            trace_codes: string[];
+        };
+        CreatePackingStationRequest: {
+            printer_code?: string | null;
+            scale_code?: string | null;
+            station_code: string;
+            station_name: string;
+            temperature_zone: string;
         };
         /** @description 创建商品请求。 */
         CreateProductRequest: {
@@ -848,6 +1391,22 @@ export interface components {
             /** Format: uuid */
             warehouse_id: string;
         };
+        CreateRetailReplenishmentSuggestionRequest: {
+            /** Format: int64 */
+            current_qty: number;
+            /** Format: int64 */
+            daily_sales_avg: number;
+            /** Format: int64 */
+            in_transit_qty: number;
+            /** Format: int64 */
+            max_qty: number;
+            /** Format: int64 */
+            min_qty: number;
+            period_key: string;
+            product_code: string;
+            /** Format: uuid */
+            store_id: string;
+        };
         CreateSpecialDrugCategoryRequest: {
             category_code: string;
             category_name: string;
@@ -862,6 +1421,24 @@ export interface components {
         CreateWarehouseRequest: {
             warehouse_code: string;
             warehouse_name: string;
+        };
+        CrossdockPlan: {
+            /** Format: uuid */
+            asn_id: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            outbound_order_id: string;
+            /** Format: uuid */
+            owner_id: string;
+            product_code: string;
+            /** Format: int64 */
+            qty: number;
+            status: string;
+            /** Format: uuid */
+            store_id: string;
         };
         /** @description 当前登录用户摘要。 */
         CurrentUser: {
@@ -903,6 +1480,24 @@ export interface components {
         };
         CustomerListResponse: {
             data: components["schemas"]["Customer"][];
+            page: components["schemas"]["PageMeta"];
+        };
+        DisposeTemperatureExcursionRequest: {
+            selected_batch_ids: string[];
+        };
+        DriverTask: {
+            cold_chain: boolean;
+            customer_name: string;
+            delivery_address: string;
+            order_no: string;
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: date-time */
+            planned_arrival_at?: string | null;
+            status: string;
+        };
+        DriverTaskListResponse: {
+            data: components["schemas"]["DriverTask"][];
             page: components["schemas"]["PageMeta"];
         };
         /** @description 统一错误响应。 */
@@ -988,6 +1583,40 @@ export interface components {
         FeatureFlagSourceSwitchResponse: {
             active_source: string;
         };
+        GenerateBillingStatementRequest: {
+            charge_ids: string[];
+            /** Format: uuid */
+            contract_id: string;
+            period_end: string;
+            period_start: string;
+        };
+        GspLedgerReport: {
+            /** Format: date-time */
+            generated_at: string;
+            ledger_type: string;
+            page: components["schemas"]["PageMeta"];
+            rows: components["schemas"]["GspLedgerRow"][];
+        };
+        GspLedgerRow: {
+            approval_id?: string | null;
+            approval_source?: string | null;
+            batch_no?: string | null;
+            document_no?: string | null;
+            document_type?: string | null;
+            ledger_type: string;
+            /** Format: date-time */
+            occurred_at?: string | null;
+            /** Format: uuid */
+            operator_id?: string | null;
+            operator_name?: string | null;
+            product_code?: string | null;
+            /** Format: int64 */
+            quantity_delta?: number | null;
+            /** @description 自由结构 JSON 对象。 */
+            values: {
+                [key: string]: unknown;
+            };
+        };
         /** @description 健康检查响应。 */
         HealthzResponse: {
             /**
@@ -1022,6 +1651,20 @@ export interface components {
             /** Format: double */
             humidity_percent?: number | null;
             out_of_range: boolean;
+            /** Format: double */
+            temperature_celsius: number;
+        };
+        IngestTransitTemperatureRequest: {
+            device_code: string;
+            /** Format: uuid */
+            dispatch_id: string;
+            external_trace_url?: string | null;
+            /** Format: double */
+            humidity_percent?: number | null;
+            is_exceeded: boolean;
+            /** Format: date-time */
+            measured_at: string;
+            plate_no: string;
             /** Format: double */
             temperature_celsius: number;
         };
@@ -1189,6 +1832,101 @@ export interface components {
             source_system: string;
             unresolved_fields: string[];
         };
+        OutboundOrder: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            customer_id: string;
+            erp_order_no?: string | null;
+            /** Format: uuid */
+            id: string;
+            lines: components["schemas"]["OutboundOrderLine"][];
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: date-time */
+            required_ship_at?: string | null;
+            short_pick: boolean;
+            status: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            warehouse_id: string;
+            wms_order_no: string;
+        };
+        OutboundOrderLine: {
+            batch_no: string;
+            /** Format: int32 */
+            line_no: number;
+            /** Format: int64 */
+            picked_qty: number;
+            /** Format: int64 */
+            planned_qty: number;
+            product_code: string;
+            /** Format: int64 */
+            reviewed_qty: number;
+            /** Format: int64 */
+            shipped_qty: number;
+            /** Format: int64 */
+            short_pick_qty: number;
+        };
+        OutboundOrderListResponse: {
+            data: components["schemas"]["OutboundOrder"][];
+            page: components["schemas"]["PageMeta"];
+        };
+        OutboundWave: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            order_ids: string[];
+            /** Format: uuid */
+            owner_id: string;
+            status: string;
+            /** Format: date-time */
+            updated_at: string;
+            wave_no: string;
+        };
+        PackJob: {
+            actual_box_type: string;
+            adjustment_reason?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            job_no: string;
+            outbound_lpn: string;
+            /** Format: uuid */
+            outbound_order_id: string;
+            /** Format: uuid */
+            owner_id: string;
+            pack_mode: string;
+            recommended_box_type: string;
+            /** Format: uuid */
+            station_id?: string | null;
+            status: string;
+            trace_codes: string[];
+            /** Format: date-time */
+            updated_at: string;
+            waybill_no?: string | null;
+            /** Format: int64 */
+            weight_grams?: number | null;
+        };
+        PackingStation: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            printer_code?: string | null;
+            scale_code?: string | null;
+            station_code: string;
+            station_name: string;
+            status: string;
+            temperature_zone: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
         /** @description 分页信息。 */
         PageMeta: {
             /**
@@ -1198,6 +1936,10 @@ export interface components {
             count: number;
             /** @description 下一页游标；为空表示无更多数据。 */
             next_cursor?: string | null;
+        };
+        PrintWaybillRequest: {
+            carrier_code: string;
+            waybill_no?: string | null;
         };
         /** @description 商品基础档案。 */
         Product: {
@@ -1298,6 +2040,22 @@ export interface components {
             /** Format: int64 */
             shortage_qty: number;
         };
+        ReceiveTmsDispatchRequest: {
+            carrier_code?: string | null;
+            delivery_provider_type: string;
+            dispatch_no: string;
+            /** Format: uuid */
+            driver_user_id?: string | null;
+            /** Format: uuid */
+            outbound_order_id: string;
+            plate_no?: string | null;
+            /** Format: date-time */
+            scheduled_load_at?: string | null;
+            vehicle_no?: string | null;
+            /** Format: int32 */
+            version: number;
+            waybill_no?: string | null;
+        };
         ReceivingInspectionRecord: {
             /** Format: int64 */
             accepted_qty: number;
@@ -1391,6 +2149,46 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        RetailReplenishmentSuggestion: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: int64 */
+            current_qty: number;
+            /** Format: int64 */
+            daily_sales_avg: number;
+            /** Format: uuid */
+            id: string;
+            /** Format: int64 */
+            in_transit_qty: number;
+            /** Format: int64 */
+            max_qty: number;
+            /** Format: int64 */
+            min_qty: number;
+            /** Format: uuid */
+            owner_id: string;
+            period_key: string;
+            product_code: string;
+            status: string;
+            /** Format: uuid */
+            store_id: string;
+            /** Format: int64 */
+            suggested_qty: number;
+        };
+        ReviewOutboundOrderRequest: {
+            review_mode: string;
+            /** Format: uuid */
+            reviewer_id: string;
+            /** Format: uuid */
+            second_reviewer_id?: string | null;
+        };
+        ShipOutboundOrderRequest: {
+            carrier_type: string;
+            handover_to: string;
+            /** Format: int32 */
+            package_count: number;
+            /** Format: date-time */
+            shipped_at?: string | null;
+        };
         SignInspectionRequest: {
             dual_required: boolean;
             /** Format: uuid */
@@ -1417,6 +2215,24 @@ export interface components {
             data: components["schemas"]["SpecialDrugCategory"][];
             page: components["schemas"]["PageMeta"];
         };
+        StoreDashboardResponse: {
+            /** Format: int32 */
+            exceptions_this_month: number;
+            /** Format: date-time */
+            generated_at: string;
+            /** Format: int32 */
+            in_transit_orders: number;
+            /** Format: int32 */
+            inventory_alert_count: number;
+            /** Format: int32 */
+            pending_receipt_orders: number;
+            /** Format: int32 */
+            returns_this_month: number;
+            /** Format: int32 */
+            signed_orders_last_7_days: number;
+            /** Format: uuid */
+            store_id?: string | null;
+        };
         /** @description 供应商基础档案。 */
         Supplier: {
             contact_name?: string | null;
@@ -1436,6 +2252,11 @@ export interface components {
         SupplierListResponse: {
             data: components["schemas"]["Supplier"][];
             page: components["schemas"]["PageMeta"];
+        };
+        TemperatureExcursionDispositionResponse: {
+            approval_source: string;
+            event: components["schemas"]["TemperatureExcursionEvent"];
+            quarantined_batches: components["schemas"]["InventoryBatch"][];
         };
         TemperatureExcursionEvent: {
             affected_batch_ids: string[];
@@ -1458,6 +2279,10 @@ export interface components {
             started_at: string;
             status: string;
         };
+        TemperatureExcursionEventListResponse: {
+            data: components["schemas"]["TemperatureExcursionEvent"][];
+            page: components["schemas"]["PageMeta"];
+        };
         TemperatureReading: {
             /** Format: date-time */
             captured_at: string;
@@ -1470,6 +2295,73 @@ export interface components {
             out_of_range: boolean;
             /** Format: uuid */
             owner_id: string;
+            /** Format: double */
+            temperature_celsius: number;
+        };
+        TmsDispatch: {
+            carrier_code?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            delivery_provider_type: string;
+            dispatch_no: string;
+            /** Format: uuid */
+            driver_user_id?: string | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            outbound_order_id: string;
+            /** Format: uuid */
+            owner_id: string;
+            plate_no?: string | null;
+            /** Format: date-time */
+            scheduled_load_at?: string | null;
+            status: string;
+            /** Format: date-time */
+            updated_at: string;
+            vehicle_no?: string | null;
+            /** Format: int32 */
+            version: number;
+            waybill_no?: string | null;
+        };
+        TraceabilityOutboundReport: {
+            events: components["schemas"]["TraceabilityStatusChangeEvent"][];
+            /** Format: date-time */
+            generated_at: string;
+            platform: string;
+            /** Format: int32 */
+            queued_count: number;
+            /** Format: uuid */
+            report_id: string;
+            status: string;
+        };
+        TraceabilityOutboundReportRequest: {
+            events: components["schemas"]["TraceabilityStatusChangeEvent"][];
+        };
+        TraceabilityStatusChangeEvent: {
+            /** Format: uuid */
+            event_id: string;
+            /** Format: date-time */
+            occurred_at: string;
+            status_change_type: string;
+            trace_code: string;
+        };
+        TransitTemperatureReading: {
+            /** Format: date-time */
+            created_at: string;
+            device_code: string;
+            /** Format: uuid */
+            dispatch_id: string;
+            external_trace_url?: string | null;
+            /** Format: double */
+            humidity_percent?: number | null;
+            /** Format: uuid */
+            id: string;
+            is_exceeded: boolean;
+            /** Format: date-time */
+            measured_at: string;
+            /** Format: uuid */
+            owner_id: string;
+            plate_no: string;
             /** Format: double */
             temperature_celsius: number;
         };
@@ -1539,6 +2431,15 @@ export interface components {
         WarehouseListResponse: {
             data: components["schemas"]["Warehouse"][];
             page: components["schemas"]["PageMeta"];
+        };
+        WeighPackJobRequest: {
+            /** Format: int64 */
+            actual_weight_grams: number;
+            override_reason?: string | null;
+            /** Format: int64 */
+            theoretical_weight_grams: number;
+            /** Format: int32 */
+            tolerance_percent: number;
         };
     };
     responses: never;
@@ -1686,6 +2587,69 @@ export interface operations {
             };
         };
     };
+    calculate_billing_charges: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalculateBillingChargesRequest"];
+            };
+        };
+        responses: {
+            /** @description 计算周期计费明细 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillingChargeCalculation"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 计费合同不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 计费明细或幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     create_billing_contract: {
         parameters: {
             query?: never;
@@ -1743,6 +2707,135 @@ export interface operations {
             };
             /** @description 未登录 */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    generate_billing_statement: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GenerateBillingStatementRequest"];
+            };
+        };
+        responses: {
+            /** @description 生成月结账单 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillingStatement"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 计费合同不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 账单或幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    confirm_billing_statement: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 月结账单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmBillingStatementRequest"];
+            };
+        };
+        responses: {
+            /** @description 确认月结账单 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillingStatement"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 账单不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 账单状态不可确认 */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1823,6 +2916,89 @@ export interface operations {
             };
             /** @description 外部系统 API Key 缺失或无效 */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_pending_temperature_excursions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 温度超标待处置列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemperatureExcursionEventListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    dispose_temperature_excursion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 外部冷链系统事件 ID */
+                external_event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DisposeTemperatureExcursionRequest"];
+            };
+        };
+        responses: {
+            /** @description 温度超标处置并隔离批次 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemperatureExcursionDispositionResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 温度超标事件不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 批次不在影响范围或事件状态不可处置 */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2052,6 +3228,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FeatureFlagSourceSwitchResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_driver_today_tasks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 司机今日配送任务 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DriverTaskListResponse"];
                 };
             };
             /** @description 未登录 */
@@ -3358,6 +4563,534 @@ export interface operations {
             };
         };
     };
+    create_outbound_order: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateOutboundOrderRequest"];
+            };
+        };
+        responses: {
+            /** @description 创建出库订单 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutboundOrder"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 单号或幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    review_outbound_order: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 出库订单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewOutboundOrderRequest"];
+            };
+        };
+        responses: {
+            /** @description 完成出库复核 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutboundOrder"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 订单状态不可复核 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    ship_outbound_order: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 出库订单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShipOutboundOrderRequest"];
+            };
+        };
+        responses: {
+            /** @description 发货交接并扣减库存 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutboundOrder"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 短拣未补齐或库存不足 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    complete_outbound_pick_task: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 出库订单 ID；当前最小闭环按订单行完成拣选 */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompletePickTaskRequest"];
+            };
+        };
+        responses: {
+            /** @description 完成拣选任务，短拣时订单进入待补齐状态 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutboundOrder"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 数量或状态非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_outbound_wave: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateOutboundWaveRequest"];
+            };
+        };
+        responses: {
+            /** @description 创建并下发出库波次 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutboundWave"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 订单状态不可入波次 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_pack_job: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePackJobRequest"];
+            };
+        };
+        responses: {
+            /** @description 创建装箱任务 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackJob"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 出库订单或工位不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 装箱任务或幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    print_pack_job_waybill: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 装箱任务 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrintWaybillRequest"];
+            };
+        };
+        responses: {
+            /** @description 记录面单打印结果 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackJob"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 装箱任务不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 面单数据非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    weigh_pack_job: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 装箱任务 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WeighPackJobRequest"];
+            };
+        };
+        responses: {
+            /** @description 记录装箱称重 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackJob"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 装箱任务不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 称重数据非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_packing_station: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePackingStationRequest"];
+            };
+        };
+        responses: {
+            /** @description 创建包装工位 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackingStation"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 工位或幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     execute_mapping: {
         parameters: {
             query?: never;
@@ -3423,6 +5156,105 @@ export interface operations {
             };
         };
     };
+    query_gsp_inbound_ledger: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportQueryRequest"];
+            };
+        };
+        responses: {
+            /** @description GSP 入库验收台账 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GspLedgerReport"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    query_gsp_inventory_ledger: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportQueryRequest"];
+            };
+        };
+        responses: {
+            /** @description GSP 库存流水台账 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GspLedgerReport"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    query_gsp_outbound_ledger: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportQueryRequest"];
+            };
+        };
+        responses: {
+            /** @description GSP 出库复核台账 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GspLedgerReport"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     query_report: {
         parameters: {
             query?: never;
@@ -3447,6 +5279,392 @@ export interface operations {
             };
             /** @description 未登录 */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_retail_crossdock_plan: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCrossdockPlanRequest"];
+            };
+        };
+        responses: {
+            /** @description 创建门店越库计划 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CrossdockPlan"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 出库订单不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 越库数量非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_retail_replenishment_suggestion: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRetailReplenishmentSuggestionRequest"];
+            };
+        };
+        responses: {
+            /** @description 生成门店补货建议 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetailReplenishmentSuggestion"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 建议或幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 补货水位非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_store_dashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 门店首页业务概览 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoreDashboardResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    confirm_container_recovery: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmContainerRecoveryRequest"];
+            };
+        };
+        responses: {
+            /** @description 确认周转容器回收 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContainerRecovery"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description TMS 调度不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 容器回收或幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    receive_tms_dispatch: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 外部 TMS 生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReceiveTmsDispatchRequest"];
+            };
+        };
+        responses: {
+            /** @description 接收 TMS 调度 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TmsDispatch"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 出库订单不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 调度或幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    ingest_transit_temperature: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 外部 TMS 生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IngestTransitTemperatureRequest"];
+            };
+        };
+        responses: {
+            /** @description 接收在途温控读数 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransitTemperatureReading"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description TMS 调度不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 温控数据非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_traceability_outbound_report: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TraceabilityOutboundReportRequest"];
+            };
+        };
+        responses: {
+            /** @description 追溯码出库核销待上报记录 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TraceabilityOutboundReport"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 追溯码状态变更三元组不完整 */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
