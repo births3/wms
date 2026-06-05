@@ -83,7 +83,7 @@ M11 监管 EDI 已移除：码上放心由 M-TC 承接，药监 EDI 由 ERP/H8 �
 
 **开发完成标准**：任意业务 handler 可挂 H1；任意写操作经 H2；后端注解可生成 OpenAPI，前端 `@wms/api-client` 可消费；`apps/web-admin` 壳工程可复用 `@wms/ui` 并接入 H1/H2/H3 基础链路；文件版灰度链路（环境变量 / `deploy/feature_flags.toml` 后端）+ 自动回滚运行资产就绪，缺真实 dev/staging 信号时不伪造证据；`check_feature_flags.py` 进入 T1 治理脚本集。**四横向契约联合评审（W1.F/G/H + H-INT）**：W1.F H-INT / W1.G H-APV / W1.H H-SCH 三契约 + H-FILE 附件契约在 Wave 1 完成前须做一次联合评审，确认字段/审计/留痕约束无冲突（重点核对 H-APV 审批留痕 approval_source 与 H-INT 外部对接审计、H-SCH 调度审计三者在 H2 审计表的字段不冲突），结论记入 Wave 1 retro。
 
-**预发布 gate**：真实 dev PostgreSQL 60M baseline + wrk 1k QPS × 1 小时 + P99 < 200ms + 7 天封档 cron 0 失败；真实 dev/staging smoke gate 或 Prometheus 信号触发自动回滚成功。两份证据必须通过 `just wave-1-runtime-evidence-validate`，不得使用 localhost / stub / mock / fake / example 边界。
+**预发布 gate**：真实 dev PostgreSQL 60M baseline + wrk 1k QPS × 1 小时 + P99 < 200ms + 7 天封档 cron 0 失败；真实 dev/staging smoke gate 或 Prometheus 信号触发自动回滚成功。两份证据必须通过 `just wave-1-runtime-evidence-validate`，每个 evidence 引用必须包含当前 `environment` 标记，不得使用 localhost / stub / mock / fake / example / prod 边界。
 
 ---
 
@@ -103,7 +103,7 @@ M11 监管 EDI 已移除：码上放心由 M-TC 承接，药监 EDI 由 ERP/H8 �
 
 **开发完成标准**：核心 schema 落地；商品 / 供应商 / 收货单基础 CRUD 可用；M-PM 可处理 ERP 推送的不规则字段；OpenAPI 反映完整 schema；配置中心版 Feature Flag 后端覆盖迁移 / 导出 / 批量导入 / 对账 / 切换读取源 / 旧文件归档；`just wave-2-complete-check` 通过。
 
-**预发布 gate**：配置中心版灰度链路（M1-008 后端）必须在真实 dev / staging 验证可用；W1 文件版 flag 迁移至 M1-008 且对账通过；证据写入 `docs/retros/wave-2-runtime-evidence.json` 并通过 `just wave-2-runtime-evidence-validate`。不得使用 localhost / stub / mock / fake / example 边界。
+**预发布 gate**：配置中心版灰度链路（M1-008 后端）必须在真实 dev / staging 验证可用；W1 文件版 flag 迁移至 M1-008 且对账通过；证据写入 `docs/retros/wave-2-runtime-evidence.json` 并通过 `just wave-2-runtime-evidence-validate`。每个 evidence 引用必须包含当前 `environment` 标记，不得使用 localhost / stub / mock / fake / example / prod 边界。
 
 ---
 
@@ -156,7 +156,7 @@ M11 监管 EDI 已移除：码上放心由 M-TC 承接，药监 EDI 由 ERP/H8 �
 
 **开发完成标准**：M-PK / M8 / M9 / M10 生产接口、PostgreSQL migration、OpenAPI 契约与 owner 隔离证据落地；至少一个连锁客户场景（门店补货 → 出库 → 装箱 → TMS/快递 → 计费）可复跑；`just wave-5-complete-check` 通过。
 
-**预发布 gate**：M-PK 真实硬件、M10 真实 TMS、W4.D “码上放心”真实 dev/staging evidence，以及首次试运行灰度发布 evidence 统一由 Wave 6 收口。不得用 localhost / stub / mock / fake / example 替代真实证据。
+**预发布 gate**：M-PK 真实硬件、M10 真实 TMS、W4.D “码上放心”真实 dev/staging evidence，以及首次试运行灰度发布 evidence 统一由 Wave 6 收口。每个 evidence 引用必须包含当前 `environment` 标记，不得用 localhost / stub / mock / fake / example / prod 替代真实证据。
 
 ---
 
@@ -177,7 +177,7 @@ M11 监管 EDI 已移除：码上放心由 M-TC 承接，药监 EDI 由 ERP/H8 �
 - W6.G：Wave 5 M10 TMS+ 真实 dev/staging 推送、回调、失败重试和 audit_event 查询 evidence
 - W6.H：首次试运行投产按 ADR-0016 灰度发布链路执行，不允许全量直发
 
-**非范围**：不新增业务模块；不启动 v26 GSP 字段命名规范化；不补 i18n；不使用 local / mock / fake / stub / example 证据。
+**非范围**：不新增业务模块；不启动 v26 GSP 字段命名规范化；不补 i18n；不使用 local / mock / fake / stub / example / prod 证据。
 
 **完成标准**：ADR-0035 列出的 W6.A-H 全部有真实证据并通过对应 validator / runbook；`docs/retros/wave-6-retro.md` 写完。
 

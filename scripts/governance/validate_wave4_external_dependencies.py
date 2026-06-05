@@ -68,7 +68,7 @@ def validate_wave4_external_dependency_payload(
 
     environment = str(payload.get("environment", "")).lower()
     if environment not in {"dev", "staging"}:
-        return False, "environment 必须是真实 dev 或 staging，不能是 local/prod/example"
+        return False, "environment 必须是真实 dev 或 staging，不能是 local/prod/mock/fake/stub/example"
 
     if payload.get("platform") != "码上放心":
         return False, "platform 必须为 码上放心"

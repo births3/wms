@@ -70,7 +70,7 @@ def validate_wave5_tms_payload(
 
     environment = str(payload.get("environment", "")).lower()
     if environment not in {"dev", "staging"}:
-        return False, "environment 必须是真实 dev 或 staging，不能是 local/prod/example"
+        return False, "environment 必须是真实 dev 或 staging，不能是 local/prod/mock/fake/stub/example"
 
     missing_refs = [key for key in REQUIRED_REFS if not payload.get(key)]
     if missing_refs:

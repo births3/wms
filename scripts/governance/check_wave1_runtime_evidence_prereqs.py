@@ -151,11 +151,10 @@ def validate_signal(environment: str, errors: list[str]) -> None:
             return
         if contains_forbidden_boundary(prometheus_url) or contains_forbidden_boundary(prometheus_query):
             errors.append("Prometheus boundary must not point to localhost/prod/stub/mock/fake/example boundaries")
-        if not (
-            contains_environment_token(prometheus_url, environment)
-            or contains_environment_token(prometheus_query, environment)
-        ):
-            errors.append(f"Prometheus URL or query must include environment token: {environment}")
+        if not contains_environment_token(prometheus_url, environment):
+            errors.append(f"Prometheus URL must include environment token: {environment}")
+        if not contains_environment_token(prometheus_query, environment):
+            errors.append(f"Prometheus query must include environment token: {environment}")
         return
 
     errors.append("missing runtime signal: set SMOKE_URL or PROMETHEUS_URL + PROMETHEUS_QUERY")

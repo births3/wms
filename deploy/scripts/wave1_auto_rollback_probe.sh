@@ -273,12 +273,15 @@ validate_prometheus_boundary() {
     echo "Prometheus boundary must not reference localhost/127.0.0.1 unless WAVE1_ALLOW_LOCAL_TEST_SIGNAL=true" >&2
     exit 2
   fi
-  if contains_environment_token "$url" "$environment" || contains_environment_token "$query" "$environment"; then
-    return 0
+  if ! contains_environment_token "$url" "$environment"; then
+    echo "Prometheus URL must include the selected environment token (${environment})" >&2
+    exit 2
   fi
 
-  echo "Prometheus URL or PromQL must include the selected environment token (${environment})" >&2
-  exit 2
+  if ! contains_environment_token "$query" "$environment"; then
+    echo "PromQL must include the selected environment token (${environment})" >&2
+    exit 2
+  fi
 }
 
 validate_signal_boundary_only() {

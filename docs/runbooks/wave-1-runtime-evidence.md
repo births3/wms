@@ -91,7 +91,7 @@ probe 会写入 `docs/retros/wave-1-runtime-evidence.json`，并校验：
 - signal_type = `http` 或 `prometheus`
 - rollback_triggered = true
 - rollback_exit_code = 0
-- signal / log 引用不能指向 localhost、127.0.0.1、0.0.0.0、prod、stub、mock、fake 或 example
+- 每个 signal / log 引用必须包含当前 `environment` 标记（`dev` 或 `staging`），且不能指向 localhost、127.0.0.1、0.0.0.0、prod、stub、mock、fake 或 example
 
 ## 3. 预发布验证
 

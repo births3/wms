@@ -116,14 +116,19 @@ def external_dependency_status(label: str) -> str | None:
 
 
 def wave4_todo_started() -> bool:
-    return file_contains(
-        "TODO.md",
-        "当前 Wave：Wave 4",
-        "W4.A",
-        "W4.B",
-        "W4.C",
-        "W4.D",
-        "W4.E",
+    text = read_text("TODO.md")
+    if not text:
+        return False
+    phase_recorded = "当前 Wave：Wave 4" in text or "已归档：Wave 4" in text
+    return phase_recorded and all(
+        marker in text
+        for marker in (
+            "W4.A",
+            "W4.B",
+            "W4.C",
+            "W4.D",
+            "W4.E",
+        )
     )
 
 
@@ -194,10 +199,10 @@ def collect_items() -> list[EvidenceItem]:
     )
     items.append(EvidenceItem(
         "W4-startup",
-        "Wave 4 当前 TODO 与完成度检查入口已启动",
+        "Wave 4 TODO 记录与完成度检查入口已登记",
         PROVED_BY_STATIC_FILES if startup_ok else MISSING_OR_NEEDS_CONFIRMATION,
         ["TODO.md", "justfile", "scripts/governance/report_wave4_completion.py"] if startup_ok else [],
-        [] if startup_ok else ["需要把 TODO 切到 Wave 4，并登记 just wave-4-status / wave-4-complete-check"],
+        [] if startup_ok else ["需要在 TODO 登记当前或归档的 Wave 4，并登记 just wave-4-status / wave-4-complete-check"],
     ))
 
     scope_ok = wave4_scope_aligned()

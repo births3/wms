@@ -72,7 +72,7 @@ def validate_wave5_hardware_payload(
 
     environment = str(payload.get("environment", "")).lower()
     if environment not in {"dev", "staging"}:
-        return False, "environment 必须是真实 dev 或 staging，不能是 local/prod/example"
+        return False, "environment 必须是真实 dev 或 staging，不能是 local/prod/mock/fake/stub/example"
 
     station_code = str(payload.get("station_code", "")).strip()
     if not station_code:

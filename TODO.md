@@ -12,7 +12,7 @@
 
 ### 当前阻塞 / 外部依赖
 
-- [ ] 稳定 dev/staging 环境仍未就绪；Wave 6 的真实 runtime evidence 不能用 localhost / stub / mock / fake / example 替代
+- [ ] 稳定 dev/staging 环境仍未就绪；Wave 6 的真实 runtime evidence 每个引用必须包含当前 `environment` 标记，不能用 localhost / stub / mock / fake / example / prod 替代
 - [ ] M-PK 电子秤 / 蓝牙打印机 / 面单打印真实设备未接入
 - [ ] 外部 TMS dev/staging 接口、回调鉴权、调度结果格式仍需确认
 - [ ] “码上放心”账号、正式接口文档、鉴权方式、错误码、频率限制和 dev/staging 回执仍需补齐
@@ -72,7 +72,7 @@ Wave 1 / Wave 2 / Wave 3 / Wave 4 / Wave 5 开发完成状态仍分别以 `just 
 - `cargo test --manifest-path backend/Cargo.toml -p wms-api --lib -- --skip postgres_`：66 passed
 - 临时 PostgreSQL 执行 `cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave5_postgres -- --nocapture`：3 passed
 - `just openapi-check`：通过
-- `python3 -m pytest scripts/governance/tests/test_core_logic.py -q`：137 passed
+- `python3 -m pytest scripts/governance/tests/test_core_logic.py -q`：140 passed
 - `just gov-t1`：30/30 ok
 - `just task-check`：6/6 ok
 - `git diff --check`：通过
@@ -114,7 +114,7 @@ Wave 1 / Wave 2 / Wave 3 / Wave 4 / Wave 5 开发完成状态仍分别以 `just 
 - W1.B / W1.D pre-release runtime gate：仍按 [Wave 1 Pre-release Runtime Evidence Runbook](docs/runbooks/wave-1-runtime-evidence.md) 在真实环境补齐
 - W2-external：人工确认“码上放心”账号外部开通状态；外部依赖仍按 [ROADMAP.md](ROADMAP.md) 的外部依赖追踪表跟进
 
-Wave 1 / Wave 2 / Wave 3 开发完成状态仍分别以 `just wave-1-complete-check` / `just wave-2-complete-check` / `just wave-3-complete-check` 为准；上述 runtime gate 在预发布前单独验证，禁止用 localhost / stub / mock / fake / example 代替。
+Wave 1 / Wave 2 / Wave 3 开发完成状态仍分别以 `just wave-1-complete-check` / `just wave-2-complete-check` / `just wave-3-complete-check` 为准；上述 runtime gate 在预发布前单独验证，每个 evidence 引用必须包含当前 `environment` 标记，禁止用 localhost / stub / mock / fake / example / prod 代替。
 
 ---
 
@@ -143,7 +143,7 @@ Wave 1 / Wave 2 / Wave 3 开发完成状态仍分别以 `just wave-1-complete-ch
 ### 后续 / 不阻塞 Wave 3 开发完成
 
 - [ ] W3.A PDA 生产端：`apps/pda-mobile` 目前只有 `.gitkeep`，生产 app 等真 PDA 与 SPIKE-005 验证后启动，作为预发布 gate 跟踪
-- [ ] W3.D 后续：M9 自动计费与账单管理仍在 Wave 5；当前 Wave 3 只完成账户/合同/规则模型
+- [x] W3.D 后续：M9 自动计费与账单管理已在 Wave 5.C 完成；`just wave-5-complete-check` 通过
 
 ## 已归档：Wave 0.5 — 原型 + 技术 Spike + 组件库抽离
 
@@ -219,13 +219,15 @@ Wave 1 / Wave 2 / Wave 3 开发完成状态仍分别以 `just wave-1-complete-ch
 >
 > 以下两项为**已知、推迟**的技术债，留待后续有前端权限的执行者处理。
 
-- [ ] 【低优】**原型 mock 占位数据语义错位**（`prototypes/src/prototype-kit/prototype-model.ts`）
+- [x] 【低优】**原型 mock 占位数据语义错位**（`prototypes/src/prototype-kit/prototype-model.ts`）
   - 现状：`sampleValue` 采用"列名关键字猜测"生成占位值；部分列名（货主 / 控制属性 / 承运商 / 周转箱 / 客户门店 / 波次号 等）未命中关键字，回落到示例池，导致列头与单元格语义不符（如货主列显示商品名）。
   - 根治方案：将 `MODULE_BLUEPRINTS` 的列定义从 `string[]` 升级为"列名 + 示例值同源"结构（约 30 个 blueprint）。
   - 影响范围：仅原型占位数据，不影响布局 / 控件 / 业务流；转生产阶段会被真实样例替换。
-- [ ] 【中优】**m4-manifest 随货同行单 PDF 中文竖排**（`prototypes/src/pages/m4-manifest/M4Manifest.tsx`）
+  - 核对结果：`prototype-model.ts` 已改为 `rowSample` / `fieldSample` 与列/字段逐项对应，不再使用关键字猜值；`check_prototype_fidelity.py` 已随 `just gov-t1` 通过。
+- [x] 【中优】**m4-manifest 随货同行单 PDF 中文竖排**（`prototypes/src/pages/m4-manifest/M4Manifest.tsx`）
   - 现状：商品明细表 9 列在 A4 画布内被挤压，中文品名 / 生产企业逐字竖排堆叠（已加 `table-fixed` + 百分比列宽未见改善）。
   - 处理方向：单独重构 `PrintPreview` 布局或缩字号。GSP 法定打印件，视觉要求高。
+  - 核对结果：`PrintPreview` 已改为按真实纸张尺寸排版后缩放显示，`m4-manifest` 去除重复内边距；`just matrix-e2e-full` 已验证 204/204 通过，随货同行单启用 `detect_vertical_cjk_table`。
 
 ---
 

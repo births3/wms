@@ -134,8 +134,20 @@ def validate_w1d_runtime_payload(
         for value in [signal_url, rollback_log_ref, external_log_ref]
     ):
         return False, "W1.D runtime evidence 不能指向 localhost/127.0.0.1/0.0.0.0/prod/stub/mock/fake/example 边界"
-    if not any(contains_environment_token(value, environment) for value in [signal_url, rollback_log_ref, external_log_ref]):
-        return False, "W1.D runtime evidence 必须在 signal/log 引用中包含 dev/staging 环境标记"
+    missing_environment_refs = [
+        name
+        for name, value in {
+            "signal_url": signal_url,
+            "rollback_log_ref": rollback_log_ref,
+            "external_log_ref": external_log_ref,
+        }.items()
+        if not contains_environment_token(value, environment)
+    ]
+    if missing_environment_refs:
+        return False, (
+            "W1.D runtime evidence 必须在每个 signal/log 引用中包含 "
+            f"{environment} 环境标记: {', '.join(missing_environment_refs)}"
+        )
     if payload.get("rollback_triggered") is not True or payload.get("rollback_exit_code") != 0:
         return False, "W1.D runtime evidence 必须证明失败信号触发 rollback 且退出码为 0"
     if payload.get("signal_type") not in {"http", "prometheus"}:

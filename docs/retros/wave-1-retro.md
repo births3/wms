@@ -4,7 +4,7 @@
 - 状态：开发完成；真实 runtime evidence 移至预发布 gate
 - 范围：H1/H2/H3、文件版 Feature Flag、回滚演练资产、web-admin 壳工程、W1.F/G/H + H-FILE 契约联合评审
 
-> 2026-06-03 口径更新：当前尚无稳定 dev/staging 环境，两份真实 runtime evidence 不再阻塞 Wave 1 开发完成；它们保留为预发布 gate，禁止用 localhost、stub、mock、fake 或 example 证据替代。
+> 2026-06-03 口径更新：当前尚无稳定 dev/staging 环境，两份真实 runtime evidence 不再阻塞 Wave 1 开发完成；它们保留为预发布 gate，禁止用 localhost、stub、mock、fake、example 或 prod 证据替代。
 
 ---
 
@@ -37,8 +37,8 @@
 当前脚本不再注入 `kubectl` / `docker` stub，也不再用 forced failure 冒充自动回滚证据。`deploy/scripts/wave1_auto_rollback_probe.sh` 仅在提供真实 dev/staging 信号时执行：
 
 - HTTP smoke：`--smoke-url` 或 `SMOKE_URL`，2xx/3xx 视为健康；真实模式拒绝 localhost / 127.0.0.1 / 0.0.0.0
-- Prometheus：`PROMETHEUS_URL` + `PROMETHEUS_QUERY`（或对应 CLI 参数），PromQL 结果 `0` 视为健康，`> 0` 触发回滚
-- 缺少真实信号配置、边界命中 `prod/production/prodution`、或环境标记不含 `dev/staging` 时，脚本直接退出非 0
+- Prometheus：`PROMETHEUS_URL` + `PROMETHEUS_QUERY`（或对应 CLI 参数），两者都必须包含当前 `environment` 标记；PromQL 结果 `0` 视为健康，`> 0` 触发回滚
+- 缺少真实信号配置、边界命中 `prod/production/prodution`、或任一 evidence 引用环境标记不含当前 `dev/staging` 时，脚本直接退出非 0
 
 结论：这仍然不是可发布前所需的真实自动回滚链路证据。必须在稳定 dev/staging 接入 smoke gate 或监控信号后复跑，并以 `docs/retros/wave-1-runtime-evidence.json` 记录非本机 signal URL、rollback log 引用、外部日志引用、触发结果与退出码，再回写 ADR-0016 v3.2 的阈值校准结果。
 

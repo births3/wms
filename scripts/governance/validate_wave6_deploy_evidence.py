@@ -72,7 +72,7 @@ def validate_wave6_deploy_payload(
 
     environment = str(payload.get("environment", "")).lower()
     if environment not in {"dev", "staging"}:
-        return False, "environment 必须是真实 dev 或 staging，不能是 local/prod/example"
+        return False, "environment 必须是真实 dev 或 staging，不能是 local/prod/mock/fake/stub/example"
 
     deployment_mode = str(payload.get("deployment_mode", ""))
     if deployment_mode not in {"docker-compose", "kubernetes"}:

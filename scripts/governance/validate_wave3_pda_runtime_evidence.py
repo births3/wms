@@ -75,7 +75,7 @@ def validate_wave3_pda_runtime_payload(
 
     environment = str(payload.get("environment", "")).lower()
     if environment not in {"dev", "staging"}:
-        return False, "environment 必须是真实 dev 或 staging，不能是 local/prod/example"
+        return False, "environment 必须是真实 dev 或 staging，不能是 local/prod/mock/fake/stub/example"
 
     for key in ("pda_model", "android_version", "scan_input_method"):
         if not str(payload.get(key, "")).strip():
