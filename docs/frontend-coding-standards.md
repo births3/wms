@@ -454,7 +454,7 @@ just matrix-e2e-full                                           # 4. T4 全量矩
 
 ### 12.2 何时更新 baseline
 
-- ✅ 业务方走查 approved 的视觉调整 → `cp prototypes/.visual-snapshots/*.png governance/visual-baselines/` + 更新 `manifest.toml.reviewed_at`
+- ✅ 业务方走查 approved 的视觉调整 → 先跑截图，再用 `accept_baseline.py --reviewer="<name>"` dry-run，确认通过后用 `--apply` 接受；禁止裸 `cp`
 - ❌ 回归 bug 不能更新 baseline（先修代码让脚本回到 0 差异）
 
 ### 12.3 加新原型页的强制流程（红线）
@@ -478,10 +478,11 @@ just matrix-e2e-full                                           # 4. T4 全量矩
    reviewed_at = "YYYY-MM-DD"
    related_story = "US-X-NNN ..."
    ```
-4. 起 vite + 跑 capture + check 入 baseline:
+4. 起 vite + 跑 capture + 通过接受门禁写入 baseline:
    ```bash
    python3 scripts/governance/capture_visual_snapshots.py
-   cp prototypes/.visual-snapshots/<kebab-name>.png governance/visual-baselines/
+   python3 scripts/governance/accept_baseline.py --reviewer="项目主人" --tab=<kebab-name>
+   python3 scripts/governance/accept_baseline.py --apply --reviewer="项目主人" --tab=<kebab-name>
    python3 scripts/governance/check_visual_regression.py    # 应 0 差异
    ```
 5. **人工 review 截图视觉无异常**：底部不截断 / 无偏移 / 无遮挡 / 内容对齐

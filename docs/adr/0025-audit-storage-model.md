@@ -272,7 +272,7 @@ pub async fn append_event(pool: &PgPool, req: &AuditWriteRequest) -> AuditResult
 ## 6. 关联文档
 
 - [SPIKE-002 验证记录](../spikes/spike-002-h2-append-only.md)
-- [Spike 代码](../../spikes/spike-002-h2-append-only/)
+- Spike 代码：`spikes/spike-002-h2-append-only/`
 - [ADR-0001 技术栈 + §SQLx 附录](0001-tech-stack.md)
 - [ADR-0014 数据迁移](0014-data-migration.md)
 - [ADR-0024 鉴权模型](0024-auth-model.md)（actor 字段来源）

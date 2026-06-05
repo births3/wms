@@ -387,7 +387,7 @@ M-RC-001 创建召回单（含 product_id, batch_no, 召回范围）
 
 | 脚本 | 校验项 |
 |----|----|
-| [check_approval_source_chain.py](../../scripts/governance/check_approval_source_chain.py) | 触发库存状态变更的故事必须声明审批源（BR-8）|
+| `scripts/governance/check_approval_source_chain.py` | 触发库存状态变更的故事必须声明审批源（BR-8）|
 | `check_business_rules_registry.py` | （Wave 1 待实现）每条规则在故事中有对应实现引用 |
 
 ---

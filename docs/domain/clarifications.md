@@ -238,7 +238,7 @@
 > - 缺漏关键大表：作业绩效追踪 86M / 装箱明细 82M / 系统消息日志合计 64M / PIX 接口日志 24M
 > - 业务方已实施按 WHSE+时间分区（PURGE_IDX 系列）
 >
-> **修正结论**：3 张表分区不够，需 5 张超大表 + 5 张中等表分区；详见 [docs/infra/sharding-decision-matrix.md](../infra/sharding-decision-matrix.md) 与 [docs/legacy-analysis/legacy-comparison-matrix.md](../../docs/legacy-analysis/legacy-comparison-matrix.md)。
+> **修正结论**：3 张表分区不够，需 5 张超大表 + 5 张中等表分区；详见 [docs/infra/sharding-decision-matrix.md](../infra/sharding-decision-matrix.md) 与 `docs/legacy-analysis/legacy-comparison-matrix.md`。
 
 ---
 

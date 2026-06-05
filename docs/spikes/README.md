@@ -106,7 +106,7 @@ Spike（带时间盒的验证） → 结论
 
 ## 6. Wave 0.5 退出条件中的 Spike 项
 
-按 [ROADMAP.md](../../ROADMAP.md) Wave 0.5：
+按 `ROADMAP.md` Wave 0.5：
 
 > **完成标准**：Storybook 可运行；P0 原型 ≥1 次走查 approved；Spike 结论记录到 `docs/spikes/`。
 

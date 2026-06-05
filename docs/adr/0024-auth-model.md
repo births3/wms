@@ -297,8 +297,8 @@ async fn list_items(
 ## 6. 关联文档
 
 - [SPIKE-001 验证记录](../spikes/spike-001-axum-jwt.md)
-- [PDA 离线状态机](../../spikes/spike-001-axum-jwt/pda-offline-state.md)
-- [Spike 代码](../../spikes/spike-001-axum-jwt/)
+- PDA 离线状态机：`spikes/spike-001-axum-jwt/pda-offline-state.md`
+- Spike 代码：`spikes/spike-001-axum-jwt/`
 - [ADR-0001 技术栈](0001-tech-stack.md)
 - [ADR-0010 错误码](0010-error-codes.md)
 - [ADR-0011 可观测](0011-observability.md)

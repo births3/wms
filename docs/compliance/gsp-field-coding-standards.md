@@ -233,7 +233,7 @@ encrypted:   0  (Wave 1+ 加患者数据时启用)
 
 | 脚本 | 校验项 |
 |----|----|
-| [check_gsp_field_traceability.py](../../scripts/governance/check_gsp_field_traceability.py) | 70 GSP 字段在故事字段表实现 + 5 项技术属性完整性 |
+| `scripts/governance/check_gsp_field_traceability.py` | 70 GSP 字段在故事字段表实现 + 5 项技术属性完整性 |
 | `check_field_coding_standards.py` | （Wave 1 待实现）字段命名 / 类型 / 加密 / 审计是否符合本规范 |
 
 ---

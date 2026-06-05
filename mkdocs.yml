@@ -183,6 +183,7 @@ nav:
     - 前端编码规范: frontend-coding-standards.md
     - 原型组件注册表: prototypes/component-registry.md
     - 原型转生产清单: prototypes/prototype-to-production.md
+    - Matrix E2E 截图门禁: prototypes/matrix-e2e-screenshot-gate.md
 
 # 额外配置
 extra:

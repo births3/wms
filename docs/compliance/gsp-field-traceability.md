@@ -3,7 +3,7 @@
 > 时间：2026-05-17
 > 版本：v1
 > 文档层级：L4 评审/合规追溯
-> 关联：[docs/compliance/README.md](README.md) 条款级 RTM；[scripts/governance/check_gsp_field_traceability.py](../../scripts/governance/check_gsp_field_traceability.py) 自动核对
+> 关联：[docs/compliance/README.md](README.md) 条款级 RTM；`scripts/governance/check_gsp_field_traceability.py` 自动核对
 
 ---
 
