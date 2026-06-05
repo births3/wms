@@ -93,7 +93,9 @@ export function M4Picking() {
             <div className="flex items-start justify-between mb-2">
               <div>
                 <div className="text-sm font-semibold">{currentItem.itemName}</div>
-                <div className="text-xs text-muted-foreground mt-0.5">{currentItem.spec}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  <span className="font-mono">{currentItem.itemCode}</span> · {currentItem.spec}
+                </div>
               </div>
               <div className="text-right">
                 <div className="text-2xl font-bold text-primary">{currentItem.qty}</div>
@@ -116,6 +118,9 @@ export function M4Picking() {
           </Card>
 
           <div className="mt-3">
+            <div className="mb-1 text-[11px] text-muted-foreground">
+              扫码校验码 <span className="font-mono text-foreground">AB12-CD34-EF56</span>
+            </div>
             <ScanInput
               mode="scanner"
               placeholder="扫库位 → 扫货 → 提交"
@@ -152,7 +157,7 @@ export function M4Picking() {
                     )}
                   </div>
                   <div className="text-[11px] text-muted-foreground">
-                    <span className="font-mono">{item.location}</span> · 批 {item.batch}
+                    <span className="font-mono">{item.itemCode}</span> · <span className="font-mono">{item.location}</span> · 批 {item.batch}
                   </div>
                 </div>
                 <div className="text-right">

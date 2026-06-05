@@ -65,7 +65,7 @@ export function M8StorageFeeRules() {
     <div className="w-full max-w-[1400px] bg-background rounded-lg border shadow-sm">
       <PageHeader
         title="仓储费规则配置"
-        subtitle="M8-001 · 3PL 计费 · 当前版本 v3 · 生效 2026-04-01"
+        subtitle="M8-001 · 3PL 计费 · GSP 计费审计 · 当前版本 v3 · 生效 2026-04-01"
         actions={
           <>
             <Button variant="outline" size="sm">
@@ -129,7 +129,7 @@ export function M8StorageFeeRules() {
                   <th className="text-left pb-2">时长档</th>
                   <th className="text-right pb-2">常温/阴凉</th>
                   <th className="text-right pb-2">❄️ 冷藏</th>
-                  <th className="text-right pb-2">❄️ 冷冻</th>
+                  <th className="text-right pb-2">❄️ 冷冻（FR）</th>
                 </tr>
               </thead>
               <tbody>

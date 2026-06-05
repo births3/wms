@@ -131,6 +131,7 @@ export function M4Exception() {
                         "text-muted-foreground"
                       }`} />
                       <span className="text-sm font-medium">{r.title}</span>
+                      <span className="font-mono text-[10px] text-muted-foreground">{r.code}</span>
                       {isPrimary && (
                         <span className="text-[10px] px-1.5 py-0.5 bg-primary/10 text-primary rounded font-medium">
                           推荐

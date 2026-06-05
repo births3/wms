@@ -34,6 +34,8 @@ const TEMPLATE_META: Record<PrintTemplate, { label: string; w: number; h: number
   shipping: { label: "快递面单 (100×180mm)", w: 100, h: 180, ratio: "100/180" },
 };
 
+const PX_PER_MM = 3.78;
+
 export const PrintPreview = React.forwardRef<HTMLDivElement, PrintPreviewProps>(
   (
     {
@@ -50,8 +52,10 @@ export const PrintPreview = React.forwardRef<HTMLDivElement, PrintPreviewProps>(
     ref
   ) => {
     const meta = TEMPLATE_META[template];
-    // 渲染宽度（mm → px，1mm ≈ 3.78px）
-    const baseW = meta.w * 3.78 * zoom;
+    const pageWidthPx = meta.w * PX_PER_MM;
+    const pageHeightPx = meta.h * PX_PER_MM;
+    const scaledWidthPx = pageWidthPx * zoom;
+    const scaledHeightPx = pageHeightPx * zoom;
 
     return (
       <div ref={ref} className={cn("bg-muted rounded-md border overflow-hidden font-sans", className)} {...rest}>
@@ -86,16 +90,18 @@ export const PrintPreview = React.forwardRef<HTMLDivElement, PrintPreviewProps>(
         </div>
         {/* 预览区 */}
         <div className="p-6 flex justify-center overflow-auto max-h-[900px]">
-          <div
-            className="bg-background shadow-md border border-border/40 origin-top"
-            style={{
-              width: baseW,
-              aspectRatio: meta.ratio,
-              padding: template === "a4" ? "16mm" : "4mm",
-              transform: zoom > 1.2 ? `scale(${zoom / zoom})` : undefined, // 保留扩展空间
-            }}
-          >
-            {children}
+          <div className="relative shrink-0" style={{ width: scaledWidthPx, height: scaledHeightPx }}>
+            <div
+              className="absolute left-0 top-0 bg-background shadow-md border border-border/40 origin-top-left"
+              style={{
+                width: pageWidthPx,
+                height: pageHeightPx,
+                padding: template === "a4" ? "16mm" : "4mm",
+                transform: `scale(${zoom})`,
+              }}
+            >
+              {children}
+            </div>
           </div>
         </div>
         {/* 底部翻页 */}

@@ -41,7 +41,7 @@ export function PrototypeSidePanel({ spec, model }: { spec: MatrixPrototypeSpec;
             <ChecklistItem text={`${spec.storyId} 绑定 ${model.primaryObject}`} />
             <ChecklistItem text={`${spec.end.toUpperCase()} 端字段与流程来自故事模型`} />
             <ChecklistItem text={`${model.moduleName} 异常路径已可见`} />
-            <ChecklistItem text="H1 权限 / H2 审计 / H3 契约占位齐全" />
+            <ChecklistItem text="GSP 合规 / H1 权限 / H2 审计 / H3 契约占位齐全" />
           </div>
         </CardContent>
       </Card>
@@ -64,20 +64,28 @@ export function PrototypeSidePanel({ spec, model }: { spec: MatrixPrototypeSpec;
 }
 
 export function PrintArea({ spec, model }: { spec: MatrixPrototypeSpec; model: StoryPrototypeModel }) {
+  const documentTitle = spec.storyId === "US-M4-005" ? "药品随货同行单" : spec.title;
+
   return (
-    <PrintPreview template={spec.title.includes("面单") ? "shipping" : "a4"} zoom={0.7} pageCount={2}>
-      <div className="flex flex-col gap-4 text-xs">
-        <div className="text-center">
-          <div className="text-lg font-semibold">{spec.title}</div>
-          <div className="text-[10px] text-muted-foreground">{spec.storyId} · {model.primaryObject} · GSP 单据格式</div>
+    <div className="flex flex-col gap-3">
+      <PrintPreview template={spec.title.includes("面单") ? "shipping" : "a4"} zoom={0.7} pageCount={2}>
+        <div className="flex flex-col gap-4 text-xs">
+          <div className="text-center">
+            <div className="text-lg font-semibold">{documentTitle}</div>
+            <div className="text-[10px] text-muted-foreground">{spec.storyId} · {model.primaryObject} · GSP 单据格式</div>
+          </div>
+          <FieldTable rows={model.fields.slice(0, 5)} size="sm" />
+          <div className="grid grid-cols-2 gap-6 pt-8">
+            <div className="border-t pt-2">复核人：u001 张三</div>
+            <div className="border-t pt-2">交接人：u002 李四</div>
+          </div>
         </div>
-        <FieldTable rows={model.fields.slice(0, 5)} size="sm" />
-        <div className="grid grid-cols-2 gap-6 pt-8">
-          <div className="border-t pt-2">复核人：u001 张三</div>
-          <div className="border-t pt-2">交接人：u002 李四</div>
-        </div>
+      </PrintPreview>
+      <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
+        <span className="font-semibold text-foreground">打印设置</span>
+        <span className="ml-2">A4 / SimSun / PDF / GSP 留存</span>
       </div>
-    </PrintPreview>
+    </div>
   );
 }
 

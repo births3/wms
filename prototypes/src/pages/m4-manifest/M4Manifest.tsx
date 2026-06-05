@@ -81,7 +81,7 @@ export function M4Manifest() {
           onZoomChange={setZoom}
         >
           {/* A4 内容 */}
-          <div className="p-12 bg-white text-black font-sans" style={{ fontFamily: "SimSun, serif" }}>
+          <div className="bg-white text-black font-sans" style={{ fontFamily: "SimSun, serif" }}>
             <div className="text-center mb-6">
               <h1 className="text-2xl font-bold mb-1">药品随货同行单</h1>
               <div className="text-xs text-gray-600">
