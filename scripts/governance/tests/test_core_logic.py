@@ -945,6 +945,30 @@ def test_wave1_runtime_prereq_rollback_compose_accepts_valid_prometheus_signal(
     assert exit_code == 0
 
 
+def test_wave1_runtime_prereq_rollback_rejects_prometheus_without_env_url(
+    tmp_path, monkeypatch, capsys
+):
+    """Prometheus evidence 最终只记录 query endpoint，所以 URL 本身也必须带环境标记。"""
+    prereq = _wave1_prereq_module(monkeypatch)
+    _clear_wave1_prereq_env(monkeypatch)
+    compose_dir = tmp_path / "wms-dev"
+    compose_dir.mkdir()
+    compose_file = compose_dir / "docker-compose.yml"
+    compose_file.write_text("services: {}\n", encoding="utf-8")
+    monkeypatch.setenv("WAVE1_ROLLBACK_ENVIRONMENT", "dev")
+    monkeypatch.setenv("WAVE1_PREVIOUS_VERSION", "previous-dev-sha")
+    monkeypatch.setenv("WAVE1_COMPOSE_FILE", str(compose_file))
+    monkeypatch.setenv("PROMETHEUS_URL", "https://prometheus.wms.internal")
+    monkeypatch.setenv("PROMETHEUS_QUERY", 'wms_wave1_rollback_signal{environment="dev"}')
+    monkeypatch.setenv("WAVE1_ROLLBACK_LOG_REF", "s3://wms-dev-evidence/wave1/rollback.log")
+    monkeypatch.setenv("WAVE1_EXTERNAL_LOG_REF", "s3://wms-dev-evidence/wave1/prometheus.log")
+
+    exit_code = prereq.main(["--mode", "rollback-compose"])
+
+    assert exit_code == 2
+    assert "Prometheus URL" in capsys.readouterr().err
+
+
 def test_wave1_completion_report_w1d_runtime_evidence_requires_real_signal_record(tmp_path, monkeypatch):
     """W1.D runtime 出口证据必须证明 dev/staging 失败信号触发回滚成功。"""
     import json
@@ -986,6 +1010,17 @@ def test_wave1_completion_report_w1d_runtime_evidence_requires_real_signal_recor
     ok, message = report.valid_w1d_runtime_evidence()
     assert ok is False
     assert "localhost" in message
+
+    evidence["signal_url"] = "https://prometheus.staging.wms.internal/api/v1/query"
+    evidence["rollback_log_ref"] = "s3://wms-evidence/wave1/rollback.log"
+    (evidence_dir / "wave-1-runtime-evidence.json").write_text(
+        json.dumps(evidence),
+        encoding="utf-8",
+    )
+
+    ok, message = report.valid_w1d_runtime_evidence()
+    assert ok is False
+    assert "rollback_log_ref" in message
 
 
 def test_validate_wave1_runtime_evidence_accepts_two_real_records(tmp_path, capsys):
@@ -1777,6 +1812,60 @@ def test_wave1_auto_rollback_probe_check_only_rejects_bad_evidence_refs(tmp_path
     assert "--rollback-log-ref" in result.stderr
 
 
+def test_wave1_auto_rollback_probe_check_only_rejects_prometheus_without_env_url(tmp_path):
+    """probe check-only 必须和最终 evidence validator 一样要求 Prometheus URL 带环境标记。"""
+    import os
+    import subprocess
+
+    repo_root = Path(__file__).resolve().parents[3]
+    script = repo_root / "deploy" / "scripts" / "wave1_auto_rollback_probe.sh"
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    for command in ["curl", "docker"]:
+        stub = bin_dir / command
+        stub.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+        stub.chmod(0o755)
+
+    compose_dir = tmp_path / "wms-dev"
+    compose_dir.mkdir()
+    compose_file = compose_dir / "docker-compose.yml"
+    compose_file.write_text("services: {}\n", encoding="utf-8")
+
+    env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"}
+    result = subprocess.run(
+        [
+            str(script),
+            "--check-only",
+            "--environment",
+            "dev",
+            "--target",
+            "docker-compose",
+            "--previous-version",
+            "previous-dev-sha",
+            "--compose-file",
+            str(compose_file),
+            "--prometheus-url",
+            "https://prometheus.wms.internal",
+            "--promql",
+            'wms_wave1_rollback_signal{environment="dev"}',
+            "--evidence-file",
+            str(tmp_path / "wave-1-runtime-evidence.json"),
+            "--rollback-log-ref",
+            "s3://wms-dev-evidence/wave1/rollback.log",
+            "--external-log-ref",
+            "s3://wms-dev-evidence/wave1/prometheus-alert.log",
+        ],
+        check=False,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
+    )
+
+    assert result.returncode == 2
+    assert "Prometheus URL" in result.stderr
+
+
 @pytest.mark.parametrize(
     ("environment", "target", "expected"),
     [
@@ -2434,8 +2523,22 @@ def test_wave4_scope_alignment_detects_w4f_mismatch(monkeypatch):
     assert report.wave4_scope_aligned() is False
 
 
-def test_wave4_startup_item_blocks_when_todo_not_switched(monkeypatch):
-    """Wave 4 启动前，TODO 和 just 入口缺失不能被报告成完成。"""
+def test_wave4_startup_item_accepts_archived_todo(monkeypatch):
+    """Wave 4 已归档后，完成门禁仍应可复跑。"""
+    import report_wave4_completion as report
+
+    def fake_read_text(path):
+        if path == "TODO.md":
+            return "## 已归档：Wave 4\nW4.A W4.B W4.C W4.D W4.E"
+        return ""
+
+    monkeypatch.setattr(report, "read_text", fake_read_text)
+
+    assert report.wave4_todo_started() is True
+
+
+def test_wave4_startup_item_blocks_when_todo_not_recorded(monkeypatch):
+    """Wave 4 未登记时，TODO 和 just 入口缺失不能被报告成完成。"""
     import report_wave4_completion as report
 
     monkeypatch.setattr(report, "wave4_todo_started", lambda: False)
@@ -2636,6 +2739,133 @@ def test_record_wave4_external_dependencies_requires_force_to_overwrite(tmp_path
 
     assert recorder.main([*args, "--force"]) == 0
     assert json.loads(output.read_text(encoding="utf-8"))["platform"] == "码上放心"
+
+
+def test_record_wave_runtime_evidence_requires_force_to_overwrite_existing_files(tmp_path):
+    """所有 Wave 6 收口 record 脚本都不能静默覆盖已有真实 evidence。"""
+    import importlib
+
+    cases = [
+        (
+            "record_wave2_runtime_evidence",
+            "wave-2-runtime-evidence.json",
+            [
+                "--environment", "staging",
+                "--service-url", "https://wms-staging.internal",
+                "--migrated-count", "1",
+                "--reconcile-matched", "1",
+                "--smoke-log-ref", "ci/staging/wave2-feature-flags-smoke/123",
+                "--reconcile-log-ref", "ci/staging/wave2-feature-flags-reconcile/123",
+                "--archive-ref", "s3://wms-staging-audit/feature-flags/feature_flags.toml",
+            ],
+        ),
+        (
+            "record_wave3_pda_runtime_evidence",
+            "wave-3-pda-runtime-evidence.json",
+            [
+                "--environment", "staging",
+                "--pda-model", "Honeywell EDA52",
+                "--android-version", "Android 11",
+                "--scan-input-method", "physical-scan-key-intent",
+                "--pda-device-ref", "asset://wms-staging/pda/honeywell-eda52-01",
+                "--spike005-result-ref", "s3://wms-staging-evidence/wave3/pda/spike-005-runtime-20260604.md",
+                "--m2-scan-log-ref", "ci/staging/wave3-pda-m2-scan/123",
+                "--m3-scan-log-ref", "ci/staging/wave3-pda-m3-scan/123",
+                "--offline-replay-log-ref", "ci/staging/wave3-pda-offline-replay/123",
+                "--idempotency-replay-log-ref", "ci/staging/wave3-pda-idempotency-replay/123",
+                "--audit-event-query-ref", "ci/staging/wave3-pda-audit/123",
+                "--l7-run-ref", "ci/staging/wave3-pda-l7/123",
+                "--usability-review-ref", "s3://wms-staging-evidence/wave3/pda/usability-review.md",
+                "--barcode-samples-scanned", "1",
+                "--m2-operations-exercised", "1",
+                "--m3-operations-exercised", "1",
+                "--offline-replays-exercised", "1",
+                "--idempotency-replays-exercised", "1",
+                "--real-pda-used",
+                "--physical-scan-key-verified",
+                "--dev-or-staging-service-verified",
+                "--audit-event-verified",
+                "--l7-review-completed",
+                "--usability-review-completed",
+            ],
+        ),
+        (
+            "record_wave5_hardware_evidence",
+            "wave-5-hardware-evidence.json",
+            [
+                "--environment", "staging",
+                "--station-code", "PK-STAGING-01",
+                "--scale-device-ref", "asset://wms-staging/hardware/scale-01",
+                "--bluetooth-printer-ref", "asset://wms-staging/hardware/bluetooth-printer-01",
+                "--waybill-printer-ref", "asset://wms-staging/hardware/waybill-printer-01",
+                "--calibration-record-ref", "s3://wms-staging-evidence/wave5/hardware/calibration.pdf",
+                "--scale-reading-log-ref", "ci/staging/wave5-scale-reading/123",
+                "--bluetooth-print-log-ref", "ci/staging/wave5-bluetooth-print/123",
+                "--waybill-print-log-ref", "ci/staging/wave5-waybill-print/123",
+                "--audit-event-query-ref", "ci/staging/wave5-hardware-audit/123",
+                "--scale-readings-recorded", "1",
+                "--bluetooth-labels-printed", "1",
+                "--waybills-printed", "1",
+                "--hardware-connected",
+                "--print-artifacts-reviewed",
+                "--audit-event-verified",
+            ],
+        ),
+        (
+            "record_wave5_tms_evidence",
+            "wave-5-tms-evidence.json",
+            [
+                "--environment", "staging",
+                "--tms-system-ref", "vendor://wms-staging/tms/vendor-a",
+                "--dispatch-push-log-ref", "ci/staging/wave5-tms-dispatch/123",
+                "--callback-log-ref", "ci/staging/wave5-tms-callback/123",
+                "--failure-retry-log-ref", "ci/staging/wave5-tms-retry/123",
+                "--audit-event-query-ref", "ci/staging/wave5-tms-audit/123",
+                "--credential-ref", "vault://wms/staging/tms/vendor-a",
+                "--dispatches-received", "1",
+                "--callbacks-received", "1",
+                "--failed-callbacks-exercised", "1",
+                "--retry-succeeded",
+                "--audit-event-verified",
+            ],
+        ),
+        (
+            "record_wave6_deploy_evidence",
+            "wave-6-deploy-evidence.json",
+            [
+                "--environment", "staging",
+                "--deployment-mode", "kubernetes",
+                "--release-version", "wms-staging-20260604.1",
+                "--release-plan-ref", "ticket://staging-release-plan/WMS-20260604",
+                "--artifact-ref", "registry://wms-staging/wms-api:20260604.1",
+                "--canary-config-ref", "git://wms/deploy/staging/canary-20260604.yaml",
+                "--smoke-gate-ref", "ci/staging/wave6-smoke-gate/123",
+                "--observability-dashboard-ref", "grafana/staging/wave6-release/123",
+                "--rollback-drill-log-ref", "ci/staging/wave6-rollback-drill/123",
+                "--approval-record-ref", "ticket://staging-release-approval/WMS-20260604",
+                "--audit-event-query-ref", "ci/staging/wave6-deploy-audit/123",
+                "--canary-stages-exercised", "1",
+                "--smoke-checks-passed", "1",
+                "--rollback-drills-exercised", "1",
+                "--canary-used",
+                "--full-release-blocked",
+                "--rollback-verified",
+                "--audit-event-verified",
+                "--dual-approval-recorded",
+            ],
+        ),
+    ]
+
+    for module_name, filename, args in cases:
+        recorder = importlib.import_module(module_name)
+        output = tmp_path / filename
+        output.write_text("{}", encoding="utf-8")
+        command = ["--output", str(output), *args]
+
+        assert recorder.main(command) == 1, module_name
+        assert output.read_text(encoding="utf-8") == "{}"
+        assert recorder.main([*command, "--force"]) == 0, module_name
+        assert json.loads(output.read_text(encoding="utf-8"))["environment"] == "staging"
 
 
 def test_record_wave2_runtime_evidence_writes_valid_evidence(tmp_path):
