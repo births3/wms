@@ -368,12 +368,13 @@
 6. [docs/adr/0022-prototype-component-spec.md](docs/adr/0022-prototype-component-spec.md) — 原型组件规范（三层架构 + cva + forwardRef + 文档头）
 7. [docs/adr/0029-frontend-as-prototype-workflow.md](docs/adr/0029-frontend-as-prototype-workflow.md) — 前端原型先行工作流（prototype → checklist → production）
 8. [docs/prototypes/prototype-to-production.md](docs/prototypes/prototype-to-production.md) — 原型转生产迁移清单
-9. [docs/architecture-dependencies.md](docs/architecture-dependencies.md) — 模块依赖图（当前模块清单 + 5 波次）
-10. [docs/adr/README.md](docs/adr/README.md) — 所有架构决策索引
-11. [docs/infra/technical-specs.md](docs/infra/technical-specs.md) — 基础设施技术规格（H6 状态机 / H7 导入导出 / H8 ERP 防腐层 / H9 打印 / H10 备份恢复）
-12. [docs/concept-audit.md](docs/concept-audit.md) — 概念审计报告（8 镜头扫描结果 + 数据量评估）
-13. [docs/domain/clarifications.md](docs/domain/clarifications.md) — 业务澄清记录（42 项决策）
-14. [docs/glossary.md](docs/glossary.md) — 术语表（54 个，含禁用词）
+9. [docs/prototypes/matrix-e2e-screenshot-gate.md](docs/prototypes/matrix-e2e-screenshot-gate.md) — Matrix E2E 截图门禁（全量 tab / DOM / 交互 / 截图证据）
+10. [docs/architecture-dependencies.md](docs/architecture-dependencies.md) — 模块依赖图（当前模块清单 + 5 波次）
+11. [docs/adr/README.md](docs/adr/README.md) — 所有架构决策索引
+12. [docs/infra/technical-specs.md](docs/infra/technical-specs.md) — 基础设施技术规格（H6 状态机 / H7 导入导出 / H8 ERP 防腐层 / H9 打印 / H10 备份恢复）
+13. [docs/concept-audit.md](docs/concept-audit.md) — 概念审计报告（8 镜头扫描结果 + 数据量评估）
+14. [docs/domain/clarifications.md](docs/domain/clarifications.md) — 业务澄清记录（42 项决策）
+15. [docs/glossary.md](docs/glossary.md) — 术语表（54 个，含禁用词）
 
 ## 业务文档索引
 

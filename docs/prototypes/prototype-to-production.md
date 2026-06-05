@@ -27,6 +27,7 @@
 | 8 | 错误路径 | 用户可见错误、权限错误、网络错误有处理 | L4 测试 |
 | 9 | 数据一致 | 乐观更新、分页、缓存失效、并发刷新有策略 | TanStack Query key / invalidation |
 | 10 | 视觉基线 | 原型 baseline 当前 T3 视觉回归通过 | `check_visual_regression.py` 输出 |
+| 11 | Matrix E2E 截图 | 合并前全量矩阵 E2E 截图通过 | `just matrix-e2e-full` / `check_matrix_e2e_report.py` 输出 |
 
 ## 3. 迁移步骤
 

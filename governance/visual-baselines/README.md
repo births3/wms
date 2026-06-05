@@ -73,3 +73,16 @@ python3 scripts/governance/accept_baseline.py --apply --reviewer="项目主人" 
 | `capture_visual_snapshots.py` | 工具 | chrome headless 截图 |
 | `check_visual_regression.py` | T3 | baseline ↔ snapshot 像素差 + 截断检测 |
 | `check_visual_keywords.py` | T3 | OCR 关键字 sanity check |
+| `check_e2e_matrix_completeness.py` | T1 | Matrix E2E 策略覆盖全部 tab |
+| `run_matrix_e2e_screenshots.py` | T4 | Playwright 全量矩阵 E2E 截图、DOM 健康与交互截图 |
+| `check_matrix_e2e_report.py` | T4 | 校验 Matrix E2E 聚合报告 |
+
+## Matrix E2E Screenshot Gate
+
+C 方案全量门禁命令：
+
+```bash
+just matrix-e2e-full
+```
+
+本门禁基于 `manifest.toml` 的全部 tab 生成 Playwright 场景，并输出到 `prototypes/.e2e-artifacts/`。策略文件为 `e2e-scenarios.toml`，详细规则见 `docs/prototypes/matrix-e2e-screenshot-gate.md`。

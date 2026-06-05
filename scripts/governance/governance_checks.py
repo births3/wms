@@ -69,6 +69,7 @@ TIER_SCRIPTS: dict[str, list[str]] = {
         "check_prototype_fidelity.py",
         "check_prototype_navigation.py",
         "check_baseline_completeness.py",
+        "check_e2e_matrix_completeness.py",
     ],
     "T2": [
         # T1 + diff 驱动（task_check.py）之外，T2 全量入口也要跑
@@ -86,7 +87,8 @@ TIER_SCRIPTS: dict[str, list[str]] = {
         "check_visual_keywords.py",
     ],
     "T4": [
-        # 未来 Wave 4+：perf baseline、observability、concurrency、API compat 等
+        # 完整矩阵 E2E 截图报告由 just verify 的 _t4-e2e 生成，这里只校验报告。
+        "check_matrix_e2e_report.py",
     ],
 }
 

@@ -440,6 +440,7 @@ StatusBadge.displayName = "StatusBadge";
 cd prototypes && pnpm dev &                                    # 1. 起 vite
 python3 scripts/governance/capture_visual_snapshots.py         # 2. 截 N 个 tab → .visual-snapshots/
 python3 scripts/governance/check_visual_regression.py          # 3. 对比 baseline ↔ snapshot
+just matrix-e2e-full                                           # 4. T4 全量矩阵 E2E 截图（合并前）
 ```
 
 ### 12.1 阈值（参 governance/visual-baselines/README.md）
@@ -501,9 +502,14 @@ python3 scripts/governance/check_visual_regression.py          # 3. 对比 basel
 | 脚本 | Tier | 作用 |
 |---|---|---|
 | `check_baseline_completeness.py` | T1 | Tabs.tsx ↔ manifest.toml ↔ baseline PNG 三者一致（强制） |
+| `check_e2e_matrix_completeness.py` | T1 | Matrix E2E 策略覆盖全部 baseline tab |
 | `check_prototype_navigation.py` | T1 | 原型预览导航必须保持领域 / 模块 / 页面三层结构 |
 | `capture_visual_snapshots.py` | 工具 | chrome headless 截图（按 manifest.toml 配置） |
 | `check_visual_regression.py` | T3 | MD5 + 像素 + 64×64 感知差异 + 底部截断检测 |
+| `run_matrix_e2e_screenshots.py` | T4 | Playwright 全量矩阵 E2E 截图 + DOM / 交互健康检查 |
+| `check_matrix_e2e_report.py` | T4 | 校验 Matrix E2E 聚合报告 |
+
+Matrix E2E 详细规范见 [docs/prototypes/matrix-e2e-screenshot-gate.md](prototypes/matrix-e2e-screenshot-gate.md)。
 
 ## 13. 前端原型先行与生产迁移（ADR-0029）
 

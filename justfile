@@ -117,8 +117,8 @@ _t4-full-tests:
     @# cargo test --workspace --release
 
 _t4-e2e:
-    @echo "  · E2E tests (placeholder, [WAVE-3])"
-    @# pnpm -r run test:e2e
+    @echo "  · Matrix E2E screenshots (full, [PROTOTYPE-C])"
+    @just matrix-e2e-full
 
 _t4-perf-bench:
     @echo "  · L7 performance baselines (placeholder, [WAVE-4])"
@@ -162,6 +162,18 @@ gov-t1:
 # 跑全部 T2 治理脚本
 gov-t2:
     @python3 scripts/governance/governance_checks.py --tier T2
+
+# Matrix E2E 截图烟测（默认只跑前 20 个 tab；可传 --tab 精确调试）
+matrix-e2e-smoke *args:
+    @python3 scripts/governance/check_e2e_matrix_completeness.py
+    @python3 scripts/governance/run_matrix_e2e_screenshots.py --limit 20 {{args}}
+    @python3 scripts/governance/check_matrix_e2e_report.py --allow-partial
+
+# Matrix E2E 截图全量门禁（C 方案：204 tab，全量 DOM / 交互 / 截图证据）
+matrix-e2e-full *args:
+    @python3 scripts/governance/check_e2e_matrix_completeness.py
+    @python3 scripts/governance/run_matrix_e2e_screenshots.py {{args}}
+    @python3 scripts/governance/check_matrix_e2e_report.py
 
 # 生成主仓 OpenAPI JSON 并刷新 @wms/api-client 类型
 openapi-sync:

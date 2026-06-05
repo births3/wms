@@ -173,7 +173,22 @@ tier = "T1"
 
 [[rules]]
 match = "governance/visual-baselines/manifest.toml"
-checks = ["check_baseline_completeness"]
+checks = ["check_baseline_completeness", "check_e2e_matrix_completeness"]
+tier = "T1"
+
+[[rules]]
+match = "governance/visual-baselines/e2e-scenarios.toml"
+checks = ["check_e2e_matrix_completeness"]
+tier = "T1"
+
+[[rules]]
+match = "prototypes/e2e/**"
+checks = ["check_e2e_matrix_completeness"]
+tier = "T1"
+
+[[rules]]
+match = "prototypes/playwright-matrix-config.ts"
+checks = ["check_e2e_matrix_completeness"]
 tier = "T1"
 
 [[rules]]

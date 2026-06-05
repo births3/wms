@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "test:e2e:matrix": "playwright test --config=playwright-matrix-config.ts",
     "preview": "vite preview",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
@@ -17,6 +18,7 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@storybook/addon-essentials": "^8.4.0",
     "@storybook/blocks": "^8.4.0",
     "@storybook/react": "^8.4.0",
