@@ -20,6 +20,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+from validate_wave3_pda_runtime_evidence import validate_one
+
 _THIS = Path(__file__).resolve()
 REPO_ROOT = _THIS.parent.parent.parent
 
@@ -101,18 +103,57 @@ def pda_app_started() -> bool:
     return bool(real_files) and (root / "package.json").exists()
 
 
+def adr_0027_accepted() -> bool:
+    text = read_text("docs/adr/0027-pda-offline-model.md")
+    return "- 状态：Accepted" in text or "- 状态: Accepted" in text
+
+
+def pda_runtime_evidence_status() -> tuple[bool, str]:
+    return validate_one(
+        REPO_ROOT / "docs/retros/wave-3-pda-runtime-evidence.json",
+        allow_example_refs=False,
+    )
+
+
 def pda_readiness_recorded() -> bool:
     return (
         file_contains(
             "docs/runbooks/wave-3-pda-readiness.md",
-            "SPIKE-005",
-            "不引入 RN 依赖",
+            "SPIKE-005B",
+            "不引入 RN / Expo / EAS / Capacitor 生产 workspace 依赖",
             "设备清单",
+            "蓝牙打印",
+            "Wave 5",
+            "docs/retros/wave-5-hardware-evidence.json",
         )
         and file_contains(
             "docs/spikes/spike-005-rn-scanner.md",
             "7.7 Wave 3 readiness 决策",
             "先落 readiness/runbook",
+            "真 PDA",
+            "手机摄像头不能作为 SPIKE-005 evidence",
+        )
+        and file_contains(
+            "docs/spikes/spike-005b-webview-capacitor-pda.md",
+            "7.1 用户确认",
+            "WebView/Capacitor native shell",
+            "不直接替换 ADR-0001",
+        )
+        and file_contains(
+            "docs/adr/0027-pda-offline-model.md",
+            "PDA 离线模型与技术栈定版框架",
+            "react-native",
+            "webview-capacitor",
+            "本 ADR 进入 Accepted 的前置条件",
+            "apps/pda-mobile",
+        )
+        and file_contains(
+            "docs/domain/clarifications.md",
+            "PDA 端推进方式",
+            "SPIKE-005 / SPIKE-005B readiness",
+            "PDA Web 打包方案边界",
+            "ADR-0027 定版",
+            "不引入 RN / Expo / EAS / Capacitor 生产 workspace 依赖",
         )
     )
 
@@ -467,20 +508,44 @@ def collect_items() -> list[EvidenceItem]:
     ))
 
     pda_ready = pda_readiness_recorded()
-    pda_ok = pda_app_started()
+    pda_started = pda_app_started()
+    pda_adr_accepted = adr_0027_accepted()
+    pda_evidence_ok, pda_evidence_message = (
+        pda_runtime_evidence_status()
+        if pda_started and pda_adr_accepted
+        else (False, "")
+    )
+    pda_ok = pda_started and pda_adr_accepted and pda_evidence_ok
     items.append(EvidenceItem(
         "W3.A-PDA-readiness",
-        "PDA 生产端启动前置：SPIKE-005 readiness / 设备清单 / 执行 runbook",
+        "PDA 生产端启动前置：SPIKE-005 / SPIKE-005B readiness、设备清单与执行 runbook",
         PROVED_BY_STATIC_FILES if pda_ready else MISSING_OR_NEEDS_CONFIRMATION,
-        ["docs/runbooks/wave-3-pda-readiness.md", "docs/spikes/spike-005-rn-scanner.md"] if pda_ready else [],
-        [] if pda_ready else ["缺少 PDA readiness runbook 或 SPIKE-005 readiness 决策记录"],
+        [
+            "docs/runbooks/wave-3-pda-readiness.md",
+            "docs/adr/0027-pda-offline-model.md",
+            "docs/domain/clarifications.md",
+            "docs/spikes/spike-005-rn-scanner.md",
+            "docs/spikes/spike-005b-webview-capacitor-pda.md",
+        ] if pda_ready else [],
+        [] if pda_ready else ["缺少 PDA readiness runbook、ADR-0027、clarifications 或 SPIKE-005 / 005B readiness 决策记录"],
     ))
     items.append(EvidenceItem(
         "W3.A-PDA-production",
         "PDA 生产 app：承接 M2/M3 扫码与离线队列",
         PROVED_BY_STATIC_FILES if pda_ok else PRE_RELEASE_GATE,
-        ["apps/pda-mobile"] if pda_ok else [],
-        [] if pda_ok else ["按用户决策先不引入 RN 依赖；生产 app 等 SPIKE-005 真机验证后启动"],
+        [
+            "apps/pda-mobile",
+            "docs/adr/0027-pda-offline-model.md",
+            "docs/retros/wave-3-pda-runtime-evidence.json",
+        ] if pda_ok else [],
+        [] if pda_ok else [
+            f"ADR-0027 Accepted 后还必须通过 PDA runtime evidence validator：{pda_evidence_message}"
+            if pda_started and pda_adr_accepted
+            else
+            "生产 app 必须等 ADR-0027 Accepted；当前仍需 SPIKE-005 / 005B 真机验证和 dev/staging evidence"
+            if pda_started
+            else "按用户决策先不引入 RN / Expo / EAS / Capacitor 生产 workspace 依赖；生产 app 等 SPIKE-005 / 005B 真机验证、ADR-0027 Accepted 后启动"
+        ],
         strict_blocking=False,
     ))
 

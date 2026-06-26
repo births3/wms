@@ -22,6 +22,12 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
             "missing_in_config_center": [],
             "mismatched": [],
         },
+        "business_smoke": {
+            "path": args.business_smoke_path,
+            "enabled_flag": args.business_smoke_enabled_flag,
+            "success_status": args.business_smoke_success_status,
+            "fail_closed_error_code": args.business_smoke_fail_closed_error_code,
+        },
         "smoke_log_ref": args.smoke_log_ref,
         "reconcile_log_ref": args.reconcile_log_ref,
         "archive_ref": args.archive_ref,
@@ -52,6 +58,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--service-url", required=True)
     parser.add_argument("--migrated-count", type=int, required=True)
     parser.add_argument("--reconcile-matched", type=int, required=True)
+    parser.add_argument("--business-smoke-path", default="/api/v1/inventory/batches")
+    parser.add_argument(
+        "--business-smoke-enabled-flag",
+        default="m3_inventory_batches_config_center_smoke",
+    )
+    parser.add_argument("--business-smoke-success-status", type=int, default=200)
+    parser.add_argument(
+        "--business-smoke-fail-closed-error-code",
+        default="M1_CONFIG_FLAG_MISSING",
+    )
     parser.add_argument("--smoke-log-ref", required=True)
     parser.add_argument("--reconcile-log-ref", required=True)
     parser.add_argument("--archive-ref", required=True)

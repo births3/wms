@@ -38,11 +38,12 @@ REPO_ROOT = _THIS.parent.parent.parent
 GOVERNANCE_MD = REPO_ROOT / "docs" / "governance.md"
 GATE_RULES = REPO_ROOT / "governance" / "gate-rules.toml"
 
-# §4.6 表格行模式：| Wave N | `script_a.py` / `script_b.py` | T2 | ... |
+# §4.6 表格行模式：| Wave N | `script_a.py` / `script_b.py` | T2 | `path/**` |
 TABLE_ROW_RE = re.compile(
-    r"^\|\s*Wave\s*(\d+)\s*\|\s*([^|]+?)\s*\|\s*(T\d+)\s*\|"
+    r"^\|\s*Wave\s*(\d+)\s*\|\s*([^|]+?)\s*\|\s*(T\d+)\s*\|\s*([^|]+?)\s*\|"
 )
 SCRIPT_RE = re.compile(r"`([a-z_][a-z0-9_]*)\.py`")
+PATTERN_RE = re.compile(r"`([^`]+)`")
 
 
 @dataclass
@@ -52,40 +53,52 @@ class Issue:
     detail: str
 
 
-def parse_doc_section() -> dict[str, str]:
-    """从 governance.md §4.6 解析 {script_name: tier}。
+@dataclass
+class RuleSpec:
+    tier: str
+    patterns: set[str]
+
+
+def _doc_section_text() -> str:
+    if not GOVERNANCE_MD.exists():
+        return ""
+    text = GOVERNANCE_MD.read_text(encoding="utf-8")
+    start = text.find("### 4.6 Tier 启动 SOP")
+    if start == -1:
+        return ""
+    end = text.find("\n---", start)
+    return text[start:end] if end != -1 else text[start:]
+
+
+def parse_doc_rule_specs() -> dict[str, RuleSpec]:
+    """从 governance.md §4.6 解析 {script_name: RuleSpec}。
 
     跳过标记"CI 全量，非 diff 触发"的脚本（这些不需在 gate-rules.toml 出现）。
     """
-    if not GOVERNANCE_MD.exists():
-        return {}
-    text = GOVERNANCE_MD.read_text(encoding="utf-8")
-
-    # 定位 §4.6 段
-    start = text.find("### 4.6 Tier 启动 SOP")
-    if start == -1:
-        return {}
-    end = text.find("\n---", start)
-    section = text[start:end] if end != -1 else text[start:]
-
-    scripts: dict[str, str] = {}
-    for line in section.splitlines():
+    scripts: dict[str, RuleSpec] = {}
+    for line in _doc_section_text().splitlines():
         m = TABLE_ROW_RE.match(line)
         if not m:
             continue
         # 跳过"CI 全量，非 diff 触发"的行（这些不应在 gate-rules.toml 出现）
         if "非 diff 触发" in line or "CI 全量" in line:
             continue
-        wave_num = m.group(1)
         scripts_cell = m.group(2)
         tier = m.group(3)
+        patterns_cell = m.group(4)
+        patterns = set(PATTERN_RE.findall(patterns_cell))
         for sm in SCRIPT_RE.finditer(scripts_cell):
-            scripts[sm.group(1)] = tier
+            scripts[sm.group(1)] = RuleSpec(tier=tier, patterns=patterns)
     return scripts
 
 
-def parse_gate_rules() -> dict[str, str]:
-    """从 gate-rules.toml 的 Wave 计划段解析 {check_name: tier}。"""
+def parse_doc_section() -> dict[str, str]:
+    """从 governance.md §4.6 解析 {script_name: tier}。"""
+    return {script: spec.tier for script, spec in parse_doc_rule_specs().items()}
+
+
+def parse_gate_rule_specs() -> dict[str, RuleSpec]:
+    """从 gate-rules.toml 的 Wave 计划段解析 {check_name: RuleSpec}。"""
     if not GATE_RULES.exists():
         return {}
     text = GATE_RULES.read_text(encoding="utf-8")
@@ -101,14 +114,20 @@ def parse_gate_rules() -> dict[str, str]:
         import tomli
         data = tomli.loads(text)
 
-    scripts: dict[str, str] = {}
+    scripts: dict[str, RuleSpec] = {}
     for r in data.get("rules", []):
         tier = r.get("tier", "T2")
+        pattern = r.get("match", "")
         for c in r.get("checks", []):
-            # 同一脚本在多规则出现时，取首次的 tier
             if c not in scripts:
-                scripts[c] = tier
+                scripts[c] = RuleSpec(tier=tier, patterns=set())
+            scripts[c].patterns.add(pattern)
     return scripts
+
+
+def parse_gate_rules() -> dict[str, str]:
+    """从 gate-rules.toml 的 Wave 计划段解析 {check_name: tier}。"""
+    return {script: spec.tier for script, spec in parse_gate_rule_specs().items()}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -116,8 +135,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
 
-    doc_scripts = parse_doc_section()
-    gate_scripts = parse_gate_rules()
+    doc_specs = parse_doc_rule_specs()
+    gate_specs = parse_gate_rule_specs()
+    doc_scripts = {script: spec.tier for script, spec in doc_specs.items()}
+    gate_scripts = {script: spec.tier for script, spec in gate_specs.items()}
 
     issues: list[Issue] = []
 
@@ -146,6 +167,16 @@ def main(argv: list[str] | None = None) -> int:
                 kind="tier_mismatch",
                 script=script,
                 detail=f"§4.6={doc_scripts[script]} vs gate-rules.toml={gate_scripts[script]}",
+            ))
+        missing_patterns = doc_specs[script].patterns - gate_specs[script].patterns
+        if missing_patterns:
+            issues.append(Issue(
+                kind="pattern_mismatch",
+                script=script,
+                detail=(
+                    "§4.6 声明但 gate-rules.toml 未覆盖的模式: "
+                    f"{', '.join(sorted(missing_patterns))}"
+                ),
             ))
 
     if args.json:

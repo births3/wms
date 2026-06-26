@@ -225,6 +225,64 @@ wave-3-complete-check:
 wave-3-pda-runtime-evidence-validate:
     @python3 scripts/governance/validate_wave3_pda_runtime_evidence.py
 
+# Wave 3 真 PDA + L7 runtime evidence readiness；不写 evidence
+wave-3-pda-runtime-readiness *args:
+    @python3 scripts/governance/check_wave3_pda_runtime_readiness.py {{args}}
+
+# Wave 3 无 PDA 阶段服务前置检查；只探测 dev/staging health 与 Wave3 鉴权边界，不写 evidence
+wave-3-pda-service-precheck *args:
+    @python3 scripts/governance/check_wave3_pda_runtime_readiness.py --service-precheck-only {{args}}
+
+# Wave 3 无 PDA 阶段追溯码 OpenAPI 前置检查；只读验证合约和 X-API-Key，不写 evidence
+wave-3-pda-trace-code-openapi-precheck *args:
+    @python3 scripts/governance/check_wave3_pda_runtime_readiness.py --trace-code-openapi-precheck {{args}}
+
+# Wave 3 无 PDA 阶段现场材料清单；只输出字段分工，不探测服务、不写 evidence
+wave-3-pda-materials-checklist *args:
+    @python3 scripts/governance/check_wave3_pda_runtime_readiness.py --materials-checklist {{args}}
+
+# Wave 3 无 PDA 阶段预审包；汇总可推进项、真机阻塞项和禁止事项，不探测服务、不写 evidence
+wave-3-pda-preaudit-kit *args:
+    @python3 scripts/governance/check_wave3_pda_runtime_readiness.py --preaudit-kit {{args}}
+
+# Wave 3 现场资源申请包；只输出可转发 Markdown/JSON，不探测服务、不写 evidence
+wave-3-pda-field-work-request *args:
+    @python3 scripts/governance/check_wave3_pda_runtime_readiness.py --field-work-request {{args}}
+
+# Wave 3 现场执行摘要；只汇总当前变量缺口和下一步命令，不探测服务、不写 evidence
+wave-3-pda-field-execution-summary *args:
+    @python3 scripts/governance/check_wave3_pda_runtime_readiness.py --field-execution-summary {{args}}
+
+# Wave 3 现场前置一键预检；组合服务、追溯码 OpenAPI 和字段摘要，只读不写 evidence
+wave-3-pda-field-precheck-summary *args:
+    @python3 scripts/governance/check_wave3_pda_runtime_readiness.py --field-precheck-summary {{args}}
+
+# Wave 3 现场 owner 缺口动作单；按负责人聚合缺口，只读不写 evidence
+wave-3-pda-field-owner-gap-actions *args:
+    @python3 scripts/governance/check_wave3_pda_runtime_readiness.py --field-owner-gap-actions {{args}}
+
+# Wave 3 现场交接总包；聚合预审、材料、owner 缺口、证据包模板和可选 from-env/attachment 预检，可用 --field-handoff-output 归档，只读不写 evidence
+wave-3-pda-field-handoff-bundle *args:
+    @python3 scripts/governance/check_wave3_pda_runtime_readiness.py --field-handoff-bundle {{args}}
+
+# Wave 3 现场证据包 Markdown/JSON 模板；只输出模板，不写 runtime evidence
+wave-3-pda-evidence-package-template *args:
+    @python3 scripts/governance/record_wave3_pda_runtime_evidence.py --export-package-template {{args}}
+
+# Wave 3 现场 JSON intake 模板；可输出或用 --intake-template-output 落盘，不写 runtime evidence
+wave-3-pda-intake-template *args:
+    @python3 scripts/governance/record_wave3_pda_runtime_evidence.py --export-intake-template {{args}}
+
+# Wave 3 现场 JSON intake 只读校验；从 WAVE_3_PDA_EVIDENCE_PACKAGE_TEMPLATE_FROM_INTAKE_FILE 读取路径，不写 runtime evidence
+wave-3-pda-intake-check *args:
+    @test -n "$WAVE_3_PDA_EVIDENCE_PACKAGE_TEMPLATE_FROM_INTAKE_FILE" || (echo "WAVE_3_PDA_EVIDENCE_PACKAGE_TEMPLATE_FROM_INTAKE_FILE is required" >&2; exit 2)
+    @python3 scripts/governance/record_wave3_pda_runtime_evidence.py --from-intake-file "$WAVE_3_PDA_EVIDENCE_PACKAGE_TEMPLATE_FROM_INTAKE_FILE" --check-only {{args}}
+
+# Wave 3 现场 JSON intake 正式记录；从同一份 intake 文件读取真实材料，写 runtime evidence
+wave-3-pda-intake-record *args:
+    @test -n "$WAVE_3_PDA_EVIDENCE_PACKAGE_TEMPLATE_FROM_INTAKE_FILE" || (echo "WAVE_3_PDA_EVIDENCE_PACKAGE_TEMPLATE_FROM_INTAKE_FILE is required" >&2; exit 2)
+    @python3 scripts/governance/record_wave3_pda_runtime_evidence.py --from-intake-file "$WAVE_3_PDA_EVIDENCE_PACKAGE_TEMPLATE_FROM_INTAKE_FILE" {{args}}
+
 # 记录 Wave 3 真 PDA + L7 runtime evidence；参数透传给 record_wave3_pda_runtime_evidence.py
 wave-3-pda-runtime-evidence-record *args:
     @python3 scripts/governance/record_wave3_pda_runtime_evidence.py {{args}}
@@ -240,6 +298,10 @@ wave-4-complete-check:
 # Wave 4 外部依赖真实证据校验（当前主要覆盖 M-TC 码上放心）
 wave-4-external-dependencies-validate:
     @python3 scripts/governance/validate_wave4_external_dependencies.py
+
+# Wave 4 外部依赖 readiness；只读检查真实材料引用，不写 evidence
+wave-4-external-dependencies-readiness *args:
+    @python3 scripts/governance/check_wave4_external_dependencies_readiness.py {{args}}
 
 # 记录 Wave 4 外部依赖真实证据；参数透传给 record_wave4_external_dependencies.py
 wave-4-external-dependencies-record *args:
@@ -268,6 +330,14 @@ wave-5-complete-check:
 wave-5-hardware-evidence-validate:
     @python3 scripts/governance/validate_wave5_hardware_evidence.py
 
+# Wave 5 M-PK 真实硬件 evidence 材料预检；只校验字段和引用边界，不写 evidence
+wave-5-hardware-materials *args:
+    @python3 scripts/governance/record_wave5_hardware_evidence.py --check-only {{args}}
+
+# Wave 5 M-PK 真实硬件 evidence readiness；只读预检，不连接硬件，不写 evidence
+wave-5-hardware-readiness *args:
+    @python3 scripts/governance/record_wave5_hardware_evidence.py --check-only {{args}}
+
 # 记录 Wave 5 M-PK 真实硬件 evidence；参数透传给 record_wave5_hardware_evidence.py
 wave-5-hardware-evidence-record *args:
     @python3 scripts/governance/record_wave5_hardware_evidence.py {{args}}
@@ -275,6 +345,14 @@ wave-5-hardware-evidence-record *args:
 # Wave 5 M10 TMS+ 真实 dev/staging evidence 预发布验证
 wave-5-tms-evidence-validate:
     @python3 scripts/governance/validate_wave5_tms_evidence.py
+
+# Wave 5 M10 TMS+ 材料检查；只读检查真实 dev/staging refs，不写 evidence
+wave-5-tms-materials *args:
+    @python3 scripts/governance/record_wave5_tms_evidence.py --check-only {{args}}
+
+# Wave 5 M10 TMS+ readiness；只读检查真实 dev/staging refs，不写 evidence
+wave-5-tms-readiness *args:
+    @python3 scripts/governance/record_wave5_tms_evidence.py --check-only {{args}}
 
 # 记录 Wave 5 M10 TMS+ evidence；参数透传给 record_wave5_tms_evidence.py
 wave-5-tms-evidence-record *args:
@@ -292,9 +370,29 @@ wave-6-complete-check:
 wave-6-evidence-check:
     @python3 scripts/governance/report_wave6_pre_release.py --strict --evidence-only
 
+# Wave 6 缺失 evidence gate 的人工采集命令清单（只读，不写 evidence）
+wave-6-missing-evidence-commands:
+    @python3 scripts/governance/report_wave6_pre_release.py --commands-only --strict --evidence-only
+
+# Wave 6 evidence preflight：只检查 runbook / just 入口 / validator 链路，不写真实 evidence
+wave-6-evidence-preflight:
+    @python3 scripts/governance/check_wave6_evidence_preflight.py
+
 # Wave 6 灰度发布 evidence 预发布验证
 wave-6-deploy-evidence-validate:
     @python3 scripts/governance/validate_wave6_deploy_evidence.py
+
+# Wave 6 灰度发布 readiness：只读检查 staging / payload 前置条件，不写 evidence
+wave-6-deploy-readiness *args:
+    @python3 scripts/governance/check_wave6_deploy_readiness.py {{args}}
+
+# Wave 6 灰度发布材料 worksheet：只读检查外部 ref 环境变量，不写 evidence
+wave-6-deploy-materials *args:
+    @python3 scripts/governance/report_wave6_deploy_materials.py {{args}}
+
+# Wave 6 灰度发布审计写入：正式写 audit_event，输出 audit_event_query_ref
+wave-6-deploy-audit *args:
+    @cargo run --manifest-path backend/Cargo.toml -p wms-api --bin wms-deploy-audit -- {{args}}
 
 # 记录 Wave 6 灰度发布 evidence；参数透传给 record_wave6_deploy_evidence.py
 wave-6-deploy-evidence-record *args:
@@ -307,6 +405,22 @@ wave-2-runtime-evidence-validate:
 # 记录 Wave 2 配置中心 Feature Flag runtime evidence；参数透传给 record_wave2_runtime_evidence.py
 wave-2-runtime-evidence-record *args:
     @python3 scripts/governance/record_wave2_runtime_evidence.py {{args}}
+
+# Wave 2 配置中心 Feature Flag runtime evidence readiness；不写 evidence
+wave-2-runtime-evidence-readiness *args:
+    @python3 scripts/governance/collect_wave2_runtime_evidence.py --check-only {{args}}
+
+# 执行 Wave 2 配置中心 Feature Flag 真实 smoke 并记录 runtime evidence
+wave-2-runtime-evidence-smoke *args:
+    @python3 scripts/governance/collect_wave2_runtime_evidence.py {{args}}
+
+# 执行 Wave 2 配置中心 Feature Flag 真实 smoke 并记录 runtime evidence（兼容别名）
+wave-2-runtime-evidence-collect *args:
+    @python3 scripts/governance/collect_wave2_runtime_evidence.py {{args}}
+
+# 生成 Wave 2 staging H1 token；输出 export WAVE_2_H1_TOKEN=...
+wave-2-h1-token *args:
+    @python3 scripts/governance/generate_wave2_h1_token.py {{args}}
 
 # 定向验证两份 Wave 1 runtime evidence JSON（不检查其他静态完成项）
 wave-1-runtime-evidence-validate:
@@ -321,6 +435,124 @@ wave-1-h2-runtime-readiness:
     @python3 scripts/governance/check_wave1_runtime_evidence_prereqs.py --mode h2 && \
       python3 scripts/governance/check_wave1_h2_runtime_readiness.py \
         --database-url "$WAVE1_H2_DATABASE_URL"
+
+# Wave 1 H2 本机 dev-h2 dry-run 状态报告：只读，不写 evidence，不能关闭 W6.A gate
+wave-1-h2-runtime-readiness-dry-run:
+    @python3 scripts/governance/check_wave1_h2_runtime_readiness.py \
+      --database-url "$WAVE1_H2_DATABASE_URL" \
+      --dry-run-alias-ok \
+      --json
+
+# Wave 1 H2 dev 基线材料状态：只读查看行数、分布、容量和 loader 进程，不写 runtime evidence
+wave-1-h2-baseline-status-container:
+    @sudo -n docker exec wms-dev-h2-postgres-dev-h2-1 psql -U wms_dev_h2 -d wms_dev_h2 -v ON_ERROR_STOP=1 -c "select count(*) as audit_event_rows from audit_event; select count(*) as audit_chain_seal_rows from audit_chain_seal; select occurred_at::date as day, count(*) as rows from audit_event group by 1 order by 1; with audit_event_relations as (select 'audit_event'::regclass as relid union select inhrelid from pg_inherits where inhparent = 'audit_event'::regclass) select pg_size_pretty(pg_database_size(current_database())) as db_size, pg_size_pretty(sum(pg_total_relation_size(relid))) as audit_event_total_size from audit_event_relations;"
+    @sudo -n docker exec wms-dev-h2-postgres-dev-h2-1 df -h /var/lib/postgresql/data
+    @ps -eo pid,ppid,stat,pcpu,pmem,etime,cmd | rg '[w]ms-audit-baseline-load|[d]ocker run --rm --pull=never --network wms-dev-h2_default' || true
+
+# Wave 1 H2 dev 60M 基线材料 preflight：只读检查封档/混入/并发加载，然后 dry-run，不写 runtime evidence
+wave-1-h2-baseline-preflight-60m-container:
+    @SEALED_COUNT="$(sudo -n docker exec wms-dev-h2-postgres-dev-h2-1 psql -U wms_dev_h2 -d wms_dev_h2 -v ON_ERROR_STOP=1 -Atc "select count(*) from audit_chain_seal where seal_date >= current_date - 7 and seal_date < current_date")"; if [ "$SEALED_COUNT" != "0" ]; then echo "target date range already contains audit_chain_seal rows: $SEALED_COUNT" >&2; exit 2; fi
+    @MIXED_COUNT="$(sudo -n docker exec wms-dev-h2-postgres-dev-h2-1 psql -U wms_dev_h2 -d wms_dev_h2 -v ON_ERROR_STOP=1 -Atc "select count(*) from audit_event where occurred_at >= current_date - 7 and occurred_at < current_date and (actor_name <> 'wave1-h2-baseline-loader' or action <> 'baseline.synthetic_event.prepared')")"; if [ "$MIXED_COUNT" != "0" ]; then echo "target date range contains non-baseline audit_event rows: $MIXED_COUNT" >&2; exit 2; fi
+    @if ps -eo cmd | rg -q '[w]ms-audit-baseline-load|[d]ocker run --rm --pull=never --network wms-dev-h2_default'; then echo "baseline loader already running; refusing preflight" >&2; exit 2; fi
+    @just wave-1-h2-baseline-plan-60m-container
+
+# Wave 1 H2 dev 60M 基线材料规划：固定参数 dry-run，不写 runtime evidence
+wave-1-h2-baseline-plan-60m-container:
+    @RUN_ID="PLAN60M-$(date -u +%Y%m%dT%H%M%SZ)"; just wave-1-h2-baseline-dry-run-container \
+      --target-total-rows 60000000 \
+      --start-date "$(date -u -d '7 days ago' +%F)" \
+      --days 7 \
+      --batch-size 4000 \
+      --run-id "$RUN_ID" \
+      --summary-output "artifacts/dev/wave1/h2/baseline-loader-$RUN_ID.json"
+
+# Wave 1 H2 dev 60M 基线材料加载：固定参数真实写 dev-h2，不写 runtime evidence
+wave-1-h2-baseline-load-60m-container:
+    @RUN_ID="BASELINE60M-$(date -u +%Y%m%dT%H%M%SZ)"; just wave-1-h2-baseline-load-container \
+      --target-total-rows 60000000 \
+      --start-date "$(date -u -d '7 days ago' +%F)" \
+      --days 7 \
+      --batch-size 4000 \
+      --run-id "$RUN_ID" \
+      --summary-output "artifacts/dev/wave1/h2/baseline-loader-$RUN_ID.json" \
+      --execute \
+      --i-understand-this-is-not-evidence
+
+# Wave 1 H2 dev 基线材料 dry-run：只规划 audit_event 补数，不写 runtime evidence
+wave-1-h2-baseline-dry-run *args:
+    @cargo run --manifest-path backend/Cargo.toml -p wms-api --bin wms-audit-baseline-load -- {{args}}
+
+# Wave 1 H2 dev 基线材料容器网络 dry-run：复用 dev-h2 compose 网络，不写 runtime evidence
+wave-1-h2-baseline-dry-run-container *args:
+    @case " {{args}} " in *" --execute "*) echo "dry-run-container refuses --execute; use wave-1-h2-baseline-load-container" >&2; exit 2;; esac
+    @mkdir -p artifacts/dev/wave1/h2
+    @cargo build --manifest-path backend/Cargo.toml -p wms-api --release --bin wms-audit-baseline-load
+    @sudo -n docker run --rm --pull=never --network wms-dev-h2_default \
+      --env-file deploy/env/dev-h2.env \
+      --workdir /tmp \
+      --user "$(id -u):$(id -g)" \
+      -v "$PWD/artifacts/dev/wave1/h2:/tmp/artifacts/dev/wave1/h2" \
+      -v "$PWD/backend/target/release/wms-audit-baseline-load:/tmp/wms-audit-baseline-load:ro" \
+      --entrypoint /bin/sh \
+      wms-api-dev-h2:${WMS_VERSION:-latest} \
+      -c 'export WMS_DB_URL="postgres://wms_dev_h2:${WMS_DEV_H2_DB_PASSWORD}@postgres-dev-h2:5432/wms_dev_h2"; exec /tmp/wms-audit-baseline-load {{args}}'
+
+# Wave 1 H2 dev 基线材料容器网络加载：需要显式 --execute 和 --i-understand-this-is-not-evidence，不写 runtime evidence
+wave-1-h2-baseline-load-container *args:
+    @mkdir -p artifacts/dev/wave1/h2
+    @cargo build --manifest-path backend/Cargo.toml -p wms-api --release --bin wms-audit-baseline-load
+    @sudo -n docker run --rm --pull=never --network wms-dev-h2_default \
+      --env-file deploy/env/dev-h2.env \
+      --workdir /tmp \
+      --user "$(id -u):$(id -g)" \
+      -v "$PWD/artifacts/dev/wave1/h2:/tmp/artifacts/dev/wave1/h2" \
+      -v "$PWD/backend/target/release/wms-audit-baseline-load:/tmp/wms-audit-baseline-load:ro" \
+      -e WMS_DEV_DB_HOST_ALLOWLIST=postgres-dev-h2 \
+      --entrypoint /bin/sh \
+      wms-api-dev-h2:${WMS_VERSION:-latest} \
+      -c 'export WMS_DB_URL="postgres://wms_dev_h2:${WMS_DEV_H2_DB_PASSWORD}@postgres-dev-h2:5432/wms_dev_h2"; exec /tmp/wms-audit-baseline-load {{args}}'
+
+# Wave 1 H2 dev 基线材料加载：需要显式 --execute 和 --i-understand-this-is-not-evidence，不写 runtime evidence
+wave-1-h2-baseline-load *args:
+    @cargo run --manifest-path backend/Cargo.toml -p wms-api --bin wms-audit-baseline-load -- {{args}}
+
+# Wave 1 H2 dev 7 天封档状态：只读查看 audit_chain_seal，不写 runtime evidence
+wave-1-h2-seal-status-container:
+    @sudo -n docker exec wms-dev-h2-postgres-dev-h2-1 psql -U wms_dev_h2 -d wms_dev_h2 -v ON_ERROR_STOP=1 -c "select seal_date, last_id, sealed_at from audit_chain_seal where seal_date >= current_date - 7 and seal_date < current_date order by seal_date; select count(*) as recent_seal_days from audit_chain_seal where seal_date >= current_date - 7 and seal_date < current_date;"
+
+# Wave 1 H2 dev 7 天封档 dry-run：构建维护 binary 并展示目标日期，不写 audit_chain_seal / runtime evidence
+wave-1-h2-seal-dry-run-7d-container:
+    @cargo build --manifest-path backend/Cargo.toml -p wms-api --release --bin audit-maintenance
+    @echo "writes_audit_chain_seal=false"
+    @echo "writes_runtime_evidence=false"
+    @echo "target seal dates:"
+    @for offset in 7 6 5 4 3 2 1; do date -u -d "$offset days ago" +%F; done
+    @just wave-1-h2-seal-status-container
+
+# Wave 1 H2 dev 7 天封档 preflight：只读检查 60M 基线、7 日覆盖、封档冲突和并发加载
+wave-1-h2-seal-preflight-7d-container:
+    @TOTAL_ROWS="$(sudo -n docker exec wms-dev-h2-postgres-dev-h2-1 psql -U wms_dev_h2 -d wms_dev_h2 -v ON_ERROR_STOP=1 -Atc "select count(*) from audit_event")"; if [ "$TOTAL_ROWS" -lt 60000000 ]; then echo "audit_event rows must be >= 60000000 before seal run: $TOTAL_ROWS" >&2; exit 2; fi
+    @DAYS_WITH_EVENTS="$(sudo -n docker exec wms-dev-h2-postgres-dev-h2-1 psql -U wms_dev_h2 -d wms_dev_h2 -v ON_ERROR_STOP=1 -Atc "select count(*) from (select occurred_at::date from audit_event where occurred_at >= current_date - 7 and occurred_at < current_date group by 1 having count(*) > 0) d")"; if [ "$DAYS_WITH_EVENTS" -ne 7 ]; then echo "target window must have audit_event rows on 7 days before seal run: $DAYS_WITH_EVENTS" >&2; exit 2; fi
+    @EVENT_DAYS_WITHOUT_SEAL="$(sudo -n docker exec wms-dev-h2-postgres-dev-h2-1 psql -U wms_dev_h2 -d wms_dev_h2 -v ON_ERROR_STOP=1 -Atc "select count(*) from (select current_date - offs as seal_date from generate_series(1,7) as offs) d where exists (select 1 from audit_event e where e.occurred_at >= d.seal_date and e.occurred_at < d.seal_date + interval '1 day') and not exists (select 1 from audit_chain_seal s where s.seal_date = d.seal_date)")"; if [ "$EVENT_DAYS_WITHOUT_SEAL" -ne 7 ]; then echo "target window must have 7 unsealed event days before seal run: $EVENT_DAYS_WITHOUT_SEAL" >&2; exit 2; fi
+    @SEALED_COUNT="$(sudo -n docker exec wms-dev-h2-postgres-dev-h2-1 psql -U wms_dev_h2 -d wms_dev_h2 -v ON_ERROR_STOP=1 -Atc "select count(*) from audit_chain_seal where seal_date >= current_date - 7 and seal_date < current_date")"; if [ "$SEALED_COUNT" -ne 0 ]; then echo "target date range already contains audit_chain_seal rows: $SEALED_COUNT" >&2; exit 2; fi
+    @if ps -eo cmd | rg -q '[w]ms-audit-baseline-load|[d]ocker run --rm --pull=never --network wms-dev-h2_default'; then echo "baseline loader already running; refusing seal preflight" >&2; exit 2; fi
+    @echo "writes_runtime_evidence=false"
+    @sudo -n docker exec wms-dev-h2-postgres-dev-h2-1 psql -U wms_dev_h2 -d wms_dev_h2 -v ON_ERROR_STOP=1 -Atc "select 'seal preflight ok: audit_event_rows=' || (select count(*) from audit_event) || ' event_days=' || (select count(*) from (select occurred_at::date from audit_event where occurred_at >= current_date - 7 and occurred_at < current_date group by 1 having count(*) > 0) d) || ' unsealed_event_days=' || (select count(*) from (select current_date - offs as seal_date from generate_series(1,7) as offs) d where exists (select 1 from audit_event e where e.occurred_at >= d.seal_date and e.occurred_at < d.seal_date + interval '1 day') and not exists (select 1 from audit_chain_seal s where s.seal_date = d.seal_date))"
+
+# Wave 1 H2 dev 7 天封档执行：真实写 dev-h2 audit_chain_seal，不写 runtime evidence
+wave-1-h2-seal-run-7d-container:
+    @just wave-1-h2-seal-preflight-7d-container
+    @cargo build --manifest-path backend/Cargo.toml -p wms-api --release --bin audit-maintenance
+    @sudo -n docker run --rm --pull=never --network wms-dev-h2_default \
+      --env-file deploy/env/dev-h2.env \
+      --workdir /tmp \
+      --user "$(id -u):$(id -g)" \
+      -v "$PWD/backend/target/release/audit-maintenance:/tmp/audit-maintenance:ro" \
+      -v "$PWD/deploy/scripts/audit_maintenance.sh:/tmp/audit_maintenance.sh:ro" \
+      -e AUDIT_MAINTENANCE_BIN=/tmp/audit-maintenance \
+      --entrypoint /bin/sh \
+      wms-api-dev-h2:${WMS_VERSION:-latest} \
+      -c 'export DATABASE_URL="postgres://wms_dev_h2:${WMS_DEV_H2_DB_PASSWORD}@postgres-dev-h2:5432/wms_dev_h2"; for offset in 7 6 5 4 3 2 1; do seal_date="$(date -u -d "$offset days ago" +%F)"; /tmp/audit_maintenance.sh --seal-date "$seal_date"; done'
 
 # Wave 1 runtime evidence 前置检查：k8s 自动回滚输入边界
 wave-1-runtime-prereq-rollback-k8s:
@@ -357,7 +589,7 @@ wave-1-rollback-runtime-readiness-compose:
         --rollback-log-ref "$WAVE1_ROLLBACK_LOG_REF" \
         --external-log-ref "$WAVE1_EXTERNAL_LOG_REF"
 
-# 采集 Wave 1 H2 runtime 证据：必须在真实 dev PostgreSQL + wrk 压测完成后运行
+# 采集 Wave 1 H2 runtime 证据：必须在真实 dev PostgreSQL + wrk 压测完成后运行，拒绝本机 dev-h2 readiness alias
 wave-1-h2-runtime-evidence:
     @python3 scripts/governance/check_wave1_runtime_evidence_prereqs.py --mode h2 --require-wrk-output && \
       python3 scripts/governance/collect_wave1_h2_runtime_evidence.py \

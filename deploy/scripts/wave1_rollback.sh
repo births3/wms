@@ -10,14 +10,14 @@ usage() {
   cat <<'USAGE'
 Usage:
   wave1_rollback.sh --target k8s --environment dev|staging [--deployment wms-api] [--context ctx] [--namespace ns] [--execute]
-  wave1_rollback.sh --target docker-compose --environment dev|staging --previous-version <sha> [--compose-file path] [--execute]
+  wave1_rollback.sh --target docker-compose --environment dev|staging --previous-version <sha> [--compose-file path] [--compose-env-file path] [--execute]
 
 Default mode prints the command. Add --execute to run it.
 When --execute is used, k8s requires --context and --namespace; docker-compose requires --compose-file.
 
 ADR-0016 rollback commands represented:
   k8s:            kubectl rollout undo deployment/wms-api
-  docker-compose: WMS_VERSION=<prev-sha> docker compose up -d
+  docker-compose: WMS_VERSION=<prev-sha> docker compose up -d --no-build
 USAGE
 }
 
@@ -29,7 +29,10 @@ namespace=""
 previous_version=""
 compose_file=""
 compose_file_abs=""
+compose_env_file="${WAVE1_COMPOSE_ENV_FILE:-}"
+compose_env_file_abs=""
 execute="false"
+docker_bin="${WAVE1_DOCKER_BIN:-docker}"
 
 need_value() {
   if [ -z "${2:-}" ] || [[ "${2:-}" == --* ]]; then
@@ -75,6 +78,11 @@ while [ "$#" -gt 0 ]; do
       compose_file="${2:-}"
       shift 2
       ;;
+    --compose-env-file)
+      need_value "$1" "${2:-}"
+      compose_env_file="${2:-}"
+      shift 2
+      ;;
     --execute)
       execute="true"
       shift
@@ -110,7 +118,30 @@ contains_production_token() {
   [[ "$value" =~ (^|[^[:alnum:]])(prod|production|prodution)([^[:alnum:]]|$) ]]
 }
 
-validate_environment_boundary() {
+contains_local_boundary() {
+  local value="${1,,}"
+  [[ "$value" =~ (^|[^[:alnum:]])(local|localhost|127\.0\.0\.1|0\.0\.0\.0)([^[:alnum:]]|$) ]]
+}
+
+contains_stub_runtime_boundary() {
+  local value="${1,,}"
+  [[ "$value" =~ (^|[^[:alnum:]])(stub|mock|fake)([^[:alnum:]]|$) ]]
+}
+
+contains_example_boundary() {
+  local value="${1,,}"
+  [[ "$value" =~ (^|[^[:alnum:]])example([^[:alnum:]]|$) ]]
+}
+
+contains_template_placeholder() {
+  local value="${1,,}"
+  [[ "$value" =~ (^|[^[:alnum:]])(yyyy|todo|tbd)([^[:alnum:]]|$) ]] \
+    || [[ "$value" == *"<"*">"* ]] \
+    || [[ "$value" == *"待填"* ]] \
+    || [[ "$value" == *"待确认"* ]]
+}
+
+validate_runtime_value() {
   local label="$1"
   local value="$2"
 
@@ -118,6 +149,29 @@ validate_environment_boundary() {
     echo "${label} must not point to a production boundary when --execute is used" >&2
     exit 2
   fi
+  if contains_local_boundary "$value"; then
+    echo "${label} must not point to a local boundary when --execute is used" >&2
+    exit 2
+  fi
+  if contains_stub_runtime_boundary "$value"; then
+    echo "${label} must not point to a stub/mock/fake boundary when --execute is used" >&2
+    exit 2
+  fi
+  if contains_example_boundary "$value"; then
+    echo "${label} must not point to an example boundary when --execute is used" >&2
+    exit 2
+  fi
+  if contains_template_placeholder "$value"; then
+    echo "${label} must not contain a template placeholder when --execute is used" >&2
+    exit 2
+  fi
+}
+
+validate_environment_boundary() {
+  local label="$1"
+  local value="$2"
+
+  validate_runtime_value "$label" "$value"
   if ! contains_environment_token "$value" "$environment"; then
     echo "${label} must include the selected environment token (${environment}) when --execute is used" >&2
     exit 2
@@ -155,11 +209,26 @@ case "$target" in
         compose_file_abs="$compose_file"
       fi
     fi
-    cmd=(docker compose)
+    if [ -n "$compose_env_file" ]; then
+      if [ "$execute" = "true" ] && [ ! -f "$compose_env_file" ]; then
+        echo "--compose-env-file must point to an existing file when --execute is used" >&2
+        exit 2
+      fi
+      if [ -f "$compose_env_file" ]; then
+        compose_env_dir="$(cd "$(dirname "$compose_env_file")" && pwd -P)"
+        compose_env_file_abs="${compose_env_dir}/$(basename "$compose_env_file")"
+      else
+        compose_env_file_abs="$compose_env_file"
+      fi
+    fi
+    cmd=("$docker_bin" compose)
+    if [ -n "$compose_env_file_abs" ]; then
+      cmd+=(--env-file "$compose_env_file_abs")
+    fi
     if [ -n "$compose_file" ]; then
       cmd+=(-f "$compose_file_abs")
     fi
-    cmd+=(up -d)
+    cmd+=(up -d --no-build)
     ;;
   *)
     echo "--target must be k8s or docker-compose" >&2
@@ -182,7 +251,11 @@ if [ "$execute" = "true" ]; then
         echo "--compose-file is required for docker-compose rollback when --execute is used" >&2
         exit 2
       fi
+      validate_runtime_value "--previous-version" "$previous_version"
       validate_environment_boundary "--compose-file" "$compose_file_abs"
+      if [ -n "$compose_env_file_abs" ]; then
+        validate_runtime_value "--compose-env-file" "$compose_env_file_abs"
+      fi
       ;;
   esac
 fi
@@ -193,7 +266,7 @@ case "$target" in
     boundary="${boundary} context=${context:-<not-set>} namespace=${namespace:-<not-set>} deployment=${deployment}"
     ;;
   docker-compose)
-    boundary="${boundary} compose_file=${compose_file_abs:-<not-set>} previous_version=${previous_version}"
+    boundary="${boundary} compose_file=${compose_file_abs:-<not-set>} compose_env_file=${compose_env_file_abs:-<not-set>} previous_version=${previous_version}"
     ;;
 esac
 echo "wave1 rollback ${boundary}"

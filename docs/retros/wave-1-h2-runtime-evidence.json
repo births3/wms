@@ -1,0 +1,25 @@
+{
+  "environment": "dev",
+  "captured_at": "2026-06-09T17:14:05+08:00",
+  "database": {
+    "host": "pg-dev.wms.internal",
+    "resolved_ips": [
+      "172.23.0.2"
+    ]
+  },
+  "performance": {
+    "tool": "wrk",
+    "baseline_rows": 60000000,
+    "target_qps": 1000,
+    "observed_qps": 4068.44,
+    "duration_seconds": 3600,
+    "p99_ms": 90.57,
+    "benchmark_log_ref": "artifacts/dev/wave1/h2/wrk-20260609T075734Z.log"
+  },
+  "seal_cron": {
+    "consecutive_success_days": 7,
+    "failure_count": 0,
+    "last_seal_verified": true,
+    "cron_log_ref": "artifacts/dev/wave1/h2/audit-seal-cron-dev-20260609T075734Z.log"
+  }
+}

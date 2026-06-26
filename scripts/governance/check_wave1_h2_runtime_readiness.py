@@ -8,8 +8,10 @@ import sys
 
 from collect_wave1_h2_runtime_evidence import (
     EvidenceError,
+    H2_DRY_RUN_ALIAS,
     count_audit_rows,
     count_recent_seals,
+    database_host,
     validate_database_url,
 )
 
@@ -19,26 +21,56 @@ def check_readiness(
     environment: str,
     min_baseline_rows: int,
     min_seal_days: int,
+    *,
+    dry_run_alias_ok: bool = False,
 ) -> tuple[bool, dict[str, int | str], list[str]]:
-    validate_database_url(database_url, environment)
+    host = database_host(database_url).lower()
+    dry_run_only = dry_run_alias_ok and host == H2_DRY_RUN_ALIAS
+    if not dry_run_only:
+        validate_database_url(database_url, environment)
     baseline_rows = count_audit_rows(database_url)
     consecutive_success_days = count_recent_seals(database_url)
     facts: dict[str, int | str] = {
         "environment": environment,
+        "database_host": host,
         "baseline_rows": baseline_rows,
         "consecutive_success_days": consecutive_success_days,
         "min_baseline_rows": min_baseline_rows,
         "min_seal_days": min_seal_days,
+        "dry_run_only": dry_run_only,
     }
 
     issues: list[str] = []
+    if dry_run_only:
+        issues.append(
+            f"{H2_DRY_RUN_ALIAS} is dry-run only and cannot close W6.A runtime evidence gate"
+        )
     if baseline_rows < min_baseline_rows:
         issues.append(f"baseline_rows must be >= {min_baseline_rows}, got {baseline_rows}")
     if consecutive_success_days < min_seal_days:
         issues.append(
             f"consecutive_success_days must be >= {min_seal_days}, got {consecutive_success_days}"
         )
-    return not issues, facts, issues
+    return not issues and not dry_run_only, facts, issues
+
+
+def result_payload(ok: bool, facts: dict[str, int | str], issues: list[str]) -> dict[str, object]:
+    dry_run_only = facts.get("dry_run_only") is True
+    return {
+        "check": "check_wave1_h2_runtime_readiness",
+        "tier": "T1",
+        "category": "流程治理",
+        "ok": ok,
+        "schema_version": 1,
+        "mode": "wave1-h2-runtime-readiness",
+        "writes_runtime_evidence": False,
+        "closes_gate": False,
+        "evidence_file": "docs/retros/wave-1-h2-runtime-evidence.json",
+        "dry_run_only": dry_run_only,
+        "formal_evidence_allowed": ok and not dry_run_only,
+        "facts": facts,
+        "issues": issues,
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -47,6 +79,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--environment", default="dev", choices=["dev"])
     parser.add_argument("--min-baseline-rows", default=60_000_000, type=int)
     parser.add_argument("--min-seal-days", default=7, type=int)
+    parser.add_argument(
+        "--dry-run-alias-ok",
+        action="store_true",
+        help="Allow dev-h2.wms.internal for local dry-run reporting only.",
+    )
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
 
@@ -56,6 +93,7 @@ def main(argv: list[str] | None = None) -> int:
             args.environment,
             args.min_baseline_rows,
             args.min_seal_days,
+            dry_run_alias_ok=args.dry_run_alias_ok,
         )
     except (EvidenceError, OSError, ValueError) as error:
         if args.json:
@@ -68,11 +106,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     if args.json:
-        print(json.dumps({
-            "ok": ok,
-            "facts": facts,
-            "issues": issues,
-        }, ensure_ascii=False, indent=2))
+        print(json.dumps(result_payload(ok, facts, issues), ensure_ascii=False, indent=2))
     elif ok:
         print(
             "wave1 h2 runtime readiness ok: "

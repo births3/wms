@@ -51,7 +51,7 @@
 | [ADR-0024](0024-auth-model.md) | 鉴权模型（JWT+AuthContext+多租户）| Accepted v0.3 | SPIKE-001 验证 accept；JWT claims (sub/iat/exp/jti/owner_id/user_name/permissions) + Access Token 1h + Refresh Token 24h + Redis blacklist + 混合失效模式 (permissions_changed_at → AUTH-009) + Redis fail-open 故障降级 + handler 模板（ctx: AuthContext 自动注入 owner_id 过滤）+ PostgreSQL RLS 延后评估 + AUTH-001..009 错误码 |
 | [ADR-0025](0025-audit-storage-model.md) | 审计存储模型（PG append-only）| Accepted v0.2 | SPIKE-002 验证 accept；audit_event 表 + 月分区 (PARTITION BY RANGE) + trigger + wms_app 角色权限 + JSONB diff (jsonb_path_ops 索引) + 每日封档 hash chain (方案 C) + spike-002b 并发 fallback + 5 年保留与归档 |
 | [ADR-0026](0026-cross-end-contract-pipeline.md) | 跨端契约管线 | Accepted | utoipa→OpenAPI→openapi-typescript→openapi-fetch 全链路；SPIKE-003 验证 accept；Wave 1 W1.C 实施 checklist；含数据类型映射表 + utoipa 编码约束 + CI sync 治理 |
-| ADR-0027 | Spike 拟产出 | 待写 | 0027 PDA 离线（SPIKE-005，可推迟到 Wave 3 启动前）|
+| [ADR-0027](0027-pda-offline-model.md) | PDA 离线模型与技术栈定版框架 | Proposed | SPIKE-005 RN 与 SPIKE-005B WebView/Capacitor 同口径对比；生产 PDA 技术栈待真 PDA + dev/staging evidence 后定版；生产 app 等 Accepted 后启动 |
 | [ADR-0029](0029-frontend-as-prototype-workflow.md) | 前端原型先行工作流 | Accepted | 前端高保真原型先行，业务走查后经 checklist 迁移生产；原型页不得直接复制为生产页，`apps/web-admin` Wave 1 只启动 H1/H2/H3 壳工程 |
 | [ADR-0030](0030-integration-capability.md) | H-INT 统一外部集成能力 | Accepted | 外部对接（H8/H5/M5/M10/M-TC/H4）确立统一接入契约（复用 ADR-0018 弹性 + M-PM 规整 + ADR-0013 凭证 + H2 审计）；契约先行随 Wave 1、引擎延后；H8 首个参考实现 |
 | [ADR-0031](0031-file-attachment-capability.md) | H-FILE 统一附件/文件能力 | Accepted | 将 infra/file-storage.md（MinIO/S3 + attachments 表 + presigned URL）提升登记为横向能力 H-FILE + 接入契约；复核 15 命中→9 真需求模块；成本最低 |

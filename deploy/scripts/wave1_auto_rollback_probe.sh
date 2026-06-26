@@ -12,8 +12,8 @@ usage() {
 Usage:
   wave1_auto_rollback_probe.sh --environment dev|staging --target k8s --context <ctx> --namespace <ns> [--deployment wms-api] [--smoke-url <url>]
   wave1_auto_rollback_probe.sh --environment dev|staging --target k8s --context <ctx> --namespace <ns> [--deployment wms-api] [--prometheus-url <url>] [--promql <query>]
-  wave1_auto_rollback_probe.sh --environment dev|staging --target docker-compose --previous-version <sha> --compose-file <path> [--smoke-url <url>]
-  wave1_auto_rollback_probe.sh --environment dev|staging --target docker-compose --previous-version <sha> --compose-file <path> [--prometheus-url <url>] [--promql <query>]
+  wave1_auto_rollback_probe.sh --environment dev|staging --target docker-compose --previous-version <sha> --compose-file <path> [--compose-env-file <path>] [--smoke-url <url>]
+  wave1_auto_rollback_probe.sh --environment dev|staging --target docker-compose --previous-version <sha> --compose-file <path> [--compose-env-file <path>] [--prometheus-url <url>] [--promql <query>]
 
 Signal configuration:
   HTTP smoke:   use --smoke-url or SMOKE_URL. HTTP 2xx/3xx means healthy.
@@ -28,7 +28,8 @@ there is no dev/staging runtime evidence.
 Evidence output:
   --evidence-file <path> writes Wave 1 runtime evidence JSON only after a
   failed real signal triggers rollback and rollback exits 0. When used, also
-  pass --rollback-log-ref and --external-log-ref.
+  pass --rollback-log-ref and --external-log-ref. Existing evidence is not
+  overwritten unless --force is supplied.
 
 Readiness:
   --check-only validates the exact runtime boundary, command availability and
@@ -44,15 +45,16 @@ context=""
 namespace=""
 previous_version=""
 compose_file=""
+compose_env_file="${WAVE1_COMPOSE_ENV_FILE:-}"
 smoke_url="${SMOKE_URL:-}"
 prometheus_url="${PROMETHEUS_URL:-}"
 promql="${PROMETHEUS_QUERY:-}"
 curl_max_time="${CURL_MAX_TIME_SECONDS:-10}"
-allow_local_test_signal="${WAVE1_ALLOW_LOCAL_TEST_SIGNAL:-false}"
 evidence_file=""
 rollback_log_ref=""
 external_log_ref=""
 check_only="false"
+force="false"
 
 need_value() {
   if [ -z "${2:-}" ] || [[ "${2:-}" == --* ]]; then
@@ -98,6 +100,11 @@ while [ "$#" -gt 0 ]; do
       compose_file="${2:-}"
       shift 2
       ;;
+    --compose-env-file)
+      need_value "$1" "${2:-}"
+      compose_env_file="${2:-}"
+      shift 2
+      ;;
     --smoke-url)
       need_value "$1" "${2:-}"
       smoke_url="${2:-}"
@@ -135,6 +142,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --check-only)
       check_only="true"
+      shift
+      ;;
+    --force)
+      force="true"
       shift
       ;;
     -h|--help)
@@ -191,7 +202,15 @@ contains_example_runtime_boundary() {
 
 contains_local_runtime_boundary() {
   local value="${1,,}"
-  [[ "$value" =~ (^|[^[:alnum:]])(localhost|127\.0\.0\.1|0\.0\.0\.0)([^[:alnum:]]|$) ]]
+  [[ "$value" =~ (^|[^[:alnum:]])(local|localhost|127\.0\.0\.1|0\.0\.0\.0)([^[:alnum:]]|$) ]]
+}
+
+contains_template_placeholder() {
+  local value="${1,,}"
+  [[ "$value" =~ (^|[^[:alnum:]])(yyyy|todo|tbd)([^[:alnum:]]|$) ]] \
+    || [[ "$value" == *"<"*">"* ]] \
+    || [[ "$value" == *"待填"* ]] \
+    || [[ "$value" == *"待确认"* ]]
 }
 
 require_command() {
@@ -215,6 +234,14 @@ validate_environment_boundary() {
   fi
   if contains_example_runtime_boundary "$value"; then
     echo "${label} must not point to an example boundary" >&2
+    exit 2
+  fi
+  if contains_local_runtime_boundary "$value"; then
+    echo "${label} must not point to a local boundary" >&2
+    exit 2
+  fi
+  if contains_template_placeholder "$value"; then
+    echo "${label} must not contain a template placeholder" >&2
     exit 2
   fi
   if ! contains_environment_token "$value" "$environment"; then
@@ -243,8 +270,12 @@ validate_evidence_ref() {
     echo "${label} must not point to an example boundary" >&2
     exit 2
   fi
-  if [ "$allow_local_test_signal" != "true" ] && contains_local_runtime_boundary "$value"; then
-    echo "${label} must not reference localhost/127.0.0.1 unless WAVE1_ALLOW_LOCAL_TEST_SIGNAL=true" >&2
+  if contains_local_runtime_boundary "$value"; then
+    echo "${label} must not point to a local boundary" >&2
+    exit 2
+  fi
+  if contains_template_placeholder "$value"; then
+    echo "${label} must not contain a template placeholder" >&2
     exit 2
   fi
   if ! contains_environment_token "$value" "$environment"; then
@@ -269,8 +300,12 @@ validate_prometheus_boundary() {
     echo "Prometheus boundary must not reference example" >&2
     exit 2
   fi
-  if [ "$allow_local_test_signal" != "true" ] && contains_local_runtime_boundary "$url"; then
-    echo "Prometheus boundary must not reference localhost/127.0.0.1 unless WAVE1_ALLOW_LOCAL_TEST_SIGNAL=true" >&2
+  if contains_local_runtime_boundary "$url" || contains_local_runtime_boundary "$query"; then
+    echo "Prometheus boundary must not reference local/localhost/127.0.0.1/0.0.0.0" >&2
+    exit 2
+  fi
+  if contains_template_placeholder "$url" || contains_template_placeholder "$query"; then
+    echo "Prometheus boundary must not contain a template placeholder" >&2
     exit 2
   fi
   if ! contains_environment_token "$url" "$environment"; then
@@ -291,10 +326,6 @@ validate_signal_boundary_only() {
     http)
       require_command curl
       validate_environment_boundary "--smoke-url" "$smoke_url"
-      if [ "$allow_local_test_signal" != "true" ] && contains_local_runtime_boundary "$smoke_url"; then
-        echo "HTTP smoke URL must not reference localhost/127.0.0.1 unless WAVE1_ALLOW_LOCAL_TEST_SIGNAL=true" >&2
-        exit 2
-      fi
       ;;
     prometheus)
       require_command curl
@@ -343,10 +374,6 @@ prometheus_query_endpoint() {
 probe_http_smoke() {
   require_command curl
   validate_environment_boundary "--smoke-url" "$smoke_url"
-  if [ "$allow_local_test_signal" != "true" ] && contains_local_runtime_boundary "$smoke_url"; then
-    echo "HTTP smoke URL must not reference localhost/127.0.0.1 unless WAVE1_ALLOW_LOCAL_TEST_SIGNAL=true" >&2
-    exit 2
-  fi
 
   local response_file http_code curl_exit
   response_file="$(mktemp)"
@@ -460,6 +487,9 @@ build_rollback_args() {
       ;;
     docker-compose)
       rollback_args+=(--previous-version "$previous_version" --compose-file "$compose_file")
+      if [ -n "$compose_env_file" ]; then
+        rollback_args+=(--compose-env-file "$compose_env_file")
+      fi
       ;;
   esac
 }
@@ -485,6 +515,10 @@ validate_rollback_configuration() {
         echo "--compose-file must point to an existing file" >&2
         exit 2
       fi
+      if [ -n "$compose_env_file" ] && [ ! -f "$compose_env_file" ]; then
+        echo "--compose-env-file must point to an existing file" >&2
+        exit 2
+      fi
       validate_environment_boundary "--compose-file" "$compose_file"
       ;;
   esac
@@ -497,6 +531,11 @@ validate_evidence_configuration() {
 
   validate_evidence_ref "--rollback-log-ref" "$rollback_log_ref"
   validate_evidence_ref "--external-log-ref" "$external_log_ref"
+
+  if [ -e "$evidence_file" ] && [ "$force" != "true" ]; then
+    echo "${evidence_file} already exists; pass --force to overwrite" >&2
+    exit 2
+  fi
 }
 
 write_evidence_file() {
@@ -509,8 +548,7 @@ write_evidence_file() {
   fi
 
   require_command python3
-  validate_evidence_ref "--rollback-log-ref" "$rollback_log_ref"
-  validate_evidence_ref "--external-log-ref" "$external_log_ref"
+  validate_evidence_configuration
 
   EVIDENCE_FILE="$evidence_file" \
   ENVIRONMENT="$environment" \
@@ -573,6 +611,7 @@ else
         *) evidence_signal_url="" ;;
       esac
       write_evidence_file "$signal_mode" "$evidence_signal_url" "$rollback_exit"
+      exit 0
     fi
     exit "$signal_exit"
   fi

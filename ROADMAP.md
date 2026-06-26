@@ -54,7 +54,7 @@ M11 监管 EDI 已移除：码上放心由 M-TC 承接，药监 EDI 由 ERP/H8 �
 - [x] 视觉基线治理（accept_baseline.py + manifest.toml + 204 个 baseline 签字）
 - [x] **组件库抽离至 packages/ui**（commit e3ce5a0，决策见 ADR-0028）— 为 Wave 1 `apps/web-admin/` 复用 `@wms/ui` 准备就绪
 - [x] 技术 Spike 计划落盘（`docs/spikes/` 5 项 + README，状态=起草）
-- [x] 技术 Spike 验证：SPIKE-001 / 002 / 003 / 004 accepted，SPIKE-005 deferred
+- [x] 技术 Spike 验证：SPIKE-001 / 002 / 003 / 004 accepted，SPIKE-005 deferred；SPIKE-005B 为 2026-06-06 后续补充候选，不计入 Wave 0.5 退出统计
 - [x] Wave 0.5 retro（`docs/retros/wave-0.5-retro.md`）
 
 **完成标准**：Storybook 可运行 ✓；P0 原型 ≥1 次走查 approved ✓；Spike 结论已记录到 `docs/spikes/`；packages/ui 抽离完成 ✓。
@@ -65,7 +65,7 @@ M11 监管 EDI 已移除：码上放心由 M-TC 承接，药监 EDI 由 ERP/H8 �
 
 **周期**：4-6 周（个人）
 **目标**：所有业务模块的基础设施就绪。
-**当前状态**：开发完成；`just wave-1-complete-check` 为 Wave 1 开发完成门禁。当前尚无稳定 dev/staging，H2 压测/封档与 W1.D 自动回滚真实 runtime evidence 后移为预发布 gate，按 `docs/runbooks/wave-1-runtime-evidence.md` 补齐。
+**当前状态**：开发完成；`just wave-1-complete-check` 为 Wave 1 开发完成门禁。预发布 gate 已在 Wave 6 补齐：H2 压测/封档写入 `docs/retros/wave-1-h2-runtime-evidence.json`，W1.D 自动回滚写入 `docs/retros/wave-1-runtime-evidence.json`，并通过 `just wave-1-runtime-evidence-validate`。
 
 并行任务：
 
@@ -83,7 +83,7 @@ M11 监管 EDI 已移除：码上放心由 M-TC 承接，药监 EDI 由 ERP/H8 �
 
 **开发完成标准**：任意业务 handler 可挂 H1；任意写操作经 H2；后端注解可生成 OpenAPI，前端 `@wms/api-client` 可消费；`apps/web-admin` 壳工程可复用 `@wms/ui` 并接入 H1/H2/H3 基础链路；文件版灰度链路（环境变量 / `deploy/feature_flags.toml` 后端）+ 自动回滚运行资产就绪，缺真实 dev/staging 信号时不伪造证据；`check_feature_flags.py` 进入 T1 治理脚本集。**四横向契约联合评审（W1.F/G/H + H-INT）**：W1.F H-INT / W1.G H-APV / W1.H H-SCH 三契约 + H-FILE 附件契约在 Wave 1 完成前须做一次联合评审，确认字段/审计/留痕约束无冲突（重点核对 H-APV 审批留痕 approval_source 与 H-INT 外部对接审计、H-SCH 调度审计三者在 H2 审计表的字段不冲突），结论记入 Wave 1 retro。
 
-**预发布 gate**：真实 dev PostgreSQL 60M baseline + wrk 1k QPS × 1 小时 + P99 < 200ms + 7 天封档 cron 0 失败；真实 dev/staging smoke gate 或 Prometheus 信号触发自动回滚成功。两份证据必须通过 `just wave-1-runtime-evidence-validate`，每个 evidence 引用必须包含当前 `environment` 标记，不得使用 localhost / stub / mock / fake / example / prod 边界。
+**预发布 gate（已由 W6.A / W6.B 关闭）**：真实 dev PostgreSQL 60M baseline + wrk 1k QPS × 1 小时 + P99 90.57ms + 7 天封档 cron 0 失败；真实 staging smoke gate 触发自动回滚成功。两份证据已通过 `just wave-1-runtime-evidence-validate`，每个 evidence 引用包含当前 `environment` 标记，且未使用 localhost / stub / mock / fake / example / prod / production 边界。
 
 ---
 
@@ -91,7 +91,7 @@ M11 监管 EDI 已移除：码上放心由 M-TC 承接，药监 EDI 由 ERP/H8 �
 
 **周期**：3-4 周
 **目标**：核心 schema 落地，基础 CRUD 可用。
-**当前状态**：开发完成；`just wave-2-complete-check` 为 Wave 2 开发完成门禁。当前尚无稳定 dev/staging，配置中心版灰度链路真实 runtime evidence 后移为预发布 gate，按 `docs/runbooks/wave-2-runtime-evidence.md` 补齐。
+**当前状态**：开发完成；`just wave-2-complete-check` 为 Wave 2 开发完成门禁。配置中心版灰度链路真实 runtime evidence 已在 Wave 6 补齐，写入 `docs/retros/wave-2-runtime-evidence.json`，并通过 `just wave-2-runtime-evidence-validate`。
 
 并行任务：
 
@@ -103,7 +103,7 @@ M11 监管 EDI 已移除：码上放心由 M-TC 承接，药监 EDI 由 ERP/H8 �
 
 **开发完成标准**：核心 schema 落地；商品 / 供应商 / 收货单基础 CRUD 可用；M-PM 可处理 ERP 推送的不规则字段；OpenAPI 反映完整 schema；配置中心版 Feature Flag 后端覆盖迁移 / 导出 / 批量导入 / 对账 / 切换读取源 / 旧文件归档；`just wave-2-complete-check` 通过。
 
-**预发布 gate**：配置中心版灰度链路（M1-008 后端）必须在真实 dev / staging 验证可用；W1 文件版 flag 迁移至 M1-008 且对账通过；证据写入 `docs/retros/wave-2-runtime-evidence.json` 并通过 `just wave-2-runtime-evidence-validate`。每个 evidence 引用必须包含当前 `environment` 标记，不得使用 localhost / stub / mock / fake / example / prod 边界。
+**预发布 gate（已由 W6.C 关闭）**：配置中心版灰度链路（M1-008 后端）已在 staging 验证可用；W1 文件版 flag 迁移至 M1-008 且对账通过；证据写入 `docs/retros/wave-2-runtime-evidence.json` 并通过 `just wave-2-runtime-evidence-validate`。每个 evidence 引用包含当前 `environment` 标记，且未使用 localhost / stub / mock / fake / example / prod / production 边界。
 
 ---
 
@@ -111,7 +111,7 @@ M11 监管 EDI 已移除：码上放心由 M-TC 承接，药监 EDI 由 ERP/H8 �
 
 **周期**：8-10 周
 **目标**：单货主下"商品-供应商-入库-库存"闭环。
-**当前状态**：开发完成；第一批后端切片已覆盖 M2 收货/验收/上架规则、M3 库存批次与状态机、M5 外部冷链接入 schema + 外部 API Key 接入、M9 账户/合同模型；M2/M3/M5 关键 handler 已接 PostgreSQL repository、幂等表与 H2 审计。M2/M3 关键路径 L1-L6/L8-L11 已有静态证据，L7 降级为预发布 gate；PDA 先完成 SPIKE-005 readiness/runbook，生产 app 等真 PDA 验证后启动。GSP 资质有效期校验来源已冻结为 M1 本地资质档案 + M-VR 校验规则执行。
+**当前状态**：开发完成；第一批后端切片已覆盖 M2 收货/验收/上架规则、M3 库存批次与状态机、M5 外部冷链接入 schema + 外部 API Key 接入、M9 账户/合同模型；M2/M3/M5 关键 handler 已接 PostgreSQL repository、幂等表与 H2 审计。M2/M3 关键路径 L1-L6/L8-L11 已有静态证据，L7 降级为预发布 gate；PDA 先完成 SPIKE-005 / SPIKE-005B readiness/runbook，生产 app 等真 PDA 验证与 ADR-0027 Accepted 后启动；2026-06-06 补充 SPIKE-005B，用同口径对比 WebView/Capacitor native shell 候选。GSP 资质有效期校验来源已冻结为 M1 本地资质档案 + M-VR 校验规则执行。
 
 并行任务：
 
@@ -156,7 +156,7 @@ M11 监管 EDI 已移除：码上放心由 M-TC 承接，药监 EDI 由 ERP/H8 �
 
 **开发完成标准**：M-PK / M8 / M9 / M10 生产接口、PostgreSQL migration、OpenAPI 契约与 owner 隔离证据落地；至少一个连锁客户场景（门店补货 → 出库 → 装箱 → TMS/快递 → 计费）可复跑；`just wave-5-complete-check` 通过。
 
-**预发布 gate**：M-PK 真实硬件、M10 真实 TMS、W4.D “码上放心”真实 dev/staging evidence，以及首次试运行灰度发布 evidence 统一由 Wave 6 收口。每个 evidence 引用必须包含当前 `environment` 标记，不得用 localhost / stub / mock / fake / example / prod 替代真实证据。
+**预发布 gate**：M-PK 真实硬件、M10 真实 TMS、W4.D “码上放心”真实 dev/staging evidence，以及首次试运行灰度发布 evidence 统一由 Wave 6 收口。每个 evidence 引用必须包含当前 `environment` 标记，不得用 localhost / stub / mock / fake / example / prod / production 替代真实证据。
 
 ---
 
@@ -164,20 +164,20 @@ M11 监管 EDI 已移除：码上放心由 M-TC 承接，药监 EDI 由 ERP/H8 �
 
 **周期**：取决于 dev/staging 稳定性、硬件到位、外部系统开通。
 **目标**：把 Wave 1-5 已开发能力推进到可预发布 / 可试运行状态。
-**当前状态**：启动中；范围定义见 ADR-0035。
+**当前状态**：收口中；W6.A / W6.B / W6.C 已有真实 evidence 并通过 validator，W6.D-H 仍等待真 PDA、外部系统、硬件和 staging 灰度发布证据；范围定义见 ADR-0035。
 
 并行任务：
 
-- W6.A：Wave 1 H2 真实 dev PostgreSQL 60M baseline + wrk 1k QPS × 1 小时 + P99 < 200ms + 7 天封档 runtime evidence
-- W6.B：Wave 1 W1.D 真实 dev/staging 自动回滚 runtime evidence
-- W6.C：Wave 2 配置中心版 Feature Flag 真实 dev/staging runtime evidence
+- W6.A：Wave 1 H2 真实 dev PostgreSQL 60M baseline + wrk 1k QPS × 1 小时 + P99 90.57ms + 7 天封档 runtime evidence（已关闭）
+- W6.B：Wave 1 W1.D 真实 dev/staging 自动回滚 runtime evidence（已关闭）
+- W6.C：Wave 2 配置中心版 Feature Flag 真实 dev/staging runtime evidence（已关闭）
 - W6.D：Wave 3 真 PDA + L7 性能/易用性 runtime evidence
 - W6.E：Wave 4 M-TC “码上放心”真实 dev/staging 外部 evidence
 - W6.F：Wave 5 M-PK 电子秤 / 蓝牙打印机 / 面单打印真实硬件 evidence
 - W6.G：Wave 5 M10 TMS+ 真实 dev/staging 推送、回调、失败重试和 audit_event 查询 evidence
 - W6.H：首次试运行投产按 ADR-0016 灰度发布链路执行，不允许全量直发
 
-**非范围**：不新增业务模块；不启动 v26 GSP 字段命名规范化；不补 i18n；不使用 local / mock / fake / stub / example / prod 证据。
+**非范围**：不新增业务模块；不启动 v26 GSP 字段命名规范化；不补 i18n；不使用 local / mock / fake / stub / example / prod / production 证据。
 
 **完成标准**：ADR-0035 列出的 W6.A-H 全部有真实证据并通过对应 validator / runbook；`docs/retros/wave-6-retro.md` 写完。
 
@@ -221,7 +221,8 @@ M11 监管 EDI 已移除：码上放心由 M-TC 承接，药监 EDI 由 ERP/H8 �
 | 放射性药品 30 年保留分区实施 | Wave 4+ | 业务方启动放射性药品承运业务前 | H10 分级保留矩阵已设计完成（docs/infra/technical-specs.md），实施需财务 + 运维联合成本评估，建议走 ADR 决策 |
 | 放射性 / 血液制品 / 疫苗运营级双人矩阵默认值生效 | Wave 4+ | 业务方启动对应分类承运前 | M1-010 字典 + M-VR 双人策略矩阵设计完成，实施仅需启用预置规则 + 仓库主管确认 |
 | 地方法规 ≥ 10 年保留按运营省份细化 | Wave 4+ | 业务方确定运营省份 + 法规专家核对地方法规 | 默认 5 年；按地方法规可单独配置（H10 分级保留矩阵已支持）|
-| **SPIKE-005 RN 扫枪 + 离线队列验证** | Wave 3 W3.A 启动前 0.5 周 | 业务方采购 / 借测 PDA 设备（任 1 款）+ Wave 1 W1.A/W1.C 完成（鉴权 + packages/api-client 可用）| 详 `docs/spikes/spike-005-rn-scanner.md` §7；当前状态 deferred；启动时重新计时 2 天时间盒 + ADR-0027 PDA 离线模型随 spike 产出 |
+| **SPIKE-005 RN 扫枪 + 离线队列验证** | Wave 3 W3.A 启动前 0.5 周 | 业务方采购 / 借测 PDA 设备（任 1 款）+ Wave 1 W1.A/W1.C 完成（鉴权 + packages/api-client 可用）| 详 `docs/spikes/spike-005-rn-scanner.md` §7；当前状态 deferred；启动时重新计时 2 天时间盒 |
+| **SPIKE-005B WebView/Capacitor PDA 可行性验证** | 与 SPIKE-005 同期 | 与 SPIKE-005 同一真 PDA / dev 或 staging / M2/M3 测试数据 / 条码样本 | 详 `docs/spikes/spike-005b-webview-capacitor-pda.md`；当前状态 deferred；不替换 ADR-0001，结论与 SPIKE-005 一起输入 ADR-0027 |
 
 ## v26 GSP 字段命名规范化 backlog（v25 审计发现）
 

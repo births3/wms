@@ -4,7 +4,7 @@
 - 决策日期：2026-06-04
 - 决策人：项目主人
 - 起草人：AI 助手
-- 关联：ADR-0007 / ADR-0016 / ADR-0025 / ADR-0030 / ROADMAP.md / TODO.md / docs/runbooks/wave-1-runtime-evidence.md / docs/runbooks/wave-2-runtime-evidence.md / docs/runbooks/wave-3-pda-readiness.md / docs/runbooks/wave-4-external-dependencies.md / docs/runbooks/wave-5-hardware-evidence.md / docs/runbooks/wave-5-tms-evidence.md / docs/runbooks/wave-6-deploy-evidence.md / docs/runbooks/wave-6-closeout.md
+- 关联：ADR-0007 / ADR-0016 / ADR-0025 / ADR-0030 / ROADMAP.md / TODO.md / docs/runbooks/wave-1-runtime-evidence.md / docs/runbooks/wave-2-runtime-evidence.md / docs/runbooks/wave-3-pda-readiness.md / docs/runbooks/wave-4-external-dependencies.md / docs/runbooks/wave-5-hardware-evidence.md / docs/runbooks/wave-5-tms-evidence.md / docs/runbooks/wave-6-deploy-evidence.md / docs/runbooks/wave-6-evidence-preflight.md / docs/runbooks/wave-6-closeout.md
 
 ---
 
@@ -32,7 +32,7 @@
 若继续把这些散落为“后续跟踪”，容易出现两类风险：
 
 1. 误把开发完成等同于可预发布。
-2. 在没有稳定 dev/staging 或外部系统时，用 localhost / stub / mock / fake / example / prod 证据替代真实证据。
+2. 在没有稳定 dev/staging 或外部系统时，用 localhost / stub / mock / fake / example / prod / production 证据替代真实证据。
 
 用户已确认接受建议：下一步不新增业务功能波次，先把 Wave 5 closeout 做完，并把下一阶段定义为 Wave 6 预发布证据 / 外部依赖收口。
 
@@ -103,7 +103,7 @@ Wave 6 不新增业务模块，不扩展用户故事范围，不把 v26 字段�
 - 不新增业务模块。
 - 不启动 v26 GSP 字段命名规范化，除非用户另行确认。
 - 不补 i18n，仍按 ROADMAP 的 i18n 启动条件。
-- 不用本地 PostgreSQL、localhost、stub、mock、fake、example、prod 替代真实 dev/staging 或外部系统证据。
+- 不用本地 PostgreSQL、localhost、stub、mock、fake、example、prod、production 替代真实 dev/staging 或外部系统证据。
 - 每个 evidence 引用必须包含当前 `environment` 标记（`dev` 或 `staging`）；缺少环境标记的 CI、Vault、工单、日志或证据库引用不能关闭 gate。
 
 ---
@@ -128,10 +128,11 @@ Wave 6 不新增业务模块，不扩展用户故事范围，不把 v26 字段�
 1. Wave 6 启动前必须完成 Wave 5 closeout：TODO 归档、retro 落地、completion check 通过。
 2. Wave 6 只收口 evidence，不新增业务故事。
 3. 所有 secret / webhook / 外部凭证只允许放在环境变量、Vault 或运行环境 secret，禁止入仓。
-4. 所有 evidence 引用必须指向真实 dev/staging、真实硬件或真实外部系统日志 / 工单 / 对账记录，且包含当前 `environment` 标记（`dev` 或 `staging`），禁止 local/mock/fake/stub/example/prod。
+4. 所有 evidence 引用必须指向真实 dev/staging、真实硬件或真实外部系统日志 / 工单 / 对账记录，且包含当前 `environment` 标记（`dev` 或 `staging`），禁止 local/mock/fake/stub/example/prod/production。
 5. 已有 validator 是完成判据的单一事实源；缺 validator 的 gate，先补 runbook / validator，再关闭证据。
 6. 首次试运行投产必须使用 ADR-0016 灰度发布策略链路，不允许全量直发。
-7. Wave 6 结束前必须写 `docs/retros/wave-6-retro.md`。
+7. 真实环境尚未到位时，只允许执行 `just wave-6-evidence-preflight` 这类静态预检；preflight 不写 evidence，也不能关闭 gate。
+8. Wave 6 结束前必须写 `docs/retros/wave-6-retro.md`。
 
 ---
 
@@ -146,5 +147,6 @@ Wave 6 不新增业务模块，不扩展用户故事范围，不把 v26 字段�
 - docs/runbooks/wave-5-hardware-evidence.md
 - docs/runbooks/wave-5-tms-evidence.md
 - docs/runbooks/wave-6-deploy-evidence.md
+- docs/runbooks/wave-6-evidence-preflight.md
 - docs/runbooks/wave-6-closeout.md
 - docs/domain/clarifications.md #50 / #66 / #67

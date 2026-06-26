@@ -55,6 +55,7 @@ class ScriptResult:
 # task_check --strict 时，这些脚本自身也必须以严格语义执行。
 STRICT_SCRIPT_ARGS = {
     "check_openapi_in_sync": ["--strict"],
+    "report_wave2_completion": ["--strict", "--require-runtime-evidence"],
 }
 
 

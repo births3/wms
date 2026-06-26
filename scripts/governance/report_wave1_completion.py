@@ -14,6 +14,7 @@ Tier：手动 / Wave 出口检查
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import re
 import sys
@@ -92,10 +93,44 @@ def contains_environment_token(value: str, environment: str) -> bool:
 
 
 def contains_forbidden_runtime_boundary(value: str, *, allow_example_refs: bool = False) -> bool:
-    forbidden = r"prod|production|prodution|localhost|127\.0\.0\.1|0\.0\.0\.0|stub|mock|fake"
+    forbidden = r"local|prod|production|prodution|localhost|127\.0\.0\.1|0\.0\.0\.0|stub|mock|fake"
     if not allow_example_refs:
         forbidden = f"{forbidden}|example"
     return re.search(rf"(^|[^0-9a-z])({forbidden})([^0-9a-z]|$)", value.lower()) is not None
+
+
+def contains_staging_boundary(value: str) -> bool:
+    return re.search(r"(^|[^0-9a-z])staging([^0-9a-z]|$)", value.lower()) is not None
+
+
+def contains_forbidden_h2_runtime_boundary(value: str, *, allow_example_refs: bool = False) -> bool:
+    return contains_staging_boundary(value) or contains_forbidden_runtime_boundary(
+        value,
+        allow_example_refs=allow_example_refs,
+    )
+
+
+def is_ip_address(value: str) -> bool:
+    try:
+        ipaddress.ip_address(value)
+    except ValueError:
+        return False
+    return True
+
+
+def is_loopback_ip(value: str) -> bool:
+    try:
+        return ipaddress.ip_address(value).is_loopback
+    except ValueError:
+        return False
+
+
+PLACEHOLDER_TOKENS = ("yyyy", "<", ">", "todo", "tbd", "待填", "待确认")
+
+
+def contains_template_placeholder(value: str) -> bool:
+    lowered = value.lower()
+    return any(token in lowered for token in PLACEHOLDER_TOKENS)
 
 
 def coerce_int(value: object) -> int | None:
@@ -129,11 +164,25 @@ def validate_w1d_runtime_payload(
     external_log_ref = str(payload.get("external_log_ref", ""))
     if not signal_url or not rollback_log_ref or not external_log_ref:
         return False, "W1.D runtime evidence 必须包含 signal_url / rollback_log_ref / external_log_ref"
+    placeholder_fields = [
+        name
+        for name, value in {
+            "signal_url": signal_url,
+            "rollback_log_ref": rollback_log_ref,
+            "external_log_ref": external_log_ref,
+        }.items()
+        if contains_template_placeholder(value)
+    ]
+    if placeholder_fields:
+        return False, (
+            "W1.D runtime evidence 不能保留模板占位: "
+            f"{', '.join(placeholder_fields)}"
+        )
     if any(
         contains_forbidden_runtime_boundary(value, allow_example_refs=allow_example_refs)
         for value in [signal_url, rollback_log_ref, external_log_ref]
     ):
-        return False, "W1.D runtime evidence 不能指向 localhost/127.0.0.1/0.0.0.0/prod/stub/mock/fake/example 边界"
+        return False, "W1.D runtime evidence 不能指向 localhost/127.0.0.1/0.0.0.0/local/prod/production/stub/mock/fake/example 边界"
     missing_environment_refs = [
         name
         for name, value in {
@@ -218,6 +267,28 @@ def validate_h2_runtime_payload(
         return False, "H2 runtime evidence environment 必须是 dev"
     if not payload.get("captured_at"):
         return False, "H2 runtime evidence 必须包含 captured_at"
+    database = payload.get("database")
+    if not isinstance(database, dict):
+        return False, "H2 runtime evidence 必须包含 database 对象和 database.host"
+    database_host = str(database.get("host", "")).lower()
+    if not database_host:
+        return False, "H2 runtime evidence 必须包含 database.host"
+    if (
+        is_ip_address(database_host)
+        or contains_forbidden_h2_runtime_boundary(database_host, allow_example_refs=allow_example_refs)
+        or not contains_environment_token(database_host, environment)
+        or database_host == "dev-h2.wms.internal"
+    ):
+        return False, "H2 runtime evidence database.host 必须是正式 dev DB DNS，不能是本机/dry-run/raw IP/非 dev 边界"
+    resolved_ips = database.get("resolved_ips")
+    if not isinstance(resolved_ips, list) or not resolved_ips:
+        return False, "H2 runtime evidence 必须包含 database.resolved_ips"
+    for value in resolved_ips:
+        ip = str(value)
+        if not is_ip_address(ip):
+            return False, "H2 runtime evidence database.resolved_ips 必须都是 IP 字符串"
+        if is_loopback_ip(ip):
+            return False, "H2 runtime evidence database.resolved_ips 不能包含 loopback IP"
 
     performance = payload.get("performance")
     if not isinstance(performance, dict):
@@ -252,11 +323,13 @@ def validate_h2_runtime_payload(
     benchmark_log_ref = str(performance.get("benchmark_log_ref", ""))
     if not benchmark_log_ref:
         return False, "H2 runtime evidence 必须包含 performance.benchmark_log_ref"
+    if contains_template_placeholder(benchmark_log_ref):
+        return False, "H2 runtime evidence 不能保留模板占位: benchmark_log_ref"
     if (
-        contains_forbidden_runtime_boundary(benchmark_log_ref, allow_example_refs=allow_example_refs)
+        contains_forbidden_h2_runtime_boundary(benchmark_log_ref, allow_example_refs=allow_example_refs)
         or not contains_environment_token(benchmark_log_ref, environment)
     ):
-        return False, "H2 runtime evidence benchmark_log_ref 必须指向非本机 dev 证据"
+        return False, "H2 runtime evidence benchmark_log_ref 必须指向非本机 dev 证据，不能包含 staging/local/prod/mock/fake 边界"
 
     seal_cron = payload.get("seal_cron")
     if not isinstance(seal_cron, dict):
@@ -276,11 +349,13 @@ def validate_h2_runtime_payload(
     cron_log_ref = str(seal_cron.get("cron_log_ref", ""))
     if not cron_log_ref:
         return False, "H2 runtime evidence 必须包含 seal_cron.cron_log_ref"
+    if contains_template_placeholder(cron_log_ref):
+        return False, "H2 runtime evidence 不能保留模板占位: cron_log_ref"
     if (
-        contains_forbidden_runtime_boundary(cron_log_ref, allow_example_refs=allow_example_refs)
+        contains_forbidden_h2_runtime_boundary(cron_log_ref, allow_example_refs=allow_example_refs)
         or not contains_environment_token(cron_log_ref, environment)
     ):
-        return False, "H2 runtime evidence cron_log_ref 必须指向非本机 dev 证据"
+        return False, "H2 runtime evidence cron_log_ref 必须指向非本机 dev 证据，不能包含 staging/local/prod/mock/fake 边界"
 
     return True, "H2 runtime evidence 内容有效"
 

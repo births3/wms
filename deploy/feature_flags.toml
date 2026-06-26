@@ -1,7 +1,7 @@
 # Wave 1 file-backed Feature Flag registry.
 #
-# Runtime flags are intentionally empty until a Wave task introduces a real
-# guarded rollout. Each future flag must include:
+# Runtime flags are intentionally minimal until a Wave task introduces a real
+# guarded rollout. Each flag must include:
 #   key, owner, created_at, cleanup_by, enabled
 # and cleanup_by must be within 90 days of created_at.
 #
@@ -13,7 +13,12 @@
 # cleanup_by = 2026-08-31
 # enabled = false
 
-flags = []
+[[flags]]
+key = "m3_inventory_batches_config_center_smoke"
+owner = "platform"
+created_at = 2026-06-07
+cleanup_by = 2026-09-05
+enabled = true
 
 [meta]
 schema_version = "1"

@@ -4,10 +4,10 @@
 类别：1. 文档治理（元治理：守护治理脚本注册表）
 Tier：T1（< 10s，纯静态扫描）
 输入：scripts/governance/*.py + governance_checks.py + task_check.py 引用
-      + governance/gate-rules.toml + tests/test_smoke.py
+      + governance/gate-rules.toml + justfile + tests/test_smoke.py
 输出：人类可读 + --json
 退出码：
-  0  每个 check_*/validate_* 脚本都被运行器覆盖且纳入 smoke 测试
+  0  每个 check_*/validate_* 脚本和被 gate 使用的 report_* 脚本都被运行器覆盖且纳入 smoke 测试
   1  存在未注册（孤儿）或未测试的脚本
   2  脚本自身错误
 
@@ -17,8 +17,9 @@ Tier：T1（< 10s，纯静态扫描）
   也没被 gate-rules.toml 的 diff 触发引用，更没纳入 smoke 测试。
   这类脚本永远不会跑，等于没写。此脚本守护"写了就必须被覆盖"。
 
-覆盖维度（每个 check_*/validate_* 脚本都必须满足）：
-  R = reachable   被某运行器覆盖：在 TIER_SCRIPTS 列表里，或被 gate-rules.toml 引用
+覆盖维度（每个 check_*/validate_* 脚本和被 gate 使用的 report_* 脚本都必须满足）：
+  R = reachable   被某运行器覆盖：在 TIER_SCRIPTS 列表里、被 gate-rules.toml
+                  引用，或由 justfile 显式编排（适用于需要参数/环境的脚本）
   S = smoke       纳入 tests/test_smoke.py 的通用 smoke 测试清单
 
 smoke 豁免：
@@ -39,6 +40,7 @@ _THIS = Path(__file__).resolve()
 SCRIPTS_DIR = _THIS.parent
 REPO_ROOT = SCRIPTS_DIR.parent.parent
 GATE_RULES = REPO_ROOT / "governance" / "gate-rules.toml"
+JUSTFILE = REPO_ROOT / "justfile"
 SMOKE_TEST = SCRIPTS_DIR / "tests" / "test_smoke.py"
 
 # 不参与覆盖性统计的脚本：调度器自身、辅助库（_ 前缀）、本元检查脚本
@@ -52,6 +54,20 @@ SMOKE_EXEMPT = {
     "check_visual_keywords.py": "T3 重脚本，依赖 chrome/OCR，超 smoke 时限；已注册进 T3 TIER_SCRIPTS（reachable）",
     "check_visual_regression.py": "T3 重脚本，依赖 chrome 渲染快照，超 smoke 时限；已注册进 T3 TIER_SCRIPTS（reachable）",
     "check_story_size.py": "warning-only，故意 exit0/ok=False（拆分是建议非硬约束），违反 smoke 的 ok⟺exit 契约",
+    "check_wave1_runtime_evidence_prereqs.py": "Wave 1 runtime evidence 前置检查需要 --mode 选择 h2/rollback-k8s/rollback-compose；由 justfile 多个 evidence/readiness 入口显式编排",
+    "check_wave1_h2_runtime_readiness.py": "Wave 1 H2 DB readiness 需要 --database-url 指向真实 dev PostgreSQL；由 just wave-1-h2-runtime-readiness 显式编排",
+    "check_wave4_external_dependencies_readiness.py": "Wave 4 外部依赖 readiness 需要真实 dev/staging 证据引用参数；由 just wave-4-external-dependencies-readiness 显式编排并由专项测试覆盖",
+}
+
+# 需要运行参数或真实环境的脚本不能由 gate-rules.toml 裸跑；这些脚本的
+# 可达性由 justfile 中的人工 evidence/readiness 入口证明。
+JUSTFILE_REACHABLE = {
+    "check_wave1_runtime_evidence_prereqs.py",
+    "check_wave1_h2_runtime_readiness.py",
+    "check_wave3_pda_runtime_readiness.py",
+    "check_wave4_external_dependencies_readiness.py",
+    "check_wave6_deploy_readiness.py",
+    "report_wave6_deploy_materials.py",
 }
 
 
@@ -63,9 +79,10 @@ class Gap:
 
 
 def discover_scripts() -> list[str]:
-    """所有应被覆盖的治理校验脚本（check_*/validate_*，排除辅助/调度器）。"""
+    """所有应被覆盖的治理校验脚本（含被 gate 使用的 report_*）。"""
     names = {p.name for p in SCRIPTS_DIR.glob("check_*.py")}
     names |= {p.name for p in SCRIPTS_DIR.glob("validate_*.py")}
+    names |= {name for name in gate_referenced() if name.startswith("report_")}
     return sorted(n for n in names if n not in EXCLUDE and not n.startswith("_"))
 
 
@@ -84,6 +101,15 @@ def gate_referenced() -> set[str]:
     return {f"{c}.py" for r in data.get("rules", []) for c in r.get("checks", [])}
 
 
+def justfile_referenced() -> set[str]:
+    """justfile 中显式调用的治理脚本名。"""
+    text = JUSTFILE.read_text(encoding="utf-8")
+    return {
+        Path(match).name
+        for match in re.findall(r"scripts/governance/([a-z_][a-z0-9_]*\.py)", text)
+    } & JUSTFILE_REACHABLE
+
+
 def smoke_listed() -> set[str]:
     """tests/test_smoke.py GOVERNANCE_SCRIPTS 清单中的脚本名。"""
     return set(SCRIPT_RE.findall(SMOKE_TEST.read_text(encoding="utf-8")))
@@ -95,13 +121,13 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     scripts = discover_scripts()
-    reachable = tier_registered() | gate_referenced()
+    reachable = tier_registered() | gate_referenced() | justfile_referenced()
     smoke = smoke_listed()
 
     gaps: list[Gap] = []
     for s in scripts:
         if s not in reachable:
-            gaps.append(Gap(s, "reachable", "未在 TIER_SCRIPTS 注册，也未被 gate-rules.toml 引用 → 永不执行"))
+            gaps.append(Gap(s, "reachable", "未在 TIER_SCRIPTS 注册、未被 gate-rules.toml 引用，也未由 justfile 显式编排 → 永不执行"))
         if s not in smoke and s not in SMOKE_EXEMPT:
             gaps.append(Gap(s, "smoke", "未纳入 tests/test_smoke.py 通用 smoke 清单"))
 
@@ -123,7 +149,7 @@ def main(argv: list[str] | None = None) -> int:
         }, ensure_ascii=False, indent=2))
     else:
         print("check_governance_coverage (T1, 文档治理)")
-        print(f"  · 发现 {total} 个 check_*/validate_* 脚本")
+        print(f"  · 发现 {total} 个 check_*/validate_* / gate report_* 脚本")
         print(f"  · 运行器可达 {sum(1 for s in scripts if s in reachable)}/{total}，"
               f"smoke 覆盖 {sum(1 for s in scripts if s in smoke)}/{total}"
               f"（豁免 {sum(1 for s in scripts if s in SMOKE_EXEMPT)}），"

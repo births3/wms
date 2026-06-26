@@ -4,9 +4,18 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
 from pathlib import Path
+
+from _wave_evidence_validator import (
+    bad_ref,
+    blocked_ref_fields,
+    blocked_ref_message,
+    has_environment_token as _has_environment_token,
+    placeholder_fields,
+    positive_int as _positive_int,
+    validate_one as _validate_one,
+)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 DEFAULT_EVIDENCE = REPO_ROOT / "docs/retros/wave-5-hardware-evidence.json"
@@ -15,6 +24,7 @@ BLOCKED_REF_TOKENS = (
     "localhost",
     "127.0.0.1",
     "0.0.0.0",
+    "local",
     "prod",
     "production",
     "mock",
@@ -33,33 +43,19 @@ REQUIRED_REFS = (
     "waybill_print_log_ref",
     "audit_event_query_ref",
 )
-
-
-def read_json(path: Path) -> tuple[object | None, str | None]:
-    if not path.exists():
-        return None, f"missing file: {path}"
-    try:
-        return json.loads(path.read_text(encoding="utf-8")), None
-    except json.JSONDecodeError as error:
-        return None, f"invalid JSON: {path}: {error}"
+PLACEHOLDER_TOKENS = ("yyyy", "<", ">", "todo", "tbd", "待填", "待确认")
 
 
 def _bad_ref(value: str, *, allow_example_refs: bool) -> bool:
-    lowered = value.lower()
-    blocked = BLOCKED_REF_TOKENS if not allow_example_refs else BLOCKED_REF_TOKENS[:-1]
-    return any(token in lowered for token in blocked)
+    return bad_ref(
+        value,
+        allow_example_refs=allow_example_refs,
+        blocked_ref_tokens=BLOCKED_REF_TOKENS,
+    )
 
 
-def _has_environment_token(value: str, environment: str) -> bool:
-    return re.search(
-        rf"(^|[^0-9a-z]){re.escape(environment)}([^0-9a-z]|$)",
-        value.lower(),
-    ) is not None
-
-
-def _positive_int(payload: dict[str, object], key: str) -> bool:
-    value = payload.get(key)
-    return isinstance(value, int) and value >= 1
+def _placeholder_fields(payload: dict[str, object], keys: tuple[str, ...]) -> list[str]:
+    return placeholder_fields(payload, keys, placeholder_tokens=PLACEHOLDER_TOKENS)
 
 
 def validate_wave5_hardware_payload(
@@ -72,7 +68,7 @@ def validate_wave5_hardware_payload(
 
     environment = str(payload.get("environment", "")).lower()
     if environment not in {"dev", "staging"}:
-        return False, "environment 必须是真实 dev 或 staging，不能是 local/prod/mock/fake/stub/example"
+        return False, "environment 必须是真实 dev 或 staging，不能是 local/prod/production/mock/fake/stub/example"
 
     station_code = str(payload.get("station_code", "")).strip()
     if not station_code:
@@ -82,9 +78,21 @@ def validate_wave5_hardware_payload(
     if missing_refs:
         return False, f"缺少必需证据引用: {', '.join(missing_refs)}"
 
-    ref_values = [str(payload.get(key, "")) for key in REQUIRED_REFS]
-    if any(_bad_ref(value, allow_example_refs=allow_example_refs) for value in ref_values):
-        return False, "证据引用不能指向 local/prod/mock/fake/stub/example 边界"
+    placeholder_fields = _placeholder_fields(payload, ("station_code", *REQUIRED_REFS))
+    if placeholder_fields:
+        return False, f"真实 Wave 5 hardware evidence 不能保留模板占位: {', '.join(placeholder_fields)}"
+
+    bad_ref_fields = blocked_ref_fields(
+        payload,
+        REQUIRED_REFS,
+        is_bad_ref=_bad_ref,
+        allow_example_refs=allow_example_refs,
+    )
+    if bad_ref_fields:
+        return False, blocked_ref_message(
+            "local/prod/production/mock/fake/stub/example",
+            bad_ref_fields,
+        )
 
     missing_environment_refs = [
         key
@@ -114,14 +122,11 @@ def validate_wave5_hardware_payload(
 
 
 def validate_one(path: Path, *, allow_example_refs: bool) -> tuple[bool, str]:
-    payload, error = read_json(path)
-    if error:
-        return False, error
-    ok, message = validate_wave5_hardware_payload(
-        payload,
+    return _validate_one(
+        path,
         allow_example_refs=allow_example_refs,
+        validate=validate_wave5_hardware_payload,
     )
-    return ok, f"{path}: {message}"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -130,7 +135,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--allow-example-refs",
         action="store_true",
-        help="Allow example placeholder references; only use for validating templates.",
+        help=(
+            "Allow refs containing example domain tokens when validating templates; "
+            "template placeholders are still rejected."
+        ),
     )
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)

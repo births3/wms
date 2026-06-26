@@ -14,7 +14,7 @@
 
 ## 前置条件
 
-- 环境为 `dev` 或 `staging`，不得使用 `local` / `prod`。
+- 环境为 `dev` 或 `staging`，不得使用 `local` / `prod` / `production`。
 - 外部 TMS 测试环境、回调地址和鉴权方式已确认。
 - M10 TMS+ API、PostgreSQL migration、H2 audit_event 已部署到同一环境。
 - TMS 凭证通过 ADR-0013 约定的 secrets 机制注入，不写入仓库。
@@ -41,6 +41,7 @@
 ## Evidence JSON
 
 真实证据写入 `docs/retros/wave-5-tms-evidence.json`：
+以下 JSON 仅为字段结构示例，不得复制为真实 evidence；真实 evidence 必须由 record 命令生成。
 
 ```json
 {
@@ -78,32 +79,39 @@
 
 ## 验证命令
 
-所有 TMS 系统、推送、回调、失败重试、Vault 和审计证据引用必须包含当前 `environment` 标记（`dev` 或 `staging`），并且不能指向 local / prod / mock / fake / stub / example。
+所有 TMS 系统、推送、回调、失败重试、Vault 和审计证据引用必须包含当前 `environment` 标记（`dev` 或 `staging`），并且不能指向 local / prod / production / mock / fake / stub / example。
+
+先导出现场材料变量模板。该命令只输出变量清单和 check-only 命令，不调用 TMS，不写 `docs/retros/wave-5-tms-evidence.json`，不能关闭 W6.G gate：
 
 ```bash
-just wave-5-tms-evidence-record \
-  --environment staging \
-  --tms-system-ref '<真实 TMS dev/staging 系统引用>' \
-  --dispatch-push-log-ref '<WMS 推送日志引用>' \
-  --callback-log-ref '<TMS 回调日志引用>' \
-  --failure-retry-log-ref '<失败重试日志引用>' \
-  --audit-event-query-ref '<audit_event 查询证据>' \
-  --credential-ref 'vault://wms/staging/tms/vendor-a' \
-  --dispatches-received 1 \
-  --callbacks-received 1 \
-  --failed-callbacks-exercised 1 \
-  --retry-succeeded \
-  --audit-event-verified
+just wave-5-tms-materials --export-template
+```
 
+```bash
+just wave-5-tms-materials --from-env --json
+just wave-5-tms-readiness --from-env --json
+just wave-5-tms-evidence-record --from-env --check-only --json
+just wave-5-tms-evidence-record --from-env --json
 just wave-5-tms-evidence-validate
 ```
 
-该命令只验证 evidence JSON 的完整性和边界，不负责调用 TMS。外部联调必须先在真实 dev/staging 环境完成。
+`just wave-5-tms-materials --from-env --json`、`just wave-5-tms-readiness --from-env --json` 和 `just wave-5-tms-evidence-record --from-env --check-only --json` 只校验字段、证据引用和 dev/staging 边界；不调用 TMS，不写 `docs/retros/wave-5-tms-evidence.json`，不能关闭 W6.G gate。外部联调必须先在真实 dev/staging 环境完成；`record --from-env --json` 写入真实 evidence 后，`validate` 只验证 evidence JSON 的完整性和边界。
+
+### 现场执行包完成标准
+
+W6.G 现场执行包完成，不等于真实 TMS evidence 完成。现场执行包完成标准是：
+
+1. `just wave-5-tms-materials --export-template` 能输出完整 `WAVE_5_TMS_*` 变量清单和后续命令。
+2. TMS 对接方和测试负责人只需要填入真实 TMS 系统引用、推送日志、回调日志、失败重试日志、Vault 凭证引用和 `audit_event` 查询引用，不需要拼长参数。
+3. `just wave-5-tms-materials --from-env --json` 和 `just wave-5-tms-readiness --from-env --json` 能定位缺失变量及负责人。
+4. `just wave-5-tms-evidence-record --from-env --check-only --json` 通过后，现场同事执行一条正式命令 `just wave-5-tms-evidence-record --from-env --json` 生成 `docs/retros/wave-5-tms-evidence.json`。
+5. 正式 record 后必须立即执行 `just wave-5-tms-evidence-validate`；只有 validator 通过才关闭 W6.G。
 
 ## 拒绝边界
 
 - `environment` 是 `local` / `prod` / `production`。
-- 任一证据引用包含 `localhost`、`127.0.0.1`、`0.0.0.0`、`prod`、`production`、`mock`、`fake`、`stub`、`example`。
+- 任一证据引用包含 `localhost`、`127.0.0.1`、`0.0.0.0`、`local`、`prod`、`production`、`mock`、`fake`、`stub`、`example`。
+- 任一证据引用保留模板占位，如 `YYYY`、`<...>`、`TODO`、`TBD`、`待填`、`待确认`。
 - `credential_ref` 不是 `vault://` 引用。
 - 只有 WMS 内部 handler 测试，没有真实 TMS 推送或回调记录。
 - 计数为 0。

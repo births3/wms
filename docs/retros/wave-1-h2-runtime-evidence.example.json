@@ -1,6 +1,12 @@
 {
   "environment": "dev",
   "captured_at": "2026-06-02T12:00:00+08:00",
+  "database": {
+    "host": "pg-dev.wms.internal",
+    "resolved_ips": [
+      "10.0.0.8"
+    ]
+  },
   "performance": {
     "tool": "wrk",
     "baseline_rows": 60000000,

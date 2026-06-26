@@ -35,6 +35,7 @@ BLOCKED_RUNTIME_REF_TOKENS = (
     "localhost",
     "127.0.0.1",
     "0.0.0.0",
+    "local",
     "example",
     "prod",
     "production",
@@ -42,6 +43,24 @@ BLOCKED_RUNTIME_REF_TOKENS = (
     "fake",
     "stub",
 )
+PLACEHOLDER_TOKENS = (
+    "yyyy",
+    "<",
+    ">",
+    "todo",
+    "tbd",
+    "your-",
+    "internal-domain",
+    "待填",
+    "待确认",
+)
+BLOCKED_RUNTIME_REF_RE = re.compile(
+    rf"(^|[^0-9a-z])({'|'.join(re.escape(token) for token in BLOCKED_RUNTIME_REF_TOKENS)})([^0-9a-z]|$)",
+    re.IGNORECASE,
+)
+BUSINESS_SMOKE_PATH = "/api/v1/inventory/batches"
+BUSINESS_SMOKE_FLAG = "m3_inventory_batches_config_center_smoke"
+BUSINESS_SMOKE_FAIL_CLOSED_CODE = "M1_CONFIG_FLAG_MISSING"
 
 
 def contains_environment_token(value: str, environment: str) -> bool:
@@ -49,6 +68,15 @@ def contains_environment_token(value: str, environment: str) -> bool:
         rf"(^|[^0-9a-z]){re.escape(environment)}([^0-9a-z]|$)",
         value.lower(),
     ) is not None
+
+
+def contains_template_placeholder(value: str) -> bool:
+    lowered = value.lower()
+    return any(token in lowered for token in PLACEHOLDER_TOKENS)
+
+
+def contains_blocked_runtime_ref_token(value: str) -> bool:
+    return BLOCKED_RUNTIME_REF_RE.search(value) is not None
 
 
 @dataclass
@@ -108,12 +136,22 @@ def validate_wave2_runtime_payload(data: object) -> tuple[bool, str]:
 
     environment = str(data.get("environment", "")).lower()
     if environment not in {"dev", "staging"}:
-        return False, "environment 必须是真实 dev 或 staging，不能是 local/prod/mock/fake/stub/example"
+        return False, "environment 必须是真实 dev 或 staging，不能是 local/prod/production/mock/fake/stub/example"
 
     ref_keys = ("service_url", "smoke_log_ref", "reconcile_log_ref", "archive_ref")
-    target = " ".join(str(data.get(key, "")) for key in ref_keys).lower()
-    if any(token in target for token in BLOCKED_RUNTIME_REF_TOKENS):
-        return False, "证据引用不能指向 local/prod/mock/fake/stub/example"
+    missing_ref_keys = [key for key in ref_keys if not data.get(key)]
+    if missing_ref_keys:
+        return False, f"必须记录 {', '.join(missing_ref_keys)}"
+    placeholder_fields = [
+        key
+        for key in ref_keys
+        if data.get(key) and contains_template_placeholder(str(data.get(key, "")))
+    ]
+    if placeholder_fields:
+        return False, f"真实 Wave 2 runtime evidence 不能保留模板占位: {', '.join(placeholder_fields)}"
+
+    if any(contains_blocked_runtime_ref_token(str(data.get(key, ""))) for key in ref_keys):
+        return False, "证据引用不能指向 local/prod/production/mock/fake/stub/example"
 
     missing_environment_refs = [
         key
@@ -126,11 +164,30 @@ def validate_wave2_runtime_payload(data: object) -> tuple[bool, str]:
     if data.get("source_switched_to") != "config_center":
         return False, "source_switched_to 必须为 config_center"
 
+    migrated_count = data.get("migrated_count")
+    if not isinstance(migrated_count, int) or migrated_count <= 0:
+        return False, "migrated_count 必须大于 0，不能用空迁移关闭 Wave 2 runtime gate"
+
     reconcile = data.get("reconcile")
     if not isinstance(reconcile, dict):
         return False, "缺少 reconcile 对账结果"
+    matched = reconcile.get("matched")
+    if not isinstance(matched, int) or matched <= 0:
+        return False, "reconcile.matched 必须大于 0，不能用空对账关闭 Wave 2 runtime gate"
     if reconcile.get("missing_in_config_center") or reconcile.get("mismatched"):
         return False, "对账结果仍有 missing_in_config_center 或 mismatched"
+
+    business_smoke = data.get("business_smoke")
+    if not isinstance(business_smoke, dict):
+        return False, "缺少 business_smoke，必须证明真实业务接口启用读取与 fail-closed"
+    if business_smoke.get("path") != BUSINESS_SMOKE_PATH:
+        return False, f"business_smoke.path 必须为 {BUSINESS_SMOKE_PATH}"
+    if business_smoke.get("enabled_flag") != BUSINESS_SMOKE_FLAG:
+        return False, f"business_smoke.enabled_flag 必须为 {BUSINESS_SMOKE_FLAG}"
+    if business_smoke.get("success_status") != 200:
+        return False, "business_smoke.success_status 必须为 200"
+    if business_smoke.get("fail_closed_error_code") != BUSINESS_SMOKE_FAIL_CLOSED_CODE:
+        return False, f"business_smoke.fail_closed_error_code 必须为 {BUSINESS_SMOKE_FAIL_CLOSED_CODE}"
 
     if not data.get("smoke_log_ref") or not data.get("reconcile_log_ref") or not data.get("archive_ref"):
         return False, "必须记录 smoke_log_ref、reconcile_log_ref 与 archive_ref"

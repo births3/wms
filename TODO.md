@@ -12,7 +12,7 @@
 
 ### 当前阻塞 / 外部依赖
 
-- [ ] 稳定 dev/staging 环境仍未就绪；Wave 6 的真实 runtime evidence 每个引用必须包含当前 `environment` 标记，不能用 localhost / stub / mock / fake / example / prod 替代
+- [ ] 剩余 W6.D-H 仍需真 PDA / 外部系统 / 硬件 / staging 灰度环境；Wave 6 的真实 runtime evidence 每个引用必须包含当前 `environment` 标记，不能用 localhost / stub / mock / fake / example / prod / production 替代
 - [ ] M-PK 电子秤 / 蓝牙打印机 / 面单打印真实设备未接入
 - [ ] 外部 TMS dev/staging 接口、回调鉴权、调度结果格式仍需确认
 - [ ] “码上放心”账号、正式接口文档、鉴权方式、错误码、频率限制和 dev/staging 回执仍需补齐
@@ -23,11 +23,13 @@
 - [x] W6 scope：ADR-0035 已定义 Wave 6 为预发布证据收口波次，不新增业务功能
 - [x] W6 status / complete check：建立 Wave 6 证据收口报告与 `just wave-6-status` / `just wave-6-complete-check`
 - [x] W6 closeout runbook：建立 [Wave 6 Closeout Runbook](docs/runbooks/wave-6-closeout.md)，集中 8 个 evidence gate 的记录与验证顺序
-- [ ] W6.A Wave 1 H2 runtime evidence：按 [Wave 1 Pre-release Runtime Evidence Runbook](docs/runbooks/wave-1-runtime-evidence.md) 采集 `docs/retros/wave-1-h2-runtime-evidence.json`，通过 `just wave-1-runtime-evidence-validate`
-- [ ] W6.B Wave 1 W1.D 自动回滚 evidence：按同一 runbook 采集 `docs/retros/wave-1-runtime-evidence.json`，通过 `just wave-1-runtime-evidence-validate`
+- [x] W6 evidence preflight：建立 [Wave 6 Evidence Preflight Runbook](docs/runbooks/wave-6-evidence-preflight.md) 与 `just wave-6-evidence-preflight`，先验 runbook / just 入口 / validator 链路，不写真实 evidence
+- [x] W6.A Wave 1 H2 runtime evidence：已按 [Wave 1 Pre-release Runtime Evidence Runbook](docs/runbooks/wave-1-runtime-evidence.md) 采集 `docs/retros/wave-1-h2-runtime-evidence.json`，60M baseline / wrk 1 小时 / P99 90.57ms / 7 天封档均通过 `just wave-1-runtime-evidence-validate`
+- [x] W6.B Wave 1 W1.D 自动回滚 evidence：已按同一 runbook 采集 `docs/retros/wave-1-runtime-evidence.json`，staging 自动回滚证据通过 `just wave-1-runtime-evidence-validate`
 - [x] W6.C tooling：在 [Wave 2 Pre-release Runtime Evidence Runbook](docs/runbooks/wave-2-runtime-evidence.md) 补 record 命令，建立 `record_wave2_runtime_evidence.py` 与 `just wave-2-runtime-evidence-record`
-- [ ] W6.C Wave 2 配置中心 Feature Flag evidence：按 runbook 采集 `docs/retros/wave-2-runtime-evidence.json`，通过 `just wave-2-runtime-evidence-validate`
+- [x] W6.C Wave 2 配置中心 Feature Flag evidence：已按 runbook 采集 `docs/retros/wave-2-runtime-evidence.json`，staging 配置中心切源 / 对账 / smoke 通过 `just wave-2-runtime-evidence-validate`
 - [x] W6.D tooling：在 [Wave 3 PDA Readiness Runbook](docs/runbooks/wave-3-pda-readiness.md) 补 evidence schema / record 命令，建立 `record_wave3_pda_runtime_evidence.py`、`validate_wave3_pda_runtime_evidence.py` 与对应 `just` 入口
+- [x] W6.D trace-code OpenAPI 前置：已直连 `http://43.128.77.47:9100/openapi/wms-openapi.yaml` 验证 HTTP 200 / OpenAPI 3.0.3 / 5 个 required paths / `X-API-Key` 认证头；脱敏附件见 `docs/retros/wave-3-pda-field-precheck-2026-06-14.json`，该附件不写 runtime evidence、不能关闭 W6.D gate
 - [ ] W6.D Wave 3 真 PDA + L7 evidence：按 runbook 补齐 `docs/retros/wave-3-pda-runtime-evidence.json`，通过 `just wave-3-pda-runtime-evidence-validate`
 - [ ] W6.E Wave 4 M-TC “码上放心” external evidence：按 [Wave 4 External Dependency Evidence Runbook](docs/runbooks/wave-4-external-dependencies.md) 补齐 `docs/retros/wave-4-external-dependencies.json`，通过 `just wave-4-external-dependencies-validate`
 - [x] W6.F tooling：建立 [Wave 5 Hardware Evidence Runbook](docs/runbooks/wave-5-hardware-evidence.md)、`record_wave5_hardware_evidence.py`、`validate_wave5_hardware_evidence.py` 与对应 `just` 入口
@@ -108,13 +110,13 @@ Wave 1 / Wave 2 / Wave 3 / Wave 4 / Wave 5 开发完成状态仍分别以 `just 
 
 - W4 pre-release deploy gate：首次试运行投产必须使用 ADR-0016 灰度发布链路，不允许全量直发
 - W4.D external evidence gate："码上放心"账号 / 正式接口文档 / 鉴权方式 / 错误码 / 频率限制 / dev/staging 成功回执 / 失败重试 / audit_event 查询证据后续补齐；使用 `just wave-4-external-dependencies-record ...` 记录，再跑 `just wave-4-external-dependencies-validate`
-- W3 PDA production gate：生产 PDA app 等真 PDA 与 SPIKE-005 验证后启动
-- W3 L7 pre-release gate：有稳定 dev/staging + 真 PDA 后，按 [Wave 3 PDA Readiness Runbook](docs/runbooks/wave-3-pda-readiness.md) 启动 SPIKE-005，采集 M2/M3 性能/易用性证据
-- W2.G pre-release runtime gate：有稳定 dev/staging 后，按 [Wave 2 Pre-release Runtime Evidence Runbook](docs/runbooks/wave-2-runtime-evidence.md) 验证配置中心版 Feature Flag 迁移、对账、切源、旧文件归档和 smoke，写入 `docs/retros/wave-2-runtime-evidence.json`
-- W1.B / W1.D pre-release runtime gate：仍按 [Wave 1 Pre-release Runtime Evidence Runbook](docs/runbooks/wave-1-runtime-evidence.md) 在真实环境补齐
+- W3 PDA production gate：生产 PDA app 等真 PDA 与 SPIKE-005 / SPIKE-005B 验证、ADR-0027 Accepted 后启动
+- W3 L7 pre-release gate：有稳定 dev/staging + 真 PDA 后，按 [Wave 3 PDA Readiness Runbook](docs/runbooks/wave-3-pda-readiness.md) 启动 SPIKE-005 / SPIKE-005B，采集 M2/M3 性能/易用性证据
+- W2.G pre-release runtime gate：已按 [Wave 2 Pre-release Runtime Evidence Runbook](docs/runbooks/wave-2-runtime-evidence.md) 验证配置中心版 Feature Flag 迁移、对账、切源、旧文件归档和 smoke，写入 `docs/retros/wave-2-runtime-evidence.json`
+- W1.B / W1.D pre-release runtime gate：已按 [Wave 1 Pre-release Runtime Evidence Runbook](docs/runbooks/wave-1-runtime-evidence.md) 在真实环境补齐，写入 `docs/retros/wave-1-h2-runtime-evidence.json` 与 `docs/retros/wave-1-runtime-evidence.json`
 - W2-external：人工确认“码上放心”账号外部开通状态；外部依赖仍按 [ROADMAP.md](ROADMAP.md) 的外部依赖追踪表跟进
 
-Wave 1 / Wave 2 / Wave 3 开发完成状态仍分别以 `just wave-1-complete-check` / `just wave-2-complete-check` / `just wave-3-complete-check` 为准；上述 runtime gate 在预发布前单独验证，每个 evidence 引用必须包含当前 `environment` 标记，禁止用 localhost / stub / mock / fake / example / prod 代替。
+Wave 1 / Wave 2 / Wave 3 开发完成状态仍分别以 `just wave-1-complete-check` / `just wave-2-complete-check` / `just wave-3-complete-check` 为准；上述 runtime gate 在预发布前单独验证，每个 evidence 引用必须包含当前 `environment` 标记，禁止用 localhost / stub / mock / fake / example / prod / production 代替。
 
 ---
 
@@ -137,12 +139,12 @@ Wave 1 / Wave 2 / Wave 3 开发完成状态仍分别以 `just wave-1-complete-ch
 - [x] H3 同步：`shared/openapi/openapi.json` 与 `packages/api-client/src/schema.ts` 已反映 Wave 3 第一批 path/schema
 - [x] 治理：`check_openapi_contract.py` 要求 Wave 3 第一批 path/schema
 - [x] W3 completion report：新增 `report_wave3_completion.py` 与 `just wave-3-complete-check`，汇总 M2/M3 11 层证据和 Wave 3 阻塞项
-- [x] W3.A PDA readiness：按 SPIKE-005 先落设备清单与 runbook，不引入 RN 依赖，不创建生产 app
+- [x] W3.A PDA readiness：按 SPIKE-005 / SPIKE-005B 先落设备清单与 runbook，不引入 RN / Expo / EAS / Capacitor 生产 workspace 依赖，不创建生产 app
 - [x] W3 完成门禁：M2 / M3 关键路径 L1-L6/L8-L11 已有静态证据，L7 为预发布 gate；GSP 资质有效期校验来源冻结为 M1 本地资质档案 + M-VR 校验规则执行
 
 ### 后续 / 不阻塞 Wave 3 开发完成
 
-- [ ] W3.A PDA 生产端：`apps/pda-mobile` 目前只有 `.gitkeep`，生产 app 等真 PDA 与 SPIKE-005 验证后启动，作为预发布 gate 跟踪
+- [ ] W3.A PDA 生产端：`apps/pda-mobile` 目前只有 `.gitkeep`，生产 app 等真 PDA 与 SPIKE-005 / SPIKE-005B 验证、ADR-0027 Accepted 后启动，作为预发布 gate 跟踪
 - [x] W3.D 后续：M9 自动计费与账单管理已在 Wave 5.C 完成；`just wave-5-complete-check` 通过
 
 ## 已归档：Wave 0.5 — 原型 + 技术 Spike + 组件库抽离
@@ -188,7 +190,7 @@ Wave 1 / Wave 2 / Wave 3 开发完成状态仍分别以 `just wave-1-complete-ch
   - [x] SPIKE-002 H2 append-only（accept → ADR-0025 Accepted v0.2）
   - [x] SPIKE-004 SQLx offline（accept → ADR-0001 §SQLx 附录 v0.2）
   - [x] SPIKE-005 RN 扫枪（**deferred** → 推迟到 Wave 3 启动前；启动条件见 ROADMAP §v25 backlog + spike-005 §7.2）
-- [x] 产出 ADR-0024 (Accepted v0.2) / 0025 (Accepted v0.2) / 0026 (Accepted)+ ADR-0001 §SQLx 附录 v0.2（已合入）；ADR-0027 推迟随 spike-005
+- [x] 产出 ADR-0024 (Accepted v0.2) / 0025 (Accepted v0.2) / 0026 (Accepted)+ ADR-0001 §SQLx 附录 v0.2（已合入）；ADR-0027 已建 Proposed，等待 SPIKE-005 / SPIKE-005B 真机 evidence 后定版
 - [x] **Wave 0.5 retro**（`docs/retros/wave-0.5-retro.md`，含 §11 持续演进补记）
 - [x] 重新 capture visual snapshot 验证 e3ce5a0 后渲染（commit 62bf9eb：37 baseline 全部完美 mean_diff=0.00）
 - [x] **前端原型先行工作流**：ADR-0029 + `docs/prototypes/prototype-to-production.md` 落地，确认原型可先行但不得直接复制为生产页
@@ -203,7 +205,7 @@ Wave 1 / Wave 2 / Wave 3 开发完成状态仍分别以 `just wave-1-complete-ch
 - [x] packages/ui 抽离（commit e3ce5a0，ADR-0028 备案）
 - [x] Spike 计划落盘（commit b2e84eb，5 项 docs/spikes/*.md）
 - [x] **5 项 Spike 全部进入三态之一**（4 accepted: 001/002/003/004 / 1 deferred: 005）
-- [x] 任一 accept 的 Spike 都有对应 ADR（0024 (Accepted v0.2) / 0025 (Accepted v0.2) / 0026 (Accepted) + 0001 §SQLx 附录 v0.2 已合入；0027 随 spike-005 推迟）
+- [x] 任一 accept 的 Spike 都有对应 ADR（0024 (Accepted v0.2) / 0025 (Accepted v0.2) / 0026 (Accepted) + 0001 §SQLx 附录 v0.2 已合入；0027 已建 Proposed，等待 SPIKE-005 / SPIKE-005B 真机 evidence 后定版）
 - [x] Wave 0.5 retro 写完（`docs/retros/wave-0.5-retro.md`，含 §11 持续演进补记）
 - [x] T1 治理 24/24 全绿（持续条件）
 

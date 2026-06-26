@@ -38,10 +38,25 @@ match = "docs/adr/**"
 checks = ["validate_adr_index", "check_doc_links"]
 tier = "T1"
 
+[[rules]]
+match = "docs/adr/0001-tech-stack.md"
+checks = ["check_pda_production_gate"]
+tier = "T1"
+
 # H-INT 统一外部集成能力：三处真相源(ADR-0030/依赖图/ROADMAP)登记一致性
 [[rules]]
 match = "docs/adr/0030-integration-capability.md"
 checks = ["check_integration_contract"]
+tier = "T1"
+
+[[rules]]
+match = "docs/adr/0035-wave-6-pre-release-evidence-closeout.md"
+checks = ["check_wave6_evidence_preflight"]
+tier = "T1"
+
+[[rules]]
+match = "docs/adr/0027-pda-offline-model.md"
+checks = ["check_pda_production_gate"]
 tier = "T1"
 
 [[rules]]
@@ -50,8 +65,23 @@ checks = ["check_integration_contract"]
 tier = "T1"
 
 [[rules]]
+match = "docs/architecture-dependencies.md"
+checks = ["check_wave6_evidence_preflight"]
+tier = "T1"
+
+[[rules]]
 match = "ROADMAP.md"
 checks = ["check_integration_contract"]
+tier = "T1"
+
+[[rules]]
+match = "ROADMAP.md"
+checks = ["check_wave6_evidence_preflight"]
+tier = "T1"
+
+[[rules]]
+match = "TODO.md"
+checks = ["check_wave6_evidence_preflight"]
 tier = "T1"
 
 [[rules]]
@@ -62,16 +92,231 @@ tier = "T1"
 # ============================================================
 # 治理脚本自身的变更（Tier 1）
 # ============================================================
-# 修改治理脚本时，至少跑一遍环境检查与文档链接，确认无破坏
+# 修改治理脚本时，至少跑环境检查、文档链接与覆盖元检查，确认无破坏且已接线
 
 [[rules]]
 match = "scripts/governance/**"
-checks = ["validate_environment", "check_doc_links"]
+checks = ["validate_environment", "check_doc_links", "check_governance_coverage"]
 tier = "T1"
 
 [[rules]]
 match = "governance/gate-rules.toml"
-checks = ["validate_environment"]
+checks = ["validate_environment", "check_governance_coverage"]
+tier = "T1"
+
+[[rules]]
+match = "justfile"
+checks = ["check_wave6_evidence_preflight", "check_governance_coverage"]
+tier = "T1"
+
+[[rules]]
+match = "package.json"
+checks = ["check_pda_production_gate"]
+tier = "T1"
+
+[[rules]]
+match = "**/package.json"
+checks = ["check_pda_production_gate"]
+tier = "T1"
+
+[[rules]]
+match = "pnpm-workspace.yaml"
+checks = ["check_pda_production_gate"]
+tier = "T1"
+
+[[rules]]
+match = "pnpm-lock.yaml"
+checks = ["check_pda_production_gate"]
+tier = "T1"
+
+[[rules]]
+match = "apps/pda-mobile/**"
+checks = ["check_pda_production_gate"]
+tier = "T1"
+
+[[rules]]
+match = "docs/spikes/spike-005*.md"
+checks = ["check_pda_production_gate"]
+tier = "T1"
+
+[[rules]]
+match = "docs/spikes/README.md"
+checks = ["check_pda_production_gate"]
+tier = "T1"
+
+[[rules]]
+match = "docs/retros/wave-3-pda-runtime-evidence.json"
+checks = ["check_pda_production_gate", "validate_wave3_pda_runtime_evidence"]
+tier = "T1"
+
+[[rules]]
+match = "docs/retros/wave-1-h2-runtime-evidence.json"
+checks = ["validate_wave1_runtime_evidence"]
+tier = "T1"
+
+[[rules]]
+match = "docs/retros/wave-1-runtime-evidence.json"
+checks = ["validate_wave1_runtime_evidence"]
+tier = "T1"
+
+[[rules]]
+match = "docs/retros/wave-2-runtime-evidence.json"
+checks = ["report_wave2_completion"]
+tier = "T1"
+
+[[rules]]
+match = "docs/retros/wave-4-external-dependencies.json"
+checks = ["validate_wave4_external_dependencies"]
+tier = "T1"
+
+[[rules]]
+match = "docs/retros/wave-5-hardware-evidence.json"
+checks = ["validate_wave5_hardware_evidence"]
+tier = "T1"
+
+[[rules]]
+match = "docs/retros/wave-5-tms-evidence.json"
+checks = ["validate_wave5_tms_evidence"]
+tier = "T1"
+
+[[rules]]
+match = "docs/retros/wave-6-deploy-evidence.json"
+checks = ["validate_wave6_deploy_evidence"]
+tier = "T1"
+
+[[rules]]
+match = "scripts/governance/check_pda_production_gate.py"
+checks = ["check_pda_production_gate"]
+tier = "T1"
+
+[[rules]]
+match = "scripts/governance/check_wave6_evidence_preflight.py"
+checks = ["check_wave6_evidence_preflight"]
+tier = "T1"
+
+[[rules]]
+match = "scripts/governance/report_wave6_pre_release.py"
+checks = ["check_wave6_evidence_preflight"]
+tier = "T1"
+
+[[rules]]
+match = "scripts/governance/validate_wave3_pda_runtime_evidence.py"
+checks = ["check_pda_production_gate", "check_wave6_evidence_preflight"]
+tier = "T1"
+
+[[rules]]
+match = "scripts/governance/record_wave3_pda_runtime_evidence.py"
+checks = ["check_pda_production_gate", "check_wave6_evidence_preflight"]
+tier = "T1"
+
+[[rules]]
+match = "scripts/governance/check_wave3_pda_runtime_readiness.py"
+checks = ["check_wave6_evidence_preflight"]
+tier = "T1"
+
+[[rules]]
+match = "deploy/scripts/wave1_auto_rollback_probe.sh"
+checks = ["check_wave6_evidence_preflight"]
+tier = "T1"
+
+[[rules]]
+match = "deploy/scripts/wave1_rollback.sh"
+checks = ["check_wave6_evidence_preflight"]
+tier = "T1"
+
+[[rules]]
+match = "scripts/governance/validate_wave1_runtime_evidence.py"
+checks = ["check_wave6_evidence_preflight"]
+tier = "T1"
+
+[[rules]]
+match = "scripts/governance/check_wave1_runtime_evidence_prereqs.py"
+checks = ["check_wave6_evidence_preflight"]
+tier = "T1"
+
+[[rules]]
+match = "scripts/governance/check_wave1_h2_runtime_readiness.py"
+checks = ["check_wave6_evidence_preflight"]
+tier = "T1"
+
+[[rules]]
+match = "scripts/governance/collect_wave1_h2_runtime_evidence.py"
+checks = ["check_wave6_evidence_preflight"]
+tier = "T1"
+
+[[rules]]
+match = "scripts/governance/report_wave2_completion.py"
+checks = ["check_wave6_evidence_preflight"]
+tier = "T1"
+
+[[rules]]
+match = "scripts/governance/record_wave2_runtime_evidence.py"
+checks = ["check_wave6_evidence_preflight"]
+tier = "T1"
+
+[[rules]]
+match = "scripts/governance/collect_wave2_runtime_evidence.py"
+checks = ["check_wave6_evidence_preflight"]
+tier = "T1"
+
+[[rules]]
+match = "scripts/governance/record_wave3_pda_runtime_evidence.py"
+checks = ["check_wave6_evidence_preflight"]
+tier = "T1"
+
+[[rules]]
+match = "scripts/governance/validate_wave4_external_dependencies.py"
+checks = ["check_wave6_evidence_preflight"]
+tier = "T1"
+
+[[rules]]
+match = "scripts/governance/record_wave4_external_dependencies.py"
+checks = ["check_wave6_evidence_preflight"]
+tier = "T1"
+
+[[rules]]
+match = "scripts/governance/check_wave4_external_dependencies_readiness.py"
+checks = ["check_wave6_evidence_preflight"]
+tier = "T1"
+
+[[rules]]
+match = "scripts/governance/validate_wave5_hardware_evidence.py"
+checks = ["check_wave6_evidence_preflight"]
+tier = "T1"
+
+[[rules]]
+match = "scripts/governance/record_wave5_hardware_evidence.py"
+checks = ["check_wave6_evidence_preflight"]
+tier = "T1"
+
+[[rules]]
+match = "scripts/governance/validate_wave5_tms_evidence.py"
+checks = ["check_wave6_evidence_preflight"]
+tier = "T1"
+
+[[rules]]
+match = "scripts/governance/record_wave5_tms_evidence.py"
+checks = ["check_wave6_evidence_preflight"]
+tier = "T1"
+
+[[rules]]
+match = "scripts/governance/validate_wave6_deploy_evidence.py"
+checks = ["check_wave6_evidence_preflight"]
+tier = "T1"
+
+[[rules]]
+match = "scripts/governance/check_wave6_deploy_readiness.py"
+checks = ["check_wave6_evidence_preflight"]
+tier = "T1"
+
+[[rules]]
+match = "scripts/governance/report_wave6_deploy_materials.py"
+checks = ["check_wave6_evidence_preflight"]
+tier = "T1"
+
+[[rules]]
+match = "scripts/governance/record_wave6_deploy_evidence.py"
+checks = ["check_wave6_evidence_preflight"]
 tier = "T1"
 
 # Wave 1 W1.D：文件版 Feature Flag 必须登记 owner / 创建日期 / 90 天清理期
@@ -159,6 +404,16 @@ match = "prototypes/src/prototype-kit/**"
 checks = ["check_page_size", "check_prototype_fidelity", "check_baseline_completeness"]
 tier = "T1"
 
+[[rules]]
+match = "apps/web-admin/src/pages/**"
+checks = ["check_page_size"]
+tier = "T1"
+
+[[rules]]
+match = "apps/pda-mobile/src/pages/**"
+checks = ["check_page_size"]
+tier = "T1"
+
 # baseline 完整性：Tabs.tsx ↔ manifest.toml ↔ baseline PNG 三者一致
 [[rules]]
 match = "prototypes/src/Tabs.tsx"
@@ -196,6 +451,31 @@ match = "docs/prototypes/component-registry.md"
 checks = ["check_component_registry_consistency"]
 tier = "T1"
 
+[[rules]]
+match = "docs/runbooks/wave-*-evidence.md"
+checks = ["check_wave6_evidence_preflight"]
+tier = "T1"
+
+[[rules]]
+match = "docs/runbooks/wave-3-pda-readiness.md"
+checks = ["check_wave6_evidence_preflight", "check_pda_production_gate"]
+tier = "T1"
+
+[[rules]]
+match = "docs/runbooks/wave-4-external-dependencies.md"
+checks = ["check_wave6_evidence_preflight"]
+tier = "T1"
+
+[[rules]]
+match = "docs/runbooks/wave-6-closeout.md"
+checks = ["check_wave6_evidence_preflight"]
+tier = "T1"
+
+[[rules]]
+match = "docs/runbooks/wave-6-evidence-preflight.md"
+checks = ["check_wave6_evidence_preflight"]
+tier = "T1"
+
 # ============================================================
 # 占位规则（未来 Wave 启用，当前对应脚本不存在 → task_check 会跳过）
 # ============================================================
@@ -218,9 +498,19 @@ match = "docs/compliance/gsp-field-traceability.md"
 checks = ["check_field_coding_standards"]
 tier = "T1"
 
+[[rules]]
+match = "docs/domain/user-stories-*.md"
+checks = ["check_field_coding_standards"]
+tier = "T1"
+
 # Wave 1 启用：业务规则字段引用（每条 BR-N 在故事中有对应实现）
 [[rules]]
 match = "docs/compliance/gsp-business-rules-registry.md"
+checks = ["check_business_rules_registry"]
+tier = "T1"
+
+[[rules]]
+match = "docs/domain/user-stories-*.md"
 checks = ["check_business_rules_registry"]
 tier = "T1"
 
@@ -259,7 +549,7 @@ tier = "T3"
 
 # Wave 5 启用：CHANGELOG 与 git tag 同步
 [[rules]]
-match = "CHANGELOG.md"
+match = "*.md"
 checks = ["check_changelog_freshness"]
 tier = "T1"
 

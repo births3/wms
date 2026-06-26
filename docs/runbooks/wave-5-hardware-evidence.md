@@ -14,7 +14,7 @@
 
 ## 前置条件
 
-- 环境为 `dev` 或 `staging`，不得使用 `local` / `prod`。
+- 环境为 `dev` 或 `staging`，不得使用 `local` / `prod` / `production`。
 - M-PK API、PostgreSQL migration、H2 audit_event 已部署到同一环境。
 - 电子秤、蓝牙打印机和面单打印设备已接入测试工位。
 - 设备校准记录已归档。
@@ -43,6 +43,7 @@
 ## Evidence JSON
 
 真实证据写入 `docs/retros/wave-5-hardware-evidence.json`：
+以下 JSON 仅为字段结构示例，不得复制为真实 evidence；真实 evidence 必须由 record 命令生成。
 
 ```json
 {
@@ -51,7 +52,7 @@
   "scale_device_ref": "asset://wms-staging/hardware/scale-01",
   "bluetooth_printer_ref": "asset://wms-staging/hardware/bluetooth-printer-01",
   "waybill_printer_ref": "asset://wms-staging/hardware/waybill-printer-01",
-  "calibration_record_ref": "s3://wms-staging-evidence/wave5/hardware/calibration-YYYYMMDD.pdf",
+  "calibration_record_ref": "s3://wms-staging-evidence/wave5/hardware/calibration-20260603.pdf",
   "scale_reading_log_ref": "ci/staging/wave5-hardware-scale/123",
   "bluetooth_print_log_ref": "ci/staging/wave5-hardware-bluetooth-print/123",
   "waybill_print_log_ref": "ci/staging/wave5-hardware-waybill-print/123",
@@ -81,36 +82,39 @@
 
 ## 验证命令
 
-所有设备、校准、打印、称重和审计证据引用必须包含当前 `environment` 标记（`dev` 或 `staging`），并且不能指向 local / prod / mock / fake / stub / example。
+所有设备、校准、打印、称重和审计证据引用必须包含当前 `environment` 标记（`dev` 或 `staging`），并且不能指向 local / prod / production / mock / fake / stub / example。
+
+先导出现场材料变量模板。该命令只输出变量清单和 check-only 命令，不连接硬件，不写 `docs/retros/wave-5-hardware-evidence.json`，不能关闭 W6.F gate：
 
 ```bash
-just wave-5-hardware-evidence-record \
-  --environment staging \
-  --station-code '<真实包装工位编号>' \
-  --scale-device-ref '<电子秤设备引用>' \
-  --bluetooth-printer-ref '<蓝牙打印机设备引用>' \
-  --waybill-printer-ref '<面单打印设备引用>' \
-  --calibration-record-ref '<设备校准记录引用>' \
-  --scale-reading-log-ref '<电子秤读数日志引用>' \
-  --bluetooth-print-log-ref '<蓝牙标签打印日志引用>' \
-  --waybill-print-log-ref '<面单打印日志引用>' \
-  --audit-event-query-ref '<audit_event 查询证据>' \
-  --scale-readings-recorded 1 \
-  --bluetooth-labels-printed 1 \
-  --waybills-printed 1 \
-  --hardware-connected \
-  --print-artifacts-reviewed \
-  --audit-event-verified
+just wave-5-hardware-materials --export-template
+```
 
+```bash
+just wave-5-hardware-materials --from-env --json
+just wave-5-hardware-readiness --from-env --json
+just wave-5-hardware-evidence-record --from-env --check-only --json
+just wave-5-hardware-evidence-record --from-env --json
 just wave-5-hardware-evidence-validate
 ```
 
-该命令只验证 evidence JSON 的完整性和边界，不负责连接设备。设备联调必须先在真实 dev/staging 环境完成。
+`just wave-5-hardware-materials --from-env --json`、`just wave-5-hardware-readiness --from-env --json` 和 `just wave-5-hardware-evidence-record --from-env --check-only --json` 只校验字段、证据引用和 dev/staging 边界；不连接真实硬件，不写 `docs/retros/wave-5-hardware-evidence.json`，不能关闭 W6.F gate。设备联调必须先在真实 dev/staging 环境完成；`record --from-env --json` 写入真实 evidence 后，`validate` 只验证 evidence JSON 的完整性和边界。
+
+### 现场执行包完成标准
+
+W6.F 现场执行包完成，不等于真实硬件 evidence 完成。现场执行包完成标准是：
+
+1. `just wave-5-hardware-materials --export-template` 能输出完整 `WAVE_5_*` 变量清单和后续命令。
+2. 现场设备负责人只需要填入真实设备资产、校准记录、称重日志、打印日志和 `audit_event` 查询引用，不需要拼长参数。
+3. `just wave-5-hardware-materials --from-env --json` 和 `just wave-5-hardware-readiness --from-env --json` 能定位缺失变量及负责人。
+4. `just wave-5-hardware-evidence-record --from-env --check-only --json` 通过后，现场同事执行一条正式命令 `just wave-5-hardware-evidence-record --from-env --json` 生成 `docs/retros/wave-5-hardware-evidence.json`。
+5. 正式 record 后必须立即执行 `just wave-5-hardware-evidence-validate`；只有 validator 通过才关闭 W6.F。
 
 ## 拒绝边界
 
 - `environment` 是 `local` / `prod` / `production`。
-- 任一证据引用包含 `localhost`、`127.0.0.1`、`0.0.0.0`、`prod`、`production`、`mock`、`fake`、`stub`、`example`。
+- 任一证据引用包含 `localhost`、`127.0.0.1`、`0.0.0.0`、`local`、`prod`、`production`、`mock`、`fake`、`stub`、`example`。
+- 任一证据引用保留模板占位，如 `YYYY`、`<...>`、`TODO`、`TBD`、`待填`、`待确认`。
 - 设备引用只指向本地模拟器、单元测试、截图占位或人工描述。
 - 计数为 0。
 - 未人工核对打印产物。

@@ -26,6 +26,19 @@ need_value() {
   fi
 }
 
+contains_forbidden_boundary() {
+  local value="${1,,}"
+  [[ "$value" =~ (^|[^[:alnum:]])(local|localhost|127\.0\.0\.1|0\.0\.0\.0|prod|production|prodution|stub|mock|fake|example)([^[:alnum:]]|$) ]]
+}
+
+contains_template_placeholder() {
+  local value="${1,,}"
+  [[ "$value" =~ (^|[^[:alnum:]])(yyyy|todo|tbd)([^[:alnum:]]|$) ]] \
+    || [[ "$value" == *"<"*">"* ]] \
+    || [[ "$value" == *"待填"* ]] \
+    || [[ "$value" == *"待确认"* ]]
+}
+
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --seal-date)
@@ -47,6 +60,14 @@ done
 
 if [ -z "${DATABASE_URL:-}" ]; then
   echo "DATABASE_URL is required" >&2
+  exit 2
+fi
+if contains_forbidden_boundary "$DATABASE_URL"; then
+  echo "DATABASE_URL must not point to local/prod/production/stub/mock/fake/example boundaries" >&2
+  exit 2
+fi
+if contains_template_placeholder "$DATABASE_URL"; then
+  echo "DATABASE_URL must not contain a template placeholder" >&2
   exit 2
 fi
 
