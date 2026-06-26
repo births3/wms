@@ -7,6 +7,7 @@
 .env
 .env.*
 !.env.example
+deploy/env/*.env
 *.pem
 *.key
 id_rsa
@@ -39,6 +40,7 @@ prototypes/.visual-snapshots/
 prototypes/.visual-diffs/
 prototypes/.e2e-artifacts/
 prototypes/test-results/
+test-results/
 
 # ---- Python（治理脚本） ----
 __pycache__/
@@ -63,7 +65,11 @@ Thumbs.db
 logs/
 tmp/
 .tmp/
+artifacts/
 *.local
+
+# ---- 真实系统导出数据 ----
+docs/legacy-analysis/*.csv
 
 # ---- 测试与覆盖率 ----
 coverage/
@@ -94,3 +100,7 @@ site/
 # ---- Kiro CLI 本地工具配置（agent / commander / skill 定义） ----
 # kiro-cli 用，不是项目资产。每个开发机各自维护本地 .kiro/。
 .kiro/
+
+# ---- Codex CLI 本地工具配置（agent / plugin / skill 定义） ----
+# codex-cli 用，不是项目资产。每个开发机各自维护本地 .codex/。
+.codex/

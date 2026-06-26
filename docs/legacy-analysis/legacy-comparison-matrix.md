@@ -2,7 +2,7 @@
 
 > 时间：2026-05-17
 > 版本：v1
-> 数据源：`docs/legacy-analysis/{1,2,3,4,5,6}.csv`（Oracle WMS 生产环境导出，2026-05-16）
+> 数据源：Oracle WMS 生产环境导出 CSV（2026-05-16）；原始 CSV 不入 Git，按 `export-scripts.sql` 可重新导出
 > 文档层级：L4 评审/对标记录
 > 关联：[docs/infra/sharding-decision-matrix.md](../infra/sharding-decision-matrix.md) / [docs/domain/clarifications.md](../domain/clarifications.md) #42
 
