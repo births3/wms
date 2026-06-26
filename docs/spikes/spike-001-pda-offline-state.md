@@ -3,6 +3,7 @@
 > SPIKE-001 H5 验证：PDA 离线 24h 通过"长 refresh + 短 access"实现，
 > 状态机文档化（不写代码；PDA 端代码在 SPIKE-005）。
 > 关联：clarifications.md C1（PDA 离线 24h 默认可配置）
+> 原路径：`spikes/spike-001-axum-jwt/pda-offline-state.md`；PoC 代码移除后迁入 `docs/spikes/` 保留。
 
 ---
 

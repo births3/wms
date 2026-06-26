@@ -127,7 +127,7 @@ M-TC 追溯码与药监 EDI 边界（"码上放心"由 ERP 还是 WMS 处理）�
 | SPIKE-002 H2 append-only | 起草 | 拟产出 ADR-0025 | Wave 1 W1.B 启动前必跑 |
 | SPIKE-003 utoipa→OpenAPI→TS | 起草 | 拟产出 ADR-0026 | **Wave 1 W1.C / packages/api-client 启动前必跑（最高优先级）** |
 | SPIKE-004 SQLx offline | 起草 | ADR-0001 附录 | Wave 1 W1.A/B 编译前必跑 |
-| SPIKE-005 RN 扫枪 | 起草 | 拟产出 ADR-0027 | Wave 3 W3.A PDA 业务启动前必跑（可后置） |
+| SPIKE-005 RN 扫枪 | 起草 | ADR-0027（Proposed）；2026-06-06 已建 | Wave 3 W3.A PDA 业务启动前必跑（可后置） |
 
 5 项合计时间盒 8.5 天。**当前节奏铁律阻塞 Wave 1**——Wave 0.5 退出条件之一是"Spike 进入 accept/reject/defer"，全部停在"起草"。
 
@@ -151,7 +151,7 @@ M-TC 追溯码与药监 EDI 边界（"码上放心"由 ERP 还是 WMS 处理）�
 | 0024 鉴权模型（拟） | 占位 | SPIKE-001 accept 后写 |
 | 0025 审计存储模型（拟） | 占位 | SPIKE-002 accept 后写 |
 | 0026 跨端契约管线（拟） | 占位 | SPIKE-003 accept 后写 |
-| 0027 PDA 离线模型（拟） | 占位 | SPIKE-005 accept 后写 |
+| 0027 PDA 离线模型与技术栈定版框架 | Proposed | 2026-06-06 已建；保留 RN 当前方向 + WebView/Capacitor 候选，Accepted 等真 PDA + dev/staging evidence |
 
 ---
 

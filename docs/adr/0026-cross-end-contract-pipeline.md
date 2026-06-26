@@ -217,6 +217,6 @@ openapi-check:
 ## 6. 关联文档
 
 - [SPIKE-003 验证记录](../spikes/spike-003-utoipa-openapi-ts-pipeline.md)
-- Spike 代码：`spikes/spike-003-utoipa-openapi-ts-pipeline/`
+- Spike PoC 代码：已在 ADR 固化和生产实现后从仓库移除；保留验证记录
 - [ADR-0001 技术栈](0001-tech-stack.md)
 - [ADR-0028 组件库抽离](0028-component-library-extraction.md)（同期产出，packages/ui 与 packages/api-client 是姊妹包）

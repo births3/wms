@@ -53,7 +53,7 @@ ADR-0001 决定了"后端 utoipa 注解 → openapi.json → 前端 openapi-type
 ### 步骤 1：搭 demo workspace（2 小时）
 
 ```
-spikes/spike-003-utoipa-openapi-ts-pipeline/
+历史 PoC 路径：spikes/spike-003-utoipa-openapi-ts-pipeline/
 ├── Cargo.toml                # workspace
 ├── crates/
 │   ├── domain/               # lib：含 5 种典型类型
@@ -148,7 +148,7 @@ data?.batch_no  // ← 改后端 utoipa schema 删除 batch_no 后此行 tsc 报
 
 ## 6. 产出物清单
 
-- 代码：`spikes/spike-003-utoipa-openapi-ts-pipeline/`
+- 代码：历史 PoC `spikes/spike-003-utoipa-openapi-ts-pipeline/` 已在 ADR 固化后从仓库移除
 - 文档：本文件 §7
 - ADR：`docs/adr/0026-cross-end-contract-pipeline.md`
 - 治理：T2 加 `check_openapi_in_sync.py`（diff 后端导出 vs git 内 openapi.json）
@@ -196,7 +196,7 @@ data?.batch_no  // ← 改后端 utoipa schema 删除 batch_no 后此行 tsc 报
 
 1. **写 ADR-0026 跨端契约管线**（本次 spike 配套产出，已起草，见下条）
 2. **Wave 1 W1.C 实施清单**：
-   - 把 `spikes/spike-003-utoipa-openapi-ts-pipeline/crates/{domain,api,openapi-export}` 的模式迁到 `backend/crates/{domain,api,openapi-export}`
+   - 把历史 PoC 的 `{domain,api,openapi-export}` 分层模式迁到 `backend/crates/{domain,api,openapi-export}`
    - `shared/openapi/openapi.json` 入仓
    - `packages/api-client/` 新建：`openapi-typescript` 生成 + `openapi-fetch` 封装
    - `check_openapi_in_sync.py` BACKEND_DIR 改指 `backend/`，加入 T2 治理

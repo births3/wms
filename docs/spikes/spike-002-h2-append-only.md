@@ -52,7 +52,7 @@ H2 审计追踪是 GSP 合规的硬性要求。**append-only 必须在数据库�
 ### 步骤 1：建表 + 分区 + trigger（3 小时）
 
 ```sql
--- spikes/spike-002-h2-append-only/migrations/001_audit_event.sql
+-- 历史 PoC 路径：spikes/spike-002-h2-append-only/migrations/001_audit_event.sql
 CREATE TABLE audit_event (
     id          BIGSERIAL,
     occurred_at TIMESTAMPTZ NOT NULL,
@@ -147,7 +147,7 @@ psql -U wms_app -c "UPDATE audit_event SET action='hacked' WHERE id=1"
 
 ## 6. 产出物清单
 
-- 代码：`spikes/spike-002-h2-append-only/`
+- 代码：历史 PoC `spikes/spike-002-h2-append-only/` 已在 ADR 固化后从仓库移除
   - `migrations/`（3 个 SQL）
   - `src/audit.rs`（写入函数 + diff + hash）
   - `tests/`（trigger 反向验证 + 分区性能 + 吞吐基线）

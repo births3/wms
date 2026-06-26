@@ -53,7 +53,7 @@ ADR-0001 选 SQLx 的核心理由是**编译期校验 SQL**。但默认模式要
 ### 步骤 1：建最小 sqlx demo（1 小时）
 
 ```
-spikes/spike-004-sqlx-offline/
+历史 PoC 路径：spikes/spike-004-sqlx-offline/
 ├── Cargo.toml             # sqlx with features ["postgres", "macros", "uuid", "chrono"]
 ├── migrations/
 │   ├── 20260601000000_create_items.sql
@@ -73,7 +73,7 @@ spikes/spike-004-sqlx-offline/
 ```bash
 docker run -d --name spike-pg -p 5432:5432 -e POSTGRES_PASSWORD=spike postgres:16
 export DATABASE_URL=postgres://postgres:spike@localhost:5432/postgres
-cd spikes/spike-004-sqlx-offline
+cd spikes/spike-004-sqlx-offline  # 历史 PoC 路径，当前仓库已移除
 sqlx migrate run
 cargo sqlx prepare
 git status .sqlx  # 应该有新文件
@@ -147,7 +147,7 @@ async fn test_audit_trigger(pool: PgPool) { ... }
 
 ## 6. 产出物清单
 
-- 代码：`spikes/spike-004-sqlx-offline/`（含 .sqlx/ 缓存）
+- 代码：历史 PoC `spikes/spike-004-sqlx-offline/`（含 .sqlx/ 缓存）已在 ADR 固化后从仓库移除
 - 文档：本文件 §7
 - ADR：`docs/adr/0001-tech-stack-appendix-sqlx.md`（或在 0001 末尾追加）
 - 治理：T2 加 `check_sqlx_prepared.py`（diff 触发；改了 .rs 中的 `query!()` 必须同步更新 .sqlx/）

@@ -41,7 +41,7 @@ Wave 1 W1.A 要求"任意业务 handler 可挂 H1"——即任意 handler 写入
 
 | 状态 | 条件 |
 |------|------|
-| accept | H1-H5 全部确认；产出 ADR-0024 草案；spike 代码在 `spikes/spike-001-axum-jwt/` 可 `cargo test` 跑通 |
+| accept | H1-H5 全部确认；产出 ADR-0024 草案；历史 spike 代码在 `spikes/spike-001-axum-jwt/` 可 `cargo test` 跑通（已在 ADR 固化后移除） |
 | reject | H1 / H2 任一不成立（如必须 ≥ 200 行 middleware 才能完成基础功能）→ 候选改用 actix-web + 现成 middleware 生态；新建 spike-001b |
 | defer | H5 PDA 离线策略复杂度过高（如必须在 PDA 端做 token 重签）→ Wave 1 仅做 PC 端 JWT，PDA 端鉴权延后到 Wave 2 spike |
 
@@ -51,7 +51,7 @@ Wave 1 W1.A 要求"任意业务 handler 可挂 H1"——即任意 handler 写入
 
 ### 步骤 1：起最小 Axum demo（2 小时）
 
-- `spikes/spike-001-axum-jwt/Cargo.toml`：axum 0.7 / tokio / tower / tower-http / jsonwebtoken / serde
+- 历史 PoC：`spikes/spike-001-axum-jwt/Cargo.toml` 使用 axum 0.7 / tokio / tower / tower-http / jsonwebtoken / serde
 - 单 binary，3 路由：`POST /login`（签发 token）/ `GET /me`（受保护，返回 claim）/ `GET /admin`（要 `permissions:["admin"]`）
 
 ### 步骤 2：实现 AuthContext extractor（4 小时）
@@ -74,7 +74,7 @@ Wave 1 W1.A 要求"任意业务 handler 可挂 H1"——即任意 handler 写入
 ### 步骤 5：PDA 离线 token 状态机文档（2 小时）
 
 - 不写代码（PDA 在 spike-005），只画状态图与 token 时序：online-online / online-offline / offline-online / offline-expired
-- 输出 `spikes/spike-001-axum-jwt/pda-offline-state.md`
+- 输出 [PDA 离线 token 状态机](spike-001-pda-offline-state.md)
 
 ### 步骤 6：写 ADR-0024 草案（2 小时）
 
@@ -96,8 +96,8 @@ Wave 1 W1.A 要求"任意业务 handler 可挂 H1"——即任意 handler 写入
 
 ## 6. 产出物清单
 
-- 代码：`spikes/spike-001-axum-jwt/`（Cargo crate，含 tests）
-- 文档：本文件（§7 决策）；`pda-offline-state.md`
+- 代码：历史 PoC `spikes/spike-001-axum-jwt/` 已在 ADR 固化后从仓库移除
+- 文档：本文件（§7 决策）；[PDA 离线 token 状态机](spike-001-pda-offline-state.md)
 - ADR：`docs/adr/0024-auth-model.md`（状态 Proposed → 经 review 后 Accepted）
 - 治理：如果 ADR 0024 引入新概念（如 jti / tenant_id），同步加入 docs/glossary.md
 
@@ -117,7 +117,7 @@ Wave 1 W1.A 要求"任意业务 handler 可挂 H1"——即任意 handler 写入
 | H2 | `FromRequestParts` 实现 AuthContext 让 handler 直接拿 user_id/owner_id/permissions | ✓ | 6 个 handler（me/admin/logout/list_items/get_item）签名直接用 `ctx: AuthContext` |
 | H3 | in-memory blacklist 实现 token 撤销 | ✓ | `t3_logout_revokes_token`：login → /me 200 → /logout → 同 token /me 401 (AUTH-004) |
 | H4 | middleware 注入 owner_id + handler 过滤业务数据足够多租户隔离 | ✓ | `t4_owner_isolation_list_only_own`（alice 看不见 owner B 的 item） + `t4_owner_isolation_cross_owner_get_403`（cross-owner GET 返回 AUTH-006） |
-| H5 | PDA 离线 24h 通过双 token 实现，状态机文档化 | ✓ | `pda-offline-state.md` 230 行，5 状态（S1-S5）+ 转换矩阵 + 时间预算 + 服务端配套 |
+| H5 | PDA 离线 24h 通过双 token 实现，状态机文档化 | ✓ | [PDA 离线 token 状态机](spike-001-pda-offline-state.md) 230 行，5 状态（S1-S5）+ 转换矩阵 + 时间预算 + 服务端配套 |
 
 ### 7.2 测试覆盖
 
@@ -166,7 +166,7 @@ Wave 1 W1.A 要求"任意业务 handler 可挂 H1"——即任意 handler 写入
    - JWT secret 走配置中心（依赖 ADR-0013 config-secrets）
 3. **传染给后续 Spike**：
    - SPIKE-002 H2 审计：每条 audit 记 actor_id / actor_name / owner_id（来自本 spike 的 AuthContext）+ jti（用于审计 token 流）
-   - SPIKE-005 RN 扫枪：复用 `pda-offline-state.md` 的状态机；token 持久化用 `react-native-mmkv` 加密
+   - SPIKE-005 RN 扫枪：复用 [PDA 离线 token 状态机](spike-001-pda-offline-state.md)；token 持久化用 `react-native-mmkv` 加密
 4. **不在本 spike 范围**：
    - 真实 RLS（PostgreSQL）— Wave 2+ 评估
    - 暴力破解防护（5 次失败锁账户）— Wave 1 W1.A 业务规则

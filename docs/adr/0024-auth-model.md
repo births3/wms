@@ -81,7 +81,7 @@ AuthContext extractor 增加一步（在 §2.4 验签后、blacklist 检查前�
 
 ### 2.2 双 token + PDA 离线策略
 
-依据 `pda-offline-state.md` 文档：
+依据 [SPIKE-001 PDA 离线 token 状态机](../spikes/spike-001-pda-offline-state.md) 文档：
 
 | Token | 寿命 | 存储 |
 |-------|------|------|
@@ -90,7 +90,7 @@ AuthContext extractor 增加一步（在 §2.4 验签后、blacklist 检查前�
 
 5 状态机（PDA）：
 - S1 在线工作 / S2 在线刷新中 / S3 离线工作 / S4 离线只读 / S5 锁定
-- 转换矩阵详见 `spikes/spike-001-axum-jwt/pda-offline-state.md` §4
+- 转换矩阵详见 [SPIKE-001 PDA 离线 token 状态机](../spikes/spike-001-pda-offline-state.md) §4
 
 PC 端不需要状态机（始终在线，access 过期就重定向到登录）。
 
@@ -297,8 +297,8 @@ async fn list_items(
 ## 6. 关联文档
 
 - [SPIKE-001 验证记录](../spikes/spike-001-axum-jwt.md)
-- PDA 离线状态机：`spikes/spike-001-axum-jwt/pda-offline-state.md`
-- Spike 代码：`spikes/spike-001-axum-jwt/`
+- [PDA 离线状态机](../spikes/spike-001-pda-offline-state.md)
+- Spike PoC 代码：已在 ADR 固化和生产实现后从仓库移除；保留验证记录与状态机文档
 - [ADR-0001 技术栈](0001-tech-stack.md)
 - [ADR-0010 错误码](0010-error-codes.md)
 - [ADR-0011 可观测](0011-observability.md)
