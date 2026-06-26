@@ -71,15 +71,15 @@
 
 ---
 
-## 3. 严重度分布概览（v3.1 初版）
+## 3. 严重度分布概览
 
 | 级别 | 数量 | 主要场景 |
 |---|---|---|
-| info | 5 | 状态变更通知 / 数据已存在等正常路径 |
-| warning | 25 | 业务规则拦截（库存不足 / 资质过期等）|
-| error | 15 | 业务异常（数据冲突 / 校验失败）|
-| critical | 5 | 合规/安全异常（跨货主访问 / 篡改尝试）|
-| **合计** | **50** | — |
+| info | 1 | 状态变更通知 / 数据已存在等正常路径 |
+| warning | 28 | 业务规则拦截（库存不足 / 资质过期等）|
+| error | 23 | 业务异常（数据冲突 / 校验失败）|
+| critical | 7 | 合规/安全异常（跨货主访问 / 篡改尝试）|
+| **合计** | **59** | — |
 
 ---
 
@@ -87,13 +87,13 @@
 
 | 前缀 | 错误码数 | 主要场景 |
 |---|---|---|
-| H1 | 6 | 鉴权 / 多租户隔离 |
+| H1 | 12 | 鉴权 / 多租户隔离 |
 | H2 | 3 | 审计 / 事件总线 |
 | H4 | 2 | 通知发送 |
 | H5 | 2 | 快递面单 |
 | H_DOCK | 3 | 月台预约 |
 | H_AL | 2 | 告警引擎 |
-| M1 | 5 | 主数据校验 |
+| M1 | 8 | 主数据校验 / 配置中心 |
 | M2 | 6 | 入库流程 |
 | M3 | 8 | 库存与状态 |
 | M4 | 7 | 出库与拣选 |
@@ -308,6 +308,30 @@ error_codes:
     related_stories: [US-H2-003]
     introduced_in: v3.1
 
+  - code: H2_AUDIT_QUERY_CURSOR_INVALID
+    module: H2
+    category: AUDIT
+    detail: QUERY_CURSOR_INVALID
+    http_status: 400
+    severity: error
+    message_zh: '审计查询游标格式无效'
+    message_en: 'Audit query cursor is invalid'
+    related_fields: []
+    related_stories: [US-H2-002]
+    introduced_in: v3.1
+
+  - code: H2_AUDIT_QUERY_FAILED
+    module: H2
+    category: AUDIT
+    detail: QUERY_FAILED
+    http_status: 500
+    severity: error
+    message_zh: '审计查询失败'
+    message_en: 'Audit query failed'
+    related_fields: []
+    related_stories: [US-H2-002]
+    introduced_in: v3.1
+
   - code: H2_EVENT_DLQ_OVERFLOW
     module: H2
     category: EVENT
@@ -504,6 +528,42 @@ error_codes:
     related_fields: []
     related_stories: [US-M1-005]
     introduced_in: v3.1
+
+  - code: M1_CONFIG_FLAG_MISSING
+    module: M1
+    category: CONFIG
+    detail: FLAG_MISSING
+    http_status: 404
+    severity: error
+    message_zh: 'Feature Flag 不存在'
+    message_en: 'Feature Flag missing'
+    related_fields: []
+    related_stories: [US-M1-008]
+    introduced_in: W6.C
+
+  - code: M1_CONFIG_FLAG_DISABLED
+    module: M1
+    category: CONFIG
+    detail: FLAG_DISABLED
+    http_status: 404
+    severity: error
+    message_zh: 'Feature Flag 未启用'
+    message_en: 'Feature Flag disabled'
+    related_fields: []
+    related_stories: [US-M1-008]
+    introduced_in: W6.C
+
+  - code: M1_CONFIG_FLAG_SOURCE_INVALID
+    module: M1
+    category: CONFIG
+    detail: FLAG_SOURCE_INVALID
+    http_status: 422
+    severity: error
+    message_zh: 'Feature Flag 读取源无效'
+    message_en: 'Feature Flag source invalid'
+    related_fields: []
+    related_stories: [US-M1-008]
+    introduced_in: W6.C
 
   # ========== M2 入库 ==========
   - code: M2_ASN_DUPLICATE
@@ -853,3 +913,4 @@ error_codes:
 | 日期 | 版本 | 变更 |
 |------|------|------|
 | 2026-05-18 | v1 | 初版：50 个错误码（H1×6 + H2×3 + H4×2 + H5×2 + H_DOCK×3 + H_AL×2 + M1×5 + M2×6 + M3×8 + M4×7 + M_VR×2 + M_QL×1 + M_TC×2 + M_PM×1）|
+| 2026-06-07 | v2 | W6.C 配置中心 Feature Flag smoke 新增 M1_CONFIG_FLAG_* 3 项；脚本统计当前合计 59 项 |

@@ -33,6 +33,10 @@ use crate::{
     auth::{AuthContext, AuthError},
     billing::{BillingError, BillingStore},
     cold_chain::{ColdChainError, ColdChainService},
+    config_center::{
+        ConfigCenterAppState, ConfigCenterError, CONFIG_FLAG_DISABLED_CODE,
+        CONFIG_FLAG_MISSING_CODE, CONFIG_FLAG_SOURCE_INVALID_CODE,
+    },
     inbound::{ReceivingOrderError, ReceivingOrderStore},
     inventory::{InventoryError, InventoryStore},
     wave3_repository::{PgWave3Repository, Wave3RepositoryError},
@@ -42,6 +46,7 @@ const IDEMPOTENCY_KEY_HEADER: &str = "idempotency-key";
 const EXTERNAL_API_KEY_HEADER: &str = "x-wms-api-key";
 const COLD_CHAIN_API_KEY_SHA256_ENV: &str = "WMS_M5_COLD_CHAIN_API_KEY_SHA256";
 const COLD_CHAIN_OWNER_ID_ENV: &str = "WMS_M5_COLD_CHAIN_OWNER_ID";
+pub const INVENTORY_BATCHES_SMOKE_FLAG: &str = "m3_inventory_batches_config_center_smoke";
 
 #[derive(Clone, Debug)]
 pub struct ExternalApiKeyConfig {
@@ -75,6 +80,7 @@ pub struct Wave3AppState {
     pub audit_log: Arc<Mutex<AuditLog>>,
     pub wave3_repository: Option<Arc<PgWave3Repository>>,
     pub cold_chain_api_key: Option<ExternalApiKeyConfig>,
+    pub config_center_state: Option<ConfigCenterAppState>,
 }
 
 impl Default for Wave3AppState {
@@ -87,6 +93,7 @@ impl Default for Wave3AppState {
             audit_log: Arc::new(Mutex::new(AuditLog::default())),
             wave3_repository: None,
             cold_chain_api_key: None,
+            config_center_state: None,
         }
     }
 }
@@ -98,6 +105,11 @@ impl Wave3AppState {
             cold_chain_api_key: ExternalApiKeyConfig::from_env().ok(),
             ..Self::default()
         }
+    }
+
+    pub fn with_config_center(mut self, config_center_state: ConfigCenterAppState) -> Self {
+        self.config_center_state = Some(config_center_state);
+        self
     }
 
     pub fn with_postgres_and_cold_chain_api_key(
@@ -119,6 +131,7 @@ pub enum Wave3HandlerError {
     Inventory(InventoryError),
     ColdChain(ColdChainError),
     Billing(BillingError),
+    ConfigCenter(ConfigCenterError),
     Repository(Wave3RepositoryError),
     MissingIdempotencyKey,
     ExternalAuthMissing,
@@ -154,6 +167,12 @@ impl From<ColdChainError> for Wave3HandlerError {
 impl From<BillingError> for Wave3HandlerError {
     fn from(value: BillingError) -> Self {
         Self::Billing(value)
+    }
+}
+
+impl From<ConfigCenterError> for Wave3HandlerError {
+    fn from(value: ConfigCenterError) -> Self {
+        Self::ConfigCenter(value)
     }
 }
 
@@ -198,6 +217,16 @@ impl IntoResponse for Wave3HandlerError {
             | Wave3HandlerError::Repository(Wave3RepositoryError::NotFound) => {
                 (StatusCode::NOT_FOUND, "W3-404", "资源不存在")
             }
+            Wave3HandlerError::ConfigCenter(ConfigCenterError::MissingFlag(_)) => (
+                StatusCode::NOT_FOUND,
+                CONFIG_FLAG_MISSING_CODE,
+                "Feature Flag 不存在",
+            ),
+            Wave3HandlerError::ConfigCenter(ConfigCenterError::DisabledFlag(_)) => (
+                StatusCode::NOT_FOUND,
+                CONFIG_FLAG_DISABLED_CODE,
+                "Feature Flag 未启用",
+            ),
             Wave3HandlerError::Receiving(ReceivingOrderError::DuplicateReceiptNo(_))
             | Wave3HandlerError::ColdChain(ColdChainError::DuplicateDevice(_))
             | Wave3HandlerError::Billing(BillingError::DuplicateAccountCode(_))
@@ -243,6 +272,11 @@ impl IntoResponse for Wave3HandlerError {
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "W3-422",
                 "业务规则校验失败",
+            ),
+            Wave3HandlerError::ConfigCenter(ConfigCenterError::InvalidFeatureFlagSource(_)) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                CONFIG_FLAG_SOURCE_INVALID_CODE,
+                "Feature Flag 读取源无效",
             ),
             Wave3HandlerError::Repository(Wave3RepositoryError::Audit(_))
             | Wave3HandlerError::Repository(Wave3RepositoryError::Database(_))
@@ -503,6 +537,16 @@ async fn list_inventory_batches_handler(
     State(state): State<Wave3AppState>,
 ) -> Result<Json<InventoryBatchListResponse>, Wave3HandlerError> {
     require_any_permission(&ctx, &["m3.read", "m3.write"])?;
+    if let Some(config_center_state) = &state.config_center_state {
+        if !config_center_state
+            .is_feature_enabled(INVENTORY_BATCHES_SMOKE_FLAG)
+            .await?
+        {
+            return Err(
+                ConfigCenterError::DisabledFlag(INVENTORY_BATCHES_SMOKE_FLAG.to_string()).into(),
+            );
+        }
+    }
     if let Some(repository) = &state.wave3_repository {
         let batches = repository.list_inventory_batches(&ctx).await?;
         let count = batches.len() as u32;
@@ -864,8 +908,10 @@ async fn append_audit(
 #[cfg(test)]
 mod tests {
     use axum::{
+        body::to_bytes,
         extract::{Path, State},
-        http::HeaderMap,
+        http::{HeaderMap, StatusCode},
+        response::IntoResponse,
         Json,
     };
     use chrono::{NaiveDate, TimeZone, Utc};
@@ -886,9 +932,14 @@ mod tests {
         putaway_receiving_order_handler, receive_receiving_order_handler, sha256_hex,
         sign_receiving_order_handler, wave3_router, ExternalApiKeyConfig, Wave3AppState,
         Wave3HandlerError, EXTERNAL_API_KEY_HEADER, IDEMPOTENCY_KEY_HEADER,
+        INVENTORY_BATCHES_SMOKE_FLAG,
     };
     use crate::{
         auth::{AuthContext, AuthError},
+        config_center::{
+            ConfigCenterAppState, ConfigCenterError, FeatureFlagSource, CONFIG_FLAG_MISSING_CODE,
+        },
+        feature_flags::FeatureFlagRegistry,
         inventory::{InventoryError, STATUS_QUALIFIED, STATUS_QUARANTINED},
     };
 
@@ -931,6 +982,20 @@ mod tests {
         }
     }
 
+    fn config_center_smoke_registry() -> FeatureFlagRegistry {
+        FeatureFlagRegistry::from_toml_str(&format!(
+            r#"
+            [[flags]]
+            key = "{INVENTORY_BATCHES_SMOKE_FLAG}"
+            owner = "platform"
+            created_at = 2026-06-07
+            cleanup_by = 2026-09-05
+            enabled = true
+            "#
+        ))
+        .expect("valid smoke flag registry")
+    }
+
     fn idempotency_headers(key: &'static str) -> HeaderMap {
         let mut headers = HeaderMap::new();
         headers.insert(IDEMPOTENCY_KEY_HEADER, key.parse().expect("valid header"));
@@ -952,6 +1017,16 @@ mod tests {
             owner_id,
             actor_name: "external-cold-chain-test".to_string(),
         }
+    }
+
+    async fn error_response(error: Wave3HandlerError) -> (StatusCode, wms_domain::ErrorResponse) {
+        let response = error.into_response();
+        let status = response.status();
+        let body = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("body should read");
+        let payload = serde_json::from_slice(&body).expect("error response should be json");
+        (status, payload)
     }
 
     async fn seed_cold_chain_device(pool: &PgPool, owner_id: Uuid, device_code: &str) {
@@ -1657,5 +1732,42 @@ mod tests {
         audit_log
             .verify_hash_chain()
             .expect("audit hash chain should verify");
+    }
+
+    #[tokio::test]
+    async fn inventory_batches_handler_reads_config_center_smoke_flag_and_fails_closed() {
+        let owner_id = Uuid::new_v4();
+        let authorized = ctx(owner_id, &["m3.read"]);
+        let config_center_state =
+            ConfigCenterAppState::from_registry(config_center_smoke_registry());
+        let state = Wave3AppState::default().with_config_center(config_center_state.clone());
+
+        {
+            config_center_state
+                .switch_feature_flag_source(FeatureFlagSource::ConfigCenter)
+                .await;
+        }
+
+        let missing_before_migration =
+            list_inventory_batches_handler(authorized.clone(), State(state.clone()))
+                .await
+                .expect_err("config-center source should fail closed before migration");
+        assert!(matches!(
+            missing_before_migration,
+            Wave3HandlerError::ConfigCenter(ConfigCenterError::MissingFlag(_))
+        ));
+        let (status, error) = error_response(missing_before_migration).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(error.code, CONFIG_FLAG_MISSING_CODE);
+
+        {
+            config_center_state.migrate_feature_flags_from_file().await;
+        }
+
+        let Json(list) = list_inventory_batches_handler(authorized, State(state))
+            .await
+            .expect("migrated config-center smoke flag should allow inventory list");
+
+        assert_eq!(list.page.count, 0);
     }
 }
