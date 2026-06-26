@@ -1,8 +1,10 @@
 import { createApiClient, type paths } from "@wms/api-client";
 
+import { readAccessToken } from "./auth-session";
+
 type AuthTokenProvider = () => string | null;
 
-let authTokenProvider: AuthTokenProvider = () => null;
+let authTokenProvider: AuthTokenProvider = readAccessToken;
 
 export const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "";
 

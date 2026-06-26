@@ -138,34 +138,29 @@ impl AuthRuntimePolicy {
 
 #[derive(Clone)]
 pub struct RedisAuthRevocationStore {
-    client: redis::Client,
+    connection: redis::aio::MultiplexedConnection,
 }
 
 impl RedisAuthRevocationStore {
-    pub fn new(client: redis::Client) -> Self {
-        Self { client }
+    pub fn new(connection: redis::aio::MultiplexedConnection) -> Self {
+        Self { connection }
     }
 
-    pub fn from_url(redis_url: &str) -> Result<Self, AuthRevocationStoreError> {
+    pub async fn from_url(redis_url: &str) -> Result<Self, AuthRevocationStoreError> {
         let client = redis::Client::open(redis_url)
             .map_err(|error| AuthRevocationStoreError::Unavailable(error.to_string()))?;
-        Ok(Self::new(client))
-    }
-
-    async fn connection(
-        &self,
-    ) -> Result<redis::aio::MultiplexedConnection, AuthRevocationStoreError> {
-        self.client
+        let connection = client
             .get_multiplexed_async_connection()
             .await
-            .map_err(AuthRevocationStoreError::from)
+            .map_err(AuthRevocationStoreError::from)?;
+        Ok(Self::new(connection))
     }
 }
 
 #[axum::async_trait]
 impl AuthRevocationStore for RedisAuthRevocationStore {
     async fn jti_is_blacklisted(&self, jti: &str) -> Result<bool, AuthRevocationStoreError> {
-        let mut connection = self.connection().await?;
+        let mut connection = self.connection.clone();
         let key = blacklist_key(jti);
         connection
             .exists(key)
@@ -177,7 +172,7 @@ impl AuthRevocationStore for RedisAuthRevocationStore {
         &self,
         user_id: Uuid,
     ) -> Result<Option<i64>, AuthRevocationStoreError> {
-        let mut connection = self.connection().await?;
+        let mut connection = self.connection.clone();
         let key = permissions_changed_at_key(user_id);
         connection
             .get(key)
@@ -190,7 +185,7 @@ impl AuthRevocationStore for RedisAuthRevocationStore {
         jti: &str,
         ttl_seconds: u64,
     ) -> Result<(), AuthRevocationStoreError> {
-        let mut connection = self.connection().await?;
+        let mut connection = self.connection.clone();
         let key = blacklist_key(jti);
         let _: () = connection
             .set_ex(key, "1", ttl_seconds)
@@ -204,7 +199,7 @@ impl AuthRevocationStore for RedisAuthRevocationStore {
         user_id: Uuid,
         changed_at_unix: i64,
     ) -> Result<(), AuthRevocationStoreError> {
-        let mut connection = self.connection().await?;
+        let mut connection = self.connection.clone();
         let key = permissions_changed_at_key(user_id);
         let _: () = connection
             .set_ex(
