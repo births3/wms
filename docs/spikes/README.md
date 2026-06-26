@@ -13,9 +13,17 @@
 | 2 | [SPIKE-002](spike-002-h2-append-only.md) | PostgreSQL append-only 审计 | W1.B 审计追踪 | **accepted** | 2 天（用 ~2h） | ADR-0001 / 产出 ADR-0025（Accepted v0.2） |
 | 3 | [SPIKE-003](spike-003-utoipa-openapi-ts-pipeline.md) | utoipa → OpenAPI → TS 全链路 | W1.C OpenAPI 工具链 | **accepted** | 1.5 天（用 ~4h） | ADR-0001 / 产出 ADR-0026（Accepted） |
 | 4 | [SPIKE-004](spike-004-sqlx-offline.md) | SQLx offline 编译模式 | 跨 W1.A/B（基础设施） | **accepted** | 1 天（用 ~1.5h） | ADR-0001 §SQLx 附录（已更新 v0.2） |
-| 5 | [SPIKE-005](spike-005-rn-scanner.md) | RN 扫枪 + 离线队列 | Wave 1 PDA 离线 / W3.A | **deferred** | 2 天（启动时重新计时） | ADR-0015 / 拟产出 ADR-0027（推迟随 spike） |
+| 5 | [SPIKE-005](spike-005-rn-scanner.md) | RN 扫枪 + 离线队列 | Wave 1 PDA 离线 / W3.A | **deferred** | 2 天（启动时重新计时） | ADR-0015 / ADR-0027（Proposed） |
 
 合计上限：8.5 天。**任何 Spike 超出时间盒 50% 必须 escalate**：要么承认走错路（reject + 重新设计），要么承认低估（写新 spike 接力，原 spike 关闭）。不允许"再多花 1 天试试"无限延期。
+
+### 1.1 PDA 技术栈补充候选（2026-06-06）
+
+| ID | 标题 | 关联 Wave 任务 | 状态 | 时间盒 | 关联 ADR |
+|----|------|-------------|------|------|---------|
+| [SPIKE-005B](spike-005b-webview-capacitor-pda.md) | WebView/Capacitor PDA 可行性验证 | W3.A PDA 生产端 / W6.D 真 PDA evidence | **deferred** | 2 天（与 SPIKE-005 同口径对比） | ADR-0001 / ADR-0015 / ADR-0027（Proposed） |
+
+SPIKE-005B 不改变 Wave 0.5 的 5 项退出统计，也不替换 ADR-0001 的当前 RN 选型。它只是在真 PDA 到位后，把 Web UI + Android native shell + native plugins 纳入与 SPIKE-005 的证据对比；两者共同作为 ADR-0027 Accepted 前的输入。
 
 ---
 
@@ -31,6 +39,7 @@ Spike（带时间盒的验证） → 结论
 - Spike 文档**永久保留**在 `docs/spikes/`（即使被 ADR 取代）—— 它是决策的史料证据
 - 决策一旦升级为 ADR，Spike 文档**只追加**"决策记录"段引用 ADR，不删原文
 - Spike 失败（reject）也保留：避免后人重复试错
+- Spike PoC 代码不永久保留：accepted 且结论已固化到 ADR/生产实现后，可删除 `spikes/<spike-id>/` 目录；保留必要的非代码文档到 `docs/spikes/`
 
 ---
 

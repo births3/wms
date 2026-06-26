@@ -465,8 +465,8 @@
 
 | # | 问题 | 答案 |
 |---|------|------|
-| 66 | PDA 端推进方式 | 先落 SPIKE-005 readiness / 设备清单 / runbook，不引入 RN 依赖；生产 app 等真 PDA 与 SPIKE-005 验证后启动 |
-| 67 | M2/M3 L7 性能与易用性证据 | 降级为预发布 gate；当前不发明本地阈值，不用 local/mock/fake/example 代替真实 dev/staging/PDA 证据 |
+| 66 | PDA 端推进方式 | 先落 SPIKE-005 / SPIKE-005B readiness、设备清单、runbook 与 ADR-0027 Proposed 决策框架，不引入 RN / Expo / EAS / Capacitor 生产 workspace 依赖；生产 app 等真 PDA 与两条 Spike 同口径验证后启动 |
+| 67 | M2/M3 L7 性能与易用性证据 | 降级为预发布 gate；当前不发明本地阈值，不用 local/prod/production/mock/fake/stub/example 代替真实 dev/staging/PDA 证据 |
 | 68 | GSP 资质有效期校验来源 | 继续接口占位，暂不冻结 M1 本地资质表或 ERP/H8 校验端口；Wave 3 仍不标记完成 |
 
 ## Wave 3 GSP 资质来源冻结（2026-06-03）
@@ -483,4 +483,12 @@
 
 | # | 问题 | 答案 |
 |---|------|------|
-| 70 | Wave 6 范围 | Wave 6 不新增业务模块，不启动 v26 字段规范化；范围限定为收口 Wave 1-5 已后移的真实 dev/staging、硬件、TMS、码上放心、灰度发布 runtime evidence gate。完成判据以 ADR-0035 与各 gate validator / runbook 为准，禁止用 localhost / stub / mock / fake / example 证据替代。 |
+| 70 | Wave 6 范围 | Wave 6 不新增业务模块，不启动 v26 字段规范化；范围限定为收口 Wave 1-5 已后移的真实 dev/staging、硬件、TMS、码上放心、灰度发布 runtime evidence gate。完成判据以 ADR-0035 与各 gate validator / runbook 为准，禁止用 localhost / stub / mock / fake / example / prod / production 证据替代。 |
+
+## PDA 技术栈候选补充（2026-06-06）
+
+> 背景：用户提出 PDA 是否可以先做成网页版再打包，并确认按 review 后的修正建议执行。
+
+| # | 问题 | 答案 |
+|---|------|------|
+| 71 | PDA Web 打包方案边界 | 保留 ADR-0001 当前 React Native 正式选型，不直接改成纯 Web/PWA；新增 SPIKE-005B 验证 Web UI + Android native shell + native plugins（Capacitor / Android WebView 候选），与 SPIKE-005 RN 在真 PDA、同一条码样本、同一 M2/M3 dev/staging 数据和同一 evidence 标准下对比。最终 PDA 技术栈等 SPIKE-005 / SPIKE-005B 真机结论后由 ADR-0027 定版。 |
