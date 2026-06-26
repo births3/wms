@@ -2,6 +2,7 @@
 
 > 本文档是 wms 项目所有代码（Rust / TypeScript / SQL / 脚本）的书写规范唯一真相源。
 > AI 编码助手与人类开发者同样遵守。治理体系见 `docs/governance.md`。
+> 前后端分层边界见 `docs/layered-design.md`。
 
 ---
 
@@ -227,8 +228,8 @@ backend/crates/<crate>/src/
 ```
 
 **拆文件时机**：
-- 单文件 > 300 行 → 考虑拆
-- 单文件 > 500 行 → 必须拆
+- 单文件 ≥ 600 行 → 考虑拆
+- 单文件 ≥ 800 行 → 必须拆
 - 一个 struct 的 impl 块 > 100 行 → 拆到独立文件
 
 **禁止**：

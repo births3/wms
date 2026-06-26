@@ -140,14 +140,30 @@ nav:
     - ADR-0021 高保真原型策略: adr/0021-high-fidelity-prototype-strategy.md
     - ADR-0022 原型组件规范: adr/0022-prototype-component-spec.md
     - ADR-0023 业务报表策略: adr/0023-business-report-strategy.md
+    - ADR-0024 鉴权模型: adr/0024-auth-model.md
+    - ADR-0025 审计存储模型: adr/0025-audit-storage-model.md
+    - ADR-0026 跨端契约管线: adr/0026-cross-end-contract-pipeline.md
+    - ADR-0027 PDA 离线模型: adr/0027-pda-offline-model.md
     - ADR-0028 组件库抽离: adr/0028-component-library-extraction.md
     - ADR-0029 前端原型先行: adr/0029-frontend-as-prototype-workflow.md
     - ADR-0030 统一外部集成能力: adr/0030-integration-capability.md
     - ADR-0031 H-FILE 附件能力: adr/0031-file-attachment-capability.md
     - ADR-0032 H-APV 审批引擎: adr/0032-approval-engine.md
     - ADR-0033 H-SCH 调度引擎: adr/0033-scheduler-engine.md
+    - ADR-0034 Wave 3 业务表 PG 模型: adr/0034-wave-3-operational-postgres-schema.md
+    - ADR-0035 Wave 6 证据收口: adr/0035-wave-6-pre-release-evidence-closeout.md
+    - 技术 Spike:
+      - Spike 索引: spikes/README.md
+      - SPIKE-001 Axum + JWT: spikes/spike-001-axum-jwt.md
+      - SPIKE-001 PDA 离线 token 状态机: spikes/spike-001-pda-offline-state.md
+      - SPIKE-002 H2 append-only: spikes/spike-002-h2-append-only.md
+      - SPIKE-003 OpenAPI → TS: spikes/spike-003-utoipa-openapi-ts-pipeline.md
+      - SPIKE-004 SQLx offline: spikes/spike-004-sqlx-offline.md
+      - SPIKE-005 RN 扫枪: spikes/spike-005-rn-scanner.md
+      - SPIKE-005B WebView/Capacitor PDA: spikes/spike-005b-webview-capacitor-pda.md
   - 架构与领域:
     - 模块依赖图: architecture-dependencies.md
+    - 前后端分层设计规范: layered-design.md
     - 概念审计: concept-audit.md
     - 业务澄清记录: domain/clarifications.md
     - 术语表: glossary.md
@@ -157,14 +173,25 @@ nav:
     - 缓存策略: infra/cache-strategy.md
     - 易用性基线 (v25): infra/usability-baseline.md
     - 分库分表决策矩阵 (v25): infra/sharding-decision-matrix.md
+    - 遗留系统分析:
+      - 分析索引: legacy-analysis/README.md
+      - Oracle WMS 对照矩阵: legacy-analysis/legacy-comparison-matrix.md
+      - 表结构对比待办: domain/todo-legacy-comparison.md
   - 评审记录:
     - 用户故事审计 v1-v10: reviews/user-stories-audit-2026-05-16.md
     - 软件设计审计 (12 维度): reviews/software-design-audit-2026-05-18.md
     - 模式提炼 (4 方法): reviews/pattern-extraction-2026-05-18.md
     - 用户故事矩阵审计: reviews/user-stories-matrix-audit-2026-05-18.md
     - 波次参数对标 - Manhattan: reviews/wave-parameters-comparison-manhattan.md
+    - Wave 6 任务完成审计: reviews/wave-6-task-completion-audit-2026-06-04.md
     - 用户故事 Review 规范: review-guidelines-user-stories.md
-    - Wave 0 回顾: retros/wave-0-retro.md
+    - Wave 复盘:
+      - 复盘索引: retros/README.md
+      - Wave 0 回顾: retros/wave-0-retro.md
+      - Wave 0.5 回顾: retros/wave-0.5-retro.md
+      - Wave 1 回顾: retros/wave-1-retro.md
+      - Wave 2 回顾: retros/wave-2-retro.md
+      - Wave 5 回顾: retros/wave-5-retro.md
   - GSP 合规追溯:
     - 总索引: compliance/README.md
     - 第 5 章 质量管理体系: compliance/gsp-ch5-warehouse-management.md
@@ -184,6 +211,23 @@ nav:
     - 原型组件注册表: prototypes/component-registry.md
     - 原型转生产清单: prototypes/prototype-to-production.md
     - Matrix E2E 截图门禁: prototypes/matrix-e2e-screenshot-gate.md
+    - 视觉基线接受标准: prototypes/baseline-acceptance.md
+    - R3 原型矩阵: prototypes/prototype-matrix-r3.md
+    - 原型证明报告: prototypes/prototype-proof-report.md
+    - 视觉打磨自查: prototypes/visual-review-batch1.md
+  - 运行手册:
+    - Wave 1 H2 Dev 环境: runbooks/wave-1-h2-dev-environment.md
+    - Wave 1 运行证据: runbooks/wave-1-runtime-evidence.md
+    - Wave 2 运行证据: runbooks/wave-2-runtime-evidence.md
+    - Wave 2 Staging 环境: runbooks/wave-2-staging-environment.md
+    - Wave 3 PDA 就绪: runbooks/wave-3-pda-readiness.md
+    - Wave 4 外部依赖证据: runbooks/wave-4-external-dependencies.md
+    - Wave 5 硬件证据: runbooks/wave-5-hardware-evidence.md
+    - Wave 5 TMS 证据: runbooks/wave-5-tms-evidence.md
+    - Wave 6 收口: runbooks/wave-6-closeout.md
+    - Wave 6 部署证据: runbooks/wave-6-deploy-evidence.md
+    - Wave 6 Evidence Preflight: runbooks/wave-6-evidence-preflight.md
+    - Wave 6 Staging 部署干跑: runbooks/wave-6-staging-deploy-dry-run.md
 
 # 额外配置
 extra:
@@ -191,10 +235,7 @@ extra:
 
 # 排除不参与构建的文件
 exclude_docs: |
-  legacy-analysis/*
-  retros/README.md
   adr/README.md.disabled
-  domain/todo-legacy-comparison.md
   domain/.gitkeep
   compliance/.gitkeep
 

@@ -11,6 +11,21 @@
 - 本文件修改必须随对应规范文档的 PR 一起提交
 - 保持极简：AI 助手应在 30 秒内读完本文件，再按需深入引用文档
 
+### AGENTS.md 写入规范
+
+**必须写入 AGENTS.md 的内容**：
+- AI 在生成内容前必须知道的硬约束：安全红线、确认流程、Git 红线、验证命令、回复语言。
+- 会直接影响输出形状的数字阈值：如 PR / 文件行数 warning 与门禁线。
+- 频繁触发返工的治理约束：如新增原型页三同步、原型转生产 checklist、前端页面行数门禁。
+- 必读文档索引和业务文档索引：只放路径、用途、关键标签。
+
+**只用引导 / 引用方式写入 AGENTS.md 的内容**：
+- 详细实现步骤、长表格、示例、脚本内部逻辑、历史原因，放到 `docs/*` 或 `scripts/*`。
+- 业务故事正文、字段字典、ADR 细节，AGENTS.md 只引用事实源。
+- 不影响生成前决策的建议项，保留在对应规范文档，不搬进 AGENTS.md。
+
+**同步规则**：AGENTS.md 里的数字阈值必须和规范文档、治理脚本一致；改阈值时同一 PR 同步 AGENTS.md、对应 `docs/*`、脚本和测试。
+
 ## 设计流程（标准步骤）
 
 > 每个阶段完成后进入下一个，不可跳过。
@@ -231,12 +246,20 @@
 5. **绝不在 commit 里包含可疑文件**：`.env` / 私钥 / 密钥 / token 等先警告并停下
 6. **绝不 git add .** 当工作区跨主题混杂时：先列出文件让用户确认范围，再分主题分别 stage
 
+### 工作区脏时的处理
+
+1. **先分类再动手**：跑 `git status --short`，区分本轮要改、相关既有改动、无关既有改动。
+2. **已修改的目标文件先看 diff**：编辑前跑 `git diff -- <file>`，理解用户已有改动后再补丁式修改。
+3. **只改任务相关文件**：无关 modified / deleted / untracked 文件不碰、不格式化、不顺手清理。
+4. **提交必须显式列范围**：脏工作区提交时先给 `git diff --stat`，按主题拆分并显式 stage 文件；继续禁止 `git add .`。
+5. **汇报只归因本轮工作**：最终说明只覆盖本轮实际修改和验证结果，不把整片脏工作区混成自己的结论。
+
 ### AI 应该主动做的（不需用户确认）
 
 1. **每次改文件后** → 跑治理脚本（T1）验证 → 报告 EXIT 码
 2. **完成一个原子任务**（如修一个 bug、改一组关联文件）后 → **建议**用户考虑 commit，但不主动执行
 3. **跨主题工作累积** → 在累积变更跨 ≥ 2 个主题或 ≥ 5 个文件时，**主动建议**用户拆分多个 commit
-4. **看到未提交变更 > 400 行** → 主动提示"超过 PR 规范 400 行上限，建议拆分"
+4. **看到未提交变更 ≥ 600 行** → 主动提示"超过 PR 规模 warning 线，建议拆分"；≥ 800 行必须拆分
 5. **每次会话开始** → 跑 `git status` 看是否有遗留未提交变更
 
 ### 用户说"提交"时 AI 的标准动作
@@ -245,11 +268,12 @@
 
 1. 跑 `git status` 确认改动范围
 2. 跑 `git diff --stat` 给用户看本次提交涉及哪些文件 + 行数
-3. **如果跨多主题或 > 400 行** → 提示拆分建议，等用户确认怎么拆
-4. **如果在单一主题且 < 400 行** → 起草符合 [docs/governance.md §3.2](docs/governance.md#32-conventional-commits) 的 commit message（中文 type + scope + subject + 正文 + 关联）
-5. **展示 commit message 草稿给用户审阅**，等"确认"后再执行 `git commit`
-6. 跑 lefthook pre-commit / commit-msg 钩子，把脚本输出贴回给用户
-7. **不主动 push**，除非用户额外说"推上去"
+3. **如果跨多主题或 ≥ 800 行** → 提示拆分建议，等用户确认怎么拆
+4. **如果单一主题但 600-799 行** → 提示接近 PR 上限，建议拆分；用户确认后再起草 commit message
+5. **如果在单一主题且 < 600 行** → 起草符合 [docs/governance.md §3.2](docs/governance.md#32-conventional-commits) 的 commit message（中文 type + scope + subject + 正文 + 关联）
+6. **展示 commit message 草稿给用户审阅**，等"确认"后再执行 `git commit`
+7. 跑 lefthook pre-commit / commit-msg 钩子，把脚本输出贴回给用户
+8. **不主动 push**，除非用户额外说"推上去"
 
 ### 用户说"推送 / push"时 AI 的标准动作
 
@@ -362,19 +386,20 @@
 
 1. [docs/coding-standards.md](docs/coding-standards.md) — 代码书写规范（Rust / TS / 跨端 / 禁止清单）
 2. [docs/frontend-coding-standards.md](docs/frontend-coding-standards.md) — **前端编码规范**（项目结构 / 命名 / 组件接口 / Tailwind 风格 / PDA 触控基线 / 4 个治理脚本 / PR 自查清单）
-3. [docs/governance.md](docs/governance.md) — 治理体系（5 类 + 4 Tier + Baseline + 文档四层管理）
-4. [docs/adr/0006-tdd-and-test-layers.md](docs/adr/0006-tdd-and-test-layers.md) — TDD + 11 层测试
-5. [docs/adr/0021-high-fidelity-prototype-strategy.md](docs/adr/0021-high-fidelity-prototype-strategy.md) — 高保真原型策略（shadcn/ui + Storybook 工具链）
-6. [docs/adr/0022-prototype-component-spec.md](docs/adr/0022-prototype-component-spec.md) — 原型组件规范（三层架构 + cva + forwardRef + 文档头）
-7. [docs/adr/0029-frontend-as-prototype-workflow.md](docs/adr/0029-frontend-as-prototype-workflow.md) — 前端原型先行工作流（prototype → checklist → production）
-8. [docs/prototypes/prototype-to-production.md](docs/prototypes/prototype-to-production.md) — 原型转生产迁移清单
-9. [docs/prototypes/matrix-e2e-screenshot-gate.md](docs/prototypes/matrix-e2e-screenshot-gate.md) — Matrix E2E 截图门禁（全量 tab / DOM / 交互 / 截图证据）
-10. [docs/architecture-dependencies.md](docs/architecture-dependencies.md) — 模块依赖图（当前模块清单 + 5 波次）
-11. [docs/adr/README.md](docs/adr/README.md) — 所有架构决策索引
-12. [docs/infra/technical-specs.md](docs/infra/technical-specs.md) — 基础设施技术规格（H6 状态机 / H7 导入导出 / H8 ERP 防腐层 / H9 打印 / H10 备份恢复）
-13. [docs/concept-audit.md](docs/concept-audit.md) — 概念审计报告（8 镜头扫描结果 + 数据量评估）
-14. [docs/domain/clarifications.md](docs/domain/clarifications.md) — 业务澄清记录（42 项决策）
-15. [docs/glossary.md](docs/glossary.md) — 术语表（54 个，含禁用词）
+3. [docs/layered-design.md](docs/layered-design.md) — **前后端分层设计规范**（后端 handler/service/repository/domain；前端 app/page/feature/lib/ui；原型到生产边界）
+4. [docs/governance.md](docs/governance.md) — 治理体系（5 类 + 4 Tier + Baseline + 文档四层管理）
+5. [docs/adr/0006-tdd-and-test-layers.md](docs/adr/0006-tdd-and-test-layers.md) — TDD + 11 层测试
+6. [docs/adr/0021-high-fidelity-prototype-strategy.md](docs/adr/0021-high-fidelity-prototype-strategy.md) — 高保真原型策略（shadcn/ui + Storybook 工具链）
+7. [docs/adr/0022-prototype-component-spec.md](docs/adr/0022-prototype-component-spec.md) — 原型组件规范（三层架构 + cva + forwardRef + 文档头）
+8. [docs/adr/0029-frontend-as-prototype-workflow.md](docs/adr/0029-frontend-as-prototype-workflow.md) — 前端原型先行工作流（prototype → checklist → production）
+9. [docs/prototypes/prototype-to-production.md](docs/prototypes/prototype-to-production.md) — 原型转生产迁移清单
+10. [docs/prototypes/matrix-e2e-screenshot-gate.md](docs/prototypes/matrix-e2e-screenshot-gate.md) — Matrix E2E 截图门禁（全量 tab / DOM / 交互 / 截图证据）
+11. [docs/architecture-dependencies.md](docs/architecture-dependencies.md) — 模块依赖图（当前模块清单 + 5 波次）
+12. [docs/adr/README.md](docs/adr/README.md) — 所有架构决策索引
+13. [docs/infra/technical-specs.md](docs/infra/technical-specs.md) — 基础设施技术规格（H6 状态机 / H7 导入导出 / H8 ERP 防腐层 / H9 打印 / H10 备份恢复）
+14. [docs/concept-audit.md](docs/concept-audit.md) — 概念审计报告（8 镜头扫描结果 + 数据量评估）
+15. [docs/domain/clarifications.md](docs/domain/clarifications.md) — 业务澄清记录（42 项决策）
+16. [docs/glossary.md](docs/glossary.md) — 术语表（54 个，含禁用词）
 
 ## 业务文档索引
 
@@ -452,8 +477,10 @@
 - PDA：React Native + TypeScript
 - 提交规范：Conventional Commits（`<type>(<scope>): <subject>`）
 - 禁止：`unwrap` / `any` / 裸 fetch / 注释掉的代码 / 硬编码密钥
+- 行数阈值：≥ 600 行 warning，≥ 800 行门禁 / 必须拆分；适用于 PR 规模、单文件规模和前端页面 `.tsx`
 - 审计表只能 INSERT，禁止 UPDATE/DELETE
 - domain 不依赖 infra
+- 分层设计：后端 `bin/runtime → handler → service → domain/repository`；前端 `app shell → page → feature → api-client` 与 `page → @wms/ui business → @wms/ui ui`
 - **发现缺口必须确认**：新增模块/故事/基础设施前必须和用户确认（见上方流程）
 
 ### 前端组件红线（详见 [frontend-coding-standards.md](docs/frontend-coding-standards.md)）
@@ -466,7 +493,7 @@
 - size 三档对齐 shadcn：`sm | default | lg`（禁止 md）
 - 状态枚举必须对齐 `docs/prototypes/component-registry.md §4.3`
 - PDA 端组件触控 ≥ 48pt / 字号 ≥ 16pt（usability-baseline §2.1）
-- **单页面 `.tsx` < 300 行**（≥ 300 警告，≥ 500 PR 门禁，加 `@governance: skip-page-size` 注释豁免）
+- **单页面 `.tsx` < 600 行**（≥ 600 警告，≥ 800 PR 门禁，加 `@governance: skip-page-size` 注释豁免）
 - **流程类组件按决策树选型**（StepFlow 通用进度 / AuditTimeline 历史事件 / ApprovalFlow 审批 / DualSignPanel 双人签字特例）
 - 新增 Layer 2 组件 PR 必须在 component-registry.md §3.1 注册
 - **加新原型页强制三同步**（page → Tabs.tsx → manifest.toml → baseline PNG），跑一次 `capture_visual_snapshots.py` + 人工 review 截图无截断/偏移；`check_baseline_completeness.py` 强制阻断（参前端规范 §12.3）
@@ -480,7 +507,7 @@
 | `check_component_no_inline_style.py` | 业务复合无静态 inline style（动态值豁免） |
 | `check_component_props_classname.py` | Props 接口含 className + forwardRef + displayName |
 | `check_component_registry_consistency.py` | 注册表 ↔ 实际目录一致（区分"已开发"/"待开发"） |
-| `check_page_size.py` | 页面 < 300 行通过 / 300-499 警告 / ≥ 500 门禁 |
+| `check_page_size.py` | 页面 < 600 行通过 / 600-799 警告 / ≥ 800 门禁 |
 | `check_baseline_completeness.py` | **Tabs.tsx ↔ manifest.toml ↔ baseline PNG 三者一致（强制）** |
 | `check_prototype_index_consistency.py` | 原型 index.toml 字段合法 |
 | `check_prototype_story_sync.py` | 原型 ↔ 故事文件同步 |

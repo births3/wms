@@ -126,7 +126,7 @@ Layer 1 + 2 抽到 packages/ui 的决策见 ADR-0028。
 - **check_component_props_classname.py**：Props 接口必须支持 className（forwardRef + displayName；泛型函数自动豁免 forwardRef）
 - **check_component_no_inline_style.py**：业务复合禁止 inline style
 - **check_component_registry_consistency.py**：注册表 ↔ 实际目录一致
-- **check_page_size.py**：页面级文件大小（300 警告 / 500 门禁）→ 强制提取 PageHeader/DataTable/FilterBar 等
+- **check_page_size.py**：页面级文件大小（600 警告 / 800 门禁）→ 强制提取 PageHeader/DataTable/FilterBar 等
 
 ---
 

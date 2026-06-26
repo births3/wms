@@ -2,7 +2,7 @@
 
 > 时间：2026-05-17
 > 版本：v1
-> 数据源：`docs/legacy-analysis/{1,2,3,4,5,6}.csv`（Oracle WMS 生产环境真实数据）
+> 数据源：Oracle WMS 生产环境导出 CSV（2026-05-16）；原始 CSV 不入 Git，详见 [docs/legacy-analysis/README.md](../legacy-analysis/README.md)
 > 文档层级：基础设施层
 > 关联：[docs/legacy-analysis/legacy-comparison-matrix.md](../legacy-analysis/legacy-comparison-matrix.md) / [docs/infra/technical-specs.md](technical-specs.md) H10 / [docs/domain/clarifications.md](../domain/clarifications.md) #42
 

@@ -2,6 +2,7 @@
 
 > 适用范围：`prototypes/`（当前）+ Wave 1 起 `apps/web-admin/` `apps/pda-mobile/`
 > 关联：[ADR-0001](adr/0001-tech-stack.md) 技术栈 / [ADR-0015](adr/0015-multi-end-rules.md) 多端规则 / [ADR-0021](adr/0021-high-fidelity-prototype-strategy.md) 原型策略 / [ADR-0022](adr/0022-prototype-component-spec.md) 组件规范
+> 前后端生产分层边界见 `docs/layered-design.md`。
 > 治理：4 个 `check_component_*.py` 脚本（T1）
 
 ---
@@ -265,9 +266,9 @@ PDA 端组件（含 PDA 模式）必须满足 `docs/infra/usability-baseline.md 
 
 | 行数 | 严重度 | 治理动作 |
 |---|---|---|
-| < 300 行 | ✅ 通过 | — |
-| 300-499 行 | ⚠️ 警告 | `check_page_size.py` 报 warning，强烈建议提取组件 |
-| ≥ 500 行 | 🔴 门禁 | `check_page_size.py` 报 error，PR 阻断（除非加豁免标签） |
+| < 600 行 | ✅ 通过 | — |
+| 600-799 行 | ⚠️ 警告 | `check_page_size.py` 报 warning，强烈建议提取组件 |
+| ≥ 800 行 | 🔴 门禁 | `check_page_size.py` 报 error，PR 阻断（除非加豁免标签） |
 
 **触发提取的信号**：
 - 重复的 `<table>` 表格代码（≥ 30 行）→ 提取为 `<DataTable>`
@@ -304,7 +305,7 @@ PDA 端组件（含 PDA 模式）必须满足 `docs/infra/usability-baseline.md 
 | `check_component_props_classname.py` | T1 | Props 接口含 className + forwardRef + displayName（**泛型函数自动豁免 forwardRef**） | `@governance: skip-classname` |
 | `check_component_no_inline_style.py` | T1 | 业务复合无静态 inline style | 紧邻上方 `// 动态：理由` 注释 |
 | `check_component_registry_consistency.py` | T1 | 业务复合目录 ↔ component-registry.md §3.1 一一对应 | `[[component_exemptions]]` |
-| `check_page_size.py` | T1 | 页面 < 300 通过 / 300-499 警告 / ≥ 500 门禁 | `@governance: skip-page-size` |
+| `check_page_size.py` | T1 | 页面 < 600 通过 / 600-799 警告 / ≥ 800 门禁 | `@governance: skip-page-size` |
 
 ---
 

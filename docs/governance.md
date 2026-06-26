@@ -3,8 +3,8 @@
 > 本文档是 wms 项目的"宪法"。所有规范、流程、决策机制都在此声明。
 > 修改本文档必须经过 PR，并在文末"变更记录"中追加条目。
 
-- 版本：v0.3（追加文档四层管理 + validate_doc_layers 脚本）
-- 日期：2026-05-15
+- 版本：v0.6（统一行数治理阈值）
+- 日期：2026-06-26
 - 适用范围：整个 wms 仓库（backend、apps/*、packages/*、scripts/*、docs/*）
 
 ---
@@ -185,7 +185,7 @@ wms 是一个**医药冷链 GSP 合规仓储管理系统**，目标是支撑：
 
 - PR 标题与提交信息同格式
 - PR 描述用模板（变更说明 / 关联 / 自查清单 / 测试方法 / 截图）
-- 单 PR 改动 < 400 行（不含自动生成代码），超过强制拆分
+- 单 PR 改动 < 800 行（不含自动生成代码）；≥ 600 行 warning，≥ 800 行强制拆分
 
 #### 3.4.1 commit 粒度规则
 
@@ -196,7 +196,7 @@ wms 是一个**医药冷链 GSP 合规仓储管理系统**，目标是支撑：
 - **必须拆分**的情形（即使在同一 PR 内也分多个 commit）：
   - 跨 ≥ 2 个 scope（如同时改了"治理"和"基础档案"）
   - 跨"格式" / "重构" / "功能"等不同 type（重构和功能不要混提交，便于 reviewer 区分）
-  - 单次累积变更 ≥ 400 行
+  - 单次累积变更 ≥ 800 行
   - Breaking Change 必须独立 commit
 - **不建议拆分**的情形：
   - 同主题强关联的多个文件（如改一个故事 + 配套字段表 + 配套测试）
@@ -213,7 +213,7 @@ wms 是一个**医药冷链 GSP 合规仓储管理系统**，目标是支撑：
 | 维度 | PR | commit（本地）|
 |---|---|---|
 | 粒度 | 一个完整功能/修复 | 一个原子改动 |
-| 行数上限 | < 400 行（硬约束）| 无硬约束，但 ≥ 400 行应拆分 |
+| 行数上限 | < 800 行（硬约束），≥ 600 行 warning | 无硬约束，但 ≥ 600 行应拆分 |
 | 单 scope | **强制单一**（跨 scope 拆 PR）| 推荐单一（跨 scope 拆 commit）|
 | 提交人 | review 通过后 squash | 实时提交 |
 
@@ -249,11 +249,14 @@ wms 是一个**医药冷链 GSP 合规仓储管理系统**，目标是支撑：
 | `check_approval_source_chain.py` | 库存状态变更故事必须声明审批源 | L3 | ✅ 已有（T1）|
 | `check_config_center_consistency.py` | 故事使用 ⇄ M1-008 配置中心 ⇄ 故事默认值 三向一致 | L3 | ✅ 已有（T1）|
 | `check_pda_story_completeness.py` | PDA 故事三件套（字段表 + 扫码顺序 + 离线声明）| L3 | ✅ 已有（T1）|
+| `check_pda_production_gate.py` | ADR-0027 Accepted 前禁止启动 `apps/pda-mobile` 生产 app 文件 / workspace / lockfile / 依赖 / scripts；Accepted 后校验 Spike accepted evidence 与候选一致性 | L1/L4 | ✅ 已有（T1，PDA 新方案）|
 | `check_gsp_field_traceability.py` | 70 GSP 字段在故事字段表中有实现（v25 字段追溯矩阵）| L3 | ✅ 已有（T1，原计划 Wave 3，提前实现）|
 | `check_baseline_health.py` | baseline 数量单调下降 + 过期检测（防止滥用 baseline 抑制噪音）| 跨层 | ✅ 已有（T1，v0.4 加入）|
+| `check_governance_coverage.py` | 所有 `check_*` / `validate_*` 治理脚本，以及被 gate-rules.toml 用作 evidence gate 的 `report_*` 脚本，必须被运行器覆盖，并纳入 smoke 或记录明确豁免 | 跨层 | ✅ 已有（T1，元治理）|
+| `check_wave6_evidence_preflight.py` | Wave 6 evidence runbook / just 入口 / validator 链路完整性 | L4 | ✅ 已有（T1，Wave 6）|
 | `validate_governance_consistency.py` | governance.md 引用的 ADR/规范都存在且状态有效 | L2 | Wave 2（占位）|
 | `validate_domain_glossary.py` | L3 文档术语与代码命名一致 | L3 | Wave 3（占位）|
-| `check_changelog_freshness.py` | CHANGELOG 与最近 tag 同步 | L4 | Wave 4（占位）|
+| `check_changelog_freshness.py` | CHANGELOG 与最近 tag 同步 | L4 | ✅ 已有（T1，Wave 5）|
 
 #### 3.5.2 文档清单
 
@@ -486,3 +489,4 @@ docs/governance.md（本文档，规则源头）
 | 2026-05-17 | v0.4.1 | v0.4 review 二轮修复（5 项）：gate-rules.toml ↔ §4.6 Wave 时序统一（OpenAPI Wave 2 / handler Wave 1 / cold-chain Wave 3）；§4.6 表格加"对应 gate-rules 规则"列 + "事实之源约定"段；check_baseline_health 默认仅检测不改 working tree（--update-snapshot 才写）；task_check.py docstring 加 --strict 启用时机说明；governance/baselines/README.md 加治理元数据文件入库说明 |
 | 2026-05-17 | v0.4.2 | v0.4.1 review 三轮修复（4 项 + 2 验证）：(P0) §7 补 v0.4.1 变更记录；(P1) 新增 check_governance_consistency.py（元检查 §4.6 ↔ gate-rules.toml 一致性）；(P2) wave-1-ready 加 baseline-health 初始化 + --strict 启用提醒；测试加 v0.4.1 行为回归；baselines/README.md 标题改为"治理债务与元数据" |
 | 2026-05-24 | v0.5 | 接受 ADR-0029 前端原型先行工作流：§3.6.1 增加"用户故事 → 原型走查 → 契约冻结 → TDD 生产实现"流程；文档清单加入 `docs/prototypes/*.md`；原型转生产必须走 checklist |
+| 2026-06-26 | v0.6 | 放宽行数治理阈值：PR 规模与文件规模统一为 ≥ 600 行 warning、≥ 800 行门禁 / 必须拆分；同步 AGENTS.md 速查约束和前端页面脚本阈值 |
