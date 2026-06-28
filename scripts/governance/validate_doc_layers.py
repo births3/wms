@@ -13,7 +13,7 @@ Tier：T1（< 10s）
 校验项：
 - L1: governance.md / architecture-dependencies.md 引用的 ADR 文件必须存在
 - L2: governance.md 变更记录段必须存在且非空
-- L3: Wave 2 起 docs/domain/*.md 如果存在，对应 backend/crates 目录应存在（弱校验）
+- L3: Wave 2 起 docs/domain/ 下的领域设计文档如果存在，对应 backend/crates 目录应存在（弱校验）
 - L4: ROADMAP.md / TODO.md / CHANGELOG.md 必须存在
 - 跨层: L2 文档引用的 L1 ADR 状态不能是 Deprecated（引用已废弃决策 = 规范过时）
 """
@@ -116,7 +116,7 @@ def check_l2_changelog(issues: list[Issue]) -> None:
 
 
 def check_l3_domain_code_sync(issues: list[Issue]) -> None:
-    """Wave 2 起，docs/domain/*.md 如果存在，对应 backend 目录应存在（弱校验）。"""
+    """Wave 2 起，领域设计文档如果存在，对应 backend 目录应存在（弱校验）。"""
     domain_dir = DOCS_DIR / "domain"
     if not domain_dir.exists():
         return
@@ -132,6 +132,8 @@ def check_l3_domain_code_sync(issues: list[Issue]) -> None:
         return
     for md in domain_dir.glob("*.md"):
         if md.name == ".gitkeep":
+            continue
+        if md.name == "clarifications.md" or md.name.startswith(("user-stories-", "todo-")):
             continue
         # 从文件名推断上下文名：如 inbound.md → backend/crates 下应有 inbound 相关
         ctx = md.stem.replace("-", "_")
