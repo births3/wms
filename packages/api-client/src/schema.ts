@@ -1044,6 +1044,22 @@ export interface paths {
         patch: operations["disable_system_dictionary_item"];
         trace?: never;
     };
+    "/api/v1/system-dictionaries/{dict_code}/items/{item_code}/impact-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["preview_system_dictionary_item_impact"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tms/container-recoveries": {
         parameters: {
             query?: never;
@@ -2379,6 +2395,23 @@ export interface components {
             sort_order: number;
             /** Format: date-time */
             updated_at: string;
+        };
+        SystemDictionaryImpactPreview: {
+            dict_code: string;
+            /** Format: date-time */
+            effective_at: string;
+            item_code: string;
+            /** Format: uuid */
+            owner_id: string;
+            references: components["schemas"]["SystemDictionaryImpactReference"][];
+            /** Format: int64 */
+            total_references: number;
+        };
+        SystemDictionaryImpactReference: {
+            business_object: string;
+            module_code: string;
+            /** Format: int64 */
+            reference_count: number;
         };
         /** @description 系统字典项。 */
         SystemDictionaryItem: {
@@ -5875,6 +5908,72 @@ export interface operations {
                 };
             };
             /** @description 字典项作用域非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    preview_system_dictionary_item_impact: {
+        parameters: {
+            query?: {
+                /** @description 预览指定货主影响；默认当前货主 */
+                owner_id?: string | null;
+                /** @description 按指定时间统计影响 */
+                effective_at?: string | null;
+            };
+            header?: never;
+            path: {
+                /** @description 字典分类编码 */
+                dict_code: string;
+                /** @description 字典项编码 */
+                item_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 字典项引用影响预览 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemDictionaryImpactPreview"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 跨货主预览越权 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 字典分类或字典项不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 运行时字典参数无效，fail closed */
             422: {
                 headers: {
                     [name: string]: unknown;

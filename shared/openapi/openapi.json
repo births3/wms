@@ -4219,6 +4219,108 @@
         }
       }
     },
+    "/api/v1/system-dictionaries/{dict_code}/items/{item_code}/impact-preview": {
+      "get": {
+        "tags": [
+          "system-dictionary"
+        ],
+        "operationId": "preview_system_dictionary_item_impact",
+        "parameters": [
+          {
+            "name": "dict_code",
+            "in": "path",
+            "description": "字典分类编码",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "item_code",
+            "in": "path",
+            "description": "字典项编码",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "owner_id",
+            "in": "query",
+            "description": "预览指定货主影响；默认当前货主",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "effective_at",
+            "in": "query",
+            "description": "按指定时间统计影响",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "字典项引用影响预览",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemDictionaryImpactPreview"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "跨货主预览越权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "字典分类或字典项不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "运行时字典参数无效，fail closed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/tms/container-recoveries": {
       "post": {
         "tags": [
@@ -8281,6 +8383,63 @@
           "updated_at": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "SystemDictionaryImpactPreview": {
+        "type": "object",
+        "required": [
+          "dict_code",
+          "item_code",
+          "owner_id",
+          "effective_at",
+          "total_references",
+          "references"
+        ],
+        "properties": {
+          "dict_code": {
+            "type": "string"
+          },
+          "effective_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "item_code": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SystemDictionaryImpactReference"
+            }
+          },
+          "total_references": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "SystemDictionaryImpactReference": {
+        "type": "object",
+        "required": [
+          "module_code",
+          "business_object",
+          "reference_count"
+        ],
+        "properties": {
+          "business_object": {
+            "type": "string"
+          },
+          "module_code": {
+            "type": "string"
+          },
+          "reference_count": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },

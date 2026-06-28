@@ -61,14 +61,14 @@ use wms_domain::{
     RetailReplenishmentSuggestion, ReviewOutboundOrderRequest, ShipOutboundOrderRequest,
     SignInspectionRequest, SpecialDrugCategory, SpecialDrugCategoryListResponse,
     StoreDashboardResponse, Supplier, SupplierListResponse, SystemDictionaryCategory,
-    SystemDictionaryItem, SystemDictionaryItemListResponse,
-    TemperatureExcursionDispositionResponse, TemperatureExcursionEvent,
-    TemperatureExcursionEventListResponse, TemperatureReading, TmsDispatch,
-    TraceabilityOutboundReport, TraceabilityOutboundReportRequest, TraceabilityStatusChangeEvent,
-    TransitTemperatureReading, UpdateCustomerRequest, UpdateLocationRequest, UpdateProductRequest,
-    UpdateReceivingOrderRequest, UpdateSpecialDrugCategoryRequest, UpdateSupplierRequest,
-    UpdateWarehouseRequest, UpsertSystemDictionaryItemRequest, Warehouse, WarehouseListResponse,
-    WeighPackJobRequest,
+    SystemDictionaryImpactPreview, SystemDictionaryImpactReference, SystemDictionaryItem,
+    SystemDictionaryItemListResponse, TemperatureExcursionDispositionResponse,
+    TemperatureExcursionEvent, TemperatureExcursionEventListResponse, TemperatureReading,
+    TmsDispatch, TraceabilityOutboundReport, TraceabilityOutboundReportRequest,
+    TraceabilityStatusChangeEvent, TransitTemperatureReading, UpdateCustomerRequest,
+    UpdateLocationRequest, UpdateProductRequest, UpdateReceivingOrderRequest,
+    UpdateSpecialDrugCategoryRequest, UpdateSupplierRequest, UpdateWarehouseRequest,
+    UpsertSystemDictionaryItemRequest, Warehouse, WarehouseListResponse, WeighPackJobRequest,
 };
 
 #[utoipa::path(
@@ -289,6 +289,27 @@ fn delete_special_drug_category() {}
 )]
 #[allow(dead_code)]
 fn list_system_dictionary_items() {}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/system-dictionaries/{dict_code}/items/{item_code}/impact-preview",
+    tag = "system-dictionary",
+    params(
+        ("dict_code" = String, Path, description = "字典分类编码"),
+        ("item_code" = String, Path, description = "字典项编码"),
+        ("owner_id" = Option<uuid::Uuid>, Query, description = "预览指定货主影响；默认当前货主"),
+        ("effective_at" = Option<chrono::DateTime<chrono::Utc>>, Query, description = "按指定时间统计影响"),
+    ),
+    responses(
+        (status = 200, description = "字典项引用影响预览", body = SystemDictionaryImpactPreview),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "跨货主预览越权", body = ErrorResponse),
+        (status = 404, description = "字典分类或字典项不存在", body = ErrorResponse),
+        (status = 422, description = "运行时字典参数无效，fail closed", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+fn preview_system_dictionary_item_impact() {}
 
 #[utoipa::path(
     put,
@@ -584,6 +605,7 @@ fn confirm_container_recovery() {}
         update_special_drug_category,
         delete_special_drug_category,
         list_system_dictionary_items,
+        preview_system_dictionary_item_impact,
         upsert_system_dictionary_item,
         disable_system_dictionary_item,
         list_receiving_orders,
@@ -749,6 +771,8 @@ fn confirm_container_recovery() {}
         Supplier,
         SupplierListResponse,
         SystemDictionaryCategory,
+        SystemDictionaryImpactPreview,
+        SystemDictionaryImpactReference,
         SystemDictionaryItem,
         SystemDictionaryItemListResponse,
         TmsDispatch,
@@ -827,6 +851,7 @@ mod tests {
             "/api/v1/master-data/special-drug-categories/{id}",
             "/api/v1/system-dictionaries/{dict_code}/items",
             "/api/v1/system-dictionaries/{dict_code}/items/{item_code}",
+            "/api/v1/system-dictionaries/{dict_code}/items/{item_code}/impact-preview",
             "/api/v1/system-dictionaries/{dict_code}/items/{item_code}/disable",
             "/api/v1/inbound/receiving-orders",
             "/api/v1/inbound/receiving-orders/{id}",
@@ -914,6 +939,8 @@ mod tests {
             "\"TemperatureExcursionEventListResponse\"",
             "\"SystemDictionaryItem\"",
             "\"SystemDictionaryItemListResponse\"",
+            "\"SystemDictionaryImpactPreview\"",
+            "\"SystemDictionaryImpactReference\"",
             "\"UpsertSystemDictionaryItemRequest\"",
             "\"DisableSystemDictionaryItemRequest\"",
             "\"GspLedgerReport\"",

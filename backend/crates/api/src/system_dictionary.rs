@@ -9,8 +9,10 @@ use sha2::{Digest, Sha256};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{
-    DisableSystemDictionaryItemRequest, SystemDictionaryCategory, SystemDictionaryItem,
-    UpsertSystemDictionaryItemRequest,
+    DisableSystemDictionaryItemRequest, SystemDictionaryCategory, SystemDictionaryImpactPreview,
+    SystemDictionaryImpactReference, SystemDictionaryItem, UpsertSystemDictionaryItemRequest,
+    DOCUMENT_TYPE_PURCHASE_INBOUND, DOCUMENT_TYPE_PURCHASE_RETURN_OUTBOUND,
+    DOCUMENT_TYPE_SALES_OUTBOUND, DOCUMENT_TYPE_SALES_RETURN, SYSTEM_DICTIONARY_DOCUMENT_TYPE,
 };
 
 use crate::{
@@ -136,6 +138,43 @@ impl PgSystemDictionaryRepository {
                 Ok(row.into())
             })
             .collect()
+    }
+
+    pub async fn preview_item_impact(
+        &self,
+        ctx: &AuthContext,
+        dict_code: &str,
+        item_code: &str,
+        owner_id: Uuid,
+        effective_at: DateTime<Utc>,
+    ) -> Result<SystemDictionaryImpactPreview, SystemDictionaryError> {
+        ensure_request_owner(ctx, Some(owner_id))?;
+        let items = self
+            .list_effective_items(ctx, dict_code, effective_at)
+            .await?;
+        if !items.iter().any(|item| item.item_code == item_code) {
+            return Err(SystemDictionaryError::NotFound);
+        }
+
+        let references = if dict_code == SYSTEM_DICTIONARY_DOCUMENT_TYPE {
+            self.count_document_type_references(owner_id, item_code, effective_at)
+                .await?
+        } else {
+            Vec::new()
+        };
+        let total_references = references
+            .iter()
+            .map(|reference| reference.reference_count)
+            .sum();
+
+        Ok(SystemDictionaryImpactPreview {
+            dict_code: dict_code.to_string(),
+            item_code: item_code.to_string(),
+            owner_id,
+            effective_at,
+            total_references,
+            references,
+        })
     }
 
     pub async fn upsert_item(
@@ -348,6 +387,76 @@ impl PgSystemDictionaryRepository {
     async fn begin(&self) -> Result<Transaction<'_, Postgres>, SystemDictionaryError> {
         self.pool.begin().await.map_err(map_db_error)
     }
+
+    async fn count_document_type_references(
+        &self,
+        owner_id: Uuid,
+        item_code: &str,
+        effective_at: DateTime<Utc>,
+    ) -> Result<Vec<SystemDictionaryImpactReference>, SystemDictionaryError> {
+        let mut references = Vec::new();
+
+        if matches!(
+            item_code,
+            DOCUMENT_TYPE_PURCHASE_INBOUND | DOCUMENT_TYPE_SALES_RETURN
+        ) {
+            let reference_count: i64 = sqlx::query_scalar(
+                r#"
+                SELECT COUNT(*)::BIGINT
+                  FROM receiving_orders
+                 WHERE owner_id = $1
+                   AND document_type = $2
+                   AND created_at <= $3
+                "#,
+            )
+            .bind(owner_id)
+            .bind(item_code)
+            .bind(effective_at)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(map_db_error)?;
+            push_reference(&mut references, "M2", "receiving_orders", reference_count);
+        }
+
+        match item_code {
+            DOCUMENT_TYPE_SALES_OUTBOUND => {
+                let reference_count: i64 = sqlx::query_scalar(
+                    r#"
+                    SELECT COUNT(*)::BIGINT
+                      FROM outbound_orders
+                     WHERE owner_id = $1
+                       AND created_at <= $2
+                    "#,
+                )
+                .bind(owner_id)
+                .bind(effective_at)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(map_db_error)?;
+                push_reference(&mut references, "M4", "outbound_orders", reference_count);
+            }
+            DOCUMENT_TYPE_PURCHASE_RETURN_OUTBOUND => {}
+            _ => {}
+        }
+
+        Ok(references)
+    }
+}
+
+fn push_reference(
+    references: &mut Vec<SystemDictionaryImpactReference>,
+    module_code: &str,
+    business_object: &str,
+    reference_count: i64,
+) {
+    if reference_count == 0 {
+        return;
+    }
+    references.push(SystemDictionaryImpactReference {
+        module_code: module_code.to_string(),
+        business_object: business_object.to_string(),
+        reference_count,
+    });
 }
 
 async fn load_enabled_category_in_tx(

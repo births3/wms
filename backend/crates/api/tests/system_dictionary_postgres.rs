@@ -8,7 +8,7 @@ use wms_api::{
 };
 use wms_domain::{
     DisableSystemDictionaryItemRequest, UpsertSystemDictionaryItemRequest,
-    DOCUMENT_TYPE_PURCHASE_INBOUND, SYSTEM_DICTIONARY_DOCUMENT_TYPE,
+    DOCUMENT_TYPE_PURCHASE_INBOUND, DOCUMENT_TYPE_SALES_OUTBOUND, SYSTEM_DICTIONARY_DOCUMENT_TYPE,
 };
 
 fn ctx(owner_id: Uuid) -> AuthContext {
@@ -165,4 +165,154 @@ async fn document_type_rejects_invalid_params(pool: PgPool) {
         .expect_err("invalid document_type params must be rejected");
 
     assert!(matches!(error, SystemDictionaryError::ParamInvalid { .. }));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn document_type_impact_preview_counts_owner_scoped_m2_and_m4_references(pool: PgPool) {
+    let repo = PgSystemDictionaryRepository::new(pool.clone());
+    let owner_a = Uuid::new_v4();
+    let owner_b = Uuid::new_v4();
+    let ctx_a = ctx(owner_a);
+    let effective_at = Utc
+        .with_ymd_and_hms(2026, 6, 28, 12, 0, 0)
+        .single()
+        .expect("valid time");
+
+    for (owner_id, receipt_no, document_type, created_at) in [
+        (
+            owner_a,
+            "ASN-IMPACT-001",
+            DOCUMENT_TYPE_PURCHASE_INBOUND,
+            effective_at - chrono::Duration::hours(2),
+        ),
+        (
+            owner_a,
+            "ASN-IMPACT-002",
+            DOCUMENT_TYPE_PURCHASE_INBOUND,
+            effective_at - chrono::Duration::hours(1),
+        ),
+        (
+            owner_a,
+            "ASN-IMPACT-FUTURE",
+            DOCUMENT_TYPE_PURCHASE_INBOUND,
+            effective_at + chrono::Duration::hours(1),
+        ),
+        (
+            owner_b,
+            "ASN-IMPACT-OTHER",
+            DOCUMENT_TYPE_PURCHASE_INBOUND,
+            effective_at - chrono::Duration::hours(1),
+        ),
+    ] {
+        sqlx::query(
+            r#"
+            INSERT INTO receiving_orders (
+                id, owner_id, receipt_no, document_type, warehouse_id, status, created_at, updated_at
+            )
+            VALUES ($1, $2, $3, $4, $5, 'draft', $6, $6)
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(owner_id)
+        .bind(receipt_no)
+        .bind(document_type)
+        .bind(Uuid::new_v4())
+        .bind(created_at)
+        .execute(&pool)
+        .await
+        .expect("seed receiving order");
+    }
+
+    for (owner_id, wms_order_no, created_at) in [
+        (
+            owner_a,
+            "OUT-IMPACT-001",
+            effective_at - chrono::Duration::hours(2),
+        ),
+        (
+            owner_a,
+            "OUT-IMPACT-002",
+            effective_at - chrono::Duration::hours(1),
+        ),
+        (
+            owner_a,
+            "OUT-IMPACT-FUTURE",
+            effective_at + chrono::Duration::hours(1),
+        ),
+        (
+            owner_b,
+            "OUT-IMPACT-OTHER",
+            effective_at - chrono::Duration::hours(1),
+        ),
+    ] {
+        sqlx::query(
+            r#"
+            INSERT INTO outbound_orders (
+                id, owner_id, wms_order_no, customer_id, warehouse_id, status, created_at, updated_at
+            )
+            VALUES ($1, $2, $3, $4, $5, 'confirmed', $6, $6)
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(owner_id)
+        .bind(wms_order_no)
+        .bind(Uuid::new_v4())
+        .bind(Uuid::new_v4())
+        .bind(created_at)
+        .execute(&pool)
+        .await
+        .expect("seed outbound order");
+    }
+
+    let inbound_preview = repo
+        .preview_item_impact(
+            &ctx_a,
+            SYSTEM_DICTIONARY_DOCUMENT_TYPE,
+            DOCUMENT_TYPE_PURCHASE_INBOUND,
+            owner_a,
+            effective_at,
+        )
+        .await
+        .expect("inbound document type impact preview");
+
+    assert_eq!(inbound_preview.total_references, 2);
+    assert_eq!(inbound_preview.references.len(), 1);
+    assert_eq!(inbound_preview.references[0].module_code, "M2");
+    assert_eq!(
+        inbound_preview.references[0].business_object,
+        "receiving_orders"
+    );
+    assert_eq!(inbound_preview.references[0].reference_count, 2);
+
+    let outbound_preview = repo
+        .preview_item_impact(
+            &ctx_a,
+            SYSTEM_DICTIONARY_DOCUMENT_TYPE,
+            DOCUMENT_TYPE_SALES_OUTBOUND,
+            owner_a,
+            effective_at,
+        )
+        .await
+        .expect("outbound document type impact preview");
+
+    assert_eq!(outbound_preview.total_references, 2);
+    assert_eq!(outbound_preview.references.len(), 1);
+    assert_eq!(outbound_preview.references[0].module_code, "M4");
+    assert_eq!(
+        outbound_preview.references[0].business_object,
+        "outbound_orders"
+    );
+    assert_eq!(outbound_preview.references[0].reference_count, 2);
+
+    let error = repo
+        .preview_item_impact(
+            &ctx_a,
+            SYSTEM_DICTIONARY_DOCUMENT_TYPE,
+            DOCUMENT_TYPE_PURCHASE_INBOUND,
+            owner_b,
+            effective_at,
+        )
+        .await
+        .expect_err("cross-owner preview must be rejected");
+    assert_eq!(error, SystemDictionaryError::CrossOwnerAccess);
 }

@@ -460,6 +460,23 @@ pub struct SystemDictionaryItemListResponse {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct SystemDictionaryImpactReference {
+    pub module_code: String,
+    pub business_object: String,
+    pub reference_count: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct SystemDictionaryImpactPreview {
+    pub dict_code: String,
+    pub item_code: String,
+    pub owner_id: Uuid,
+    pub effective_at: DateTime<Utc>,
+    pub total_references: i64,
+    pub references: Vec<SystemDictionaryImpactReference>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct UpsertSystemDictionaryItemRequest {
     pub owner_id: Option<Uuid>,
     pub item_name: String,

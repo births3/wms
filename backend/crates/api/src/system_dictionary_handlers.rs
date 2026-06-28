@@ -13,8 +13,8 @@ use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use sqlx::PgPool;
 use wms_domain::{
-    DisableSystemDictionaryItemRequest, ErrorResponse, PageMeta, SystemDictionaryItem,
-    SystemDictionaryItemListResponse, UpsertSystemDictionaryItemRequest,
+    DisableSystemDictionaryItemRequest, ErrorResponse, PageMeta, SystemDictionaryImpactPreview,
+    SystemDictionaryItem, SystemDictionaryItemListResponse, UpsertSystemDictionaryItemRequest,
 };
 
 use crate::{
@@ -34,6 +34,12 @@ pub struct SystemDictionaryAppState {
 
 #[derive(Debug, Deserialize)]
 struct ListSystemDictionaryQuery {
+    effective_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct PreviewSystemDictionaryImpactQuery {
+    owner_id: Option<uuid::Uuid>,
     effective_at: Option<DateTime<Utc>>,
 }
 
@@ -142,6 +148,10 @@ pub fn system_dictionary_router(state: SystemDictionaryAppState) -> Router {
             put(upsert_system_dictionary_item_handler),
         )
         .route(
+            "/api/v1/system-dictionaries/:dict_code/items/:item_code/impact-preview",
+            get(preview_system_dictionary_impact_handler),
+        )
+        .route(
             "/api/v1/system-dictionaries/:dict_code/items/:item_code/disable",
             patch(disable_system_dictionary_item_handler),
         )
@@ -164,6 +174,26 @@ async fn list_system_dictionary_items_handler(
         )
         .await?;
     Ok(Json(item_list_response(items)))
+}
+
+async fn preview_system_dictionary_impact_handler(
+    ctx: AuthContext,
+    State(state): State<SystemDictionaryAppState>,
+    Path((dict_code, item_code)): Path<(String, String)>,
+    Query(query): Query<PreviewSystemDictionaryImpactQuery>,
+) -> Result<Json<SystemDictionaryImpactPreview>, SystemDictionaryHandlerError> {
+    require_any_permission(&ctx, &[READ_PERMISSION, WRITE_PERMISSION])?;
+    let preview = state
+        .repository
+        .preview_item_impact(
+            &ctx,
+            &dict_code,
+            &item_code,
+            query.owner_id.unwrap_or(ctx.owner_id),
+            query.effective_at.unwrap_or_else(Utc::now),
+        )
+        .await?;
+    Ok(Json(preview))
 }
 
 async fn upsert_system_dictionary_item_handler(
@@ -265,9 +295,10 @@ mod tests {
     use wms_domain::UpsertSystemDictionaryItemRequest;
 
     use super::{
-        idempotency_key_from_headers, upsert_system_dictionary_item_handler,
+        idempotency_key_from_headers, preview_system_dictionary_impact_handler,
+        upsert_system_dictionary_item_handler, PreviewSystemDictionaryImpactQuery,
         SystemDictionaryAppState, SystemDictionaryHandlerError, GLOBAL_WRITE_PERMISSION,
-        WRITE_PERMISSION,
+        READ_PERMISSION, WRITE_PERMISSION,
     };
     use crate::auth::{AuthContext, AuthError};
 
@@ -329,6 +360,29 @@ mod tests {
             error,
             SystemDictionaryHandlerError::Auth(AuthError::PermissionDenied(permission))
                 if permission == WRITE_PERMISSION
+        ));
+    }
+
+    #[tokio::test]
+    async fn preview_handler_checks_permission_before_database() {
+        let pool =
+            PgPool::connect_lazy("postgres://localhost/wms").expect("lazy pool should not connect");
+        let error = preview_system_dictionary_impact_handler(
+            ctx(&[]),
+            axum::extract::State(SystemDictionaryAppState::with_postgres(pool)),
+            Path(("document_type".to_string(), "purchase_inbound".to_string())),
+            axum::extract::Query(PreviewSystemDictionaryImpactQuery {
+                owner_id: None,
+                effective_at: None,
+            }),
+        )
+        .await
+        .expect_err("read permission should be required");
+
+        assert!(matches!(
+            error,
+            SystemDictionaryHandlerError::Auth(AuthError::PermissionDenied(permission))
+                if permission == format!("{READ_PERMISSION}|{WRITE_PERMISSION}")
         ));
     }
 
