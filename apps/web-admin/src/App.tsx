@@ -2,15 +2,20 @@ import * as React from "react";
 import { Button, Card, CardContent, Input, PageHeader, StatusBadge } from "@wms/ui";
 import {
   Activity,
+  BookOpen,
+  Building2,
   ChevronDown,
   CheckCircle2,
   ClipboardList,
   KeyRound,
   LogOut,
+  MapPinned,
   PackageCheck,
   RefreshCw,
   Search,
   ShieldCheck,
+  Users,
+  Warehouse,
   type LucideIcon,
 } from "lucide-react";
 
@@ -19,10 +24,12 @@ import { apiBaseUrl, wave1ContractPaths } from "@/lib/api";
 import { clearAuthSession, hasActiveAuthSession } from "@/lib/auth-session";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { M2InboundPage, type M2InboundMode } from "@/pages/inbound/M2InboundPage";
+import { M1MasterDataPage, type MasterDataViewId } from "@/pages/master-data/M1MasterDataPage";
 import { M4OutboundPage, type M4OutboundMode } from "@/pages/outbound/M4OutboundPage";
 
 type AdminView =
   | "dashboard"
+  | MasterDataViewId
   | "m2-receiving"
   | "m2-inspecting"
   | "m2-putaway"
@@ -65,6 +72,17 @@ const menuSections: Array<{ label: string; items: MenuItem[] }> = [
   {
     label: "工作台",
     items: [{ id: "dashboard", title: "运营总览", subtitle: "系统基础状态", icon: Activity }],
+  },
+  {
+    label: "基础档案",
+    items: [
+      { id: "m1-products", title: "M1 商品档案", subtitle: "商品编码 / 规格", icon: PackageCheck },
+      { id: "m1-suppliers", title: "M1 供应商档案", subtitle: "资质 / 联系人", icon: Building2 },
+      { id: "m1-customers", title: "M1 客户档案", subtitle: "客户 / 门店", icon: Users },
+      { id: "m1-warehouses", title: "M1 仓库管理", subtitle: "仓库 / 状态", icon: Warehouse },
+      { id: "m1-locations", title: "M1 库位管理", subtitle: "库位 / 容量", icon: MapPinned },
+      { id: "m1-system-dictionary", title: "M1 系统字典", subtitle: "document_type", icon: BookOpen },
+    ],
   },
   {
     label: "入库业务",
@@ -135,10 +153,13 @@ export function App() {
   };
   const inboundMode = inboundViewToMode(view);
   const outboundMode = outboundViewToMode(view);
+  const masterDataViewId = masterDataViewToId(view);
 
   return (
     <AppShell currentUser={currentUserQuery.data} activeView={view} onNavigate={setView} onLogout={handleLogout}>
-      {inboundMode ? (
+      {masterDataViewId ? (
+        <M1MasterDataPage viewId={masterDataViewId} onBack={() => setView("dashboard")} />
+      ) : inboundMode ? (
         <M2InboundPage
           mode={inboundMode}
           currentOwner={{ ownerId: currentUserQuery.data.owner_id, ownerCode: currentUserQuery.data.owner_code }}
@@ -161,6 +182,20 @@ function inboundViewToMode(view: AdminView): M2InboundMode | null {
   if (view === "m2-receiving") return "receiving";
   if (view === "m2-inspecting") return "inspecting";
   if (view === "m2-putaway") return "putaway";
+  return null;
+}
+
+function masterDataViewToId(view: AdminView): MasterDataViewId | null {
+  if (
+    view === "m1-products" ||
+    view === "m1-suppliers" ||
+    view === "m1-customers" ||
+    view === "m1-warehouses" ||
+    view === "m1-locations" ||
+    view === "m1-system-dictionary"
+  ) {
+    return view;
+  }
   return null;
 }
 
