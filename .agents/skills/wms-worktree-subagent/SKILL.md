@@ -13,6 +13,7 @@ description: WMS 仓库用独立 worktree 和 codex exec 运行子代理、复�
 - 子代理只改明确授权的文件范围；不推送、不改 main、不跨任务抢文件。
 - 子代理必须知道自己不是唯一修改者：不得回滚他人变更，遇到冲突要适配。
 - 默认要求子代理使用 `wms-loop-engineering` 和 `wms-review-fix-commit`，验证通过后在子 worktree 本地分组提交。
+- 只读校准任务用于先跑通子代理和收敛切片：使用 `read-only` sandbox，不改文件、不提交，只输出下一轮切片、允许文件、停止条件、验证命令和技能缺口。
 - 外部设备、TMS、冷链平台、生产数据和凭据类 evidence 不能交给子代理伪造；只能让子代理整理采集步骤或验证已有证据。
 
 ## 建立子代理
@@ -30,7 +31,15 @@ git worktree add -b agent/<slug> ../wms-agent-<slug> HEAD
 4. 在子 worktree 跑：
 
 ```bash
-codex exec -C ../wms-agent-<slug> -s workspace-write -a never -o ../wms-agent-<slug>.out.md "<任务提示词>"
+codex exec -C ../wms-agent-<slug> -s workspace-write -o ../wms-agent-<slug>.out.md "<任务提示词>"
+```
+
+当前 `codex exec` 不接受顶层交互命令的 `-a/--ask-for-approval` 参数；需要加新参数前先用 `codex exec --help` 核对。
+
+只读校准命令：
+
+```bash
+codex exec -C ../wms-agent-<slug> -s read-only -o ../wms-agent-<slug>.out.md "<只读校准提示词>"
 ```
 
 ## 子代理任务提示词模板
@@ -54,10 +63,13 @@ codex exec -C ../wms-agent-<slug> -s workspace-write -a never -o ../wms-agent-<s
 1. 使用 wms-loop-engineering 定义目标、输入、检查、反馈和停止条件。
 2. 复用现有前后端模块、组件、API client、测试夹具和治理脚本。
 3. 只做本任务最小闭环；新增字段、状态、角色、模块或业务默认值时停止并说明需要主代理/用户确认。
-4. 非平凡逻辑留下最小测试。
-5. 运行 git diff --check、just gov-t1 和任务相关测试。
-6. 使用 wms-review-fix-commit 做 review→修复→review；验证通过后本地分组提交。
-7. 不推送。
+4. 检索时限制范围，优先 `rg -n "<关键词>" <相关目录> --glob '!node_modules/**' --glob '!target/**'`，避免把无关大输出塞进结果。
+5. API 变更必须同步 `shared/openapi/openapi.json` 和 `packages/api-client/src/schema.ts`，并运行 `just openapi-sync`、`just openapi-check`。
+6. 真实前端任务必须在提示词里明确 9002 端口、截图路径、视口、是否提交 artifact；禁止用原型图代替真实页面截图。
+7. 非平凡逻辑留下最小测试。
+8. 运行 git diff --check、just gov-t1 和任务相关测试。
+9. 使用 wms-review-fix-commit 做 review→修复→review；验证通过后本地分组提交。
+10. 不推送。
 
 最终输出：
 - 子 worktree 路径
