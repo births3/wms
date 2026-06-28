@@ -8,7 +8,7 @@
 |---|---|---|
 | `AGENTS.md` | 项目原则、常用命令、验证要求、协作约定、禁止事项 | 本文件 |
 | `*/AGENTS.override.md` | 模块独有规则，例如后端、前端应用、原型、部署、治理脚本 | 见下方模块规则 |
-| `.agents/skills/<skill>/SKILL.md` | 复杂流程，例如需求确认、治理修复、审计流程 | 见 `.agents/skills/wms-governance-workflow/SKILL.md`、`.agents/skills/wms-loop-engineering/SKILL.md` 与 `.agents/skills/wms-review-fix-commit/SKILL.md` |
+| `.agents/skills/<skill>/SKILL.md` | 复杂流程，例如需求确认、治理修复、审计流程、worktree 子代理流程 | 见 `.agents/skills/wms-governance-workflow/SKILL.md`、`.agents/skills/wms-loop-engineering/SKILL.md`、`.agents/skills/wms-review-fix-commit/SKILL.md` 与 `.agents/skills/wms-worktree-subagent/SKILL.md` |
 | `.codex/config.toml` | 模型、沙箱、MCP、钩子、审批默认值 | 本仓库不跟踪；`.gitignore` 标记为本机配置 |
 | `.codex/rules/*.rules` | 命令允许 / 提示 / 禁止规则 | 本仓库不跟踪；`.gitignore` 标记为本机配置 |
 | `docs/*.md` | 详细说明、经验手册、长规范、背景材料 | 见 [docs/agent-collaboration.md](docs/agent-collaboration.md) 与 [docs/agent-document-index.md](docs/agent-document-index.md) |
@@ -51,7 +51,7 @@
 - 向用户提确认问题时使用编号表格，问题不超过 10 个，详见 [docs/agent-collaboration.md](docs/agent-collaboration.md)。
 - 有风险决策给 2-3 个候选方案、影响和建议，等待用户确认；无风险治理修复可直接做。
 - 业务/法规/安全最终结论不由 AI 拍板；AI 只给可验证参考意见。
-- 复杂流程按对应 `.agents/skills/*/SKILL.md` 执行；治理修复用 `wms-governance-workflow`，闭环执行用 `wms-loop-engineering`，审查修复后分组提交用 `wms-review-fix-commit`。
+- 复杂流程按对应 `.agents/skills/*/SKILL.md` 执行；治理修复用 `wms-governance-workflow`，闭环执行用 `wms-loop-engineering`，审查修复后分组提交用 `wms-review-fix-commit`，worktree 子代理执行用 `wms-worktree-subagent`。
 
 ## 禁止事项
 
