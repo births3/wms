@@ -83,6 +83,7 @@ nav:
     - M2 入库:
       - ASN 与收货: domain/user-stories-m2-inbound-asn.md
       - 验收与上架: domain/user-stories-m2-inbound-verify.md
+      - PC Web 三页设计规划: m2-inbound-web-design-plan.md
     - M3 库存:
       - 查询与批次: domain/user-stories-m3-inventory-query.md
       - 养护/盘点/移库: domain/user-stories-m3-inventory-operation.md
@@ -90,6 +91,7 @@ nav:
       - 订单与波次: domain/user-stories-m4-outbound-order.md
       - 拣选/复核/发货: domain/user-stories-m4-outbound-pick.md
       - 退货处理: domain/user-stories-m4-outbound-return.md
+      - PC Web 页面设计规划: m4-outbound-web-design-plan.md
     - M5 冷链数据集成: domain/user-stories-m5-cold-chain.md
     - M6 报表与审计: domain/user-stories-m6-audit-report.md
     - M8 连锁药店: domain/user-stories-m8-retail-chain.md
@@ -184,7 +186,7 @@ nav:
     - 用户故事矩阵审计: reviews/user-stories-matrix-audit-2026-05-18.md
     - 波次参数对标 - Manhattan: reviews/wave-parameters-comparison-manhattan.md
     - Wave 6 任务完成审计: reviews/wave-6-task-completion-audit-2026-06-04.md
-    - 用户故事 Review 规范: review-guidelines-user-stories.md
+    - 用户故事审查规范: review-guidelines-user-stories.md
     - Wave 复盘:
       - 复盘索引: retros/README.md
       - Wave 0 回顾: retros/wave-0-retro.md
@@ -206,6 +208,9 @@ nav:
     - 业务规则字段注册表 (v2): compliance/gsp-business-rules-registry.md
   - 治理:
     - 治理总文档: governance.md
+    - AI 协作规范: agent-collaboration.md
+    - AI Loop Engineering: agent-loop-engineering.md
+    - AI 常用文档索引: agent-document-index.md
     - 编码规范: coding-standards.md
     - 前端编码规范: frontend-coding-standards.md
     - 原型组件注册表: prototypes/component-registry.md
@@ -216,18 +221,18 @@ nav:
     - 原型证明报告: prototypes/prototype-proof-report.md
     - 视觉打磨自查: prototypes/visual-review-batch1.md
   - 运行手册:
-    - Wave 1 H2 Dev 环境: runbooks/wave-1-h2-dev-environment.md
+    - Wave 1 H2 开发环境: runbooks/wave-1-h2-dev-environment.md
     - Wave 1 运行证据: runbooks/wave-1-runtime-evidence.md
     - Wave 2 运行证据: runbooks/wave-2-runtime-evidence.md
-    - Wave 2 Staging 环境: runbooks/wave-2-staging-environment.md
+    - Wave 2 预发布环境: runbooks/wave-2-staging-environment.md
     - Wave 3 PDA 就绪: runbooks/wave-3-pda-readiness.md
     - Wave 4 外部依赖证据: runbooks/wave-4-external-dependencies.md
     - Wave 5 硬件证据: runbooks/wave-5-hardware-evidence.md
     - Wave 5 TMS 证据: runbooks/wave-5-tms-evidence.md
     - Wave 6 收口: runbooks/wave-6-closeout.md
     - Wave 6 部署证据: runbooks/wave-6-deploy-evidence.md
-    - Wave 6 Evidence Preflight: runbooks/wave-6-evidence-preflight.md
-    - Wave 6 Staging 部署干跑: runbooks/wave-6-staging-deploy-dry-run.md
+    - Wave 6 证据预检: runbooks/wave-6-evidence-preflight.md
+    - Wave 6 预发布部署干跑: runbooks/wave-6-staging-deploy-dry-run.md
 
 # 额外配置
 extra:
