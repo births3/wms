@@ -71,6 +71,15 @@ def test_governance_checks_t1_includes_governance_coverage_meta_check():
     assert "check_governance_coverage.py" in expand_tier_scripts("T1")
 
 
+def test_governance_checks_t1_includes_runtime_and_navigation_guards():
+    """T1 全量入口必须覆盖管理端导航和运行时路由挂载，避免契约有但页面/服务不可达。"""
+    from governance_checks import expand_tier_scripts
+
+    scripts = expand_tier_scripts("T1")
+    assert "check_admin_navigation.py" in scripts
+    assert "check_runtime_route_mounts.py" in scripts
+
+
 def test_governance_script_changes_trigger_coverage_meta_check():
     """治理脚本变更时，diff gate 必须触发覆盖元检查。"""
     from _diff import load_gate_rules, match_rules
@@ -90,6 +99,31 @@ def test_governance_routing_sources_trigger_coverage_meta_check():
     for changed_file in ["governance/gate-rules.toml", "justfile"]:
         triggered = match_rules([changed_file], load_gate_rules())
         assert "check_governance_coverage" in triggered
+
+
+def test_admin_navigation_sources_trigger_navigation_guard():
+    """管理端入口变更必须触发导航可见性检查。"""
+    from _diff import load_gate_rules, match_rules
+
+    triggered = match_rules(["apps/web-admin/src/App.tsx"], load_gate_rules())
+
+    assert "check_admin_navigation" in triggered
+
+
+def test_runtime_route_sources_trigger_mount_guard():
+    """OpenAPI 或运行时入口变更必须触发路由挂载检查。"""
+    from _diff import load_gate_rules, match_rules
+
+    rules = load_gate_rules()
+    for changed_file in [
+        "shared/openapi/openapi.json",
+        "backend/crates/api/src/bin/wms_api.rs",
+        "backend/crates/api/src/lib.rs",
+        "backend/crates/api/src/master_data_handlers.rs",
+        "backend/crates/api/src/system_dictionary_handlers.rs",
+    ]:
+        triggered = match_rules([changed_file], rules)
+        assert "check_runtime_route_mounts" in triggered
 
 
 def test_runtime_evidence_json_changes_trigger_validators():

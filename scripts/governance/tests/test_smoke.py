@@ -36,6 +36,8 @@ GOVERNANCE_SCRIPTS = [
     "check_field_coding_standards.py",
     "check_business_rules_registry.py",
     "check_system_dictionary_alignment.py",
+    "check_admin_navigation.py",
+    "check_runtime_route_mounts.py",
     "check_project_rtm.py",
     "check_owner_scope_sql.py",
     "check_web_design_rtm.py",

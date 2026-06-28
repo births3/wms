@@ -49,6 +49,31 @@ checks = ["check_owner_scope_sql"]
 tier = "T1"
 
 [[rules]]
+match = "shared/openapi/openapi.json"
+checks = ["check_runtime_route_mounts"]
+tier = "T1"
+
+[[rules]]
+match = "backend/crates/api/src/bin/wms_api.rs"
+checks = ["check_runtime_route_mounts"]
+tier = "T1"
+
+[[rules]]
+match = "backend/crates/api/src/lib.rs"
+checks = ["check_runtime_route_mounts"]
+tier = "T1"
+
+[[rules]]
+match = "backend/crates/api/src/master_data_handlers.rs"
+checks = ["check_runtime_route_mounts"]
+tier = "T1"
+
+[[rules]]
+match = "backend/crates/api/src/system_dictionary_handlers.rs"
+checks = ["check_runtime_route_mounts"]
+tier = "T1"
+
+[[rules]]
 match = "docs/*-web-design-plan.md"
 checks = ["check_web_design_rtm", "check_system_dictionary_alignment"]
 tier = "T1"
@@ -397,6 +422,11 @@ tier = "T1"
 [[rules]]
 match = "apps/**"
 checks = ["check_secrets"]
+tier = "T1"
+
+[[rules]]
+match = "apps/web-admin/src/App.tsx"
+checks = ["check_admin_navigation"]
 tier = "T1"
 
 # ============================================================
