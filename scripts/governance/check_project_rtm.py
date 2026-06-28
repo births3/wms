@@ -23,6 +23,13 @@ STORY_ID_PATTERN = re.compile(r"\bUS-[A-Z0-9]+-\d+[A-Za-z]?\b")
 VALID_CONCLUSIONS = {"已覆盖", "部分覆盖", "待补证据", "不适用"}
 INCOMPLETE_CONCLUSIONS = {"部分覆盖", "待补证据"}
 EMPTY_GAP_VALUES = {"", "-", "无", "不适用", "N/A", "n/a"}
+REQUIRED_LAYER_GATES = (
+    ("故事总 RTM", "check_project_rtm.py"),
+    ("前端体验 RTM", "check_web_design_rtm.py"),
+    ("后端实现 RTM", "check_project_rtm.py"),
+    ("测试证据 RTM", "check_project_rtm.py"),
+    ("合规风险 RTM", "check_project_rtm.py"),
+)
 
 
 @dataclass(frozen=True)
@@ -134,6 +141,35 @@ def validate_conclusions(spec: RtmSpec, headers: list[str], rows: list[list[str]
     return issues
 
 
+def validate_layer_gates(text: str) -> list[Issue]:
+    section = section_for(text, "RTM 分层")
+    if not section:
+        return [Issue("RTM 分层", "缺少 RTM 分层小节")]
+    headers, rows = parse_markdown_table(section)
+    if not headers:
+        return [Issue("RTM 分层", "缺少 Markdown 表格")]
+    missing = [column for column in ("RTM", "门禁") if column not in headers]
+    if missing:
+        return [Issue("RTM 分层", f"缺少列: {', '.join(missing)}")]
+
+    rtm_index = headers.index("RTM")
+    gate_index = headers.index("门禁")
+    gates = {
+        row[rtm_index]: row[gate_index]
+        for row in rows
+        if rtm_index < len(row) and gate_index < len(row)
+    }
+
+    issues: list[Issue] = []
+    for rtm, script in REQUIRED_LAYER_GATES:
+        gate = gates.get(rtm)
+        if gate is None:
+            issues.append(Issue("RTM 分层", f"缺少 {rtm} 门禁登记"))
+        elif script not in gate:
+            issues.append(Issue("RTM 分层", f"{rtm} 门禁未包含 {script}"))
+    return issues
+
+
 def validate_doc(
     doc: Path = DOC,
     domain_dir: Path = DOMAIN_DIR,
@@ -144,6 +180,7 @@ def validate_doc(
 
     text = doc.read_text(encoding="utf-8")
     existing_story_ids = known_story_ids(domain_dir)
+    issues.extend(validate_layer_gates(text))
     for spec in RTM_SPECS:
         section = section_for(text, spec.name)
         if not section:

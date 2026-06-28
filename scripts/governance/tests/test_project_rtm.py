@@ -25,7 +25,11 @@ def valid_doc() -> str:
 
 | RTM | 目的 | 维护位置 | 门禁 |
 |---|---|---|---|
-| 故事总 RTM | A | B | C |
+| 故事总 RTM | A | B | `check_project_rtm.py` |
+| 前端体验 RTM | A | B | `check_web_design_rtm.py` |
+| 后端实现 RTM | A | B | `check_project_rtm.py` |
+| 测试证据 RTM | A | B | `check_project_rtm.py` |
+| 合规风险 RTM | A | B | `check_project_rtm.py` |
 
 ## 3. 故事总 RTM
 
@@ -125,5 +129,21 @@ def test_project_rtm_requires_gap_details_for_partial_rows(tmp_path):
         (issue.rtm, issue.detail) for issue in issues
     ]
     assert ("前端体验 RTM", "第 1 行为 部分覆盖 但补齐路径为空") in [
+        (issue.rtm, issue.detail) for issue in issues
+    ]
+
+
+def test_project_rtm_requires_rtm_layer_gate_registration(tmp_path):
+    docs = tmp_path / "docs"
+    seed_story(docs)
+    rtm = docs / "requirements-traceability-matrix.md"
+    rtm.write_text(
+        valid_doc().replace("`check_web_design_rtm.py`", "`manual-review.md`"),
+        encoding="utf-8",
+    )
+
+    issues = check.validate_doc(rtm, docs / "domain")
+
+    assert ("RTM 分层", "前端体验 RTM 门禁未包含 check_web_design_rtm.py") in [
         (issue.rtm, issue.detail) for issue in issues
     ]
