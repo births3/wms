@@ -8,7 +8,8 @@ use wms_domain::{
     CreateReceivingOrderRequest, InspectReceivingOrderRequest, InspectionSignatureRecord,
     PutawayRecord, PutawayRequest, ReceiveReceivingOrderRequest, ReceivingInspectionRecord,
     ReceivingOrder, ReceivingOrderReceipt, RejectReceivingOrderRequest,
-    UpdateReceivingOrderRequest,
+    UpdateReceivingOrderRequest, RECEIVING_DOCUMENT_TYPE_PURCHASE_INBOUND,
+    RECEIVING_DOCUMENT_TYPE_SALES_RETURN,
 };
 
 use crate::auth::AuthContext;
@@ -26,6 +27,7 @@ pub enum ReceivingOrderError {
     OverReceiptNotAllowed,
     InvalidQuantity,
     InvalidReason,
+    InvalidDocumentType,
     BatchExpired,
     SameSigner,
     MissingSecondSigner,
@@ -50,6 +52,7 @@ impl ReceivingOrderStore {
         if req.lines.is_empty() {
             return Err(ReceivingOrderError::EmptyLines);
         }
+        validate_document_type(&req.document_type)?;
         if self
             .orders
             .values()
@@ -62,6 +65,7 @@ impl ReceivingOrderStore {
             id: Uuid::new_v4(),
             owner_id: ctx.owner_id,
             receipt_no: req.receipt_no,
+            document_type: req.document_type,
             supplier_id: req.supplier_id,
             warehouse_id: req.warehouse_id,
             external_ref: req.external_ref,
@@ -367,6 +371,13 @@ impl ReceivingOrderStore {
     }
 }
 
+fn validate_document_type(value: &str) -> Result<(), ReceivingOrderError> {
+    match value {
+        RECEIVING_DOCUMENT_TYPE_PURCHASE_INBOUND | RECEIVING_DOCUMENT_TYPE_SALES_RETURN => Ok(()),
+        _ => Err(ReceivingOrderError::InvalidDocumentType),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use chrono::{TimeZone, Utc};
@@ -417,6 +428,7 @@ mod tests {
                 &ctx_a,
                 CreateReceivingOrderRequest {
                     receipt_no: "ASN-001".to_string(),
+                    document_type: "purchase_inbound".to_string(),
                     supplier_id: None,
                     warehouse_id: Uuid::new_v4(),
                     external_ref: Some("ERP-ASN-001".to_string()),
@@ -469,6 +481,7 @@ mod tests {
             &ctx,
             CreateReceivingOrderRequest {
                 receipt_no: "ASN-EMPTY".to_string(),
+                document_type: "purchase_inbound".to_string(),
                 supplier_id: None,
                 warehouse_id: Uuid::new_v4(),
                 external_ref: None,
@@ -479,6 +492,35 @@ mod tests {
         );
 
         assert!(matches!(result, Err(ReceivingOrderError::EmptyLines)));
+    }
+
+    #[test]
+    fn receiving_order_rejects_invalid_document_type() {
+        let now = Utc
+            .with_ymd_and_hms(2026, 6, 4, 10, 0, 0)
+            .single()
+            .expect("valid time");
+        let ctx = ctx(Uuid::new_v4());
+        let mut store = ReceivingOrderStore::default();
+
+        let result = store.create(
+            &ctx,
+            CreateReceivingOrderRequest {
+                receipt_no: "ASN-BAD-TYPE".to_string(),
+                document_type: "purchase_return".to_string(),
+                supplier_id: None,
+                warehouse_id: Uuid::new_v4(),
+                external_ref: None,
+                expected_arrival_at: None,
+                lines: vec![line()],
+            },
+            now,
+        );
+
+        assert!(matches!(
+            result,
+            Err(ReceivingOrderError::InvalidDocumentType)
+        ));
     }
 
     #[test]
@@ -494,6 +536,7 @@ mod tests {
                 &ctx,
                 CreateReceivingOrderRequest {
                     receipt_no: "ASN-W3-001".to_string(),
+                    document_type: "purchase_inbound".to_string(),
                     supplier_id: None,
                     warehouse_id: Uuid::new_v4(),
                     external_ref: None,
@@ -631,6 +674,7 @@ mod tests {
                 &ctx,
                 CreateReceivingOrderRequest {
                     receipt_no: "ASN-W3-REJECT".to_string(),
+                    document_type: "purchase_inbound".to_string(),
                     supplier_id: None,
                     warehouse_id: Uuid::new_v4(),
                     external_ref: None,
@@ -687,6 +731,7 @@ mod tests {
                 &ctx,
                 CreateReceivingOrderRequest {
                     receipt_no: "ASN-W3-002".to_string(),
+                    document_type: "purchase_inbound".to_string(),
                     supplier_id: None,
                     warehouse_id: Uuid::new_v4(),
                     external_ref: None,

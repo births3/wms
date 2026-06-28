@@ -3929,6 +3929,296 @@
         }
       }
     },
+    "/api/v1/system-dictionaries/{dict_code}/items": {
+      "get": {
+        "tags": [
+          "system-dictionary"
+        ],
+        "operationId": "list_system_dictionary_items",
+        "parameters": [
+          {
+            "name": "dict_code",
+            "in": "path",
+            "description": "字典分类编码",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "effective_at",
+            "in": "query",
+            "description": "按指定时间查询有效字典项",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "按货主合并后的有效字典项",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemDictionaryItemListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "字典分类不存在或停用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "运行时字典参数无效，fail closed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/system-dictionaries/{dict_code}/items/{item_code}": {
+      "put": {
+        "tags": [
+          "system-dictionary"
+        ],
+        "operationId": "upsert_system_dictionary_item",
+        "parameters": [
+          {
+            "name": "dict_code",
+            "in": "path",
+            "description": "字典分类编码",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "item_code",
+            "in": "path",
+            "description": "字典项编码",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertSystemDictionaryItemRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "创建或更新字典项",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemDictionaryItem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "字典分类不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "字典项参数或作用域非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/system-dictionaries/{dict_code}/items/{item_code}/disable": {
+      "patch": {
+        "tags": [
+          "system-dictionary"
+        ],
+        "operationId": "disable_system_dictionary_item",
+        "parameters": [
+          {
+            "name": "dict_code",
+            "in": "path",
+            "description": "字典分类编码",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "item_code",
+            "in": "path",
+            "description": "字典项编码",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisableSystemDictionaryItemRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "停用字典项",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemDictionaryItem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "字典分类或字典项不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "字典项作用域非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/tms/container-recoveries": {
       "post": {
         "tags": [
@@ -5220,10 +5510,14 @@
         "type": "object",
         "required": [
           "receipt_no",
+          "document_type",
           "warehouse_id",
           "lines"
         ],
         "properties": {
+          "document_type": {
+            "type": "string"
+          },
           "expected_arrival_at": {
             "type": "string",
             "format": "date-time",
@@ -5515,6 +5809,20 @@
           },
           "page": {
             "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "DisableSystemDictionaryItemRequest": {
+        "type": "object",
+        "properties": {
+          "disabled_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
           }
         }
       },
@@ -7290,6 +7598,7 @@
           "id",
           "owner_id",
           "receipt_no",
+          "document_type",
           "warehouse_id",
           "status",
           "lines",
@@ -7300,6 +7609,9 @@
           "created_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "document_type": {
+            "type": "string"
           },
           "expected_arrival_at": {
             "type": "string",
@@ -7838,6 +8150,151 @@
           }
         }
       },
+      "SystemDictionaryCategory": {
+        "type": "object",
+        "description": "系统字典分类。",
+        "required": [
+          "dict_code",
+          "dict_name",
+          "enabled",
+          "control_level",
+          "param_schema",
+          "scope_mode",
+          "override_policy",
+          "sort_order",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "control_level": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "dict_code": {
+            "type": "string"
+          },
+          "dict_name": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "override_policy": {
+            "type": "object",
+            "description": "自由结构 JSON 对象。",
+            "additionalProperties": true
+          },
+          "param_schema": {
+            "type": "object",
+            "description": "自由结构 JSON 对象。",
+            "additionalProperties": true
+          },
+          "remark": {
+            "type": "string",
+            "nullable": true
+          },
+          "scope_mode": {
+            "type": "string"
+          },
+          "sort_order": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SystemDictionaryItem": {
+        "type": "object",
+        "description": "系统字典项。",
+        "required": [
+          "id",
+          "dict_code",
+          "item_code",
+          "item_name",
+          "enabled",
+          "params",
+          "source",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "dict_code": {
+            "type": "string"
+          },
+          "disabled_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "effective_from": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "effective_to": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "item_code": {
+            "type": "string"
+          },
+          "item_name": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "params": {
+            "type": "object",
+            "description": "自由结构 JSON 对象。",
+            "additionalProperties": true
+          },
+          "source": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SystemDictionaryItemListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SystemDictionaryItem"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
       "TemperatureExcursionDispositionResponse": {
         "type": "object",
         "required": [
@@ -8353,6 +8810,42 @@
           }
         }
       },
+      "UpsertSystemDictionaryItemRequest": {
+        "type": "object",
+        "required": [
+          "item_name",
+          "enabled",
+          "params"
+        ],
+        "properties": {
+          "effective_from": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "effective_to": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "item_name": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "params": {
+            "type": "object",
+            "description": "自由结构 JSON 对象。",
+            "additionalProperties": true
+          }
+        }
+      },
       "Warehouse": {
         "type": "object",
         "description": "仓库基础档案。",
@@ -8455,6 +8948,10 @@
     {
       "name": "master-data",
       "description": "M1 基础档案"
+    },
+    {
+      "name": "system-dictionary",
+      "description": "US-M1-011 系统字典中心"
     },
     {
       "name": "inbound",

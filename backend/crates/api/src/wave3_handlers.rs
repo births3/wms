@@ -244,6 +244,7 @@ impl IntoResponse for Wave3HandlerError {
             | Wave3HandlerError::Receiving(ReceivingOrderError::OverReceiptNotAllowed)
             | Wave3HandlerError::Receiving(ReceivingOrderError::InvalidQuantity)
             | Wave3HandlerError::Receiving(ReceivingOrderError::InvalidReason)
+            | Wave3HandlerError::Receiving(ReceivingOrderError::InvalidDocumentType)
             | Wave3HandlerError::Receiving(ReceivingOrderError::BatchExpired)
             | Wave3HandlerError::Receiving(ReceivingOrderError::SameSigner)
             | Wave3HandlerError::Receiving(ReceivingOrderError::MissingSecondSigner)
@@ -257,6 +258,7 @@ impl IntoResponse for Wave3HandlerError {
             | Wave3HandlerError::Billing(BillingError::InvalidEffectiveWindow)
             | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidStatus { .. })
             | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidQuantity)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidDocumentType)
             | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidDate(_))
             | Wave3HandlerError::Repository(Wave3RepositoryError::BatchExpired)
             | Wave3HandlerError::Repository(Wave3RepositoryError::QuantityClosureMismatch)
@@ -1120,6 +1122,7 @@ mod tests {
                     &authorized,
                     CreateReceivingOrderRequest {
                         receipt_no: "ASN-HANDLER-001".to_string(),
+                        document_type: "purchase_inbound".to_string(),
                         supplier_id: None,
                         warehouse_id: Uuid::new_v4(),
                         external_ref: None,
@@ -1223,6 +1226,7 @@ mod tests {
                 &authorized,
                 CreateReceivingOrderRequest {
                     receipt_no: "ASN-HANDLER-PG-001".to_string(),
+                    document_type: "purchase_inbound".to_string(),
                     supplier_id: None,
                     warehouse_id: Uuid::new_v4(),
                     external_ref: None,
@@ -1299,6 +1303,7 @@ mod tests {
                 &authorized,
                 CreateReceivingOrderRequest {
                     receipt_no: "ASN-HANDLER-PG-002".to_string(),
+                    document_type: "purchase_inbound".to_string(),
                     supplier_id: None,
                     warehouse_id: Uuid::new_v4(),
                     external_ref: None,
@@ -1368,6 +1373,7 @@ mod tests {
                 &authorized,
                 CreateReceivingOrderRequest {
                     receipt_no: "ASN-HANDLER-PG-003".to_string(),
+                    document_type: "purchase_inbound".to_string(),
                     supplier_id: None,
                     warehouse_id: Uuid::new_v4(),
                     external_ref: None,

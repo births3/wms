@@ -25,6 +25,7 @@ fn ctx(owner_id: Uuid) -> AuthContext {
 fn receiving_order_req(receipt_no: &str) -> CreateReceivingOrderRequest {
     CreateReceivingOrderRequest {
         receipt_no: receipt_no.to_string(),
+        document_type: "purchase_inbound".to_string(),
         supplier_id: None,
         warehouse_id: Uuid::new_v4(),
         external_ref: Some(format!("ERP-{receipt_no}")),
@@ -39,6 +40,35 @@ fn receiving_order_req(receipt_no: &str) -> CreateReceivingOrderRequest {
             expiry_date: Some("2028-01-01".to_string()),
         }],
     }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn receiving_order_persists_document_type(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let ctx = ctx(owner_id);
+    let repo = PgWave3Repository::new(pool.clone());
+    let now = Utc
+        .with_ymd_and_hms(2026, 6, 4, 9, 0, 0)
+        .single()
+        .expect("valid time");
+    let mut req = receiving_order_req("SR-PG-001");
+    req.document_type = "sales_return".to_string();
+
+    let order = repo
+        .create_receiving_order(&ctx, req, now)
+        .await
+        .expect("create sales return receiving order");
+    assert_eq!(order.document_type, "sales_return");
+
+    let stored: String = sqlx::query_scalar(
+        "SELECT document_type FROM receiving_orders WHERE id = $1 AND owner_id = $2",
+    )
+    .bind(order.id)
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("stored document type");
+    assert_eq!(stored, "sales_return");
 }
 
 #[sqlx::test(migrations = "../../migrations")]

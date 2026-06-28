@@ -24,6 +24,7 @@ use wms_api::{
     auth_handlers::{auth_router, AuthAppState},
     config_center::{config_center_router, ConfigCenterAppState},
     feature_flags::FeatureFlagRegistry,
+    system_dictionary_handlers::{system_dictionary_router, SystemDictionaryAppState},
     wave3_handlers::{wave3_router, Wave3AppState},
 };
 use wms_domain::{AuditActor, AuditEvent, AuditEventListResponse, ErrorResponse, HealthzResponse};
@@ -102,6 +103,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let config_center_state = ConfigCenterAppState::from_registry(file_registry);
     let auth_state = AuthAppState::new(pool.clone());
     let audit_query_state = AuditQueryState { pool: pool.clone() };
+    let system_dictionary_state = SystemDictionaryAppState::with_postgres(pool.clone());
     let wave3_state =
         Wave3AppState::with_postgres(pool.clone()).with_config_center(config_center_state.clone());
     let app = app(
@@ -109,6 +111,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         auth_state,
         wave3_state,
         audit_query_state,
+        system_dictionary_state,
     )
     .layer(auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(
         revocation_store,
@@ -173,6 +176,7 @@ fn app(
     auth_state: AuthAppState,
     wave3_state: Wave3AppState,
     audit_query_state: AuditQueryState,
+    system_dictionary_state: SystemDictionaryAppState,
 ) -> Router {
     Router::new()
         .route("/healthz", get(healthz))
@@ -181,6 +185,7 @@ fn app(
         .merge(auth_router(auth_state))
         .merge(audit_query_router(audit_query_state))
         .merge(config_center_router(config_center_state))
+        .merge(system_dictionary_router(system_dictionary_state))
         .merge(wave3_router(wave3_state))
 }
 
@@ -505,7 +510,8 @@ mod tests {
             config_center_state(),
             AuthAppState::new(pool.clone()),
             Wave3AppState::default(),
-            AuditQueryState { pool },
+            AuditQueryState { pool: pool.clone() },
+            SystemDictionaryAppState::with_postgres(pool),
         )
         .layer(auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(
             AllowAllRevocationStore,
@@ -618,6 +624,7 @@ mod tests {
             AuthAppState::new(pool.clone()),
             Wave3AppState::default(),
             AuditQueryState { pool: pool.clone() },
+            SystemDictionaryAppState::with_postgres(pool.clone()),
         )
         .layer(auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(
             AllowAllRevocationStore,
@@ -715,7 +722,8 @@ mod tests {
             config_center_state(),
             AuthAppState::new(pool.clone()),
             Wave3AppState::default(),
-            AuditQueryState { pool },
+            AuditQueryState { pool: pool.clone() },
+            SystemDictionaryAppState::with_postgres(pool),
         )
         .layer(auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(
             AllowAllRevocationStore,

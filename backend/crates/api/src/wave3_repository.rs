@@ -13,7 +13,8 @@ use wms_domain::{
     InventoryBatch, InventoryMovement, PutawayRecord, PutawayRequest, ReceiveReceivingOrderRequest,
     ReceivingInspectionRecord, ReceivingOrder, ReceivingOrderLine, ReceivingOrderReceipt,
     RejectReceivingOrderRequest, SignInspectionRequest, TemperatureExcursionEvent,
-    TemperatureReading,
+    TemperatureReading, RECEIVING_DOCUMENT_TYPE_PURCHASE_INBOUND,
+    RECEIVING_DOCUMENT_TYPE_SALES_RETURN,
 };
 
 use crate::{
@@ -50,6 +51,7 @@ pub enum Wave3RepositoryError {
         actual: String,
     },
     InvalidQuantity,
+    InvalidDocumentType,
     InvalidDate(String),
     BatchExpired,
     QuantityClosureMismatch,
@@ -78,6 +80,7 @@ struct ReceivingOrderRow {
     id: Uuid,
     owner_id: Uuid,
     receipt_no: String,
+    document_type: String,
     supplier_id: Option<Uuid>,
     warehouse_id: Uuid,
     external_ref: Option<String>,
@@ -170,21 +173,23 @@ impl PgWave3Repository {
         if req.lines.is_empty() {
             return Err(Wave3RepositoryError::InvalidQuantity);
         }
+        validate_document_type(&req.document_type)?;
 
         let mut tx = self.begin().await?;
         let id = Uuid::new_v4();
         sqlx::query(
             r#"
             INSERT INTO receiving_orders (
-                id, owner_id, receipt_no, supplier_id, warehouse_id, external_ref,
-                status, expected_arrival_at, created_at, updated_at
+                id, owner_id, receipt_no, document_type, supplier_id, warehouse_id,
+                external_ref, status, expected_arrival_at, created_at, updated_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, 'draft', $7, $8, $8)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, 'draft', $8, $9, $9)
             "#,
         )
         .bind(id)
         .bind(ctx.owner_id)
         .bind(&req.receipt_no)
+        .bind(&req.document_type)
         .bind(req.supplier_id)
         .bind(req.warehouse_id)
         .bind(&req.external_ref)
@@ -224,6 +229,7 @@ impl PgWave3Repository {
             id,
             owner_id: ctx.owner_id,
             receipt_no: req.receipt_no,
+            document_type: req.document_type,
             supplier_id: req.supplier_id,
             warehouse_id: req.warehouse_id,
             external_ref: req.external_ref,
@@ -248,8 +254,8 @@ impl PgWave3Repository {
                    updated_at = $3,
                    version = version + 1
              WHERE id = $1 AND owner_id = $2
-            RETURNING id, owner_id, receipt_no, supplier_id, warehouse_id, external_ref,
-                      status, expected_arrival_at, created_at, updated_at
+            RETURNING id, owner_id, receipt_no, document_type, supplier_id, warehouse_id,
+                      external_ref, status, expected_arrival_at, created_at, updated_at
             "#,
         )
         .bind(id)
@@ -1502,8 +1508,8 @@ async fn lock_receiving_order(
 ) -> Result<ReceivingOrderRow, Wave3RepositoryError> {
     sqlx::query_as::<_, ReceivingOrderRow>(
         r#"
-        SELECT id, owner_id, receipt_no, supplier_id, warehouse_id, external_ref,
-               status, expected_arrival_at, created_at, updated_at
+        SELECT id, owner_id, receipt_no, document_type, supplier_id, warehouse_id,
+               external_ref, status, expected_arrival_at, created_at, updated_at
           FROM receiving_orders
          WHERE id = $1 AND owner_id = $2
          FOR UPDATE
@@ -1707,6 +1713,13 @@ fn parse_optional_date(value: Option<&str>) -> Result<Option<NaiveDate>, Wave3Re
     value.map(parse_date).transpose()
 }
 
+fn validate_document_type(value: &str) -> Result<(), Wave3RepositoryError> {
+    match value {
+        RECEIVING_DOCUMENT_TYPE_PURCHASE_INBOUND | RECEIVING_DOCUMENT_TYPE_SALES_RETURN => Ok(()),
+        _ => Err(Wave3RepositoryError::InvalidDocumentType),
+    }
+}
+
 fn parse_date(value: &str) -> Result<NaiveDate, Wave3RepositoryError> {
     NaiveDate::parse_from_str(value, "%Y-%m-%d")
         .map_err(|_| Wave3RepositoryError::InvalidDate(value.to_string()))
@@ -1717,6 +1730,7 @@ fn map_receiving_order(row: ReceivingOrderRow, lines: Vec<ReceivingOrderLine>) -
         id: row.id,
         owner_id: row.owner_id,
         receipt_no: row.receipt_no,
+        document_type: row.document_type,
         supplier_id: row.supplier_id,
         warehouse_id: row.warehouse_id,
         external_ref: row.external_ref,

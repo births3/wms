@@ -386,6 +386,72 @@ pub struct SpecialDrugCategoryListResponse {
     pub page: PageMeta,
 }
 
+pub const SYSTEM_DICTIONARY_DOCUMENT_TYPE: &str = "document_type";
+pub const DOCUMENT_TYPE_PURCHASE_INBOUND: &str = "purchase_inbound";
+pub const DOCUMENT_TYPE_SALES_RETURN: &str = "sales_return";
+pub const DOCUMENT_TYPE_PURCHASE_RETURN_OUTBOUND: &str = "purchase_return_outbound";
+pub const DOCUMENT_TYPE_SALES_OUTBOUND: &str = "sales_outbound";
+
+/// 系统字典分类。
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct SystemDictionaryCategory {
+    pub dict_code: String,
+    pub dict_name: String,
+    pub enabled: bool,
+    pub control_level: String,
+    #[schema(schema_with = free_form_json_schema)]
+    pub param_schema: serde_json::Value,
+    pub scope_mode: String,
+    #[schema(schema_with = free_form_json_schema)]
+    pub override_policy: serde_json::Value,
+    pub sort_order: i32,
+    pub remark: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// 系统字典项。
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct SystemDictionaryItem {
+    pub id: Uuid,
+    pub dict_code: String,
+    pub item_code: String,
+    pub item_name: String,
+    pub enabled: bool,
+    pub owner_id: Option<Uuid>,
+    #[schema(schema_with = free_form_json_schema)]
+    pub params: serde_json::Value,
+    pub effective_from: Option<DateTime<Utc>>,
+    pub effective_to: Option<DateTime<Utc>>,
+    pub source: String,
+    pub disabled_reason: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct SystemDictionaryItemListResponse {
+    pub data: Vec<SystemDictionaryItem>,
+    pub page: PageMeta,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct UpsertSystemDictionaryItemRequest {
+    pub owner_id: Option<Uuid>,
+    pub item_name: String,
+    pub enabled: bool,
+    #[schema(schema_with = free_form_json_schema)]
+    pub params: serde_json::Value,
+    pub effective_from: Option<DateTime<Utc>>,
+    pub effective_to: Option<DateTime<Utc>>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct DisableSystemDictionaryItemRequest {
+    pub owner_id: Option<Uuid>,
+    pub disabled_reason: Option<String>,
+}
+
 /// 收货单明细。
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct ReceivingOrderLine {
@@ -398,12 +464,16 @@ pub struct ReceivingOrderLine {
     pub expiry_date: Option<String>,
 }
 
+pub const RECEIVING_DOCUMENT_TYPE_PURCHASE_INBOUND: &str = "purchase_inbound";
+pub const RECEIVING_DOCUMENT_TYPE_SALES_RETURN: &str = "sales_return";
+
 /// 收货单。
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct ReceivingOrder {
     pub id: Uuid,
     pub owner_id: Uuid,
     pub receipt_no: String,
+    pub document_type: String,
     pub supplier_id: Option<Uuid>,
     pub warehouse_id: Uuid,
     pub external_ref: Option<String>,
@@ -417,6 +487,7 @@ pub struct ReceivingOrder {
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct CreateReceivingOrderRequest {
     pub receipt_no: String,
+    pub document_type: String,
     pub supplier_id: Option<Uuid>,
     pub warehouse_id: Uuid,
     pub external_ref: Option<String>,

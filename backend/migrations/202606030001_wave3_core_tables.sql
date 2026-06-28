@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS receiving_orders (
     id                   UUID PRIMARY KEY,
     owner_id             UUID NOT NULL,
     receipt_no           TEXT NOT NULL,
+    document_type        TEXT NOT NULL,
     supplier_id          UUID,
     warehouse_id         UUID NOT NULL,
     external_ref         TEXT,

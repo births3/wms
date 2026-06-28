@@ -18,6 +18,8 @@ pub mod packing_station;
 pub mod parameter_mapping;
 pub mod reports;
 pub mod retail_chain;
+pub mod system_dictionary;
+pub mod system_dictionary_handlers;
 pub mod tms_plus;
 pub mod traceability_code;
 pub mod wave3_handlers;
@@ -39,31 +41,34 @@ use wms_domain::{
     CreateOutboundWaveRequest, CreatePackJobRequest, CreatePackingStationRequest,
     CreateProductRequest, CreateReceivingOrderRequest, CreateRetailReplenishmentSuggestionRequest,
     CreateSpecialDrugCategoryRequest, CreateSupplierRequest, CreateWarehouseRequest, CrossdockPlan,
-    CurrentUser, Customer, CustomerListResponse, DisposeTemperatureExcursionRequest, DriverTask,
-    DriverTaskListResponse, ErrorResponse, ExecuteMappingRequest, ExecuteMappingResponse,
-    FeatureFlagArchiveRequest, FeatureFlagArchiveResult, FeatureFlagBatchImportRequest,
-    FeatureFlagBatchImportResult, FeatureFlagConfig, FeatureFlagExportResponse,
-    FeatureFlagMigrationResult, FeatureFlagReconcileReport, FeatureFlagSourceSwitchRequest,
-    FeatureFlagSourceSwitchResponse, GenerateBillingStatementRequest, GspLedgerReport,
-    GspLedgerRow, HealthzResponse, IngestTemperatureExcursionRequest,
-    IngestTemperatureReadingRequest, IngestTransitTemperatureRequest, InspectReceivingOrderRequest,
-    InspectionSignatureRecord, InventoryBatch, InventoryBatchListResponse, InventoryMovement,
-    Location, LocationListResponse, LoginRequest, LoginResponse, MappingDictionary,
-    MappingQueueItem, MappingRule, MappingTraceResponse, OutboundOrder, OutboundOrderLine,
-    OutboundOrderListResponse, OutboundWave, PackJob, PackingStation, PageMeta,
-    PrintWaybillRequest, Product, ProductListResponse, PutawayInventoryRequest, PutawayRecord,
-    PutawayRequest, ReceiveReceivingOrderRequest, ReceiveTmsDispatchRequest,
-    ReceivingInspectionRecord, ReceivingOrder, ReceivingOrderLine, ReceivingOrderListResponse,
-    ReceivingOrderReceipt, RejectReceivingOrderRequest, ReportQueryRequest, ReportQueryResponse,
-    ReportRow, RetailReplenishmentSuggestion, ReviewOutboundOrderRequest, ShipOutboundOrderRequest,
+    CurrentUser, Customer, CustomerListResponse, DisableSystemDictionaryItemRequest,
+    DisposeTemperatureExcursionRequest, DriverTask, DriverTaskListResponse, ErrorResponse,
+    ExecuteMappingRequest, ExecuteMappingResponse, FeatureFlagArchiveRequest,
+    FeatureFlagArchiveResult, FeatureFlagBatchImportRequest, FeatureFlagBatchImportResult,
+    FeatureFlagConfig, FeatureFlagExportResponse, FeatureFlagMigrationResult,
+    FeatureFlagReconcileReport, FeatureFlagSourceSwitchRequest, FeatureFlagSourceSwitchResponse,
+    GenerateBillingStatementRequest, GspLedgerReport, GspLedgerRow, HealthzResponse,
+    IngestTemperatureExcursionRequest, IngestTemperatureReadingRequest,
+    IngestTransitTemperatureRequest, InspectReceivingOrderRequest, InspectionSignatureRecord,
+    InventoryBatch, InventoryBatchListResponse, InventoryMovement, Location, LocationListResponse,
+    LoginRequest, LoginResponse, MappingDictionary, MappingQueueItem, MappingRule,
+    MappingTraceResponse, OutboundOrder, OutboundOrderLine, OutboundOrderListResponse,
+    OutboundWave, PackJob, PackingStation, PageMeta, PrintWaybillRequest, Product,
+    ProductListResponse, PutawayInventoryRequest, PutawayRecord, PutawayRequest,
+    ReceiveReceivingOrderRequest, ReceiveTmsDispatchRequest, ReceivingInspectionRecord,
+    ReceivingOrder, ReceivingOrderLine, ReceivingOrderListResponse, ReceivingOrderReceipt,
+    RejectReceivingOrderRequest, ReportQueryRequest, ReportQueryResponse, ReportRow,
+    RetailReplenishmentSuggestion, ReviewOutboundOrderRequest, ShipOutboundOrderRequest,
     SignInspectionRequest, SpecialDrugCategory, SpecialDrugCategoryListResponse,
-    StoreDashboardResponse, Supplier, SupplierListResponse,
+    StoreDashboardResponse, Supplier, SupplierListResponse, SystemDictionaryCategory,
+    SystemDictionaryItem, SystemDictionaryItemListResponse,
     TemperatureExcursionDispositionResponse, TemperatureExcursionEvent,
     TemperatureExcursionEventListResponse, TemperatureReading, TmsDispatch,
     TraceabilityOutboundReport, TraceabilityOutboundReportRequest, TraceabilityStatusChangeEvent,
     TransitTemperatureReading, UpdateCustomerRequest, UpdateLocationRequest, UpdateProductRequest,
     UpdateReceivingOrderRequest, UpdateSpecialDrugCategoryRequest, UpdateSupplierRequest,
-    UpdateWarehouseRequest, Warehouse, WarehouseListResponse, WeighPackJobRequest,
+    UpdateWarehouseRequest, UpsertSystemDictionaryItemRequest, Warehouse, WarehouseListResponse,
+    WeighPackJobRequest,
 };
 
 #[utoipa::path(
@@ -266,6 +271,68 @@ fn update_special_drug_category() {}
 #[utoipa::path(delete, path = "/api/v1/master-data/special-drug-categories/{id}", tag = "master-data", params(("id" = uuid::Uuid, Path, description = "特殊药品分类 ID")), responses((status = 200, description = "删除特殊药品分类", body = SpecialDrugCategory), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 fn delete_special_drug_category() {}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/system-dictionaries/{dict_code}/items",
+    tag = "system-dictionary",
+    params(
+        ("dict_code" = String, Path, description = "字典分类编码"),
+        ("effective_at" = Option<chrono::DateTime<chrono::Utc>>, Query, description = "按指定时间查询有效字典项"),
+    ),
+    responses(
+        (status = 200, description = "按货主合并后的有效字典项", body = SystemDictionaryItemListResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 404, description = "字典分类不存在或停用", body = ErrorResponse),
+        (status = 422, description = "运行时字典参数无效，fail closed", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+fn list_system_dictionary_items() {}
+
+#[utoipa::path(
+    put,
+    path = "/api/v1/system-dictionaries/{dict_code}/items/{item_code}",
+    tag = "system-dictionary",
+    params(
+        ("dict_code" = String, Path, description = "字典分类编码"),
+        ("item_code" = String, Path, description = "字典项编码"),
+        ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键"),
+    ),
+    request_body = UpsertSystemDictionaryItemRequest,
+    responses(
+        (status = 200, description = "创建或更新字典项", body = SystemDictionaryItem),
+        (status = 400, description = "缺少或非法幂等键", body = ErrorResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 404, description = "字典分类不存在", body = ErrorResponse),
+        (status = 409, description = "幂等冲突", body = ErrorResponse),
+        (status = 422, description = "字典项参数或作用域非法", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+fn upsert_system_dictionary_item() {}
+
+#[utoipa::path(
+    patch,
+    path = "/api/v1/system-dictionaries/{dict_code}/items/{item_code}/disable",
+    tag = "system-dictionary",
+    params(
+        ("dict_code" = String, Path, description = "字典分类编码"),
+        ("item_code" = String, Path, description = "字典项编码"),
+        ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键"),
+    ),
+    request_body = DisableSystemDictionaryItemRequest,
+    responses(
+        (status = 200, description = "停用字典项", body = SystemDictionaryItem),
+        (status = 400, description = "缺少或非法幂等键", body = ErrorResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 404, description = "字典分类或字典项不存在", body = ErrorResponse),
+        (status = 409, description = "幂等冲突", body = ErrorResponse),
+        (status = 422, description = "字典项作用域非法", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+fn disable_system_dictionary_item() {}
 
 #[utoipa::path(get, path = "/api/v1/inbound/receiving-orders", tag = "inbound", responses((status = 200, description = "收货单列表", body = ReceivingOrderListResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
@@ -516,6 +583,9 @@ fn confirm_container_recovery() {}
         create_special_drug_category,
         update_special_drug_category,
         delete_special_drug_category,
+        list_system_dictionary_items,
+        upsert_system_dictionary_item,
+        disable_system_dictionary_item,
         list_receiving_orders,
         create_receiving_order,
         get_receiving_order,
@@ -678,6 +748,9 @@ fn confirm_container_recovery() {}
         StoreDashboardResponse,
         Supplier,
         SupplierListResponse,
+        SystemDictionaryCategory,
+        SystemDictionaryItem,
+        SystemDictionaryItemListResponse,
         TmsDispatch,
         TemperatureExcursionDispositionResponse,
         TemperatureExcursionEvent,
@@ -694,15 +767,18 @@ fn confirm_container_recovery() {}
         UpdateSpecialDrugCategoryRequest,
         UpdateSupplierRequest,
         UpdateWarehouseRequest,
+        UpsertSystemDictionaryItemRequest,
         WeighPackJobRequest,
         Warehouse,
         WarehouseListResponse,
+        DisableSystemDictionaryItemRequest,
     )),
     tags(
         (name = "system", description = "系统探针"),
         (name = "auth", description = "鉴权与会话"),
         (name = "audit", description = "审计追踪"),
         (name = "master-data", description = "M1 基础档案"),
+        (name = "system-dictionary", description = "US-M1-011 系统字典中心"),
         (name = "inbound", description = "M2 入库业务规则"),
         (name = "inventory", description = "M3 库存批次与状态"),
         (name = "outbound", description = "M4 出库闭环"),
@@ -749,6 +825,9 @@ mod tests {
             "/api/v1/master-data/locations/{id}",
             "/api/v1/master-data/special-drug-categories",
             "/api/v1/master-data/special-drug-categories/{id}",
+            "/api/v1/system-dictionaries/{dict_code}/items",
+            "/api/v1/system-dictionaries/{dict_code}/items/{item_code}",
+            "/api/v1/system-dictionaries/{dict_code}/items/{item_code}/disable",
             "/api/v1/inbound/receiving-orders",
             "/api/v1/inbound/receiving-orders/{id}",
             "/api/v1/inbound/receiving-orders/{id}/receive",
@@ -833,6 +912,10 @@ mod tests {
             "\"DisposeTemperatureExcursionRequest\"",
             "\"TemperatureExcursionDispositionResponse\"",
             "\"TemperatureExcursionEventListResponse\"",
+            "\"SystemDictionaryItem\"",
+            "\"SystemDictionaryItemListResponse\"",
+            "\"UpsertSystemDictionaryItemRequest\"",
+            "\"DisableSystemDictionaryItemRequest\"",
             "\"GspLedgerReport\"",
             "\"GspLedgerRow\"",
             "\"TraceabilityOutboundReport\"",

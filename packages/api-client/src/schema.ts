@@ -996,6 +996,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/system-dictionaries/{dict_code}/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_system_dictionary_items"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/system-dictionaries/{dict_code}/items/{item_code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["upsert_system_dictionary_item"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/system-dictionaries/{dict_code}/items/{item_code}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["disable_system_dictionary_item"];
+        trace?: never;
+    };
     "/api/v1/tms/container-recoveries": {
         parameters: {
             query?: never;
@@ -1397,6 +1445,7 @@ export interface components {
             special_drug_category_code?: string | null;
         };
         CreateReceivingOrderRequest: {
+            document_type: string;
             /** Format: date-time */
             expected_arrival_at?: string | null;
             external_ref?: string | null;
@@ -1497,6 +1546,11 @@ export interface components {
         CustomerListResponse: {
             data: components["schemas"]["Customer"][];
             page: components["schemas"]["PageMeta"];
+        };
+        DisableSystemDictionaryItemRequest: {
+            disabled_reason?: string | null;
+            /** Format: uuid */
+            owner_id?: string | null;
         };
         DisposeTemperatureExcursionRequest: {
             selected_batch_ids: string[];
@@ -2092,6 +2146,7 @@ export interface components {
         ReceivingOrder: {
             /** Format: date-time */
             created_at: string;
+            document_type: string;
             /** Format: date-time */
             expected_arrival_at?: string | null;
             external_ref?: string | null;
@@ -2272,6 +2327,58 @@ export interface components {
             data: components["schemas"]["Supplier"][];
             page: components["schemas"]["PageMeta"];
         };
+        /** @description 系统字典分类。 */
+        SystemDictionaryCategory: {
+            control_level: string;
+            /** Format: date-time */
+            created_at: string;
+            dict_code: string;
+            dict_name: string;
+            enabled: boolean;
+            /** @description 自由结构 JSON 对象。 */
+            override_policy: {
+                [key: string]: unknown;
+            };
+            /** @description 自由结构 JSON 对象。 */
+            param_schema: {
+                [key: string]: unknown;
+            };
+            remark?: string | null;
+            scope_mode: string;
+            /** Format: int32 */
+            sort_order: number;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        /** @description 系统字典项。 */
+        SystemDictionaryItem: {
+            /** Format: date-time */
+            created_at: string;
+            dict_code: string;
+            disabled_reason?: string | null;
+            /** Format: date-time */
+            effective_from?: string | null;
+            /** Format: date-time */
+            effective_to?: string | null;
+            enabled: boolean;
+            /** Format: uuid */
+            id: string;
+            item_code: string;
+            item_name: string;
+            /** Format: uuid */
+            owner_id?: string | null;
+            /** @description 自由结构 JSON 对象。 */
+            params: {
+                [key: string]: unknown;
+            };
+            source: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        SystemDictionaryItemListResponse: {
+            data: components["schemas"]["SystemDictionaryItem"][];
+            page: components["schemas"]["PageMeta"];
+        };
         TemperatureExcursionDispositionResponse: {
             approval_source: string;
             event: components["schemas"]["TemperatureExcursionEvent"];
@@ -2432,6 +2539,20 @@ export interface components {
         UpdateWarehouseRequest: {
             status?: string | null;
             warehouse_name?: string | null;
+        };
+        UpsertSystemDictionaryItemRequest: {
+            /** Format: date-time */
+            effective_from?: string | null;
+            /** Format: date-time */
+            effective_to?: string | null;
+            enabled: boolean;
+            item_name: string;
+            /** Format: uuid */
+            owner_id?: string | null;
+            /** @description 自由结构 JSON 对象。 */
+            params: {
+                [key: string]: unknown;
+            };
         };
         /** @description 仓库基础档案。 */
         Warehouse: {
@@ -5501,6 +5622,213 @@ export interface operations {
             };
             /** @description 未登录 */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_system_dictionary_items: {
+        parameters: {
+            query?: {
+                /** @description 按指定时间查询有效字典项 */
+                effective_at?: string | null;
+            };
+            header?: never;
+            path: {
+                /** @description 字典分类编码 */
+                dict_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 按货主合并后的有效字典项 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemDictionaryItemListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 字典分类不存在或停用 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 运行时字典参数无效，fail closed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    upsert_system_dictionary_item: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 字典分类编码 */
+                dict_code: string;
+                /** @description 字典项编码 */
+                item_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertSystemDictionaryItemRequest"];
+            };
+        };
+        responses: {
+            /** @description 创建或更新字典项 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemDictionaryItem"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 字典分类不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 字典项参数或作用域非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    disable_system_dictionary_item: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 字典分类编码 */
+                dict_code: string;
+                /** @description 字典项编码 */
+                item_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DisableSystemDictionaryItemRequest"];
+            };
+        };
+        responses: {
+            /** @description 停用字典项 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemDictionaryItem"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 字典分类或字典项不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 字典项作用域非法 */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
