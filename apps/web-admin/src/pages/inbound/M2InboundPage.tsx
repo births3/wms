@@ -288,10 +288,10 @@ export function M2InboundPage({ mode, onBack }: M2InboundPageProps) {
     },
   ];
 
-  async function refreshInbound() {
+  async function refreshInbound(message = "入库列表已刷新") {
     await ordersQuery.refetch();
     if (selectedId) await detailQuery.refetch();
-    setLastEvent("入库列表已刷新");
+    setLastEvent(message);
   }
 
   function openRowDetail(id: string) {
@@ -428,7 +428,7 @@ export function M2InboundPage({ mode, onBack }: M2InboundPageProps) {
                   {lastEvent}
                 </span>
               )}
-              <Button type="button" variant="outline" onClick={refreshInbound}>
+              <Button type="button" variant="outline" onClick={() => refreshInbound()}>
                 <RefreshCw className="size-4" aria-hidden />
                 刷新
               </Button>
@@ -466,6 +466,7 @@ export function M2InboundPage({ mode, onBack }: M2InboundPageProps) {
           onDocumentTypeFilterChange={setDocumentTypeFilter}
           onStatusFilterChange={setStatusFilter}
           onArrivalDateChange={setArrivalDate}
+          onQuery={() => refreshInbound("入库列表已查询")}
           onReset={() => {
             setKeyword("");
             setDocumentTypeFilter("all");

@@ -26,6 +26,7 @@ interface M2InboundFilterBarProps {
   onDocumentTypeFilterChange: (value: InboundDocumentTypeFilter) => void;
   onStatusFilterChange: (value: StatusFilter) => void;
   onArrivalDateChange: (value: string) => void;
+  onQuery: () => void;
   onReset: () => void;
 }
 
@@ -38,6 +39,7 @@ export function M2InboundFilterBar({
   onDocumentTypeFilterChange,
   onStatusFilterChange,
   onArrivalDateChange,
+  onQuery,
   onReset,
 }: M2InboundFilterBarProps) {
   return (
@@ -86,9 +88,15 @@ export function M2InboundFilterBar({
           <label className="mb-1 block text-xs text-muted-foreground">预计到货</label>
           <Input type="date" value={arrivalDate} onChange={(event) => onArrivalDateChange(event.target.value)} />
         </div>
-        <Button type="button" variant="outline" onClick={onReset}>
-          重置
-        </Button>
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-1 xl:grid-cols-2">
+          <Button type="button" className="w-full whitespace-nowrap" onClick={onQuery}>
+            <Search className="size-4" aria-hidden />
+            查询
+          </Button>
+          <Button type="button" variant="outline" className="w-full whitespace-nowrap" onClick={onReset}>
+            重置
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
