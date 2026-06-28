@@ -12,7 +12,7 @@ description: WMS 仓库用独立 worktree 和 codex exec 运行子代理、复�
 - 一个任务一个 worktree，不共享主工作区。
 - 子代理只改明确授权的文件范围；不推送、不改 main、不跨任务抢文件。
 - 子代理必须知道自己不是唯一修改者：不得回滚他人变更，遇到冲突要适配。
-- 默认要求子代理使用 `wms-loop-engineering` 和 `wms-review-fix-commit`，验证通过后在子 worktree 本地分组提交。
+- 默认要求子代理使用 `wms-loop-engineering` 和 `wms-review-fix-commit`。`workspace-write` 子代理只留下可审查修改和最终报告，由主代理复查后显式暂存/提交；只有 sandbox 明确可写 `.git/worktrees/<worktree>` 时才要求子代理本地提交。
 - 只读校准任务用于先跑通子代理和收敛切片：使用 `read-only` sandbox，不改文件、不提交，只输出下一轮切片、允许文件、停止条件、验证命令和技能缺口。
 - 外部设备、TMS、冷链平台、生产数据和凭据类 evidence 不能交给子代理伪造；只能让子代理整理采集步骤或验证已有证据。
 
@@ -35,7 +35,7 @@ codex exec -C ../wms-agent-<slug> -s workspace-write -o ../wms-agent-<slug>.out.
 ```
 
 当前 `codex exec` 不接受顶层交互命令的 `-a/--ask-for-approval` 参数；需要加新参数前先用 `codex exec --help` 核对。
-如果要求子代理本地提交，sandbox 必须允许写入主仓库的 `.git/worktrees/<worktree>` 元数据；否则子代理只能留下工作区修改，主代理负责 `git add`/`git commit`。
+如果要求子代理本地提交，sandbox 必须允许写入主仓库的 `.git/worktrees/<worktree>` 元数据；否则子代理只能留下工作区修改，主代理负责 `git add`/`git commit`。主工作区有 `??` 未跟踪文件且子代理任务依赖这些文件时，不要只用 `git stash create` 做基线；先把文件内容显式纳入子代理输入，或由主代理先落最小文件。
 
 只读校准命令：
 
@@ -71,15 +71,16 @@ codex exec -C ../wms-agent-<slug> -s read-only -o ../wms-agent-<slug>.out.md "<�
 8. 重编译、截图或大验证前先跑 `df -h . /tmp`；可用空间不足 2GiB 时停止重型命令，只跑轻量检查并把磁盘阻断写入最终输出。
 9. 真实前端任务必须在提示词里明确 9002 端口、截图路径、视口、是否提交 artifact；禁止用原型图代替真实页面截图。
 10. 非平凡逻辑留下最小测试。
-11. 运行 git diff --check、just gov-t1 和任务相关测试。
-12. 使用 wms-review-fix-commit 做 review→修复→review；验证通过后本地分组提交。
+11. 运行 git diff --check、just gov-t1 和任务相关测试；任一失败时最终输出必须写“不可合并”，不得建议主代理合并。
+12. 使用 wms-review-fix-commit 做 review→修复→review；验证通过且 Git 元数据可写时本地分组提交，否则停止在可审查工作区。
 13. 不推送。
 
 最终输出：
 - 子 worktree 路径
-- 提交哈希
+- 提交哈希；未提交时写 `无` 并说明阻塞
 - 修改文件
 - 验证命令和退出码
+- 是否可合并
 - 剩余问题/需要确认事项
 ```
 
@@ -93,7 +94,7 @@ git -C ../wms-agent-<slug> log --oneline -5
 git -C ../wms-agent-<slug> diff --stat HEAD~1..HEAD
 ```
 
-需要合并时，优先在主工作区 `git merge --no-ff agent/<slug>`。如果只要部分提交，用 `git cherry-pick <hash>`。
+只有子代理所有必需验证通过且最终输出写明“可合并”时，主代理才考虑合并。需要合并时，优先在主工作区 `git merge --no-ff agent/<slug>`；如果只要部分提交，用 `git cherry-pick <hash>`。未提交或验证失败的子代理产物只能当草稿，按文件级 diff 手工挑选。
 
 ## 迭代本技能
 
