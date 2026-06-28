@@ -327,8 +327,16 @@ pub struct Location {
     pub id: Uuid,
     pub owner_id: Uuid,
     pub warehouse_id: Uuid,
+    pub zone_id: Uuid,
     pub location_code: String,
-    pub location_name: String,
+    pub row_no: i32,
+    pub column_no: i32,
+    pub layer_no: i32,
+    pub max_volume_cm3: i64,
+    pub used_volume_cm3: i64,
+    pub max_sku_count: i32,
+    pub location_type: String,
+    pub bound_owner_id: Option<Uuid>,
     pub status: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -337,13 +345,29 @@ pub struct Location {
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct CreateLocationRequest {
     pub warehouse_id: Uuid,
+    pub zone_id: Uuid,
     pub location_code: String,
-    pub location_name: String,
+    pub row_no: i32,
+    pub column_no: i32,
+    pub layer_no: i32,
+    pub max_volume_cm3: i64,
+    pub max_sku_count: i32,
+    pub location_type: String,
+    pub bound_owner_id: Option<Uuid>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct UpdateLocationRequest {
-    pub location_name: Option<String>,
+    pub zone_id: Option<Uuid>,
+    pub location_code: Option<String>,
+    pub row_no: Option<i32>,
+    pub column_no: Option<i32>,
+    pub layer_no: Option<i32>,
+    pub max_volume_cm3: Option<i64>,
+    pub used_volume_cm3: Option<i64>,
+    pub max_sku_count: Option<i32>,
+    pub location_type: Option<String>,
+    pub bound_owner_id: Option<Uuid>,
     pub status: Option<String>,
 }
 

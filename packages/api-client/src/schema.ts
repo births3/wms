@@ -1382,10 +1382,24 @@ export interface components {
             license_no?: string | null;
         };
         CreateLocationRequest: {
+            /** Format: uuid */
+            bound_owner_id?: string | null;
+            /** Format: int32 */
+            column_no: number;
+            /** Format: int32 */
+            layer_no: number;
             location_code: string;
-            location_name: string;
+            location_type: string;
+            /** Format: int32 */
+            max_sku_count: number;
+            /** Format: int64 */
+            max_volume_cm3: number;
+            /** Format: int32 */
+            row_no: number;
             /** Format: uuid */
             warehouse_id: string;
+            /** Format: uuid */
+            zone_id: string;
         };
         CreateOutboundOrderLineRequest: {
             batch_no: string;
@@ -1808,19 +1822,35 @@ export interface components {
         };
         /** @description 库位基础档案。 */
         Location: {
+            /** Format: uuid */
+            bound_owner_id?: string | null;
+            /** Format: int32 */
+            column_no: number;
             /** Format: date-time */
             created_at: string;
             /** Format: uuid */
             id: string;
+            /** Format: int32 */
+            layer_no: number;
             location_code: string;
-            location_name: string;
+            location_type: string;
+            /** Format: int32 */
+            max_sku_count: number;
+            /** Format: int64 */
+            max_volume_cm3: number;
             /** Format: uuid */
             owner_id: string;
+            /** Format: int32 */
+            row_no: number;
             status: string;
             /** Format: date-time */
             updated_at: string;
+            /** Format: int64 */
+            used_volume_cm3: number;
             /** Format: uuid */
             warehouse_id: string;
+            /** Format: uuid */
+            zone_id: string;
         };
         LocationListResponse: {
             data: components["schemas"]["Location"][];
@@ -2497,8 +2527,25 @@ export interface components {
             status?: string | null;
         };
         UpdateLocationRequest: {
-            location_name?: string | null;
+            /** Format: uuid */
+            bound_owner_id?: string | null;
+            /** Format: int32 */
+            column_no?: number | null;
+            /** Format: int32 */
+            layer_no?: number | null;
+            location_code?: string | null;
+            location_type?: string | null;
+            /** Format: int32 */
+            max_sku_count?: number | null;
+            /** Format: int64 */
+            max_volume_cm3?: number | null;
+            /** Format: int32 */
+            row_no?: number | null;
             status?: string | null;
+            /** Format: int64 */
+            used_volume_cm3?: number | null;
+            /** Format: uuid */
+            zone_id?: string | null;
         };
         /** @description 更新商品请求。 */
         UpdateProductRequest: {

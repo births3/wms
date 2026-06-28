@@ -5291,17 +5291,52 @@
         "type": "object",
         "required": [
           "warehouse_id",
+          "zone_id",
           "location_code",
-          "location_name"
+          "row_no",
+          "column_no",
+          "layer_no",
+          "max_volume_cm3",
+          "max_sku_count",
+          "location_type"
         ],
         "properties": {
+          "bound_owner_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "column_no": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "layer_no": {
+            "type": "integer",
+            "format": "int32"
+          },
           "location_code": {
             "type": "string"
           },
-          "location_name": {
+          "location_type": {
             "type": "string"
           },
+          "max_sku_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "max_volume_cm3": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "row_no": {
+            "type": "integer",
+            "format": "int32"
+          },
           "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "zone_id": {
             "type": "string",
             "format": "uuid"
           }
@@ -6644,13 +6679,29 @@
           "id",
           "owner_id",
           "warehouse_id",
+          "zone_id",
           "location_code",
-          "location_name",
+          "row_no",
+          "column_no",
+          "layer_no",
+          "max_volume_cm3",
+          "used_volume_cm3",
+          "max_sku_count",
+          "location_type",
           "status",
           "created_at",
           "updated_at"
         ],
         "properties": {
+          "bound_owner_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "column_no": {
+            "type": "integer",
+            "format": "int32"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time"
@@ -6659,15 +6710,31 @@
             "type": "string",
             "format": "uuid"
           },
+          "layer_no": {
+            "type": "integer",
+            "format": "int32"
+          },
           "location_code": {
             "type": "string"
           },
-          "location_name": {
+          "location_type": {
             "type": "string"
+          },
+          "max_sku_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "max_volume_cm3": {
+            "type": "integer",
+            "format": "int64"
           },
           "owner_id": {
             "type": "string",
             "format": "uuid"
+          },
+          "row_no": {
+            "type": "integer",
+            "format": "int32"
           },
           "status": {
             "type": "string"
@@ -6676,7 +6743,15 @@
             "type": "string",
             "format": "date-time"
           },
+          "used_volume_cm3": {
+            "type": "integer",
+            "format": "int64"
+          },
           "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "zone_id": {
             "type": "string",
             "format": "uuid"
           }
@@ -8675,12 +8750,56 @@
       "UpdateLocationRequest": {
         "type": "object",
         "properties": {
-          "location_name": {
+          "bound_owner_id": {
             "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "column_no": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "layer_no": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "location_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "location_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "max_sku_count": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "max_volume_cm3": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "row_no": {
+            "type": "integer",
+            "format": "int32",
             "nullable": true
           },
           "status": {
             "type": "string",
+            "nullable": true
+          },
+          "used_volume_cm3": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "zone_id": {
+            "type": "string",
+            "format": "uuid",
             "nullable": true
           }
         }

@@ -339,9 +339,17 @@ impl MasterDataStore {
             id: Uuid::new_v4(),
             owner_id: ctx.owner_id,
             warehouse_id: req.warehouse_id,
+            zone_id: req.zone_id,
             location_code: req.location_code,
-            location_name: req.location_name,
-            status: "active".to_string(),
+            row_no: req.row_no,
+            column_no: req.column_no,
+            layer_no: req.layer_no,
+            max_volume_cm3: req.max_volume_cm3,
+            used_volume_cm3: 0,
+            max_sku_count: req.max_sku_count,
+            location_type: req.location_type,
+            bound_owner_id: req.bound_owner_id,
+            status: "available".to_string(),
             created_at: now,
             updated_at: now,
         })
@@ -359,8 +367,35 @@ impl MasterDataStore {
         now: DateTime<Utc>,
     ) -> Result<Location, MasterDataError> {
         self.locations.update(ctx.owner_id, id, now, |location| {
-            if let Some(value) = req.location_name {
-                location.location_name = value;
+            if let Some(value) = req.zone_id {
+                location.zone_id = value;
+            }
+            if let Some(value) = req.location_code {
+                location.location_code = value;
+            }
+            if let Some(value) = req.row_no {
+                location.row_no = value;
+            }
+            if let Some(value) = req.column_no {
+                location.column_no = value;
+            }
+            if let Some(value) = req.layer_no {
+                location.layer_no = value;
+            }
+            if let Some(value) = req.max_volume_cm3 {
+                location.max_volume_cm3 = value;
+            }
+            if let Some(value) = req.used_volume_cm3 {
+                location.used_volume_cm3 = value;
+            }
+            if let Some(value) = req.max_sku_count {
+                location.max_sku_count = value;
+            }
+            if let Some(value) = req.location_type {
+                location.location_type = value;
+            }
+            if let Some(value) = req.bound_owner_id {
+                location.bound_owner_id = Some(value);
             }
             if let Some(value) = req.status {
                 location.status = value;
@@ -523,7 +558,7 @@ mod tests {
     use chrono::{TimeZone, Utc};
     use serde_json::json;
     use uuid::Uuid;
-    use wms_domain::{CreateProductRequest, CreateSupplierRequest, UpdateProductRequest};
+    use wms_domain::{CreateLocationRequest, CreateProductRequest, CreateSupplierRequest, UpdateProductRequest};
 
     use super::{MasterDataError, MasterDataStore};
     use crate::auth::AuthContext;
@@ -620,5 +655,49 @@ mod tests {
         let duplicate = store.create_supplier(&ctx, req, now);
 
         assert!(matches!(duplicate, Err(MasterDataError::DuplicateCode(code)) if code == "S-001"));
+    }
+
+    #[test]
+    fn location_contract_keeps_zone_grid_and_capacity_fields() {
+        let now = Utc
+            .with_ymd_and_hms(2026, 6, 4, 9, 0, 0)
+            .single()
+            .expect("valid time");
+        let ctx = ctx(Uuid::new_v4());
+        let mut store = MasterDataStore::default();
+        let warehouse_id = Uuid::new_v4();
+        let zone_id = Uuid::new_v4();
+
+        let location = store
+            .create_location(
+                &ctx,
+                CreateLocationRequest {
+                    warehouse_id,
+                    zone_id,
+                    location_code: "A01-01-02-03".to_string(),
+                    row_no: 1,
+                    column_no: 2,
+                    layer_no: 3,
+                    max_volume_cm3: 5_000_000,
+                    max_sku_count: 1,
+                    location_type: "storage".to_string(),
+                    bound_owner_id: Some(ctx.owner_id),
+                },
+                now,
+            )
+            .expect("create location");
+
+        assert_eq!(location.warehouse_id, warehouse_id);
+        assert_eq!(location.zone_id, zone_id);
+        assert_eq!(location.location_code, "A01-01-02-03");
+        assert_eq!(location.row_no, 1);
+        assert_eq!(location.column_no, 2);
+        assert_eq!(location.layer_no, 3);
+        assert_eq!(location.max_volume_cm3, 5_000_000);
+        assert_eq!(location.used_volume_cm3, 0);
+        assert_eq!(location.max_sku_count, 1);
+        assert_eq!(location.location_type, "storage");
+        assert_eq!(location.bound_owner_id, Some(ctx.owner_id));
+        assert_eq!(location.status, "available");
     }
 }
