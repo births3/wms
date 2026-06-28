@@ -72,25 +72,29 @@ export function DataTable<T>({
       {caption && (
         <div className="px-4 py-2.5 text-xs text-muted-foreground border-b bg-muted/40">{caption}</div>
       )}
-      {data.length === 0 ? (
-        <EmptyState title={emptyTitle ?? "暂无数据"} description={emptyDescription} />
-      ) : (
-        <Table className={tableClassName}>
-          <TableHeader>
+      <Table className={tableClassName}>
+        <TableHeader>
+          <TableRow>
+            {columns.map((col) => (
+              <TableHead
+                key={col.key}
+                style={columnStyle(col)}
+                className={cn(col.align === "right" && "text-right", col.align === "center" && "text-center")}
+              >
+                {col.header}
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {data.length === 0 ? (
             <TableRow>
-              {columns.map((col) => (
-                <TableHead
-                  key={col.key}
-                  style={columnStyle(col)}
-                  className={cn(col.align === "right" && "text-right", col.align === "center" && "text-center")}
-                >
-                  {col.header}
-                </TableHead>
-              ))}
+              <TableCell colSpan={columns.length} className="py-10">
+                <EmptyState title={emptyTitle ?? "暂无数据"} description={emptyDescription} />
+              </TableCell>
             </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data.map((row, idx) => {
+          ) : (
+            data.map((row, idx) => {
               const key = rowKey(row);
               const selected = selectedKey === key;
               return (
@@ -108,7 +112,7 @@ export function DataTable<T>({
                         col.mono && "font-mono text-xs text-muted-foreground",
                         col.align === "right" && "text-right",
                         col.align === "center" && "text-center",
-                        col.className
+                        col.className,
                       )}
                     >
                       {col.render ? col.render(row, idx) : (row as Record<string, React.ReactNode>)[col.key]}
@@ -116,10 +120,10 @@ export function DataTable<T>({
                   ))}
                 </TableRow>
               );
-            })}
-          </TableBody>
-        </Table>
-      )}
+            })
+          )}
+        </TableBody>
+      </Table>
       {footer && <div className="border-t">{footer}</div>}
     </div>
   );

@@ -259,15 +259,21 @@ export function M2InboundPage({ mode, currentOwner, onBack }: M2InboundPageProps
       key: "receipt_no",
       header: "ASN / 入库单",
       mono: true,
+      width: 220,
+      minWidth: 210,
       sortable: true,
       sortValue: (row) => row.receipt_no,
       filterValue: (row) => row.receipt_no,
+      copyValue: (row) => row.receipt_no,
       filter: { type: "text" },
+      onDoubleClick: (row) => openRowDetail(row.id),
       render: (row) => <span className="text-primary">{row.receipt_no}</span>,
     },
     {
       key: "owner",
       header: "货主",
+      width: 170,
+      minWidth: 150,
       sortable: true,
       sortValue: (row) => ownerLabel(row.owner_id, currentOwner),
       filterValue: (row) => [row.owner_id, ownerLabel(row.owner_id, currentOwner)].join(" "),
@@ -278,6 +284,8 @@ export function M2InboundPage({ mode, currentOwner, onBack }: M2InboundPageProps
     {
       key: "document_type",
       header: "单据类型",
+      width: 150,
+      minWidth: 140,
       sortable: true,
       sortValue: (row) => inboundDocumentTypeLabel(inboundDocumentTypeOf(row)),
       filterValue: (row) => inboundDocumentTypeOf(row),
@@ -294,6 +302,8 @@ export function M2InboundPage({ mode, currentOwner, onBack }: M2InboundPageProps
     {
       key: "product",
       header: "商品 / 数量",
+      width: 200,
+      minWidth: 180,
       copyValue: (row) => {
         const line = row.lines[0];
         return `${line?.product_code ?? "-"} ${totalExpectedQty(row)} 件`;
@@ -313,6 +323,8 @@ export function M2InboundPage({ mode, currentOwner, onBack }: M2InboundPageProps
     {
       key: "work_fields",
       header: workFieldHeader(mode),
+      width: 440,
+      minWidth: 360,
       filterValue: (row) => workFieldText(row, mode),
       copyValue: (row) => workFieldText(row, mode),
       filter: { type: "text" },
@@ -321,6 +333,8 @@ export function M2InboundPage({ mode, currentOwner, onBack }: M2InboundPageProps
     {
       key: "expected_arrival_at",
       header: "预计到货",
+      width: 190,
+      minWidth: 180,
       sortable: true,
       sortValue: (row) => row.expected_arrival_at ?? "",
       filterValue: (row) => row.expected_arrival_at,
@@ -331,6 +345,8 @@ export function M2InboundPage({ mode, currentOwner, onBack }: M2InboundPageProps
     {
       key: "status",
       header: "状态",
+      width: 170,
+      minWidth: 150,
       sortable: true,
       sortValue: (row) => statusLabel(row.status),
       filterValue: (row) => row.status,
@@ -353,6 +369,8 @@ export function M2InboundPage({ mode, currentOwner, onBack }: M2InboundPageProps
       key: "actions",
       header: "操作",
       align: "right",
+      width: 230,
+      minWidth: 220,
       hideable: false,
       copyable: false,
       render: (row) => (
@@ -593,7 +611,7 @@ export function M2InboundPage({ mode, currentOwner, onBack }: M2InboundPageProps
           caption={ordersQuery.isPending ? "加载入库单..." : undefined}
           emptyTitle="暂无入库单"
           storageKey="m2-inbound-datagrid"
-          tableClassName="min-w-[1680px]"
+          tableClassName="min-w-[1880px]"
           selectable
         />
 

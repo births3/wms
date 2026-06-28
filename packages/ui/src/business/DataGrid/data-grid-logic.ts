@@ -238,6 +238,53 @@ export function dataGridFilterActive(value: DataGridColumnFilterValue | undefine
   return Boolean(value.from?.trim() || value.to?.trim());
 }
 
+export function dataGridFilterConfigForData<T>(
+  column: DataGridLogicColumn<T>,
+  data: T[],
+): DataGridFilterConfig | false | undefined {
+  const filter = column.filter;
+  if (!filter || (filter.type !== "select" && filter.type !== "multiSelect")) return filter;
+
+  const values = new Set(data.map((row) => valueToText(columnFilterValue(row, column))).filter(Boolean));
+  const options = filter.options ?? Array.from(values).map((value) => ({ label: value, value }));
+  return { ...filter, options: options.filter((option) => values.has(option.value)) };
+}
+
+export function sanitizeDataGridColumnFiltersForData<T>(
+  filters: DataGridColumnFilters,
+  columns: DataGridLogicColumn<T>[],
+  data: T[],
+): DataGridColumnFilters {
+  let changed = false;
+  const next: DataGridColumnFilters = {};
+
+  for (const [key, value] of Object.entries(filters)) {
+    const column = columns.find((item) => item.key === key);
+    const filter = column ? dataGridFilterConfigForData(column, data) : undefined;
+    if (!column || !filter || (filter.type !== "select" && filter.type !== "multiSelect")) {
+      next[key] = value;
+      continue;
+    }
+
+    const validValues = new Set((filter.options ?? []).map((option) => option.value));
+    if (filter.type === "select") {
+      if (typeof value === "string" && validValues.has(value)) next[key] = value;
+      else changed = true;
+      continue;
+    }
+
+    if (Array.isArray(value)) {
+      const validSelected = value.filter((item) => validValues.has(item));
+      if (validSelected.length > 0) next[key] = validSelected;
+      if (validSelected.length !== value.length) changed = true;
+    } else {
+      changed = true;
+    }
+  }
+
+  return changed ? next : filters;
+}
+
 function rowMatchesColumnFilter<T>(row: T, column: DataGridLogicColumn<T>, value: DataGridColumnFilterValue): boolean {
   const rawValue = columnFilterValue(row, column);
   const filter = column.filter === false ? { type: "text" as const } : column.filter ?? { type: "text" as const };

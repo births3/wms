@@ -8,10 +8,12 @@ import { DataTable, type DataTableColumn, type DataTableProps } from "../DataTab
 import { DataGridColumnFilter } from "./DataGridColumnFilter";
 import {
   getDataGridCopyText,
+  dataGridFilterConfigForData,
   getDataGridPage,
   moveColumnBefore,
   nextSortState,
   sanitizeGridState,
+  sanitizeDataGridColumnFiltersForData,
   setColumnWidth,
   toggleCopyableColumn,
   toggleVisibleColumn,
@@ -40,6 +42,7 @@ export interface DataGridColumn<T> extends DataTableColumn<T> {
   filterValue?: (row: T) => unknown;
   copyValue?: (row: T) => unknown;
   copyable?: boolean;
+  onDoubleClick?: (row: T) => void;
   minWidth?: number;
   maxWidth?: number;
   resizable?: boolean;
@@ -128,6 +131,10 @@ function DataGridInner<T>(
   React.useEffect(() => {
     setPageIndex(0);
   }, [columnFilters, data, settings.pageSize, settings.sort?.key, settings.sort?.direction]);
+
+  React.useEffect(() => {
+    setColumnFilters((current) => sanitizeDataGridColumnFiltersForData(current, columns, data));
+  }, [columns, data]);
 
   React.useEffect(() => {
     if (!copyNotice) return;
@@ -288,7 +295,8 @@ function DataGridInner<T>(
       render: (row, index) => {
         const content = sourceRender ? sourceRender(row, index) : defaultCellContent(row, column);
         const copyText = columnCanCopy ? getDataGridCopyText(row, column) : "";
-        if (!copyText) return content;
+        const canDoubleClick = Boolean(column.onDoubleClick);
+        if (!copyText && !canDoubleClick) return content;
         const cellKey = `${rowKey(row)}:${column.key}`;
         const cellNotice = copyNotice?.cellKey === cellKey ? copyNotice.text : null;
 
@@ -296,18 +304,24 @@ function DataGridInner<T>(
           <div
             role="button"
             tabIndex={0}
-            title="点击复制"
-            aria-label={`复制${columnLabel(column)}`}
+            title={copyText ? "点击复制" : "双击打开"}
+            aria-label={copyText ? `复制${columnLabel(column)}` : `打开${columnLabel(column)}`}
             className={cn(
               "relative rounded-sm px-1 py-0.5 text-left outline-none transition hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
               column.align === "right" && "text-right",
             )}
             onClick={(event) => {
+              if (!copyText) return;
               event.stopPropagation();
               void copyCellValue(row, column, cellKey);
             }}
+            onDoubleClick={(event) => {
+              if (!column.onDoubleClick) return;
+              event.stopPropagation();
+              column.onDoubleClick(row);
+            }}
             onKeyDown={(event) => {
-              if (event.key !== "Enter" && event.key !== " ") return;
+              if (!copyText || (event.key !== "Enter" && event.key !== " ")) return;
               event.preventDefault();
               event.stopPropagation();
               void copyCellValue(row, column, cellKey);
@@ -370,7 +384,7 @@ function DataGridInner<T>(
                   <DataGridColumnFilter
                     columnKey={column.key}
                     label={columnLabel(column)}
-                    filter={column.filter}
+                    filter={dataGridFilterConfigForData(column, data)}
                     value={columnFilters[column.key]}
                     onChange={(value) => updateColumnFilterValue(column.key, value)}
                   />

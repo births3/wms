@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import {
   getDataGridCopyText,
+  dataGridFilterConfigForData,
   getDataGridPage,
   moveColumnBefore,
   nextSortState,
+  sanitizeDataGridColumnFiltersForData,
   sanitizeGridState,
   setColumnWidth,
   toggleCopyableColumn,
@@ -49,6 +51,14 @@ assert.deepEqual(toggleCopyableColumn(["code"], columns, "status", true), ["code
 assert.deepEqual(toggleCopyableColumn(["code"], columns, "action", true), ["code"]);
 assert.deepEqual(toggleCopyableColumn(["code", "status"], columns, "status", false), ["code"]);
 assert.equal(getDataGridCopyText(rows[0], { key: "status", copyValue: (row) => row.statusLabel }), "待收货");
+assert.deepEqual(dataGridFilterConfigForData(columns[1], rows.slice(0, 2))?.options, [
+  { label: "待收货", value: "released" },
+  { label: "已完成", value: "completed" },
+]);
+assert.deepEqual(
+  sanitizeDataGridColumnFiltersForData({ status: ["released", "putaway"], code: "ASN" }, columns, rows.slice(0, 2)),
+  { status: ["released"], code: "ASN" },
+);
 
 const widthSettings = sanitizeGridState(
   { columnWidths: { code: 260, missing: 180, action: 200 } },
