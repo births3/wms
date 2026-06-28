@@ -341,38 +341,36 @@ pub async fn receive_handler(
 
 ### 1.5 SQL / 迁移规范
 
+专门规则见 [数据库设计与命名规范](database/database-design-standards.md)。本节只保留速查示例。
+
 ```sql
--- migrations/0001_create_products.sql
+-- backend/migrations/202606010001_master_data_products.sql
 
 -- 商品表
-CREATE TABLE products (
+CREATE TABLE IF NOT EXISTS products (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    code        VARCHAR(50) NOT NULL UNIQUE,
+    owner_id    UUID NOT NULL,
+    code        VARCHAR(50) NOT NULL,
     name        VARCHAR(200) NOT NULL,
-    -- 储存条件：cold_storage / frozen / cool / normal
     storage_condition VARCHAR(20) NOT NULL DEFAULT 'normal',
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    version     BIGINT NOT NULL DEFAULT 1,
+    UNIQUE (owner_id, code)
 );
 
--- 索引命名：idx_<table>_<columns>
-CREATE INDEX idx_products_code ON products(code);
-
-COMMENT ON TABLE products IS '商品主数据';
-COMMENT ON COLUMN products.storage_condition IS '储存条件：cold_storage/frozen/cool/normal';
+CREATE INDEX IF NOT EXISTS products_owner_code_idx
+    ON products(owner_id, code);
 ```
 
 **规则**：
 - 表名 snake_case 复数（`products`, `receipt_orders`）
 - 列名 snake_case（`created_at`, `supplier_id`）
 - 主键统一 `id UUID`（除非有业务编号需求）
-- 必须有 `created_at` / `updated_at`
-- 索引命名 `idx_<table>_<columns>`
-- 外键命名 `fk_<table>_<ref_table>`
-- 约束命名 `chk_<table>_<rule>`
-- 每个迁移必须有对应的 down 脚本（`0001_create_products.down.sql`）
+- 业务表必须有 `owner_id` 和 `created_at`；可变聚合表必须有 `updated_at` 和 `version`
+- 索引命名 `<table>_<purpose>_idx`
 - 迁移文件头部注释说明目的
-- **禁止**：在迁移中写 DML（INSERT/UPDATE/DELETE）——种子数据用单独脚本
+- **禁止**：在迁移中写测试账号、真实业务数据、生产默认配置或密钥；确定性的系统字典种子数据除外
 - **审计表**：只能 INSERT，禁止 UPDATE/DELETE（GSP 红线）
 
 ### 1.6 日志 / Tracing 规范

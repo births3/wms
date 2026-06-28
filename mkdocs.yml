@@ -171,6 +171,9 @@ nav:
     - 术语表: glossary.md
     - 错误码字典: error-codes.md
     - 基础设施技术规格: infra/technical-specs.md
+    - 数据库设计与命名规范: database/database-design-standards.md
+    - 数据库表目录: database/table-catalog.md
+    - 数据库设计审查矩阵: database/database-design-review.md
     - 文件存储方案: infra/file-storage.md
     - 缓存策略: infra/cache-strategy.md
     - 易用性基线 (v25): infra/usability-baseline.md

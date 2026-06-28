@@ -60,6 +60,9 @@
 | [layered-design.md](layered-design.md) | 前后端分层设计规范 |
 | [architecture-dependencies.md](architecture-dependencies.md) | 模块依赖图和波次依赖 |
 | [infra/technical-specs.md](infra/technical-specs.md) | 基础设施技术规格 |
+| [database/database-design-standards.md](database/database-design-standards.md) | PostgreSQL 表、字段、索引、约束和 migration 命名规范 |
+| [database/table-catalog.md](database/table-catalog.md) | 从 migrations 生成的数据库表、字段、索引目录 |
+| [database/database-design-review.md](database/database-design-review.md) | 基于当前数据库表的设计审查矩阵 |
 | [concept-audit.md](concept-audit.md) | 概念审计报告 |
 | [glossary.md](glossary.md) | 术语表 |
 | [adr/README.md](adr/README.md) | ADR 总索引 |
