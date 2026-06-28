@@ -36,6 +36,8 @@ export interface DataTableColumn<T> {
 export interface DataTableProps<T> extends Omit<React.HTMLAttributes<HTMLDivElement>, "onSelect"> {
   columns: DataTableColumn<T>[];
   data: T[];
+  /** 表格元素样式（用于最小宽度等布局控制） */
+  tableClassName?: string;
   /** 用于 key & 选中比对（必填） */
   rowKey: (row: T) => string;
   /** 选中的行 key */
@@ -62,6 +64,7 @@ export function DataTable<T>({
   emptyTitle,
   emptyDescription,
   className,
+  tableClassName,
   ...rest
 }: DataTableProps<T>) {
   return (
@@ -72,13 +75,13 @@ export function DataTable<T>({
       {data.length === 0 ? (
         <EmptyState title={emptyTitle ?? "暂无数据"} description={emptyDescription} />
       ) : (
-        <Table>
+        <Table className={tableClassName}>
           <TableHeader>
             <TableRow>
               {columns.map((col) => (
                 <TableHead
                   key={col.key}
-                  style={{ width: col.width, textAlign: col.align }}
+                  style={columnStyle(col)}
                   className={cn(col.align === "right" && "text-right", col.align === "center" && "text-center")}
                 >
                   {col.header}
@@ -100,7 +103,7 @@ export function DataTable<T>({
                   {columns.map((col) => (
                     <TableCell
                       key={col.key}
-                      style={{ textAlign: col.align }}
+                      style={columnStyle(col)}
                       className={cn(
                         col.mono && "font-mono text-xs text-muted-foreground",
                         col.align === "right" && "text-right",
@@ -120,4 +123,12 @@ export function DataTable<T>({
       {footer && <div className="border-t">{footer}</div>}
     </div>
   );
+}
+
+function columnStyle<T>(column: DataTableColumn<T>): React.CSSProperties {
+  return {
+    width: column.width,
+    minWidth: typeof column.width === "number" ? column.width : undefined,
+    textAlign: column.align,
+  };
 }

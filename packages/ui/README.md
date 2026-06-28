@@ -3,7 +3,7 @@
 WMS 前端共享 UI 包。
 
 - **Layer 1 primitives**：9 个 shadcn/ui 组件（Button / Input / Label / Card / Tabs / Select / Checkbox / Table / Dialog）
-- **Layer 2 业务复合**：16 个 WMS 业务组件（StatusBadge / ScanInput / DualSignPanel / AuditTimeline / ApprovalFlow / KanbanBoard / PrintPreview / RuleEditor / TempChart / OfflineIndicator / FieldTable / StepFlow / DiffPanel / PageHeader / DataTable / EmptyState）
+- **Layer 2 业务复合**：17 个 WMS 业务组件（StatusBadge / ScanInput / DualSignPanel / AuditTimeline / ApprovalFlow / KanbanBoard / PrintPreview / RuleEditor / TempChart / OfflineIndicator / FieldTable / StepFlow / DiffPanel / PageHeader / DataTable / DataGrid / EmptyState）
 - **设计 token**：CSS 变量（`src/styles/globals.css`）+ Tailwind preset（`tailwind-preset.cjs`，含 wms-warning / wms-success / wms-cold 业务色）
 - **工具**：`cn()`（clsx + tailwind-merge）
 

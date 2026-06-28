@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "description": "WMS 前端共享 UI 包：shadcn primitive + 16 个 Layer 2 业务复合组件 + Tailwind 设计 token + 工具函数。被 prototypes（走查）和 apps/web-admin（生产 PC+PAD）共用。",
+  "description": "WMS 前端共享 UI 包：shadcn primitive + 17 个 Layer 2 业务复合组件 + Tailwind 设计 token + 工具函数。被 prototypes（走查）和 apps/web-admin（生产 PC+PAD）共用。",
   "exports": {
     ".": "./src/index.ts",
     "./business": "./src/business/index.ts",

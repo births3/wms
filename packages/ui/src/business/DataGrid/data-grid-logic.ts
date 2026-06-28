@@ -1,0 +1,377 @@
+export type DataGridSortDirection = "asc" | "desc";
+
+export interface DataGridSortState {
+  key: string;
+  direction: DataGridSortDirection;
+}
+
+export type DataGridFilterType = "text" | "select" | "multiSelect" | "dateRange" | "numberRange";
+
+export interface DataGridFilterOption {
+  label: string;
+  value: string;
+}
+
+export interface DataGridFilterConfig {
+  type: DataGridFilterType;
+  options?: DataGridFilterOption[];
+}
+
+export interface DataGridRangeFilter {
+  from?: string;
+  to?: string;
+}
+
+export type DataGridColumnFilterValue = string | string[] | DataGridRangeFilter;
+export type DataGridColumnFilters = Record<string, DataGridColumnFilterValue>;
+
+export interface DataGridLogicColumn<T> {
+  key: string;
+  width?: string | number;
+  minWidth?: number;
+  maxWidth?: number;
+  sortable?: boolean;
+  sortValue?: (row: T) => unknown;
+  filterValue?: (row: T) => unknown;
+  copyValue?: (row: T) => unknown;
+  copyable?: boolean;
+  filter?: DataGridFilterConfig | false;
+  hideable?: boolean;
+  defaultHidden?: boolean;
+}
+
+export interface DataGridLogicState {
+  visibleColumns: string[];
+  copyableColumns: string[];
+  columnWidths: Record<string, number>;
+  columnOrder: string[];
+  pageSize: number;
+  sort: DataGridSortState | null;
+}
+
+export interface DataGridPageResult<T> {
+  rows: T[];
+  total: number;
+  pageCount: number;
+  pageIndex: number;
+  rangeStart: number;
+  rangeEnd: number;
+}
+
+const defaultPageSizeFallback = 20;
+
+export function defaultVisibleColumns<T>(columns: DataGridLogicColumn<T>[]): string[] {
+  const visible = columns.filter((column) => !column.defaultHidden).map((column) => column.key);
+  return visible.length > 0 ? visible : columns.slice(0, 1).map((column) => column.key);
+}
+
+export function defaultColumnOrder<T>(columns: DataGridLogicColumn<T>[]): string[] {
+  return columns.map((column) => column.key);
+}
+
+export function defaultCopyableColumns<T>(columns: DataGridLogicColumn<T>[]): string[] {
+  return columns.filter((column) => column.copyable !== false).map((column) => column.key);
+}
+
+export function sanitizeGridState<T>(
+  state: Partial<DataGridLogicState> | null | undefined,
+  columns: DataGridLogicColumn<T>[],
+  pageSizeOptions: number[] = [10, 20, 50, 100],
+  defaultPageSize = defaultPageSizeFallback,
+): DataGridLogicState {
+  const columnKeys = new Set(columns.map((column) => column.key));
+  const requiredKeys = columns.filter((column) => column.hideable === false).map((column) => column.key);
+  const requestedVisible = state?.visibleColumns?.filter((key) => columnKeys.has(key)) ?? defaultVisibleColumns(columns);
+  const visible = Array.from(new Set([...requiredKeys, ...requestedVisible])).filter((key) => columnKeys.has(key));
+  const requestedOrder = state?.columnOrder?.filter((key) => columnKeys.has(key)) ?? [];
+  const columnOrder = Array.from(new Set([...requestedOrder, ...defaultColumnOrder(columns)])).filter((key) => columnKeys.has(key));
+  const copyableColumnKeys = new Set(defaultCopyableColumns(columns));
+  const requestedCopyable = state?.copyableColumns?.filter((key) => copyableColumnKeys.has(key)) ?? defaultCopyableColumns(columns);
+  const copyableColumns = Array.from(new Set(requestedCopyable)).filter((key) => copyableColumnKeys.has(key));
+  const columnWidths = sanitizeColumnWidths(state?.columnWidths, columns);
+  const safeDefaultPageSize = pageSizeOptions.includes(defaultPageSize) ? defaultPageSize : pageSizeOptions[0] ?? defaultPageSizeFallback;
+  const pageSize = pageSizeOptions.includes(state?.pageSize ?? 0) ? state?.pageSize ?? safeDefaultPageSize : safeDefaultPageSize;
+  const sortColumn = state?.sort ? columns.find((column) => column.key === state.sort?.key && column.sortable) : undefined;
+
+  return {
+    visibleColumns: visible.length > 0 ? visible : defaultVisibleColumns(columns),
+    copyableColumns,
+    columnWidths,
+    columnOrder,
+    pageSize,
+    sort: sortColumn && state?.sort ? state.sort : null,
+  };
+}
+
+export function moveColumnBefore<T>(
+  columnOrder: string[],
+  columns: DataGridLogicColumn<T>[],
+  key: string,
+  beforeKey: string,
+): string[] {
+  const columnKeys = new Set(columns.map((column) => column.key));
+  if (key === beforeKey || !columnKeys.has(key) || !columnKeys.has(beforeKey)) return columnOrder;
+
+  const ordered = Array.from(new Set([...columnOrder, ...defaultColumnOrder(columns)])).filter((item) => columnKeys.has(item) && item !== key);
+  const beforeIndex = ordered.indexOf(beforeKey);
+  if (beforeIndex < 0) return columnOrder;
+  ordered.splice(beforeIndex, 0, key);
+  return ordered;
+}
+
+export function toggleVisibleColumn<T>(
+  visibleColumns: string[],
+  columns: DataGridLogicColumn<T>[],
+  key: string,
+  visible: boolean,
+): string[] {
+  const column = columns.find((item) => item.key === key);
+  if (!column || column.hideable === false) return visibleColumns;
+
+  const current = new Set(visibleColumns);
+  if (visible) {
+    current.add(key);
+    return Array.from(current);
+  }
+
+  if (current.size <= 1) return visibleColumns;
+  current.delete(key);
+  return current.size > 0 ? Array.from(current) : visibleColumns;
+}
+
+export function toggleCopyableColumn<T>(
+  copyableColumns: string[],
+  columns: DataGridLogicColumn<T>[],
+  key: string,
+  copyable: boolean,
+): string[] {
+  const column = columns.find((item) => item.key === key && item.copyable !== false);
+  if (!column) return copyableColumns;
+
+  const current = new Set(copyableColumns);
+  if (copyable) current.add(key);
+  else current.delete(key);
+  return Array.from(current);
+}
+
+export function setColumnWidth<T>(
+  columnWidths: Record<string, number>,
+  columns: DataGridLogicColumn<T>[],
+  key: string,
+  width: number | null,
+): Record<string, number> {
+  const column = columns.find((item) => item.key === key);
+  if (!column) return columnWidths;
+
+  const next = { ...columnWidths };
+  if (width === null) {
+    delete next[key];
+    return next;
+  }
+
+  next[key] = clampColumnWidth(width, column);
+  return next;
+}
+
+export function nextSortState(current: DataGridSortState | null, key: string): DataGridSortState | null {
+  if (!current || current.key !== key) return { key, direction: "asc" };
+  if (current.direction === "asc") return { key, direction: "desc" };
+  return null;
+}
+
+export function getDataGridPage<T>({
+  data,
+  columns,
+  visibleColumns,
+  columnFilters,
+  sort,
+  pageIndex,
+  pageSize,
+}: {
+  data: T[];
+  columns: DataGridLogicColumn<T>[];
+  visibleColumns: string[];
+  columnFilters: DataGridColumnFilters;
+  sort: DataGridSortState | null;
+  pageIndex: number;
+  pageSize: number;
+}): DataGridPageResult<T> {
+  const visibleColumnSet = new Set(visibleColumns);
+  const searchableColumns = columns.filter((column) => visibleColumnSet.has(column.key));
+  const filtered = filterRows(data, searchableColumns, columnFilters);
+  const sorted = sortRows(filtered, columns, sort);
+  const total = sorted.length;
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const safePageIndex = Math.min(Math.max(pageIndex, 0), pageCount - 1);
+  const start = safePageIndex * pageSize;
+  const rows = sorted.slice(start, start + pageSize);
+
+  return {
+    rows,
+    total,
+    pageCount,
+    pageIndex: safePageIndex,
+    rangeStart: total === 0 ? 0 : start + 1,
+    rangeEnd: Math.min(start + rows.length, total),
+  };
+}
+
+function filterRows<T>(data: T[], columns: DataGridLogicColumn<T>[], columnFilters: DataGridColumnFilters): T[] {
+  const columnByKey = new Map(columns.map((column) => [column.key, column]));
+  const activeFilters = Object.entries(columnFilters)
+    .map(([key, value]) => ({ column: columnByKey.get(key), value }))
+    .filter((filter): filter is { column: DataGridLogicColumn<T>; value: DataGridColumnFilterValue } =>
+      Boolean(filter.column && dataGridFilterActive(filter.value)),
+    );
+
+  if (activeFilters.length === 0) return data;
+
+  return data.filter((row) => {
+    return activeFilters.every(({ column, value }) => rowMatchesColumnFilter(row, column, value));
+  });
+}
+
+export function dataGridFilterActive(value: DataGridColumnFilterValue | undefined): boolean {
+  if (typeof value === "string") return value.trim().length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  return Boolean(value.from?.trim() || value.to?.trim());
+}
+
+function rowMatchesColumnFilter<T>(row: T, column: DataGridLogicColumn<T>, value: DataGridColumnFilterValue): boolean {
+  const rawValue = columnFilterValue(row, column);
+  const filter = column.filter === false ? { type: "text" as const } : column.filter ?? { type: "text" as const };
+
+  if (filter.type === "select") {
+    return typeof value === "string" && valueToText(rawValue) === value;
+  }
+
+  if (filter.type === "multiSelect") {
+    return Array.isArray(value) && value.includes(valueToText(rawValue));
+  }
+
+  if (filter.type === "dateRange") {
+    return rangeIncludes(dateOnly(rawValue), value);
+  }
+
+  if (filter.type === "numberRange") {
+    return rangeIncludesNumber(numberValue(rawValue), value);
+  }
+
+  return typeof value === "string" && valueToText(rawValue).toLowerCase().includes(value.trim().toLowerCase());
+}
+
+function sortRows<T>(data: T[], columns: DataGridLogicColumn<T>[], sort: DataGridSortState | null): T[] {
+  if (!sort) return data;
+  const column = columns.find((item) => item.key === sort.key && item.sortable);
+  if (!column) return data;
+  const direction = sort.direction === "asc" ? 1 : -1;
+
+  return data
+    .map((row, index) => ({ row, index }))
+    .sort((left, right) => {
+      const compared = compareValues(sortValue(left.row, column), sortValue(right.row, column));
+      return compared === 0 ? left.index - right.index : compared * direction;
+    })
+    .map((item) => item.row);
+}
+
+function sortValue<T>(row: T, column: DataGridLogicColumn<T>): unknown {
+  if (column.sortValue) return column.sortValue(row);
+  return recordValue(row, column.key);
+}
+
+function columnFilterValue<T>(row: T, column: DataGridLogicColumn<T>): unknown {
+  if (column.filterValue) return column.filterValue(row);
+  return recordValue(row, column.key);
+}
+
+export function getDataGridCopyText<T>(row: T, column: DataGridLogicColumn<T>): string {
+  if (column.copyValue) return valueToText(column.copyValue(row)).trim();
+  if (column.filterValue) return valueToText(column.filterValue(row)).trim();
+  return valueToText(recordValue(row, column.key)).trim();
+}
+
+function recordValue(value: unknown, key: string): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  return (value as Record<string, unknown>)[key];
+}
+
+function sanitizeColumnWidths<T>(
+  columnWidths: Record<string, number> | undefined,
+  columns: DataGridLogicColumn<T>[],
+): Record<string, number> {
+  if (!columnWidths) return {};
+  const columnByKey = new Map(columns.map((column) => [column.key, column]));
+  const next: Record<string, number> = {};
+
+  for (const [key, width] of Object.entries(columnWidths)) {
+    const column = columnByKey.get(key);
+    if (!column || !Number.isFinite(width)) continue;
+    next[key] = clampColumnWidth(width, column);
+  }
+
+  return next;
+}
+
+function clampColumnWidth<T>(width: number, column: DataGridLogicColumn<T>): number {
+  const minWidth = column.minWidth ?? 80;
+  const maxWidth = column.maxWidth ?? 640;
+  return Math.min(maxWidth, Math.max(minWidth, Math.round(width)));
+}
+
+function valueToText(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) return value.map(valueToText).join(" ");
+  if (typeof value === "object") return Object.values(value as Record<string, unknown>).map(valueToText).join(" ");
+  return String(value);
+}
+
+function dateOnly(value: unknown): string | null {
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  const text = valueToText(value);
+  if (!text) return null;
+  if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10);
+  const parsed = new Date(text);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10);
+}
+
+function numberValue(value: unknown): number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  const parsed = Number.parseFloat(valueToText(value));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function rangeIncludes(value: string | null, filter: DataGridColumnFilterValue): boolean {
+  if (!isRangeFilter(filter) || !value) return false;
+  const from = filter.from?.trim();
+  const to = filter.to?.trim();
+  return (!from || value >= from) && (!to || value <= to);
+}
+
+function rangeIncludesNumber(value: number | null, filter: DataGridColumnFilterValue): boolean {
+  if (!isRangeFilter(filter) || value === null) return false;
+  const from = numberValue(filter.from);
+  const to = numberValue(filter.to);
+  return (from === null || value >= from) && (to === null || value <= to);
+}
+
+function isRangeFilter(value: DataGridColumnFilterValue): value is DataGridRangeFilter {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function compareValues(left: unknown, right: unknown): number {
+  const leftRank = valueRank(left);
+  const rightRank = valueRank(right);
+  if (leftRank !== rightRank) return leftRank - rightRank;
+  if (leftRank === 1) return 0;
+
+  if (typeof left === "number" && typeof right === "number") return left - right;
+  if (left instanceof Date && right instanceof Date) return left.getTime() - right.getTime();
+  return valueToText(left).localeCompare(valueToText(right), "zh-CN", { numeric: true });
+}
+
+function valueRank(value: unknown): number {
+  return value === null || value === undefined || value === "" ? 1 : 0;
+}
