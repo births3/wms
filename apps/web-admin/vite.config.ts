@@ -7,10 +7,9 @@ import path from "node:path";
 const devMockEnabled = process.env.WMS_WEB_ADMIN_DEV_MOCK === "1";
 const devOwnerId = "00000000-0000-0000-0000-000000000001";
 const devUserId = "00000000-0000-0000-0000-000000000101";
-const devOrderId = "00000000-0000-0000-0000-000000002001";
-const devSalesReturnOrderId = "00000000-0000-0000-0000-000000002002";
 const devWarehouseId = "00000000-0000-0000-0000-000000003001";
 const devLocationId = "00000000-0000-0000-0000-000000000201";
+const devSeedOrderCount = 100;
 const devLoginPassword = ["Correct", "Horse1!"].join("");
 const devLoginDefaults = devMockEnabled
   ? {
@@ -24,10 +23,7 @@ const devLoginDefaults = devMockEnabled
       ownerCode: "",
       username: "",
       password: "",
-    };
-
-let devOrderStatus = "receiving";
-let devSalesReturnOrderStatus = "receiving";
+};
 
 interface DevOrderLine {
   line_no: number;
@@ -55,6 +51,7 @@ interface DevOrder {
 }
 
 const devCreatedOrders: DevOrder[] = [];
+const devSeedOrderStatusOverrides = new Map<string, string>();
 
 const devUser = {
   user_id: devUserId,
@@ -246,79 +243,86 @@ async function handleInboundAction(req: IncomingMessage, res: ServerResponse, ac
   });
 }
 
-function devReceivingOrder() {
+function devSeedOrders() {
+  return Array.from({ length: devSeedOrderCount }, (_value, index) => devSeedOrder(index + 1));
+}
+
+function devSeedOrder(index: number): DevOrder {
   const now = new Date().toISOString();
+  const id = devSeedOrderId(index);
+  const documentType = devSeedDocumentType(index);
+  const isSalesReturn = documentType === "sales_return";
+  const padded = String(index).padStart(4, "0");
+  const expectedArrivalAt = new Date(Date.UTC(2026, 5, 27 + Math.floor((index - 1) / 24), index % 24, 0, 0)).toISOString();
   return {
-    id: devOrderId,
+    id,
     owner_id: devOwnerId,
-    receipt_no: "ASN-M2-PC-0001",
-    document_type: "purchase_inbound",
+    receipt_no: `${isSalesReturn ? "SR" : "ASN"}-M2-PC-${padded}`,
+    document_type: documentType,
     warehouse_id: devWarehouseId,
-    status: devOrderStatus,
-    expected_arrival_at: "2026-06-27T10:00:00.000Z",
-    external_ref: "ERP-ASN-0001",
-    supplier_id: null,
+    status: devSeedOrderStatusOverrides.get(id) ?? devSeedOrderStatus(index),
+    expected_arrival_at: expectedArrivalAt,
+    external_ref: `${isSalesReturn ? "ERP-SR" : "ERP-ASN"}-${padded}`,
+    supplier_id: `00000000-0000-0000-0000-${String(5000 + (index % 20)).padStart(12, "0")}`,
     created_at: "2026-06-27T08:00:00.000Z",
     updated_at: now,
-    lines: [
-      {
-        line_no: 1,
-        product_code: "P-M2-001",
-        product_id: null,
-        batch_no: "BATCH-202606",
-        expected_qty: 120,
-        production_date: "2026-01-01",
-        expiry_date: "2028-01-01",
-      },
-    ],
+    lines: devSeedOrderLines(index, isSalesReturn, padded),
   };
 }
 
-function devSalesReturnOrder() {
-  const now = new Date().toISOString();
-  return {
-    id: devSalesReturnOrderId,
-    owner_id: devOwnerId,
-    receipt_no: "SR-M2-PC-0001",
-    document_type: "sales_return",
-    warehouse_id: devWarehouseId,
-    status: devSalesReturnOrderStatus,
-    expected_arrival_at: "2026-06-27T11:00:00.000Z",
-    external_ref: "ERP-SR-0001",
-    supplier_id: null,
-    created_at: "2026-06-27T09:00:00.000Z",
-    updated_at: now,
-    lines: [
+function devSeedOrderLines(index: number, isSalesReturn: boolean, padded: string) {
+  const productCode = devSeedProductCode(index);
+  const expectedQty = 20 + (index % 9) * 5;
+  if (!isSalesReturn) {
+    return [
       {
         line_no: 1,
-        product_code: "P-M2-SR-001",
+        product_code: productCode,
         product_id: null,
-        batch_no: "SR-BATCH-202606",
-        expected_qty: 8,
+        batch_no: null,
+        expected_qty: expectedQty,
         production_date: "2026-01-01",
         expiry_date: "2028-01-01",
       },
-    ],
-  };
+    ];
+  }
+
+  const secondQty = Math.max(1, Math.floor(expectedQty / 3));
+  return [
+    {
+      line_no: 1,
+      product_code: productCode,
+      product_id: null,
+      batch_no: `SR-BATCH-${padded}-01`,
+      expected_qty: expectedQty - secondQty,
+      production_date: "2026-01-01",
+      expiry_date: "2028-01-01",
+    },
+    {
+      line_no: 2,
+      product_code: productCode,
+      product_id: null,
+      batch_no: `SR-BATCH-${padded}-02`,
+      expected_qty: secondQty,
+      production_date: "2026-02-01",
+      expiry_date: "2028-02-01",
+    },
+  ];
 }
 
 function allDevOrders() {
-  return [devReceivingOrder(), devSalesReturnOrder(), ...devCreatedOrders];
+  return [...devSeedOrders(), ...devCreatedOrders];
 }
 
 function findDevOrder(id: string) {
-  if (id === devOrderId) return devReceivingOrder();
-  if (id === devSalesReturnOrderId) return devSalesReturnOrder();
+  const seedOrderIndex = devSeedOrderIndex(id);
+  if (seedOrderIndex !== null) return devSeedOrder(seedOrderIndex);
   return devCreatedOrders.find((order) => order.id === id) ?? null;
 }
 
 function setDevOrderStatus(id: string, status: string) {
-  if (id === devOrderId) {
-    devOrderStatus = status;
-    return;
-  }
-  if (id === devSalesReturnOrderId) {
-    devSalesReturnOrderStatus = status;
+  if (devSeedOrderIndex(id) !== null) {
+    devSeedOrderStatusOverrides.set(id, status);
     return;
   }
   const order = devCreatedOrders.find((item) => item.id === id);
@@ -330,6 +334,31 @@ function setDevOrderStatus(id: string, status: string) {
 function devOrderExpectedQty(id: string) {
   const order = findDevOrder(id);
   return order?.lines.reduce((total, line) => total + line.expected_qty, 0) ?? 0;
+}
+
+function devSeedOrderId(index: number) {
+  return `00000000-0000-0000-0000-${String(2000 + index).padStart(12, "0")}`;
+}
+
+function devSeedOrderIndex(id: string) {
+  const prefix = "00000000-0000-0000-0000-";
+  if (!id.startsWith(prefix)) return null;
+  const value = Number.parseInt(id.slice(prefix.length), 10) - 2000;
+  if (!Number.isInteger(value) || value < 1 || value > devSeedOrderCount) return null;
+  return value;
+}
+
+function devSeedDocumentType(index: number): DevOrder["document_type"] {
+  return index % 5 === 0 ? "sales_return" : "purchase_inbound";
+}
+
+function devSeedOrderStatus(index: number) {
+  return index % 2 === 0 ? "released" : "receiving";
+}
+
+function devSeedProductCode(index: number) {
+  if (index % 6 === 0) return `P-M2-COLD-${String(index).padStart(3, "0")}`;
+  return `P-M2-${String(index).padStart(3, "0")}`;
 }
 
 function devOrderFromCreateRequest(body: Record<string, unknown>): DevOrder {

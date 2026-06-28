@@ -3,13 +3,12 @@ import {
   Button,
   Card,
   CardContent,
-  DataTable,
+  DataGrid,
   PageHeader,
   StatusBadge,
-  type DataTableColumn,
-  type StatusKey,
+  type DataGridColumn,
 } from "@wms/ui";
-import { ArrowLeft, Ban, CheckCircle2, ClipboardCheck, Eye, PackageCheck, Plus, Printer, RefreshCw, Signature } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ClipboardCheck, Eye, PackageCheck, Plus, Printer, RefreshCw } from "lucide-react";
 
 import {
   useCreateReceivingOrderMutation,
@@ -38,15 +37,40 @@ import { M2InboundDetailDialog } from "./M2InboundDetailDialog";
 import {
   inboundDocumentTypeLabel,
   inboundDocumentTypeOf,
-  matchesInboundDocumentTypeFilter,
+  createAsnBatchNo,
   type InboundDocumentTypeFilter,
 } from "./m2-inbound-document-type";
+import {
+  canReceiveOrReject,
+  countByStatus,
+  dateToIso,
+  defaultCreatedDateRange,
+  defaultStatusFilter,
+  detailStageFromMode,
+  filterOrders,
+  formatDateTime,
+  inboundPageMeta,
+  ownerLabel,
+  productTemperatureAttribute,
+  shortId,
+  splitCodes,
+  statusKey,
+  statusLabel,
+  temperatureControlFromProductAttribute,
+  toInteger,
+  totalExpectedQty,
+  workFieldHeader,
+  workFieldText,
+  type M2InboundMode,
+  type OwnerContext,
+} from "./m2-inbound-page-helpers";
 import { M2InboundFilterBar, type StatusFilter } from "./M2InboundFilterBar";
 
-export type M2InboundMode = "receiving" | "inspecting" | "putaway";
+export type { M2InboundMode } from "./m2-inbound-page-helpers";
 
 interface M2InboundPageProps {
   mode: M2InboundMode;
+  currentOwner: OwnerContext;
   onBack: () => void;
 }
 
@@ -56,13 +80,16 @@ const defaultWarehouseId = "00000000-0000-0000-0000-000000003001";
 const defaultLocationId = "00000000-0000-0000-0000-000000000201";
 const defaultLocationCode = "A-01-01";
 
-export function M2InboundPage({ mode, onBack }: M2InboundPageProps) {
+export function M2InboundPage({ mode, currentOwner, onBack }: M2InboundPageProps) {
   const ordersQuery = useReceivingOrdersQuery();
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [keyword, setKeyword] = React.useState("");
-  const [documentTypeFilter, setDocumentTypeFilter] = React.useState<InboundDocumentTypeFilter>("all");
+  const [ownerKeyword, setOwnerKeyword] = React.useState(currentOwner.ownerCode);
+  const [documentTypeFilter, setDocumentTypeFilter] = React.useState<InboundDocumentTypeFilter>([]);
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>(() => defaultStatusFilter(mode));
   const [arrivalDate, setArrivalDate] = React.useState("");
+  const [createdAtFrom, setCreatedAtFrom] = React.useState(() => defaultCreatedDateRange().from);
+  const [createdAtTo, setCreatedAtTo] = React.useState(() => defaultCreatedDateRange().to);
   const [activeDialog, setActiveDialog] = React.useState<InboundDialog | null>(null);
   const [detailOpen, setDetailOpen] = React.useState(false);
   const [lastEvent, setLastEvent] = React.useState<string | null>(null);
@@ -73,7 +100,7 @@ export function M2InboundPage({ mode, onBack }: M2InboundPageProps) {
     warehouseId: defaultWarehouseId,
     expectedArrivalDate: "",
     productCode: "P-M2-002",
-    batchNo: "BATCH-202607",
+    batchNo: "",
     expectedQty: "60",
     productionDate: "2026-02-01",
     expiryDate: "2028-02-01",
@@ -146,8 +173,19 @@ export function M2InboundPage({ mode, onBack }: M2InboundPageProps) {
   const putawayMutation = usePutawayReceivingOrderMutation();
 
   const orders = React.useMemo(
-    () => filterOrders(ordersQuery.data ?? [], keyword, documentTypeFilter, statusFilter, arrivalDate),
-    [ordersQuery.data, keyword, documentTypeFilter, statusFilter, arrivalDate],
+    () =>
+      filterOrders(
+        ordersQuery.data ?? [],
+        keyword,
+        documentTypeFilter,
+        statusFilter,
+        arrivalDate,
+        createdAtFrom,
+        createdAtTo,
+        ownerKeyword,
+        currentOwner,
+      ),
+    [ordersQuery.data, keyword, documentTypeFilter, statusFilter, arrivalDate, createdAtFrom, createdAtTo, ownerKeyword, currentOwner],
   );
 
   React.useEffect(() => {
@@ -158,10 +196,18 @@ export function M2InboundPage({ mode, onBack }: M2InboundPageProps) {
   React.useEffect(() => {
     setStatusFilter(defaultStatusFilter(mode));
     setKeyword("");
-    setDocumentTypeFilter("all");
+    setOwnerKeyword(currentOwner.ownerCode);
+    setDocumentTypeFilter([]);
     setArrivalDate("");
+    resetCreatedDateRange();
     setLastEvent(null);
-  }, [mode]);
+  }, [mode, currentOwner.ownerCode]);
+
+  function resetCreatedDateRange() {
+    const range = defaultCreatedDateRange();
+    setCreatedAtFrom(range.from);
+    setCreatedAtTo(range.to);
+  }
 
   const selectedFromList = ordersQuery.data?.find((order) => order.id === selectedId) ?? null;
   const detailQuery = useReceivingOrderQuery(selectedId);
@@ -208,21 +254,55 @@ export function M2InboundPage({ mode, onBack }: M2InboundPageProps) {
     }));
   }, [order?.id]);
 
-  const orderColumns: DataTableColumn<ReceivingOrder>[] = [
+  const orderColumns: DataGridColumn<ReceivingOrder>[] = [
     {
       key: "receipt_no",
       header: "ASN / 入库单",
       mono: true,
+      sortable: true,
+      sortValue: (row) => row.receipt_no,
+      filterValue: (row) => row.receipt_no,
+      filter: { type: "text" },
       render: (row) => <span className="text-primary">{row.receipt_no}</span>,
+    },
+    {
+      key: "owner",
+      header: "货主",
+      sortable: true,
+      sortValue: (row) => ownerLabel(row.owner_id, currentOwner),
+      filterValue: (row) => [row.owner_id, ownerLabel(row.owner_id, currentOwner)].join(" "),
+      copyValue: (row) => ownerLabel(row.owner_id, currentOwner),
+      filter: { type: "text" },
+      render: (row) => ownerLabel(row.owner_id, currentOwner),
     },
     {
       key: "document_type",
       header: "单据类型",
+      sortable: true,
+      sortValue: (row) => inboundDocumentTypeLabel(inboundDocumentTypeOf(row)),
+      filterValue: (row) => inboundDocumentTypeOf(row),
+      copyValue: (row) => inboundDocumentTypeLabel(inboundDocumentTypeOf(row)),
+      filter: {
+        type: "multiSelect",
+        options: [
+          { label: "采购入库", value: "purchase_inbound" },
+          { label: "销售退货", value: "sales_return" },
+        ],
+      },
       render: (row) => inboundDocumentTypeLabel(inboundDocumentTypeOf(row)),
     },
     {
       key: "product",
       header: "商品 / 数量",
+      copyValue: (row) => {
+        const line = row.lines[0];
+        return `${line?.product_code ?? "-"} ${totalExpectedQty(row)} 件`;
+      },
+      filterValue: (row) => {
+        const line = row.lines[0];
+        return [line?.product_code ?? "", line?.batch_no ?? "", totalExpectedQty(row)].join(" ");
+      },
+      filter: { type: "text" },
       render: (row) => (
         <div className="text-sm">
           <div className="font-medium">{row.lines[0]?.product_code ?? "-"}</div>
@@ -230,17 +310,51 @@ export function M2InboundPage({ mode, onBack }: M2InboundPageProps) {
         </div>
       ),
     },
-    { key: "work_fields", header: workFieldHeader(mode), render: (row) => <WorkFieldSummary order={row} mode={mode} /> },
-    { key: "expected_arrival_at", header: "预计到货", render: (row) => formatDateTime(row.expected_arrival_at) },
+    {
+      key: "work_fields",
+      header: workFieldHeader(mode),
+      filterValue: (row) => workFieldText(row, mode),
+      copyValue: (row) => workFieldText(row, mode),
+      filter: { type: "text" },
+      render: (row) => <WorkFieldSummary order={row} mode={mode} />,
+    },
+    {
+      key: "expected_arrival_at",
+      header: "预计到货",
+      sortable: true,
+      sortValue: (row) => row.expected_arrival_at ?? "",
+      filterValue: (row) => row.expected_arrival_at,
+      copyValue: (row) => formatDateTime(row.expected_arrival_at),
+      filter: { type: "dateRange" },
+      render: (row) => formatDateTime(row.expected_arrival_at),
+    },
     {
       key: "status",
       header: "状态",
+      sortable: true,
+      sortValue: (row) => statusLabel(row.status),
+      filterValue: (row) => row.status,
+      copyValue: (row) => statusLabel(row.status),
+      filter: {
+        type: "multiSelect",
+        options: [
+          { label: "待处理", value: "pending" },
+          { label: "待收货", value: "released" },
+          { label: "收货中", value: "receiving" },
+          { label: "验收中", value: "inspecting" },
+          { label: "上架中", value: "putaway" },
+          { label: "已完成", value: "completed" },
+          { label: "已关闭(拒收)", value: "closed_rejected" },
+        ],
+      },
       render: (row) => <StatusBadge status={statusKey(row.status)} label={statusLabel(row.status)} size="sm" />,
     },
     {
       key: "actions",
       header: "操作",
       align: "right",
+      hideable: false,
+      copyable: false,
       render: (row) => (
         <div className="flex justify-end gap-2">
           <RowButton
@@ -255,26 +369,14 @@ export function M2InboundPage({ mode, onBack }: M2InboundPageProps) {
                 label="收货"
                 onClick={() => openRowDialog(row.id, "receive")}
               />
-              <RowButton
-                icon={<Ban className="size-4" aria-hidden />}
-                label="拒收"
-                onClick={() => openRowDialog(row.id, "reject")}
-              />
             </>
           )}
           {mode === "inspecting" && (
-            <>
-              <RowButton
-                icon={<ClipboardCheck className="size-4" aria-hidden />}
-                label="验收"
-                onClick={() => openRowDialog(row.id, "inspect")}
-              />
-              <RowButton
-                icon={<Signature className="size-4" aria-hidden />}
-                label="双人签字"
-                onClick={() => openRowDialog(row.id, "sign")}
-              />
-            </>
+            <RowButton
+              icon={<ClipboardCheck className="size-4" aria-hidden />}
+              label="验收"
+              onClick={() => openRowDialog(row.id, "inspect")}
+            />
           )}
           {mode === "putaway" && (
             <RowButton
@@ -318,7 +420,7 @@ export function M2InboundPage({ mode, onBack }: M2InboundPageProps) {
           line_no: 1,
           product_code: createForm.productCode.trim(),
           product_id: null,
-          batch_no: createForm.batchNo.trim() || null,
+          batch_no: createAsnBatchNo(createForm.documentType, createForm.batchNo),
           expected_qty: toInteger(createForm.expectedQty),
           production_date: createForm.productionDate || null,
           expiry_date: createForm.expiryDate || null,
@@ -349,8 +451,8 @@ export function M2InboundPage({ mode, onBack }: M2InboundPageProps) {
     setLastEvent(`${order.receipt_no} 收货已提交`);
   }
 
-  async function submitReject(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function submitReject(event?: React.FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
     if (!order) return;
     await rejectMutation.mutateAsync({
       id: order.id,
@@ -377,13 +479,6 @@ export function M2InboundPage({ mode, onBack }: M2InboundPageProps) {
         trace_codes: splitCodes(inspectForm.traceCodes || "TC-M2-0001"),
       },
     });
-    setActiveDialog(null);
-    setLastEvent(`${order.receipt_no} 验收已提交`);
-  }
-
-  async function submitSign(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!order) return;
     await signMutation.mutateAsync({
       id: order.id,
       request: {
@@ -393,7 +488,7 @@ export function M2InboundPage({ mode, onBack }: M2InboundPageProps) {
       },
     });
     setActiveDialog(null);
-    setLastEvent(`${order.receipt_no} 双人签字已提交`);
+    setLastEvent(`${order.receipt_no} 验收已提交`);
   }
 
   async function submitPutaway(event: React.FormEvent<HTMLFormElement>) {
@@ -417,7 +512,7 @@ export function M2InboundPage({ mode, onBack }: M2InboundPageProps) {
   const pageMeta = inboundPageMeta(mode);
 
   return (
-    <section className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 px-6 py-8">
+    <section className="mx-auto flex w-full max-w-[1680px] flex-col gap-5 px-4 py-8 xl:px-6">
         <PageHeader
           title={pageMeta.title}
           subtitle={pageMeta.subtitle}
@@ -459,19 +554,27 @@ export function M2InboundPage({ mode, onBack }: M2InboundPageProps) {
 
         <M2InboundFilterBar
           keyword={keyword}
+          ownerKeyword={ownerKeyword}
           documentTypeFilter={documentTypeFilter}
           statusFilter={statusFilter}
           arrivalDate={arrivalDate}
+          createdAtFrom={createdAtFrom}
+          createdAtTo={createdAtTo}
           onKeywordChange={setKeyword}
+          onOwnerKeywordChange={setOwnerKeyword}
           onDocumentTypeFilterChange={setDocumentTypeFilter}
           onStatusFilterChange={setStatusFilter}
           onArrivalDateChange={setArrivalDate}
+          onCreatedAtFromChange={setCreatedAtFrom}
+          onCreatedAtToChange={setCreatedAtTo}
           onQuery={() => refreshInbound("入库列表已查询")}
           onReset={() => {
             setKeyword("");
-            setDocumentTypeFilter("all");
-            setStatusFilter("all");
+            setOwnerKeyword(currentOwner.ownerCode);
+            setDocumentTypeFilter([]);
+            setStatusFilter([]);
             setArrivalDate("");
+            resetCreatedDateRange();
           }}
         />
 
@@ -481,14 +584,17 @@ export function M2InboundPage({ mode, onBack }: M2InboundPageProps) {
           </div>
         )}
 
-        <DataTable
+        <DataGrid
           columns={orderColumns}
           data={orders}
           rowKey={(row) => row.id}
           selectedKey={selectedId ?? undefined}
           onRowClick={(row) => setSelectedId(row.id)}
-          caption={ordersQuery.isPending ? "加载入库单..." : `共 ${orders.length} 张入库单，点击行选择，操作按钮弹窗处理`}
+          caption={ordersQuery.isPending ? "加载入库单..." : undefined}
           emptyTitle="暂无入库单"
+          storageKey="m2-inbound-datagrid"
+          tableClassName="min-w-[1680px]"
+          selectable
         />
 
         <M2InboundDialogs
@@ -516,10 +622,15 @@ export function M2InboundPage({ mode, onBack }: M2InboundPageProps) {
           submitReceive={submitReceive}
           submitReject={submitReject}
           submitInspect={submitInspect}
-          submitSign={submitSign}
           submitPutaway={submitPutaway}
         />
-        <M2InboundDetailDialog order={order} defaultStage={detailStageFromMode(mode)} open={detailOpen} onOpenChange={setDetailOpen} />
+        <M2InboundDetailDialog
+          order={order}
+          currentOwner={currentOwner}
+          defaultStage={detailStageFromMode(mode)}
+          open={detailOpen}
+          onOpenChange={setDetailOpen}
+        />
     </section>
   );
 }
@@ -567,153 +678,11 @@ function Metric({ label, value, tone }: { label: string; value: number; tone: "p
 }
 
 function WorkFieldSummary({ order, mode }: { order: ReceivingOrder; mode: M2InboundMode }) {
-  const line = order.lines[0];
-  const content = {
-    receiving: [`供应商 ${shortId(order.supplier_id ?? "00000000")}`, "承运商 华东冷链 / 车牌沪A-12345"],
-    inspecting: [`批号 ${line?.batch_no ?? "-"}`, `效期 ${line?.expiry_date ?? "-"} / 质量待验`],
-    putaway: [`推荐 A-01-01 / 实际待录入`, "LPN-M2-PC-0001 / 校验待执行"],
-  }[mode];
+  const content = workFieldText(order, mode);
   return (
     <div className="text-sm">
       <div className="font-medium">{content[0]}</div>
       <div className="text-xs text-muted-foreground">{content[1]}</div>
     </div>
   );
-}
-
-function workFieldHeader(mode: M2InboundMode) {
-  const headers: Record<M2InboundMode, string> = {
-    receiving: "供应商 / 承运",
-    inspecting: "批号 / 质量",
-    putaway: "库位 / LPN",
-  };
-  return headers[mode];
-}
-
-function filterOrders(
-  orders: ReceivingOrder[],
-  keyword: string,
-  documentTypeFilter: InboundDocumentTypeFilter,
-  statusFilter: StatusFilter,
-  arrivalDate: string,
-) {
-  const normalized = keyword.trim().toLowerCase();
-  return orders.filter((order) => {
-    const documentType = inboundDocumentTypeOf(order);
-    const matchesDocumentType = matchesInboundDocumentTypeFilter(order, documentTypeFilter);
-    const matchesStatus = matchesStatusFilter(order.status, statusFilter);
-    const matchesDate = !arrivalDate || order.expected_arrival_at?.slice(0, 10) === arrivalDate;
-    const searchable = [
-      order.receipt_no,
-      order.status,
-      inboundDocumentTypeLabel(documentType),
-      ...order.lines.flatMap((line) => [line.product_code, line.batch_no ?? ""]),
-    ]
-      .join(" ")
-      .toLowerCase();
-    return matchesDocumentType && matchesStatus && matchesDate && (!normalized || searchable.includes(normalized));
-  });
-}
-
-function defaultStatusFilter(mode: M2InboundMode): StatusFilter {
-  return mode;
-}
-
-function detailStageFromMode(mode: M2InboundMode) {
-  const map = { receiving: "receiving", inspecting: "inspection", putaway: "putaway" } as const;
-  return map[mode];
-}
-
-function inboundPageMeta(mode: M2InboundMode) {
-  const meta: Record<M2InboundMode, { title: string; subtitle: string }> = {
-    receiving: {
-      title: "M2 收货管理",
-      subtitle: "ASN 接收 · 到货登记 · 实到/缺货/拒收",
-    },
-    inspecting: {
-      title: "M2 验收管理",
-      subtitle: "批号效期验收 · 追溯码 · 双人签字",
-    },
-    putaway: {
-      title: "M2 上架管理",
-      subtitle: "库位确认 · 商品批号 · 数量上架",
-    },
-  };
-  return meta[mode];
-}
-
-function countByStatus(orders: ReceivingOrder[], status: string) {
-  return orders.filter((order) => (status === "receiving" ? canReceiveOrReject(order.status) : order.status === status)).length;
-}
-
-function matchesStatusFilter(status: string, filter: StatusFilter) {
-  if (filter === "all") return true;
-  if (filter === "receiving") return canReceiveOrReject(status);
-  return status === filter;
-}
-
-function canReceiveOrReject(status: string) {
-  return status === "released" || status === "receiving";
-}
-
-function statusKey(status: string): StatusKey {
-  if (status === "completed") return "completed";
-  if (status.includes("receiv") || status.includes("inspect") || status.includes("putaway")) return "in_progress";
-  if (status.includes("reject") || status.includes("closed")) return "unqualified";
-  return "pending";
-}
-
-function statusLabel(status: string) {
-  const labels: Record<string, string> = {
-    pending: "待处理",
-    released: "待收货",
-    receiving: "收货中",
-    inspecting: "验收中",
-    putaway: "上架中",
-    completed: "已完成",
-    closed_rejected: "已关闭(拒收)",
-  };
-  return labels[status] ?? status;
-}
-
-function totalExpectedQty(order: ReceivingOrder) {
-  return order.lines.reduce((sum, line) => sum + line.expected_qty, 0);
-}
-
-function productTemperatureAttribute(productCode: string | null | undefined) {
-  // ponytail: ReceivingOrderLine 还没有商品温度属性；后端补字段后替换这里。
-  if (!productCode) return "常温";
-  if (/冻|FROZEN/i.test(productCode)) return "冷冻";
-  if (/冷|COLD|P-M2-002/i.test(productCode)) return "冷藏";
-  return "常温";
-}
-
-function temperatureControlFromProductAttribute(attribute: string) {
-  if (attribute === "冷冻") return "冷冻车";
-  if (attribute === "冷藏") return "冷藏车";
-  return "常温";
-}
-
-function toInteger(value: string) {
-  const parsed = Number.parseInt(value, 10);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function splitCodes(value: string) {
-  return value.split(/\s+/).map((item) => item.trim()).filter(Boolean);
-}
-
-function dateToIso(value: string) {
-  return value ? `${value}T10:00:00.000Z` : null;
-}
-
-function shortId(value: string) {
-  return value.slice(0, 8);
-}
-
-function formatDateTime(value: string | null | undefined) {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("zh-CN", { hour12: false });
 }

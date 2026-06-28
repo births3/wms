@@ -7,44 +7,71 @@
  * 业务约束：筛选和重置在页面内直接操作，不使用弹窗。
  *
  * @example
- *   <M2InboundFilterBar statusFilter="receiving" ... />
+ *   <M2InboundFilterBar statusFilter={["receiving"]} ... />
  */
 
-import { Button, Card, CardContent, Input } from "@wms/ui";
+import * as React from "react";
+import { Button, Card, CardContent, Checkbox, Input } from "@wms/ui";
 import { Search } from "lucide-react";
 
-import type { InboundDocumentTypeFilter } from "./m2-inbound-document-type";
+import type { InboundDocumentType, InboundDocumentTypeFilter } from "./m2-inbound-document-type";
 
-export type StatusFilter = "all" | "receiving" | "inspecting" | "putaway" | "completed" | "closed_rejected";
+export type StatusFilterValue = "receiving" | "inspecting" | "putaway" | "completed" | "closed_rejected";
+export type StatusFilter = StatusFilterValue[];
+
+const documentTypeOptions: Array<{ value: InboundDocumentType; label: string }> = [
+  { value: "purchase_inbound", label: "采购入库" },
+  { value: "sales_return", label: "销售退货" },
+];
+
+const statusOptions: Array<{ value: StatusFilterValue; label: string }> = [
+  { value: "receiving", label: "待收货/收货中" },
+  { value: "inspecting", label: "验收中" },
+  { value: "putaway", label: "上架中" },
+  { value: "completed", label: "已完成" },
+  { value: "closed_rejected", label: "已关闭(拒收)" },
+];
 
 interface M2InboundFilterBarProps {
   keyword: string;
+  ownerKeyword: string;
   documentTypeFilter: InboundDocumentTypeFilter;
   statusFilter: StatusFilter;
   arrivalDate: string;
+  createdAtFrom: string;
+  createdAtTo: string;
   onKeywordChange: (value: string) => void;
+  onOwnerKeywordChange: (value: string) => void;
   onDocumentTypeFilterChange: (value: InboundDocumentTypeFilter) => void;
   onStatusFilterChange: (value: StatusFilter) => void;
   onArrivalDateChange: (value: string) => void;
+  onCreatedAtFromChange: (value: string) => void;
+  onCreatedAtToChange: (value: string) => void;
   onQuery: () => void;
   onReset: () => void;
 }
 
 export function M2InboundFilterBar({
   keyword,
+  ownerKeyword,
   documentTypeFilter,
   statusFilter,
   arrivalDate,
+  createdAtFrom,
+  createdAtTo,
   onKeywordChange,
+  onOwnerKeywordChange,
   onDocumentTypeFilterChange,
   onStatusFilterChange,
   onArrivalDateChange,
+  onCreatedAtFromChange,
+  onCreatedAtToChange,
   onQuery,
   onReset,
 }: M2InboundFilterBarProps) {
   return (
     <Card className="rounded-lg shadow-sm">
-      <CardContent className="grid gap-3 p-4 md:grid-cols-[minmax(16rem,1fr)_9rem_10rem_9rem_auto] md:items-end">
+      <CardContent className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-[minmax(14rem,1fr)_10rem_9rem_10rem_9rem_18rem_auto] xl:items-end">
         <div>
           <label className="mb-1 block text-xs text-muted-foreground">关键字</label>
           <div className="relative">
@@ -58,35 +85,41 @@ export function M2InboundFilterBar({
           </div>
         </div>
         <div>
+          <label className="mb-1 block text-xs text-muted-foreground">货主</label>
+          <Input
+            value={ownerKeyword}
+            onChange={(event) => onOwnerKeywordChange(event.target.value)}
+            placeholder="货主编码 / ID"
+          />
+        </div>
+        <div>
           <label className="mb-1 block text-xs text-muted-foreground">单据类型</label>
-          <select
-            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+          <MultiSelectFilter
+            label="单据类型"
+            options={documentTypeOptions}
             value={documentTypeFilter}
-            onChange={(event) => onDocumentTypeFilterChange(event.target.value as InboundDocumentTypeFilter)}
-          >
-            <option value="all">全部</option>
-            <option value="purchase_inbound">采购入库</option>
-            <option value="sales_return">销售退货</option>
-          </select>
+            onChange={(value) => onDocumentTypeFilterChange(value as InboundDocumentTypeFilter)}
+          />
         </div>
         <div>
           <label className="mb-1 block text-xs text-muted-foreground">状态</label>
-          <select
-            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+          <MultiSelectFilter
+            label="状态"
+            options={statusOptions}
             value={statusFilter}
-            onChange={(event) => onStatusFilterChange(event.target.value as StatusFilter)}
-          >
-            <option value="all">全部</option>
-            <option value="receiving">待收货/收货中</option>
-            <option value="inspecting">验收中</option>
-            <option value="putaway">上架中</option>
-            <option value="completed">已完成</option>
-            <option value="closed_rejected">已关闭(拒收)</option>
-          </select>
+            onChange={(value) => onStatusFilterChange(value as StatusFilter)}
+          />
         </div>
         <div>
           <label className="mb-1 block text-xs text-muted-foreground">预计到货</label>
           <Input type="date" value={arrivalDate} onChange={(event) => onArrivalDateChange(event.target.value)} />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-muted-foreground">创建时间（默认近90天）</label>
+          <div className="grid grid-cols-2 gap-2">
+            <Input type="date" value={createdAtFrom} onChange={(event) => onCreatedAtFromChange(event.target.value)} />
+            <Input type="date" value={createdAtTo} onChange={(event) => onCreatedAtToChange(event.target.value)} />
+          </div>
         </div>
         <div className="grid grid-cols-2 gap-2 md:grid-cols-1 xl:grid-cols-2">
           <Button type="button" className="w-full whitespace-nowrap" onClick={onQuery}>
@@ -99,5 +132,68 @@ export function M2InboundFilterBar({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function MultiSelectFilter<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: Array<{ value: T; label: string }>;
+  value: T[];
+  onChange: (value: T[]) => void;
+}) {
+  const rootRef = React.useRef<HTMLDivElement | null>(null);
+  const [open, setOpen] = React.useState(false);
+  const selectedLabels = options.filter((option) => value.includes(option.value)).map((option) => option.label);
+
+  React.useEffect(() => {
+    if (!open) return;
+    function close(event: PointerEvent) {
+      const target = event.target instanceof Element ? event.target : null;
+      if (target && rootRef.current?.contains(target)) return;
+      setOpen(false);
+    }
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [open]);
+
+  function toggle(optionValue: T, checked: boolean) {
+    const next = new Set(value);
+    if (checked) next.add(optionValue);
+    else next.delete(optionValue);
+    onChange(Array.from(next));
+  }
+
+  return (
+    <div ref={rootRef} className="relative">
+      <Button
+        type="button"
+        variant="outline"
+        className="h-10 w-full justify-between px-3 font-normal"
+        aria-label={`筛选${label}`}
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <span className="truncate">{selectedLabels.length > 0 ? selectedLabels.join("、") : "全部"}</span>
+      </Button>
+      {open && (
+        <div className="absolute z-30 mt-2 grid w-full min-w-48 gap-2 rounded-md border bg-background p-3 text-sm shadow-lg">
+          {options.map((option) => {
+            const checked = value.includes(option.value);
+            const checkboxId = `${label}-${option.value}`;
+            return (
+              <label key={option.value} htmlFor={checkboxId} className="flex items-center gap-2 text-muted-foreground">
+                <Checkbox id={checkboxId} checked={checked} onCheckedChange={(next) => toggle(option.value, next === true)} />
+                <span className="truncate">{option.label}</span>
+              </label>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }

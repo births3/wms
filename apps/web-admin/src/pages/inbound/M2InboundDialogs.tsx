@@ -22,11 +22,11 @@ import {
   DialogTitle,
   Input,
 } from "@wms/ui";
-import { Ban, CheckCircle2, ClipboardCheck, PackageCheck, Plus, Signature } from "lucide-react";
+import { Ban, CheckCircle2, ClipboardCheck, PackageCheck, Plus } from "lucide-react";
 
 import type { InboundDocumentType } from "./m2-inbound-document-type";
 
-export type InboundDialog = "create" | "receive" | "reject" | "inspect" | "sign" | "putaway";
+export type InboundDialog = "create" | "receive" | "reject" | "inspect" | "putaway";
 
 export interface CreateFormState {
   receiptNo: string;
@@ -128,9 +128,8 @@ interface M2InboundDialogsProps {
   setPutawayForm: React.Dispatch<React.SetStateAction<PutawayFormState>>;
   submitCreate: (event: React.FormEvent<HTMLFormElement>) => void;
   submitReceive: (event: React.FormEvent<HTMLFormElement>) => void;
-  submitReject: (event: React.FormEvent<HTMLFormElement>) => void;
+  submitReject: (event?: React.FormEvent<HTMLFormElement>) => void;
   submitInspect: (event: React.FormEvent<HTMLFormElement>) => void;
-  submitSign: (event: React.FormEvent<HTMLFormElement>) => void;
   submitPutaway: (event: React.FormEvent<HTMLFormElement>) => void;
 }
 
@@ -159,7 +158,6 @@ export function M2InboundDialogs({
   submitReceive,
   submitReject,
   submitInspect,
-  submitSign,
   submitPutaway,
 }: M2InboundDialogsProps) {
   if (!activeDialog) return null;
@@ -201,7 +199,9 @@ export function M2InboundDialogs({
             <TextField label="仓库 ID" value={createForm.warehouseId} onChange={(warehouseId) => setCreateForm((value) => ({ ...value, warehouseId }))} />
             <TextField label="预计到货" type="date" value={createForm.expectedArrivalDate} onChange={(expectedArrivalDate) => setCreateForm((value) => ({ ...value, expectedArrivalDate }))} />
             <TextField label="ASN 商品编码" value={createForm.productCode} onChange={(productCode) => setCreateForm((value) => ({ ...value, productCode }))} />
-            <TextField label="ASN 批号" value={createForm.batchNo} onChange={(batchNo) => setCreateForm((value) => ({ ...value, batchNo }))} />
+            {createForm.documentType === "sales_return" && (
+              <TextField label="ASN 批号" value={createForm.batchNo} onChange={(batchNo) => setCreateForm((value) => ({ ...value, batchNo }))} />
+            )}
             <TextField label="预报数量" type="number" value={createForm.expectedQty} onChange={(expectedQty) => setCreateForm((value) => ({ ...value, expectedQty }))} />
             <TextField label="生产日期" type="date" value={createForm.productionDate} onChange={(productionDate) => setCreateForm((value) => ({ ...value, productionDate }))} />
             <TextField label="有效期至" type="date" value={createForm.expiryDate} onChange={(expiryDate) => setCreateForm((value) => ({ ...value, expiryDate }))} />
@@ -248,6 +248,23 @@ export function M2InboundDialogs({
             <TextField label="备案件样式核对" value={receiveForm.filingChecked} onChange={(filingChecked) => setReceiveForm((value) => ({ ...value, filingChecked }))} />
             <TextField label="第二收货员验证" value={receiveForm.secondReceiverId} onChange={(secondReceiverId) => setReceiveForm((value) => ({ ...value, secondReceiverId }))} />
             <TextField className="md:col-span-3" label="异常备注" value={receiveForm.note} onChange={(note) => setReceiveForm((value) => ({ ...value, note }))} />
+            <section className="grid gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 md:col-span-3">
+              <div>
+                <div className="text-sm font-medium text-destructive">整单拒收</div>
+                <div className="mt-1 text-xs text-muted-foreground">整单拒收会关闭当前入库单。</div>
+              </div>
+              <TextField
+                label="拒收原因"
+                value={rejectForm.reason}
+                onChange={(reason) => setRejectForm((value) => ({ ...value, reason }))}
+              />
+              <div className="flex justify-end">
+                <Button type="button" variant="destructive" disabled={!hasOrder || pending || !rejectForm.reason.trim()} onClick={() => submitReject()}>
+                  <Ban className="size-4" aria-hidden />
+                  整单拒收
+                </Button>
+              </div>
+            </section>
             <DialogFooter className="md:col-span-3">
               <CancelButton />
               <SubmitButton icon={<CheckCircle2 className="size-4" />} label="确认收货" disabled={!hasOrder || pending} />
@@ -291,31 +308,21 @@ export function M2InboundDialogs({
             <TextField label="包装核对" value={inspectForm.packageCheck} onChange={(packageCheck) => setInspectForm((value) => ({ ...value, packageCheck }))} />
             <TextField label="说明书核对" value={inspectForm.instructionCheck} onChange={(instructionCheck) => setInspectForm((value) => ({ ...value, instructionCheck }))} />
             <TextField label="标签核对" value={inspectForm.labelCheck} onChange={(labelCheck) => setInspectForm((value) => ({ ...value, labelCheck }))} />
+            <section className="grid gap-3 rounded-md border bg-muted/20 p-3 md:col-span-2 md:grid-cols-2">
+              <div className="text-xs font-medium text-muted-foreground md:col-span-2">验收复核</div>
+              <TextField label="第一签字人" value={signForm.firstSignerId} onChange={(firstSignerId) => setSignForm((value) => ({ ...value, firstSignerId }))} />
+              <TextField label="第二签字人" value={signForm.secondSignerId} onChange={(secondSignerId) => setSignForm((value) => ({ ...value, secondSignerId }))} />
+              <TextField label="策略命中说明" value={signForm.strategyNote} onChange={(strategyNote) => setSignForm((value) => ({ ...value, strategyNote }))} />
+              <TextField label="签字备注" value={signForm.note} onChange={(note) => setSignForm((value) => ({ ...value, note }))} />
+              <label className="flex items-center gap-2 text-sm text-muted-foreground md:col-span-2">
+                <input type="checkbox" checked={signForm.dualRequired} onChange={(event) => setSignForm((value) => ({ ...value, dualRequired: event.target.checked }))} />
+                需要双人签字
+              </label>
+            </section>
             <TextField className="md:col-span-2" label="验收备注" value={inspectForm.note} onChange={(note) => setInspectForm((value) => ({ ...value, note }))} />
             <DialogFooter className="md:col-span-2">
               <CancelButton />
               <SubmitButton icon={<ClipboardCheck className="size-4" />} label="提交验收" disabled={!hasOrder || pending} />
-            </DialogFooter>
-          </form>
-        )}
-
-        {activeDialog === "sign" && (
-          <form className="grid gap-3" onSubmit={submitSign}>
-            <DialogHeader>
-              <DialogTitle>双人签字</DialogTitle>
-              <DialogDescription>{orderReceiptNo ?? "未选择入库单"}</DialogDescription>
-            </DialogHeader>
-            <TextField label="第一签字人" value={signForm.firstSignerId} onChange={(firstSignerId) => setSignForm((value) => ({ ...value, firstSignerId }))} />
-            <TextField label="第二签字人" value={signForm.secondSignerId} onChange={(secondSignerId) => setSignForm((value) => ({ ...value, secondSignerId }))} />
-            <TextField label="策略命中说明" value={signForm.strategyNote} onChange={(strategyNote) => setSignForm((value) => ({ ...value, strategyNote }))} />
-            <TextField label="签字备注" value={signForm.note} onChange={(note) => setSignForm((value) => ({ ...value, note }))} />
-            <label className="flex items-center gap-2 text-sm text-muted-foreground">
-              <input type="checkbox" checked={signForm.dualRequired} onChange={(event) => setSignForm((value) => ({ ...value, dualRequired: event.target.checked }))} />
-              需要双人签字
-            </label>
-            <DialogFooter>
-              <CancelButton />
-              <SubmitButton icon={<Signature className="size-4" />} label="双人签字" disabled={!hasOrder || pending} />
             </DialogFooter>
           </form>
         )}

@@ -21,19 +21,29 @@ import {
 } from "@wms/ui";
 
 import type { ReceivingOrder } from "@/features/inbound/inbound-queries";
+import {
+  batchInfoRows,
+  inboundDetailStageIndex,
+  inboundDetailStages,
+  orderLicenseRows,
+  productInfoRows,
+  processDetail,
+  type InboundDetailStage,
+  type ProcessState,
+} from "./m2-inbound-detail-view-model";
 import { inboundDocumentTypeLabel, inboundDocumentTypeOf } from "./m2-inbound-document-type";
+import { formatDateTime, ownerLabel, totalExpectedQty, type OwnerContext } from "./m2-inbound-page-helpers";
 
 interface M2InboundDetailDialogProps {
   order: ReceivingOrder | null;
-  defaultStage: DetailStage;
+  currentOwner: OwnerContext;
+  defaultStage: InboundDetailStage;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-type DetailStage = "receiving" | "inspection" | "sign" | "putaway" | "completed";
-
-export function M2InboundDetailDialog({ order, defaultStage, open, onOpenChange }: M2InboundDetailDialogProps) {
-  const [selectedStage, setSelectedStage] = React.useState<DetailStage>(defaultStage);
+export function M2InboundDetailDialog({ order, currentOwner, defaultStage, open, onOpenChange }: M2InboundDetailDialogProps) {
+  const [selectedStage, setSelectedStage] = React.useState<InboundDetailStage>(defaultStage);
 
   React.useEffect(() => {
     if (open) setSelectedStage(defaultStage);
@@ -44,49 +54,58 @@ export function M2InboundDetailDialog({ order, defaultStage, open, onOpenChange 
   const lineSummary = order.lines.length > 1 ? ` 等 ${order.lines.length} 行` : "";
   const expectedQty = totalExpectedQty(order);
   const documentType = inboundDocumentTypeOf(order);
-  const isSalesReturn = documentType === "sales_return";
-  const currentStage = stageIndex(order.status);
+  const currentStage = inboundDetailStageIndex(order.status);
   const selectedProcess = processDetail(selectedStage, expectedQty, currentStage);
-  const overviewRows: Array<[string, string]> = [
+  const orderRows: Array<[string, string]> = [
     ["单据状态", statusLabel(order.status)],
     ["单据类型", inboundDocumentTypeLabel(documentType)],
+    ["货主", ownerLabel(order.owner_id, currentOwner)],
     ["供应商", shortId(order.supplier_id)],
+    ["采购员", "采购员 0101"],
     ["仓库", shortId(order.warehouse_id)],
     ["预计到货", formatDateTime(order.expected_arrival_at)],
-    ["商品概要", line ? `${line.product_code}${lineSummary}` : "-"],
-  ];
-  if (isSalesReturn) {
-    overviewRows.push(["原销售批号", line?.batch_no ? `${line.batch_no}${lineSummary}` : "-"]);
-  }
-  overviewRows.push(
-    ["生产 / 有效期", `${line?.production_date ?? "-"} / ${line?.expiry_date ?? "-"}`],
     ["预报数量", `${expectedQty} 件`],
-  );
+    ...orderLicenseRows(order),
+  ];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
+      <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] max-w-none overflow-y-auto p-4 sm:p-6 lg:w-[92vw] 2xl:w-[1440px]">
         <DialogHeader>
           <DialogTitle>订单详情</DialogTitle>
-          <DialogDescription>{order.receipt_no}</DialogDescription>
+          <DialogDescription>{order.receipt_no} · {line ? `${line.product_code}${lineSummary}` : "-"}</DialogDescription>
         </DialogHeader>
 
-        <OverviewGrid rows={overviewRows} />
+        <ProductInfoBlock order={order} />
 
-        <InboundStatusRail currentStage={currentStage} selectedStage={selectedStage} onSelect={setSelectedStage} />
+        <Section title="订单信息">
+          <OverviewGrid rows={orderRows} />
+          <BatchInfoBlock order={order} />
+        </Section>
 
-        <ProcessBlock title={selectedProcess.title} state={selectedProcess.state} rows={selectedProcess.rows} />
+        <Section title="收货信息">
+          <InboundStatusRail currentStage={currentStage} selectedStage={selectedStage} onSelect={setSelectedStage} />
 
-        <LinesBlock order={order} showBatch={isSalesReturn} />
+          <ProcessBlock title={selectedProcess.title} state={selectedProcess.state} rows={selectedProcess.rows} />
+        </Section>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="grid gap-3">
+      <div className="text-sm font-semibold">{title}</div>
+      {children}
+    </section>
   );
 }
 
 function OverviewGrid({ rows }: { rows: Array<[string, string]> }) {
   return (
     <section className="rounded-md border bg-muted/20">
-      <div className="grid divide-y sm:grid-cols-4 sm:divide-x sm:divide-y-0">
+      <div className="grid divide-y sm:grid-cols-3 lg:grid-cols-6 sm:divide-x sm:divide-y-0">
         {rows.map(([label, value]) => (
           <div key={label} className="px-4 py-3">
             <div className="text-xs text-muted-foreground">{label}</div>
@@ -104,20 +123,12 @@ function InboundStatusRail({
   onSelect,
 }: {
   currentStage: number;
-  selectedStage: DetailStage;
-  onSelect: (stage: DetailStage) => void;
+  selectedStage: InboundDetailStage;
+  onSelect: (stage: InboundDetailStage) => void;
 }) {
-  const stages: Array<{ label: string; stage: DetailStage; index: number }> = [
-    { label: "收货", stage: "receiving", index: 0 },
-    { label: "验收", stage: "inspection", index: 1 },
-    { label: "双人签字", stage: "sign", index: 2 },
-    { label: "上架", stage: "putaway", index: 3 },
-    { label: "完成", stage: "completed", index: 4 },
-  ];
-
   return (
-    <div className="grid gap-3 md:grid-cols-5">
-      {stages.map(({ label, stage, index }) => {
+    <div className="grid gap-3 md:grid-cols-4">
+      {inboundDetailStages.map(({ label, stage, index }) => {
         const done = index < currentStage;
         const active = index === currentStage;
         const selected = stage === selectedStage;
@@ -158,7 +169,7 @@ function ProcessBlock({ title, state, rows }: { title: string; state: ProcessSta
         <div className="text-xs font-medium text-muted-foreground">{title}</div>
         <StatusBadge status={state.status} label={state.label} size="sm" />
       </div>
-      <div className="grid gap-3 p-4 sm:grid-cols-2">
+      <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {rows.map(([label, value]) => (
           <div key={label} className="rounded-md border bg-background px-3 py-2 text-sm">
             <div className="text-xs text-muted-foreground">{label}</div>
@@ -170,115 +181,100 @@ function ProcessBlock({ title, state, rows }: { title: string; state: ProcessSta
   );
 }
 
-function LinesBlock({ order, showBatch }: { order: ReceivingOrder; showBatch: boolean }) {
-  const rowClass = showBatch
-    ? "grid gap-2 px-4 py-3 text-sm md:grid-cols-[4rem_1fr_1fr_6rem]"
-    : "grid gap-2 px-4 py-3 text-sm md:grid-cols-[4rem_1fr_6rem]";
+function ProductInfoBlock({ order }: { order: ReceivingOrder }) {
+  const rows = productInfoRows(order);
+  return (
+    <Section title="商品信息">
+      <div className="rounded-md border">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1180px] text-sm">
+            <thead className="bg-muted/20 text-xs text-muted-foreground">
+              <tr>
+                <th className="px-4 py-2 text-left font-medium">商品编码</th>
+                <th className="px-4 py-2 text-left font-medium">品名</th>
+                <th className="px-4 py-2 text-left font-medium">规格</th>
+                <th className="px-4 py-2 text-left font-medium">生产厂家</th>
+                <th className="px-4 py-2 text-right font-medium">订单数量</th>
+                <th className="px-4 py-2 text-left font-medium">单位</th>
+                <th className="px-4 py-2 text-right font-medium">件数</th>
+                <th className="px-4 py-2 text-right font-medium">零数</th>
+                <th className="px-4 py-2 text-left font-medium">中包数量</th>
+                <th className="px-4 py-2 text-left font-medium">件包数量</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {rows.map((item) => (
+                <tr key={item.key}>
+                  <td className="px-4 py-2 font-medium">{item.productCode}</td>
+                  <td className="px-4 py-2">{item.productName}</td>
+                  <td className="px-4 py-2">{item.specification}</td>
+                  <td className="px-4 py-2">{item.manufacturer}</td>
+                  <td className="px-4 py-2 text-right">{item.orderQty}</td>
+                  <td className="px-4 py-2">{item.unit}</td>
+                  <td className="px-4 py-2 text-right">{item.caseQty}</td>
+                  <td className="px-4 py-2 text-right">{item.looseQty}</td>
+                  <td className="px-4 py-2">{item.middlePackQty}</td>
+                  <td className="px-4 py-2">{item.casePackQty}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </Section>
+  );
+}
+
+function BatchInfoBlock({ order }: { order: ReceivingOrder }) {
+  const rows = batchInfoRows(order);
   return (
     <div className="rounded-md border">
-      <div className="border-b bg-muted/40 px-4 py-2.5 text-xs text-muted-foreground">入库明细</div>
-      <div className="divide-y">
-        {order.lines.map((item) => (
-          <div key={item.line_no} className={rowClass}>
-            <span className="text-muted-foreground">#{item.line_no}</span>
-            <span className="font-medium">{item.product_code}</span>
-            {showBatch && <span>{item.batch_no ?? "-"}</span>}
-            <span className="text-right">{item.expected_qty} 件</span>
-          </div>
-        ))}
+      <div className="border-b bg-muted/40 px-4 py-2.5 text-xs font-medium text-muted-foreground">批号明细</div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[1280px] text-sm">
+          <thead className="bg-muted/20 text-xs text-muted-foreground">
+            <tr>
+              <th className="px-4 py-2 text-left font-medium">行号</th>
+              <th className="px-4 py-2 text-left font-medium">批号</th>
+              <th className="px-4 py-2 text-left font-medium">批准文号</th>
+              <th className="px-4 py-2 text-left font-medium">进口注册证</th>
+              <th className="px-4 py-2 text-left font-medium">上市持有人</th>
+              <th className="px-4 py-2 text-right font-medium">批号数量</th>
+              <th className="px-4 py-2 text-left font-medium">批号件包装</th>
+              <th className="px-4 py-2 text-left font-medium">生产日期</th>
+              <th className="px-4 py-2 text-left font-medium">有效期</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {rows.map((item) => (
+              <tr key={item.key}>
+                <td className="px-4 py-2 text-muted-foreground">{item.lineNo}</td>
+                <td className="px-4 py-2">{item.batchNo}</td>
+                <td className="px-4 py-2">{item.approvalNo}</td>
+                <td className="px-4 py-2">{item.importRegistrationCertificate}</td>
+                <td className="px-4 py-2">{item.marketingAuthorizationHolder}</td>
+                <td className="px-4 py-2 text-right">{item.batchQty}</td>
+                <td className="px-4 py-2">{item.batchCasePackage}</td>
+                <td className="px-4 py-2">{item.productionDate}</td>
+                <td className="px-4 py-2">{item.expiryDate}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
 }
 
-function totalExpectedQty(order: ReceivingOrder) {
-  return order.lines.reduce((sum, line) => sum + line.expected_qty, 0);
-}
-
-function stageIndex(status: string) {
-  if (status === "completed") return 4;
-  if (status.includes("putaway")) return 3;
-  if (status.includes("inspect")) return 1;
-  if (status.includes("receiv")) return 0;
-  return 0;
-}
-
-interface ProcessState {
-  label: string;
-  status: "completed" | "in_progress" | "pending";
-}
-
-function processState(index: number, current: number): ProcessState {
-  if (index < current) return { label: "已完成", status: "completed" };
-  if (index === current) return { label: "当前", status: "in_progress" };
-  return { label: "待处理", status: "pending" };
-}
-
-function processDetail(stage: DetailStage, expectedQty: number, currentStage: number) {
-  const map = {
-    receiving: {
-      title: "收货信息",
-      state: processState(0, currentStage),
-      rows: [
-        ["承运商 / 车牌", "华东冷链 / 沪A-12345"],
-        ["发运地点", "上海配送中心"],
-        ["启运 / 到货", "2026-06-27 08:00 / 2026-06-27 10:00"],
-        ["入库时间", "2026-06-27 10:15"],
-        ["运输 / 温控 / 温度", "冷藏车 / 冷藏车 / 20℃"],
-        ["联系人", "张三 / 13800000000 / 310101********0000"],
-        ["随货核对", "印章已核对 / 备案件已核对"],
-        ["数量闭合", `${expectedQty} / ${expectedQty} / 0 / 0 件`],
-        ["第二收货员", "收货员 0102"],
-        ["异常备注", "-"],
-      ],
-    },
-    inspection: {
-      title: "验收信息",
-      state: processState(1, currentStage),
-      rows: [
-        ["通过 / 拒收", `${expectedQty} / 0 件`],
-        ["追溯码", "TC-M2-PC-0001"],
-        ["质量状态", "合格"],
-        ["四项核对", "外观 / 包装 / 说明书 / 标签均合格"],
-        ["验收备注", "-"],
-      ],
-    },
-    sign: {
-      title: "双人签字信息",
-      state: processState(2, currentStage),
-      rows: [
-        ["双人策略", "验收节点命中双人扫码"],
-        ["签字人", "验收员 0101 / 复核员 0102"],
-        ["签字备注", "-"],
-      ],
-    },
-    putaway: {
-      title: "上架信息",
-      state: processState(3, currentStage),
-      rows: [
-        ["容器 LPN", "LPN-M2-PC-0001"],
-        ["推荐库位", "A-01-01 / A-01-02 / A-02-01"],
-        ["实际库位", "待录入"],
-        ["校验结果", "待执行"],
-        ["上架备注", "-"],
-      ],
-    },
-    completed: {
-      title: "完成信息",
-      state: processState(4, currentStage),
-      rows: [["完成状态", currentStage >= 4 ? "已完成" : "未完成"]],
-    },
-  } satisfies Record<DetailStage, { title: string; state: ProcessState; rows: Array<[string, string]> }>;
-  return map[stage];
-}
-
 function statusLabel(status: string) {
   const labels: Record<string, string> = {
     pending: "待处理",
+    released: "待收货",
     receiving: "收货中",
     inspecting: "验收中",
     putaway: "上架中",
     completed: "已完成",
+    closed_rejected: "已关闭(拒收)",
   };
   return labels[status] ?? status;
 }
@@ -286,11 +282,4 @@ function statusLabel(status: string) {
 function shortId(value: string | null | undefined) {
   if (!value) return "-";
   return value.slice(0, 8);
-}
-
-function formatDateTime(value: string | null | undefined) {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("zh-CN", { hour12: false });
 }
