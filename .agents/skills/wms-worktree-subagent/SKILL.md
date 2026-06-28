@@ -84,17 +84,45 @@ codex exec -C ../wms-agent-<slug> -s read-only -o ../wms-agent-<slug>.out.md "<�
 - 剩余问题/需要确认事项
 ```
 
-## 主代理复盘
+## 主代理复盘与合并
 
 子代理完成后，主代理在主工作区检查：
 
 ```bash
+git status --short --branch
 git -C ../wms-agent-<slug> status --short --branch
 git -C ../wms-agent-<slug> log --oneline -5
-git -C ../wms-agent-<slug> diff --stat HEAD~1..HEAD
+git -C ../wms-agent-<slug> diff --stat
+git -C ../wms-agent-<slug> show --stat --oneline <hash>  # 子代理有提交时
 ```
 
-只有子代理所有必需验证通过且最终输出写明“可合并”时，主代理才考虑合并。需要合并时，优先在主工作区 `git merge --no-ff agent/<slug>`；如果只要部分提交，用 `git cherry-pick <hash>`。未提交或验证失败的子代理产物只能当草稿，按文件级 diff 手工挑选。
+主代理只在以下条件全部满足时考虑合并：
+
+- 主工作区没有无关脏改动；如有，先停下说明，不用 stash 掩盖。
+- 子代理最终输出写明“可合并”。
+- 子代理列出的验证命令和退出码满足任务提示词。
+- 子代理修改文件都在授权写入范围内。
+- 子代理没有推送、没有改 main、没有提交真实凭据或生产数据。
+
+合并方式按产物形态选择：
+
+- 子代理有本地提交：优先在主工作区 `git merge --no-ff agent/<slug>`；只取单个提交时用 `git cherry-pick <hash>`。
+- 子代理验证通过但因 Git 元数据只读无法提交：先在主工作区审查 `git -C ../wms-agent-<slug> diff --stat` 和具体 diff，再用 `git -C ../wms-agent-<slug> diff --binary | git apply --3way` 接入；只允许接入授权范围文件。
+- 子代理最终输出“不可合并”、必需验证失败、写入越权或业务语义需确认：不合并，只把产物当草稿或问题报告。
+
+合并或接入 diff 后，主代理必须立即进入 `wms-review-fix-commit`：
+
+1. 在主工作区运行 `git status --short` 和 `git diff --stat`。
+2. 按 `wms-review-fix-commit` 做 review → 修复 → 再 review。
+3. 重新运行主工作区验证：至少 `git diff --check`、`just gov-t1`，以及本任务相关测试；子代理验证不能替代主工作区验证。
+4. 验证通过后由主代理按主题显式 `git add <file...>` 并提交；禁止 `git add .`。
+5. 验证失败则不提交，保留主工作区差异并报告失败命令、退出码和下一步；不要推送。
+
+主代理最终汇报必须区分：
+
+- 子代理结果：路径、提交哈希或无、是否可合并。
+- 主工作区结果：是否已合并、主工作区验证、主代理提交哈希。
+- 未合并产物：原因和保留路径。
 
 ## 迭代本技能
 
