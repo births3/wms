@@ -24,10 +24,13 @@ import {
 } from "@wms/ui";
 import { Ban, CheckCircle2, ClipboardCheck, PackageCheck, Plus, Signature } from "lucide-react";
 
+import type { InboundDocumentType } from "./m2-inbound-document-type";
+
 export type InboundDialog = "create" | "receive" | "reject" | "inspect" | "sign" | "putaway";
 
 export interface CreateFormState {
   receiptNo: string;
+  documentType: InboundDocumentType;
   supplierId: string;
   warehouseId: string;
   expectedArrivalDate: string;
@@ -175,9 +178,25 @@ export function M2InboundDialogs({
           <form className="grid gap-3 md:grid-cols-2" onSubmit={submitCreate}>
             <DialogHeader className="md:col-span-2">
               <DialogTitle>新建 ASN</DialogTitle>
-              <DialogDescription>手工创建采购入库通知单。</DialogDescription>
+              <DialogDescription>手工创建入库通知单。</DialogDescription>
             </DialogHeader>
             <TextField label="ASN 号" value={createForm.receiptNo} onChange={(receiptNo) => setCreateForm((value) => ({ ...value, receiptNo }))} />
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">单据类型</label>
+              <select
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={createForm.documentType}
+                onChange={(event) =>
+                  setCreateForm((value) => ({
+                    ...value,
+                    documentType: event.target.value as InboundDocumentType,
+                  }))
+                }
+              >
+                <option value="purchase_inbound">采购入库</option>
+                <option value="sales_return">销售退货</option>
+              </select>
+            </div>
             <TextField label="供应商 ID" value={createForm.supplierId} onChange={(supplierId) => setCreateForm((value) => ({ ...value, supplierId }))} />
             <TextField label="仓库 ID" value={createForm.warehouseId} onChange={(warehouseId) => setCreateForm((value) => ({ ...value, warehouseId }))} />
             <TextField label="预计到货" type="date" value={createForm.expectedArrivalDate} onChange={(expectedArrivalDate) => setCreateForm((value) => ({ ...value, expectedArrivalDate }))} />

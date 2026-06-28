@@ -43,6 +43,7 @@ interface DevOrder {
   id: string;
   owner_id: string;
   receipt_no: string;
+  document_type: "purchase_inbound" | "sales_return";
   warehouse_id: string;
   status: string;
   expected_arrival_at: string | null;
@@ -251,6 +252,7 @@ function devReceivingOrder() {
     id: devOrderId,
     owner_id: devOwnerId,
     receipt_no: "ASN-M2-PC-0001",
+    document_type: "purchase_inbound",
     warehouse_id: devWarehouseId,
     status: devOrderStatus,
     expected_arrival_at: "2026-06-27T10:00:00.000Z",
@@ -278,6 +280,7 @@ function devSalesReturnOrder() {
     id: devSalesReturnOrderId,
     owner_id: devOwnerId,
     receipt_no: "SR-M2-PC-0001",
+    document_type: "sales_return",
     warehouse_id: devWarehouseId,
     status: devSalesReturnOrderStatus,
     expected_arrival_at: "2026-06-27T11:00:00.000Z",
@@ -337,6 +340,7 @@ function devOrderFromCreateRequest(body: Record<string, unknown>): DevOrder {
     id: crypto.randomUUID(),
     owner_id: devOwnerId,
     receipt_no: asString(body.receipt_no, `ASN-M2-PC-${Date.now()}`),
+    document_type: asDocumentType(body.document_type),
     warehouse_id: asString(body.warehouse_id, devWarehouseId),
     status: "receiving",
     expected_arrival_at: asNullableString(body.expected_arrival_at),
@@ -399,6 +403,11 @@ function asString(value: unknown, fallback: string) {
 
 function asNullableString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function asDocumentType(value: unknown): "purchase_inbound" | "sales_return" {
+  if (value === "purchase_inbound" || value === "sales_return") return value;
+  throw new Error("Invalid document_type");
 }
 
 export default defineConfig({

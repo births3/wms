@@ -68,6 +68,7 @@ export function M2InboundPage({ mode, onBack }: M2InboundPageProps) {
   const [lastEvent, setLastEvent] = React.useState<string | null>(null);
   const [createForm, setCreateForm] = React.useState<CreateFormState>({
     receiptNo: "ASN-M2-PC-0002",
+    documentType: "purchase_inbound",
     supplierId: "00000000-0000-0000-0000-000000005001",
     warehouseId: defaultWarehouseId,
     expectedArrivalDate: "",
@@ -307,6 +308,7 @@ export function M2InboundPage({ mode, onBack }: M2InboundPageProps) {
     event.preventDefault();
     const request: CreateReceivingOrderRequest = {
       receipt_no: createForm.receiptNo.trim(),
+      document_type: createForm.documentType,
       warehouse_id: createForm.warehouseId.trim(),
       expected_arrival_at: dateToIso(createForm.expectedArrivalDate),
       external_ref: null,
