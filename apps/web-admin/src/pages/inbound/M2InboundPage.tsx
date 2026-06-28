@@ -9,7 +9,7 @@ import {
   type DataTableColumn,
   type StatusKey,
 } from "@wms/ui";
-import { ArrowLeft, CheckCircle2, ClipboardCheck, Eye, PackageCheck, Plus, Printer, RefreshCw, Signature } from "lucide-react";
+import { ArrowLeft, Ban, CheckCircle2, ClipboardCheck, Eye, PackageCheck, Plus, Printer, RefreshCw, Signature } from "lucide-react";
 
 import {
   useCreateReceivingOrderMutation,
@@ -18,6 +18,7 @@ import {
   useReceiveReceivingOrderMutation,
   useReceivingOrderQuery,
   useReceivingOrdersQuery,
+  useRejectReceivingOrderMutation,
   useSignReceivingOrderMutation,
   type CreateReceivingOrderRequest,
   type ReceivingOrder,
@@ -30,6 +31,7 @@ import {
   type InspectFormState,
   type PutawayFormState,
   type ReceiveFormState,
+  type RejectFormState,
   type SignFormState,
 } from "./M2InboundDialogs";
 import { M2InboundDetailDialog } from "./M2InboundDetailDialog";
@@ -91,6 +93,9 @@ export function M2InboundPage({ mode, onBack }: M2InboundPageProps) {
     secondReceiverId: secondSignerId,
     note: "",
   });
+  const [rejectForm, setRejectForm] = React.useState<RejectFormState>({
+    reason: "",
+  });
   const [inspectForm, setInspectForm] = React.useState<InspectFormState>({
     batchNo: "",
     acceptedQty: "0",
@@ -127,6 +132,7 @@ export function M2InboundPage({ mode, onBack }: M2InboundPageProps) {
 
   const createMutation = useCreateReceivingOrderMutation();
   const receiveMutation = useReceiveReceivingOrderMutation();
+  const rejectMutation = useRejectReceivingOrderMutation();
   const inspectMutation = useInspectReceivingOrderMutation();
   const signMutation = useSignReceivingOrderMutation();
   const putawayMutation = usePutawayReceivingOrderMutation();
@@ -157,12 +163,14 @@ export function M2InboundPage({ mode, onBack }: M2InboundPageProps) {
   const pending =
     createMutation.isPending ||
     receiveMutation.isPending ||
+    rejectMutation.isPending ||
     inspectMutation.isPending ||
     signMutation.isPending ||
     putawayMutation.isPending;
   const error =
     createMutation.error ??
     receiveMutation.error ??
+    rejectMutation.error ??
     inspectMutation.error ??
     signMutation.error ??
     putawayMutation.error ??
@@ -174,6 +182,7 @@ export function M2InboundPage({ mode, onBack }: M2InboundPageProps) {
     const qty = String(totalExpectedQty(order));
     const firstLine = order.lines[0];
     setReceiveForm((value) => ({ ...value, actualQty: qty, shortageQty: "0", rejectedQty: "0" }));
+    setRejectForm({ reason: "" });
     setInspectForm((value) => ({
       ...value,
       batchNo: firstLine?.batch_no ?? "BATCH-202606",
@@ -225,12 +234,19 @@ export function M2InboundPage({ mode, onBack }: M2InboundPageProps) {
             label="详情"
             onClick={() => openRowDetail(row.id)}
           />
-          {mode === "receiving" && (
-            <RowButton
-              icon={<CheckCircle2 className="size-4" aria-hidden />}
-              label="收货"
-              onClick={() => openRowDialog(row.id, "receive")}
-            />
+          {mode === "receiving" && canReceiveOrReject(row.status) && (
+            <>
+              <RowButton
+                icon={<CheckCircle2 className="size-4" aria-hidden />}
+                label="收货"
+                onClick={() => openRowDialog(row.id, "receive")}
+              />
+              <RowButton
+                icon={<Ban className="size-4" aria-hidden />}
+                label="拒收"
+                onClick={() => openRowDialog(row.id, "reject")}
+              />
+            </>
           )}
           {mode === "inspecting" && (
             <>
@@ -316,6 +332,19 @@ export function M2InboundPage({ mode, onBack }: M2InboundPageProps) {
     });
     setActiveDialog(null);
     setLastEvent(`${order.receipt_no} 收货已提交`);
+  }
+
+  async function submitReject(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!order) return;
+    await rejectMutation.mutateAsync({
+      id: order.id,
+      request: {
+        reason: rejectForm.reason.trim(),
+      },
+    });
+    setActiveDialog(null);
+    setLastEvent(`${order.receipt_no} 已关闭(拒收)`);
   }
 
   async function submitInspect(event: React.FormEvent<HTMLFormElement>) {
@@ -453,17 +482,20 @@ export function M2InboundPage({ mode, onBack }: M2InboundPageProps) {
           derivedTemperatureControl={currentTemperatureControl}
           createForm={createForm}
           receiveForm={receiveForm}
+          rejectForm={rejectForm}
           inspectForm={inspectForm}
           signForm={signForm}
           putawayForm={putawayForm}
           setActiveDialog={setActiveDialog}
           setCreateForm={setCreateForm}
           setReceiveForm={setReceiveForm}
+          setRejectForm={setRejectForm}
           setInspectForm={setInspectForm}
           setSignForm={setSignForm}
           setPutawayForm={setPutawayForm}
           submitCreate={submitCreate}
           submitReceive={submitReceive}
+          submitReject={submitReject}
           submitInspect={submitInspect}
           submitSign={submitSign}
           submitPutaway={submitPutaway}
@@ -542,7 +574,7 @@ function workFieldHeader(mode: M2InboundMode) {
 function filterOrders(orders: ReceivingOrder[], keyword: string, statusFilter: StatusFilter, arrivalDate: string) {
   const normalized = keyword.trim().toLowerCase();
   return orders.filter((order) => {
-    const matchesStatus = statusFilter === "all" || order.status === statusFilter;
+    const matchesStatus = matchesStatusFilter(order.status, statusFilter);
     const matchesDate = !arrivalDate || order.expected_arrival_at?.slice(0, 10) === arrivalDate;
     const searchable = [order.receipt_no, order.status, ...order.lines.flatMap((line) => [line.product_code, line.batch_no ?? ""])]
       .join(" ")
@@ -579,7 +611,17 @@ function inboundPageMeta(mode: M2InboundMode) {
 }
 
 function countByStatus(orders: ReceivingOrder[], status: string) {
-  return orders.filter((order) => order.status === status).length;
+  return orders.filter((order) => (status === "receiving" ? canReceiveOrReject(order.status) : order.status === status)).length;
+}
+
+function matchesStatusFilter(status: string, filter: StatusFilter) {
+  if (filter === "all") return true;
+  if (filter === "receiving") return canReceiveOrReject(status);
+  return status === filter;
+}
+
+function canReceiveOrReject(status: string) {
+  return status === "released" || status === "receiving";
 }
 
 function statusKey(status: string): StatusKey {
@@ -592,10 +634,12 @@ function statusKey(status: string): StatusKey {
 function statusLabel(status: string) {
   const labels: Record<string, string> = {
     pending: "待处理",
+    released: "待收货",
     receiving: "收货中",
     inspecting: "验收中",
     putaway: "上架中",
     completed: "已完成",
+    closed_rejected: "已关闭(拒收)",
   };
   return labels[status] ?? status;
 }

@@ -7,7 +7,8 @@ use uuid::Uuid;
 use wms_domain::{
     CreateReceivingOrderRequest, InspectReceivingOrderRequest, InspectionSignatureRecord,
     PutawayRecord, PutawayRequest, ReceiveReceivingOrderRequest, ReceivingInspectionRecord,
-    ReceivingOrder, ReceivingOrderReceipt, UpdateReceivingOrderRequest,
+    ReceivingOrder, ReceivingOrderReceipt, RejectReceivingOrderRequest,
+    UpdateReceivingOrderRequest,
 };
 
 use crate::auth::AuthContext;
@@ -24,6 +25,7 @@ pub enum ReceivingOrderError {
     QuantityClosureMismatch,
     OverReceiptNotAllowed,
     InvalidQuantity,
+    InvalidReason,
     BatchExpired,
     SameSigner,
     MissingSecondSigner,
@@ -156,9 +158,9 @@ impl ReceivingOrderStore {
         if order.owner_id != ctx.owner_id {
             return Err(ReceivingOrderError::NotFound);
         }
-        if order.status != "released" {
+        if order.status != "released" && order.status != "receiving" {
             return Err(ReceivingOrderError::InvalidStatus {
-                expected: "released",
+                expected: "released/receiving",
                 actual: order.status.clone(),
             });
         }
@@ -185,6 +187,51 @@ impl ReceivingOrderStore {
             occurred_at: now,
         };
         order.status = "inspecting".to_string();
+        order.updated_at = now;
+        self.receipts.insert(receipt.id, receipt.clone());
+        Ok(receipt)
+    }
+
+    pub fn reject(
+        &mut self,
+        ctx: &AuthContext,
+        id: Uuid,
+        req: RejectReceivingOrderRequest,
+        now: DateTime<Utc>,
+    ) -> Result<ReceivingOrderReceipt, ReceivingOrderError> {
+        if req.reason.trim().is_empty() {
+            return Err(ReceivingOrderError::InvalidReason);
+        }
+
+        let order = self
+            .orders
+            .get_mut(&id)
+            .ok_or(ReceivingOrderError::NotFound)?;
+        if order.owner_id != ctx.owner_id {
+            return Err(ReceivingOrderError::NotFound);
+        }
+        if order.status != "released" {
+            return Err(ReceivingOrderError::InvalidStatus {
+                expected: "released",
+                actual: order.status.clone(),
+            });
+        }
+
+        let expected_qty = order
+            .lines
+            .iter()
+            .map(|line| line.expected_qty)
+            .sum::<i64>();
+        let receipt = ReceivingOrderReceipt {
+            id: Uuid::new_v4(),
+            receiving_order_id: id,
+            owner_id: ctx.owner_id,
+            actual_qty: 0,
+            shortage_qty: 0,
+            rejected_qty: expected_qty,
+            occurred_at: now,
+        };
+        order.status = "closed_rejected".to_string();
         order.updated_at = now;
         self.receipts.insert(receipt.id, receipt.clone());
         Ok(receipt)

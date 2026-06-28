@@ -13,7 +13,7 @@
 import { Button, Card, CardContent, Input } from "@wms/ui";
 import { Search } from "lucide-react";
 
-export type StatusFilter = "all" | "receiving" | "inspecting" | "putaway" | "completed";
+export type StatusFilter = "all" | "receiving" | "inspecting" | "putaway" | "completed" | "closed_rejected";
 
 interface M2InboundFilterBarProps {
   keyword: string;
@@ -57,10 +57,11 @@ export function M2InboundFilterBar({
             onChange={(event) => onStatusFilterChange(event.target.value as StatusFilter)}
           >
             <option value="all">全部</option>
-            <option value="receiving">收货中</option>
+            <option value="receiving">待收货/收货中</option>
             <option value="inspecting">验收中</option>
             <option value="putaway">上架中</option>
             <option value="completed">已完成</option>
+            <option value="closed_rejected">已关闭(拒收)</option>
           </select>
         </div>
         <div>

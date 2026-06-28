@@ -22,9 +22,9 @@ import {
   DialogTitle,
   Input,
 } from "@wms/ui";
-import { CheckCircle2, ClipboardCheck, PackageCheck, Plus, Signature } from "lucide-react";
+import { Ban, CheckCircle2, ClipboardCheck, PackageCheck, Plus, Signature } from "lucide-react";
 
-export type InboundDialog = "create" | "receive" | "inspect" | "sign" | "putaway";
+export type InboundDialog = "create" | "receive" | "reject" | "inspect" | "sign" | "putaway";
 
 export interface CreateFormState {
   receiptNo: string;
@@ -60,6 +60,10 @@ export interface ReceiveFormState {
   batchQty: string;
   secondReceiverId: string;
   note: string;
+}
+
+export interface RejectFormState {
+  reason: string;
 }
 
 export interface InspectFormState {
@@ -108,17 +112,20 @@ interface M2InboundDialogsProps {
   derivedTemperatureControl: string;
   createForm: CreateFormState;
   receiveForm: ReceiveFormState;
+  rejectForm: RejectFormState;
   inspectForm: InspectFormState;
   signForm: SignFormState;
   putawayForm: PutawayFormState;
   setActiveDialog: (dialog: InboundDialog | null) => void;
   setCreateForm: React.Dispatch<React.SetStateAction<CreateFormState>>;
   setReceiveForm: React.Dispatch<React.SetStateAction<ReceiveFormState>>;
+  setRejectForm: React.Dispatch<React.SetStateAction<RejectFormState>>;
   setInspectForm: React.Dispatch<React.SetStateAction<InspectFormState>>;
   setSignForm: React.Dispatch<React.SetStateAction<SignFormState>>;
   setPutawayForm: React.Dispatch<React.SetStateAction<PutawayFormState>>;
   submitCreate: (event: React.FormEvent<HTMLFormElement>) => void;
   submitReceive: (event: React.FormEvent<HTMLFormElement>) => void;
+  submitReject: (event: React.FormEvent<HTMLFormElement>) => void;
   submitInspect: (event: React.FormEvent<HTMLFormElement>) => void;
   submitSign: (event: React.FormEvent<HTMLFormElement>) => void;
   submitPutaway: (event: React.FormEvent<HTMLFormElement>) => void;
@@ -134,17 +141,20 @@ export function M2InboundDialogs({
   derivedTemperatureControl,
   createForm,
   receiveForm,
+  rejectForm,
   inspectForm,
   signForm,
   putawayForm,
   setActiveDialog,
   setCreateForm,
   setReceiveForm,
+  setRejectForm,
   setInspectForm,
   setSignForm,
   setPutawayForm,
   submitCreate,
   submitReceive,
+  submitReject,
   submitInspect,
   submitSign,
   submitPutaway,
@@ -222,6 +232,25 @@ export function M2InboundDialogs({
             <DialogFooter className="md:col-span-3">
               <CancelButton />
               <SubmitButton icon={<CheckCircle2 className="size-4" />} label="确认收货" disabled={!hasOrder || pending} />
+            </DialogFooter>
+          </form>
+        )}
+
+        {activeDialog === "reject" && (
+          <form className="grid gap-3" onSubmit={submitReject}>
+            <DialogHeader>
+              <DialogTitle>整单拒收</DialogTitle>
+              <DialogDescription>{orderReceiptNo ?? "未选择入库单"}</DialogDescription>
+            </DialogHeader>
+            <TextField
+              label="拒收原因"
+              required
+              value={rejectForm.reason}
+              onChange={(reason) => setRejectForm((value) => ({ ...value, reason }))}
+            />
+            <DialogFooter>
+              <CancelButton />
+              <SubmitButton icon={<Ban className="size-4" />} label="确认拒收" disabled={!hasOrder || pending} />
             </DialogFooter>
           </form>
         )}

@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 export type ReceivingOrder = components["schemas"]["ReceivingOrder"];
 export type CreateReceivingOrderRequest = components["schemas"]["CreateReceivingOrderRequest"];
 export type ReceiveReceivingOrderRequest = components["schemas"]["ReceiveReceivingOrderRequest"];
+export type RejectReceivingOrderRequest = components["schemas"]["RejectReceivingOrderRequest"];
 export type InspectReceivingOrderRequest = components["schemas"]["InspectReceivingOrderRequest"];
 export type SignInspectionRequest = components["schemas"]["SignInspectionRequest"];
 export type PutawayRequest = components["schemas"]["PutawayRequest"];
@@ -61,6 +62,23 @@ async function receiveReceivingOrder(input: {
   });
   if (!result.data) {
     throw new ApiError(result.error, "提交收货失败", result.response.status);
+  }
+  return result.data;
+}
+
+async function rejectReceivingOrder(input: {
+  id: string;
+  request: RejectReceivingOrderRequest;
+}) {
+  const result = await api.POST("/api/v1/inbound/receiving-orders/{id}/reject", {
+    params: {
+      path: { id: input.id },
+      header: { "Idempotency-Key": idempotencyKey("web-m2-reject") },
+    },
+    body: input.request,
+  });
+  if (!result.data) {
+    throw new ApiError(result.error, "提交整单拒收失败", result.response.status);
   }
   return result.data;
 }
@@ -147,6 +165,14 @@ export function useReceiveReceivingOrderMutation() {
   const invalidate = useInvalidateReceivingOrders();
   return useMutation({
     mutationFn: receiveReceivingOrder,
+    onSuccess: (_data, input) => invalidate(input.id),
+  });
+}
+
+export function useRejectReceivingOrderMutation() {
+  const invalidate = useInvalidateReceivingOrders();
+  return useMutation({
+    mutationFn: rejectReceivingOrder,
     onSuccess: (_data, input) => invalidate(input.id),
   });
 }
