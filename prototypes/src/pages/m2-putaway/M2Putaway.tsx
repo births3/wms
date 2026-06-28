@@ -10,11 +10,11 @@ import {
 } from "@wms/ui";
 
 /**
- * M2Putaway — M2-005 PDA 上架
+ * M2Putaway — M2-005 PDA/PC Web 上架
  *
  * 层级：Layer 3 页面级
- * 关联故事：US-M2-005（PDA 上架 / 系统推荐库位 / 强制扫货+扫位 / 温区匹配）
- * Wave：Wave 1.5（M2 PDA 业务流）
+ * 关联故事：US-M2-005（PDA/PC Web 上架 / 系统推荐库位 / 强制扫货+扫位 / 温区匹配）
+ * Wave：Wave 1.5（M2 入库业务流）
  * 业务约束：必须扫货且扫位；冷链商品必须放冷库；推荐库位优先（FIFO + 温区匹配）
  *
  * @example
@@ -44,7 +44,7 @@ export function M2Putaway() {
   const isLocScanned = !!scannedLoc;
 
   return (
-    <div data-device="pda" className="w-[480px] min-h-[900px] flex flex-col rounded-xl border overflow-hidden shadow-md font-sans bg-muted/30">
+    <div data-device="shared" className="w-[480px] min-h-[900px] flex flex-col rounded-xl border overflow-hidden shadow-md font-sans bg-muted/30">
       <OfflineIndicator state="online" />
 
       {/* 顶栏 */}
@@ -53,7 +53,7 @@ export function M2Putaway() {
           <ChevronLeft className="size-5" />
         </Button>
         <div className="flex-1">
-          <div className="text-xs text-muted-foreground">M2-005 PDA 上架</div>
+          <div className="text-xs text-muted-foreground">M2-005 PDA/PC Web 上架</div>
           <div className="text-sm font-semibold">待上架 · 12 件</div>
         </div>
         <StatusBadge status="in_progress" size="sm" label="进行中" />
@@ -74,7 +74,7 @@ export function M2Putaway() {
 
       {/* 商品信息 */}
       <div className="bg-background px-3 py-3 border-b">
-        <div className="text-xs text-muted-foreground mb-1">① 扫货</div>
+        <div className="text-xs text-muted-foreground mb-1">① 扫货 / PC Web 输入</div>
         <Card className="p-3 mb-2">
           <div className="flex items-start justify-between mb-1">
             <div>

@@ -44,12 +44,12 @@ const STATUS_MAP = {
 };
 
 /**
- * M2Asn — M2-001 ASN 接收（PC 入口）
+ * M2Asn — M2-001/002 ASN 接收与 PC 收货入口
  *
  * 层级：Layer 3 页面级
- * 关联故事：US-M2-001（采购员上传/接收 ASN / 触发 PDA 收货任务）
+ * 关联故事：US-M2-001（采购员上传/接收 ASN）/ US-M2-002（PC Web 收货）
  * Wave：Wave 2.5（M2 PC 流程入口）
- * 业务约束：ASN 必含批号效期生产企业；冷链单独标记；提交后下发 PDA M2-002
+ * 业务约束：ASN 必含批号效期生产企业；冷链单独标记；PC Web 与 PDA 共用收货规则
  *
  * @example
  *   <M2Asn />
@@ -80,7 +80,7 @@ export function M2Asn() {
         <div className="flex gap-1">
           <Button variant="ghost" size="sm" className="h-7 px-2 text-xs">详情</Button>
           {r.status === "submitted" && (
-            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs">下发 PDA</Button>
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs">PC 收货</Button>
           )}
         </div>
       ) },
@@ -90,7 +90,7 @@ export function M2Asn() {
     <div className="w-full max-w-[1400px] bg-background rounded-lg border shadow-sm">
       <PageHeader
         title="ASN 接收单"
-        subtitle="M2-001 · 采购入库流程入口 · 触发 PDA 收货任务 · GSP §82 ASN 准入"
+        subtitle="M2-001/002 · 采购入库流程入口 · PC Web/USB 扫码枪收货 · GSP §82 ASN 准入"
         actions={
           <>
             <Button variant="outline" size="sm">
@@ -111,7 +111,7 @@ export function M2Asn() {
         <FileWarning className="size-4 text-wms-warning flex-shrink-0 mt-0.5" />
         <div className="text-xs flex-1">
           <span className="font-medium text-wms-warning">2 张 ASN 提交超 24 小时未收货</span>
-          <span className="text-muted-foreground ml-2">PO-2026-0026 / PO-2026-0029 · 请联系供应商或下发 PDA</span>
+          <span className="text-muted-foreground ml-2">PO-2026-0026 / PO-2026-0029 · 可在 PC Web 收货或下发 PDA</span>
         </div>
       </div>
 

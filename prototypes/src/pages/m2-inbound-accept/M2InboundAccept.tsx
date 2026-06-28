@@ -12,11 +12,11 @@ import {
 } from "@wms/ui";
 
 /**
- * M2InboundAccept — M2-003 PDA 14 步验收
+ * M2InboundAccept — M2-003 PDA/PC Web 14 步验收
  *
  * 层级：Layer 3 页面级
- * 关联故事：US-M2-003（PDA 14 步验收 / GSP 法定流程 / 含失败步回退）
- * Wave：Wave 1.5（M2 PDA 业务流）
+ * 关联故事：US-M2-003（PDA/PC Web 14 步验收 / GSP 法定流程 / 含失败步回退）
+ * Wave：Wave 1.5（M2 入库业务流）
  * 业务约束：14 步严格按 GSP 顺序；任一步失败可回退；外观检查失败需拍照取证
  *
  * @example
@@ -55,7 +55,7 @@ export function M2InboundAccept() {
   const [scanned, setScanned] = useState<string>("");
 
   return (
-    <div data-device="pda" className="w-[480px] min-h-[900px] flex flex-col rounded-xl border overflow-hidden shadow-md font-sans bg-muted/30">
+    <div data-device="shared" className="w-[480px] min-h-[900px] flex flex-col rounded-xl border overflow-hidden shadow-md font-sans bg-muted/30">
       <OfflineIndicator state="online" />
 
       {/* 顶栏 */}
@@ -64,7 +64,7 @@ export function M2InboundAccept() {
           <ChevronLeft className="size-5" />
         </Button>
         <div className="flex-1">
-          <div className="text-xs text-muted-foreground">M2-003 PDA 验收（步骤 6/14）</div>
+          <div className="text-xs text-muted-foreground">M2-003 PDA/PC Web 验收（步骤 6/14）</div>
           <div className="text-sm font-semibold">PO-2026-0001 · 葡萄糖注射液</div>
         </div>
         <StatusBadge status="in_progress" size="sm" label="进行中" />
@@ -90,7 +90,7 @@ export function M2InboundAccept() {
           <span className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded font-medium">当前</span>
         </div>
         <div className="text-xs text-muted-foreground mb-3">
-          扫描包装批号或手动输入，与采购单匹配后自动填充效期
+          PDA 扫描或 PC Web USB 扫码枪/手工输入，与采购单匹配后自动填充效期
         </div>
         <ScanInput
           mode="scanner"

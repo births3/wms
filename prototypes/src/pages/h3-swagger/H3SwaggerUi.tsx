@@ -17,8 +17,8 @@ const MOCK_ENDPOINTS: Record<string, ApiEndpoint[]> = {
   "M2 入库": [
     { method: "POST", path: "/api/v1/inbound/asn", summary: "创建 ASN（采购入库通知）", module: "M2", auth: "jwt" },
     { method: "GET", path: "/api/v1/inbound/asn/{id}", summary: "查询 ASN 详情", module: "M2", auth: "jwt" },
-    { method: "POST", path: "/api/v1/inbound/asn/{id}/receive", summary: "PDA 收货签收", module: "M2", auth: "jwt" },
-    { method: "POST", path: "/api/v1/inbound/asn/{id}/verify", summary: "PDA 验收提交", module: "M2", auth: "jwt" },
+    { method: "POST", path: "/api/v1/inbound/asn/{id}/receive", summary: "收货签收（PDA/PC Web）", module: "M2", auth: "jwt" },
+    { method: "POST", path: "/api/v1/inbound/asn/{id}/verify", summary: "验收提交（PDA/PC Web）", module: "M2", auth: "jwt" },
     { method: "POST", path: "/api/v1/inbound/asn/{id}/dual-sign", summary: "双人复核签字", module: "M2", auth: "jwt" },
   ],
   "M3 库存": [

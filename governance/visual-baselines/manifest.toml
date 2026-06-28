@@ -161,7 +161,7 @@ file = "m2-accept.png"
 reviewed_by = "项目主人"
 reviewed_at = "2026-05-27"
 expected_keywords = ["M2-003", "PO-2026-0001", "AB12-CD34-EF56", "20260301A", "GSP"]
-related_story = "US-M2-003 PDA 14 步验收"
+related_story = "US-M2-003 PDA/PC Web 14 步验收"
 
 [[snapshots]]
 tab = "m2-putaway"
@@ -171,7 +171,7 @@ file = "m2-putaway.png"
 reviewed_by = "项目主人"
 reviewed_at = "2026-05-27"
 expected_keywords = ["M2-005", "AB12-CD34-EF56", "A-01-02-03", "RT", "GSP"]
-related_story = "US-M2-005 PDA 上架"
+related_story = "US-M2-005 PDA/PC Web 上架"
 
 [[snapshots]]
 tab = "m2-reject"
@@ -420,7 +420,7 @@ viewport = "1700x1500"
 file = "pc-h1-005.png"
 reviewed_by = "项目主人"
 reviewed_at = "2026-05-27"
-expected_keywords = ["US-H1-005", "H1", "GSP"]
+expected_keywords = ["US-H1-005", "H1", "GSP", "Token"]
 related_story = "US-H1-005 Token 失效与登出（PC）"
 
 [[snapshots]]
@@ -994,6 +994,16 @@ expected_keywords = ["US-M2-002", "M2", "GSP"]
 related_story = "US-M2-002 PDA 收货（到货签收）（PDA）"
 
 [[snapshots]]
+tab = "pc-m2-002"
+url_hash = "#pc-m2-002"
+viewport = "1700x1500"
+file = "m2-asn.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-06-27"
+expected_keywords = ["US-M2-002", "M2", "GSP"]
+related_story = "US-M2-002 PDA/PC Web 收货（PC）"
+
+[[snapshots]]
 tab = "pda-m2-003"
 url_hash = "#pda-m2-003"
 viewport = "1500x1700"
@@ -1002,6 +1012,16 @@ reviewed_by = "项目主人"
 reviewed_at = "2026-05-27"
 expected_keywords = ["US-M2-003", "M2", "GSP"]
 related_story = "US-M2-003 PDA 验收（PDA）"
+
+[[snapshots]]
+tab = "pc-m2-003"
+url_hash = "#pc-m2-003"
+viewport = "1700x1500"
+file = "m2-accept.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-06-27"
+expected_keywords = ["US-M2-003", "M2", "GSP"]
+related_story = "US-M2-003 PDA/PC Web 验收（PC）"
 
 [[snapshots]]
 tab = "pda-m2-004"
@@ -1022,6 +1042,16 @@ reviewed_by = "项目主人"
 reviewed_at = "2026-05-27"
 expected_keywords = ["US-M2-005", "M2", "GSP"]
 related_story = "US-M2-005 智能上架（PDA）"
+
+[[snapshots]]
+tab = "pc-m2-005"
+url_hash = "#pc-m2-005"
+viewport = "1700x1500"
+file = "m2-putaway.png"
+reviewed_by = "项目主人"
+reviewed_at = "2026-06-27"
+expected_keywords = ["US-M2-005", "M2", "GSP"]
+related_story = "US-M2-005 PDA/PC Web 智能上架（PC）"
 
 [[snapshots]]
 tab = "pda-m2-006"

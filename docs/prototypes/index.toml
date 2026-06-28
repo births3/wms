@@ -14,10 +14,10 @@
 [meta]
 current_wave = "5"
 source = "docs/prototypes/prototype-matrix-r3.md"
-total_required = 167
+total_required = 170
 
 # ============================================================
-# 全量 UI 原型清单（167 个 story/end 组合）
+# 全量 UI 原型清单（170 个 story/end 组合）
 # ============================================================
 
 [[required]]
@@ -533,6 +533,14 @@ touch_target_min_pt = 48
 font_size_min_pt = 16
 
 [[required]]
+story_id = "US-M2-002"
+prototype_slug = "pc-m2-002"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "PC Web USB 扫码枪+手工收货"
+
+[[required]]
 story_id = "US-M2-003"
 prototype_slug = "pda-m2-003"
 end = "pda"
@@ -543,6 +551,14 @@ reason = "14项验收+离线+档案补录子流程"
 [required.viewport]
 touch_target_min_pt = 48
 font_size_min_pt = 16
+
+[[required]]
+story_id = "US-M2-003"
+prototype_slug = "pc-m2-003"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "PC Web USB 扫码枪+手工验收"
 
 [[required]]
 story_id = "US-M2-004"
@@ -567,6 +583,14 @@ reason = "库位推荐+扫码确认"
 [required.viewport]
 touch_target_min_pt = 48
 font_size_min_pt = 16
+
+[[required]]
+story_id = "US-M2-005"
+prototype_slug = "pc-m2-005"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "PC Web 库位推荐+扫码枪/手工确认"
 
 [[required]]
 story_id = "US-M2-006"
