@@ -24,6 +24,7 @@ use wms_api::{
     auth_handlers::{auth_router, AuthAppState},
     config_center::{config_center_router, ConfigCenterAppState},
     feature_flags::FeatureFlagRegistry,
+    master_data_handlers::{master_data_router, MasterDataAppState},
     system_dictionary_handlers::{system_dictionary_router, SystemDictionaryAppState},
     wave3_handlers::{wave3_router, Wave3AppState},
 };
@@ -103,6 +104,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let config_center_state = ConfigCenterAppState::from_registry(file_registry);
     let auth_state = AuthAppState::new(pool.clone());
     let audit_query_state = AuditQueryState { pool: pool.clone() };
+    let master_data_state = MasterDataAppState::default();
     let system_dictionary_state = SystemDictionaryAppState::with_postgres(pool.clone());
     let wave3_state =
         Wave3AppState::with_postgres(pool.clone()).with_config_center(config_center_state.clone());
@@ -111,6 +113,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         auth_state,
         wave3_state,
         audit_query_state,
+        master_data_state,
         system_dictionary_state,
     )
     .layer(auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(
@@ -176,6 +179,7 @@ fn app(
     auth_state: AuthAppState,
     wave3_state: Wave3AppState,
     audit_query_state: AuditQueryState,
+    master_data_state: MasterDataAppState,
     system_dictionary_state: SystemDictionaryAppState,
 ) -> Router {
     Router::new()
@@ -185,6 +189,7 @@ fn app(
         .merge(auth_router(auth_state))
         .merge(audit_query_router(audit_query_state))
         .merge(config_center_router(config_center_state))
+        .merge(master_data_router(master_data_state))
         .merge(system_dictionary_router(system_dictionary_state))
         .merge(wave3_router(wave3_state))
 }
@@ -511,6 +516,7 @@ mod tests {
             AuthAppState::new(pool.clone()),
             Wave3AppState::default(),
             AuditQueryState { pool: pool.clone() },
+            MasterDataAppState::default(),
             SystemDictionaryAppState::with_postgres(pool),
         )
         .layer(auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(
@@ -521,6 +527,35 @@ mod tests {
             .oneshot(
                 Request::builder()
                     .uri("/api/v1/audit/events")
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn master_data_route_is_mounted_under_auth_context() {
+        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/wms")
+            .expect("lazy pool should not connect during auth rejection test");
+        let app = app(
+            config_center_state(),
+            AuthAppState::new(pool.clone()),
+            Wave3AppState::default(),
+            AuditQueryState { pool: pool.clone() },
+            MasterDataAppState::default(),
+            SystemDictionaryAppState::with_postgres(pool),
+        )
+        .layer(auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(
+            AllowAllRevocationStore,
+        ))));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/master-data/products")
                     .body(Body::empty())
                     .expect("request should build"),
             )
@@ -624,6 +659,7 @@ mod tests {
             AuthAppState::new(pool.clone()),
             Wave3AppState::default(),
             AuditQueryState { pool: pool.clone() },
+            MasterDataAppState::default(),
             SystemDictionaryAppState::with_postgres(pool.clone()),
         )
         .layer(auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(
@@ -723,6 +759,7 @@ mod tests {
             AuthAppState::new(pool.clone()),
             Wave3AppState::default(),
             AuditQueryState { pool: pool.clone() },
+            MasterDataAppState::default(),
             SystemDictionaryAppState::with_postgres(pool),
         )
         .layer(auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(

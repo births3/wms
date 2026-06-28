@@ -13,6 +13,7 @@ pub mod feature_flags;
 pub mod inbound;
 pub mod inventory;
 pub mod master_data;
+pub mod master_data_handlers;
 pub mod outbound;
 pub mod packing_station;
 pub mod parameter_mapping;
