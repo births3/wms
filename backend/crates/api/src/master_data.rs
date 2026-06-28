@@ -558,7 +558,9 @@ mod tests {
     use chrono::{TimeZone, Utc};
     use serde_json::json;
     use uuid::Uuid;
-    use wms_domain::{CreateLocationRequest, CreateProductRequest, CreateSupplierRequest, UpdateProductRequest};
+    use wms_domain::{
+        CreateLocationRequest, CreateProductRequest, CreateSupplierRequest, UpdateProductRequest,
+    };
 
     use super::{MasterDataError, MasterDataStore};
     use crate::auth::AuthContext;
