@@ -35,7 +35,7 @@
 | H4 企业微信通知 | [user-stories-h4-wechat-notify.md](domain/user-stories-h4-wechat-notify.md) | 4 | 后端实现 RTM |
 | H5 快递对接 | [user-stories-h5-express.md](domain/user-stories-h5-express.md) | 6 | 后端实现 RTM |
 | M1 主数据商品/供应商/客户 | [user-stories-m1-master-data-product.md](domain/user-stories-m1-master-data-product.md) | 9 | 后端实现 RTM / 合规风险 RTM |
-| M1 主数据仓库/库位/配置 | [user-stories-m1-master-data-warehouse.md](domain/user-stories-m1-master-data-warehouse.md) | 12 | 后端实现 RTM / 合规风险 RTM |
+| M1 主数据仓库/库位/配置 | [user-stories-m1-master-data-warehouse.md](domain/user-stories-m1-master-data-warehouse.md) | 13 | 后端实现 RTM / 合规风险 RTM |
 | M10 运输协同 | [user-stories-m10-tms-plus.md](domain/user-stories-m10-tms-plus.md) | 4 | 后端实现 RTM / 测试证据 RTM |
 | M11 监管 EDI 边界 | [user-stories-m11-regulatory-edi.md](domain/user-stories-m11-regulatory-edi.md) | 2 | 合规风险 RTM |
 | M2 ASN 与收货 | [user-stories-m2-inbound-asn.md](domain/user-stories-m2-inbound-asn.md) | 6 | 前端体验 RTM / 后端实现 RTM |
@@ -68,6 +68,7 @@
 |---|---|---|---|---|---|---|
 | M2 PC 入库：收货、验收、上架 | US-M2-002 / US-M2-003 / US-M2-005 / US-M2-006 | `apps/web-admin` 入库业务菜单 | [m2-inbound-web-design-plan.md](m2-inbound-web-design-plan.md) | 部分覆盖 | 收货扩展字段、整单拒收、质量核对明细、推荐库位校验仍未形成完整 OpenAPI / 后端持久化闭环。 | 按 M2 设计方案 §7.3-§7.5 补 API、后端、前端动作验证和真实截图；不得用原型截图替代。 |
 | M4 PC 出库：订单、波次、复核发货、采购退货 | US-M4-001 / US-M4-002 / US-M4-004 / US-M4-006 / US-M4-010 | `apps/web-admin` 出库业务菜单 | [m4-outbound-web-design-plan.md](m4-outbound-web-design-plan.md) | 部分覆盖 | 页面已有本地状态和基础弹窗，但列表/详情/写操作仍未全部接真实 M4 OpenAPI 与后端闭环。 | 按 M4 设计方案 §8.2-§8.5 补列表/详情/写操作 API、动作测试和真实截图。 |
+| M1 PC 系统字典中心 | US-M1-011 | `apps/web-admin` 系统管理 / 系统字典菜单 | 待补真实管理页设计与截图 | 待补证据 | 系统字典管理页、字典项参数 schema、导入导出、审批和影响预览尚未实现。 | 先按 US-M1-011 补 OpenAPI / 后端 / 前端管理页，再补真实截图和动作测试；M2/M4 单据类型接入同一字典源。 |
 | 原型矩阵与截图证据 | US-H3-001 / US-H3-002 | `prototypes/src/Tabs.tsx` | [prototypes/matrix-e2e-screenshot-gate.md](prototypes/matrix-e2e-screenshot-gate.md) | 部分覆盖 | 原型矩阵覆盖 207 个 tab，但视觉回归依赖正确 dev server 和最新 baseline；生产真实前端截图另走 `apps/web-admin` 证据。 | 用正确端口重新 capture 原型 baseline；生产截图按 Matrix E2E 截图门禁“测试环境查看标准”单独归档。 |
 
 ## 5. 后端实现 RTM
@@ -76,6 +77,7 @@
 |---|---|---|---|---|---|---|---|---|
 | M2 收货单 CRUD 与收货闭环 | US-M2-001 / US-M2-002 | `backend/crates/api/src/lib.rs` inbound OpenAPI；`packages/api-client/src/schema.ts` | `backend/crates/api/src/inbound.rs`；`backend/crates/api/src/wave3_handlers.rs` | `backend/crates/api/src/wave3_repository.rs`；`backend/migrations/202606030001_wave3_core_tables.sql` | `backend/crates/api/tests/wave3_postgres.rs` | 已覆盖 | 无 | 保持 OpenAPI、api-client、repository 测试同步。 |
 | M2 验收、双签、上架入库存 | US-M2-003 / US-M2-004 / US-M2-005 | `/api/v1/inbound/receiving-orders/{id}/inspect`、`/sign`、`/putaway` | `backend/crates/api/src/inbound.rs`；`backend/crates/api/src/wave3_handlers.rs` | `backend/crates/api/src/wave3_repository.rs`；`receiving_inspections`、`receiving_putaways`、`inventory_batches` | `backend/crates/api/tests/wave3_postgres.rs` | 已覆盖 | 无 | 扩字段时先补用户故事字段表和 OpenAPI，再补 repository 测试。 |
+| M1 系统字典中心 | US-M1-011 | `backend/crates/api/src/lib.rs` system-dictionary OpenAPI | `backend/crates/api/src/system_dictionary_handlers.rs` | `backend/crates/api/src/system_dictionary.rs`；`backend/migrations/202606280001_system_dictionary.sql` | `backend/crates/api/tests/system_dictionary_postgres.rs`；`backend/crates/api/src/system_dictionary_tests.rs` | 部分覆盖 | 首批后端覆盖字典表、`document_type` 预置项、参数 schema、货主覆盖和基础幂等；M-QL 审批、H2-005 事件、导入导出、影响预览和 PC 管理页仍未实现。 | 后续分组补 M-QL 审批、H2-005 事件、导入导出、M2/M4 运行时字典校验和真实前端截图。 |
 | M3 库存状态、批次和幂等基础 | US-M3-001 / US-M3-002 / US-M3-003 / US-M3-004 | `backend/crates/api/src/lib.rs` inventory OpenAPI | `backend/crates/api/src/inventory.rs`；`backend/crates/api/src/wave3_handlers.rs` | `backend/crates/api/src/wave3_repository.rs`；`inventory_status_changes`；`idempotency_request` | `backend/crates/api/tests/wave3_postgres.rs` | 已覆盖 | 无 | 保持 L11 幂等和 owner scope 测试。 |
 | M4 出库订单、波次、拣选、复核、发货 | US-M4-001 / US-M4-002 / US-M4-003 / US-M4-004 / US-M4-006 | `backend/crates/api/src/lib.rs` outbound OpenAPI | `backend/crates/api/src/wave4_handlers.rs` | `backend/crates/api/src/outbound.rs`；`backend/crates/api/src/wave4_repository.rs`；`backend/migrations/202606040001_wave4_outbound_tables.sql` | `backend/crates/api/tests/wave4_postgres.rs` | 已覆盖 | 无 | 前端接入时复用现有 Wave4 API，不复制本地业务状态。 |
 | M4 追溯码出库上报 | US-M4-006 / US-TC-005 / US-TC-006 | `/api/v1/traceability/outbound-reports` | `backend/crates/api/src/wave4_handlers.rs` | `backend/crates/api/src/wave4_repository.rs`；`backend/crates/api/src/traceability_code.rs` | `backend/crates/api/tests/wave4_postgres.rs` | 已覆盖 | 无 | 真实平台 evidence 归入 Wave4 外部依赖 gate。 |
@@ -87,6 +89,7 @@
 | 范围 | 需求来源 | 验证命令 | 证据对象 | 当前结论 | 缺口说明 | 补齐路径 |
 |---|---|---|---|---|---|---|
 | T1 治理门禁 | US-H3-001 / US-H3-002 | `just gov-t1` | `scripts/governance/governance_checks.py` | 已覆盖 | 无 | 新增治理脚本时同步 smoke、T1 和 gate-rules。 |
+| 系统字典文档对齐 | US-M1-011 / US-M2-002 / US-M4-001 / US-M4-012 | `python3 scripts/governance/check_system_dictionary_alignment.py --json` | `scripts/governance/check_system_dictionary_alignment.py` | 已覆盖 | 无 | 后续实现 OpenAPI / 前端 / 后端时扩展脚本检查生成物和代码引用。 |
 | Web 设计 RTM | US-M2-002 / US-M4-001 | `python3 scripts/governance/check_web_design_rtm.py --json` | `docs/*-web-design-plan.md` | 已覆盖 | 无 | 设计方案新增 RTM 类型时同步 `check_web_design_rtm.py`。 |
 | 项目级 RTM | US-H3-001 / US-H3-002 | `python3 scripts/governance/check_project_rtm.py --json` | 本文 | 已覆盖 | 无 | 任何 `部分覆盖` 行必须补缺口说明和补齐路径。 |
 | 入库/库存后端闭环 | US-M2-002 / US-M2-003 / US-M2-005 / US-M3-004 | `cargo test -p wms-api --test wave3_postgres` | `backend/crates/api/tests/wave3_postgres.rs` | 已覆盖 | 无 | 后端行为变更时补跑对应 Postgres 测试。 |
@@ -101,6 +104,7 @@
 | GSP 条款级追溯 | US-H2-001 / US-M2-003 / US-M4-006 / US-M5-001 | [compliance/README.md](compliance/README.md) | 条款到故事、测试、审计证据映射 | `docs/compliance/*.md` | 部分覆盖 | 软件可控条款已覆盖；剩余 🟡 是冷链外部系统协作和特殊药品后续波次实施边界。 | 按 `docs/compliance/README.md` §4 和对应章节把外部协作 evidence 归档到 Wave6 证据链。 |
 | 审计追加不可篡改 | US-H2-001 / US-H2-002 / US-H2-003 | 审计表只能 INSERT | DB trigger + hash chain seal | `backend/migrations/202606020001_audit_event.sql`；`audit_postgres.rs` | 已覆盖 | 无 | 禁止把审计修正改成 UPDATE / DELETE。 |
 | 写操作幂等 | US-M2-002 / US-M4-001 / US-M4-006 | 重复提交、弱网重试、PDA 离线补传 | `Idempotency-Key` + `idempotency_request` | `wave3_postgres.rs`；`wave4_postgres.rs` | 已覆盖 | 无 | 新增写接口必须补 L11 幂等测试。 |
+| 系统字典受控变更 | US-M1-011 | 字典项会影响流程、批号策略、货主覆盖和历史单据解释 | 受控字典走 M-QL 审批、H2 审计、版本生效时间、影响预览和 H2-005 缓存刷新 | `check_system_dictionary_alignment.py`；`system_dictionary_postgres.rs`；后续审批 / 事件测试 | 部分覆盖 | 首批后端已覆盖基础审计、参数校验和 fail closed；M-QL 审批、H2-005 事件、影响预览和真实前端证据仍待补。 | 后续补 M-QL 审批、H2-005 事件、导入导出、M2/M4 字典运行时校验和真实前端截图。 |
 | 仓储层 SQL 货主隔离 | US-H1-001 / US-H1-002 | 多货主 / 3PL 数据隔离 | 仓储层租户表 SQL 必须写入或过滤 `owner_id` | `check_owner_scope_sql.py`；repository 测试与代码 review | 已覆盖 | 无 | 维持 T1 owner scope SQL 静态扫描；非 repository 生产 SQL 必须迁入仓储层或扩展门禁范围。 |
 | 冷链温控异常 | US-M5-001 / US-M5-002 / US-M5-003 | 温湿度越界、批次隔离、外部设备证据 | 冷链事件接入 + 库存隔离 + 审计 | `wave4_postgres.rs`；`wave5_postgres.rs` | 部分覆盖 | 仓库内温控异常处置和审计已覆盖；真实采集设备、TMS 或冷链平台证据仍未由本仓库生成。 | 按 `docs/runbooks/wave-5-hardware-evidence.md` 和 `docs/runbooks/wave-5-tms-evidence.md` 采集真实设备/外部系统 evidence。 |
 

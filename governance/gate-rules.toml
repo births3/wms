@@ -35,12 +35,12 @@ tier = "T1"
 
 [[rules]]
 match = "docs/requirements-traceability-matrix.md"
-checks = ["check_project_rtm"]
+checks = ["check_project_rtm", "check_system_dictionary_alignment"]
 tier = "T1"
 
 [[rules]]
 match = "docs/domain/user-stories-*.md"
-checks = ["check_project_rtm"]
+checks = ["check_project_rtm", "check_system_dictionary_alignment"]
 tier = "T1"
 
 [[rules]]
@@ -50,7 +50,7 @@ tier = "T1"
 
 [[rules]]
 match = "docs/*-web-design-plan.md"
-checks = ["check_web_design_rtm"]
+checks = ["check_web_design_rtm", "check_system_dictionary_alignment"]
 tier = "T1"
 
 [[rules]]

@@ -41,6 +41,7 @@
 
 - 每次改文件后，至少运行 `just gov-t1` 并报告退出码。
 - 提交前按变更范围补充最小相关测试；非平凡逻辑必须留下可运行检查。
+- 正式版发布前，数据库结构、OpenAPI / API 契约、前后端数据模型等破坏性变更或新增必填字段，必须按 [docs/adr/0016-deployment.md](docs/adr/0016-deployment.md) 补兼容迁移、数据回填、灰度和回滚证据；开发阶段直接修改建表脚本或契约不能作为正式发布方案。
 - 前端/原型变更还要遵守截图、视觉基线、页面行数等门禁，详见 [apps/AGENTS.override.md](apps/AGENTS.override.md) 与 [prototypes/AGENTS.override.md](prototypes/AGENTS.override.md)。
 - 完成后确认 `git status --short`；最终汇报只覆盖本轮实际修改和验证结果。
 
