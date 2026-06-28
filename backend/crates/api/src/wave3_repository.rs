@@ -12,7 +12,8 @@ use wms_domain::{
     IngestTemperatureReadingRequest, InspectReceivingOrderRequest, InspectionSignatureRecord,
     InventoryBatch, InventoryMovement, PutawayRecord, PutawayRequest, ReceiveReceivingOrderRequest,
     ReceivingInspectionRecord, ReceivingOrder, ReceivingOrderLine, ReceivingOrderReceipt,
-    SignInspectionRequest, TemperatureExcursionEvent, TemperatureReading,
+    RejectReceivingOrderRequest, SignInspectionRequest, TemperatureExcursionEvent,
+    TemperatureReading,
 };
 
 use crate::{
@@ -55,6 +56,7 @@ pub enum Wave3RepositoryError {
     OverReceiptNotAllowed,
     MissingSecondSigner,
     SameSigner,
+    InvalidReason,
     MissingApprovalSource,
     InvalidStateTransition {
         from: String,
@@ -305,9 +307,9 @@ impl PgWave3Repository {
         }
 
         let order = lock_receiving_order(&mut tx, ctx.owner_id, id).await?;
-        if order.status != "released" {
+        if order.status != "released" && order.status != "receiving" {
             return Err(Wave3RepositoryError::InvalidStatus {
-                expected: "released".to_string(),
+                expected: "released/receiving".to_string(),
                 actual: order.status,
             });
         }
@@ -374,6 +376,130 @@ impl PgWave3Repository {
             &request_hash,
             "POST",
             "/api/v1/inbound/receiving-orders/{id}/receive",
+            "receiving_order_receipt",
+            receipt.id.to_string(),
+            &receipt,
+            now,
+        )
+        .await?;
+        if let Some(audit) = audit {
+            append_event_in_tx(&mut tx, &audit)
+                .await
+                .map_err(|error| Wave3RepositoryError::Audit(format!("{error:?}")))?;
+        }
+        tx.commit().await.map_err(map_db_error)?;
+        Ok(IdempotentMutation {
+            value: receipt,
+            replayed: false,
+        })
+    }
+
+    pub async fn reject_receiving_order(
+        &self,
+        ctx: &AuthContext,
+        id: Uuid,
+        req: RejectReceivingOrderRequest,
+        now: DateTime<Utc>,
+        idempotency_key: &str,
+    ) -> Result<ReceivingOrderReceipt, Wave3RepositoryError> {
+        Ok(self
+            .reject_receiving_order_with_audit(ctx, id, req, now, idempotency_key, None)
+            .await?
+            .value)
+    }
+
+    pub async fn reject_receiving_order_with_audit(
+        &self,
+        ctx: &AuthContext,
+        id: Uuid,
+        req: RejectReceivingOrderRequest,
+        now: DateTime<Utc>,
+        idempotency_key: &str,
+        audit: Option<AuditWriteRequest>,
+    ) -> Result<IdempotentMutation<ReceivingOrderReceipt>, Wave3RepositoryError> {
+        let reason = req.reason.trim().to_string();
+        if reason.is_empty() {
+            return Err(Wave3RepositoryError::InvalidReason);
+        }
+        let request_hash = request_hash(&serde_json::json!({
+            "receiving_order_id": id,
+            "request": req,
+        }))?;
+
+        let mut tx = self.begin().await?;
+        lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
+        if let Some(replay) =
+            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash, now).await?
+        {
+            return Ok(IdempotentMutation {
+                value: replay,
+                replayed: true,
+            });
+        }
+
+        let order = lock_receiving_order(&mut tx, ctx.owner_id, id).await?;
+        if order.status != "released" {
+            return Err(Wave3RepositoryError::InvalidStatus {
+                expected: "released".to_string(),
+                actual: order.status,
+            });
+        }
+        let expected_qty: i64 = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(expected_qty), 0)::BIGINT FROM receiving_order_lines WHERE receiving_order_id = $1 AND owner_id = $2",
+        )
+        .bind(id)
+        .bind(ctx.owner_id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(map_db_error)?;
+
+        let receipt = ReceivingOrderReceipt {
+            id: Uuid::new_v4(),
+            receiving_order_id: id,
+            owner_id: ctx.owner_id,
+            actual_qty: 0,
+            shortage_qty: 0,
+            rejected_qty: expected_qty,
+            occurred_at: now,
+        };
+        sqlx::query(
+            r#"
+            INSERT INTO receiving_order_receipts (
+                id, receiving_order_id, owner_id, actual_qty, shortage_qty,
+                rejected_qty, arrival_temperature_celsius, exception_note, occurred_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, NULL, $7, $8)
+            "#,
+        )
+        .bind(receipt.id)
+        .bind(receipt.receiving_order_id)
+        .bind(receipt.owner_id)
+        .bind(receipt.actual_qty)
+        .bind(receipt.shortage_qty)
+        .bind(receipt.rejected_qty)
+        .bind(&reason)
+        .bind(receipt.occurred_at)
+        .execute(&mut *tx)
+        .await
+        .map_err(map_receipt_insert_error)?;
+
+        sqlx::query(
+            "UPDATE receiving_orders SET status = 'closed_rejected', updated_at = $3, version = version + 1 WHERE id = $1 AND owner_id = $2",
+        )
+        .bind(id)
+        .bind(ctx.owner_id)
+        .bind(now)
+        .execute(&mut *tx)
+        .await
+        .map_err(map_db_error)?;
+
+        store_idempotency_success(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            "POST",
+            "/api/v1/inbound/receiving-orders/{id}/reject",
             "receiving_order_receipt",
             receipt.id.to_string(),
             &receipt,

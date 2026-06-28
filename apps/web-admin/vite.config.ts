@@ -179,6 +179,20 @@ async function handleInboundAction(req: IncomingMessage, res: ServerResponse, ac
     return;
   }
 
+  if (action === "reject") {
+    setDevOrderStatus(orderId, "closed_rejected");
+    sendJson(res, 200, {
+      id: "00000000-0000-0000-0000-000000004005",
+      receiving_order_id: orderId,
+      owner_id: devOwnerId,
+      actual_qty: 0,
+      shortage_qty: 0,
+      rejected_qty: devOrderExpectedQty(orderId),
+      occurred_at: occurredAt,
+    });
+    return;
+  }
+
   if (action === "inspect") {
     sendJson(res, 200, {
       id: "00000000-0000-0000-0000-000000004002",
@@ -274,6 +288,11 @@ function setDevOrderStatus(id: string, status: string) {
   if (!order) return;
   order.status = status;
   order.updated_at = new Date().toISOString();
+}
+
+function devOrderExpectedQty(id: string) {
+  const order = findDevOrder(id);
+  return order?.lines.reduce((total, line) => total + line.expected_qty, 0) ?? 0;
 }
 
 function devOrderFromCreateRequest(body: Record<string, unknown>): DevOrder {

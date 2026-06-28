@@ -54,8 +54,8 @@ use wms_domain::{
     PrintWaybillRequest, Product, ProductListResponse, PutawayInventoryRequest, PutawayRecord,
     PutawayRequest, ReceiveReceivingOrderRequest, ReceiveTmsDispatchRequest,
     ReceivingInspectionRecord, ReceivingOrder, ReceivingOrderLine, ReceivingOrderListResponse,
-    ReceivingOrderReceipt, ReportQueryRequest, ReportQueryResponse, ReportRow,
-    RetailReplenishmentSuggestion, ReviewOutboundOrderRequest, ShipOutboundOrderRequest,
+    ReceivingOrderReceipt, RejectReceivingOrderRequest, ReportQueryRequest, ReportQueryResponse,
+    ReportRow, RetailReplenishmentSuggestion, ReviewOutboundOrderRequest, ShipOutboundOrderRequest,
     SignInspectionRequest, SpecialDrugCategory, SpecialDrugCategoryListResponse,
     StoreDashboardResponse, Supplier, SupplierListResponse,
     TemperatureExcursionDispositionResponse, TemperatureExcursionEvent,
@@ -291,6 +291,10 @@ fn delete_receiving_order() {}
 #[allow(dead_code)]
 fn receive_receiving_order() {}
 
+#[utoipa::path(post, path = "/api/v1/inbound/receiving-orders/{id}/reject", tag = "inbound", params(("id" = uuid::Uuid, Path, description = "收货单 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = RejectReceivingOrderRequest, responses((status = 200, description = "整单拒收闭环记录", body = ReceivingOrderReceipt), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn reject_receiving_order() {}
+
 #[utoipa::path(post, path = "/api/v1/inbound/receiving-orders/{id}/inspect", tag = "inbound", params(("id" = uuid::Uuid, Path, description = "收货单 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = InspectReceivingOrderRequest, responses((status = 200, description = "PDA 验收记录", body = ReceivingInspectionRecord), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 fn inspect_receiving_order() {}
@@ -518,6 +522,7 @@ fn confirm_container_recovery() {}
         update_receiving_order,
         delete_receiving_order,
         receive_receiving_order,
+        reject_receiving_order,
         inspect_receiving_order,
         sign_receiving_order_inspection,
         putaway_receiving_order,
@@ -660,6 +665,7 @@ fn confirm_container_recovery() {}
         ReceivingOrderLine,
         ReceivingOrderListResponse,
         ReceivingOrderReceipt,
+        RejectReceivingOrderRequest,
         ReportQueryRequest,
         ReportQueryResponse,
         ReportRow,
@@ -746,6 +752,7 @@ mod tests {
             "/api/v1/inbound/receiving-orders",
             "/api/v1/inbound/receiving-orders/{id}",
             "/api/v1/inbound/receiving-orders/{id}/receive",
+            "/api/v1/inbound/receiving-orders/{id}/reject",
             "/api/v1/inbound/receiving-orders/{id}/inspect",
             "/api/v1/inbound/receiving-orders/{id}/sign",
             "/api/v1/inbound/receiving-orders/{id}/putaway",

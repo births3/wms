@@ -436,6 +436,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/inbound/receiving-orders/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reject_receiving_order"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/inbound/receiving-orders/{id}/sign": {
         parameters: {
             query?: never;
@@ -2040,6 +2056,9 @@ export interface components {
             /** Format: int64 */
             shortage_qty: number;
         };
+        RejectReceivingOrderRequest: {
+            reason: string;
+        };
         ReceiveTmsDispatchRequest: {
             carrier_code?: string | null;
             delivery_provider_type: string;
@@ -3568,6 +3587,54 @@ export interface operations {
         };
         responses: {
             /** @description PDA 收货闭环记录 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceivingOrderReceipt"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    reject_receiving_order: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 收货单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectReceivingOrderRequest"];
+            };
+        };
+        responses: {
+            /** @description 整单拒收闭环记录 */
             200: {
                 headers: {
                     [name: string]: unknown;

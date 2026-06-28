@@ -25,7 +25,7 @@ use wms_domain::{
     IngestTemperatureReadingRequest, InspectReceivingOrderRequest, InspectionSignatureRecord,
     InventoryBatch, InventoryBatchListResponse, PageMeta, PutawayInventoryRequest, PutawayRecord,
     PutawayRequest, ReceiveReceivingOrderRequest, ReceivingInspectionRecord, ReceivingOrderReceipt,
-    TemperatureExcursionEvent, TemperatureReading,
+    RejectReceivingOrderRequest, TemperatureExcursionEvent, TemperatureReading,
 };
 
 use crate::{
@@ -243,6 +243,7 @@ impl IntoResponse for Wave3HandlerError {
             | Wave3HandlerError::Receiving(ReceivingOrderError::QuantityClosureMismatch)
             | Wave3HandlerError::Receiving(ReceivingOrderError::OverReceiptNotAllowed)
             | Wave3HandlerError::Receiving(ReceivingOrderError::InvalidQuantity)
+            | Wave3HandlerError::Receiving(ReceivingOrderError::InvalidReason)
             | Wave3HandlerError::Receiving(ReceivingOrderError::BatchExpired)
             | Wave3HandlerError::Receiving(ReceivingOrderError::SameSigner)
             | Wave3HandlerError::Receiving(ReceivingOrderError::MissingSecondSigner)
@@ -262,6 +263,7 @@ impl IntoResponse for Wave3HandlerError {
             | Wave3HandlerError::Repository(Wave3RepositoryError::OverReceiptNotAllowed)
             | Wave3HandlerError::Repository(Wave3RepositoryError::MissingSecondSigner)
             | Wave3HandlerError::Repository(Wave3RepositoryError::SameSigner)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidReason)
             | Wave3HandlerError::Repository(Wave3RepositoryError::MissingApprovalSource)
             | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidStateTransition {
                 ..
@@ -308,6 +310,10 @@ pub fn wave3_router(state: Wave3AppState) -> Router {
         .route(
             "/api/v1/inbound/receiving-orders/:id/receive",
             post(receive_receiving_order_handler),
+        )
+        .route(
+            "/api/v1/inbound/receiving-orders/:id/reject",
+            post(reject_receiving_order_handler),
         )
         .route(
             "/api/v1/inbound/receiving-orders/:id/inspect",
@@ -389,6 +395,46 @@ async fn receive_receiving_order_handler(
         &state,
         &ctx,
         "receive",
+        "M2",
+        "receiving_order",
+        id.to_string(),
+    )
+    .await;
+    Ok(Json(receipt))
+}
+
+async fn reject_receiving_order_handler(
+    ctx: AuthContext,
+    State(state): State<Wave3AppState>,
+    Path(id): Path<Uuid>,
+    headers: HeaderMap,
+    Json(req): Json<RejectReceivingOrderRequest>,
+) -> Result<Json<ReceivingOrderReceipt>, Wave3HandlerError> {
+    ctx.require_permission("m2.write")?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
+    let now = Utc::now();
+    if let Some(repository) = &state.wave3_repository {
+        let audit = AuditWriteRequest::from_auth_context(
+            &ctx,
+            "reject",
+            "M2",
+            "receiving_order",
+            id.to_string(),
+            None,
+        );
+        let outcome = repository
+            .reject_receiving_order_with_audit(&ctx, id, req, now, &idempotency_key, Some(audit))
+            .await?;
+        return Ok(Json(outcome.value));
+    }
+    let receipt = {
+        let mut store = state.inbound_store.lock().await;
+        store.reject(&ctx, id, req, now)?
+    };
+    append_audit(
+        &state,
+        &ctx,
+        "reject",
         "M2",
         "receiving_order",
         id.to_string(),

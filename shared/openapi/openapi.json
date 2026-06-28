@@ -1503,6 +1503,77 @@
         }
       }
     },
+    "/api/v1/inbound/receiving-orders/{id}/reject": {
+      "post": {
+        "tags": [
+          "inbound"
+        ],
+        "operationId": "reject_receiving_order",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "收货单 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectReceivingOrderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "整单拒收闭环记录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceivingOrderReceipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/inbound/receiving-orders/{id}/sign": {
       "post": {
         "tags": [
@@ -7371,6 +7442,17 @@
           "shortage_qty": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "RejectReceivingOrderRequest": {
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "reason": {
+            "type": "string"
           }
         }
       },

@@ -780,6 +780,11 @@ pub struct ReceiveReceivingOrderRequest {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct RejectReceivingOrderRequest {
+    pub reason: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct ReceivingOrderReceipt {
     pub id: Uuid,
     pub receiving_order_id: Uuid,

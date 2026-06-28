@@ -9,7 +9,7 @@ use wms_api::{
 use wms_domain::{
     ChangeInventoryStatusRequest, CreateBillingAccountRequest, CreateBillingContractRequest,
     CreateBillingRuleRequest, CreateReceivingOrderRequest, PutawayRequest,
-    ReceiveReceivingOrderRequest, ReceivingOrderLine,
+    ReceiveReceivingOrderRequest, ReceivingOrderLine, RejectReceivingOrderRequest,
 };
 
 fn ctx(owner_id: Uuid) -> AuthContext {
@@ -107,6 +107,119 @@ async fn receiving_receipt_is_single_closure_and_idempotent(pool: PgPool) {
     .await
     .expect("count receipts");
     assert_eq!(receipt_count, 1);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn receiving_order_reject_closes_order_and_replays_idempotently(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let ctx = ctx(owner_id);
+    let repo = PgWave3Repository::new(pool.clone());
+    let now = Utc
+        .with_ymd_and_hms(2026, 6, 4, 10, 15, 0)
+        .single()
+        .expect("valid time");
+
+    let order = repo
+        .create_receiving_order(&ctx, receiving_order_req("ASN-PG-REJECT-001"), now)
+        .await
+        .expect("create receiving order");
+    repo.release_receiving_order(&ctx, order.id, now)
+        .await
+        .expect("release receiving order");
+
+    let req = RejectReceivingOrderRequest {
+        reason: "外包装严重破损，整单拒收".to_string(),
+    };
+    let first = repo
+        .reject_receiving_order(&ctx, order.id, req.clone(), now, "idem-reject-1")
+        .await
+        .expect("first reject should insert");
+    let replay = repo
+        .reject_receiving_order(&ctx, order.id, req, now, "idem-reject-1")
+        .await
+        .expect("same idempotency key should replay first reject");
+    assert_eq!(first.id, replay.id);
+
+    let closed: (i64, i64, i64, Option<String>, String, i64) = sqlx::query_as(
+        r#"
+        SELECT
+            receipt.actual_qty,
+            receipt.shortage_qty,
+            receipt.rejected_qty,
+            receipt.exception_note,
+            orders.status,
+            (SELECT COUNT(*) FROM idempotency_request WHERE owner_id = $2 AND idempotency_key = 'idem-reject-1')
+          FROM receiving_order_receipts receipt
+          JOIN receiving_orders orders ON orders.id = receipt.receiving_order_id
+         WHERE receipt.receiving_order_id = $1
+        "#,
+    )
+    .bind(order.id)
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("closed reject row");
+    assert_eq!(
+        closed,
+        (
+            0,
+            0,
+            10,
+            Some("外包装严重破损，整单拒收".to_string()),
+            "closed_rejected".to_string(),
+            1,
+        )
+    );
+
+    let receiving_order = repo
+        .create_receiving_order(&ctx, receiving_order_req("ASN-PG-REJECT-002"), now)
+        .await
+        .expect("create receiving status receiving order");
+    repo.release_receiving_order(&ctx, receiving_order.id, now)
+        .await
+        .expect("release receiving status receiving order");
+    sqlx::query(
+        "UPDATE receiving_orders SET status = 'receiving' WHERE id = $1 AND owner_id = $2",
+    )
+    .bind(receiving_order.id)
+    .bind(owner_id)
+    .execute(&pool)
+    .await
+    .expect("mark order receiving");
+    let receiving_reject = repo
+        .reject_receiving_order(
+            &ctx,
+            receiving_order.id,
+            RejectReceivingOrderRequest {
+                reason: "收货中发现货损，整单拒收".to_string(),
+            },
+            now,
+            "idem-reject-receiving",
+        )
+        .await
+        .expect("receiving status order can be rejected");
+    assert_eq!(receiving_reject.rejected_qty, 10);
+
+    let draft = repo
+        .create_receiving_order(&ctx, receiving_order_req("ASN-PG-REJECT-003"), now)
+        .await
+        .expect("create draft receiving order");
+    let invalid = repo
+        .reject_receiving_order(
+            &ctx,
+            draft.id,
+            RejectReceivingOrderRequest {
+                reason: "未放行不能拒收".to_string(),
+            },
+            now,
+            "idem-reject-draft",
+        )
+        .await
+        .expect_err("non released order cannot be rejected");
+    assert!(matches!(
+        invalid,
+        Wave3RepositoryError::InvalidStatus { .. }
+    ));
 }
 
 #[sqlx::test(migrations = "../../migrations")]
