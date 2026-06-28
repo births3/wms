@@ -134,8 +134,8 @@ struct BillingChargeCalculationRow {
     id: Uuid,
     owner_id: Uuid,
     contract_id: Uuid,
-    period_start: String,
-    period_end: String,
+    period_start: chrono::NaiveDate,
+    period_end: chrono::NaiveDate,
     charge_item: String,
     quantity: i64,
     amount_cents: i64,
@@ -149,8 +149,8 @@ struct BillingStatementRow {
     id: Uuid,
     owner_id: Uuid,
     contract_id: Uuid,
-    period_start: String,
-    period_end: String,
+    period_start: chrono::NaiveDate,
+    period_end: chrono::NaiveDate,
     status: String,
     total_amount_cents: i64,
     created_at: DateTime<Utc>,
@@ -711,8 +711,8 @@ impl PgWave5Repository {
             .bind(id)
             .bind(ctx.owner_id)
             .bind(req.contract_id)
-            .bind(period_start.to_string())
-            .bind(period_end.to_string())
+            .bind(period_start)
+            .bind(period_end)
             .bind(&req.charge_item)
             .bind(req.quantity)
             .bind(amount_cents)
@@ -789,8 +789,8 @@ impl PgWave5Repository {
         .bind(ctx.owner_id)
         .bind(req.contract_id)
         .bind(&req.charge_ids)
-        .bind(period_start.to_string())
-        .bind(period_end.to_string())
+        .bind(period_start)
+        .bind(period_end)
         .fetch_one(&mut *tx)
         .await
         .map_err(map_db_error)?;
@@ -816,8 +816,8 @@ impl PgWave5Repository {
             .bind(id)
             .bind(ctx.owner_id)
             .bind(req.contract_id)
-            .bind(period_start.to_string())
-            .bind(period_end.to_string())
+            .bind(period_start)
+            .bind(period_end)
             .bind(total.unwrap_or(0))
             .bind(now)
             .fetch_one(&mut *tx)
@@ -1541,8 +1541,8 @@ fn map_charge(row: BillingChargeCalculationRow) -> BillingChargeCalculation {
         id: row.id,
         owner_id: row.owner_id,
         contract_id: row.contract_id,
-        period_start: row.period_start,
-        period_end: row.period_end,
+        period_start: row.period_start.to_string(),
+        period_end: row.period_end.to_string(),
         charge_item: row.charge_item,
         quantity: row.quantity,
         amount_cents: row.amount_cents,
@@ -1557,8 +1557,8 @@ fn map_statement(row: BillingStatementRow, charge_ids: Vec<Uuid>) -> BillingStat
         id: row.id,
         owner_id: row.owner_id,
         contract_id: row.contract_id,
-        period_start: row.period_start,
-        period_end: row.period_end,
+        period_start: row.period_start.to_string(),
+        period_end: row.period_end.to_string(),
         status: row.status,
         total_amount_cents: row.total_amount_cents,
         charge_ids,
