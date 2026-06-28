@@ -24,9 +24,10 @@ export interface LoginPageProps {
 
 export function LoginPage({ onLoggedIn, sessionMessage }: LoginPageProps) {
   const loginMutation = useLoginMutation();
-  const [ownerCode, setOwnerCode] = React.useState("");
-  const [username, setUsername] = React.useState("");
-  const [password, setPassword] = React.useState("");
+  const devLogin = __WMS_WEB_ADMIN_DEV_LOGIN__;
+  const [ownerCode, setOwnerCode] = React.useState(devLogin.enabled ? devLogin.ownerCode : "");
+  const [username, setUsername] = React.useState(devLogin.enabled ? devLogin.username : "");
+  const [password, setPassword] = React.useState(devLogin.enabled ? devLogin.password : "");
 
   const canSubmit = ownerCode.trim() !== "" && username.trim() !== "" && password !== "";
 
