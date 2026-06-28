@@ -44,6 +44,11 @@ checks = ["check_project_rtm"]
 tier = "T1"
 
 [[rules]]
+match = "backend/migrations/*.sql"
+checks = ["check_owner_scope_sql"]
+tier = "T1"
+
+[[rules]]
 match = "docs/*-web-design-plan.md"
 checks = ["check_web_design_rtm"]
 tier = "T1"
@@ -382,6 +387,11 @@ tier = "T1"
 [[rules]]
 match = "backend/**"
 checks = ["check_secrets"]
+tier = "T1"
+
+[[rules]]
+match = "backend/crates/api/src/*repository.rs"
+checks = ["check_owner_scope_sql"]
 tier = "T1"
 
 [[rules]]

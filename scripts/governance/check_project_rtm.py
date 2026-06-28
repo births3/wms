@@ -21,6 +21,8 @@ DOC = REPO_ROOT / "docs" / "requirements-traceability-matrix.md"
 DOMAIN_DIR = REPO_ROOT / "docs" / "domain"
 STORY_ID_PATTERN = re.compile(r"\bUS-[A-Z0-9]+-\d+[A-Za-z]?\b")
 VALID_CONCLUSIONS = {"已覆盖", "部分覆盖", "待补证据", "不适用"}
+INCOMPLETE_CONCLUSIONS = {"部分覆盖", "待补证据"}
+EMPTY_GAP_VALUES = {"", "-", "无", "不适用", "N/A", "n/a"}
 
 
 @dataclass(frozen=True)
@@ -38,14 +40,14 @@ class Issue:
 
 RTM_SPECS = (
     RtmSpec("故事总 RTM", ("模块/能力", "用户故事源", "故事数量", "当前 RTM"), 1),
-    RtmSpec("前端体验 RTM", ("范围", "需求来源", "前端入口", "设计/截图证据", "当前结论"), 1),
+    RtmSpec("前端体验 RTM", ("范围", "需求来源", "前端入口", "设计/截图证据", "当前结论", "缺口说明", "补齐路径"), 1),
     RtmSpec(
         "后端实现 RTM",
-        ("范围", "需求来源", "API / 契约", "Handler / Service", "Domain / Repository / Migration", "测试 / 证据", "当前结论"),
+        ("范围", "需求来源", "API / 契约", "Handler / Service", "Domain / Repository / Migration", "测试 / 证据", "当前结论", "缺口说明", "补齐路径"),
         1,
     ),
-    RtmSpec("测试证据 RTM", ("范围", "需求来源", "验证命令", "证据对象", "当前结论"), 1),
-    RtmSpec("合规风险 RTM", ("范围", "需求来源", "合规/风险来源", "控制措施", "证据对象", "当前结论"), 1),
+    RtmSpec("测试证据 RTM", ("范围", "需求来源", "验证命令", "证据对象", "当前结论", "缺口说明", "补齐路径"), 1),
+    RtmSpec("合规风险 RTM", ("范围", "需求来源", "合规/风险来源", "控制措施", "证据对象", "当前结论", "缺口说明", "补齐路径"), 1),
 )
 
 
@@ -115,10 +117,20 @@ def validate_conclusions(spec: RtmSpec, headers: list[str], rows: list[list[str]
         return []
     issues: list[Issue] = []
     conclusion_index = headers.index("当前结论")
+    gap_index = headers.index("缺口说明") if "缺口说明" in headers else -1
+    path_index = headers.index("补齐路径") if "补齐路径" in headers else -1
     for row_number, row in enumerate(rows, start=1):
         conclusion = row[conclusion_index] if conclusion_index < len(row) else ""
         if conclusion not in VALID_CONCLUSIONS:
             issues.append(Issue(spec.name, f"第 {row_number} 行当前结论非法: {conclusion}"))
+            continue
+        if conclusion in INCOMPLETE_CONCLUSIONS:
+            gap = row[gap_index].strip() if 0 <= gap_index < len(row) else ""
+            path = row[path_index].strip() if 0 <= path_index < len(row) else ""
+            if gap in EMPTY_GAP_VALUES:
+                issues.append(Issue(spec.name, f"第 {row_number} 行为 {conclusion} 但缺口说明为空"))
+            if path in EMPTY_GAP_VALUES:
+                issues.append(Issue(spec.name, f"第 {row_number} 行为 {conclusion} 但补齐路径为空"))
     return issues
 
 

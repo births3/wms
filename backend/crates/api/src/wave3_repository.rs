@@ -258,7 +258,7 @@ impl PgWave3Repository {
         .map_err(map_db_error)?
         .ok_or(Wave3RepositoryError::NotFound)?;
 
-        let lines = self.load_receiving_order_lines(id).await?;
+        let lines = self.load_receiving_order_lines(ctx.owner_id, id).await?;
         Ok(map_receiving_order(updated, lines))
     }
 
@@ -312,9 +312,10 @@ impl PgWave3Repository {
             });
         }
         let expected_qty: i64 = sqlx::query_scalar(
-            "SELECT COALESCE(SUM(expected_qty), 0)::BIGINT FROM receiving_order_lines WHERE receiving_order_id = $1",
+            "SELECT COALESCE(SUM(expected_qty), 0)::BIGINT FROM receiving_order_lines WHERE receiving_order_id = $1 AND owner_id = $2",
         )
         .bind(id)
+        .bind(ctx.owner_id)
         .fetch_one(&mut *tx)
         .await
         .map_err(map_db_error)?;
@@ -1263,12 +1264,14 @@ impl PgWave3Repository {
         }
 
         let mut tx = self.begin().await?;
-        let contract_owner: Option<Uuid> =
-            sqlx::query_scalar("SELECT owner_id FROM billing_contracts WHERE id = $1")
-                .bind(req.contract_id)
-                .fetch_optional(&mut *tx)
-                .await
-                .map_err(map_db_error)?;
+        let contract_owner: Option<Uuid> = sqlx::query_scalar(
+            "SELECT owner_id FROM billing_contracts WHERE id = $1 AND owner_id = $2",
+        )
+        .bind(req.contract_id)
+        .bind(ctx.owner_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(map_db_error)?;
         if contract_owner != Some(ctx.owner_id) {
             return Err(Wave3RepositoryError::NotFound);
         }
@@ -1345,6 +1348,7 @@ impl PgWave3Repository {
 
     async fn load_receiving_order_lines(
         &self,
+        owner_id: Uuid,
         id: Uuid,
     ) -> Result<Vec<ReceivingOrderLine>, Wave3RepositoryError> {
         let rows = sqlx::query_as::<_, ReceivingOrderLineRow>(
@@ -1352,11 +1356,12 @@ impl PgWave3Repository {
             SELECT line_no, product_id, product_code, expected_qty, batch_no,
                    production_date, expiry_date
               FROM receiving_order_lines
-             WHERE receiving_order_id = $1
+             WHERE receiving_order_id = $1 AND owner_id = $2
              ORDER BY line_no
             "#,
         )
         .bind(id)
+        .bind(owner_id)
         .fetch_all(&self.pool)
         .await
         .map_err(map_db_error)?;

@@ -35,27 +35,27 @@ def valid_doc() -> str:
 
 ## 4. 前端体验 RTM
 
-| 范围 | 需求来源 | 前端入口 | 设计/截图证据 | 当前结论 |
-|---|---|---|---|---|
-| M2 | US-M2-001 | apps/web-admin | docs | 部分覆盖 |
+| 范围 | 需求来源 | 前端入口 | 设计/截图证据 | 当前结论 | 缺口说明 | 补齐路径 |
+|---|---|---|---|---|---|---|
+| M2 | US-M2-001 | apps/web-admin | docs | 部分覆盖 | 真实截图缺失 | 补真实截图 |
 
 ## 5. 后端实现 RTM
 
-| 范围 | 需求来源 | API / 契约 | Handler / Service | Domain / Repository / Migration | 测试 / 证据 | 当前结论 |
-|---|---|---|---|---|---|---|
-| M2 | US-M2-001 | backend/crates/api/src/lib.rs | backend/crates/api/src/inbound.rs | backend/crates/api/src/wave3_repository.rs | backend/crates/api/tests/wave3_postgres.rs | 已覆盖 |
+| 范围 | 需求来源 | API / 契约 | Handler / Service | Domain / Repository / Migration | 测试 / 证据 | 当前结论 | 缺口说明 | 补齐路径 |
+|---|---|---|---|---|---|---|---|---|
+| M2 | US-M2-001 | backend/crates/api/src/lib.rs | backend/crates/api/src/inbound.rs | backend/crates/api/src/wave3_repository.rs | backend/crates/api/tests/wave3_postgres.rs | 已覆盖 | 无 | 保持同步 |
 
 ## 6. 测试证据 RTM
 
-| 范围 | 需求来源 | 验证命令 | 证据对象 | 当前结论 |
-|---|---|---|---|---|
-| M2 | US-M2-001 | just gov-t1 | check_project_rtm.py | 已覆盖 |
+| 范围 | 需求来源 | 验证命令 | 证据对象 | 当前结论 | 缺口说明 | 补齐路径 |
+|---|---|---|---|---|---|---|
+| M2 | US-M2-001 | just gov-t1 | check_project_rtm.py | 已覆盖 | 无 | 保持同步 |
 
 ## 7. 合规风险 RTM
 
-| 范围 | 需求来源 | 合规/风险来源 | 控制措施 | 证据对象 | 当前结论 |
-|---|---|---|---|---|---|
-| M2 | US-M2-001 | GSP | 审计 | evidence | 已覆盖 |
+| 范围 | 需求来源 | 合规/风险来源 | 控制措施 | 证据对象 | 当前结论 | 缺口说明 | 补齐路径 |
+|---|---|---|---|---|---|---|---|
+| M2 | US-M2-001 | GSP | 审计 | evidence | 已覆盖 | 无 | 保持同步 |
 """
 
 
@@ -107,3 +107,23 @@ def test_project_rtm_requires_backend_references(tmp_path):
         (issue.rtm, issue.detail) for issue in issues
     ]
 
+
+def test_project_rtm_requires_gap_details_for_partial_rows(tmp_path):
+    docs = tmp_path / "docs"
+    seed_story(docs)
+    rtm = docs / "requirements-traceability-matrix.md"
+    rtm.write_text(
+        valid_doc()
+        .replace("真实截图缺失", "无")
+        .replace("补真实截图", "-"),
+        encoding="utf-8",
+    )
+
+    issues = check.validate_doc(rtm, docs / "domain")
+
+    assert ("前端体验 RTM", "第 1 行为 部分覆盖 但缺口说明为空") in [
+        (issue.rtm, issue.detail) for issue in issues
+    ]
+    assert ("前端体验 RTM", "第 1 行为 部分覆盖 但补齐路径为空") in [
+        (issue.rtm, issue.detail) for issue in issues
+    ]
