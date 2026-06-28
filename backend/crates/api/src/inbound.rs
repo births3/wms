@@ -158,9 +158,9 @@ impl ReceivingOrderStore {
         if order.owner_id != ctx.owner_id {
             return Err(ReceivingOrderError::NotFound);
         }
-        if order.status != "released" && order.status != "receiving" {
+        if order.status != "released" {
             return Err(ReceivingOrderError::InvalidStatus {
-                expected: "released/receiving",
+                expected: "released",
                 actual: order.status.clone(),
             });
         }
@@ -210,9 +210,9 @@ impl ReceivingOrderStore {
         if order.owner_id != ctx.owner_id {
             return Err(ReceivingOrderError::NotFound);
         }
-        if order.status != "released" {
+        if order.status != "released" && order.status != "receiving" {
             return Err(ReceivingOrderError::InvalidStatus {
-                expected: "released",
+                expected: "released/receiving",
                 actual: order.status.clone(),
             });
         }
@@ -373,7 +373,8 @@ mod tests {
     use uuid::Uuid;
     use wms_domain::{
         CreateReceivingOrderRequest, InspectReceivingOrderRequest, PutawayRequest,
-        ReceiveReceivingOrderRequest, ReceivingOrderLine, UpdateReceivingOrderRequest,
+        ReceiveReceivingOrderRequest, ReceivingOrderLine, RejectReceivingOrderRequest,
+        UpdateReceivingOrderRequest,
     };
 
     use super::{ReceivingOrderError, ReceivingOrderStore};
@@ -614,6 +615,62 @@ mod tests {
         assert_eq!(
             store.get(&ctx, created.id).expect("get").status,
             "completed"
+        );
+    }
+
+    #[test]
+    fn receiving_order_reject_accepts_receiving_status_and_closes_order() {
+        let now = Utc
+            .with_ymd_and_hms(2026, 6, 4, 10, 0, 0)
+            .single()
+            .expect("valid time");
+        let ctx = ctx(Uuid::new_v4());
+        let mut store = ReceivingOrderStore::default();
+        let created = store
+            .create(
+                &ctx,
+                CreateReceivingOrderRequest {
+                    receipt_no: "ASN-W3-REJECT".to_string(),
+                    supplier_id: None,
+                    warehouse_id: Uuid::new_v4(),
+                    external_ref: None,
+                    expected_arrival_at: None,
+                    lines: vec![line()],
+                },
+                now,
+            )
+            .expect("create order");
+        store
+            .update(
+                &ctx,
+                created.id,
+                UpdateReceivingOrderRequest {
+                    supplier_id: None,
+                    warehouse_id: None,
+                    external_ref: None,
+                    status: Some("receiving".to_string()),
+                    expected_arrival_at: None,
+                    lines: None,
+                },
+                now,
+            )
+            .expect("mark receiving");
+
+        let receipt = store
+            .reject(
+                &ctx,
+                created.id,
+                RejectReceivingOrderRequest {
+                    reason: "外包装严重破损".to_string(),
+                },
+                now,
+            )
+            .expect("reject receiving order");
+
+        assert_eq!(receipt.rejected_qty, 10);
+        assert_eq!(
+            store.get(&ctx, created.id).expect("get").status,
+            "closed_rejected"
         );
     }
 

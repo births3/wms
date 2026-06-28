@@ -307,9 +307,9 @@ impl PgWave3Repository {
         }
 
         let order = lock_receiving_order(&mut tx, ctx.owner_id, id).await?;
-        if order.status != "released" && order.status != "receiving" {
+        if order.status != "released" {
             return Err(Wave3RepositoryError::InvalidStatus {
-                expected: "released/receiving".to_string(),
+                expected: "released".to_string(),
                 actual: order.status,
             });
         }
@@ -438,9 +438,9 @@ impl PgWave3Repository {
         }
 
         let order = lock_receiving_order(&mut tx, ctx.owner_id, id).await?;
-        if order.status != "released" {
+        if order.status != "released" && order.status != "receiving" {
             return Err(Wave3RepositoryError::InvalidStatus {
-                expected: "released".to_string(),
+                expected: "released/receiving".to_string(),
                 actual: order.status,
             });
         }

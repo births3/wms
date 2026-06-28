@@ -2056,9 +2056,6 @@ export interface components {
             /** Format: int64 */
             shortage_qty: number;
         };
-        RejectReceivingOrderRequest: {
-            reason: string;
-        };
         ReceiveTmsDispatchRequest: {
             carrier_code?: string | null;
             delivery_provider_type: string;
@@ -2144,6 +2141,9 @@ export interface components {
             rejected_qty: number;
             /** Format: int64 */
             shortage_qty: number;
+        };
+        RejectReceivingOrderRequest: {
+            reason: string;
         };
         ReportQueryRequest: {
             /** @description 自由结构 JSON 对象。 */

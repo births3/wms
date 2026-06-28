@@ -178,14 +178,12 @@ async fn receiving_order_reject_closes_order_and_replays_idempotently(pool: PgPo
     repo.release_receiving_order(&ctx, receiving_order.id, now)
         .await
         .expect("release receiving status receiving order");
-    sqlx::query(
-        "UPDATE receiving_orders SET status = 'receiving' WHERE id = $1 AND owner_id = $2",
-    )
-    .bind(receiving_order.id)
-    .bind(owner_id)
-    .execute(&pool)
-    .await
-    .expect("mark order receiving");
+    sqlx::query("UPDATE receiving_orders SET status = 'receiving' WHERE id = $1 AND owner_id = $2")
+        .bind(receiving_order.id)
+        .bind(owner_id)
+        .execute(&pool)
+        .await
+        .expect("mark order receiving");
     let receiving_reject = repo
         .reject_receiving_order(
             &ctx,
