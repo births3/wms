@@ -55,7 +55,7 @@
 
 ## 禁止事项
 
-- 禁止主动 `git commit`，除非用户明确说“提交/commit/打 tag”。
+- 禁止主动 `git commit`，除非用户明确说“提交/commit/打 tag”，或明确调用 `wms-review-fix-commit` / “review 技能”且未要求只审查不提交。
 - 禁止主动推送；推 main 分支必须额外显式确认。
 - 禁止强制推送、`git reset --hard`、`git clean -f`、删除分支，除非用户明示。
 - 禁止修改 git 全局配置、hooks、远程配置。
