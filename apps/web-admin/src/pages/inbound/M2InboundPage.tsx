@@ -35,6 +35,12 @@ import {
   type SignFormState,
 } from "./M2InboundDialogs";
 import { M2InboundDetailDialog } from "./M2InboundDetailDialog";
+import {
+  inboundDocumentTypeLabel,
+  inboundDocumentTypeOf,
+  matchesInboundDocumentTypeFilter,
+  type InboundDocumentTypeFilter,
+} from "./m2-inbound-document-type";
 import { M2InboundFilterBar, type StatusFilter } from "./M2InboundFilterBar";
 
 export type M2InboundMode = "receiving" | "inspecting" | "putaway";
@@ -54,6 +60,7 @@ export function M2InboundPage({ mode, onBack }: M2InboundPageProps) {
   const ordersQuery = useReceivingOrdersQuery();
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [keyword, setKeyword] = React.useState("");
+  const [documentTypeFilter, setDocumentTypeFilter] = React.useState<InboundDocumentTypeFilter>("all");
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>(() => defaultStatusFilter(mode));
   const [arrivalDate, setArrivalDate] = React.useState("");
   const [activeDialog, setActiveDialog] = React.useState<InboundDialog | null>(null);
@@ -138,8 +145,8 @@ export function M2InboundPage({ mode, onBack }: M2InboundPageProps) {
   const putawayMutation = usePutawayReceivingOrderMutation();
 
   const orders = React.useMemo(
-    () => filterOrders(ordersQuery.data ?? [], keyword, statusFilter, arrivalDate),
-    [ordersQuery.data, keyword, statusFilter, arrivalDate],
+    () => filterOrders(ordersQuery.data ?? [], keyword, documentTypeFilter, statusFilter, arrivalDate),
+    [ordersQuery.data, keyword, documentTypeFilter, statusFilter, arrivalDate],
   );
 
   React.useEffect(() => {
@@ -150,6 +157,7 @@ export function M2InboundPage({ mode, onBack }: M2InboundPageProps) {
   React.useEffect(() => {
     setStatusFilter(defaultStatusFilter(mode));
     setKeyword("");
+    setDocumentTypeFilter("all");
     setArrivalDate("");
     setLastEvent(null);
   }, [mode]);
@@ -205,6 +213,11 @@ export function M2InboundPage({ mode, onBack }: M2InboundPageProps) {
       header: "ASN / 入库单",
       mono: true,
       render: (row) => <span className="text-primary">{row.receipt_no}</span>,
+    },
+    {
+      key: "document_type",
+      header: "单据类型",
+      render: (row) => inboundDocumentTypeLabel(inboundDocumentTypeOf(row)),
     },
     {
       key: "product",
@@ -444,13 +457,16 @@ export function M2InboundPage({ mode, onBack }: M2InboundPageProps) {
 
         <M2InboundFilterBar
           keyword={keyword}
+          documentTypeFilter={documentTypeFilter}
           statusFilter={statusFilter}
           arrivalDate={arrivalDate}
           onKeywordChange={setKeyword}
+          onDocumentTypeFilterChange={setDocumentTypeFilter}
           onStatusFilterChange={setStatusFilter}
           onArrivalDateChange={setArrivalDate}
           onReset={() => {
             setKeyword("");
+            setDocumentTypeFilter("all");
             setStatusFilter("all");
             setArrivalDate("");
           }}
@@ -571,15 +587,28 @@ function workFieldHeader(mode: M2InboundMode) {
   return headers[mode];
 }
 
-function filterOrders(orders: ReceivingOrder[], keyword: string, statusFilter: StatusFilter, arrivalDate: string) {
+function filterOrders(
+  orders: ReceivingOrder[],
+  keyword: string,
+  documentTypeFilter: InboundDocumentTypeFilter,
+  statusFilter: StatusFilter,
+  arrivalDate: string,
+) {
   const normalized = keyword.trim().toLowerCase();
   return orders.filter((order) => {
+    const documentType = inboundDocumentTypeOf(order);
+    const matchesDocumentType = matchesInboundDocumentTypeFilter(order, documentTypeFilter);
     const matchesStatus = matchesStatusFilter(order.status, statusFilter);
     const matchesDate = !arrivalDate || order.expected_arrival_at?.slice(0, 10) === arrivalDate;
-    const searchable = [order.receipt_no, order.status, ...order.lines.flatMap((line) => [line.product_code, line.batch_no ?? ""])]
+    const searchable = [
+      order.receipt_no,
+      order.status,
+      inboundDocumentTypeLabel(documentType),
+      ...order.lines.flatMap((line) => [line.product_code, line.batch_no ?? ""]),
+    ]
       .join(" ")
       .toLowerCase();
-    return matchesStatus && matchesDate && (!normalized || searchable.includes(normalized));
+    return matchesDocumentType && matchesStatus && matchesDate && (!normalized || searchable.includes(normalized));
   });
 }
 

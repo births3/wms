@@ -13,13 +13,17 @@
 import { Button, Card, CardContent, Input } from "@wms/ui";
 import { Search } from "lucide-react";
 
+import type { InboundDocumentTypeFilter } from "./m2-inbound-document-type";
+
 export type StatusFilter = "all" | "receiving" | "inspecting" | "putaway" | "completed" | "closed_rejected";
 
 interface M2InboundFilterBarProps {
   keyword: string;
+  documentTypeFilter: InboundDocumentTypeFilter;
   statusFilter: StatusFilter;
   arrivalDate: string;
   onKeywordChange: (value: string) => void;
+  onDocumentTypeFilterChange: (value: InboundDocumentTypeFilter) => void;
   onStatusFilterChange: (value: StatusFilter) => void;
   onArrivalDateChange: (value: string) => void;
   onReset: () => void;
@@ -27,16 +31,18 @@ interface M2InboundFilterBarProps {
 
 export function M2InboundFilterBar({
   keyword,
+  documentTypeFilter,
   statusFilter,
   arrivalDate,
   onKeywordChange,
+  onDocumentTypeFilterChange,
   onStatusFilterChange,
   onArrivalDateChange,
   onReset,
 }: M2InboundFilterBarProps) {
   return (
     <Card className="rounded-lg shadow-sm">
-      <CardContent className="grid gap-3 p-4 md:grid-cols-[minmax(18rem,1fr)_10rem_9rem_auto] md:items-end">
+      <CardContent className="grid gap-3 p-4 md:grid-cols-[minmax(16rem,1fr)_9rem_10rem_9rem_auto] md:items-end">
         <div>
           <label className="mb-1 block text-xs text-muted-foreground">关键字</label>
           <div className="relative">
@@ -45,9 +51,21 @@ export function M2InboundFilterBar({
               className="pl-9"
               value={keyword}
               onChange={(event) => onKeywordChange(event.target.value)}
-              placeholder="ASN / 商品 / 批号"
+              placeholder="ASN / 商品 / 批号 / 单据类型"
             />
           </div>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-muted-foreground">单据类型</label>
+          <select
+            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            value={documentTypeFilter}
+            onChange={(event) => onDocumentTypeFilterChange(event.target.value as InboundDocumentTypeFilter)}
+          >
+            <option value="all">全部</option>
+            <option value="purchase_inbound">采购入库</option>
+            <option value="sales_return">销售退货</option>
+          </select>
         </div>
         <div>
           <label className="mb-1 block text-xs text-muted-foreground">状态</label>

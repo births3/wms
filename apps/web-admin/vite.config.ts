@@ -8,6 +8,7 @@ const devMockEnabled = process.env.WMS_WEB_ADMIN_DEV_MOCK === "1";
 const devOwnerId = "00000000-0000-0000-0000-000000000001";
 const devUserId = "00000000-0000-0000-0000-000000000101";
 const devOrderId = "00000000-0000-0000-0000-000000002001";
+const devSalesReturnOrderId = "00000000-0000-0000-0000-000000002002";
 const devWarehouseId = "00000000-0000-0000-0000-000000003001";
 const devLocationId = "00000000-0000-0000-0000-000000000201";
 const devLoginPassword = ["Correct", "Horse1!"].join("");
@@ -26,6 +27,7 @@ const devLoginDefaults = devMockEnabled
     };
 
 let devOrderStatus = "receiving";
+let devSalesReturnOrderStatus = "receiving";
 
 interface DevOrderLine {
   line_no: number;
@@ -270,18 +272,50 @@ function devReceivingOrder() {
   };
 }
 
+function devSalesReturnOrder() {
+  const now = new Date().toISOString();
+  return {
+    id: devSalesReturnOrderId,
+    owner_id: devOwnerId,
+    receipt_no: "SR-M2-PC-0001",
+    warehouse_id: devWarehouseId,
+    status: devSalesReturnOrderStatus,
+    expected_arrival_at: "2026-06-27T11:00:00.000Z",
+    external_ref: "ERP-SR-0001",
+    supplier_id: null,
+    created_at: "2026-06-27T09:00:00.000Z",
+    updated_at: now,
+    lines: [
+      {
+        line_no: 1,
+        product_code: "P-M2-SR-001",
+        product_id: null,
+        batch_no: "SR-BATCH-202606",
+        expected_qty: 8,
+        production_date: "2026-01-01",
+        expiry_date: "2028-01-01",
+      },
+    ],
+  };
+}
+
 function allDevOrders() {
-  return [devReceivingOrder(), ...devCreatedOrders];
+  return [devReceivingOrder(), devSalesReturnOrder(), ...devCreatedOrders];
 }
 
 function findDevOrder(id: string) {
   if (id === devOrderId) return devReceivingOrder();
+  if (id === devSalesReturnOrderId) return devSalesReturnOrder();
   return devCreatedOrders.find((order) => order.id === id) ?? null;
 }
 
 function setDevOrderStatus(id: string, status: string) {
   if (id === devOrderId) {
     devOrderStatus = status;
+    return;
+  }
+  if (id === devSalesReturnOrderId) {
+    devSalesReturnOrderStatus = status;
     return;
   }
   const order = devCreatedOrders.find((item) => item.id === id);

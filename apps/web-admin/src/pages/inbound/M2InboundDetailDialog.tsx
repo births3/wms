@@ -21,6 +21,7 @@ import {
 } from "@wms/ui";
 
 import type { ReceivingOrder } from "@/features/inbound/inbound-queries";
+import { inboundDocumentTypeLabel, inboundDocumentTypeOf } from "./m2-inbound-document-type";
 
 interface M2InboundDetailDialogProps {
   order: ReceivingOrder | null;
@@ -42,8 +43,26 @@ export function M2InboundDetailDialog({ order, defaultStage, open, onOpenChange 
   const line = order.lines[0];
   const lineSummary = order.lines.length > 1 ? ` 等 ${order.lines.length} 行` : "";
   const expectedQty = totalExpectedQty(order);
+  const documentType = inboundDocumentTypeOf(order);
+  const isSalesReturn = documentType === "sales_return";
   const currentStage = stageIndex(order.status);
   const selectedProcess = processDetail(selectedStage, expectedQty, currentStage);
+  const overviewRows: Array<[string, string]> = [
+    ["单据状态", statusLabel(order.status)],
+    ["单据类型", inboundDocumentTypeLabel(documentType)],
+    ["供应商", shortId(order.supplier_id)],
+    ["仓库", shortId(order.warehouse_id)],
+    ["预计到货", formatDateTime(order.expected_arrival_at)],
+    ["商品概要", line ? `${line.product_code}${lineSummary}` : "-"],
+  ];
+  if (isSalesReturn) {
+    overviewRows.push(["原销售批号", line?.batch_no ? `${line.batch_no}${lineSummary}` : "-"]);
+  }
+  overviewRows.push(
+    ["生产 / 有效期", `${line?.production_date ?? "-"} / ${line?.expiry_date ?? "-"}`],
+    ["预报数量", `${expectedQty} 件`],
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
@@ -52,24 +71,13 @@ export function M2InboundDetailDialog({ order, defaultStage, open, onOpenChange 
           <DialogDescription>{order.receipt_no}</DialogDescription>
         </DialogHeader>
 
-        <OverviewGrid
-          rows={[
-            ["单据状态", statusLabel(order.status)],
-            ["供应商", shortId(order.supplier_id)],
-            ["仓库", shortId(order.warehouse_id)],
-            ["预计到货", formatDateTime(order.expected_arrival_at)],
-            ["商品概要", line ? `${line.product_code}${lineSummary}` : "-"],
-            ["批号概要", line?.batch_no ? `${line.batch_no}${lineSummary}` : "-"],
-            ["生产 / 有效期", `${line?.production_date ?? "-"} / ${line?.expiry_date ?? "-"}`],
-            ["预报数量", `${expectedQty} 件`],
-          ]}
-        />
+        <OverviewGrid rows={overviewRows} />
 
         <InboundStatusRail currentStage={currentStage} selectedStage={selectedStage} onSelect={setSelectedStage} />
 
         <ProcessBlock title={selectedProcess.title} state={selectedProcess.state} rows={selectedProcess.rows} />
 
-        <LinesBlock order={order} />
+        <LinesBlock order={order} showBatch={isSalesReturn} />
       </DialogContent>
     </Dialog>
   );
@@ -162,16 +170,19 @@ function ProcessBlock({ title, state, rows }: { title: string; state: ProcessSta
   );
 }
 
-function LinesBlock({ order }: { order: ReceivingOrder }) {
+function LinesBlock({ order, showBatch }: { order: ReceivingOrder; showBatch: boolean }) {
+  const rowClass = showBatch
+    ? "grid gap-2 px-4 py-3 text-sm md:grid-cols-[4rem_1fr_1fr_6rem]"
+    : "grid gap-2 px-4 py-3 text-sm md:grid-cols-[4rem_1fr_6rem]";
   return (
     <div className="rounded-md border">
       <div className="border-b bg-muted/40 px-4 py-2.5 text-xs text-muted-foreground">入库明细</div>
       <div className="divide-y">
         {order.lines.map((item) => (
-          <div key={item.line_no} className="grid gap-2 px-4 py-3 text-sm md:grid-cols-[4rem_1fr_1fr_6rem]">
+          <div key={item.line_no} className={rowClass}>
             <span className="text-muted-foreground">#{item.line_no}</span>
             <span className="font-medium">{item.product_code}</span>
-            <span>{item.batch_no ?? "-"}</span>
+            {showBatch && <span>{item.batch_no ?? "-"}</span>}
             <span className="text-right">{item.expected_qty} 件</span>
           </div>
         ))}

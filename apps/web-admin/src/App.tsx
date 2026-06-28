@@ -178,7 +178,6 @@ function AppShell({
               { id: "m2-receiving", title: "M2 收货管理", subtitle: "ASN / 到货确认", icon: CheckCircle2 },
               { id: "m2-inspecting", title: "M2 验收管理", subtitle: "批号 / 效期 / 签字", icon: ClipboardList },
               { id: "m2-putaway", title: "M2 上架管理", subtitle: "库位 / 数量确认", icon: PackageCheck },
-              { title: "销售退货入库", subtitle: "客户退货 / 收货验收 / 上架", icon: PackageCheck, disabled: true },
             ]}
           />
           <MenuSection
