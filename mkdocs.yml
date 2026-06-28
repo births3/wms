@@ -208,6 +208,7 @@ nav:
     - 业务规则字段注册表 (v2): compliance/gsp-business-rules-registry.md
   - 治理:
     - 治理总文档: governance.md
+    - 项目级 RTM: requirements-traceability-matrix.md
     - AI 协作规范: agent-collaboration.md
     - AI Loop Engineering: agent-loop-engineering.md
     - AI 常用文档索引: agent-document-index.md

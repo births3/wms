@@ -54,6 +54,7 @@
 | [governance.md](governance.md) | 治理体系、提交规范、分层门禁和验证分级 |
 | [coding-standards.md](coding-standards.md) | 代码书写规范 |
 | [frontend-coding-standards.md](frontend-coding-standards.md) | 前端编码规范 |
+| [requirements-traceability-matrix.md](requirements-traceability-matrix.md) | 项目级 RTM 标准，覆盖故事、前端、后端、测试和合规风险矩阵 |
 | [m2-inbound-web-design-plan.md](m2-inbound-web-design-plan.md) | M2 PC Web 收货、验收、上架三页真实截图与设计规划 |
 | [m4-outbound-web-design-plan.md](m4-outbound-web-design-plan.md) | M4 PC Web 出库订单、波次、复核发货、退货页面设计规划 |
 | [layered-design.md](layered-design.md) | 前后端分层设计规范 |

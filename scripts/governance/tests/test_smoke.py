@@ -35,6 +35,7 @@ GOVERNANCE_SCRIPTS = [
     "check_gsp_field_traceability.py",
     "check_field_coding_standards.py",
     "check_business_rules_registry.py",
+    "check_project_rtm.py",
     "check_web_design_rtm.py",
     "check_baseline_health.py",
     "check_governance_consistency.py",
