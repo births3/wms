@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:e2e:m1-real": "pnpm --dir ../../prototypes exec playwright test --config=playwright-web-admin-m1-real-config.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.0",

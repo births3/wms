@@ -5,6 +5,7 @@ import react from "@vitejs/plugin-react";
 import path from "node:path";
 
 const devMockEnabled = process.env.WMS_WEB_ADMIN_DEV_MOCK === "1";
+const e2eApiUrl = process.env.WMS_WEB_ADMIN_E2E_API_URL?.trim();
 const devOwnerId = "00000000-0000-0000-0000-000000000001";
 const devUserId = "00000000-0000-0000-0000-000000000101";
 const devWarehouseId = "00000000-0000-0000-0000-000000003001";
@@ -452,5 +453,13 @@ export default defineConfig({
   server: {
     host: "0.0.0.0",
     port: 9002,
+    proxy: e2eApiUrl
+      ? {
+          "/api": {
+            target: e2eApiUrl,
+            changeOrigin: true,
+          },
+        }
+      : undefined,
   },
 });

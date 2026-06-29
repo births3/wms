@@ -175,6 +175,10 @@ matrix-e2e-full *args:
     @python3 scripts/governance/run_matrix_e2e_screenshots.py {{args}}
     @python3 scripts/governance/check_matrix_e2e_report.py
 
+# M1 管理端真实后端数据 E2E；需要 DATABASE_URL 或 WMS_DB_URL 指向测试库
+web-admin-m1-real-e2e:
+    @pnpm --dir apps/web-admin run test:e2e:m1-real
+
 # 生成主仓 OpenAPI JSON 并刷新 @wms/api-client 类型
 openapi-sync:
     @cd backend && cargo run --quiet --bin openapi-export > ../shared/openapi/openapi.json
