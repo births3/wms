@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { components } from "@wms/api-client";
 
 import { ApiError } from "@/features/auth/auth-queries";
@@ -18,7 +18,11 @@ type Customer = components["schemas"]["Customer"];
 type Warehouse = components["schemas"]["Warehouse"];
 type Location = components["schemas"]["Location"];
 export type BatchCreateLocationsRequest = components["schemas"]["BatchCreateLocationsRequest"];
-type SystemDictionaryItem = components["schemas"]["SystemDictionaryItem"];
+export type SystemDictionaryItem = components["schemas"]["SystemDictionaryItem"];
+export type UpsertSystemDictionaryItemRequest =
+  components["schemas"]["UpsertSystemDictionaryItemRequest"];
+export type DisableSystemDictionaryItemRequest =
+  components["schemas"]["DisableSystemDictionaryItemRequest"];
 
 export interface MasterDataRow {
   id: string;
@@ -52,11 +56,17 @@ export interface LocationMasterDataFields {
 }
 
 export interface SystemDictionaryPaneItem {
+  id: string;
   code: string;
   name: string;
   source: string;
   enabled: boolean;
+  ownerId?: string | null;
   params: Record<string, unknown>;
+  effectiveFrom?: string | null;
+  effectiveTo?: string | null;
+  disabledReason?: string | null;
+  updatedAt: string;
 }
 
 export interface SystemDictionaryPaneGroup {
@@ -66,6 +76,12 @@ export interface SystemDictionaryPaneGroup {
 }
 
 export const masterDataQueryKey = ["master-data"] as const;
+const systemDictionaryGroupsQueryKey = [
+  ...masterDataQueryKey,
+  "m1-system-dictionary",
+  "two-pane",
+] as const;
+const systemDictionaryRowsQueryKey = [...masterDataQueryKey, "m1-system-dictionary"] as const;
 
 export function useMasterDataRowsQuery(viewId: MasterDataViewId) {
   return useQuery<MasterDataRow[], ApiError>({
@@ -76,8 +92,24 @@ export function useMasterDataRowsQuery(viewId: MasterDataViewId) {
 
 export function useSystemDictionaryGroupsQuery() {
   return useQuery<SystemDictionaryPaneGroup[], ApiError>({
-    queryKey: [...masterDataQueryKey, "m1-system-dictionary", "two-pane"],
+    queryKey: systemDictionaryGroupsQueryKey,
     queryFn: listSystemDictionaryGroups,
+  });
+}
+
+export function useUpsertSystemDictionaryItemMutation() {
+  const invalidate = useInvalidateSystemDictionary();
+  return useMutation({
+    mutationFn: upsertSystemDictionaryItem,
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useDisableSystemDictionaryItemMutation() {
+  const invalidate = useInvalidateSystemDictionary();
+  return useMutation({
+    mutationFn: disableSystemDictionaryItem,
+    onSuccess: () => invalidate(),
   });
 }
 
@@ -176,6 +208,45 @@ async function fetchDocumentTypeDictionaryItems(): Promise<SystemDictionaryItem[
     throw new ApiError(result.error, "读取系统字典失败", result.response.status);
   }
   return result.data.data;
+}
+
+async function upsertSystemDictionaryItem(input: {
+  dictCode: string;
+  itemCode: string;
+  request: UpsertSystemDictionaryItemRequest;
+}): Promise<SystemDictionaryItem> {
+  const result = await api.PUT("/api/v1/system-dictionaries/{dict_code}/items/{item_code}", {
+    params: {
+      path: { dict_code: input.dictCode, item_code: input.itemCode },
+      header: { "Idempotency-Key": idempotencyKey("web-m1-dict-upsert") },
+    },
+    body: input.request,
+  });
+  if (!result.data) {
+    throw new ApiError(result.error, "保存系统字典项失败", result.response.status);
+  }
+  return result.data;
+}
+
+async function disableSystemDictionaryItem(input: {
+  dictCode: string;
+  itemCode: string;
+  request: DisableSystemDictionaryItemRequest;
+}): Promise<SystemDictionaryItem> {
+  const result = await api.PATCH(
+    "/api/v1/system-dictionaries/{dict_code}/items/{item_code}/disable",
+    {
+      params: {
+        path: { dict_code: input.dictCode, item_code: input.itemCode },
+        header: { "Idempotency-Key": idempotencyKey("web-m1-dict-disable") },
+      },
+      body: input.request,
+    },
+  );
+  if (!result.data) {
+    throw new ApiError(result.error, "停用系统字典项失败", result.response.status);
+  }
+  return result.data;
 }
 
 function productRow(item: Product): MasterDataRow {
@@ -302,11 +373,25 @@ function systemDictionaryRow(item: SystemDictionaryItem): MasterDataRow {
 
 function systemDictionaryPaneItem(item: SystemDictionaryItem): SystemDictionaryPaneItem {
   return {
+    id: item.id,
     code: item.item_code,
     name: item.item_name,
     source: item.source,
     enabled: item.enabled,
+    ownerId: item.owner_id,
     params: item.params,
+    effectiveFrom: item.effective_from,
+    effectiveTo: item.effective_to,
+    disabledReason: item.disabled_reason,
+    updatedAt: item.updated_at,
+  };
+}
+
+function useInvalidateSystemDictionary() {
+  const queryClient = useQueryClient();
+  return () => {
+    void queryClient.invalidateQueries({ queryKey: systemDictionaryGroupsQueryKey });
+    void queryClient.invalidateQueries({ queryKey: systemDictionaryRowsQueryKey });
   };
 }
 

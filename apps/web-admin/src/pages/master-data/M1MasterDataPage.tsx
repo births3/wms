@@ -7,7 +7,6 @@ import {
   Input,
   PageHeader,
   StatusBadge,
-  SystemDictionaryTwoPane,
   buildLocationBatchPreview,
   type DataGridColumn,
   type LocationBatchRange,
@@ -19,17 +18,16 @@ import { ArrowLeft, Plus, RefreshCw, Search } from "lucide-react";
 import {
   batchCreateLocations,
   useMasterDataRowsQuery,
-  useSystemDictionaryGroupsQuery,
   type LocationMasterDataFields,
   type MasterDataRow,
   type MasterDataViewId,
-  type SystemDictionaryPaneGroup,
 } from "@/features/master-data/master-data-queries";
 import {
   LocationBatchDialog,
   defaultLocationBatchType,
   initialLocationBatchRange,
 } from "./LocationBatchDialog";
+import { M1SystemDictionaryPage } from "./SystemDictionaryPage";
 
 export type { MasterDataViewId } from "@/features/master-data/master-data-queries";
 
@@ -79,10 +77,6 @@ interface M1MasterDataPageProps {
   viewId: MasterDataViewId;
   onBack: () => void;
 }
-
-const emptySystemDictionaryGroups: SystemDictionaryPaneGroup[] = [
-  { code: "document_type", name: "单据类型", items: [] },
-];
 
 const columns: DataGridColumn<MasterDataRow>[] = [
   {
@@ -296,7 +290,7 @@ const locationColumns: DataGridColumn<MasterDataRow>[] = [
 
 export function M1MasterDataPage({ viewId, onBack }: M1MasterDataPageProps) {
   if (viewId === "m1-system-dictionary") {
-    return <M1SystemDictionaryPage onBack={onBack} />;
+    return <M1SystemDictionaryPage meta={masterDataViewMeta[viewId]} onBack={onBack} />;
   }
 
   return <M1MasterDataGridPage viewId={viewId} onBack={onBack} />;
@@ -513,69 +507,6 @@ function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
           onConfirm={confirmLocationBatchPreview}
         />
       )}
-    </section>
-  );
-}
-
-function M1SystemDictionaryPage({ onBack }: Pick<M1MasterDataPageProps, "onBack">) {
-  const meta = masterDataViewMeta["m1-system-dictionary"];
-  const groupsQuery = useSystemDictionaryGroupsQuery();
-  const [lastEvent, setLastEvent] = React.useState<string | null>(null);
-  const groups = groupsQuery.data ?? emptySystemDictionaryGroups;
-  const totalCount = groups.reduce((sum, group) => sum + group.items.length, 0);
-  const activeCount = groups.reduce(
-    (sum, group) => sum + group.items.filter((item) => item.enabled).length,
-    0
-  );
-
-  async function refreshRows() {
-    await groupsQuery.refetch();
-    setLastEvent(`${meta.title} 已刷新`);
-  }
-
-  return (
-    <section className="mx-auto flex w-full max-w-[1680px] flex-col gap-5 px-4 py-8 xl:px-6">
-      <PageHeader
-        title={meta.title}
-        subtitle={meta.subtitle}
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            {lastEvent && (
-              <span className="text-sm text-muted-foreground" role="status">
-                {lastEvent}
-              </span>
-            )}
-            <Button type="button" variant="outline" onClick={refreshRows}>
-              <RefreshCw className="size-4" aria-hidden />
-              刷新
-            </Button>
-            <Button type="button" variant="outline" onClick={onBack}>
-              <ArrowLeft className="size-4" aria-hidden />
-              返回工作台
-            </Button>
-          </div>
-        }
-      />
-
-      <div className="grid gap-3 md:grid-cols-3">
-        <Metric label="字典分类" value={groups.length} />
-        <Metric label="启用项" value={activeCount} />
-        <Metric label="API 返回" value={groupsQuery.data ? totalCount : 0} />
-      </div>
-
-      {groupsQuery.error && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {groupsQuery.error.message}
-        </div>
-      )}
-
-      <SystemDictionaryTwoPane
-        groups={groups}
-        emptyTitle={meta.emptyTitle}
-        emptyDescription={
-          groupsQuery.isPending ? "正在读取 document_type 字典项。" : "document_type 暂无可展示字典项。"
-        }
-      />
     </section>
   );
 }
