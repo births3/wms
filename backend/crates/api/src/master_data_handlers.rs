@@ -9,6 +9,7 @@ use axum::{
     routing::{get, patch},
     Json, Router,
 };
+use sqlx::PgPool;
 use uuid::Uuid;
 use wms_domain::{
     CreateCustomerRequest, CreateLocationRequest, CreateProductRequest,
@@ -23,16 +24,20 @@ use wms_domain::{
 use crate::{
     auth::AuthContext,
     master_data::{MasterDataError, MasterDataStore},
+    master_data_postgres::PgMasterDataReadRepository,
 };
 
 #[derive(Clone, Debug)]
 pub struct MasterDataAppState {
     store: Arc<RwLock<MasterDataStore>>,
+    read_repository: Option<PgMasterDataReadRepository>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum MasterDataHandlerError {
     MasterData(MasterDataError),
+    PostgresReadNotImplemented,
+    PostgresWriteNotImplemented,
     StoreUnavailable,
 }
 
@@ -40,21 +45,97 @@ impl Default for MasterDataAppState {
     fn default() -> Self {
         Self {
             store: Arc::new(RwLock::new(MasterDataStore::default())),
+            read_repository: None,
         }
     }
 }
 
 impl MasterDataAppState {
+    pub fn with_postgres(pool: PgPool) -> Self {
+        Self {
+            store: Arc::new(RwLock::new(MasterDataStore::default())),
+            read_repository: Some(PgMasterDataReadRepository::new(pool)),
+        }
+    }
+
     fn read_store(&self) -> Result<RwLockReadGuard<'_, MasterDataStore>, MasterDataHandlerError> {
+        if self.read_repository.is_some() {
+            // ponytail: avoid fake 404/empty reads from the memory store in PG runtime.
+            return Err(MasterDataHandlerError::PostgresReadNotImplemented);
+        }
         self.store
             .read()
             .map_err(|_| MasterDataHandlerError::StoreUnavailable)
     }
 
     fn write_store(&self) -> Result<RwLockWriteGuard<'_, MasterDataStore>, MasterDataHandlerError> {
+        if self.read_repository.is_some() {
+            // ponytail: PG reads are real; fail writes until PG audit/idempotency writes are implemented.
+            return Err(MasterDataHandlerError::PostgresWriteNotImplemented);
+        }
         self.store
             .write()
             .map_err(|_| MasterDataHandlerError::StoreUnavailable)
+    }
+
+    async fn list_products(
+        &self,
+        ctx: &AuthContext,
+    ) -> Result<Vec<Product>, MasterDataHandlerError> {
+        if let Some(repository) = &self.read_repository {
+            return Ok(repository.list_products(ctx).await?);
+        }
+        Ok(self.read_store()?.list_products(ctx))
+    }
+
+    async fn list_suppliers(
+        &self,
+        ctx: &AuthContext,
+    ) -> Result<Vec<Supplier>, MasterDataHandlerError> {
+        if let Some(repository) = &self.read_repository {
+            return Ok(repository.list_suppliers(ctx).await?);
+        }
+        Ok(self.read_store()?.list_suppliers(ctx))
+    }
+
+    async fn list_customers(
+        &self,
+        ctx: &AuthContext,
+    ) -> Result<Vec<Customer>, MasterDataHandlerError> {
+        if let Some(repository) = &self.read_repository {
+            return Ok(repository.list_customers(ctx).await?);
+        }
+        Ok(self.read_store()?.list_customers(ctx))
+    }
+
+    async fn list_warehouses(
+        &self,
+        ctx: &AuthContext,
+    ) -> Result<Vec<Warehouse>, MasterDataHandlerError> {
+        if let Some(repository) = &self.read_repository {
+            return Ok(repository.list_warehouses(ctx).await?);
+        }
+        Ok(self.read_store()?.list_warehouses(ctx))
+    }
+
+    async fn list_locations(
+        &self,
+        ctx: &AuthContext,
+    ) -> Result<Vec<Location>, MasterDataHandlerError> {
+        if let Some(repository) = &self.read_repository {
+            return Ok(repository.list_locations(ctx).await?);
+        }
+        Ok(self.read_store()?.list_locations(ctx))
+    }
+
+    async fn list_special_drug_categories(
+        &self,
+        ctx: &AuthContext,
+    ) -> Result<Vec<SpecialDrugCategory>, MasterDataHandlerError> {
+        if let Some(repository) = &self.read_repository {
+            return Ok(repository.list_special_drug_categories(ctx).await?);
+        }
+        Ok(self.read_store()?.list_special_drug_categories(ctx))
     }
 }
 
@@ -76,6 +157,21 @@ impl IntoResponse for MasterDataHandlerError {
                 StatusCode::CONFLICT,
                 "M1_MASTER_DATA_DUPLICATE_CODE",
                 "基础档案编码已存在",
+            ),
+            MasterDataHandlerError::MasterData(MasterDataError::Database(_)) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "M1_MASTER_DATA_DATABASE_ERROR",
+                "基础档案数据库读取失败",
+            ),
+            MasterDataHandlerError::PostgresReadNotImplemented => (
+                StatusCode::NOT_IMPLEMENTED,
+                "M1_MASTER_DATA_READ_NOT_IMPLEMENTED",
+                "该基础档案读取接口尚未接入 PostgreSQL",
+            ),
+            MasterDataHandlerError::PostgresWriteNotImplemented => (
+                StatusCode::NOT_IMPLEMENTED,
+                "M1_MASTER_DATA_WRITE_NOT_IMPLEMENTED",
+                "基础档案写操作尚未接入 PostgreSQL 审计与幂等闭环",
             ),
             MasterDataHandlerError::StoreUnavailable => (
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -159,7 +255,7 @@ async fn list_products_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
 ) -> Result<Json<ProductListResponse>, MasterDataHandlerError> {
-    let data = state.read_store()?.list_products(&ctx);
+    let data = state.list_products(&ctx).await?;
     Ok(Json(ProductListResponse {
         page: page(data.len()),
         data,
@@ -212,7 +308,7 @@ async fn list_suppliers_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
 ) -> Result<Json<SupplierListResponse>, MasterDataHandlerError> {
-    let data = state.read_store()?.list_suppliers(&ctx);
+    let data = state.list_suppliers(&ctx).await?;
     Ok(Json(SupplierListResponse {
         page: page(data.len()),
         data,
@@ -257,7 +353,7 @@ async fn list_customers_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
 ) -> Result<Json<CustomerListResponse>, MasterDataHandlerError> {
-    let data = state.read_store()?.list_customers(&ctx);
+    let data = state.list_customers(&ctx).await?;
     Ok(Json(CustomerListResponse {
         page: page(data.len()),
         data,
@@ -302,7 +398,7 @@ async fn list_warehouses_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
 ) -> Result<Json<WarehouseListResponse>, MasterDataHandlerError> {
-    let data = state.read_store()?.list_warehouses(&ctx);
+    let data = state.list_warehouses(&ctx).await?;
     Ok(Json(WarehouseListResponse {
         page: page(data.len()),
         data,
@@ -347,7 +443,7 @@ async fn list_locations_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
 ) -> Result<Json<LocationListResponse>, MasterDataHandlerError> {
-    let data = state.read_store()?.list_locations(&ctx);
+    let data = state.list_locations(&ctx).await?;
     Ok(Json(LocationListResponse {
         page: page(data.len()),
         data,
@@ -392,7 +488,7 @@ async fn list_special_drug_categories_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
 ) -> Result<Json<SpecialDrugCategoryListResponse>, MasterDataHandlerError> {
-    let data = state.read_store()?.list_special_drug_categories(&ctx);
+    let data = state.list_special_drug_categories(&ctx).await?;
     Ok(Json(SpecialDrugCategoryListResponse {
         page: page(data.len()),
         data,
@@ -441,5 +537,33 @@ fn page(count: usize) -> PageMeta {
     PageMeta {
         next_cursor: None,
         count: count as u32,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use sqlx::postgres::PgPoolOptions;
+
+    use super::{MasterDataAppState, MasterDataHandlerError};
+
+    #[tokio::test]
+    async fn postgres_state_rejects_memory_backed_writes() {
+        let pool = PgPoolOptions::new()
+            .connect_lazy("postgres://localhost/wms")
+            .expect("lazy pool should not connect during write guard test");
+        let state = MasterDataAppState::with_postgres(pool);
+
+        assert_eq!(
+            state
+                .read_store()
+                .expect_err("PostgreSQL state must not read from memory store"),
+            MasterDataHandlerError::PostgresReadNotImplemented
+        );
+        assert_eq!(
+            state
+                .write_store()
+                .expect_err("PostgreSQL state must not write to memory store"),
+            MasterDataHandlerError::PostgresWriteNotImplemented
+        );
     }
 }

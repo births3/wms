@@ -104,7 +104,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let config_center_state = ConfigCenterAppState::from_registry(file_registry);
     let auth_state = AuthAppState::new(pool.clone());
     let audit_query_state = AuditQueryState { pool: pool.clone() };
-    let master_data_state = MasterDataAppState::default();
+    let master_data_state = MasterDataAppState::with_postgres(pool.clone());
     let system_dictionary_state = SystemDictionaryAppState::with_postgres(pool.clone());
     let wave3_state =
         Wave3AppState::with_postgres(pool.clone()).with_config_center(config_center_state.clone());
