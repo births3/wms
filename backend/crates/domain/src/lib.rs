@@ -357,6 +357,23 @@ pub struct CreateLocationRequest {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct BatchCreateLocationsRequest {
+    pub warehouse_id: Uuid,
+    pub zone_id: Uuid,
+    pub area_code: String,
+    pub row_start: i32,
+    pub row_end: i32,
+    pub column_start: i32,
+    pub column_end: i32,
+    pub layer_start: i32,
+    pub layer_end: i32,
+    pub max_volume_cm3: i64,
+    pub max_sku_count: i32,
+    pub location_type: String,
+    pub bound_owner_id: Option<Uuid>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct UpdateLocationRequest {
     pub zone_id: Option<Uuid>,
     pub location_code: Option<String>,

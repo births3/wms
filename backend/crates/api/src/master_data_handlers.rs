@@ -4,28 +4,31 @@ use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use axum::{
     extract::{Path, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
-    routing::{get, patch},
+    routing::{get, patch, post},
     Json, Router,
 };
 use sqlx::PgPool;
 use uuid::Uuid;
 use wms_domain::{
-    CreateCustomerRequest, CreateLocationRequest, CreateProductRequest,
-    CreateSpecialDrugCategoryRequest, CreateSupplierRequest, CreateWarehouseRequest, Customer,
-    CustomerListResponse, ErrorResponse, Location, LocationListResponse, PageMeta, Product,
-    ProductListResponse, SpecialDrugCategory, SpecialDrugCategoryListResponse, Supplier,
-    SupplierListResponse, UpdateCustomerRequest, UpdateLocationRequest, UpdateProductRequest,
-    UpdateSpecialDrugCategoryRequest, UpdateSupplierRequest, UpdateWarehouseRequest, Warehouse,
-    WarehouseListResponse,
+    BatchCreateLocationsRequest, CreateCustomerRequest, CreateLocationRequest,
+    CreateProductRequest, CreateSpecialDrugCategoryRequest, CreateSupplierRequest,
+    CreateWarehouseRequest, Customer, CustomerListResponse, ErrorResponse, Location,
+    LocationListResponse, PageMeta, Product, ProductListResponse, SpecialDrugCategory,
+    SpecialDrugCategoryListResponse, Supplier, SupplierListResponse, UpdateCustomerRequest,
+    UpdateLocationRequest, UpdateProductRequest, UpdateSpecialDrugCategoryRequest,
+    UpdateSupplierRequest, UpdateWarehouseRequest, Warehouse, WarehouseListResponse,
 };
 
 use crate::{
-    auth::AuthContext,
+    auth::{AuthContext, AuthError},
     master_data::{MasterDataError, MasterDataStore},
     master_data_postgres::PgMasterDataReadRepository,
 };
+
+const IDEMPOTENCY_KEY_HEADER: &str = "idempotency-key";
+const MASTER_DATA_WRITE_PERMISSION: &str = "m1.master_data.write";
 
 #[derive(Clone, Debug)]
 pub struct MasterDataAppState {
@@ -35,7 +38,9 @@ pub struct MasterDataAppState {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum MasterDataHandlerError {
+    Auth(AuthError),
     MasterData(MasterDataError),
+    MissingIdempotencyKey,
     PostgresReadNotImplemented,
     PostgresWriteNotImplemented,
     StoreUnavailable,
@@ -128,6 +133,21 @@ impl MasterDataAppState {
         Ok(self.read_store()?.list_locations(ctx))
     }
 
+    async fn batch_create_locations(
+        &self,
+        ctx: &AuthContext,
+        req: BatchCreateLocationsRequest,
+        now: chrono::DateTime<chrono::Utc>,
+        idempotency_key: &str,
+    ) -> Result<LocationListResponse, MasterDataHandlerError> {
+        if let Some(repository) = &self.read_repository {
+            return Ok(repository
+                .batch_create_locations(ctx, req, now, idempotency_key)
+                .await?);
+        }
+        Err(MasterDataHandlerError::PostgresWriteNotImplemented)
+    }
+
     async fn list_special_drug_categories(
         &self,
         ctx: &AuthContext,
@@ -145,9 +165,16 @@ impl From<MasterDataError> for MasterDataHandlerError {
     }
 }
 
+impl From<AuthError> for MasterDataHandlerError {
+    fn from(value: AuthError) -> Self {
+        Self::Auth(value)
+    }
+}
+
 impl IntoResponse for MasterDataHandlerError {
     fn into_response(self) -> Response {
         let (status, code, message) = match self {
+            MasterDataHandlerError::Auth(error) => return error.into_response(),
             MasterDataHandlerError::MasterData(MasterDataError::NotFound) => (
                 StatusCode::NOT_FOUND,
                 "M1_MASTER_DATA_NOT_FOUND",
@@ -158,10 +185,34 @@ impl IntoResponse for MasterDataHandlerError {
                 "M1_MASTER_DATA_DUPLICATE_CODE",
                 "基础档案编码已存在",
             ),
-            MasterDataHandlerError::MasterData(MasterDataError::Database(_)) => (
+            MasterDataHandlerError::MasterData(MasterDataError::DuplicateLocationCode(_)) => (
+                StatusCode::CONFLICT,
+                "M1_LOCATION_DUPLICATE",
+                "库位编码已存在",
+            ),
+            MasterDataHandlerError::MasterData(MasterDataError::InvalidLocationBatchRange) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M1_LOCATION_BATCH_INVALID",
+                "库位批量创建范围非法",
+            ),
+            MasterDataHandlerError::MasterData(MasterDataError::IdempotencyConflict) => (
+                StatusCode::CONFLICT,
+                "M1_LOCATION_IDEMPOTENCY_CONFLICT",
+                "幂等键已被不同请求使用",
+            ),
+            MasterDataHandlerError::MissingIdempotencyKey => (
+                StatusCode::BAD_REQUEST,
+                "M1_LOCATION_IDEMPOTENCY_REQUIRED",
+                "缺少 Idempotency-Key",
+            ),
+            MasterDataHandlerError::MasterData(
+                MasterDataError::Audit(_)
+                | MasterDataError::Database(_)
+                | MasterDataError::Serialize(_),
+            ) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "M1_MASTER_DATA_DATABASE_ERROR",
-                "基础档案数据库读取失败",
+                "基础档案数据库处理失败",
             ),
             MasterDataHandlerError::PostgresReadNotImplemented => (
                 StatusCode::NOT_IMPLEMENTED,
@@ -234,6 +285,10 @@ pub fn master_data_router(state: MasterDataAppState) -> Router {
         .route(
             "/api/v1/master-data/locations",
             get(list_locations_handler).post(create_location_handler),
+        )
+        .route(
+            "/api/v1/master-data/locations/batch-create",
+            post(batch_create_locations_handler),
         )
         .route(
             "/api/v1/master-data/locations/:id",
@@ -462,6 +517,21 @@ async fn create_location_handler(
     )?))
 }
 
+async fn batch_create_locations_handler(
+    ctx: AuthContext,
+    State(state): State<MasterDataAppState>,
+    headers: HeaderMap,
+    Json(req): Json<BatchCreateLocationsRequest>,
+) -> Result<Json<LocationListResponse>, MasterDataHandlerError> {
+    ctx.require_permission(MASTER_DATA_WRITE_PERMISSION)?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
+    Ok(Json(
+        state
+            .batch_create_locations(&ctx, req, chrono::Utc::now(), &idempotency_key)
+            .await?,
+    ))
+}
+
 async fn update_location_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
@@ -538,6 +608,16 @@ fn page(count: usize) -> PageMeta {
         next_cursor: None,
         count: count as u32,
     }
+}
+
+fn idempotency_key_from_headers(headers: &HeaderMap) -> Result<String, MasterDataHandlerError> {
+    headers
+        .get(IDEMPOTENCY_KEY_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+        .ok_or(MasterDataHandlerError::MissingIdempotencyKey)
 }
 
 #[cfg(test)]

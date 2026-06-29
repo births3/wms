@@ -18,7 +18,12 @@ use crate::auth::AuthContext;
 pub enum MasterDataError {
     NotFound,
     DuplicateCode(String),
+    DuplicateLocationCode(String),
+    InvalidLocationBatchRange,
+    IdempotencyConflict,
+    Audit(String),
     Database(String),
+    Serialize(String),
 }
 
 trait CatalogEntity: Clone {
