@@ -1,6 +1,6 @@
 ---
 name: wms-worktree-subagent
-description: WMS 仓库用独立 worktree 和 codex exec 运行子代理、复盘输出并迭代子代理提示词的流程。用户要求建立 subagent、用 worktree 跑并行任务、codex exec 子任务、先跑一个再迭代 subagent、或让主代理负责 review/merge 子代理结果时使用。
+description: WMS 仓库用独立 worktree 和 codex exec 运行子代理、复盘输出、主代理合并、清理收尾并迭代子代理提示词的流程。用户要求建立 subagent、用 worktree 跑并行任务、codex exec 子任务、先跑一个再迭代 subagent、让主代理负责 review/merge、清理 worktree、检查遗留 agent worktree 时使用。
 ---
 
 # WMS Worktree Subagent
@@ -15,6 +15,7 @@ description: WMS 仓库用独立 worktree 和 codex exec 运行子代理、复�
 - 默认要求子代理使用 `wms-loop-engineering` 和 `wms-review-fix-commit`。`workspace-write` 子代理只留下可审查修改和最终报告，由主代理复查后显式暂存/提交；只有 sandbox 明确可写 `.git/worktrees/<worktree>` 时才要求子代理本地提交。
 - 只读校准任务用于先跑通子代理和收敛切片：使用 `read-only` sandbox，不改文件、不提交，只输出下一轮切片、允许文件、停止条件、验证命令和技能缺口。
 - 外部设备、TMS、冷链平台、生产数据和凭据类 evidence 不能交给子代理伪造；只能让子代理整理采集步骤或验证已有证据。
+- 子代理不得把 `node_modules/`、`.vite-temp/`、临时 pnpm store、`target/` 以外的大型构建产物留作待合并内容；如验证命令产生缓存污染，最终输出必须显式列出并标记为“缓存污染，不能合并”。
 
 ## 建立子代理
 
@@ -74,14 +75,19 @@ codex exec -C ../wms-agent-<slug> -s read-only -o ../wms-agent-<slug>.out.md "<�
 11. 运行 git diff --check、just gov-t1 和任务相关测试；任一失败时最终输出必须写“不可合并”，不得建议主代理合并。
 12. 使用 wms-review-fix-commit 做 review→修复→review；验证通过且 Git 元数据可写时本地分组提交，否则停止在可审查工作区。
 13. 不推送。
+14. 不运行 `git clean -f`、`git reset --hard` 或删除分支；依赖安装和构建缓存优先使用 `/tmp` 或任务限定目录，避免污染子 worktree。
 
 最终输出：
 - 子 worktree 路径
 - 提交哈希；未提交时写 `无` 并说明阻塞
 - 修改文件
+- `git status --short` 输出；无输出也写“干净”
+- `git diff --stat` 摘要；只读审查任务写“不适用”
+- 未跟踪/忽略产物摘要，特别是 `node_modules/`、构建缓存、截图和测试报告
 - 验证命令和退出码
 - 是否可合并
 - 剩余问题/需要确认事项
+- 清理建议：`可普通移除`、`已合并可强制移除`、`不可合并需保留` 或 `只读审查可移除`
 ```
 
 ## 主代理复盘与合并
@@ -93,6 +99,7 @@ git status --short --branch
 git -C ../wms-agent-<slug> status --short --branch
 git -C ../wms-agent-<slug> log --oneline -5
 git -C ../wms-agent-<slug> diff --stat
+git -C ../wms-agent-<slug> status --short --ignored
 git -C ../wms-agent-<slug> show --stat --oneline <hash>  # 子代理有提交时
 ```
 
@@ -118,11 +125,52 @@ git -C ../wms-agent-<slug> show --stat --oneline <hash>  # 子代理有提交时
 4. 验证通过后由主代理按主题显式 `git add <file...>` 并提交；禁止 `git add .`。
 5. 验证失败则不提交，保留主工作区差异并报告失败命令、退出码和下一步；不要推送。
 
+## 主代理强制收尾门禁
+
+每次子代理合并、放弃或审查结束后，主代理必须做 worktree 收尾；这一步是本技能的停止条件之一，不能省略。
+
+1. 在主工作区列出所有 agent worktree：
+
+```bash
+git worktree list
+for d in ../wms-agent-*; do
+  [ -e "$d" ] || continue
+  git -C "$d" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue
+  printf '\n== %s ==\n' "$d"
+  git -C "$d" status --short --branch
+  git -C "$d" diff --stat
+  git -C "$d" status --short --ignored | sed -n '1,40p'
+done
+```
+
+2. 输出清理矩阵：
+
+| 分类 | 判断 | 处理 |
+|---|---|---|
+| 干净可删 | `status --short` 无源码/未跟踪输出，且不是当前任务保留基线 | `git worktree remove <path>` |
+| 已合并可强制移除 | 子代理修改已由主代理合并并提交，或用户明确放弃；但子 worktree 仍脏 | 用户已明确要求清理/丢弃时才 `git worktree remove --force <path>` |
+| 不可合并需保留 | 子代理报告不可合并、验证失败、越权或需要业务确认 | 保留路径和原因，不删除 |
+| 缓存污染 | 只有 `node_modules/`、pnpm store、`.vite-temp/`、构建缓存等无业务产物 | 记录污染来源；用户明确清理时优先用 `git worktree remove --force <path>` 移除整个 worktree，不手工删 `.git` |
+| 未判断 | 缺少最终报告、缺少验证结果或无法确认是否已合并 | 保留并列下一步审查命令 |
+
+3. 禁止事项：
+   - 禁止用 `git clean -f` 掩盖子代理污染。
+   - 禁止手工删除 worktree 目录里的 `.git` 文件或主仓库 `.git/worktrees/*` 元数据。
+   - 禁止删除 `agent/*` 分支，除非用户显式要求。
+   - 禁止把清理 worktree 当作合并验证；清理前必须先完成主工作区 review、验证和提交。
+
+4. 最终汇报必须包含：
+   - 已移除 worktree 列表。
+   - 保留 worktree 列表和保留原因。
+   - 是否还有脏 worktree。
+   - 如果用户要求“全部清理”，但存在不可合并或未判断 worktree，必须停止并逐项说明，不能静默强删。
+
 主代理最终汇报必须区分：
 
 - 子代理结果：路径、提交哈希或无、是否可合并。
 - 主工作区结果：是否已合并、主工作区验证、主代理提交哈希。
 - 未合并产物：原因和保留路径。
+- worktree 收尾结果：已移除、仍保留、是否需要用户确认强制移除。
 
 ## 迭代本技能
 
@@ -134,5 +182,6 @@ git -C ../wms-agent-<slug> show --stat --oneline <hash>  # 子代理有提交时
 - 子代理没提交：检查 `.git/worktrees/<worktree>` 写权限，必要时由主代理接管提交。
 - 子代理遇到低磁盘、pnpm、本地凭据或外部服务阻断：补停止条件，禁止原地循环重试。
 - 子代理输出不可审查：收紧“最终输出”字段。
+- 子代理或主代理留下未解释的 worktree：收紧“主代理强制收尾门禁”，必要时补清理矩阵字段。
 
 迭代后运行 `git diff --check` 和 `just gov-t1`，再按 `wms-review-fix-commit` 提交。
