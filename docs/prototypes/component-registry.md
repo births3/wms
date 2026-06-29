@@ -94,6 +94,7 @@ shadcn/ui 标准 CSS 变量 + WMS 自定义业务色，一处定义两端共用�
 | 15 | **DataTable** | 跨端 | 通用数据表格：列定义+选中态+空状态+翻页槽（基于 ui/Table） | 全部列表型管理页 | 已开发 |
 | 16 | **DataGrid** | PC | 管理页数据网格：客户端分页、排序、字段筛选、列显隐、列宽拖拽、点击复制、视图保存 | M2 收货管理列表 | 已开发 |
 | 17 | **EmptyState** | 跨端 | 空状态展示：图标+标题+描述+CTA | 全部列表/看板/详情 | 已开发 |
+| 18 | **SystemDictionaryTwoPane** | PC | 系统字典两层展示：左侧字典分类，右侧选中分类的字典项、来源、启停状态与参数摘要 | M1-011 系统字典 / 单据类型参数配置 | 已开发 |
 
 ### 3.2 组件依赖关系
 
@@ -160,3 +161,4 @@ interface PdaComponentProps extends WmsComponentProps {
 | 2026-05-23 | 扩到 16 个组件（+ DiffPanel / PageHeader / DataTable / EmptyState） |
 | 2026-05-23 | **路径迁移**：Layer 0/1/2 全部从 `prototypes/src/` 抽离至 `packages/ui/src/`（commit e3ce5a0），构成 `@wms/ui` 共享包；详见 ADR-0022 v0.2 修订记录 + ADR-0028 |
 | 2026-06-28 | 扩到 17 个组件（+ DataGrid），用于管理页分页、排序、字段筛选、字段显隐、列宽拖拽、点击复制和视图保存 |
+| 2026-06-29 | 扩到 18 个组件（+ SystemDictionaryTwoPane），用于 M1 系统字典左右两层展示 |

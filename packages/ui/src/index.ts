@@ -19,3 +19,13 @@ export * from "./business";
 
 // 工具函数
 export { cn } from "./lib/utils";
+export {
+  LOCATION_BATCH_MAX_COUNT,
+  buildLocationBatchPreview,
+  validateLocationBatchRange,
+} from "./lib/location-batch";
+export type {
+  LocationBatchPreview,
+  LocationBatchPreviewGroup,
+  LocationBatchRange,
+} from "./lib/location-batch";

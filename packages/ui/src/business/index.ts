@@ -33,3 +33,9 @@ export { DataGrid } from "./DataGrid";
 export type { DataGridProps, DataGridColumn } from "./DataGrid";
 export { EmptyState } from "./EmptyState";
 export type { EmptyStateProps } from "./EmptyState";
+export { SystemDictionaryTwoPane } from "./SystemDictionaryTwoPane";
+export type {
+  SystemDictionaryTwoPaneProps,
+  SystemDictionaryTwoPaneGroup,
+  SystemDictionaryTwoPaneItem,
+} from "./SystemDictionaryTwoPane";
