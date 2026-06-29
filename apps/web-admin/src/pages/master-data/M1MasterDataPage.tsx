@@ -7,16 +7,29 @@ import {
   Input,
   PageHeader,
   StatusBadge,
+  SystemDictionaryTwoPane,
+  buildLocationBatchPreview,
   type DataGridColumn,
+  type LocationBatchRange,
   type StatusKey,
+  validateLocationBatchRange,
 } from "@wms/ui";
-import { ArrowLeft, RefreshCw, Search } from "lucide-react";
+import { ArrowLeft, Plus, RefreshCw, Search } from "lucide-react";
 
 import {
+  batchCreateLocations,
   useMasterDataRowsQuery,
+  useSystemDictionaryGroupsQuery,
+  type LocationMasterDataFields,
   type MasterDataRow,
   type MasterDataViewId,
+  type SystemDictionaryPaneGroup,
 } from "@/features/master-data/master-data-queries";
+import {
+  LocationBatchDialog,
+  defaultLocationBatchType,
+  initialLocationBatchRange,
+} from "./LocationBatchDialog";
 
 export type { MasterDataViewId } from "@/features/master-data/master-data-queries";
 
@@ -66,6 +79,10 @@ interface M1MasterDataPageProps {
   viewId: MasterDataViewId;
   onBack: () => void;
 }
+
+const emptySystemDictionaryGroups: SystemDictionaryPaneGroup[] = [
+  { code: "document_type", name: "单据类型", items: [] },
+];
 
 const columns: DataGridColumn<MasterDataRow>[] = [
   {
@@ -157,11 +174,146 @@ const columns: DataGridColumn<MasterDataRow>[] = [
   },
 ];
 
+const locationColumns: DataGridColumn<MasterDataRow>[] = [
+  {
+    key: "owner",
+    header: "货主",
+    width: 230,
+    minWidth: 200,
+    sortable: true,
+    sortValue: (row) => locationValue(row, "owner"),
+    filterValue: (row) => locationValue(row, "owner"),
+    copyValue: (row) => locationValue(row, "owner"),
+    filter: { type: "text" },
+  },
+  {
+    key: "warehouse",
+    header: "仓库 / 库区",
+    width: 280,
+    minWidth: 240,
+    filterValue: (row) => `${locationValue(row, "warehouse")} ${locationValue(row, "zone")}`,
+    copyValue: (row) => `仓库 ${locationValue(row, "warehouse")} / 库区 ${locationValue(row, "zone")}`,
+    filter: { type: "text" },
+    render: (row) => (
+      <FieldText label={`库区 ${locationValue(row, "zone")}`} value={`仓库 ${locationValue(row, "warehouse")}`} />
+    ),
+  },
+  {
+    key: "code",
+    header: "库位编码",
+    mono: true,
+    width: 190,
+    minWidth: 170,
+    sortable: true,
+    sortValue: (row) => row.code,
+    filterValue: (row) => row.code,
+    copyValue: (row) => row.code,
+    filter: { type: "text" },
+    render: (row) => <span className="text-primary">{row.code}</span>,
+  },
+  {
+    key: "coordinate",
+    header: "区域 / 排列层",
+    width: 210,
+    minWidth: 190,
+    filterValue: (row) =>
+      `${locationValue(row, "area")} ${locationValue(row, "rowNo")} ${locationValue(row, "columnNo")} ${locationValue(row, "layerNo")}`,
+    copyValue: (row) =>
+      `区域 ${locationValue(row, "area")} / 排 ${locationValue(row, "rowNo")} / 列 ${locationValue(row, "columnNo")} / 层 ${locationValue(row, "layerNo")}`,
+    filter: { type: "text" },
+    render: (row) => (
+      <FieldText
+        label={`排 ${locationValue(row, "rowNo")} / 列 ${locationValue(row, "columnNo")} / 层 ${locationValue(row, "layerNo")}`}
+        value={`区域 ${locationValue(row, "area")}`}
+      />
+    ),
+  },
+  {
+    key: "locationType",
+    header: "库位类型",
+    width: 140,
+    minWidth: 120,
+    sortable: true,
+    sortValue: (row) => locationValue(row, "locationType"),
+    filterValue: (row) => locationValue(row, "locationType"),
+    copyValue: (row) => locationValue(row, "locationType"),
+    filter: { type: "text" },
+  },
+  {
+    key: "status",
+    header: "状态",
+    width: 130,
+    minWidth: 120,
+    sortable: true,
+    sortValue: (row) => row.statusLabel,
+    filterValue: (row) => statusFilterValue(row.status),
+    copyValue: (row) => row.statusLabel,
+    filter: {
+      type: "multiSelect",
+      options: [
+        { label: "可用", value: "active" },
+        { label: "停用/锁定", value: "disabled" },
+        { label: "其他", value: "other" },
+      ],
+    },
+    render: (row) => (
+      <StatusBadge status={statusKey(row.status)} label={row.statusLabel} size="sm" />
+    ),
+  },
+  {
+    key: "volume",
+    header: "已用 / 最大体积",
+    width: 180,
+    minWidth: 160,
+    filterValue: (row) => locationValue(row, "volume"),
+    copyValue: (row) => locationValue(row, "volume"),
+    filter: { type: "text" },
+  },
+  {
+    key: "maxSku",
+    header: "最大 SKU",
+    width: 130,
+    minWidth: 120,
+    sortable: true,
+    sortValue: (row) => Number.parseInt(locationValue(row, "maxSku"), 10) || 0,
+    filterValue: (row) => locationValue(row, "maxSku"),
+    copyValue: (row) => locationValue(row, "maxSku"),
+    filter: { type: "text" },
+  },
+  {
+    key: "updatedAt",
+    header: "更新时间",
+    width: 190,
+    minWidth: 170,
+    sortable: true,
+    sortValue: (row) => row.updatedAt,
+    filterValue: (row) => row.updatedAt,
+    copyValue: (row) => formatDateTime(row.updatedAt),
+    filter: { type: "dateRange" },
+    render: (row) => formatDateTime(row.updatedAt),
+  },
+];
+
 export function M1MasterDataPage({ viewId, onBack }: M1MasterDataPageProps) {
+  if (viewId === "m1-system-dictionary") {
+    return <M1SystemDictionaryPage onBack={onBack} />;
+  }
+
+  return <M1MasterDataGridPage viewId={viewId} onBack={onBack} />;
+}
+
+function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
   const meta = masterDataViewMeta[viewId];
   const rowsQuery = useMasterDataRowsQuery(viewId);
   const [keyword, setKeyword] = React.useState("");
   const [lastEvent, setLastEvent] = React.useState<string | null>(null);
+  const [locationBatchOpen, setLocationBatchOpen] = React.useState(false);
+  const [locationBatchRange, setLocationBatchRange] =
+    React.useState<LocationBatchRange>(initialLocationBatchRange);
+  const [locationBatchType, setLocationBatchType] = React.useState(defaultLocationBatchType);
+  const [locationBatchMessage, setLocationBatchMessage] = React.useState<string | null>(null);
+  const [locationBatchSubmitting, setLocationBatchSubmitting] = React.useState(false);
+  const [locationBatchScopeKey, setLocationBatchScopeKey] = React.useState("");
   const normalizedKeyword = keyword.trim().toLowerCase();
   const rows = React.useMemo(() => {
     const data = rowsQuery.data ?? [];
@@ -169,10 +321,98 @@ export function M1MasterDataPage({ viewId, onBack }: M1MasterDataPageProps) {
     return data.filter((row) => row.searchText.includes(normalizedKeyword));
   }, [normalizedKeyword, rowsQuery.data]);
   const activeCount = rows.filter((row) => statusKey(row.status) === "completed").length;
+  const locationAreas = React.useMemo(() => {
+    if (viewId !== "m1-locations") return [];
+    const areas = new Set<string>();
+    for (const row of rowsQuery.data ?? []) {
+      if (row.locationFields?.area && row.locationFields.area !== "-") areas.add(row.locationFields.area);
+    }
+    return Array.from(areas).sort((left, right) => left.localeCompare(right, "zh-CN"));
+  }, [rowsQuery.data, viewId]);
+  const locationBatchErrors = React.useMemo(
+    () => validateLocationBatchRange(locationBatchRange),
+    [locationBatchRange],
+  );
+  const locationBatchPreview = React.useMemo(
+    () => buildLocationBatchPreview(locationBatchRange),
+    [locationBatchRange],
+  );
+  const locationBatchScopes = React.useMemo(() => {
+    if (viewId !== "m1-locations") return [];
+    const scopes = new Map<
+      string,
+      { key: string; label: string; warehouseId: string; zoneId: string; ownerId: string | null }
+    >();
+    for (const row of rowsQuery.data ?? []) {
+      const fields = row.locationFields;
+      if (!fields || fields.warehouse === "-" || fields.zone === "-") continue;
+      const ownerId = fields.owner === "-" ? null : fields.owner;
+      const key = `${fields.warehouse}:${fields.zone}:${ownerId ?? "none"}`;
+      if (scopes.has(key)) continue;
+      scopes.set(key, {
+        key,
+        label: `仓库 ${shortId(fields.warehouse)} / 库区 ${shortId(fields.zone)}`,
+        warehouseId: fields.warehouse,
+        zoneId: fields.zone,
+        ownerId,
+      });
+    }
+    return Array.from(scopes.values());
+  }, [rowsQuery.data, viewId]);
+  const locationBatchScope =
+    locationBatchScopes.find((scope) => scope.key === locationBatchScopeKey) ??
+    locationBatchScopes[0] ??
+    null;
+  const gridColumns = viewId === "m1-locations" ? locationColumns : columns;
+
+  React.useEffect(() => {
+    if (viewId !== "m1-locations") return;
+    if (locationBatchScopes.some((scope) => scope.key === locationBatchScopeKey)) return;
+    setLocationBatchScopeKey(locationBatchScopes[0]?.key ?? "");
+  }, [locationBatchScopeKey, locationBatchScopes, viewId]);
 
   async function refreshRows() {
     await rowsQuery.refetch();
     setLastEvent(`${meta.title} 已刷新`);
+  }
+
+  function updateLocationBatchRange(patch: Partial<LocationBatchRange>) {
+    setLocationBatchRange((value) => ({ ...value, ...patch }));
+    setLocationBatchMessage(null);
+  }
+
+  async function confirmLocationBatchPreview() {
+    if (locationBatchErrors.length > 0) return;
+    if (!locationBatchScope) {
+      setLocationBatchMessage("缺少可用仓库和库区上下文，请先确认后端已有库位基础数据。");
+      return;
+    }
+    setLocationBatchSubmitting(true);
+    setLocationBatchMessage(null);
+    try {
+      const createdRows = await batchCreateLocations({
+        warehouse_id: locationBatchScope.warehouseId,
+        zone_id: locationBatchScope.zoneId,
+        area_code: locationBatchRange.areaCode.trim().toUpperCase(),
+        row_start: locationBatchRange.rowStart,
+        row_end: locationBatchRange.rowEnd,
+        column_start: locationBatchRange.columnStart,
+        column_end: locationBatchRange.columnEnd,
+        layer_start: locationBatchRange.layerStart,
+        layer_end: locationBatchRange.layerEnd,
+        max_volume_cm3: 5_000_000,
+        max_sku_count: 1,
+        location_type: locationBatchType,
+        bound_owner_id: locationBatchScope.ownerId,
+      });
+      await rowsQuery.refetch();
+      setLocationBatchOpen(false);
+      setLastEvent(`已新增 ${createdRows.length} 个库位`);
+    } catch (error) {
+      setLocationBatchMessage(error instanceof Error ? error.message : "批量新增库位失败");
+    } finally {
+      setLocationBatchSubmitting(false);
+    }
   }
 
   return (
@@ -186,6 +426,12 @@ export function M1MasterDataPage({ viewId, onBack }: M1MasterDataPageProps) {
               <span className="text-sm text-muted-foreground" role="status">
                 {lastEvent}
               </span>
+            )}
+            {viewId === "m1-locations" && (
+              <Button type="button" onClick={() => setLocationBatchOpen(true)}>
+                <Plus className="size-4" aria-hidden />
+                批量新增库位
+              </Button>
             )}
             <Button type="button" variant="outline" onClick={refreshRows}>
               <RefreshCw className="size-4" aria-hidden />
@@ -235,13 +481,100 @@ export function M1MasterDataPage({ viewId, onBack }: M1MasterDataPageProps) {
       )}
 
       <DataGrid
-        columns={columns}
+        columns={gridColumns}
         data={rows}
         rowKey={(row) => row.id}
         caption={rowsQuery.isPending ? "加载基础档案..." : undefined}
         emptyTitle={meta.emptyTitle}
         storageKey={meta.storageKey}
-        tableClassName="min-w-[1460px]"
+        tableClassName={viewId === "m1-locations" ? "min-w-[1720px]" : "min-w-[1460px]"}
+      />
+
+      {viewId === "m1-locations" && (
+        <LocationBatchDialog
+          open={locationBatchOpen}
+          onOpenChange={setLocationBatchOpen}
+          scopeOptions={locationBatchScopes.map((scope) => ({
+            value: scope.key,
+            label: scope.label,
+          }))}
+          scopeValue={locationBatchScope?.key ?? ""}
+          onScopeValueChange={setLocationBatchScopeKey}
+          areaOptions={locationAreas}
+          range={locationBatchRange}
+          onRangeChange={updateLocationBatchRange}
+          locationType={locationBatchType}
+          onLocationTypeChange={setLocationBatchType}
+          errors={locationBatchErrors}
+          preview={locationBatchPreview}
+          message={locationBatchMessage}
+          confirmDisabled={!locationBatchScope || locationBatchSubmitting}
+          confirmLabel={locationBatchSubmitting ? "提交中..." : "确认新增"}
+          onConfirm={confirmLocationBatchPreview}
+        />
+      )}
+    </section>
+  );
+}
+
+function M1SystemDictionaryPage({ onBack }: Pick<M1MasterDataPageProps, "onBack">) {
+  const meta = masterDataViewMeta["m1-system-dictionary"];
+  const groupsQuery = useSystemDictionaryGroupsQuery();
+  const [lastEvent, setLastEvent] = React.useState<string | null>(null);
+  const groups = groupsQuery.data ?? emptySystemDictionaryGroups;
+  const totalCount = groups.reduce((sum, group) => sum + group.items.length, 0);
+  const activeCount = groups.reduce(
+    (sum, group) => sum + group.items.filter((item) => item.enabled).length,
+    0
+  );
+
+  async function refreshRows() {
+    await groupsQuery.refetch();
+    setLastEvent(`${meta.title} 已刷新`);
+  }
+
+  return (
+    <section className="mx-auto flex w-full max-w-[1680px] flex-col gap-5 px-4 py-8 xl:px-6">
+      <PageHeader
+        title={meta.title}
+        subtitle={meta.subtitle}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {lastEvent && (
+              <span className="text-sm text-muted-foreground" role="status">
+                {lastEvent}
+              </span>
+            )}
+            <Button type="button" variant="outline" onClick={refreshRows}>
+              <RefreshCw className="size-4" aria-hidden />
+              刷新
+            </Button>
+            <Button type="button" variant="outline" onClick={onBack}>
+              <ArrowLeft className="size-4" aria-hidden />
+              返回工作台
+            </Button>
+          </div>
+        }
+      />
+
+      <div className="grid gap-3 md:grid-cols-3">
+        <Metric label="字典分类" value={groups.length} />
+        <Metric label="启用项" value={activeCount} />
+        <Metric label="API 返回" value={groupsQuery.data ? totalCount : 0} />
+      </div>
+
+      {groupsQuery.error && (
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {groupsQuery.error.message}
+        </div>
+      )}
+
+      <SystemDictionaryTwoPane
+        groups={groups}
+        emptyTitle={meta.emptyTitle}
+        emptyDescription={
+          groupsQuery.isPending ? "正在读取 document_type 字典项。" : "document_type 暂无可展示字典项。"
+        }
       />
     </section>
   );
@@ -267,6 +600,10 @@ function Metric({ label, value }: { label: string; value: number }) {
   );
 }
 
+function locationValue(row: MasterDataRow, key: keyof LocationMasterDataFields) {
+  return row.locationFields?.[key] ?? "-";
+}
+
 function statusKey(status: string): StatusKey {
   if (status === "active" || status === "available") return "completed";
   if (status === "disabled" || status === "inactive" || status === "locked") return "isolated";
@@ -277,6 +614,10 @@ function statusFilterValue(status: string) {
   if (status === "active" || status === "available") return "active";
   if (status === "disabled" || status === "inactive" || status === "locked") return "disabled";
   return "other";
+}
+
+function shortId(value: string) {
+  return value.length > 8 ? value.slice(0, 8) : value;
 }
 
 function formatDateTime(value: string) {

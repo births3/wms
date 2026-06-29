@@ -17,6 +17,7 @@ type Supplier = components["schemas"]["Supplier"];
 type Customer = components["schemas"]["Customer"];
 type Warehouse = components["schemas"]["Warehouse"];
 type Location = components["schemas"]["Location"];
+export type BatchCreateLocationsRequest = components["schemas"]["BatchCreateLocationsRequest"];
 type SystemDictionaryItem = components["schemas"]["SystemDictionaryItem"];
 
 export interface MasterDataRow {
@@ -33,7 +34,35 @@ export interface MasterDataRow {
   extraLabel: string;
   extraValue: string;
   updatedAt: string;
+  locationFields?: LocationMasterDataFields;
   searchText: string;
+}
+
+export interface LocationMasterDataFields {
+  owner: string;
+  warehouse: string;
+  zone: string;
+  area: string;
+  rowNo: string;
+  columnNo: string;
+  layerNo: string;
+  locationType: string;
+  volume: string;
+  maxSku: string;
+}
+
+export interface SystemDictionaryPaneItem {
+  code: string;
+  name: string;
+  source: string;
+  enabled: boolean;
+  params: Record<string, unknown>;
+}
+
+export interface SystemDictionaryPaneGroup {
+  code: string;
+  name: string;
+  items: SystemDictionaryPaneItem[];
 }
 
 export const masterDataQueryKey = ["master-data"] as const;
@@ -42,6 +71,13 @@ export function useMasterDataRowsQuery(viewId: MasterDataViewId) {
   return useQuery<MasterDataRow[], ApiError>({
     queryKey: [...masterDataQueryKey, viewId],
     queryFn: () => listMasterDataRows(viewId),
+  });
+}
+
+export function useSystemDictionaryGroupsQuery() {
+  return useQuery<SystemDictionaryPaneGroup[], ApiError>({
+    queryKey: [...masterDataQueryKey, "m1-system-dictionary", "two-pane"],
+    queryFn: listSystemDictionaryGroups,
   });
 }
 
@@ -102,14 +138,44 @@ async function listLocations(): Promise<MasterDataRow[]> {
   return result.data.data.map(locationRow);
 }
 
+export async function batchCreateLocations(
+  request: BatchCreateLocationsRequest,
+): Promise<MasterDataRow[]> {
+  const result = await api.POST("/api/v1/master-data/locations/batch-create", {
+    params: {
+      header: { "Idempotency-Key": idempotencyKey("web-m1-location-batch") },
+    },
+    body: request,
+  });
+  if (!result.data) {
+    throw new ApiError(result.error, "批量新增库位失败", result.response.status);
+  }
+  return result.data.data.map(locationRow);
+}
+
 async function listSystemDictionaryItems(): Promise<MasterDataRow[]> {
+  return (await fetchDocumentTypeDictionaryItems()).map(systemDictionaryRow);
+}
+
+async function listSystemDictionaryGroups(): Promise<SystemDictionaryPaneGroup[]> {
+  const items = await fetchDocumentTypeDictionaryItems();
+  return [
+    {
+      code: "document_type",
+      name: "单据类型",
+      items: items.map(systemDictionaryPaneItem),
+    },
+  ];
+}
+
+async function fetchDocumentTypeDictionaryItems(): Promise<SystemDictionaryItem[]> {
   const result = await api.GET("/api/v1/system-dictionaries/{dict_code}/items", {
     params: { path: { dict_code: "document_type" } },
   });
   if (!result.data) {
     throw new ApiError(result.error, "读取系统字典失败", result.response.status);
   }
-  return result.data.data.map(systemDictionaryRow);
+  return result.data.data;
 }
 
 function productRow(item: Product): MasterDataRow {
@@ -185,20 +251,34 @@ function warehouseRow(item: Warehouse): MasterDataRow {
 }
 
 function locationRow(item: Location): MasterDataRow {
+  const locationType = locationTypeLabel(item.location_type);
+  const volume = `${item.used_volume_cm3}/${item.max_volume_cm3} cm³`;
   return row({
     id: item.id,
     code: item.location_code,
-    name: `${item.row_no}-${item.column_no}-${item.layer_no}`,
+    name: `${locationAreaCode(item.location_code)}-${item.row_no}-${item.column_no}-${item.layer_no}`,
     status: item.status,
-    statusLabel: item.status === "available" ? "可用" : activeStatusLabel(item.status),
+    statusLabel: locationStatusLabel(item.status),
     ownerId: item.owner_id,
     primaryLabel: "库位类型",
-    primaryValue: item.location_type,
+    primaryValue: locationType,
     secondaryLabel: "容量",
-    secondaryValue: `${item.used_volume_cm3}/${item.max_volume_cm3} cm³`,
+    secondaryValue: volume,
     extraLabel: "最大 SKU",
     extraValue: String(item.max_sku_count),
     updatedAt: item.updated_at,
+    locationFields: {
+      owner: item.owner_id,
+      warehouse: item.warehouse_id,
+      zone: item.zone_id,
+      area: locationAreaCode(item.location_code),
+      rowNo: String(item.row_no),
+      columnNo: String(item.column_no),
+      layerNo: String(item.layer_no),
+      locationType,
+      volume,
+      maxSku: String(item.max_sku_count),
+    },
   });
 }
 
@@ -220,7 +300,18 @@ function systemDictionaryRow(item: SystemDictionaryItem): MasterDataRow {
   });
 }
 
+function systemDictionaryPaneItem(item: SystemDictionaryItem): SystemDictionaryPaneItem {
+  return {
+    code: item.item_code,
+    name: item.item_name,
+    source: item.source,
+    enabled: item.enabled,
+    params: item.params,
+  };
+}
+
 function row(input: Omit<MasterDataRow, "searchText">): MasterDataRow {
+  const locationSearchText = input.locationFields ? Object.values(input.locationFields) : [];
   return {
     ...input,
     searchText: [
@@ -232,6 +323,7 @@ function row(input: Omit<MasterDataRow, "searchText">): MasterDataRow {
       input.primaryValue,
       input.secondaryValue,
       input.extraValue,
+      ...locationSearchText,
     ]
       .join(" ")
       .toLowerCase(),
@@ -242,6 +334,29 @@ function activeStatusLabel(status: string) {
   if (status === "active") return "启用";
   if (status === "disabled" || status === "inactive") return "停用";
   return status || "未知";
+}
+
+function locationStatusLabel(status: string) {
+  if (status === "available") return "可用";
+  if (status === "occupied") return "占用";
+  if (status === "locked") return "锁定";
+  return activeStatusLabel(status);
+}
+
+function locationTypeLabel(type: string) {
+  if (type === "storage") return "存储位";
+  if (type === "case_pick" || type === "box_pick" || type === "carton_pick") return "箱拣位";
+  if (type === "piece_pick" || type === "each_pick") return "零拣位";
+  return text(type);
+}
+
+function locationAreaCode(locationCode: string) {
+  return text(locationCode.split("-")[0]);
+}
+
+function idempotencyKey(prefix: string) {
+  const random = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+  return `${prefix}-${random}`;
 }
 
 function text(value: unknown) {
