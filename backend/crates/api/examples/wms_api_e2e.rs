@@ -190,6 +190,11 @@ async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
             "m1.system_dictionary.read",
             "系统字典读取",
         ),
+        (
+            "00000000-0000-0000-0000-000000000113",
+            "m1.master_data.write",
+            "基础档案写入",
+        ),
     ] {
         sqlx::query(
             r#"

@@ -31,4 +31,35 @@ test("M1 管理端读取真实后端数据", async ({ page }) => {
     await expect(page.getByText(item.text).first()).toBeVisible();
     await page.screenshot({ path: path.join(artifactsDir, item.shot), fullPage: false });
   }
+
+  await page.getByRole("button", { name: /M1 库位管理/ }).click();
+  await expect(page.getByRole("heading", { name: "M1 库位管理" })).toBeVisible();
+
+  const marker = Date.now();
+  const area = `Z${String((marker % 90) + 10)}`;
+  const rowNo = ((Math.floor(marker / 100) % 90) + 10).toString();
+  const columnNo = ((Math.floor(marker / 10_000) % 90) + 10).toString();
+  const layerNo = ((Math.floor(marker / 1_000_000) % 90) + 10).toString();
+  const createdCode = `${area}-${pad2(rowNo)}-${pad2(columnNo)}-${pad2(layerNo)}`;
+
+  await page.getByRole("button", { name: "批量新增库位" }).click();
+  await page.getByLabel("区域编码").fill(area);
+  await page.getByLabel("排起始").fill(rowNo);
+  await page.getByLabel("排结束").fill(rowNo);
+  await page.getByLabel("列起始").fill(columnNo);
+  await page.getByLabel("列结束").fill(columnNo);
+  await page.getByLabel("层起始").fill(layerNo);
+  await page.getByLabel("层结束").fill(layerNo);
+  await page.getByRole("button", { name: "确认新增" }).click();
+
+  await expect(page.getByText("已新增 1 个库位")).toBeVisible();
+  await expect(page.getByText(createdCode).first()).toBeVisible();
+  await page.screenshot({
+    path: path.join(artifactsDir, "locations-batch-create.png"),
+    fullPage: false,
+  });
 });
+
+function pad2(value: string) {
+  return value.padStart(2, "0");
+}
