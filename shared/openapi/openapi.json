@@ -2004,6 +2004,97 @@
         }
       }
     },
+    "/api/v1/master-data/locations/batch-create": {
+      "post": {
+        "tags": [
+          "master-data"
+        ],
+        "operationId": "batch_create_locations",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchCreateLocationsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "批量创建库位",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "库位编码或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "库位批量创建范围非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/master-data/locations/{id}": {
       "delete": {
         "tags": [
@@ -4721,6 +4812,76 @@
             "type": "string",
             "description": "下一页游标；为空表示无更多数据。",
             "nullable": true
+          }
+        }
+      },
+      "BatchCreateLocationsRequest": {
+        "type": "object",
+        "required": [
+          "warehouse_id",
+          "zone_id",
+          "area_code",
+          "row_start",
+          "row_end",
+          "column_start",
+          "column_end",
+          "layer_start",
+          "layer_end",
+          "max_volume_cm3",
+          "max_sku_count",
+          "location_type"
+        ],
+        "properties": {
+          "area_code": {
+            "type": "string"
+          },
+          "bound_owner_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "column_end": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "column_start": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "layer_end": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "layer_start": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "location_type": {
+            "type": "string"
+          },
+          "max_sku_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "max_volume_cm3": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "row_end": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "row_start": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "zone_id": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },

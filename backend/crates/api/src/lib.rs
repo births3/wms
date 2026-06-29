@@ -33,15 +33,16 @@ pub mod wave5_repository;
 
 use utoipa::OpenApi;
 use wms_domain::{
-    AuditActor, AuditEvent, AuditEventListResponse, BillingAccount, BillingChargeCalculation,
-    BillingContract, BillingRule, BillingStatement, CalculateBillingChargesRequest,
-    ChangeInventoryStatusRequest, ColdChainDevice, CompletePickTaskRequest, ConfigEntry,
-    ConfirmBillingStatementRequest, ConfirmContainerRecoveryRequest, ContainerRecovery,
-    CreateBillingAccountRequest, CreateBillingContractRequest, CreateBillingRuleRequest,
-    CreateColdChainDeviceRequest, CreateCrossdockPlanRequest, CreateCustomerRequest,
-    CreateLocationRequest, CreateOutboundOrderLineRequest, CreateOutboundOrderRequest,
-    CreateOutboundWaveRequest, CreatePackJobRequest, CreatePackingStationRequest,
-    CreateProductRequest, CreateReceivingOrderRequest, CreateRetailReplenishmentSuggestionRequest,
+    AuditActor, AuditEvent, AuditEventListResponse, BatchCreateLocationsRequest, BillingAccount,
+    BillingChargeCalculation, BillingContract, BillingRule, BillingStatement,
+    CalculateBillingChargesRequest, ChangeInventoryStatusRequest, ColdChainDevice,
+    CompletePickTaskRequest, ConfigEntry, ConfirmBillingStatementRequest,
+    ConfirmContainerRecoveryRequest, ContainerRecovery, CreateBillingAccountRequest,
+    CreateBillingContractRequest, CreateBillingRuleRequest, CreateColdChainDeviceRequest,
+    CreateCrossdockPlanRequest, CreateCustomerRequest, CreateLocationRequest,
+    CreateOutboundOrderLineRequest, CreateOutboundOrderRequest, CreateOutboundWaveRequest,
+    CreatePackJobRequest, CreatePackingStationRequest, CreateProductRequest,
+    CreateReceivingOrderRequest, CreateRetailReplenishmentSuggestionRequest,
     CreateSpecialDrugCategoryRequest, CreateSupplierRequest, CreateWarehouseRequest, CrossdockPlan,
     CurrentUser, Customer, CustomerListResponse, DisableSystemDictionaryItemRequest,
     DisposeTemperatureExcursionRequest, DriverTask, DriverTaskListResponse, ErrorResponse,
@@ -249,6 +250,10 @@ fn list_locations() {}
 #[utoipa::path(post, path = "/api/v1/master-data/locations", tag = "master-data", request_body = CreateLocationRequest, responses((status = 200, description = "创建库位", body = Location), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 fn create_location() {}
+
+#[utoipa::path(post, path = "/api/v1/master-data/locations/batch-create", tag = "master-data", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = BatchCreateLocationsRequest, responses((status = 200, description = "批量创建库位", body = LocationListResponse), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "权限不足", body = ErrorResponse), (status = 409, description = "库位编码或幂等冲突", body = ErrorResponse), (status = 422, description = "库位批量创建范围非法", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn batch_create_locations() {}
 
 #[utoipa::path(patch, path = "/api/v1/master-data/locations/{id}", tag = "master-data", params(("id" = uuid::Uuid, Path, description = "库位 ID")), request_body = UpdateLocationRequest, responses((status = 200, description = "更新库位", body = Location), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
@@ -600,6 +605,7 @@ fn confirm_container_recovery() {}
         delete_warehouse,
         list_locations,
         create_location,
+        batch_create_locations,
         update_location,
         delete_location,
         list_special_drug_categories,
@@ -668,6 +674,7 @@ fn confirm_container_recovery() {}
         AuditActor,
         AuditEvent,
         AuditEventListResponse,
+        BatchCreateLocationsRequest,
         BillingAccount,
         BillingChargeCalculation,
         BillingContract,
@@ -848,6 +855,7 @@ mod tests {
             "/api/v1/master-data/warehouses",
             "/api/v1/master-data/warehouses/{id}",
             "/api/v1/master-data/locations",
+            "/api/v1/master-data/locations/batch-create",
             "/api/v1/master-data/locations/{id}",
             "/api/v1/master-data/special-drug-categories",
             "/api/v1/master-data/special-drug-categories/{id}",
@@ -918,6 +926,7 @@ mod tests {
             "\"LoginResponse\"",
             "\"CurrentUser\"",
             "\"AuditEvent\"",
+            "\"BatchCreateLocationsRequest\"",
             "\"Product\"",
             "\"Supplier\"",
             "\"ReceivingOrder\"",
