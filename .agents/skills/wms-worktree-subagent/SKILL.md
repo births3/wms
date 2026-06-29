@@ -117,6 +117,23 @@ git -C ../wms-agent-<slug> show --stat --oneline <hash>  # 子代理有提交时
 - 子代理验证通过但因 Git 元数据只读无法提交：先在主工作区审查 `git -C ../wms-agent-<slug> diff --stat` 和具体 diff，再用 `git -C ../wms-agent-<slug> diff --binary | git apply --3way` 接入；只允许接入授权范围文件。
 - 子代理最终输出“不可合并”、必需验证失败、写入越权或业务语义需确认：不合并，只把产物当草稿或问题报告。
 
+## 旧 worktree 迁移
+
+遗留 worktree 满足任一条件时，禁止在主工作区直接 `merge`、`cherry-pick` 或 `git apply` 旧 diff：
+
+- worktree 的基线落后当前主工作区，目标文件在主线已有后续提交。
+- worktree 修改文件与主工作区现有脏改重叠。
+- worktree 的页面、组件、API 或字段形态已被主线重构。
+- 子代理最终输出写明“不可合并”或缺少完整验证。
+
+处理方式：
+
+1. 把旧 worktree 只当参考材料，先提取“保留能力清单”：用户可见行为、API 调用、组件拆分、测试和文档价值。
+2. 从当前主工作区 `HEAD` 新建迁移 worktree：`git worktree add -b agent/<slug>-migrate ../wms-agent-<slug>-migrate HEAD`。
+3. 迁移提示词必须写清“禁止整文件复制旧实现；必须先读当前主线文件，再把保留能力按现有结构重新实现”。
+4. 迁移时禁止复制旧 worktree 的 `node_modules/`、构建产物、截图缓存和 `.vite-temp/`。
+5. 迁移完成后按“主代理复盘与合并”重新审查、验证、提交；旧 worktree 只有在迁移提交落地或用户确认丢弃后才能强制移除。
+
 合并或接入 diff 后，主代理必须立即进入 `wms-review-fix-commit`：
 
 1. 在主工作区运行 `git status --short` 和 `git diff --stat`。
