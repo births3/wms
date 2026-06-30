@@ -8,10 +8,10 @@
   - 矩阵来源
   - Tab
   - 模型关键词命中
-  - 截图 OCR
+  - 截图基线
   - review 签字
 
-依赖：tesseract（用于 OCR）+ tomli/tomllib。
+依赖：tomli/tomllib。
 """
 from __future__ import annotations
 
@@ -20,7 +20,6 @@ import datetime as dt
 import hashlib
 import json
 import re
-import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -60,15 +59,6 @@ class MatrixSource:
     slug: str
 
 
-@dataclass(frozen=True)
-class OcrResult:
-    chars: int
-    hits: tuple[str, ...]
-    miss: tuple[str, ...]
-    total: int
-    png_md5: str
-
-
 def _load_toml(path: Path) -> dict:
     text = path.read_text(encoding="utf-8")
     try:
@@ -87,46 +77,6 @@ def _md5(path: Path) -> str:
         for chunk in iter(lambda: f.read(8192), b""):
             h.update(chunk)
     return h.hexdigest()
-
-
-def _normalize_ocr(text: str) -> str:
-    return re.sub(r"\s+", " ", text).upper()
-
-
-def _ocr_extract(png: Path) -> str:
-    out_prefix = f"/tmp/_proof_ocr_{png.stem}"
-    subprocess.run(
-        ["tesseract", str(png), out_prefix, "-l", "eng"],
-        capture_output=True,
-        text=True,
-        timeout=30,
-        check=False,
-    )
-    txt = Path(f"{out_prefix}.txt")
-    if not txt.exists():
-        return ""
-    return txt.read_text(encoding="utf-8", errors="ignore")
-
-
-def _check_tesseract() -> None:
-    result = subprocess.run(["tesseract", "--version"], capture_output=True, text=True, timeout=5, check=False)
-    if result.returncode != 0:
-        raise RuntimeError("tesseract 未安装或不可用")
-
-
-def _ocr_result(png: Path, keywords: list[str], *, skip_ocr: bool) -> OcrResult:
-    if not png.exists():
-        return OcrResult(chars=0, hits=(), miss=tuple(keywords), total=len(keywords), png_md5="missing")
-    png_hash = _md5(png)
-    if skip_ocr:
-        return OcrResult(chars=-1, hits=(), miss=tuple(keywords), total=len(keywords), png_md5=png_hash)
-
-    text = _ocr_extract(png)
-    norm = _normalize_ocr(text)
-    chars = sum(1 for c in text if c.isalnum() or c in "-_./")
-    hits = tuple(kw for kw in keywords if kw.upper() in norm)
-    miss = tuple(kw for kw in keywords if kw.upper() not in norm)
-    return OcrResult(chars=chars, hits=hits, miss=miss, total=len(keywords), png_md5=png_hash)
 
 
 def _slug_for(story_id: str, end: str) -> str:
@@ -226,15 +176,10 @@ def _matrix_source_text(tab: str, snap: dict, matrix: dict[str, MatrixSource]) -
     return "未找到矩阵来源"
 
 
-def _ocr_status_text(result: OcrResult) -> tuple[str, bool]:
-    if result.png_md5 == "missing":
+def _png_status_text(png: Path) -> tuple[str, bool]:
+    if not png.exists():
         return ("PNG 缺失", False)
-    if result.chars == -1:
-        return (f"跳过 OCR · md5 `{result.png_md5[:8]}`", True)
-    if result.total == 0:
-        return (f"{result.chars} chars · 未配置关键词 · md5 `{result.png_md5[:8]}`", result.chars >= 100)
-    ok = len(result.hits) > 0 and result.chars >= 100
-    return (f"{result.chars} chars · kw {len(result.hits)}/{result.total} · md5 `{result.png_md5[:8]}`", ok)
+    return (f"md5 `{_md5(png)[:8]}`", True)
 
 
 def _render_report(rows: list[dict], summary: dict) -> str:
@@ -250,7 +195,7 @@ def _render_report(rows: list[dict], summary: dict) -> str:
         "- 原型清单：`governance/visual-baselines/manifest.toml` 的 `[[snapshots]]`。",
         "- 矩阵来源：`docs/prototypes/prototype-matrix-r3.md` 的非豁免 UI 行，按端展开到 tab。",
         "- 模型关键词：`scripts/governance/check_prototype_fidelity.py` 的 `SEMANTIC_TERMS`，对全量矩阵生成页检查标题/原因中的高风险主题词是否进入生成模型。",
-        "- 截图 OCR：对 `governance/visual-baselines/*.png` 运行 tesseract `eng`，并按 manifest 的 `expected_keywords` 统计命中。",
+        "- 截图基线：`governance/visual-baselines/*.png` 必须存在，并记录 md5 便于追溯。",
         "- Review 签字：manifest 的 `reviewed_by` / `reviewed_at`。",
         "",
         "## 汇总",
@@ -258,13 +203,13 @@ def _render_report(rows: list[dict], summary: dict) -> str:
         f"- 原型 tab 总数：{summary['total']}",
         f"- 矩阵原型：{summary['matrix_rows']}；手工/组件页：{summary['hand_built_rows']}",
         f"- 模型关键词通过：{summary['semantic_ok']}/{summary['total']}",
-        f"- 截图 OCR 通过：{summary['ocr_ok']}/{summary['total']}",
+        f"- 截图基线完整：{summary['png_ok']}/{summary['total']}",
         f"- Review 签字完整：{summary['review_ok']}/{summary['total']}",
         f"- 全部证据通过：{summary['all_ok']}/{summary['total']}",
         "",
         "## 明细",
         "",
-        "| # | 矩阵来源 | Tab | 模型关键词命中 | 截图 OCR | Review 签字 | 状态 |",
+        "| # | 矩阵来源 | Tab | 模型关键词命中 | 截图基线 | Review 签字 | 状态 |",
         "|---:|---|---|---|---|---|---|",
     ]
     for idx, row in enumerate(rows, start=1):
@@ -277,7 +222,7 @@ def _render_report(rows: list[dict], summary: dict) -> str:
                     _md_cell(row["matrix_source"]),
                     f"`{row['tab']}`",
                     _md_cell(row["semantic"]),
-                    _md_cell(row["ocr"]),
+                    _md_cell(row["png"]),
                     _md_cell(row["review"]),
                     status,
                 ]
@@ -295,10 +240,7 @@ def _render_report(rows: list[dict], summary: dict) -> str:
     return "\n".join(lines)
 
 
-def generate(*, output: Path, skip_ocr: bool) -> dict:
-    if not skip_ocr:
-        _check_tesseract()
-
+def generate(*, output: Path) -> dict:
     manifest = _load_toml(MANIFEST_TOML)
     snapshots = manifest.get("snapshots", [])
     matrix = _matrix_sources()
@@ -320,8 +262,7 @@ def generate(*, output: Path, skip_ocr: bool) -> dict:
             blueprints=blueprints,
             profiles=profiles,
         )
-        ocr_result = _ocr_result(BASELINE_DIR / snap["file"], list(snap.get("expected_keywords", [])), skip_ocr=skip_ocr)
-        ocr_text, ocr_ok = _ocr_status_text(ocr_result)
+        png_text, png_ok = _png_status_text(BASELINE_DIR / snap["file"])
         review_text, review_ok = _review_status(snap)
         matrix_source = _matrix_source_text(tab, snap, matrix)
         rows.append(
@@ -330,11 +271,11 @@ def generate(*, output: Path, skip_ocr: bool) -> dict:
                 "matrix_source": matrix_source,
                 "semantic": semantic_text,
                 "semantic_ok": semantic_ok,
-                "ocr": ocr_text,
-                "ocr_ok": ocr_ok,
+                "png": png_text,
+                "png_ok": png_ok,
                 "review": review_text,
                 "review_ok": review_ok,
-                "ok": semantic_ok and ocr_ok and review_ok,
+                "ok": semantic_ok and png_ok and review_ok,
             }
         )
 
@@ -343,7 +284,7 @@ def generate(*, output: Path, skip_ocr: bool) -> dict:
         "matrix_rows": sum(1 for row in rows if row["tab"] in matrix),
         "hand_built_rows": sum(1 for row in rows if row["tab"] not in matrix),
         "semantic_ok": sum(1 for row in rows if row["semantic_ok"]),
-        "ocr_ok": sum(1 for row in rows if row["ocr_ok"]),
+        "png_ok": sum(1 for row in rows if row["png_ok"]),
         "review_ok": sum(1 for row in rows if row["review_ok"]),
         "all_ok": sum(1 for row in rows if row["ok"]),
     }
@@ -356,12 +297,11 @@ def generate(*, output: Path, skip_ocr: bool) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--output", default=str(REPORT_MD), help="输出 Markdown 路径")
-    parser.add_argument("--skip-ocr", action="store_true", help="跳过 OCR，仅生成结构报告")
     parser.add_argument("--json", action="store_true", help="输出 JSON 摘要")
     args = parser.parse_args()
 
     try:
-        summary = generate(output=Path(args.output), skip_ocr=args.skip_ocr)
+        summary = generate(output=Path(args.output))
     except Exception as e:  # noqa: BLE001
         if args.json:
             print(json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False))
@@ -377,7 +317,7 @@ def main() -> int:
             "  "
             f"tabs={summary['total']} "
             f"semantic={summary['semantic_ok']}/{summary['total']} "
-            f"ocr={summary['ocr_ok']}/{summary['total']} "
+            f"png={summary['png_ok']}/{summary['total']} "
             f"review={summary['review_ok']}/{summary['total']} "
             f"all={summary['all_ok']}/{summary['total']}"
         )

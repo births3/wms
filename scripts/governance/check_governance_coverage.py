@@ -23,7 +23,7 @@ Tier：T1（< 10s，纯静态扫描）
   S = smoke       纳入 tests/test_smoke.py 的通用 smoke 测试清单
 
 smoke 豁免：
-  少数脚本本质不适合"快速 smoke"（依赖 cargo/chrome/OCR，或 warning-only
+  少数脚本本质不适合"快速 smoke"（依赖 cargo/chrome，或 warning-only
   故意打破 ok⟺exit 契约）。这些在 SMOKE_EXEMPT 显式登记理由，免除 S 维度，
   但仍强制 R 维度（必须被某运行器覆盖）。
 """
@@ -51,7 +51,6 @@ SCRIPT_RE = re.compile(r'"([a-z_][a-z0-9_]*\.py)"')
 # 仍要求 reachable（被运行器覆盖），仅免除 smoke 维度。
 SMOKE_EXEMPT = {
     "check_openapi_in_sync.py": "T2 契约同步脚本，依赖 cargo + pnpm/openapi-typescript 且可能触发编译，超 smoke 时限；已注册进 T2 TIER_SCRIPTS（reachable）",
-    "check_visual_keywords.py": "T3 重脚本，依赖 chrome/OCR，超 smoke 时限；已注册进 T3 TIER_SCRIPTS（reachable）",
     "check_visual_regression.py": "T3 重脚本，依赖 chrome 渲染快照，超 smoke 时限；已注册进 T3 TIER_SCRIPTS（reachable）",
     "check_story_size.py": "warning-only，故意 exit0/ok=False（拆分是建议非硬约束），违反 smoke 的 ok⟺exit 契约",
     "check_wave1_runtime_evidence_prereqs.py": "Wave 1 runtime evidence 前置检查需要 --mode 选择 h2/rollback-k8s/rollback-compose；由 justfile 多个 evidence/readiness 入口显式编排",

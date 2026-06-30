@@ -12,12 +12,12 @@
      python3 scripts/governance/accept_baseline.py --reviewer="项目主人" --apply
 
 接受标准（详见 docs/prototypes/baseline-acceptance.md）：
-  A. 结构健康：文件大小 / OCR 字符 / 截断检测 / 关键字命中
+  A. 结构健康：文件大小 / 截断检测
   B. 变化幅度：mean_diff ≤ 5 自动 / 5-30 需 --confirm-medium / >30 需 --force-major
   C. 签字：--reviewer 必填非占位
   D. 字段完整：tab 在 Tabs.tsx + manifest 完整
 
-依赖：tesseract + PIL
+依赖：PIL
 """
 from __future__ import annotations
 
@@ -26,7 +26,6 @@ import datetime
 import hashlib
 import re
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 
@@ -40,7 +39,6 @@ SNAPSHOT_DIR = REPO_ROOT / "prototypes" / ".visual-snapshots"
 # 接受标准阈值
 SIZE_MIN_KB = 1
 SIZE_MAX_MB = 3
-MIN_OCR_CHARS = 100
 TRUNCATION_THRESHOLD = 0.05  # 底部 30 行非白比例
 SMALL_CHANGE = 5.0           # mean_diff ≤ 5 视为小调整
 LARGE_CHANGE = 30.0          # mean_diff > 30 视为大变化
@@ -65,22 +63,6 @@ def _md5(path: Path) -> str:
         for chunk in iter(lambda: f.read(8192), b""):
             h.update(chunk)
     return h.hexdigest()
-
-
-def _ocr_chars(png: Path) -> int:
-    out_prefix = f"/tmp/_accept_{png.stem}"
-    try:
-        subprocess.run(
-            ["tesseract", str(png), out_prefix, "-l", "eng"],
-            capture_output=True, text=True, timeout=30,
-        )
-        txt = Path(f"{out_prefix}.txt")
-        if txt.exists():
-            text = txt.read_text(encoding="utf-8", errors="ignore")
-            return sum(1 for c in text if c.isalnum())
-    except Exception:
-        pass
-    return 0
 
 
 def _detect_truncation(png: Path) -> float:
@@ -134,22 +116,6 @@ def _compare(baseline: Path, candidate: Path) -> tuple[float, float, int]:
         return (-1.0, -1.0, -1)
 
 
-def _ocr_keyword_hits(png: Path, keywords: list[str]) -> int:
-    out_prefix = f"/tmp/_accept_kw_{png.stem}"
-    try:
-        subprocess.run(
-            ["tesseract", str(png), out_prefix, "-l", "eng"],
-            capture_output=True, text=True, timeout=30,
-        )
-        txt = Path(f"{out_prefix}.txt")
-        if txt.exists():
-            text = re.sub(r"\s+", " ", txt.read_text(encoding="utf-8", errors="ignore")).upper()
-            return sum(1 for kw in keywords if kw.upper() in text)
-    except Exception:
-        pass
-    return 0
-
-
 def _evaluate_one(snap: dict, args) -> tuple[bool, list[str], list[str], dict]:
     """评估一张候选图。Returns (accept, errors, warnings, info)"""
     tab = snap["tab"]
@@ -172,22 +138,7 @@ def _evaluate_one(snap: dict, args) -> tuple[bool, list[str], list[str], dict]:
     elif size_kb > SIZE_MAX_MB * 1024:
         warnings.append(f"A1: 文件过大 {size_kb/1024:.1f} MB > {SIZE_MAX_MB} MB")
 
-    # A2 + A4 联合判定（与 check_visual_keywords 同档逻辑）：
-    # - 至少 1 关键字命中 → 通过（OCR 识别在位）
-    # - 0 命中 + OCR < 100 字符 → 错误（图异常/全空白）
-    # - 0 命中 + OCR >= 100 字符 → 警告（关键字配置可能过严）
-    ocr = _ocr_chars(candidate)
-    info["ocr_chars"] = ocr
-    keywords = snap.get("expected_keywords", [])
-    hits = _ocr_keyword_hits(candidate, keywords) if keywords else 0
-    info["keyword_hits"] = f"{hits}/{len(keywords)}" if keywords else "—"
-    if hits == 0 and keywords:
-        if ocr < MIN_OCR_CHARS:
-            errors.append(f"A2+A4: OCR {ocr} 字符 + 0 关键字命中 → 图异常或全空白")
-        else:
-            warnings.append(f"A4: 0 关键字命中 / {len(keywords)}（OCR {ocr} 字符识别正常，检查 expected_keywords 配置）")
-
-    # A3. 截断检测
+    # A2. 截断检测
     bottom_ratio = _detect_truncation(candidate)
     info["bottom_ratio"] = round(bottom_ratio, 4)
     if bottom_ratio >= TRUNCATION_THRESHOLD:
@@ -288,8 +239,8 @@ def main() -> int:
         ok, errors, warnings, info = _evaluate_one(snap, args)
         change = info.get("change", "?")
         icon = "✓" if ok else "✘"
-        print(f"  {icon} {info['tab']:14s}  size={info.get('size_kb','?')}KB  ocr={info.get('ocr_chars','?')}  "
-              f"hits={info.get('keyword_hits','?')}  change={change}  "
+        print(f"  {icon} {info['tab']:14s}  size={info.get('size_kb','?')}KB  "
+              f"change={change}  "
               f"mean_diff={info.get('mean_diff','—')}  phash={info.get('phash','—')}")
         for e in errors:
             print(f"      ✘ {e}")

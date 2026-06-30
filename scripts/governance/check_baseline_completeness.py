@@ -143,7 +143,7 @@ def main() -> int:
 
         # 注：PNG mtime 与 reviewed_at 的比较已移除，原因：
         # - mtime 在 cp / git checkout 时会被刷新，不可靠
-        # - 'PNG 改了视觉是否健康' 由 check_visual_keywords (OCR) 替代治理
+        # - 'PNG 改了视觉是否健康' 由视觉回归和人工走查替代治理
         # - 真要追溯 review 历史，看 git log 即可
 
     # d) 反向：baseline 目录里有 .png 但 manifest 无引用
