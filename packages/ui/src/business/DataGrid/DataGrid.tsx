@@ -1,12 +1,11 @@
 import * as React from "react";
-import { createPortal } from "react-dom";
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Filter, GripVertical, Settings2, X } from "lucide-react";
 import { cn } from "../../lib/utils";
-import { Button } from "../../ui/button";
 import { Checkbox } from "../../ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../ui/select";
 import { DataTable, type DataTableColumn, type DataTableProps } from "../DataTable";
-import { DataGridColumnFilter } from "./DataGridColumnFilter";
+import { DataGridCellContent } from "./DataGridCellContent";
+import { DataGridFieldSettingsPanel } from "./DataGridFieldSettingsPanel";
+import { DataGridHeaderCell } from "./DataGridHeaderCell";
+import { DataGridPaginationFooter } from "./DataGridPaginationFooter";
 import {
   getDataGridCopyText,
   dataGridFloatingPanelPosition,
@@ -15,6 +14,7 @@ import {
   getDataGridPage,
   moveColumnBefore,
   nextSortState,
+  reconcileDataGridSelectedRowKeys,
   sanitizeGridState,
   sanitizeDataGridColumnFiltersForData,
   setColumnWidth,
@@ -26,8 +26,8 @@ import {
   type DataGridFloatingPanelPosition,
   type DataGridFilterConfig,
   type DataGridLogicState,
-  type DataGridSortState,
 } from "./data-grid-logic";
+import { loadGridSettings, saveGridSettings } from "./data-grid-storage";
 
 /**
  * DataGrid — 管理页薄数据网格（DataTable + 客户端分页/排序/列视图/字段筛选）
@@ -193,6 +193,19 @@ function DataGridInner<T>(
   }, [fieldsOpen, openFilterKey]);
 
   React.useEffect(() => {
+    if (!fieldsOpen && !openFilterKey) return;
+
+    function closePanelsByKeyboard(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      setFieldsOpen(false);
+      setOpenFilterKey(null);
+    }
+
+    document.addEventListener("keydown", closePanelsByKeyboard);
+    return () => document.removeEventListener("keydown", closePanelsByKeyboard);
+  }, [fieldsOpen, openFilterKey]);
+
+  React.useEffect(() => {
     if (!fieldsOpen) return;
 
     function updatePosition() {
@@ -231,74 +244,19 @@ function DataGridInner<T>(
   const lastVisibleColumnKey = visibleColumns.at(-1)?.key;
   const hideableColumns = orderedHideableColumns;
   const visibleHideableCount = hideableColumns.filter((column) => visibleKeys.has(column.key)).length;
-  const currentPage = page.pageIndex + 1;
   const selectedKeys = selectedRowKeys ?? internalSelectedRowKeys;
   const selectedKeySet = new Set(selectedKeys);
   const pageRowKeys = page.rows.map(rowKey);
+  const filteredRowKeys = React.useMemo(() => page.filteredRows.map(rowKey), [page.filteredRows, rowKey]);
   const selectedPageCount = pageRowKeys.filter((key) => selectedKeySet.has(key)).length;
   const allPageSelected = pageRowKeys.length > 0 && selectedPageCount === pageRowKeys.length;
 
-  const fieldSettingsPanel =
-    fieldsOpen && fieldsPanelPosition && typeof document !== "undefined"
-      ? createPortal(
-          <div
-            id={fieldListId}
-            className="fixed z-50 w-64 overflow-auto rounded-md border border-primary/30 bg-background p-2 text-left text-sm shadow-lg"
-            style={{
-              top: fieldsPanelPosition.top,
-              left: fieldsPanelPosition.left,
-              maxHeight: fieldsPanelPosition.maxHeight,
-            }}
-            data-datagrid-popover
-          >
-            {hideableColumns.map((item) => {
-              const checked = visibleKeys.has(item.key);
-              const copyable = copyableKeys.has(item.key);
-              const disabled = checked && visibleHideableCount <= 1;
-              const checkboxId = `${fieldListId}-${item.key}`;
-              const copyCheckboxId = `${fieldListId}-${item.key}-copy`;
-              return (
-                <div
-                  key={item.key}
-                  draggable
-                  onDragStart={() => setDraggingColumnKey(item.key)}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={() => {
-                    if (draggingColumnKey) moveColumn(draggingColumnKey, item.key);
-                    setDraggingColumnKey(null);
-                  }}
-                  onDragEnd={() => setDraggingColumnKey(null)}
-                  className={cn(
-                    "flex items-center gap-2 rounded-sm px-2 py-1.5",
-                    draggingColumnKey === item.key ? "bg-muted" : "hover:bg-muted/60",
-                  )}
-                >
-                  <GripVertical className="size-4 shrink-0 cursor-grab text-muted-foreground" aria-hidden />
-                  <Checkbox
-                    id={checkboxId}
-                    checked={checked}
-                    disabled={disabled}
-                    onCheckedChange={(value) => updateColumnVisible(item.key, value === true)}
-                  />
-                  <label htmlFor={checkboxId} className="min-w-0 flex-1 truncate text-muted-foreground">
-                    {columnLabel(item)}
-                  </label>
-                  <label htmlFor={copyCheckboxId} className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-                    <Checkbox
-                      id={copyCheckboxId}
-                      checked={copyable}
-                      disabled={item.copyable === false}
-                      onCheckedChange={(value) => updateColumnCopyable(item.key, value === true)}
-                    />
-                    复制
-                  </label>
-                </div>
-              );
-            })}
-          </div>,
-          document.body,
-        )
-      : null;
+  React.useEffect(() => {
+    if (!selectable || selectedKeys.length === 0) return;
+    const nextKeys = reconcileDataGridSelectedRowKeys(selectedKeys, filteredRowKeys);
+    const changed = nextKeys.length !== selectedKeys.length || nextKeys.some((key, index) => key !== selectedKeys[index]);
+    if (changed) setSelectedKeys(nextKeys);
+  }, [selectable, selectedKeys, filteredRowKeys]);
 
   function updateSort(column: DataGridColumn<T>) {
     if (!column.sortable) return;
@@ -324,8 +282,42 @@ function DataGridInner<T>(
     setSettings((current) => ({ ...current, columnOrder: moveColumnBefore(current.columnOrder, columns, key, beforeKey) }));
   }
 
+  function moveColumnByStep(key: string, step: -1 | 1) {
+    const index = hideableColumns.findIndex((column) => column.key === key);
+    const target = hideableColumns[index + step];
+    if (!target) return;
+
+    if (step < 0) {
+      moveColumn(key, target.key);
+      return;
+    }
+
+    const afterTarget = hideableColumns[index + 2];
+    setSettings((current) => {
+      const moved = moveColumnBefore(current.columnOrder, columns, key, target.key);
+      const columnOrder = afterTarget ? moveColumnBefore(moved, columns, key, afterTarget.key) : [...moved.filter((item) => item !== key), key];
+      return { ...current, columnOrder };
+    });
+  }
+
   function resetColumnWidth(key: string) {
     setSettings((current) => ({ ...current, columnWidths: setColumnWidth(current.columnWidths, columns, key, null) }));
+  }
+
+  function startColumnResize(handle: HTMLElement, column: DataGridColumn<T>, clientX: number) {
+    setResizingColumn({
+      key: column.key,
+      startX: clientX,
+      startWidth: currentColumnWidth(handle, column, settings.columnWidths[column.key]),
+    });
+  }
+
+  function nudgeColumnWidth(handle: HTMLElement, column: DataGridColumn<T>, delta: number) {
+    const nextWidth = currentColumnWidth(handle, column, settings.columnWidths[column.key]) + delta;
+    setSettings((current) => ({
+      ...current,
+      columnWidths: setColumnWidth(current.columnWidths, columns, column.key, nextWidth),
+    }));
   }
 
   function updateColumnFilterValue(key: string, value: DataGridColumnFilterValue) {
@@ -384,158 +376,49 @@ function DataGridInner<T>(
       render: (row, index) => {
         const content = sourceRender ? sourceRender(row, index) : defaultCellContent(row, column);
         const copyText = columnCanCopy ? getDataGridCopyText(row, column) : "";
-        const canDoubleClick = Boolean(column.onDoubleClick);
-        if (!copyText && !canDoubleClick) return content;
         const cellKey = `${rowKey(row)}:${column.key}`;
         const cellNotice = copyNotice?.cellKey === cellKey ? copyNotice.text : null;
 
         return (
-          <div
-            role="button"
-            tabIndex={0}
-            title={copyText ? "点击复制" : "双击打开"}
-            aria-label={copyText ? `复制${columnLabel(column)}` : `打开${columnLabel(column)}`}
-            className={cn(
-              "relative rounded-sm px-1 py-0.5 text-left outline-none transition hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
-              column.align === "right" && "text-right",
-            )}
-            onClick={(event) => {
-              if (!copyText) return;
-              event.stopPropagation();
-              void copyCellValue(row, column, cellKey);
-            }}
-            onDoubleClick={(event) => {
-              if (!column.onDoubleClick) return;
-              event.stopPropagation();
-              column.onDoubleClick(row);
-            }}
-            onKeyDown={(event) => {
-              if (!copyText || (event.key !== "Enter" && event.key !== " ")) return;
-              event.preventDefault();
-              event.stopPropagation();
-              void copyCellValue(row, column, cellKey);
-            }}
-          >
-            <div className="relative inline-block max-w-full align-middle">
-              <div className="min-w-0 truncate">{content}</div>
-              {cellNotice && (
-                <span className="pointer-events-none absolute left-full top-1/2 z-20 ml-2 -translate-y-1/2 whitespace-nowrap rounded-sm bg-foreground px-1.5 py-0.5 text-[11px] font-normal text-background shadow-sm">
-                  {cellNotice}
-                </span>
-              )}
-            </div>
-          </div>
+          <DataGridCellContent
+            row={row}
+            column={column}
+            content={content}
+            copyText={copyText}
+            cellNotice={cellNotice}
+            label={columnLabel(column)}
+            onCopy={() => void copyCellValue(row, column, cellKey)}
+            onDoubleClick={column.onDoubleClick}
+          />
         );
       },
       header: (
-        <div className={cn("relative flex min-w-0 items-center gap-1 pr-2", column.align === "right" && "justify-end")}>
-          <div className="min-w-0">
-          {column.sortable ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="-ml-3 h-8 px-2"
-              onClick={() => updateSort(column)}
-            >
-              {column.header}
-              {sortIcon(settings.sort, column.key)}
-            </Button>
-          ) : (
-            <span>{column.header}</span>
-          )}
-          </div>
-          {columnFilterable(column) && (
-            <>
-              <Button
-                type="button"
-                variant={dataGridFilterActive(columnFilters[column.key]) ? "secondary" : "ghost"}
-                size="icon"
-                className="size-7 shrink-0"
-                aria-label={`筛选${columnLabel(column)}`}
-                aria-expanded={openFilterKey === column.key}
-                onClick={() => {
-                  setFieldsOpen(false);
-                  setOpenFilterKey((key) => (key === column.key ? null : column.key));
-                }}
-                data-datagrid-popover
-              >
-                <Filter className="size-3.5" aria-hidden />
-              </Button>
-              {openFilterKey === column.key && (
-                <div
-                  className={cn(
-                    "absolute top-full z-30 mt-2 w-56 rounded-md border bg-background p-3 text-left shadow-lg",
-                    column.align === "right" ? "right-0" : "left-0",
-                  )}
-                  data-datagrid-popover
-                >
-                  <DataGridColumnFilter
-                    columnKey={column.key}
-                    label={columnLabel(column)}
-                    filter={dataGridFilterConfigForData(column, data)}
-                    value={columnFilters[column.key]}
-                    onChange={(value) => updateColumnFilterValue(column.key, value)}
-                  />
-                  <div className="mt-2 flex justify-end gap-2">
-                    <Button type="button" variant="ghost" size="sm" onClick={() => updateColumnFilterValue(column.key, "")}>
-                      <X className="size-3.5" aria-hidden />
-                      清除
-                    </Button>
-                    <Button type="button" variant="outline" size="sm" onClick={() => setOpenFilterKey(null)}>
-                      关闭
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-          {column.key === lastVisibleColumnKey && (
-            <div className="relative ml-1 border-l pl-2">
-              <Button
-                ref={fieldButtonRef}
-                type="button"
-                variant="outline"
-                size="icon"
-                className="size-7 border-primary/40 bg-primary/5 text-primary hover:bg-primary/10"
-                aria-label="字段设置"
-                aria-expanded={fieldsOpen}
-                aria-controls={fieldListId}
-                disabled={hideableColumns.length === 0}
-                onClick={() => {
-                  setOpenFilterKey(null);
-                  setFieldsOpen((open) => !open);
-                }}
-                data-datagrid-popover
-              >
-                <Settings2 className="size-3.5" aria-hidden />
-              </Button>
-            </div>
-          )}
-          {column.resizable !== false && (
-            <button
-              type="button"
-              className="absolute -right-1 top-0 h-full w-2 cursor-col-resize rounded-sm hover:bg-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label={`调整${columnLabel(column)}列宽`}
-              title="拖动调整列宽，双击恢复默认"
-              onClick={(event) => event.stopPropagation()}
-              onDoubleClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                resetColumnWidth(column.key);
-              }}
-              onPointerDown={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                setResizingColumn({
-                  key: column.key,
-                  startX: event.clientX,
-                  startWidth: currentColumnWidth(event.currentTarget, column, settings.columnWidths[column.key]),
-                });
-              }}
-            />
-          )}
-        </div>
+        <DataGridHeaderCell
+          column={column}
+          sort={settings.sort}
+          filter={dataGridFilterConfigForData(column, data)}
+          filterValue={columnFilters[column.key]}
+          filterOpen={openFilterKey === column.key}
+          isLastVisibleColumn={column.key === lastVisibleColumnKey}
+          fieldListId={fieldListId}
+          fieldButtonRef={fieldButtonRef}
+          fieldsOpen={fieldsOpen}
+          hideableColumnsLength={hideableColumns.length}
+          onSort={updateSort}
+          onToggleFilter={(key) => {
+            setFieldsOpen(false);
+            setOpenFilterKey((current) => (current === key ? null : key));
+          }}
+          onFilterChange={updateColumnFilterValue}
+          onCloseFilter={() => setOpenFilterKey(null)}
+          onToggleFields={() => {
+            setOpenFilterKey(null);
+            setFieldsOpen((open) => !open);
+          }}
+          onResetColumnWidth={resetColumnWidth}
+          onStartResize={startColumnResize}
+          onNudgeColumnWidth={nudgeColumnWidth}
+        />
       ),
     };
   });
@@ -568,6 +451,8 @@ function DataGridInner<T>(
       ]
     : tableColumns;
   const finalTableWidth = dataGridTableWidth(finalColumns);
+  // 动态：表格宽度由当前显示列、用户拖动列宽和字符串列宽共同计算。
+  const tableStyle = { width: finalTableWidth, minWidth: finalTableWidth };
 
   return (
     <div ref={rootRef} className={cn("space-y-3", className)} {...rest}>
@@ -577,69 +462,44 @@ function DataGridInner<T>(
         data={page.rows}
         rowKey={rowKey}
         tableClassName={cn("table-fixed", tableClassName)}
-        tableStyle={{ width: finalTableWidth, minWidth: finalTableWidth }}
+        tableStyle={tableStyle}
         selectedKey={selectedKey}
         onRowClick={onRowClick}
         caption={caption}
         emptyTitle={emptyTitle}
         emptyDescription={emptyDescription}
         footer={
-          <div className="flex flex-col gap-2 px-4 py-3 text-xs text-muted-foreground md:flex-row md:items-center md:justify-between">
-            <span>
-              {page.rangeStart}-{page.rangeEnd} / 共 {page.total} 条
-              {selectable && selectedKeys.length > 0 ? ` · 已选 ${selectedKeys.length} 条` : ""}
-            </span>
-            <div className="flex flex-wrap items-center gap-2">
-              {selectable && selectedKeys.length > 0 && (
-                <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedKeys([])}>
-                  清空选择
-                </Button>
-              )}
-              <Select
-                value={String(settings.pageSize)}
-                onValueChange={(value) =>
-                  setSettings((current) => ({ ...current, pageSize: Number.parseInt(value, 10) }))
-                }
-              >
-                <SelectTrigger className="h-8 w-[116px]" aria-label="每页条数">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {safePageSizeOptions.map((option) => (
-                    <SelectItem key={option} value={String(option)}>
-                      {option} 条/页
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <span>
-                第 {currentPage} / {page.pageCount} 页
-              </span>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={page.pageIndex === 0}
-                onClick={() => setPageIndex((value) => Math.max(0, value - 1))}
-              >
-                <ChevronLeft className="size-4" aria-hidden />
-                上一页
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={page.pageIndex >= page.pageCount - 1}
-                onClick={() => setPageIndex((value) => Math.min(page.pageCount - 1, value + 1))}
-              >
-                下一页
-                <ChevronRight className="size-4" aria-hidden />
-              </Button>
-            </div>
-          </div>
+          <DataGridPaginationFooter
+            rangeStart={page.rangeStart}
+            rangeEnd={page.rangeEnd}
+            total={page.total}
+            selectable={selectable}
+            selectedCount={selectedKeys.length}
+            pageSize={settings.pageSize}
+            pageSizeOptions={safePageSizeOptions}
+            pageIndex={page.pageIndex}
+            pageCount={page.pageCount}
+            onPageSizeChange={(pageSize) => setSettings((current) => ({ ...current, pageSize }))}
+            onPageIndexChange={setPageIndex}
+            onClearSelected={() => setSelectedKeys([])}
+          />
         }
       />
-      {fieldSettingsPanel}
+      <DataGridFieldSettingsPanel
+        open={fieldsOpen}
+        panelId={fieldListId}
+        position={fieldsPanelPosition}
+        columns={hideableColumns}
+        visibleKeys={visibleKeys}
+        copyableKeys={copyableKeys}
+        visibleHideableCount={visibleHideableCount}
+        draggingColumnKey={draggingColumnKey}
+        onDraggingColumnKeyChange={setDraggingColumnKey}
+        onColumnVisibleChange={updateColumnVisible}
+        onColumnCopyableChange={updateColumnCopyable}
+        onMoveColumn={moveColumn}
+        onMoveColumnByStep={moveColumnByStep}
+      />
     </div>
   );
 }
@@ -652,18 +512,8 @@ const DataGridWithRef = React.forwardRef(DataGridInner) as <T>(
 
 export { DataGridWithRef as DataGrid };
 
-function sortIcon(sort: DataGridSortState | null, key: string) {
-  if (sort?.key !== key) return <ArrowUpDown className="size-3.5 text-muted-foreground" aria-hidden />;
-  if (sort.direction === "asc") return <ArrowUp className="size-3.5" aria-hidden />;
-  return <ArrowDown className="size-3.5" aria-hidden />;
-}
-
 function columnLabel<T>(column: DataGridColumn<T>): string {
   return typeof column.header === "string" ? column.header : column.key;
-}
-
-function columnFilterable<T>(column: DataGridColumn<T>): boolean {
-  return column.hideable !== false && column.filter !== false;
 }
 
 function defaultCellContent<T>(row: T, column: DataGridColumn<T>): React.ReactNode {
@@ -701,65 +551,4 @@ async function writeClipboardText(value: string) {
 
 function isDataGridColumn<T>(column: DataGridColumn<T> | undefined): column is DataGridColumn<T> {
   return Boolean(column);
-}
-
-function loadGridSettings<T>(
-  storageKey: string | undefined,
-  columns: DataGridColumn<T>[],
-  pageSizeOptions: number[],
-  defaultPageSize: number,
-): DataGridLogicState {
-  if (!storageKey || typeof window === "undefined") {
-    return sanitizeGridState(null, columns, pageSizeOptions, defaultPageSize);
-  }
-
-  try {
-    const raw = window.localStorage.getItem(storageKey);
-    return sanitizeGridState(parseStoredGridSettings(raw ? JSON.parse(raw) : null), columns, pageSizeOptions, defaultPageSize);
-  } catch {
-    return sanitizeGridState(null, columns, pageSizeOptions, defaultPageSize);
-  }
-}
-
-function saveGridSettings(storageKey: string | undefined, settings: DataGridLogicState) {
-  if (!storageKey || typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(storageKey, JSON.stringify(settings));
-  } catch {
-    // localStorage 可能被禁用；表格仍使用当前内存状态。
-  }
-}
-
-function parseStoredGridSettings(value: unknown): Partial<DataGridLogicState> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const record = value as Record<string, unknown>;
-  return {
-    visibleColumns: Array.isArray(record.visibleColumns) ? record.visibleColumns.filter(isString) : undefined,
-    copyableColumns: Array.isArray(record.copyableColumns) ? record.copyableColumns.filter(isString) : undefined,
-    columnWidths: parseStoredColumnWidths(record.columnWidths),
-    columnOrder: Array.isArray(record.columnOrder) ? record.columnOrder.filter(isString) : undefined,
-    pageSize: typeof record.pageSize === "number" ? record.pageSize : undefined,
-    sort: parseStoredSort(record.sort),
-  };
-}
-
-function parseStoredColumnWidths(value: unknown): Record<string, number> | undefined {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
-  const widths: Record<string, number> = {};
-  for (const [key, width] of Object.entries(value)) {
-    if (typeof width === "number" && Number.isFinite(width)) widths[key] = width;
-  }
-  return widths;
-}
-
-function parseStoredSort(value: unknown): DataGridSortState | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const record = value as Record<string, unknown>;
-  if (typeof record.key !== "string") return null;
-  if (record.direction !== "asc" && record.direction !== "desc") return null;
-  return { key: record.key, direction: record.direction };
-}
-
-function isString(value: unknown): value is string {
-  return typeof value === "string";
 }

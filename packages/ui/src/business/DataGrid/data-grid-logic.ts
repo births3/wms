@@ -51,6 +51,7 @@ export interface DataGridLogicState {
 
 export interface DataGridPageResult<T> {
   rows: T[];
+  filteredRows: T[];
   total: number;
   pageCount: number;
   pageIndex: number;
@@ -190,8 +191,18 @@ export function setColumnWidth<T>(
   return next;
 }
 
-export function dataGridTableWidth<T>(columns: DataGridLogicColumn<T>[], fallbackWidth = 160): number {
-  return columns.reduce((total, column) => total + (typeof column.width === "number" ? column.width : fallbackWidth), 0);
+export function dataGridTableWidth<T>(columns: DataGridLogicColumn<T>[], fallbackWidth = 160): number | string {
+  const parts = columns.map((column) => columnWidthPart(column.width, fallbackWidth));
+  if (parts.every((part): part is number => typeof part === "number")) {
+    return parts.reduce((total, width) => total + width, 0);
+  }
+
+  return `calc(${parts.map((part) => (typeof part === "number" ? `${part}px` : part)).join(" + ")})`;
+}
+
+export function reconcileDataGridSelectedRowKeys(selectedKeys: string[], availableKeys: string[]): string[] {
+  const available = new Set(availableKeys);
+  return selectedKeys.filter((key) => available.has(key));
 }
 
 export function dataGridFloatingPanelPosition(
@@ -249,6 +260,7 @@ export function getDataGridPage<T>({
 
   return {
     rows,
+    filteredRows: sorted,
     total,
     pageCount,
     pageIndex: safePageIndex,
@@ -462,4 +474,10 @@ function compareValues(left: unknown, right: unknown): number {
 
 function valueRank(value: unknown): number {
   return value === null || value === undefined || value === "" ? 1 : 0;
+}
+
+function columnWidthPart(width: string | number | undefined, fallbackWidth: number): string | number {
+  if (typeof width === "number" && Number.isFinite(width)) return width;
+  if (typeof width === "string" && width.trim()) return width.trim();
+  return fallbackWidth;
 }

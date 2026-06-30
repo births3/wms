@@ -7,6 +7,7 @@ import {
   getDataGridPage,
   moveColumnBefore,
   nextSortState,
+  reconcileDataGridSelectedRowKeys,
   sanitizeDataGridColumnFiltersForData,
   sanitizeGridState,
   setColumnWidth,
@@ -73,6 +74,7 @@ assert.deepEqual(setColumnWidth({}, columns, "code", 80), { code: 120 });
 assert.deepEqual(setColumnWidth({ code: 160, status: 180 }, columns, "code", null), { status: 180 });
 assert.deepEqual(setColumnWidth({}, columns, "missing", 180), {});
 assert.equal(dataGridTableWidth([{ key: "select", width: 44 }, { key: "code", width: 120 }, { key: "notes" }]), 324);
+assert.equal(dataGridTableWidth([{ key: "select", width: 44 }, { key: "code", width: "12rem" }, { key: "notes" }]), "calc(44px + 12rem + 160px)");
 assert.deepEqual(
   dataGridFloatingPanelPosition({ top: 120, left: 300, right: 332 }, { width: 640, height: 480 }, 256),
   { top: 120, left: 36, maxHeight: 352 },
@@ -113,6 +115,14 @@ const filtered = getDataGridPage({
 
 assert.deepEqual(
   filtered.rows.map((row) => row.code),
+  ["ASN-010"],
+);
+assert.deepEqual(
+  filtered.filteredRows.map((row) => row.code),
+  ["ASN-010"],
+);
+assert.deepEqual(
+  reconcileDataGridSelectedRowKeys(["ASN-010", "ASN-002"], filtered.filteredRows.map((row) => row.code)),
   ["ASN-010"],
 );
 
