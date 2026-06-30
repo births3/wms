@@ -8,6 +8,7 @@ import { DataGridCellContent } from "./DataGridCellContent";
 import { DataGridFieldSettingsPanel } from "./DataGridFieldSettingsPanel";
 import { DataGridFilterChips } from "./DataGridFilterChips";
 import { DataGridHeaderCell } from "./DataGridHeaderCell";
+import { DataGridNamedViewsToolbar } from "./DataGridNamedViewsToolbar";
 import { DataGridPaginationFooter } from "./DataGridPaginationFooter";
 import { buildDataGridCsv, downloadDataGridCsv } from "./data-grid-export";
 import { clearDataGridFilterKey } from "./data-grid-filter-summary";
@@ -388,6 +389,11 @@ function DataGridInner<T>(
     });
   }
 
+  function applyNamedViewState(state: DataGridLogicState) {
+    setSettings(state);
+    setPageIndex(0);
+  }
+
   const tableColumns: DataTableColumn<T>[] = visibleColumns.map((column) => {
     const sourceRender = column.render;
     const columnCanCopy = column.copyable !== false && copyableKeys.has(column.key);
@@ -490,17 +496,27 @@ function DataGridInner<T>(
           }
           onClearAll={() => setColumnFilters({})}
         />
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-8 shrink-0 self-end md:ml-auto"
-          disabled={page.filteredRows.length === 0}
-          onClick={exportCsv}
-        >
-          <Download className="size-4" aria-hidden />
-          导出 CSV
-        </Button>
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 self-end md:ml-auto">
+          <DataGridNamedViewsToolbar
+            storageKey={storageKey}
+            columns={columns}
+            pageSizeOptions={safePageSizeOptions}
+            defaultPageSize={defaultPageSize}
+            settings={settings}
+            onApplyView={applyNamedViewState}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 shrink-0"
+            disabled={page.filteredRows.length === 0}
+            onClick={exportCsv}
+          >
+            <Download className="size-4" aria-hidden />
+            导出 CSV
+          </Button>
+        </div>
       </div>
       <DataTable
         className="overflow-visible"

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   dataGridNamedViewsStorageKey,
   loadDataGridNamedViewsFromStorage,
@@ -149,3 +150,38 @@ assert.deepEqual(loadDataGridNamedViewsFromStorage(storage, "m2.inbound", option
 
 fakeStorage.set(dataGridNamedViewsStorageKey("m2.inbound"), "{bad json");
 assert.deepEqual(loadDataGridNamedViewsFromStorage(storage, "m2.inbound", options), []);
+
+const dataGridSource = readFileSync(
+  new URL("../src/business/DataGrid/DataGrid.tsx", import.meta.url),
+  "utf8",
+);
+const namedViewsToolbarSource = readFileSync(
+  new URL("../src/business/DataGrid/DataGridNamedViewsToolbar.tsx", import.meta.url),
+  "utf8",
+);
+
+assert.match(dataGridSource, /import \{ DataGridNamedViewsToolbar \} from "\.\/DataGridNamedViewsToolbar";/);
+assert.match(dataGridSource, /function applyNamedViewState\(state: DataGridLogicState\) \{[\s\S]*setSettings\(state\);[\s\S]*setPageIndex\(0\);[\s\S]*\}/);
+assert.match(dataGridSource, /<DataGridNamedViewsToolbar[\s\S]*storageKey=\{storageKey\}[\s\S]*settings=\{settings\}[\s\S]*onApplyView=\{applyNamedViewState\}[\s\S]*\/>/);
+
+for (const symbol of [
+  "dataGridNamedViewsStorageKey",
+  "loadDataGridNamedViewsFromStorage",
+  "pickDefaultDataGridNamedView",
+  "removeDataGridNamedView",
+  "saveDataGridNamedViewsToStorage",
+  "upsertDataGridNamedView",
+]) {
+  assert.match(namedViewsToolbarSource, new RegExp(`\\b${symbol}\\b`));
+}
+
+assert.match(namedViewsToolbarSource, /function getDataGridNamedViewStorage\(storageKey: string \| undefined\): Storage \| null/);
+assert.match(namedViewsToolbarSource, /if \(!storageKey \|\| typeof window === "undefined"\) return null;/);
+assert.match(namedViewsToolbarSource, /return window\.localStorage;/);
+assert.match(namedViewsToolbarSource, /保存视图/);
+assert.match(namedViewsToolbarSource, /应用视图/);
+assert.match(namedViewsToolbarSource, /删除视图/);
+assert.match(namedViewsToolbarSource, /state: settings/);
+assert.match(namedViewsToolbarSource, /onApplyView\(selectedView\.state\)/);
+assert.match(namedViewsToolbarSource, /saveDataGridNamedViewsToStorage\(storage, storageKey, result\.views\)/);
+assert.match(namedViewsToolbarSource, /saveDataGridNamedViewsToStorage\(storage, storageKey, removed\.views\)/);
