@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   buildDataGridCsv,
   downloadDataGridCsv,
@@ -98,3 +99,31 @@ assert.throws(
 );
 assert.equal(removed, true);
 assert.equal(revokedHref, "blob:data-grid");
+
+const dataGridSource = readFileSync(
+  new URL("../src/business/DataGrid/DataGrid.tsx", import.meta.url),
+  "utf8",
+);
+
+assert.match(
+  dataGridSource,
+  /import \{\s*buildDataGridCsv,\s*downloadDataGridCsv\s*\} from "\.\/data-grid-export";/s,
+);
+assert.match(dataGridSource, /import \{ Button \} from "\.\.\/\.\.\/ui\/button";/);
+assert.match(dataGridSource, /import \{ Download \} from "lucide-react";/);
+assert.match(
+  dataGridSource,
+  /const csv = buildDataGridCsv\(\{\s*columns,\s*visibleColumnKeys: visibleColumns\.map\(\(column\) => column\.key\),\s*rows: page\.filteredRows,\s*\}\);/s,
+);
+assert.match(
+  dataGridSource,
+  /fileName: storageKey \? `\$\{storageKey\}\.csv` : "data-grid\.csv"/,
+);
+assert.match(
+  dataGridSource,
+  /document: typeof document === "undefined" \? undefined : document/,
+);
+assert.match(
+  dataGridSource,
+  /<Button[\s\S]*disabled=\{page\.filteredRows\.length === 0\}[\s\S]*导出 CSV[\s\S]*<\/Button>/,
+);

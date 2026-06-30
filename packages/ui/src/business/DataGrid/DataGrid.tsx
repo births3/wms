@@ -1,5 +1,7 @@
 import * as React from "react";
+import { Download } from "lucide-react";
 import { cn } from "../../lib/utils";
+import { Button } from "../../ui/button";
 import { Checkbox } from "../../ui/checkbox";
 import { DataTable, type DataTableColumn, type DataTableProps } from "../DataTable";
 import { DataGridCellContent } from "./DataGridCellContent";
@@ -7,6 +9,7 @@ import { DataGridFieldSettingsPanel } from "./DataGridFieldSettingsPanel";
 import { DataGridFilterChips } from "./DataGridFilterChips";
 import { DataGridHeaderCell } from "./DataGridHeaderCell";
 import { DataGridPaginationFooter } from "./DataGridPaginationFooter";
+import { buildDataGridCsv, downloadDataGridCsv } from "./data-grid-export";
 import { clearDataGridFilterKey } from "./data-grid-filter-summary";
 import {
   getDataGridCopyText,
@@ -371,6 +374,20 @@ function DataGridInner<T>(
     }
   }
 
+  function exportCsv() {
+    const csv = buildDataGridCsv({
+      columns,
+      visibleColumnKeys: visibleColumns.map((column) => column.key),
+      rows: page.filteredRows,
+    });
+
+    downloadDataGridCsv({
+      csv,
+      fileName: storageKey ? `${storageKey}.csv` : "data-grid.csv",
+      document: typeof document === "undefined" ? undefined : document,
+    });
+  }
+
   const tableColumns: DataTableColumn<T>[] = visibleColumns.map((column) => {
     const sourceRender = column.render;
     const columnCanCopy = column.copyable !== false && copyableKeys.has(column.key);
@@ -463,12 +480,28 @@ function DataGridInner<T>(
 
   return (
     <div ref={rootRef} className={cn("space-y-3", className)} {...rest}>
-      <DataGridFilterChips
-        filters={columnFilters}
-        fields={filterSummaryFields}
-        onClearFilter={(key) => setColumnFilters((current) => clearDataGridFilterKey(current, key))}
-        onClearAll={() => setColumnFilters({})}
-      />
+      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+        <DataGridFilterChips
+          className="min-w-0 flex-1"
+          filters={columnFilters}
+          fields={filterSummaryFields}
+          onClearFilter={(key) =>
+            setColumnFilters((current) => clearDataGridFilterKey(current, key))
+          }
+          onClearAll={() => setColumnFilters({})}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8 shrink-0 self-end md:ml-auto"
+          disabled={page.filteredRows.length === 0}
+          onClick={exportCsv}
+        >
+          <Download className="size-4" aria-hidden />
+          导出 CSV
+        </Button>
+      </div>
       <DataTable
         className="overflow-visible"
         columns={finalColumns}
