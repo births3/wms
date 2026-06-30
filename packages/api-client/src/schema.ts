@@ -1199,6 +1199,32 @@ export interface components {
             /** @description 下一页游标；为空表示无更多数据。 */
             next_cursor?: string | null;
         };
+        BatchCreateLocationsRequest: {
+            area_code: string;
+            /** Format: uuid */
+            bound_owner_id?: string | null;
+            /** Format: int32 */
+            column_end: number;
+            /** Format: int32 */
+            column_start: number;
+            /** Format: int32 */
+            layer_end: number;
+            /** Format: int32 */
+            layer_start: number;
+            location_type: string;
+            /** Format: int32 */
+            max_sku_count: number;
+            /** Format: int64 */
+            max_volume_cm3: number;
+            /** Format: int32 */
+            row_end: number;
+            /** Format: int32 */
+            row_start: number;
+            /** Format: uuid */
+            warehouse_id: string;
+            /** Format: uuid */
+            zone_id: string;
+        };
         BillingAccount: {
             account_code: string;
             account_name: string;
@@ -1277,32 +1303,6 @@ export interface components {
             total_amount_cents: number;
             /** Format: date-time */
             updated_at: string;
-        };
-        BatchCreateLocationsRequest: {
-            area_code: string;
-            /** Format: uuid */
-            bound_owner_id?: string | null;
-            /** Format: int32 */
-            column_end: number;
-            /** Format: int32 */
-            column_start: number;
-            /** Format: int32 */
-            layer_end: number;
-            /** Format: int32 */
-            layer_start: number;
-            location_type: string;
-            /** Format: int32 */
-            max_sku_count: number;
-            /** Format: int64 */
-            max_volume_cm3: number;
-            /** Format: int32 */
-            row_end: number;
-            /** Format: int32 */
-            row_start: number;
-            /** Format: uuid */
-            warehouse_id: string;
-            /** Format: uuid */
-            zone_id: string;
         };
         CalculateBillingChargesRequest: {
             charge_item: string;
