@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   buildDataGridFilterSummaryItems,
   clearDataGridFilterKey,
@@ -89,3 +90,12 @@ assert.deepEqual(cleared, {
   ignoredRange: {},
 });
 assert.equal(clearDataGridFilterKey(filters, "missing"), filters);
+
+assert.deepEqual(buildDataGridFilterSummaryItems({}, fields), []);
+
+const dataGridSource = readFileSync(
+  new URL("../src/business/DataGrid/DataGrid.tsx", import.meta.url),
+  "utf8",
+);
+assert.match(dataGridSource, /<DataGridFilterChips\b/);
+assert.match(dataGridSource, /onClearAll=\{\(\) => setColumnFilters\(\{\}\)\}/);

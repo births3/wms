@@ -4,8 +4,10 @@ import { Checkbox } from "../../ui/checkbox";
 import { DataTable, type DataTableColumn, type DataTableProps } from "../DataTable";
 import { DataGridCellContent } from "./DataGridCellContent";
 import { DataGridFieldSettingsPanel } from "./DataGridFieldSettingsPanel";
+import { DataGridFilterChips } from "./DataGridFilterChips";
 import { DataGridHeaderCell } from "./DataGridHeaderCell";
 import { DataGridPaginationFooter } from "./DataGridPaginationFooter";
+import { clearDataGridFilterKey } from "./data-grid-filter-summary";
 import {
   getDataGridCopyText,
   dataGridFloatingPanelPosition,
@@ -250,6 +252,11 @@ function DataGridInner<T>(
   const filteredRowKeys = React.useMemo(() => page.filteredRows.map(rowKey), [page.filteredRows, rowKey]);
   const selectedPageCount = pageRowKeys.filter((key) => selectedKeySet.has(key)).length;
   const allPageSelected = pageRowKeys.length > 0 && selectedPageCount === pageRowKeys.length;
+  const filterSummaryFields = visibleColumns.map((column) => ({
+    key: column.key,
+    label: columnLabel(column),
+    filter: dataGridFilterConfigForData(column, data),
+  }));
 
   React.useEffect(() => {
     if (!selectable || selectedKeys.length === 0) return;
@@ -456,6 +463,12 @@ function DataGridInner<T>(
 
   return (
     <div ref={rootRef} className={cn("space-y-3", className)} {...rest}>
+      <DataGridFilterChips
+        filters={columnFilters}
+        fields={filterSummaryFields}
+        onClearFilter={(key) => setColumnFilters((current) => clearDataGridFilterKey(current, key))}
+        onClearAll={() => setColumnFilters({})}
+      />
       <DataTable
         className="overflow-visible"
         columns={finalColumns}
