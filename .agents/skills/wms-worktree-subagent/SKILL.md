@@ -198,6 +198,36 @@ done
    - `git branch -D <branch>` 只允许在用户明确确认丢弃未合并产物时使用。
    - 删除分支前后都要输出 `git branch --list '<branch>'` 或等价核查，证明删除对象准确。
 
+   批量清理已合并 `agent/*` 分支时使用以下命令块；它只会普通删除已并入当前 `HEAD` 的分支，并把未合并分支留给后续取舍：
+
+```bash
+git status --short --branch
+git worktree list
+
+mapfile -t merged_agent_branches < <(
+  git branch --merged HEAD --list 'agent/*' --format='%(refname:short)'
+)
+mapfile -t unmerged_agent_branches < <(
+  git branch --no-merged HEAD --list 'agent/*' --format='%(refname:short) %(objectname:short) %(subject)'
+)
+
+if ((${#unmerged_agent_branches[@]} > 0)); then
+  printf '未合并 agent 分支，禁止自动删除：\n'
+  printf '  %s\n' "${unmerged_agent_branches[@]}"
+fi
+
+if ((${#merged_agent_branches[@]} > 0)); then
+  printf '删除已合并 agent 分支：\n'
+  printf '  %s\n' "${merged_agent_branches[@]}"
+  git branch -d "${merged_agent_branches[@]}"
+else
+  printf '没有已合并 agent 分支需要删除。\n'
+fi
+
+printf '清理后残留 agent 分支：\n'
+git branch --list 'agent/*' --format='%(refname:short) %(objectname:short) %(subject)'
+```
+
 6. 最终汇报必须包含：
    - 已移除 worktree 列表。
    - 已删除 agent 分支列表；若用户要求删除但未删除，说明未合并或未确认原因。
