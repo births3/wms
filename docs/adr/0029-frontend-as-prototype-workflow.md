@@ -95,7 +95,7 @@ Wave 0.5 已经交付 `prototypes/` 高保真原型、`packages/ui` 共享组件
 - 业务流程先被真实交互验证，再进入生产实现，降低返工。
 - `@wms/ui` 成为原型与生产前端的共同基础，组件投资能延续。
 - 生产实现仍受领域模型、OpenAPI 和 TDD 约束，不把 mock 页面误当成系统行为。
-- 视觉回归、OCR 关键字、baseline completeness 等治理脚本继续发挥作用。
+- 视觉回归、baseline completeness 等治理脚本继续发挥作用。
 
 ### 负面
 

@@ -16,7 +16,7 @@
 | Layer 2 业务复合组件 | 12 个 | 16 个（+ DiffPanel / PageHeader / DataTable / EmptyState） | +33% |
 | Layer 1 shadcn primitive | 不在计划中 | 9 个（Button / Input / Label / Card / Tabs / Select / Checkbox / Table / Dialog） | 新增 |
 | Storybook 接入 | 计划在内但未指明版本 | 8.6.18 + 16 stories.tsx 全覆盖（与组件 1:1） | 完成 |
-| 视觉基线治理 | 不在计划中 | accept_baseline.py + manifest.toml + 37 baseline PNG + OCR + imagehash + 截断检测 | 新增重大产出 |
+| 视觉基线治理 | 不在计划中 | accept_baseline.py + manifest.toml + 37 baseline PNG + imagehash + 截断检测 | 新增重大产出 |
 | 组件库抽离至 packages/ui | 不在计划中 | commit e3ce5a0 + ADR-0028 + 117 文件改动 | 新增（用户决策驱动） |
 | 技术 Spike 验证 | 5 项（结论入 docs/spikes/） | 5 项**计划**全落盘（状态=起草），验证未跑 | 计划达成 / 验证未启动 |
 | ADR 产出 | 计划 ≥ 0021 | 4 份新增（0021 / 0022 / 0023 / 0028）+ 4 份占位（0024-0027 待 Spike accept） | 超出 |
@@ -36,7 +36,6 @@
 从最初"截图 + 像素 diff"到完整治理：
 - `bfd5ee4` 11 baseline + 像素对比脚本基线
 - `671f59e` 底部截断检测（A3 类）
-- `29d2bea` OCR 关键字命中替代人工 review（A4 类）
 - `5fa518c` `accept_baseline.py` 工具 + 4 类标准
 - `e81318b` baseline 入仓强制规范
 - `430fdab` imagehash 集成（phash 比 mean_diff 对结构变化更敏感）

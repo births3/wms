@@ -166,7 +166,6 @@ Wave 1 / Wave 2 / Wave 3 开发完成状态仍分别以 `just wave-1-complete-ch
 - [x] **9 个 shadcn primitive**（Button / Input / Label / Card / Tabs / Select / Checkbox / Table / Dialog）
 - [x] **16 个组件 Stories.tsx**（与组件 1:1）+ Storybook 8.6 接入（build 通过 7.65s）
 - [x] 视觉基线治理：`accept_baseline.py` + `manifest.toml` + 204 个 baseline 全签字
-- [x] OCR 关键字校验（`check_visual_keywords.py`）
 
 #### 跨包共享（ADR-0028 / commit e3ce5a0）
 - [x] **packages/ui 抽离**：16 业务组件 + 9 shadcn primitive + lib/utils + globals.css → `@wms/ui`

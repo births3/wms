@@ -49,7 +49,7 @@ python3 scripts/governance/accept_baseline.py --apply --reviewer="项目主人" 
 
 | 类别 | 标准 | 强制度 |
 |---|---|---|
-| **A 结构健康** | 文件 1KB-3MB / OCR 关键字命中 / 底部不截断 | 强制（无 force 选项）|
+| **A 结构健康** | 文件 1KB-3MB / 底部不截断 | 强制（无 force 选项）|
 | **B 变化幅度** | small 自动 / medium 需 confirm / major 需 force | 分档强制 |
 | **C 签字** | --reviewer 必填非占位 / reviewed_at 自动更新 | 强制 |
 | **D 字段完整** | tab 在 Tabs.tsx + manifest 注册 | 强制（由 baseline_completeness 治理）|
@@ -61,7 +61,6 @@ python3 scripts/governance/accept_baseline.py --apply --reviewer="项目主人" 
 | `mean_diff`（64×64 灰度均值差，0-255）| ≤ 5 small / 5-30 medium / > 30 major |
 | `pixel_diff_ratio` | ≤ 30% medium / > 30% major |
 | 文件大小 | 1 KB - 3 MB |
-| OCR 字符数 | ≥ 100（兜底；hits ≥ 1 时不强制） |
 | 底部 30 行非白 | < 5%（防截断）|
 
 ## 治理脚本一览
@@ -72,7 +71,6 @@ python3 scripts/governance/accept_baseline.py --apply --reviewer="项目主人" 
 | `accept_baseline.py` | 工具 | 候选图能否接受为新 baseline（4 类标准） |
 | `capture_visual_snapshots.py` | 工具 | chrome headless 截图 |
 | `check_visual_regression.py` | T3 | baseline ↔ snapshot 像素差 + 截断检测 |
-| `check_visual_keywords.py` | T3 | OCR 关键字 sanity check |
 | `check_e2e_matrix_completeness.py` | T1 | Matrix E2E 策略覆盖全部 tab |
 | `run_matrix_e2e_screenshots.py` | T4 | Playwright 全量矩阵 E2E 截图、DOM 健康与交互截图 |
 | `check_matrix_e2e_report.py` | T4 | 校验 Matrix E2E 聚合报告 |

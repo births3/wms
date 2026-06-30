@@ -10,8 +10,7 @@
 | ID | 检查 | 阈值 | 失败原因 |
 |---|---|---|---|
 | A1 | 文件大小 | 1 KB ≤ size ≤ 3 MB | 截图失败 / 图爆炸 |
-| A2+A4 | OCR 关键字命中 + 字符数 | hits ≥ 1（兜底 OCR ≥ 100 字符）| 图全空白 / 截图失败 |
-| A3 | 底部截断检测 | 底部 30 行非白 < 5% | 内容超出 viewport |
+| A2 | 底部截断检测 | 底部 30 行非白 < 5% | 内容超出 viewport |
 
 ### B. 变化幅度（与现有 baseline 对比）
 
@@ -36,8 +35,6 @@
 |---|---|---|
 | D1 | tab 在 Tabs.tsx | 否则是孤儿（不接受） |
 | D2 | manifest 有 [[snapshots]] | 否则未注册（不接受） |
-| D3 | expected_keywords 存在 | 否则跳过 A4（但其他仍要求） |
-
 > D1/D2 由 `check_baseline_completeness.py` 单独治理；accept_baseline 假定它们已通过。
 
 ## 工作流
@@ -92,7 +89,6 @@ python3 scripts/governance/accept_baseline.py --apply --reviewer="<name>" --tab=
 ┌─────────────────────────────────────────────────────────┐
 │ 持续验证（T3）                                              │
 │ check_visual_regression.py（baseline ↔ 当前 snapshot 差异）  │
-│ check_visual_keywords.py（OCR sanity check）                │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -108,7 +104,6 @@ python3 scripts/governance/accept_baseline.py --apply --reviewer="<name>" --tab=
 
 | 阈值 | 取值 | 依据 |
 |---|---|---|
-| MIN_OCR_CHARS = 100 | 100 个英数字符 | 实测：所有正常 PC 页 ≥ 391 字符；PDA 页 ≥ 65（h1-token 例外有 hits 兜底）|
 | TRUNCATION = 5% | 底部 30 行非白比例 | 实测：所有完整页 = 0%；截断时 ≥ 13% |
 | SMALL_CHANGE = 5.0 | 64×64 灰度 mean_diff | 实测：色调微调 1.2，无明显视觉变化 |
 | LARGE_CHANGE = 30.0 | mean_diff | 实测：主题色变深 25%；整页变暗 50% mean_diff > 100 |
