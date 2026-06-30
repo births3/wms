@@ -1,14 +1,6 @@
 import * as React from "react";
-import {
-  Button,
-  Card,
-  CardContent,
-  DataGrid,
-  PageHeader,
-  StatusBadge,
-  type DataGridColumn,
-} from "@wms/ui";
-import { ArrowLeft, CheckCircle2, ClipboardCheck, Eye, PackageCheck, Plus, Printer, RefreshCw } from "lucide-react";
+import { Button, PageHeader } from "@wms/ui";
+import { ArrowLeft, Plus, Printer, RefreshCw } from "lucide-react";
 
 import {
   useCreateReceivingOrderMutation,
@@ -20,7 +12,6 @@ import {
   useRejectReceivingOrderMutation,
   useSignReceivingOrderMutation,
   type CreateReceivingOrderRequest,
-  type ReceivingOrder,
 } from "@/features/inbound/inbound-queries";
 import {
   M2InboundDialogs,
@@ -35,36 +26,27 @@ import {
 } from "./M2InboundDialogs";
 import { M2InboundDetailDialog } from "./M2InboundDetailDialog";
 import {
-  inboundDocumentTypeLabel,
-  inboundDocumentTypeOf,
   createAsnBatchNo,
   type InboundDocumentTypeFilter,
 } from "./m2-inbound-document-type";
 import {
-  canReceiveOrReject,
-  countByStatus,
   dateToIso,
   defaultCreatedDateRange,
   defaultStatusFilter,
   detailStageFromMode,
   filterOrders,
-  formatDateTime,
   inboundPageMeta,
-  ownerLabel,
   productTemperatureAttribute,
-  shortId,
   splitCodes,
-  statusKey,
-  statusLabel,
   temperatureControlFromProductAttribute,
   toInteger,
   totalExpectedQty,
-  workFieldHeader,
-  workFieldText,
   type M2InboundMode,
   type OwnerContext,
 } from "./m2-inbound-page-helpers";
 import { M2InboundFilterBar, type StatusFilter } from "./M2InboundFilterBar";
+import { M2InboundMetrics } from "./M2InboundMetrics";
+import { M2InboundOrderTable } from "./M2InboundOrderTable";
 
 export type { M2InboundMode } from "./m2-inbound-page-helpers";
 
@@ -254,160 +236,6 @@ export function M2InboundPage({ mode, currentOwner, onBack }: M2InboundPageProps
     }));
   }, [order?.id]);
 
-  const orderColumns: DataGridColumn<ReceivingOrder>[] = [
-    {
-      key: "receipt_no",
-      header: "ASN / 入库单",
-      mono: true,
-      width: 220,
-      minWidth: 210,
-      sortable: true,
-      sortValue: (row) => row.receipt_no,
-      filterValue: (row) => row.receipt_no,
-      copyValue: (row) => row.receipt_no,
-      filter: { type: "text" },
-      onDoubleClick: (row) => openRowDetail(row.id),
-      render: (row) => <span className="text-primary">{row.receipt_no}</span>,
-    },
-    {
-      key: "owner",
-      header: "货主",
-      width: 170,
-      minWidth: 150,
-      sortable: true,
-      sortValue: (row) => ownerLabel(row.owner_id, currentOwner),
-      filterValue: (row) => [row.owner_id, ownerLabel(row.owner_id, currentOwner)].join(" "),
-      copyValue: (row) => ownerLabel(row.owner_id, currentOwner),
-      filter: { type: "text" },
-      render: (row) => ownerLabel(row.owner_id, currentOwner),
-    },
-    {
-      key: "document_type",
-      header: "单据类型",
-      width: 150,
-      minWidth: 140,
-      sortable: true,
-      sortValue: (row) => inboundDocumentTypeLabel(inboundDocumentTypeOf(row)),
-      filterValue: (row) => inboundDocumentTypeOf(row),
-      copyValue: (row) => inboundDocumentTypeLabel(inboundDocumentTypeOf(row)),
-      filter: {
-        type: "multiSelect",
-        options: [
-          { label: "采购入库", value: "purchase_inbound" },
-          { label: "销售退货", value: "sales_return" },
-        ],
-      },
-      render: (row) => inboundDocumentTypeLabel(inboundDocumentTypeOf(row)),
-    },
-    {
-      key: "product",
-      header: "商品 / 数量",
-      width: 200,
-      minWidth: 180,
-      copyValue: (row) => {
-        const line = row.lines[0];
-        return `${line?.product_code ?? "-"} ${totalExpectedQty(row)} 件`;
-      },
-      filterValue: (row) => {
-        const line = row.lines[0];
-        return [line?.product_code ?? "", line?.batch_no ?? "", totalExpectedQty(row)].join(" ");
-      },
-      filter: { type: "text" },
-      render: (row) => (
-        <div className="text-sm">
-          <div className="font-medium">{row.lines[0]?.product_code ?? "-"}</div>
-          <div className="text-xs text-muted-foreground">{totalExpectedQty(row)} 件</div>
-        </div>
-      ),
-    },
-    {
-      key: "work_fields",
-      header: workFieldHeader(mode),
-      width: 440,
-      minWidth: 360,
-      filterValue: (row) => workFieldText(row, mode),
-      copyValue: (row) => workFieldText(row, mode),
-      filter: { type: "text" },
-      render: (row) => <WorkFieldSummary order={row} mode={mode} />,
-    },
-    {
-      key: "expected_arrival_at",
-      header: "预计到货",
-      width: 190,
-      minWidth: 180,
-      sortable: true,
-      sortValue: (row) => row.expected_arrival_at ?? "",
-      filterValue: (row) => row.expected_arrival_at,
-      copyValue: (row) => formatDateTime(row.expected_arrival_at),
-      filter: { type: "dateRange" },
-      render: (row) => formatDateTime(row.expected_arrival_at),
-    },
-    {
-      key: "status",
-      header: "状态",
-      width: 170,
-      minWidth: 150,
-      sortable: true,
-      sortValue: (row) => statusLabel(row.status),
-      filterValue: (row) => row.status,
-      copyValue: (row) => statusLabel(row.status),
-      filter: {
-        type: "multiSelect",
-        options: [
-          { label: "待处理", value: "pending" },
-          { label: "待收货", value: "released" },
-          { label: "收货中", value: "receiving" },
-          { label: "验收中", value: "inspecting" },
-          { label: "上架中", value: "putaway" },
-          { label: "已完成", value: "completed" },
-          { label: "已关闭(拒收)", value: "closed_rejected" },
-        ],
-      },
-      render: (row) => <StatusBadge status={statusKey(row.status)} label={statusLabel(row.status)} size="sm" />,
-    },
-    {
-      key: "actions",
-      header: "操作",
-      align: "right",
-      width: 230,
-      minWidth: 220,
-      hideable: false,
-      copyable: false,
-      render: (row) => (
-        <div className="flex justify-end gap-2">
-          <RowButton
-            icon={<Eye className="size-4" aria-hidden />}
-            label="详情"
-            onClick={() => openRowDetail(row.id)}
-          />
-          {mode === "receiving" && canReceiveOrReject(row.status) && (
-            <>
-              <RowButton
-                icon={<CheckCircle2 className="size-4" aria-hidden />}
-                label="收货"
-                onClick={() => openRowDialog(row.id, "receive")}
-              />
-            </>
-          )}
-          {mode === "inspecting" && (
-            <RowButton
-              icon={<ClipboardCheck className="size-4" aria-hidden />}
-              label="验收"
-              onClick={() => openRowDialog(row.id, "inspect")}
-            />
-          )}
-          {mode === "putaway" && (
-            <RowButton
-              icon={<PackageCheck className="size-4" aria-hidden />}
-              label="上架"
-              onClick={() => openRowDialog(row.id, "putaway")}
-            />
-          )}
-        </div>
-      ),
-    },
-  ];
-
   async function refreshInbound(message = "入库列表已刷新") {
     await ordersQuery.refetch();
     if (selectedId) await detailQuery.refetch();
@@ -563,12 +391,7 @@ export function M2InboundPage({ mode, currentOwner, onBack }: M2InboundPageProps
           }
         />
 
-        <div className="grid gap-3 md:grid-cols-4">
-          <Metric label="待处理" value={countByStatus(ordersQuery.data ?? [], "receiving")} tone="primary" />
-          <Metric label="验收中" value={countByStatus(ordersQuery.data ?? [], "inspecting")} tone="warning" />
-          <Metric label="上架中" value={countByStatus(ordersQuery.data ?? [], "putaway")} tone="success" />
-          <Metric label="本页合计" value={(ordersQuery.data ?? []).length} tone="muted" />
-        </div>
+        <M2InboundMetrics orders={ordersQuery.data ?? []} />
 
         <M2InboundFilterBar
           keyword={keyword}
@@ -602,17 +425,15 @@ export function M2InboundPage({ mode, currentOwner, onBack }: M2InboundPageProps
           </div>
         )}
 
-        <DataGrid
-          columns={orderColumns}
-          data={orders}
-          rowKey={(row) => row.id}
-          selectedKey={selectedId ?? undefined}
-          onRowClick={(row) => setSelectedId(row.id)}
-          caption={ordersQuery.isPending ? "加载入库单..." : undefined}
-          emptyTitle="暂无入库单"
-          storageKey="m2-inbound-datagrid"
-          tableClassName="min-w-[1880px]"
-          selectable
+        <M2InboundOrderTable
+          mode={mode}
+          currentOwner={currentOwner}
+          orders={orders}
+          selectedId={selectedId}
+          isPending={ordersQuery.isPending}
+          onSelectOrder={setSelectedId}
+          onOpenDetail={openRowDetail}
+          onOpenDialog={openRowDialog}
         />
 
         <M2InboundDialogs
@@ -650,57 +471,5 @@ export function M2InboundPage({ mode, currentOwner, onBack }: M2InboundPageProps
           onOpenChange={setDetailOpen}
         />
     </section>
-  );
-}
-
-function RowButton({
-  icon,
-  label,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      onClick={(event) => {
-        event.stopPropagation();
-        onClick();
-      }}
-    >
-      {icon}
-      {label}
-    </Button>
-  );
-}
-
-function Metric({ label, value, tone }: { label: string; value: number; tone: "primary" | "warning" | "success" | "muted" }) {
-  const toneClass = {
-    primary: "text-primary",
-    warning: "text-wms-warning",
-    success: "text-wms-success",
-    muted: "text-foreground",
-  }[tone];
-  return (
-    <Card className="rounded-lg shadow-sm">
-      <CardContent className="p-4">
-        <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        <p className={`mt-2 text-2xl font-semibold tracking-normal ${toneClass}`}>{value}</p>
-      </CardContent>
-    </Card>
-  );
-}
-
-function WorkFieldSummary({ order, mode }: { order: ReceivingOrder; mode: M2InboundMode }) {
-  const content = workFieldText(order, mode);
-  return (
-    <div className="text-sm">
-      <div className="font-medium">{content[0]}</div>
-      <div className="text-xs text-muted-foreground">{content[1]}</div>
-    </div>
   );
 }
