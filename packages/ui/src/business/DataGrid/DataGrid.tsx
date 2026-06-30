@@ -1,4 +1,5 @@
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Filter, GripVertical, Settings2, X } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { Button } from "../../ui/button";
@@ -8,6 +9,8 @@ import { DataTable, type DataTableColumn, type DataTableProps } from "../DataTab
 import { DataGridColumnFilter } from "./DataGridColumnFilter";
 import {
   getDataGridCopyText,
+  dataGridFloatingPanelPosition,
+  dataGridTableWidth,
   dataGridFilterConfigForData,
   getDataGridPage,
   moveColumnBefore,
@@ -20,6 +23,7 @@ import {
   dataGridFilterActive,
   type DataGridColumnFilterValue,
   type DataGridColumnFilters,
+  type DataGridFloatingPanelPosition,
   type DataGridFilterConfig,
   type DataGridLogicState,
   type DataGridSortState,
@@ -89,6 +93,7 @@ function DataGridInner<T>(
   ref: React.ForwardedRef<HTMLDivElement>,
 ) {
   const rootRef = React.useRef<HTMLDivElement | null>(null);
+  const fieldButtonRef = React.useRef<HTMLButtonElement | null>(null);
   const columnsRef = React.useRef(columns);
   const fieldListId = React.useId();
   const pageSizeSignature = pageSizeOptions.join("|");
@@ -108,6 +113,7 @@ function DataGridInner<T>(
   const [pageIndex, setPageIndex] = React.useState(0);
   const [columnFilters, setColumnFilters] = React.useState<DataGridColumnFilters>({});
   const [fieldsOpen, setFieldsOpen] = React.useState(false);
+  const [fieldsPanelPosition, setFieldsPanelPosition] = React.useState<DataGridFloatingPanelPosition | null>(null);
   const [openFilterKey, setOpenFilterKey] = React.useState<string | null>(null);
   const [internalSelectedRowKeys, setInternalSelectedRowKeys] = React.useState<string[]>([]);
   const [draggingColumnKey, setDraggingColumnKey] = React.useState<string | null>(null);
@@ -186,6 +192,26 @@ function DataGridInner<T>(
     return () => document.removeEventListener("pointerdown", closePanels);
   }, [fieldsOpen, openFilterKey]);
 
+  React.useEffect(() => {
+    if (!fieldsOpen) return;
+
+    function updatePosition() {
+      const rect = fieldButtonRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setFieldsPanelPosition(
+        dataGridFloatingPanelPosition(rect, { width: window.innerWidth, height: window.innerHeight }, 256),
+      );
+    }
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [fieldsOpen]);
+
   const page = getDataGridPage({
     data,
     columns,
@@ -211,6 +237,68 @@ function DataGridInner<T>(
   const pageRowKeys = page.rows.map(rowKey);
   const selectedPageCount = pageRowKeys.filter((key) => selectedKeySet.has(key)).length;
   const allPageSelected = pageRowKeys.length > 0 && selectedPageCount === pageRowKeys.length;
+
+  const fieldSettingsPanel =
+    fieldsOpen && fieldsPanelPosition && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            id={fieldListId}
+            className="fixed z-50 w-64 overflow-auto rounded-md border border-primary/30 bg-background p-2 text-left text-sm shadow-lg"
+            style={{
+              top: fieldsPanelPosition.top,
+              left: fieldsPanelPosition.left,
+              maxHeight: fieldsPanelPosition.maxHeight,
+            }}
+            data-datagrid-popover
+          >
+            {hideableColumns.map((item) => {
+              const checked = visibleKeys.has(item.key);
+              const copyable = copyableKeys.has(item.key);
+              const disabled = checked && visibleHideableCount <= 1;
+              const checkboxId = `${fieldListId}-${item.key}`;
+              const copyCheckboxId = `${fieldListId}-${item.key}-copy`;
+              return (
+                <div
+                  key={item.key}
+                  draggable
+                  onDragStart={() => setDraggingColumnKey(item.key)}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={() => {
+                    if (draggingColumnKey) moveColumn(draggingColumnKey, item.key);
+                    setDraggingColumnKey(null);
+                  }}
+                  onDragEnd={() => setDraggingColumnKey(null)}
+                  className={cn(
+                    "flex items-center gap-2 rounded-sm px-2 py-1.5",
+                    draggingColumnKey === item.key ? "bg-muted" : "hover:bg-muted/60",
+                  )}
+                >
+                  <GripVertical className="size-4 shrink-0 cursor-grab text-muted-foreground" aria-hidden />
+                  <Checkbox
+                    id={checkboxId}
+                    checked={checked}
+                    disabled={disabled}
+                    onCheckedChange={(value) => updateColumnVisible(item.key, value === true)}
+                  />
+                  <label htmlFor={checkboxId} className="min-w-0 flex-1 truncate text-muted-foreground">
+                    {columnLabel(item)}
+                  </label>
+                  <label htmlFor={copyCheckboxId} className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                    <Checkbox
+                      id={copyCheckboxId}
+                      checked={copyable}
+                      disabled={item.copyable === false}
+                      onCheckedChange={(value) => updateColumnCopyable(item.key, value === true)}
+                    />
+                    复制
+                  </label>
+                </div>
+              );
+            })}
+          </div>,
+          document.body,
+        )
+      : null;
 
   function updateSort(column: DataGridColumn<T>) {
     if (!column.sortable) return;
@@ -292,6 +380,7 @@ function DataGridInner<T>(
     return {
       ...column,
       width: columnWidth,
+      className: cn(column.className, "max-w-0 overflow-hidden"),
       render: (row, index) => {
         const content = sourceRender ? sourceRender(row, index) : defaultCellContent(row, column);
         const copyText = columnCanCopy ? getDataGridCopyText(row, column) : "";
@@ -404,6 +493,7 @@ function DataGridInner<T>(
           {column.key === lastVisibleColumnKey && (
             <div className="relative ml-1 border-l pl-2">
               <Button
+                ref={fieldButtonRef}
                 type="button"
                 variant="outline"
                 size="icon"
@@ -420,58 +510,6 @@ function DataGridInner<T>(
               >
                 <Settings2 className="size-3.5" aria-hidden />
               </Button>
-              {fieldsOpen && (
-                <div
-                  id={fieldListId}
-                  className="absolute right-full top-0 z-40 mr-2 w-64 rounded-md border border-primary/30 bg-background p-2 text-left text-sm shadow-lg"
-                  data-datagrid-popover
-                >
-                  {hideableColumns.map((item) => {
-                    const checked = visibleKeys.has(item.key);
-                    const copyable = copyableKeys.has(item.key);
-                    const disabled = checked && visibleHideableCount <= 1;
-                    const checkboxId = `${fieldListId}-${item.key}`;
-                    const copyCheckboxId = `${fieldListId}-${item.key}-copy`;
-                    return (
-                      <div
-                        key={item.key}
-                        draggable
-                        onDragStart={() => setDraggingColumnKey(item.key)}
-                        onDragOver={(event) => event.preventDefault()}
-                        onDrop={() => {
-                          if (draggingColumnKey) moveColumn(draggingColumnKey, item.key);
-                          setDraggingColumnKey(null);
-                        }}
-                        onDragEnd={() => setDraggingColumnKey(null)}
-                        className={cn(
-                          "flex items-center gap-2 rounded-sm px-2 py-1.5",
-                          draggingColumnKey === item.key ? "bg-muted" : "hover:bg-muted/60",
-                        )}
-                      >
-                        <GripVertical className="size-4 shrink-0 cursor-grab text-muted-foreground" aria-hidden />
-                        <Checkbox
-                          id={checkboxId}
-                          checked={checked}
-                          disabled={disabled}
-                          onCheckedChange={(value) => updateColumnVisible(item.key, value === true)}
-                        />
-                        <label htmlFor={checkboxId} className="min-w-0 flex-1 truncate text-muted-foreground">
-                          {columnLabel(item)}
-                        </label>
-                        <label htmlFor={copyCheckboxId} className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-                          <Checkbox
-                            id={copyCheckboxId}
-                            checked={copyable}
-                            disabled={item.copyable === false}
-                            onCheckedChange={(value) => updateColumnCopyable(item.key, value === true)}
-                          />
-                          复制
-                        </label>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
             </div>
           )}
           {column.resizable !== false && (
@@ -529,6 +567,7 @@ function DataGridInner<T>(
         ...tableColumns,
       ]
     : tableColumns;
+  const finalTableWidth = dataGridTableWidth(finalColumns);
 
   return (
     <div ref={rootRef} className={cn("space-y-3", className)} {...rest}>
@@ -537,7 +576,8 @@ function DataGridInner<T>(
         columns={finalColumns}
         data={page.rows}
         rowKey={rowKey}
-        tableClassName={tableClassName}
+        tableClassName={cn("table-fixed", tableClassName)}
+        tableStyle={{ width: finalTableWidth, minWidth: finalTableWidth }}
         selectedKey={selectedKey}
         onRowClick={onRowClick}
         caption={caption}
@@ -599,6 +639,7 @@ function DataGridInner<T>(
           </div>
         }
       />
+      {fieldSettingsPanel}
     </div>
   );
 }

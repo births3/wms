@@ -58,6 +58,23 @@ export interface DataGridPageResult<T> {
   rangeEnd: number;
 }
 
+export interface DataGridFloatingPanelRect {
+  top: number;
+  left: number;
+  right: number;
+}
+
+export interface DataGridFloatingPanelViewport {
+  width: number;
+  height: number;
+}
+
+export interface DataGridFloatingPanelPosition {
+  top: number;
+  left: number;
+  maxHeight: number;
+}
+
 const defaultPageSizeFallback = 20;
 
 export function defaultVisibleColumns<T>(columns: DataGridLogicColumn<T>[]): string[] {
@@ -171,6 +188,30 @@ export function setColumnWidth<T>(
 
   next[key] = clampColumnWidth(width, column);
   return next;
+}
+
+export function dataGridTableWidth<T>(columns: DataGridLogicColumn<T>[], fallbackWidth = 160): number {
+  return columns.reduce((total, column) => total + (typeof column.width === "number" ? column.width : fallbackWidth), 0);
+}
+
+export function dataGridFloatingPanelPosition(
+  anchor: DataGridFloatingPanelRect,
+  viewport: DataGridFloatingPanelViewport,
+  panelWidth: number,
+  minHeight = 160,
+  gap = 8,
+  margin = 8,
+): DataGridFloatingPanelPosition {
+  const maxLeft = Math.max(margin, viewport.width - panelWidth - margin);
+  const preferredLeft = anchor.left - panelWidth - gap;
+  const fallbackLeft = anchor.right + gap;
+  const left = preferredLeft >= margin ? preferredLeft : Math.min(Math.max(margin, fallbackLeft), maxLeft);
+  const top = Math.min(Math.max(margin, anchor.top), Math.max(margin, viewport.height - minHeight - margin));
+  return {
+    top,
+    left,
+    maxHeight: Math.max(minHeight, viewport.height - top - margin),
+  };
 }
 
 export function nextSortState(current: DataGridSortState | null, key: string): DataGridSortState | null {

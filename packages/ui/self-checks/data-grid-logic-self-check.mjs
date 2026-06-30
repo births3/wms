@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import {
   getDataGridCopyText,
+  dataGridFloatingPanelPosition,
+  dataGridTableWidth,
   dataGridFilterConfigForData,
   getDataGridPage,
   moveColumnBefore,
@@ -70,6 +72,15 @@ assert.deepEqual(widthSettings.columnWidths, { code: 240, action: 200 });
 assert.deepEqual(setColumnWidth({}, columns, "code", 80), { code: 120 });
 assert.deepEqual(setColumnWidth({ code: 160, status: 180 }, columns, "code", null), { status: 180 });
 assert.deepEqual(setColumnWidth({}, columns, "missing", 180), {});
+assert.equal(dataGridTableWidth([{ key: "select", width: 44 }, { key: "code", width: 120 }, { key: "notes" }]), 324);
+assert.deepEqual(
+  dataGridFloatingPanelPosition({ top: 120, left: 300, right: 332 }, { width: 640, height: 480 }, 256),
+  { top: 120, left: 36, maxHeight: 352 },
+);
+assert.deepEqual(
+  dataGridFloatingPanelPosition({ top: 400, left: 40, right: 72 }, { width: 640, height: 480 }, 256),
+  { top: 312, left: 80, maxHeight: 160 },
+);
 
 const page = getDataGridPage({
   data: rows,

@@ -38,6 +38,7 @@ export interface DataTableProps<T> extends Omit<React.HTMLAttributes<HTMLDivElem
   data: T[];
   /** 表格元素样式（用于最小宽度等布局控制） */
   tableClassName?: string;
+  tableStyle?: React.CSSProperties;
   /** 用于 key & 选中比对（必填） */
   rowKey: (row: T) => string;
   /** 选中的行 key */
@@ -65,6 +66,7 @@ export function DataTable<T>({
   emptyDescription,
   className,
   tableClassName,
+  tableStyle,
   ...rest
 }: DataTableProps<T>) {
   return (
@@ -72,7 +74,12 @@ export function DataTable<T>({
       {caption && (
         <div className="px-4 py-2.5 text-xs text-muted-foreground border-b bg-muted/40">{caption}</div>
       )}
-      <Table className={tableClassName}>
+      <Table className={tableClassName} style={tableStyle}>
+        <colgroup>
+          {columns.map((col) => (
+            <col key={col.key} style={columnStyle(col)} />
+          ))}
+        </colgroup>
         <TableHeader>
           <TableRow>
             {columns.map((col) => (
