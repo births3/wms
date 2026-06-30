@@ -241,6 +241,57 @@ impl PgWave3Repository {
         })
     }
 
+    pub async fn list_receiving_orders(
+        &self,
+        ctx: &AuthContext,
+    ) -> Result<Vec<ReceivingOrder>, Wave3RepositoryError> {
+        let rows = sqlx::query_as::<_, ReceivingOrderRow>(
+            r#"
+            SELECT id, owner_id, receipt_no, document_type, supplier_id, warehouse_id,
+                   external_ref, status, expected_arrival_at, created_at, updated_at
+              FROM receiving_orders
+             WHERE owner_id = $1
+             ORDER BY updated_at DESC, receipt_no
+            "#,
+        )
+        .bind(ctx.owner_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_db_error)?;
+
+        let mut orders = Vec::with_capacity(rows.len());
+        for row in rows {
+            let lines = self
+                .load_receiving_order_lines(ctx.owner_id, row.id)
+                .await?;
+            orders.push(map_receiving_order(row, lines));
+        }
+        Ok(orders)
+    }
+
+    pub async fn get_receiving_order(
+        &self,
+        ctx: &AuthContext,
+        id: Uuid,
+    ) -> Result<ReceivingOrder, Wave3RepositoryError> {
+        let row = sqlx::query_as::<_, ReceivingOrderRow>(
+            r#"
+            SELECT id, owner_id, receipt_no, document_type, supplier_id, warehouse_id,
+                   external_ref, status, expected_arrival_at, created_at, updated_at
+              FROM receiving_orders
+             WHERE id = $1 AND owner_id = $2
+            "#,
+        )
+        .bind(id)
+        .bind(ctx.owner_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(map_db_error)?
+        .ok_or(Wave3RepositoryError::NotFound)?;
+        let lines = self.load_receiving_order_lines(ctx.owner_id, id).await?;
+        Ok(map_receiving_order(row, lines))
+    }
+
     pub async fn release_receiving_order(
         &self,
         ctx: &AuthContext,

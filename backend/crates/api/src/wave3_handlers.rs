@@ -21,11 +21,13 @@ use uuid::Uuid;
 use wms_domain::{
     BillingAccount, BillingContract, BillingRule, ChangeInventoryStatusRequest, ColdChainDevice,
     CreateBillingAccountRequest, CreateBillingContractRequest, CreateBillingRuleRequest,
-    CreateColdChainDeviceRequest, ErrorResponse, IngestTemperatureExcursionRequest,
-    IngestTemperatureReadingRequest, InspectReceivingOrderRequest, InspectionSignatureRecord,
-    InventoryBatch, InventoryBatchListResponse, PageMeta, PutawayInventoryRequest, PutawayRecord,
-    PutawayRequest, ReceiveReceivingOrderRequest, ReceivingInspectionRecord, ReceivingOrderReceipt,
-    RejectReceivingOrderRequest, TemperatureExcursionEvent, TemperatureReading,
+    CreateColdChainDeviceRequest, CreateReceivingOrderRequest, ErrorResponse,
+    IngestTemperatureExcursionRequest, IngestTemperatureReadingRequest,
+    InspectReceivingOrderRequest, InspectionSignatureRecord, InventoryBatch,
+    InventoryBatchListResponse, PageMeta, PutawayInventoryRequest, PutawayRecord, PutawayRequest,
+    ReceiveReceivingOrderRequest, ReceivingInspectionRecord, ReceivingOrder,
+    ReceivingOrderListResponse, ReceivingOrderReceipt, RejectReceivingOrderRequest,
+    TemperatureExcursionEvent, TemperatureReading,
 };
 
 use crate::{
@@ -310,6 +312,14 @@ impl IntoResponse for Wave3HandlerError {
 pub fn wave3_router(state: Wave3AppState) -> Router {
     Router::new()
         .route(
+            "/api/v1/inbound/receiving-orders",
+            get(list_receiving_orders_handler).post(create_receiving_order_handler),
+        )
+        .route(
+            "/api/v1/inbound/receiving-orders/:id",
+            get(get_receiving_order_handler),
+        )
+        .route(
             "/api/v1/inbound/receiving-orders/:id/receive",
             post(receive_receiving_order_handler),
         )
@@ -363,6 +373,64 @@ pub fn wave3_router(state: Wave3AppState) -> Router {
         )
         .route("/api/v1/billing/rules", post(create_billing_rule_handler))
         .with_state(state)
+}
+
+async fn list_receiving_orders_handler(
+    ctx: AuthContext,
+    State(state): State<Wave3AppState>,
+) -> Result<Json<ReceivingOrderListResponse>, Wave3HandlerError> {
+    let data = if let Some(repository) = &state.wave3_repository {
+        repository.list_receiving_orders(&ctx).await?
+    } else {
+        let store = state.inbound_store.lock().await;
+        store.list(&ctx)
+    };
+    Ok(Json(ReceivingOrderListResponse {
+        page: PageMeta {
+            count: data.len() as u32,
+            next_cursor: None,
+        },
+        data,
+    }))
+}
+
+async fn create_receiving_order_handler(
+    ctx: AuthContext,
+    State(state): State<Wave3AppState>,
+    Json(req): Json<CreateReceivingOrderRequest>,
+) -> Result<Json<ReceivingOrder>, Wave3HandlerError> {
+    ctx.require_permission("m2.write")?;
+    let now = Utc::now();
+    let order = if let Some(repository) = &state.wave3_repository {
+        repository.create_receiving_order(&ctx, req, now).await?
+    } else {
+        let mut store = state.inbound_store.lock().await;
+        store.create(&ctx, req, now)?
+    };
+    append_audit(
+        &state,
+        &ctx,
+        "create",
+        "M2",
+        "receiving_order",
+        order.id.to_string(),
+    )
+    .await;
+    Ok(Json(order))
+}
+
+async fn get_receiving_order_handler(
+    ctx: AuthContext,
+    State(state): State<Wave3AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ReceivingOrder>, Wave3HandlerError> {
+    let order = if let Some(repository) = &state.wave3_repository {
+        repository.get_receiving_order(&ctx, id).await?
+    } else {
+        let store = state.inbound_store.lock().await;
+        store.get(&ctx, id)?
+    };
+    Ok(Json(order))
 }
 
 async fn receive_receiving_order_handler(
