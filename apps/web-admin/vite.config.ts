@@ -12,19 +12,22 @@ const devWarehouseId = "00000000-0000-0000-0000-000000003001";
 const devLocationId = "00000000-0000-0000-0000-000000000201";
 const devSeedOrderCount = 100;
 const devLoginPassword = ["Correct", "Horse1!"].join("");
-const devLoginDefaults = devMockEnabled
-  ? {
-      enabled: true,
-      ownerCode: "PY_OWNER",
-      username: "admin",
-      password: devLoginPassword,
-    }
-  : {
-      enabled: false,
-      ownerCode: "",
-      username: "",
-      password: "",
-};
+
+function devLoginDefaults(enabled: boolean) {
+  return enabled
+    ? {
+        enabled: true,
+        ownerCode: "PY_OWNER",
+        username: "admin",
+        password: devLoginPassword,
+      }
+    : {
+        enabled: false,
+        ownerCode: "",
+        username: "",
+        password: "",
+      };
+}
 
 interface DevOrderLine {
   line_no: number;
@@ -128,6 +131,14 @@ async function handleDevMockRequest(
     return true;
   }
 
+  if (req.method === "GET") {
+    const masterDataResponse = devMasterDataResponse(pathname);
+    if (masterDataResponse) {
+      sendJson(res, 200, masterDataResponse);
+      return true;
+    }
+  }
+
   if (req.method === "GET" && pathname === "/api/v1/inbound/receiving-orders") {
     const data = allDevOrders();
     sendJson(res, 200, { data, page: { count: data.length, next_cursor: null } });
@@ -159,7 +170,165 @@ async function handleDevMockRequest(
     return true;
   }
 
-  return false;
+  sendJson(res, 404, {
+    code: "DEV_MOCK_NOT_FOUND",
+    message: "Dev mock route not found",
+    trace_id: "dev-mock",
+  });
+  return true;
+}
+
+function devMasterDataResponse(pathname: string): Record<string, unknown> | null {
+  const updatedAt = "2026-06-29T00:00:00.000Z";
+  const page = { count: 1, next_cursor: null };
+
+  if (pathname === "/api/v1/master-data/products") {
+    return {
+      data: [
+        {
+          id: "00000000-0000-0000-0000-000000001001",
+          owner_id: devOwnerId,
+          product_code: "P-M1-001",
+          product_name: "冷藏胰岛素注射液",
+          spec: "10ml*1支",
+          dosage_form: "注射剂",
+          approval_no: "国药准字H20260001",
+          manufacturer: "鹏鹞示例药业",
+          special_drug_category_code: "none",
+          attrs: { storage_condition: "cold" },
+          status: "active",
+          created_at: updatedAt,
+          updated_at: updatedAt,
+        },
+      ],
+      page,
+      inventory_alert_count: 0,
+      pending_receipt_orders: 0,
+      returns_this_month: 0,
+      signed_orders_last_7_days: 0,
+      store_id: null,
+    };
+  }
+
+  if (pathname === "/api/v1/master-data/suppliers") {
+    return {
+      data: [
+        {
+          id: "00000000-0000-0000-0000-000000001101",
+          owner_id: devOwnerId,
+          supplier_code: "S-M1-001",
+          supplier_name: "鹏鹞示例供应商",
+          license_no: "SPL-2026-001",
+          contact_name: "王供应",
+          status: "active",
+          created_at: updatedAt,
+          updated_at: updatedAt,
+        },
+      ],
+      page,
+    };
+  }
+
+  if (pathname === "/api/v1/master-data/customers") {
+    return {
+      data: [
+        {
+          id: "00000000-0000-0000-0000-000000001201",
+          owner_id: devOwnerId,
+          customer_code: "C-M1-001",
+          customer_name: "鹏鹞示例门店",
+          license_no: "CPL-2026-001",
+          status: "active",
+          created_at: updatedAt,
+          updated_at: updatedAt,
+        },
+      ],
+      page,
+    };
+  }
+
+  if (pathname === "/api/v1/master-data/warehouses") {
+    return {
+      data: [
+        {
+          id: devWarehouseId,
+          owner_id: devOwnerId,
+          warehouse_code: "WH-M1-001",
+          warehouse_name: "鹏鹞冷链仓",
+          status: "active",
+          created_at: updatedAt,
+          updated_at: updatedAt,
+        },
+      ],
+      page,
+    };
+  }
+
+  if (pathname === "/api/v1/master-data/locations") {
+    return {
+      data: [
+        {
+          id: devLocationId,
+          owner_id: devOwnerId,
+          warehouse_id: devWarehouseId,
+          zone_id: "00000000-0000-0000-0000-000000003101",
+          location_code: "A01-01-02-03",
+          row_no: 1,
+          column_no: 2,
+          layer_no: 3,
+          max_volume_cm3: 1000000,
+          used_volume_cm3: 120000,
+          max_sku_count: 3,
+          location_type: "storage",
+          bound_owner_id: null,
+          status: "available",
+          created_at: updatedAt,
+          updated_at: updatedAt,
+        },
+      ],
+      page,
+    };
+  }
+
+  if (pathname === "/api/v1/system-dictionaries/document_type/items") {
+    return {
+      data: [
+        {
+          id: "00000000-0000-0000-0000-000000001501",
+          dict_code: "document_type",
+          item_code: "purchase_inbound",
+          item_name: "采购入库",
+          owner_id: null,
+          params: { direction: "inbound", batch_policy: "none" },
+          source: "global",
+          enabled: true,
+          effective_from: null,
+          effective_to: null,
+          disabled_reason: null,
+          created_at: updatedAt,
+          updated_at: updatedAt,
+        },
+        {
+          id: "00000000-0000-0000-0000-000000001502",
+          dict_code: "document_type",
+          item_code: "sales_return",
+          item_name: "销售退货入库",
+          owner_id: null,
+          params: { direction: "inbound", batch_policy: "required" },
+          source: "global",
+          enabled: true,
+          effective_from: null,
+          effective_to: null,
+          disabled_reason: null,
+          created_at: updatedAt,
+          updated_at: updatedAt,
+        },
+      ],
+      page: { count: 2, next_cursor: null },
+    };
+  }
+
+  return null;
 }
 
 async function handleInboundAction(req: IncomingMessage, res: ServerResponse, action: string | undefined, orderId: string) {
@@ -440,26 +609,30 @@ function asDocumentType(value: unknown): "purchase_inbound" | "sales_return" {
   throw new Error("Invalid document_type");
 }
 
-export default defineConfig({
-  define: {
-    __WMS_WEB_ADMIN_DEV_LOGIN__: JSON.stringify(devLoginDefaults),
-  },
-  plugins: [react(), webAdminDevMock()],
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
+export default defineConfig(({ command }) => {
+  const devLoginEnabled = command === "serve" && process.env.WMS_WEB_ADMIN_DEV_LOGIN !== "0";
+
+  return {
+    define: {
+      __WMS_WEB_ADMIN_DEV_LOGIN__: JSON.stringify(devLoginDefaults(devLoginEnabled)),
     },
-  },
-  server: {
-    host: "0.0.0.0",
-    port: 9002,
-    proxy: e2eApiUrl
-      ? {
-          "/api": {
-            target: e2eApiUrl,
-            changeOrigin: true,
-          },
-        }
-      : undefined,
-  },
+    plugins: [react(), webAdminDevMock()],
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "./src"),
+      },
+    },
+    server: {
+      host: "0.0.0.0",
+      port: 9002,
+      proxy: e2eApiUrl
+        ? {
+            "/api": {
+              target: e2eApiUrl,
+              changeOrigin: true,
+            },
+          }
+        : undefined,
+    },
+  };
 });
