@@ -5,7 +5,7 @@ description: 用 Loop Engineering 方式执行 WMS 仓库任务，先定义目�
 
 # WMS Loop Engineering
 
-当用户要求“用这个方案跑”“跑闭环”“Loop Engineering”“review 并修复直到没问题”，或任务需要多轮检查反馈时使用本技能。
+当用户要求“用这个方案跑”“跑闭环”“Loop Engineering”，或任务需要多轮检查反馈时使用本技能；明确要求 review、修复、复审或分组提交时，转用 `wms-review-fix-commit`。
 
 ## 先读
 
