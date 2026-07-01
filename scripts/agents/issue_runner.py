@@ -24,6 +24,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUT_DIR = REPO_ROOT / ".codex" / "issue-agent"
 ANALYSIS_MARKER = "<!-- wms-issue-agent:analysis:v2 -->"
 TMUX_MARKER = "<!-- wms-issue-agent:tmux:v1 -->"
+MERGE_MARKER = "<!-- wms-issue-agent:merge:v1 -->"
 
 
 @dataclass(frozen=True)
@@ -67,6 +68,19 @@ def tea_api(endpoint: str, *, method: str = "GET", payload: dict[str, Any] | Non
 def list_open_issues(limit: int) -> list[dict[str, Any]]:
     items = tea_api(f"/repos/{{owner}}/{{repo}}/issues?state=open&limit={limit}")
     return [item for item in items if not item.get("pull_request")]
+
+
+def list_closed_issues(limit: int) -> list[dict[str, Any]]:
+    items = tea_api(f"/repos/{{owner}}/{{repo}}/issues?state=closed&limit={limit}")
+    return [item for item in items if not item.get("pull_request")]
+
+
+def list_open_pulls(limit: int) -> list[dict[str, Any]]:
+    return tea_api(f"/repos/{{owner}}/{{repo}}/pulls?state=open&limit={limit}")
+
+
+def get_pull(index: int) -> dict[str, Any]:
+    return tea_api(f"/repos/{{owner}}/{{repo}}/pulls/{index}")
 
 
 def get_issue(index: int) -> dict[str, Any]:
@@ -134,14 +148,83 @@ def comment_summary(comments: list[dict[str, Any]], limit: int = 5) -> str:
     lines: list[str] = []
     for c in human_comments[-limit:]:
         author = (c.get("user") or {}).get("login", "unknown")
-        lines.append(f"- {author}: {short(body_of(c), 220)}")
+        lines.append(f"- {author}: {short(normalize_attachment_links(body_of(c)), 220)}")
     return "\n".join(lines)
+
+
+def gitea_root() -> str:
+    remote = run(["git", "remote", "get-url", "origin"]).strip()
+    return remote.removesuffix(".git").rsplit("/", 2)[0]
+
+
+def normalize_attachment_links(text: str) -> str:
+    root = gitea_root()
+    return text.replace("](/attachments/", f"]({root}/attachments/").replace("(/attachments/", f"({root}/attachments/")
+
+
+def attachment_summary(comments: list[dict[str, Any]], limit: int = 10) -> str:
+    lines: list[str] = []
+    for c in comments[-limit:]:
+        if "wms-issue-agent:" in body_of(c):
+            continue
+        author = (c.get("user") or {}).get("login", "unknown")
+        for asset in c.get("assets") or []:
+            url = asset.get("browser_download_url")
+            if url:
+                lines.append(f"- {author}: {asset.get('name', 'attachment')} {url}")
+    return "\n".join(lines) if lines else "无"
+
+
+def text_blob(*parts: Any) -> str:
+    return "\n".join(str(part or "") for part in parts)
+
+
+def pr_mentions_issue(pr: dict[str, Any], issue_number: int) -> bool:
+    text = text_blob(pr.get("title"), pr.get("body"))
+    return bool(re.search(rf"(?:issue|关联|关闭|close[sd]?)\s*#?{issue_number}\b", text, re.I))
+
+
+def has_merge_blocker(text: str) -> bool:
+    return any(word in text for word in ("/reject", "不要合并", "暂不合并", "合并阻塞", "blocked", "BLOCKED"))
+
+
+def has_merge_evidence(text: str) -> bool:
+    return "验证" in text and ("截图" in text or "附件" in text) and ("重启" in text or "healthz" in text)
+
+
+def merge_blockers(issue: dict[str, Any], comments: list[dict[str, Any]], pr: dict[str, Any]) -> list[str]:
+    human_comments = [body_of(c) for c in comments if "wms-issue-agent:" not in body_of(c)]
+    text = text_blob(issue.get("body"), pr.get("body"), *human_comments)
+    head_ref = str((pr.get("head") or {}).get("ref") or "")
+    blockers: list[str] = []
+    if issue.get("state") != "closed":
+        blockers.append("issue 未关闭")
+    if latest_marker_time(comments, MERGE_MARKER):
+        blockers.append("issue 已有合并 marker")
+    if pr.get("state") != "open":
+        blockers.append("PR 不是 open")
+    if pr.get("merged"):
+        blockers.append("PR 已合并")
+    if not pr.get("mergeable"):
+        blockers.append("PR 不可自动合并")
+    if not head_ref.startswith("agent/"):
+        blockers.append("PR 分支不是 agent/*")
+    if has_merge_blocker(text):
+        blockers.append("存在阻塞或拒绝合并评论")
+    if not has_merge_evidence(text):
+        blockers.append("缺少验证、截图或重启证据")
+    return blockers
+
+
+def latest_human_time(comments: list[dict[str, Any]]) -> datetime | None:
+    times = [parse_time(str(c["created_at"])) for c in comments if "wms-issue-agent:" not in body_of(c)]
+    return max(times) if times else None
 
 
 def build_analysis_comment(issue: dict[str, Any], comments: list[dict[str, Any]]) -> str:
     labels = ", ".join(label["name"] for label in issue.get("labels") or []) or "无"
     scope = "待确认"
-    text = f"{issue.get('title', '')} {issue.get('body', '')}"
+    text = f"{issue.get('title', '')} {issue.get('body', '')} {comment_summary(comments, limit=10)}"
     if "菜单" in text or "导航" in text:
         scope = "可能是管理端左侧导航 / 菜单交互"
     conclusion = "需要补充"
@@ -153,6 +236,11 @@ def build_analysis_comment(issue: dict[str, Any], comments: list[dict[str, Any]]
         confidence = "中"
         reason = "描述指向可复现故障，优先用日志、接口或页面复现定位。"
         action = "评论 `/confirm` 后执行最小修复；如复现信息不足，执行时会先停止补问。"
+    elif any(word in text for word in ("截图", "图片", "红框", "圈", "页面")):
+        conclusion = "建议执行"
+        confidence = "中"
+        reason = "已有截图或页面位置补充，可以按当前范围做最小修复。"
+        action = "评论 `/confirm` 后执行最小修复；未确认前继续只评论判断。"
     elif any(word in text for word in ("新增", "增加", "字段", "状态", "流程", "规则")):
         conclusion = "需要人工决策"
         confidence = "中"
@@ -176,6 +264,10 @@ def build_analysis_comment(issue: dict[str, Any], comments: list[dict[str, Any]]
 ### 评论摘要
 
 {comment_summary(comments)}
+
+### 截图 / 附件
+
+{attachment_summary(comments)}
 
 ### 判断依据
 
@@ -217,13 +309,17 @@ def build_fix_prompt(issue: dict[str, Any], comments: list[dict[str, Any]]) -> s
 
 用户已在 issue 评论中确认执行。请按 WMS 仓库规则处理：
 1. 使用 `wms-loop-engineering` 定义目标、输入、检查、反馈和停止条件。
-2. 必须使用 `wms-worktree-subagent` 或独立 git worktree 隔离开发；禁止直接修改当前主工作区。
-3. 只修复 issue 指向的问题。新增字段、状态、角色、模块或业务默认值时停止并向用户确认。
-4. 完成后运行相关测试，至少 `git diff --check` 和 `just gov-t1`。
-5. 涉及前端或用户可见行为时，必须重启本地测试环境前端和后端；前端优先使用 `pnpm -C apps/web-admin dev --host 0.0.0.0 --port 9002 --strictPort`，后端按仓库现有运行方式启动并检查 `/healthz`。重启后必须校验运行的是本次修复版本：记录当前提交哈希，并用页面可见变更、接口响应版本字段或等价证据证明不是旧进程缓存；把端口、URL、提交哈希和版本校验结果写入 PR 与 issue。
-6. 涉及前端或用户可见行为时，必须采集真实前端截图；截图路径、视口、页面 URL、截图结论必须同时评论到 PR 和 issue，不能只写本地路径。
-7. 用户已授权：创建修复分支、推送到远端并创建 Gitea PR；禁止推 main，禁止强推。
-8. 最后把 PR 链接、提交哈希、验证结果、截图证据、本地测试环境重启结果和剩余风险评论回 issue。
+2. 使用 `wms-execution-retrospective` 从 issue 标题、正文、评论和附件中先判断是否存在共性问题；若是共性问题，必须同步补规则、脚本或矩阵，不能只修一个页面。
+3. 必须使用 `wms-worktree-subagent` 或独立 git worktree 隔离开发；禁止直接修改当前主工作区。
+4. 只修复 issue 指向的问题。新增字段、状态、角色、模块或业务默认值时停止并向用户确认。
+5. 完成后运行相关测试，至少 `git diff --check` 和 `just gov-t1`。
+6. 涉及前端或用户可见行为时，必须重启本地测试环境前端和后端；前端优先使用 `pnpm -C apps/web-admin dev --host 0.0.0.0 --port 9002 --strictPort`，后端按仓库现有运行方式启动并检查 `/healthz`。重启后必须校验运行的是本次修复版本：记录当前提交哈希，并用页面可见变更、接口响应版本字段或等价证据证明不是旧进程缓存；把端口、URL、提交哈希和版本校验结果写入 PR 与 issue。
+7. 如果 issue 评论包含截图 / 附件，必须先打开或下载附件辅助定位，不能只按文字猜测。
+8. 涉及前端或用户可见行为时，必须采集真实前端截图；必须用 `POST /repos/{{owner}}/{{repo}}/issues/<编号>/assets` 把截图上传为 Gitea 附件，并用 Markdown 图片同时评论到 PR 和 issue；不能只写本地路径。
+9. 当前可用截图 / 附件如下：
+{attachment_summary(comments, limit=10)}
+10. 用户已授权：创建修复分支、推送到远端并创建 Gitea PR；禁止推 main，禁止强推，禁止自行合并 PR。
+11. PR 创建不是完成。最后必须把 PR 链接、提交哈希、验证结果、截图证据、本地测试环境重启结果、tmux 任务会话状态、PR 合并前置条件和剩余风险评论回 issue，并明确下一步是“等待主代理合并”“等待用户确认合并”或“阻塞”。
 
 Issue 正文：
 {issue.get("body") or ""}
@@ -250,12 +346,15 @@ def choose_action(
         return None
     if has_label(issue, confirm_label) or has_confirm_after(comments, analysis_time, confirm_token):
         return Action(issue=issue, kind="tmux", body=build_fix_prompt(issue, comments))
+    human_time = latest_human_time(comments)
+    if human_time and human_time > analysis_time:
+        return Action(issue=issue, kind="analysis", body=build_analysis_comment(issue, comments))
     return None
 
 
 def write_preview(out_dir: Path, issue_number: int, kind: str, body: str) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
-    path = out_dir / f"issue-{issue_number}-{kind}.md"
+    path = out_dir / f"issue-{issue_number}-{kind}.txt"
     path.write_text(body, encoding="utf-8")
     return path
 
@@ -357,6 +456,46 @@ def execute_action(
     print(f"applied: 已通过 {tmux_mode} 发送到 tmux {destination} 并评论 issue #{issue_number}", flush=True)
 
 
+def merge_pull(pr_number: int) -> str:
+    return run(["tea", "pulls", "merge", str(pr_number), "--style", "squash"])
+
+
+def run_merge_closed(args: argparse.Namespace) -> int:
+    issues = [get_issue(args.issue)] if args.issue else list_closed_issues(args.limit)
+    pulls = list_open_pulls(args.pr_limit)
+    for issue in issues:
+        issue_number = int(issue["number"])
+        issue_comments = get_comments(issue_number)
+        linked = [pr for pr in pulls if pr_mentions_issue(pr, issue_number)]
+        if not linked:
+            print(f"skip: issue #{issue_number} 未找到关联 open PR", flush=True)
+            continue
+        for pr in linked:
+            pr = get_pull(int(pr["number"]))
+            pr_comments = get_comments(int(pr["number"]))
+            comments = [*issue_comments, *pr_comments]
+            blockers = merge_blockers(issue, comments, pr)
+            if blockers:
+                print(f"skip: issue #{issue_number} PR #{pr['number']}：{'; '.join(blockers)}", flush=True)
+                continue
+            if not args.apply:
+                print(f"dry-run: 将合并 issue #{issue_number} PR #{pr['number']}", flush=True)
+                return 0
+            merge_pull(int(pr["number"]))
+            body = (
+                f"{MERGE_MARKER}\n"
+                f"issue 已关闭，PR #{pr['number']} 已按闭环规则自动合并。\n"
+                f"- 分支：`{(pr.get('head') or {}).get('ref', '')}`\n"
+                f"- 触发：closed issue #{issue_number}\n"
+            )
+            post_comment(issue_number, body)
+            post_comment(int(pr["number"]), body)
+            print(f"merged: issue #{issue_number} PR #{pr['number']}", flush=True)
+            return 0
+    print("no-action: 没有可自动合并的 closed issue PR", flush=True)
+    return 0
+
+
 def run_once(args: argparse.Namespace) -> int:
     issues = [get_issue(args.issue)] if args.issue else list_open_issues(args.limit)
     for issue in issues:
@@ -387,6 +526,8 @@ def run_watch(args: argparse.Namespace) -> int:
     while True:
         try:
             run_once(args)
+            if args.merge_closed:
+                run_merge_closed(args)
         except Exception as exc:  # noqa: BLE001
             print(f"watch-error: {exc}", file=sys.stderr, flush=True)
         count += 1
@@ -405,7 +546,9 @@ def self_test() -> int:
     confirmed = [*comments, {"created_at": t1, "body": "/confirm"}]
     assert choose_action(issue, confirmed, confirm_token="/confirm", confirm_label="codex:confirmed").kind == "tmux"
     mentioned = [*comments, {"created_at": t1, "body": "不要 /confirm，先补截图"}]
-    assert choose_action(issue, mentioned, confirm_token="/confirm", confirm_label="codex:confirmed") is None
+    assert choose_action(issue, mentioned, confirm_token="/confirm", confirm_label="codex:confirmed").kind == "analysis"
+    refreshed = [*mentioned, {"created_at": "2026-07-01T00:02:00Z", "body": build_analysis_comment(issue, mentioned)}]
+    assert choose_action(issue, refreshed, confirm_token="/confirm", confirm_label="codex:confirmed") is None
     sent = [*confirmed, {"created_at": "2026-07-01T00:02:00Z", "body": TMUX_MARKER}]
     assert choose_action(issue, sent, confirm_token="/confirm", confirm_label="codex:confirmed") is None
     assert choose_action(
@@ -419,6 +562,41 @@ def self_test() -> int:
     assert choose_action(issue, rejected, confirm_token="/confirm", confirm_label="codex:confirmed") is None
     labeled = {**issue, "labels": [{"name": "codex:confirmed"}]}
     assert choose_action(labeled, comments, confirm_token="/confirm", confirm_label="codex:confirmed").kind == "tmux"
+    with_asset = [
+        *comments,
+        {
+            "created_at": t1,
+            "body": "见截图",
+            "user": {"login": "u"},
+            "assets": [{"name": "image.png", "browser_download_url": "http://gitea/attachments/a"}],
+        },
+        {"created_at": "2026-07-01T00:02:00Z", "body": "/confirm"},
+    ]
+    prompt = choose_action(issue, with_asset, confirm_token="/confirm", confirm_label="codex:confirmed").body
+    assert "http://gitea/attachments/a" in prompt
+    assert "上传为 Gitea 附件" in prompt
+    assert "wms-execution-retrospective" in prompt
+    assert "共性问题" in prompt
+    closed_issue = {"number": 8, "state": "closed", "body": "已验收"}
+    pr = {
+        "number": 9,
+        "state": "open",
+        "merged": False,
+        "mergeable": True,
+        "title": "修复：issue #8",
+        "body": "关联 issue #8\n验证：通过\n截图证据：已上传附件\n后端重启：/healthz ok",
+        "head": {"ref": "agent/issue-8-demo"},
+    }
+    assert pr_mentions_issue(pr, 8)
+    assert not pr_mentions_issue({**pr, "title": "普通变更", "body": "普通 PR #8，不是 issue 关联"}, 8)
+    assert merge_blockers(closed_issue, [], pr) == []
+    assert "缺少验证、截图或重启证据" in merge_blockers(closed_issue, [], {**pr, "body": "关联 issue #8"})
+    assert merge_blockers(closed_issue, [{"created_at": t1, "body": f"{ANALYSIS_MARKER}\n评论 `/reject`"}], pr) == []
+    assert "存在阻塞或拒绝合并评论" in merge_blockers(
+        closed_issue,
+        [{"created_at": t1, "body": "不要合并"}],
+        pr,
+    )
     print("self-test: ok", flush=True)
     return 0
 
@@ -447,7 +625,16 @@ def build_parser() -> argparse.ArgumentParser:
     add_common(watch)
     watch.add_argument("--interval", type=int, default=60, help="轮询间隔秒数")
     watch.add_argument("--max-iterations", type=int, default=0, help="最多轮询次数；0 表示一直运行")
+    watch.add_argument("--merge-closed", action="store_true", help="同时扫描已关闭 issue 并合并满足闭环条件的 PR")
+    watch.add_argument("--pr-limit", type=int, default=20, help="每轮最多扫描 open PR 数")
     watch.set_defaults(func=run_watch)
+
+    merge_closed = sub.add_parser("merge-closed", help="扫描已关闭 issue，并合并满足闭环条件的关联 PR")
+    merge_closed.add_argument("--apply", action="store_true", help="执行合并并评论；默认只 dry-run")
+    merge_closed.add_argument("--issue", type=int, help="只处理指定 issue 编号")
+    merge_closed.add_argument("--limit", type=int, default=20, help="每轮最多扫描 closed issue 数")
+    merge_closed.add_argument("--pr-limit", type=int, default=20, help="每轮最多扫描 open PR 数")
+    merge_closed.set_defaults(func=run_merge_closed)
 
     test = sub.add_parser("self-test", help="运行内置测试")
     test.set_defaults(func=lambda _args: self_test())

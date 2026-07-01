@@ -70,7 +70,7 @@ codex exec -C ../wms-agent-<slug> -s read-only -o ../wms-agent-<slug>.out.md "<�
 6. API 变更必须同步 `shared/openapi/openapi.json` 和 `packages/api-client/src/schema.ts`，并运行 `just openapi-sync`、`just openapi-check`。如果 pnpm/corepack/网络导致生成器失败，记录失败点和已同步文件，禁止盲目重试。
 7. Rust 命令必须在 `backend/` 下运行，或使用 `cargo --manifest-path backend/Cargo.toml ...`；从仓库根目录直接跑 `cargo test` 视为无效验证。
 8. 重编译、截图或大验证前先跑 `df -h . /tmp`；可用空间不足 2GiB 时停止重型命令，只跑轻量检查并把磁盘阻断写入最终输出。
-9. 真实前端任务必须在提示词里明确 9002 端口、截图路径、视口、是否提交 artifact；禁止用原型图代替真实页面截图。
+9. 真实前端任务必须在提示词里明确 9002 端口、截图路径、视口、是否上传 Gitea 附件；禁止用原型图代替真实页面截图。issue 或 PR 已有截图 / 附件时，必须先打开或下载附件辅助定位。
 10. 非平凡逻辑留下最小测试。
 11. 运行 git diff --check、just gov-t1 和任务相关测试；任一失败时最终输出必须写“不可合并”，不得建议主代理合并。
 12. 使用 wms-review-fix-commit 做 review→修复→review；验证通过且 Git 元数据可写时本地分组提交，否则停止在可审查工作区。
@@ -141,6 +141,25 @@ git -C ../wms-agent-<slug> show --stat --oneline <hash>  # 子代理有提交时
 3. 重新运行主工作区验证：至少 `git diff --check`、`just gov-t1`，以及本任务相关测试；子代理验证不能替代主工作区验证。
 4. 验证通过后由主代理按主题显式 `git add <file...>` 并提交；禁止 `git add .`。
 5. 验证失败则不提交，保留主工作区差异并报告失败命令、退出码和下一步；不要推送。
+
+## PR 与 tmux 收口
+
+子代理或 issue agent 创建 PR 后，PR 不是完成态。主代理必须把每个 PR 分到以下状态之一，并在 issue / PR 评论中写清：
+
+| 状态 | 条件 | 下一步 |
+|---|---|---|
+| 可合并待确认 | 主工作区复审和验证通过，但合并会进入远端主线 | 等用户明确确认合并；确认前不 merge |
+| 已合并待清理 | 用户已确认合并，PR 已 merge，主工作区验证通过 | 进入 worktree、agent 分支和 tmux 清理 |
+| 阻塞 | 验证失败、冲突、缺截图、缺前后端重启证据、缺用户业务确认 | 写明阻塞命令、退出码、owner 和下一步 |
+| 放弃待清理 | 用户确认放弃，或 PR 被更完整实现替代 | 清理 worktree 和分支；未确认前不强删 |
+
+tmux 收口规则：
+
+- `wms-issue-<issue>-<时间>` 任务会话正常跑完后应自然退出；主代理用 `tmux has-session -t <session>` 或 `tmux ls` 记录结果。
+- 会话仍在运行时，先 `tmux capture-pane -pt <session>` 看是否仍在执行、等待输入或卡死；不能把正在执行的会话当垃圾清理。
+- 已合并或已放弃且不再需要保留日志时，用户已要求“清理/收尾”即可 `tmux kill-session -t <session>`；未确认放弃的阻塞会话只记录，不强杀。
+- 最终汇报必须写：PR 状态、是否已 merge、tmux 会话是否仍存在、清理动作或保留原因。
+- 前端或用户可见修复的截图必须用 `POST /repos/{owner}/{repo}/issues/<编号>/assets` 上传为 Gitea 附件，并用 Markdown 图片同时评论到 PR 和 issue；只写本地截图路径不算闭环。
 
 ## 主代理强制收尾门禁
 
@@ -229,6 +248,8 @@ git branch --list 'agent/*' --format='%(refname:short) %(objectname:short) %(sub
 ```
 
 6. 最终汇报必须包含：
+   - PR 收口状态：已合并、可合并待确认、阻塞或放弃待清理。
+   - tmux 任务会话状态：已自然退出、已清理、仍运行或需用户确认。
    - 已移除 worktree 列表。
    - 已删除 agent 分支列表；若用户要求删除但未删除，说明未合并或未确认原因。
    - 保留 worktree 列表和保留原因。

@@ -14,7 +14,9 @@
 3. issue 出现 `/confirm` 评论，或带 `codex:confirmed` 标签后，脚本生成修复 prompt。
 4. `--apply` 模式下，脚本默认新建 `wms-issue-<issue>-<时间>` tmux 会话，并在其中运行 `codex exec`。
 5. Codex 任务会话按 WMS `AGENTS.md` 和 skills 修复、验证、重启本地测试前后端、采集截图、分支推送并创建 PR。
-6. Codex 最后把 PR 链接、提交哈希、验证结果、截图证据、本地测试环境重启结果和剩余风险评论回 PR 与 issue。
+6. Codex 把 PR 链接、提交哈希、验证结果、截图附件、本地测试环境重启结果、tmux 任务会话状态、PR 合并前置条件和剩余风险评论回 PR 与 issue。
+7. 主代理把 PR 纳入收口队列：复审、合并或等待用户确认合并；合并后清理 worktree、agent 分支和已结束的 tmux 任务会话。
+8. 启用 `--merge-closed` 后，watcher 还会扫描已关闭 issue；只有关联 PR 满足闭环证据、可合并、无阻塞评论且分支为 `agent/*` 时，才会自动合并并写回 marker。
 
 ## 前置条件
 
@@ -70,10 +72,23 @@ just issue-agent-once --issue 1 --apply --force-dispatch
 just issue-agent-watch --interval 60 --apply
 ```
 
+循环运行并在 issue 关闭后自动合并满足条件的 PR：
+
+```bash
+just issue-agent-watch --interval 60 --apply --merge-closed
+```
+
+单独 dry-run 检查 closed issue 合并候选：
+
+```bash
+python3 scripts/agents/issue_runner.py merge-closed
+python3 scripts/agents/issue_runner.py merge-closed --issue 3
+```
+
 在 tmux 中长期运行：
 
 ```bash
-tmux new -d -s wms-issue-agent 'cd /home/test1/workspace/wms && just issue-agent-watch --interval 60 --apply 2>&1 | tee -a .codex/issue-agent/watch.log'
+tmux new -d -s wms-issue-agent 'cd /home/test1/workspace/wms && just issue-agent-watch --interval 60 --apply --merge-closed 2>&1 | tee -a .codex/issue-agent/watch.log'
 tmux attach -t wms-issue-agent
 ```
 
@@ -91,9 +106,13 @@ python3 scripts/agents/issue_runner.py self-test
 - 默认新开独立 tmux 任务会话并运行 `codex exec`，避免依赖交互式 TUI 粘贴状态。
 - 使用 `--tmux-mode paste` 时，发送前必须能找到目标 pane。
 - prompt 要求 Codex 禁止推 main、禁止强推。
+- prompt 要求 Codex 禁止自行合并 PR；PR 创建后必须写清合并前置条件和 tmux 任务会话状态。
+- 自动合并只由 issue watcher 在 `--merge-closed --apply` 下执行，合并策略固定为 squash；子代理仍禁止自行合并 PR。
+- 自动合并前必须满足：issue 已关闭、PR open、PR `mergeable=true`、PR 未合并、PR head 分支为 `agent/*`、已有验证 / 截图 / 重启证据、没有 `/reject` / `不要合并` / `阻塞` / `blocked` 评论。
+- issue 评论包含截图 / 附件时，prompt 必须列出附件下载 URL；Codex 必须先打开或下载附件辅助定位。
 - 前端或用户可见行为修复必须重启本地测试前后端，并把端口、URL、`/healthz` 或等价健康检查结果写回 PR 与 issue。
 - 重启后必须校验运行的是本次修复版本：记录提交哈希，并用页面可见变更、接口响应版本字段或等价证据证明不是旧进程缓存。
-- 前端或用户可见行为修复必须采集真实前端截图，并把截图路径、视口、页面 URL、结论同时写回 PR 与 issue。
+- 前端或用户可见行为修复必须采集真实前端截图，用 `POST /repos/{owner}/{repo}/issues/<编号>/assets` 上传为 Gitea 附件，并用 Markdown 图片同时评论到 PR 与 issue；不能只写本地路径。
 - 新增字段、状态、角色、模块或业务默认值时，Codex 必须停止并询问用户。
 - `session` 和 `paste` 只用于调试；无人值守定时任务必须使用默认 `exec` 模式。
 
@@ -105,9 +124,12 @@ python3 scripts/agents/issue_runner.py self-test
 |---|---|
 | issue 读取 | 能读取标题、正文、评论 |
 | 判断评论 | 内容中文，包含结论、置信度、依据、预计影响范围、建议动作、验证要求和停止条件；不能只要求 `/confirm` |
+| 输入附件 | issue 评论中的截图 / 附件必须以可下载 URL 写入判断评论和执行 prompt |
 | 确认识别 | `/confirm` 或 `codex:confirmed` 才触发 tmux |
 | tmux 投递 | 默认新建 issue 任务会话并运行 `codex exec`；paste 模式只发送到固定 pane，目标不存在则失败停止 |
-| WMS 执行 | Codex 使用 WMS skills，完成验证、截图、前后端重启后创建 PR |
-| 证据回写 | PR 与 issue 都包含截图证据、本地测试环境重启结果、重启后版本校验和剩余风险 |
+| WMS 执行 | Codex 使用 WMS skills，完成验证、截图、前后端重启后创建 PR，且不自行合并 PR |
+| 证据回写 | PR 与 issue 都包含真实截图附件、本地测试环境重启结果、重启后版本校验、tmux 任务会话状态、PR 合并前置条件和剩余风险 |
+| PR 收口 | issue 关闭后，watcher dry-run 能发现关联 PR；`--apply --merge-closed` 下满足条件才自动合并并写回 marker，不能停在“已创建 PR” |
+| tmux 清理 | 任务会话完成后应自然退出；未退出时记录会话名、原因和下一步，用户确认清理后再 `tmux kill-session -t <session>` |
 
 失败时只修失败点，不扩大流程。
