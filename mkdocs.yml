@@ -106,6 +106,7 @@ nav:
     - M-TC 追溯码: domain/user-stories-mtc-traceability-code.md
     - M-QL 质量联系单: domain/user-stories-mql-quality-liaison.md
     - M-CG 编码生成: domain/user-stories-mcg-code-generator.md
+    - M-CG 单据号图文说明: diagrams/mcg-document-numbering/docu.md
     - M-SA 报损报溢: domain/user-stories-msa-stock-adjustment.md
     - M-BA 批号调整 (v21): domain/user-stories-mba-batch-adjustment.md
     - M-RC 对账: domain/user-stories-mrc-reconciliation.md

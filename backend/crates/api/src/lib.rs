@@ -9,6 +9,8 @@ pub mod billing;
 pub mod cold_chain;
 pub mod config_center;
 pub mod deploy_audit;
+pub mod document_numbering;
+mod document_numbering_repository;
 pub mod feature_flags;
 pub mod inbound;
 pub mod inventory;

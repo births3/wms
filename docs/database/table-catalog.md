@@ -4,9 +4,9 @@
 
 ## 统计
 
-- 迁移文件：7
-- 数据表：52
-- 索引：49
+- 迁移文件：8
+- 数据表：55
+- 索引：52
 
 ## 表清单
 
@@ -64,6 +64,9 @@
 | `warehouses` | M1 主数据 / 数据库规范对齐 | `backend/migrations/202606280002_database_design_standard_alignment.sql` | 有 | 10 | 2 |
 | `warehouse_zones` | M1 主数据 / 数据库规范对齐 | `backend/migrations/202606280002_database_design_standard_alignment.sql` | 有 | 11 | 2 |
 | `warehouse_locations` | M1 主数据 / 数据库规范对齐 | `backend/migrations/202606280002_database_design_standard_alignment.sql` | 有 | 17 | 1 |
+| `document_number_rules` | mcg_document_numbering | `backend/migrations/202607020001_mcg_document_numbering.sql` | 有 | 15 | 2 |
+| `document_number_counters` | mcg_document_numbering | `backend/migrations/202607020001_mcg_document_numbering.sql` | 无 | 7 | 0 |
+| `document_number_allocations` | mcg_document_numbering | `backend/migrations/202607020001_mcg_document_numbering.sql` | 有 | 12 | 1 |
 
 ## 字段明细
 
@@ -1104,3 +1107,67 @@
 | `created_at` | `created_at TIMESTAMPTZ NOT NULL DEFAULT now()` |
 | `updated_at` | `updated_at TIMESTAMPTZ NOT NULL DEFAULT now()` |
 | `version` | `version BIGINT NOT NULL DEFAULT 1` |
+
+### `document_number_rules`
+
+- 模块：mcg_document_numbering
+- 迁移：`backend/migrations/202607020001_mcg_document_numbering.sql`
+- 货主字段：有
+- 索引：`UNIQUE document_number_rules_scope_code_uidx`, `document_number_rules_effective_idx`
+
+| 字段 | SQL 定义 |
+|---|---|
+| `id` | `id UUID PRIMARY KEY` |
+| `owner_id` | `owner_id UUID REFERENCES auth_owners(id) ON DELETE CASCADE` |
+| `document_type` | `document_type TEXT NOT NULL` |
+| `rule_code` | `rule_code TEXT NOT NULL` |
+| `rule_name` | `rule_name TEXT NOT NULL` |
+| `template` | `template TEXT NOT NULL` |
+| `reset_policy` | `reset_policy TEXT NOT NULL` |
+| `sequence_width` | `sequence_width INT NOT NULL CHECK (sequence_width > 0 AND sequence_width <= 18)` |
+| `sequence_mode` | `sequence_mode TEXT NOT NULL DEFAULT 'no_gap'` |
+| `enabled` | `enabled BOOLEAN NOT NULL DEFAULT TRUE` |
+| `effective_from` | `effective_from TIMESTAMPTZ` |
+| `effective_to` | `effective_to TIMESTAMPTZ` |
+| `created_at` | `created_at TIMESTAMPTZ NOT NULL DEFAULT now()` |
+| `updated_at` | `updated_at TIMESTAMPTZ NOT NULL DEFAULT now()` |
+| `version` | `version BIGINT NOT NULL DEFAULT 1` |
+
+### `document_number_counters`
+
+- 模块：mcg_document_numbering
+- 迁移：`backend/migrations/202607020001_mcg_document_numbering.sql`
+- 货主字段：无
+- 索引：无
+
+| 字段 | SQL 定义 |
+|---|---|
+| `id` | `id UUID PRIMARY KEY` |
+| `rule_id` | `rule_id UUID NOT NULL REFERENCES document_number_rules(id) ON DELETE RESTRICT` |
+| `counter_key` | `counter_key TEXT NOT NULL` |
+| `current_value` | `current_value BIGINT NOT NULL DEFAULT 0 CHECK (current_value >= 0)` |
+| `created_at` | `created_at TIMESTAMPTZ NOT NULL DEFAULT now()` |
+| `updated_at` | `updated_at TIMESTAMPTZ NOT NULL DEFAULT now()` |
+| `version` | `version BIGINT NOT NULL DEFAULT 1` |
+
+### `document_number_allocations`
+
+- 模块：mcg_document_numbering
+- 迁移：`backend/migrations/202607020001_mcg_document_numbering.sql`
+- 货主字段：有
+- 索引：`document_number_allocations_lookup_idx`
+
+| 字段 | SQL 定义 |
+|---|---|
+| `id` | `id UUID PRIMARY KEY` |
+| `owner_id` | `owner_id UUID NOT NULL REFERENCES auth_owners(id) ON DELETE CASCADE` |
+| `rule_id` | `rule_id UUID NOT NULL REFERENCES document_number_rules(id) ON DELETE RESTRICT` |
+| `document_type` | `document_type TEXT NOT NULL` |
+| `idempotency_key` | `idempotency_key TEXT NOT NULL` |
+| `request_hash` | `request_hash TEXT NOT NULL` |
+| `generated_no` | `generated_no TEXT NOT NULL` |
+| `sequence_value` | `sequence_value BIGINT NOT NULL CHECK (sequence_value > 0)` |
+| `counter_key` | `counter_key TEXT NOT NULL` |
+| `source_module` | `source_module TEXT NOT NULL` |
+| `source_document_id` | `source_document_id UUID` |
+| `created_at` | `created_at TIMESTAMPTZ NOT NULL DEFAULT now()` |

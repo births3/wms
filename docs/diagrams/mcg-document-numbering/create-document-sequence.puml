@@ -1,0 +1,39 @@
+@startuml
+title M-CG 创建业务单据时的单据号生成时序
+
+actor "PC / PDA / 外部系统" as Client
+participant "业务模块\nM2 / M4 / M3" as Biz
+participant "M-CG 单据号服务" as CG
+participant "M1 document_type 字典" as Dict
+database "PostgreSQL" as DB
+participant "H2 审计" as Audit
+
+Client -> Biz: 创建业务单据\nIdempotency-Key
+Biz -> DB: BEGIN
+Biz -> CG: 在当前事务内申请单据号\nowner_id, document_type, occurred_at, idempotency_key
+
+CG -> DB: 查询 idempotency_key 是否已有生成记录
+alt 已生成
+  DB --> CG: 返回原 generated_no
+  CG --> Biz: 返回原单据号
+else 未生成
+  CG -> Dict: 校验 document_type 启用、生效、作用域、参数有效
+  Dict --> CG: 返回有效字典项
+  CG -> DB: 查询 owner_id + document_type 的有效规则
+  CG -> DB: SELECT counter FOR UPDATE
+  CG -> DB: current_value + 1
+  CG -> DB: 写 document_number_allocations
+  CG -> Audit: 写编码生成审计事件
+  CG --> Biz: 返回新单据号
+end
+
+Biz -> DB: 写业务单据\n单据号 + document_type + owner_id
+Biz -> Audit: 写业务创建审计事件
+Biz -> DB: COMMIT
+Biz --> Client: 创建成功
+
+note over CG,DB
+no-gap 号码必须在业务创建同一事务内处理。
+如果业务写入失败，事务整体回滚，counter 不前进。
+end note
+@enduml

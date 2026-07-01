@@ -1,0 +1,49 @@
+@startuml
+title M-CG no-gap 单据号生成活动流程
+
+start
+:接收申请\nowner_id + document_type + idempotency_key;
+
+if (幂等键已生成?) then (是)
+  :返回原单据号;
+  stop
+else (否)
+endif
+
+:校验 document_type\n来自 M1 系统字典;
+if (字典项有效?) then (是)
+else (否)
+  :拒绝创建\nCG_RULE_NOT_FOUND / 参数非法;
+  stop
+endif
+
+:查询有效编码规则\n货主规则优先于全局规则;
+if (规则存在并启用?) then (是)
+else (否)
+  :拒绝创建\nCG_RULE_NOT_FOUND;
+  stop
+endif
+
+:开启数据库事务;
+:锁定 counter 行\nrule_id + counter_key;
+if (流水号溢出?) then (是)
+  :回滚事务;
+  :返回 CG_SEQUENCE_OVERFLOW 并告警;
+  stop
+else (否)
+endif
+
+:递增 counter;
+:按模板生成单据号;
+:写生成记录 / 幂等记录;
+:写业务单据;
+:写 H2 审计事件;
+:提交事务;
+:返回单据号;
+stop
+
+note right
+全部 no-gap 的代价是创建单据时会有计数器行锁。
+counter_key 应按货主、单据类型和重置周期拆分，减少锁竞争。
+end note
+@enduml
