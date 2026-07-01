@@ -155,6 +155,18 @@ const columns: DataGridColumn<MasterDataRow>[] = [
     render: (row) => <FieldText label={row.extraLabel} value={row.extraValue} />,
   },
   {
+    key: "createdAt",
+    header: "创建时间",
+    width: 190,
+    minWidth: 170,
+    sortable: true,
+    sortValue: (row) => row.createdAt,
+    filterValue: (row) => row.createdAt,
+    copyValue: (row) => formatDateTime(row.createdAt),
+    filter: { type: "dateRange" },
+    render: (row) => formatDateTime(row.createdAt),
+  },
+  {
     key: "updatedAt",
     header: "更新时间",
     width: 190,
@@ -273,6 +285,18 @@ const locationColumns: DataGridColumn<MasterDataRow>[] = [
     filterValue: (row) => locationValue(row, "maxSku"),
     copyValue: (row) => locationValue(row, "maxSku"),
     filter: { type: "text" },
+  },
+  {
+    key: "createdAt",
+    header: "创建时间",
+    width: 190,
+    minWidth: 170,
+    sortable: true,
+    sortValue: (row) => row.createdAt,
+    filterValue: (row) => row.createdAt,
+    copyValue: (row) => formatDateTime(row.createdAt),
+    filter: { type: "dateRange" },
+    render: (row) => formatDateTime(row.createdAt),
   },
   {
     key: "updatedAt",
@@ -481,7 +505,7 @@ function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
         caption={rowsQuery.isPending ? "加载基础档案..." : undefined}
         emptyTitle={meta.emptyTitle}
         storageKey={meta.storageKey}
-        tableClassName={viewId === "m1-locations" ? "min-w-[1720px]" : "min-w-[1460px]"}
+        tableClassName={viewId === "m1-locations" ? "min-w-[1910px]" : "min-w-[1650px]"}
       />
 
       {viewId === "m1-locations" && (

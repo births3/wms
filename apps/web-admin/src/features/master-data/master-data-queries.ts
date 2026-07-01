@@ -37,6 +37,7 @@ export interface MasterDataRow {
   secondaryValue: string;
   extraLabel: string;
   extraValue: string;
+  createdAt: string;
   updatedAt: string;
   locationFields?: LocationMasterDataFields;
   searchText: string;
@@ -263,6 +264,7 @@ function productRow(item: Product): MasterDataRow {
     secondaryValue: text(item.approval_no),
     extraLabel: "储存条件",
     extraValue: text(item.attrs.storage_condition ?? item.attrs.storage),
+    createdAt: item.created_at,
     updatedAt: item.updated_at,
   });
 }
@@ -281,6 +283,7 @@ function supplierRow(item: Supplier): MasterDataRow {
     secondaryValue: text(item.contact_name),
     extraLabel: "档案类型",
     extraValue: "供应商",
+    createdAt: item.created_at,
     updatedAt: item.updated_at,
   });
 }
@@ -299,6 +302,7 @@ function customerRow(item: Customer): MasterDataRow {
     secondaryValue: "客户/门店",
     extraLabel: "货主",
     extraValue: item.owner_id,
+    createdAt: item.created_at,
     updatedAt: item.updated_at,
   });
 }
@@ -317,6 +321,7 @@ function warehouseRow(item: Warehouse): MasterDataRow {
     secondaryValue: item.owner_id,
     extraLabel: "档案类型",
     extraValue: "仓库",
+    createdAt: item.created_at,
     updatedAt: item.updated_at,
   });
 }
@@ -337,6 +342,7 @@ function locationRow(item: Location): MasterDataRow {
     secondaryValue: volume,
     extraLabel: "最大 SKU",
     extraValue: String(item.max_sku_count),
+    createdAt: item.created_at,
     updatedAt: item.updated_at,
     locationFields: {
       owner: item.owner_id,
@@ -367,6 +373,7 @@ function systemDictionaryRow(item: SystemDictionaryItem): MasterDataRow {
     secondaryValue: item.source,
     extraLabel: "参数",
     extraValue: paramsText(item.params),
+    createdAt: item.created_at,
     updatedAt: item.updated_at,
   });
 }
@@ -408,6 +415,7 @@ function row(input: Omit<MasterDataRow, "searchText">): MasterDataRow {
       input.primaryValue,
       input.secondaryValue,
       input.extraValue,
+      input.createdAt,
       ...locationSearchText,
     ]
       .join(" ")
