@@ -60,6 +60,7 @@ codex exec -C ../wms-agent-<slug> -s read-only -o ../wms-agent-<slug>.out.md "<�
 - 相关 */AGENTS.override.md
 - docs/requirements-traceability-matrix.md
 - 任务相关用户故事、设计文档、ADR 或 runbook
+- 任务相关 PlantUML 图文：`docs/diagrams/<topic>/*.puml` 和 `docs/diagrams/<topic>/docu.md`；PlantUML 只作为设计辅助输入，事实源仍以用户故事、ADR、RTM、OpenAPI、数据库文档和代码为准
 
 执行规则：
 1. 使用 wms-loop-engineering 定义目标、输入、检查、反馈和停止条件。
@@ -70,12 +71,14 @@ codex exec -C ../wms-agent-<slug> -s read-only -o ../wms-agent-<slug>.out.md "<�
 6. API 变更必须同步 `shared/openapi/openapi.json` 和 `packages/api-client/src/schema.ts`，并运行 `just openapi-sync`、`just openapi-check`。如果 pnpm/corepack/网络导致生成器失败，记录失败点和已同步文件，禁止盲目重试。
 7. Rust 命令必须在 `backend/` 下运行，或使用 `cargo --manifest-path backend/Cargo.toml ...`；从仓库根目录直接跑 `cargo test` 视为无效验证。
 8. 重编译、截图或大验证前先跑 `df -h . /tmp`；可用空间不足 2GiB 时停止重型命令，只跑轻量检查并把磁盘阻断写入最终输出。
-9. 真实前端任务必须在提示词里明确 9002 端口、截图路径、视口、是否上传 Gitea 附件；禁止用原型图代替真实页面截图。issue 或 PR 已有截图 / 附件时，必须先打开或下载附件辅助定位。
-10. 非平凡逻辑留下最小测试。
-11. 运行 git diff --check、just gov-t1 和任务相关测试；任一失败时最终输出必须写“不可合并”，不得建议主代理合并。
-12. 使用 wms-review-fix-commit 做 review→修复→review；验证通过且 Git 元数据可写时本地分组提交，否则停止在可审查工作区。
-13. 不推送。
-14. 不运行 `git clean -f`、`git reset --hard` 或删除分支；依赖安装和构建缓存优先使用 `/tmp` 或任务限定目录，避免污染子 worktree。
+9. 需要真实 PostgreSQL 的测试必须先检查环境来源：若子 worktree 内没有 `.env`，必须安全读取主工作区 `/home/test1/workspace/wms/.env` 并只导出变量运行命令，例如 `set -a; source /home/test1/workspace/wms/.env; set +a; cargo test ...`；禁止打印 `DATABASE_URL`/`WMS_DB_URL` 真实值，最终输出只写 `present/missing` 和来源。只有主工作区 `.env` 与当前环境都缺失时，才能报告“缺 DATABASE_URL”。
+10. 真实前端任务必须在提示词里明确截图路径、视口、是否上传 Gitea 附件；禁止用原型图代替真实页面截图。9002 只允许主工作区固定会话 `wms-web-admin-9002` 占用，子代理不得在 worktree 中启动或占用 9002；需要截图时由主代理在主工作区运行 `just dev-web-restart` 和 `just dev-web-verify` 后采集。issue 或 PR 已有截图 / 附件时，必须先打开或下载附件辅助定位。
+11. 非平凡逻辑留下最小测试。
+12. 如果实现与相关 PlantUML/docu 不一致，先判断是实现错误还是图文过期；能确定为图文过期时同步更新图文并说明原因，不能确定时停止并请求主代理/用户确认。
+13. 运行 git diff --check、just gov-t1 和任务相关测试；任一失败时最终输出必须写“不可合并”，不得建议主代理合并。
+14. 使用 wms-review-fix-commit 做 review→修复→review；验证通过且 Git 元数据可写时本地分组提交，否则停止在可审查工作区。
+15. 不推送。
+16. 不运行 `git clean -f`、`git reset --hard` 或删除分支；依赖安装和构建缓存优先使用 `/tmp` 或任务限定目录，避免污染子 worktree。
 
 最终输出：
 - 子 worktree 路径
@@ -84,7 +87,11 @@ codex exec -C ../wms-agent-<slug> -s read-only -o ../wms-agent-<slug>.out.md "<�
 - `git status --short` 输出；无输出也写“干净”
 - `git diff --stat` 摘要；只读审查任务写“不适用”
 - 未跟踪/忽略产物摘要，特别是 `node_modules/`、构建缓存、截图和测试报告
+- 已读取的 PlantUML/docu 文件；如未读取，说明任务为什么无相关图文
+- 实现与 PlantUML/docu 是否一致；不一致时说明已同步图文、保留差异或需要确认
+- 数据库验证环境来源：`当前环境`、`主工作区 .env` 或 `缺失`；禁止输出连接串
 - 验证命令和退出码
+- 是否需要主代理重启并校验 9002
 - 是否可合并
 - 剩余问题/需要确认事项
 - 清理建议：`可普通移除`、`已合并可强制移除`、`不可合并需保留` 或 `只读审查可移除`
