@@ -201,6 +201,14 @@ status:
     @echo ""
     @if [ -f TODO.md ]; then echo "── TODO.md ──"; head -20 TODO.md; fi
 
+# Gitea issue agent：执行一轮扫描；默认 dry-run，传 --apply 才评论或发送到 tmux
+issue-agent-once *args:
+    @python3 -u scripts/agents/issue_runner.py once {{args}}
+
+# Gitea issue agent：循环扫描；默认 dry-run，传 --apply 才评论或发送到 tmux
+issue-agent-watch *args:
+    @python3 -u scripts/agents/issue_runner.py watch {{args}}
+
 # 报告 Wave 1 完成度（默认不阻塞；出口检查用 --strict）
 wave-1-status:
     @python3 scripts/governance/report_wave1_completion.py
