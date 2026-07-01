@@ -80,6 +80,7 @@
 | [prototypes/component-registry.md](prototypes/component-registry.md) | 原型组件注册表 |
 | [prototypes/prototype-proof-report.md](prototypes/prototype-proof-report.md) | 原型证明报告 |
 | [runbooks/wave-1-runtime-evidence.md](runbooks/wave-1-runtime-evidence.md) | Wave 1 运行证据 |
+| [runbooks/gitea-issue-agent.md](runbooks/gitea-issue-agent.md) | Gitea issue 自动判断、确认和 tmux 执行流程 |
 | [runbooks/wave-2-runtime-evidence.md](runbooks/wave-2-runtime-evidence.md) | Wave 2 运行证据 |
 | [runbooks/wave-3-pda-readiness.md](runbooks/wave-3-pda-readiness.md) | Wave 3 PDA 就绪 |
 | [runbooks/wave-4-external-dependencies.md](runbooks/wave-4-external-dependencies.md) | Wave 4 外部依赖证据 |

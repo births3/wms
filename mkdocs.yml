@@ -225,6 +225,7 @@ nav:
     - 原型证明报告: prototypes/prototype-proof-report.md
     - 视觉打磨自查: prototypes/visual-review-batch1.md
   - 运行手册:
+    - Gitea Issue Agent: runbooks/gitea-issue-agent.md
     - Wave 1 H2 开发环境: runbooks/wave-1-h2-dev-environment.md
     - Wave 1 运行证据: runbooks/wave-1-runtime-evidence.md
     - Wave 2 运行证据: runbooks/wave-2-runtime-evidence.md
