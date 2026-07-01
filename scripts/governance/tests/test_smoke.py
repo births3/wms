@@ -41,6 +41,7 @@ GOVERNANCE_SCRIPTS = [
     "check_project_rtm.py",
     "check_owner_scope_sql.py",
     "check_web_design_rtm.py",
+    "check_admin_datagrid_system_fields.py",
     "check_baseline_health.py",
     "check_governance_consistency.py",
     "check_commit_convention.py",
