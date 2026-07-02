@@ -10,8 +10,8 @@
    - 摘要已有人工评论。
    - 给出结论、置信度、判断依据、预计影响范围、建议动作、验证要求和停止条件。
    - 明确本轮不改代码、不提交、不推送。
-   - 只有判断为可执行或用户接受风险后，才提示用 `/confirm` 确认。
-3. issue 出现 `/confirm` 评论，或带 `codex:confirmed` 标签后，脚本生成修复 prompt。
+   - 只有判断为可执行或用户接受风险后，才提示用 `/confirm`、`确认方案` 或 `开始处理` 确认。
+3. issue 出现 `/confirm`、裸一行 `确认方案`、裸一行 `开始处理` 评论，或带 `codex:confirmed` 标签后，脚本生成修复 prompt。
 4. `--apply` 模式下，脚本默认新建 `wms-issue-<issue>-<时间>` tmux 会话，并在其中运行 `codex exec`。
 5. Codex 任务会话按 WMS `AGENTS.md` 和 skills 修复、验证、重启本地测试前后端、采集截图、分支推送并创建 PR。
 6. Codex 把 PR 链接、提交哈希、验证结果、截图附件、本地测试环境重启结果、tmux 任务会话状态、PR 合并前置条件和剩余风险评论回 PR 与 issue。
@@ -133,7 +133,7 @@ python3 scripts/agents/issue_runner.py self-test
 | issue 读取 | 能读取标题、正文、评论 |
 | 判断评论 | 内容中文，包含结论、置信度、代码核查证据、依据、预计影响范围、建议动作、验证要求和停止条件；不能只要求 `/confirm`，不能只复述 issue |
 | 输入附件 | issue 本体和 issue 评论中的截图 / 附件必须以可下载 URL 写入判断评论和执行 prompt |
-| 确认识别 | `/confirm` 或 `codex:confirmed` 才触发 tmux |
+| 确认识别 | `/confirm`、裸一行 `确认方案`、裸一行 `开始处理` 或 `codex:confirmed` 才触发 tmux；否定句不能触发 |
 | tmux 投递 | 默认新建 issue 任务会话、创建独立 worktree 并在该 worktree 运行 `codex exec`；paste 模式只发送到固定 pane，目标不存在则失败停止 |
 | WMS 执行 | Codex 使用 WMS skills，完成验证；前端截图和 9002 重启证据由主代理在主工作区校验后补齐，且不自行合并 PR |
 | 证据回写 | PR 与 issue 都包含真实截图附件、本地测试环境重启结果、重启后版本校验、tmux 任务会话状态、PR 合并前置条件和剩余风险 |

@@ -30,6 +30,7 @@ MERGE_FAILED_MARKER = "<!-- wms-issue-agent:merge-failed:v1 -->"
 MERGE_CORRECTION_MARKER = "<!-- wms-issue-agent:merge-correction:v1 -->"
 STATUS_CORRECTION_MARKER = "<!-- wms-issue-agent:status-correction:v1 -->"
 MERGE_RETRY_COMMAND = "/retry-merge"
+CONFIRM_PHRASES = ("确认方案", "开始处理")
 
 STATUS_COMMENT_TOKENS = (
     "最终交付 PR",
@@ -155,7 +156,10 @@ def has_confirm_after(comments: list[dict[str, Any]], since: datetime, token: st
     for comment in comments:
         created = parse_time(str(comment["created_at"]))
         text = body_of(comment)
-        if created > since and (has_command(text, token) or has_command(text, "/codex run")):
+        phrase_confirmed = any(line.strip() in CONFIRM_PHRASES for line in text.splitlines())
+        if created > since and (
+            has_command(text, token) or has_command(text, "/codex run") or phrase_confirmed
+        ):
             return True
     return False
 
@@ -424,12 +428,12 @@ def build_analysis_comment(issue: dict[str, Any], comments: list[dict[str, Any]]
         conclusion = "建议执行"
         confidence = "中"
         reason = "描述指向可复现故障，优先用日志、接口或页面复现定位。"
-        action = "评论 `/confirm` 后执行最小修复；如复现信息不足，执行时会先停止补问。"
+        action = "评论 `/confirm`、`确认方案` 或 `开始处理` 后执行最小修复；如复现信息不足，执行时会先停止补问。"
     elif any(word in text for word in ("截图", "图片", "红框", "圈", "页面")):
         conclusion = "建议执行"
         confidence = "中"
         reason = "已有截图或页面位置补充，可以按当前范围做最小修复。"
-        action = "评论 `/confirm` 后执行最小修复；未确认前继续只评论判断。"
+        action = "评论 `/confirm`、`确认方案` 或 `开始处理` 后执行最小修复；未确认前继续只评论判断。"
     elif any(word in text for word in ("新增", "增加", "字段", "状态", "流程", "规则")):
         conclusion = "需要人工决策"
         confidence = "中"
@@ -490,7 +494,7 @@ def build_analysis_comment(issue: dict[str, Any], comments: list[dict[str, Any]]
 
 ### 请确认
 
-- 同意按上述范围执行：评论 `/confirm`
+- 同意按上述范围执行：评论 `/confirm`、`确认方案` 或 `开始处理`
 - 需要补充：直接继续评论需求细节或截图
 - 暂不执行：评论 `/reject`
 """
@@ -815,8 +819,14 @@ def self_test() -> int:
     assert choose_action(issue, comments, confirm_token="/confirm", confirm_label="codex:confirmed") is None
     confirmed = [*comments, {"created_at": t1, "body": "/confirm"}]
     assert choose_action(issue, confirmed, confirm_token="/confirm", confirm_label="codex:confirmed").kind == "tmux"
+    confirmed_zh = [*comments, {"created_at": t1, "body": "确认方案"}]
+    assert choose_action(issue, confirmed_zh, confirm_token="/confirm", confirm_label="codex:confirmed").kind == "tmux"
+    start_zh = [*comments, {"created_at": t1, "body": "开始处理"}]
+    assert choose_action(issue, start_zh, confirm_token="/confirm", confirm_label="codex:confirmed").kind == "tmux"
     mentioned = [*comments, {"created_at": t1, "body": "不要 /confirm，先补截图"}]
     assert choose_action(issue, mentioned, confirm_token="/confirm", confirm_label="codex:confirmed").kind == "analysis"
+    mentioned_zh = [*comments, {"created_at": t1, "body": "不要确认方案，先补截图"}]
+    assert choose_action(issue, mentioned_zh, confirm_token="/confirm", confirm_label="codex:confirmed").kind == "analysis"
     refreshed = [*mentioned, {"created_at": "2026-07-01T00:02:00Z", "body": build_analysis_comment(issue, mentioned)}]
     assert choose_action(issue, refreshed, confirm_token="/confirm", confirm_label="codex:confirmed") is None
     sent = [*confirmed, {"created_at": "2026-07-01T00:02:00Z", "body": TMUX_MARKER}]
