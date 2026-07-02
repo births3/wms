@@ -625,6 +625,7 @@ export default defineConfig(({ command }) => {
     server: {
       host: "0.0.0.0",
       port: 9002,
+      strictPort: true,
       proxy: e2eApiUrl
         ? {
             "/api": {
