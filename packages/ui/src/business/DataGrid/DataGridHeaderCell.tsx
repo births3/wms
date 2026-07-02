@@ -33,6 +33,7 @@ export interface DataGridHeaderCellProps<T> {
   fieldButtonRef: React.Ref<HTMLButtonElement>;
   fieldsOpen: boolean;
   hideableColumnsLength: number;
+  namedViewsControl?: React.ReactNode;
   className?: string;
   onSort: (column: DataGridColumn<T>) => void;
   onToggleFilter: (key: string) => void;
@@ -55,6 +56,7 @@ export function DataGridHeaderCell<T>({
   fieldButtonRef,
   fieldsOpen,
   hideableColumnsLength,
+  namedViewsControl,
   className,
   onSort,
   onToggleFilter,
@@ -122,7 +124,8 @@ export function DataGridHeaderCell<T>({
         </>
       )}
       {isLastVisibleColumn && (
-        <div className="relative ml-1 border-l pl-2">
+        <div className="relative ml-1 flex items-center gap-1 border-l pl-2">
+          {namedViewsControl}
           <Button
             ref={fieldButtonRef}
             type="button"

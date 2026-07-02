@@ -35,6 +35,7 @@ interface M2InboundOrderTableProps {
   onSelectOrder: (id: string) => void;
   onOpenDetail: (id: string) => void;
   onOpenDialog: (id: string, dialog: InboundDialog) => void;
+  onCsvExportStateChange?: (state: { disabled: boolean; exportCsv: () => void } | null) => void;
 }
 
 export function M2InboundOrderTable({
@@ -46,6 +47,7 @@ export function M2InboundOrderTable({
   onSelectOrder,
   onOpenDetail,
   onOpenDialog,
+  onCsvExportStateChange,
 }: M2InboundOrderTableProps) {
   const orderColumns: DataGridColumn<ReceivingOrder>[] = [
     {
@@ -222,6 +224,8 @@ export function M2InboundOrderTable({
       emptyTitle="暂无入库单"
       storageKey="m2-inbound-datagrid"
       tableClassName="min-w-[2070px]"
+      csvExportPlacement="external"
+      onCsvExportStateChange={onCsvExportStateChange}
       selectable
     />
   );

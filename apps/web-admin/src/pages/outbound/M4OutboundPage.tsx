@@ -3,7 +3,7 @@ import {
   Button,
   Card,
   CardContent,
-  DataTable,
+  DataGrid,
   Dialog,
   DialogClose,
   DialogContent,
@@ -14,7 +14,7 @@ import {
   Input,
   PageHeader,
   StatusBadge,
-  type DataTableColumn,
+  type DataGridColumn,
   type StatusKey,
 } from "@wms/ui";
 import { ArrowLeft, CheckCircle2, ClipboardCheck, Eye, Plus, Printer, RefreshCw, Truck } from "lucide-react";
@@ -90,6 +90,8 @@ const seedReturns: PurchaseReturnOrder[] = [
     product_code: "P-M4-001",
     batch_no: "BATCH-OUT-202606",
     qty: 6,
+    created_at: "2026-06-27T10:00:00.000Z",
+    updated_at: "2026-06-27T10:00:00.000Z",
   },
 ];
 
@@ -133,31 +135,34 @@ export function M4OutboundPage({ mode, onBack }: M4OutboundPageProps) {
 
   const meta = pageMeta(mode);
 
-  const orderColumns: DataTableColumn<OutboundOrder>[] = [
-    { key: "wms_order_no", header: "单号 / 类型", mono: true, render: (row) => <OrderNoSummary order={row} /> },
-    { key: "product", header: mode === "review" ? "复核 / 数量" : "商品 / 数量", render: (row) => mode === "review" ? <ReviewSummary order={row} /> : <ProductSummary order={row} /> },
-    { key: "customer_id", header: mode === "review" ? "客户 / 配送" : "客户 / 门店", mono: true, render: (row) => mode === "review" ? <TwoLine top={`${shortId(row.customer_id)} / 门店A`} bottom="配送方 第三方快递" /> : `${shortId(row.customer_id)} / 门店A` },
-    { key: "required_ship_at", header: mode === "review" ? "包裹 / 车牌" : "要求发货", render: (row) => mode === "review" ? <TwoLine top="包裹数量 1" bottom="车牌号 沪A-12345" /> : formatDate(row.required_ship_at) },
-    { key: "status", header: "状态", render: (row) => <StatusBadge status={statusKey(row.status)} label={statusLabel(row.status)} size="sm" /> },
-    { key: "actions", header: "操作", align: "right", render: (row) => <OrderActions row={row} mode={mode} onDetail={openOrderDetail} onAction={openAction} /> },
+  const orderColumns: DataGridColumn<OutboundOrder>[] = [
+    { key: "wms_order_no", header: "单号 / 类型", mono: true, minWidth: 180, render: (row) => <OrderNoSummary order={row} /> },
+    { key: "product", header: mode === "review" ? "复核 / 数量" : "商品 / 数量", minWidth: 220, render: (row) => mode === "review" ? <ReviewSummary order={row} /> : <ProductSummary order={row} /> },
+    { key: "customer_id", header: mode === "review" ? "客户 / 配送" : "客户 / 门店", mono: true, minWidth: 170, render: (row) => mode === "review" ? <TwoLine top={`${shortId(row.customer_id)} / 门店A`} bottom="配送方 第三方快递" /> : `${shortId(row.customer_id)} / 门店A` },
+    { key: "required_ship_at", header: mode === "review" ? "包裹 / 车牌" : "要求发货", minWidth: 150, render: (row) => mode === "review" ? <TwoLine top="包裹数量 1" bottom="车牌号 沪A-12345" /> : formatDate(row.required_ship_at) },
+    { key: "created_at", header: "创建时间", minWidth: 150, filter: { type: "dateRange" }, render: (row) => formatDate(row.created_at) },
+    { key: "status", header: "状态", minWidth: 130, filter: { type: "multiSelect", options: statusOptions(mode).map(([value, label]) => ({ value, label })) }, render: (row) => <StatusBadge status={statusKey(row.status)} label={statusLabel(row.status)} size="sm" /> },
+    { key: "actions", header: "操作", align: "right", minWidth: 280, filter: false, sortable: false, copyable: false, hideable: false, render: (row) => <OrderActions row={row} mode={mode} onDetail={openOrderDetail} onAction={openAction} /> },
   ];
 
-  const waveColumns: DataTableColumn<OutboundWave>[] = [
-    { key: "wave_no", header: "波次号", mono: true, render: (row) => <span className="text-primary">{row.wave_no}</span> },
-    { key: "orders", header: "订单 / 明细", render: (row) => `${row.order_ids.length} 单 / ${waveLineCount(row, orders)} 行` },
-    { key: "qty", header: "件数 / 温区", align: "right", render: (row) => `${waveQty(row, orders)} 件 / 常温` },
-    { key: "route", header: "路径策略 / 容量", render: () => <TwoLine top="S 型最短路径" bottom="容量上限 100 单 / 10000 件" /> },
-    { key: "status", header: "状态", render: (row) => <StatusBadge status={statusKey(row.status)} label={statusLabel(row.status)} size="sm" /> },
-    { key: "actions", header: "操作", align: "right", render: (row) => <WaveActions row={row} onDetail={openWaveDetail} onAction={openAction} /> },
+  const waveColumns: DataGridColumn<OutboundWave>[] = [
+    { key: "wave_no", header: "波次号", mono: true, minWidth: 180, render: (row) => <span className="text-primary">{row.wave_no}</span> },
+    { key: "orders", header: "订单 / 明细", minWidth: 140, render: (row) => `${row.order_ids.length} 单 / ${waveLineCount(row, orders)} 行` },
+    { key: "qty", header: "件数 / 温区", align: "right", minWidth: 130, render: (row) => `${waveQty(row, orders)} 件 / 常温` },
+    { key: "route", header: "路径策略 / 容量", minWidth: 180, render: () => <TwoLine top="S 型最短路径" bottom="容量上限 100 单 / 10000 件" /> },
+    { key: "created_at", header: "创建时间", minWidth: 150, filter: { type: "dateRange" }, render: (row) => formatDate(row.created_at) },
+    { key: "status", header: "状态", minWidth: 130, filter: { type: "multiSelect", options: statusOptions(mode).map(([value, label]) => ({ value, label })) }, render: (row) => <StatusBadge status={statusKey(row.status)} label={statusLabel(row.status)} size="sm" /> },
+    { key: "actions", header: "操作", align: "right", minWidth: 220, filter: false, sortable: false, copyable: false, hideable: false, render: (row) => <WaveActions row={row} onDetail={openWaveDetail} onAction={openAction} /> },
   ];
 
-  const returnColumns: DataTableColumn<PurchaseReturnOrder>[] = [
-    { key: "return_no", header: "采购退货单", mono: true, render: (row) => <span className="text-primary">{row.return_no}</span> },
-    { key: "source_purchase_order_no", header: "原采购入库单", mono: true },
-    { key: "supplier_name", header: "供应商 / 原因", render: (row) => <TwoLine top={row.supplier_name} bottom={row.reason} /> },
-    { key: "product", header: "商品 / 批号 / 数量", render: (row) => <TwoLine top={`${row.product_code} / ${row.qty} 件`} bottom={row.batch_no} /> },
-    { key: "status", header: "状态", render: (row) => <StatusBadge status={statusKey(row.status)} label={statusLabel(row.status)} size="sm" /> },
-    { key: "actions", header: "操作", align: "right", render: (row) => <ReturnActions row={row} onDetail={openReturnDetail} onAction={openAction} /> },
+  const returnColumns: DataGridColumn<PurchaseReturnOrder>[] = [
+    { key: "return_no", header: "采购退货单", mono: true, minWidth: 180, render: (row) => <span className="text-primary">{row.return_no}</span> },
+    { key: "source_purchase_order_no", header: "原采购入库单", mono: true, minWidth: 180 },
+    { key: "supplier_name", header: "供应商 / 原因", minWidth: 200, render: (row) => <TwoLine top={row.supplier_name} bottom={row.reason} /> },
+    { key: "product", header: "商品 / 批号 / 数量", minWidth: 200, render: (row) => <TwoLine top={`${row.product_code} / ${row.qty} 件`} bottom={row.batch_no} /> },
+    { key: "created_at", header: "创建时间", minWidth: 150, filter: { type: "dateRange" }, render: (row) => formatDate(row.created_at) },
+    { key: "status", header: "状态", minWidth: 130, filter: { type: "multiSelect", options: statusOptions(mode).map(([value, label]) => ({ value, label })) }, render: (row) => <StatusBadge status={statusKey(row.status)} label={statusLabel(row.status)} size="sm" /> },
+    { key: "actions", header: "操作", align: "right", minWidth: 360, filter: false, sortable: false, copyable: false, hideable: false, render: (row) => <ReturnActions row={row} onDetail={openReturnDetail} onAction={openAction} /> },
   ];
 
   const filteredOrders = filterOrders(orders, keyword, statusFilter, dateFilter, mode);
@@ -301,11 +306,11 @@ export function M4OutboundPage({ mode, onBack }: M4OutboundPageProps) {
       />
 
       {mode === "waves" ? (
-        <DataTable columns={waveColumns} data={filteredWaves} rowKey={(row) => row.id} selectedKey={selectedId ?? undefined} onRowClick={(row) => setSelectedId(row.id)} caption={`共 ${filteredWaves.length} 个波次，操作按钮弹窗处理`} emptyTitle="暂无波次" />
+        <DataGrid storageKey="m4.outbound.waves" columns={waveColumns} data={filteredWaves} rowKey={(row) => row.id} selectedKey={selectedId ?? undefined} onRowClick={(row) => setSelectedId(row.id)} emptyTitle="暂无波次" />
       ) : mode === "returns" ? (
-        <DataTable columns={returnColumns} data={filteredReturns} rowKey={(row) => row.id} selectedKey={selectedId ?? undefined} onRowClick={(row) => setSelectedId(row.id)} caption={`共 ${filteredReturns.length} 张采购退货单，操作按钮弹窗处理`} emptyTitle="暂无采购退货单" />
+        <DataGrid storageKey="m4.outbound.returns" columns={returnColumns} data={filteredReturns} rowKey={(row) => row.id} selectedKey={selectedId ?? undefined} onRowClick={(row) => setSelectedId(row.id)} emptyTitle="暂无采购退货单" />
       ) : (
-        <DataTable columns={orderColumns} data={filteredOrders} rowKey={(row) => row.id} selectedKey={selectedId ?? undefined} onRowClick={(row) => setSelectedId(row.id)} caption={`共 ${filteredOrders.length} 张出库单，操作按钮弹窗处理`} emptyTitle="暂无出库单" />
+        <DataGrid storageKey={`m4.outbound.${mode}`} columns={orderColumns} data={filteredOrders} rowKey={(row) => row.id} selectedKey={selectedId ?? undefined} onRowClick={(row) => setSelectedId(row.id)} emptyTitle="暂无出库单" />
       )}
 
       <ActionDialog
@@ -620,7 +625,8 @@ function makeWave(waveNo: string, orderIds: string[]): OutboundWave {
 }
 
 function makeReturn(returnNo: string): PurchaseReturnOrder {
-  return { id: crypto.randomUUID(), return_no: returnNo, source_purchase_order_no: "ASN-M2-PC-0001", supplier_name: "华东医药供应商", reason: "供应商召回", status: "pending_approval", product_code: "P-M4-001", batch_no: "BATCH-OUT-202606", qty: 3 };
+  const now = new Date().toISOString();
+  return { id: crypto.randomUUID(), return_no: returnNo, source_purchase_order_no: "ASN-M2-PC-0001", supplier_name: "华东医药供应商", reason: "供应商召回", status: "pending_approval", product_code: "P-M4-001", batch_no: "BATCH-OUT-202606", qty: 3, created_at: now, updated_at: now };
 }
 
 function countOrders(orders: OutboundOrder[], status: string) {

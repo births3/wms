@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Bookmark } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { Button } from "../../ui/button";
 import type { DataGridColumn } from "./DataGrid";
@@ -6,6 +7,7 @@ import type { DataGridLogicState } from "./data-grid-logic";
 import {
   dataGridNamedViewsStorageKey,
   loadDataGridNamedViewsFromStorage,
+  nextDataGridNamedViewDraftName,
   pickDefaultDataGridNamedView,
   removeDataGridNamedView,
   saveDataGridNamedViewsToStorage,
@@ -44,7 +46,6 @@ export function DataGridNamedViewsToolbar<T>({
   className,
   ...rest
 }: DataGridNamedViewsToolbarProps<T>) {
-  const listId = React.useId();
   const storage = getDataGridNamedViewStorage(storageKey);
   const options = React.useMemo(
     () => ({
@@ -61,7 +62,9 @@ export function DataGridNamedViewsToolbar<T>({
   const [viewName, setViewName] = React.useState(
     () => pickDefaultDataGridNamedView(views)?.name ?? "",
   );
+  const [open, setOpen] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const panelId = React.useId();
 
   React.useEffect(() => {
     if (!storage || !storageKey) {
@@ -79,6 +82,27 @@ export function DataGridNamedViewsToolbar<T>({
     });
     setError(null);
   }, [options, storage, storageKey]);
+
+  React.useEffect(() => {
+    if (!open) return;
+
+    function closePanel(event: PointerEvent) {
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest("[data-datagrid-popover]")) return;
+      setOpen(false);
+    }
+
+    function closePanelByKeyboard(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+
+    document.addEventListener("pointerdown", closePanel);
+    document.addEventListener("keydown", closePanelByKeyboard);
+    return () => {
+      document.removeEventListener("pointerdown", closePanel);
+      document.removeEventListener("keydown", closePanelByKeyboard);
+    };
+  }, [open]);
 
   if (!storage || !storageKey) return null;
 
@@ -102,7 +126,7 @@ export function DataGridNamedViewsToolbar<T>({
     }
 
     setViews(result.views);
-    setViewName(result.view.name);
+    setViewName(nextDataGridNamedViewDraftName(views, result.view.name));
     const saved = saveDataGridNamedViewsToStorage(storage, storageKey, result.views);
     setError(saved.ok ? null : saved.error);
   }
@@ -130,60 +154,89 @@ export function DataGridNamedViewsToolbar<T>({
 
   return (
     <div
-      className={cn("flex flex-wrap items-center justify-end gap-1", className)}
+      className={cn("relative inline-flex", className)}
       data-datagrid-named-views
       data-storage-key={dataGridNamedViewsStorageKey(storageKey)}
       {...rest}
     >
-      <input
-        type="text"
-        list={listId}
-        value={viewName}
-        onChange={(event) => setViewName(event.target.value)}
-        placeholder="命名视图"
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        className="size-7 border-primary/40 bg-primary/5 text-primary hover:bg-primary/10"
         aria-label="命名视图"
-        className="h-8 w-32 rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      />
-      <datalist id={listId}>
-        {views.map((view) => (
-          <option key={view.name} value={view.name} />
-        ))}
-      </datalist>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="h-8"
-        disabled={!viewName.trim()}
-        onClick={saveView}
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((current) => !current)}
+        data-datagrid-popover
       >
-        保存视图
+        <Bookmark className="size-3.5" aria-hidden />
       </Button>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="h-8"
-        disabled={!selectedView}
-        onClick={applyView}
-      >
-        应用视图
-      </Button>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="h-8"
-        disabled={!selectedView}
-        onClick={deleteView}
-      >
-        删除视图
-      </Button>
-      {error ? (
-        <span role="status" className="text-xs text-destructive">
-          {error}
-        </span>
-      ) : null}
+      {open && (
+        <div
+          id={panelId}
+          className="absolute right-0 top-full z-30 mt-2 w-80 rounded-md border bg-background p-3 text-left text-sm shadow-lg"
+          data-datagrid-popover
+        >
+          <div className="grid gap-2">
+            <input
+              type="text"
+              value={viewName}
+              onChange={(event) => setViewName(event.target.value)}
+              placeholder="命名视图"
+              aria-label="命名视图"
+              className="h-8 rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+            <select
+              value={selectedView ? selectedView.name : ""}
+              aria-label="选择命名视图"
+              onChange={(event) => setViewName(event.target.value)}
+              className="h-8 rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="">选择视图</option>
+              {views.map((view) => (
+                <option key={view.name} value={view.name}>
+                  {view.name}
+                </option>
+              ))}
+            </select>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!viewName.trim()}
+                onClick={saveView}
+              >
+                保存视图
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!selectedView}
+                onClick={applyView}
+              >
+                应用视图
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!selectedView}
+                onClick={deleteView}
+              >
+                删除视图
+              </Button>
+            </div>
+            {error ? (
+              <span role="status" className="text-xs text-destructive">
+                {error}
+              </span>
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -33,6 +33,8 @@ export interface PurchaseReturnOrder {
   product_code: string;
   batch_no: string;
   qty: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export type DetailTarget =

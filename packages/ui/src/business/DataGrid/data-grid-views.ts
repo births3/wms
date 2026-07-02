@@ -83,6 +83,13 @@ export function upsertDataGridNamedView<T>(
   return { ok: true, views: next, view };
 }
 
+export function nextDataGridNamedViewDraftName(
+  previousViews: readonly DataGridNamedView[],
+  savedName: string,
+): string {
+  return previousViews.some((view) => view.name === savedName) ? savedName : "";
+}
+
 export function renameDataGridNamedView(
   views: readonly DataGridNamedView[],
   currentName: string,
