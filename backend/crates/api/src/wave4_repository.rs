@@ -162,6 +162,74 @@ impl PgWave4Repository {
         Self { pool }
     }
 
+    pub async fn list_outbound_orders(
+        &self,
+        ctx: &AuthContext,
+        status: Option<&str>,
+        q: Option<&str>,
+        limit: Option<u32>,
+    ) -> Result<Vec<OutboundOrder>, Wave4RepositoryError> {
+        let status = non_empty_filter(status);
+        let q = non_empty_filter(q);
+        let limit = i64::from(limit.unwrap_or(50).clamp(1, 200));
+        let rows = sqlx::query_as::<_, OutboundOrderRow>(
+            r#"
+            SELECT id, owner_id, wms_order_no, erp_order_no, customer_id,
+                   warehouse_id, required_ship_at, status, short_pick,
+                   created_at, updated_at
+              FROM outbound_orders
+             WHERE owner_id = $1
+               AND ($2::TEXT IS NULL OR status = $2)
+               AND (
+                    $3::TEXT IS NULL
+                    OR wms_order_no ILIKE '%' || $3 || '%'
+                    OR erp_order_no ILIKE '%' || $3 || '%'
+               )
+             ORDER BY updated_at DESC, wms_order_no ASC
+             LIMIT $4
+            "#,
+        )
+        .bind(ctx.owner_id)
+        .bind(status)
+        .bind(q)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_db_error)?;
+
+        let mut orders = Vec::with_capacity(rows.len());
+        for row in rows {
+            let lines =
+                load_outbound_order_lines_from_pool(&self.pool, ctx.owner_id, row.id).await?;
+            orders.push(map_outbound_order(row, lines));
+        }
+        Ok(orders)
+    }
+
+    pub async fn get_outbound_order(
+        &self,
+        ctx: &AuthContext,
+        id: Uuid,
+    ) -> Result<OutboundOrder, Wave4RepositoryError> {
+        let row = sqlx::query_as::<_, OutboundOrderRow>(
+            r#"
+            SELECT id, owner_id, wms_order_no, erp_order_no, customer_id,
+                   warehouse_id, required_ship_at, status, short_pick,
+                   created_at, updated_at
+              FROM outbound_orders
+             WHERE owner_id = $1 AND id = $2
+            "#,
+        )
+        .bind(ctx.owner_id)
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(map_db_error)?
+        .ok_or(Wave4RepositoryError::NotFound)?;
+        let lines = load_outbound_order_lines_from_pool(&self.pool, ctx.owner_id, id).await?;
+        Ok(map_outbound_order(row, lines))
+    }
+
     pub async fn create_outbound_order(
         &self,
         ctx: &AuthContext,
@@ -1084,6 +1152,31 @@ async fn load_outbound_order(
     Ok(map_outbound_order(row, lines))
 }
 
+async fn load_outbound_order_lines_from_pool(
+    pool: &PgPool,
+    owner_id: Uuid,
+    id: Uuid,
+) -> Result<Vec<OutboundOrderLine>, Wave4RepositoryError> {
+    let line_rows = sqlx::query_as::<_, OutboundOrderLineRow>(
+        r#"
+        SELECT line_no, product_code, batch_no, planned_qty, picked_qty,
+               reviewed_qty, shipped_qty, short_pick_qty
+          FROM outbound_order_lines
+         WHERE owner_id = $1 AND outbound_order_id = $2
+         ORDER BY line_no
+        "#,
+    )
+    .bind(owner_id)
+    .bind(id)
+    .fetch_all(pool)
+    .await
+    .map_err(map_db_error)?;
+    line_rows
+        .into_iter()
+        .map(map_outbound_order_line)
+        .collect::<Result<Vec<_>, _>>()
+}
+
 async fn load_traceability_outbound_report(
     tx: &mut Transaction<'_, Postgres>,
     owner_id: Uuid,
@@ -1454,6 +1547,10 @@ fn idempotency_lock_id(owner_id: Uuid, idempotency_key: &str) -> i64 {
     let mut bytes = [0_u8; 8];
     bytes.copy_from_slice(&digest[..8]);
     i64::from_be_bytes(bytes)
+}
+
+fn non_empty_filter(value: Option<&str>) -> Option<&str> {
+    value.map(str::trim).filter(|value| !value.is_empty())
 }
 
 fn map_outbound_order(row: OutboundOrderRow, lines: Vec<OutboundOrderLine>) -> OutboundOrder {

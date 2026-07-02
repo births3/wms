@@ -440,6 +440,37 @@ fn change_inventory_batch_status() {}
 #[allow(dead_code)]
 fn create_outbound_order() {}
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/outbound/orders",
+    tag = "outbound",
+    params(
+        ("status" = Option<String>, Query, description = "按出库订单状态过滤"),
+        ("q" = Option<String>, Query, description = "按 WMS/ERP 单号模糊查询"),
+        ("limit" = Option<u32>, Query, description = "返回条数，默认 50，最大 200"),
+    ),
+    responses(
+        (status = 200, description = "出库订单列表", body = OutboundOrderListResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+fn list_outbound_orders() {}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/outbound/orders/{id}",
+    tag = "outbound",
+    params(("id" = uuid::Uuid, Path, description = "出库订单 ID")),
+    responses(
+        (status = 200, description = "出库订单详情", body = OutboundOrder),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 404, description = "出库订单不存在", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+fn get_outbound_order() {}
+
 #[utoipa::path(post, path = "/api/v1/outbound/waves", tag = "outbound", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = CreateOutboundWaveRequest, responses((status = 200, description = "创建并下发出库波次", body = OutboundWave), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 422, description = "订单状态不可入波次", body = ErrorResponse)))]
 #[allow(dead_code)]
 fn create_outbound_wave() {}
@@ -653,6 +684,8 @@ fn confirm_container_recovery() {}
         putaway_inventory_batch,
         change_inventory_batch_status,
         create_outbound_order,
+        list_outbound_orders,
+        get_outbound_order,
         create_outbound_wave,
         complete_outbound_pick_task,
         review_outbound_order,
@@ -901,6 +934,7 @@ mod tests {
             "/api/v1/inventory/batches/putaway",
             "/api/v1/inventory/batches/status",
             "/api/v1/outbound/orders",
+            "/api/v1/outbound/orders/{id}",
             "/api/v1/outbound/waves",
             "/api/v1/outbound/pick-tasks/{id}/complete",
             "/api/v1/outbound/orders/{id}/review",

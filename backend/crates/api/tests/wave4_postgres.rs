@@ -12,7 +12,7 @@ use wms_api::{
 };
 use wms_domain::{
     CompletePickTaskRequest, CreateOutboundOrderLineRequest, CreateOutboundOrderRequest,
-    CreateOutboundWaveRequest, ReviewOutboundOrderRequest, ShipOutboundOrderRequest,
+    CreateOutboundWaveRequest, OutboundOrder, ReviewOutboundOrderRequest, ShipOutboundOrderRequest,
     TraceabilityOutboundReportRequest, TraceabilityStatusChangeEvent,
 };
 
@@ -119,6 +119,37 @@ async fn seed_temperature_excursion(
     .await
     .expect("seed temperature excursion");
     event_id
+}
+
+async fn create_read_order(
+    repo: &PgWave4Repository,
+    ctx: &AuthContext,
+    wms_order_no: &str,
+    erp_order_no: &str,
+    now: chrono::DateTime<Utc>,
+) -> OutboundOrder {
+    repo.create_outbound_order(
+        ctx,
+        CreateOutboundOrderRequest {
+            wms_order_no: wms_order_no.to_string(),
+            erp_order_no: Some(erp_order_no.to_string()),
+            customer_id: Uuid::new_v4(),
+            warehouse_id: Uuid::new_v4(),
+            required_ship_at: Some(now),
+            lines: vec![CreateOutboundOrderLineRequest {
+                line_no: 1,
+                product_code: format!("P-{wms_order_no}"),
+                batch_no: format!("B-{wms_order_no}"),
+                planned_qty: 6,
+            }],
+        },
+        now,
+        &format!("idem-{wms_order_no}"),
+        None,
+    )
+    .await
+    .expect("read fixture outbound order should be created")
+    .value
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -298,6 +329,72 @@ async fn outbound_short_pick_must_be_replenished_before_ship_and_deducts_invento
     .await
     .expect("counts");
     assert_eq!(counts, (0, -10, 1));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn outbound_order_reads_are_owner_scoped_filterable_and_include_lines(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let other_owner_id = Uuid::new_v4();
+    let owner_ctx = ctx(owner_id);
+    let other_ctx = ctx(other_owner_id);
+    let repo = PgWave4Repository::new(pool);
+    let now = Utc
+        .with_ymd_and_hms(2026, 6, 5, 8, 30, 0)
+        .single()
+        .expect("valid time");
+
+    let first = create_read_order(&repo, &owner_ctx, "WMS-R-READ-001", "ERP-READ-001", now).await;
+    let second = create_read_order(&repo, &owner_ctx, "WMS-R-READ-002", "ERP-READ-002", now).await;
+    repo.create_outbound_wave(
+        &owner_ctx,
+        CreateOutboundWaveRequest {
+            wave_no: "WAVE-READ-001".to_string(),
+            order_ids: vec![second.id],
+        },
+        now,
+        "outbound-read-wave-1",
+        None,
+    )
+    .await
+    .expect("second order should enter wave");
+
+    create_read_order(&repo, &other_ctx, "WMS-R-READ-OTHER", "ERP-READ-001", now).await;
+
+    let confirmed = repo
+        .list_outbound_orders(&owner_ctx, Some("confirmed"), None, Some(10))
+        .await
+        .expect("confirmed orders should list");
+    assert_eq!(confirmed.len(), 1);
+    assert_eq!(confirmed[0].id, first.id);
+    assert_eq!(confirmed[0].lines[0].product_code, "P-WMS-R-READ-001");
+
+    let searched = repo
+        .list_outbound_orders(&owner_ctx, None, Some("ERP-READ-001"), Some(10))
+        .await
+        .expect("query should match wms or erp order number");
+    assert_eq!(searched.len(), 1);
+    assert_eq!(searched[0].owner_id, owner_id);
+    assert_eq!(searched[0].wms_order_no, "WMS-R-READ-001");
+
+    let limited = repo
+        .list_outbound_orders(&owner_ctx, None, None, Some(1))
+        .await
+        .expect("limit should apply");
+    assert_eq!(limited.len(), 1);
+
+    let detail = repo
+        .get_outbound_order(&owner_ctx, first.id)
+        .await
+        .expect("detail should load for same owner");
+    assert_eq!(detail.id, first.id);
+    assert_eq!(detail.lines[0].line_no, 1);
+    assert_eq!(detail.lines[0].batch_no, "B-WMS-R-READ-001");
+
+    let other_owner_detail = repo
+        .get_outbound_order(&other_ctx, first.id)
+        .await
+        .expect_err("other owner must not read order detail");
+    assert!(matches!(other_owner_detail, Wave4RepositoryError::NotFound));
 }
 
 #[sqlx::test(migrations = "../../migrations")]

@@ -3,20 +3,21 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
 use chrono::Utc;
+use serde::Deserialize;
 use sqlx::PgPool;
 use uuid::Uuid;
 use wms_domain::{
     CompletePickTaskRequest, CreateOutboundOrderRequest, CreateOutboundWaveRequest,
     DisposeTemperatureExcursionRequest, DriverTaskListResponse, ErrorResponse, OutboundOrder,
-    OutboundWave, PageMeta, ReviewOutboundOrderRequest, ShipOutboundOrderRequest,
-    StoreDashboardResponse, TemperatureExcursionDispositionResponse,
+    OutboundOrderListResponse, OutboundWave, PageMeta, ReviewOutboundOrderRequest,
+    ShipOutboundOrderRequest, StoreDashboardResponse, TemperatureExcursionDispositionResponse,
     TemperatureExcursionEventListResponse, TraceabilityOutboundReport,
     TraceabilityOutboundReportRequest,
 };
@@ -30,9 +31,18 @@ use crate::{
     },
 };
 
+const M4_READ_PERMISSION: &str = "m4.read";
+
 #[derive(Clone, Debug)]
 pub struct Wave4AppState {
     pub wave4_repository: Arc<PgWave4Repository>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+struct ListOutboundOrdersQuery {
+    status: Option<String>,
+    q: Option<String>,
+    limit: Option<u32>,
 }
 
 impl Wave4AppState {
@@ -125,7 +135,11 @@ pub fn wave4_router(state: Wave4AppState) -> Router {
     Router::new()
         .route(
             "/api/v1/outbound/orders",
-            post(create_outbound_order_handler),
+            get(list_outbound_orders_handler).post(create_outbound_order_handler),
+        )
+        .route(
+            "/api/v1/outbound/orders/:order_id",
+            get(get_outbound_order_handler),
         )
         .route("/api/v1/outbound/waves", post(create_outbound_wave_handler))
         .route(
@@ -287,6 +301,43 @@ async fn ship_outbound_order_handler(
     Ok(Json(outcome.value))
 }
 
+async fn list_outbound_orders_handler(
+    ctx: AuthContext,
+    State(state): State<Wave4AppState>,
+    Query(query): Query<ListOutboundOrdersQuery>,
+) -> Result<Json<OutboundOrderListResponse>, Wave4HandlerError> {
+    require_any_permission(&ctx, &[M4_READ_PERMISSION, "m4.write"])?;
+    let data = state
+        .wave4_repository
+        .list_outbound_orders(
+            &ctx,
+            query.status.as_deref(),
+            query.q.as_deref(),
+            query.limit,
+        )
+        .await?;
+    Ok(Json(OutboundOrderListResponse {
+        page: PageMeta {
+            count: data.len() as u32,
+            next_cursor: None,
+        },
+        data,
+    }))
+}
+
+async fn get_outbound_order_handler(
+    ctx: AuthContext,
+    State(state): State<Wave4AppState>,
+    Path(order_id): Path<Uuid>,
+) -> Result<Json<OutboundOrder>, Wave4HandlerError> {
+    require_any_permission(&ctx, &[M4_READ_PERMISSION, "m4.write"])?;
+    let order = state
+        .wave4_repository
+        .get_outbound_order(&ctx, order_id)
+        .await?;
+    Ok(Json(order))
+}
+
 async fn list_pending_temperature_excursions_handler(
     ctx: AuthContext,
     State(state): State<Wave4AppState>,
@@ -319,6 +370,17 @@ fn idempotency_key_from_headers(headers: &HeaderMap) -> Result<String, Wave4Hand
         return Err(Wave4HandlerError::InvalidIdempotencyKey);
     }
     Ok(key.to_string())
+}
+
+fn require_any_permission(ctx: &AuthContext, permissions: &[&str]) -> Result<(), AuthError> {
+    if permissions
+        .iter()
+        .any(|permission| ctx.has_permission(permission))
+    {
+        Ok(())
+    } else {
+        Err(AuthError::PermissionDenied(permissions.join("|")))
+    }
 }
 
 async fn dispose_temperature_excursion_handler(
@@ -419,7 +481,7 @@ async fn get_store_dashboard_handler(
 #[cfg(test)]
 mod tests {
     use axum::http::HeaderMap;
-    use axum::{extract::State, Json};
+    use axum::{extract::Path, extract::Query, extract::State, Json};
     use chrono::{NaiveDate, TimeZone, Utc};
     use sqlx::PgPool;
     use uuid::Uuid;
@@ -430,8 +492,9 @@ mod tests {
 
     use super::{
         create_outbound_order_handler, create_traceability_outbound_report_handler,
-        dispose_temperature_excursion_handler, get_store_dashboard_handler,
-        list_driver_today_tasks_handler, list_pending_temperature_excursions_handler, wave4_router,
+        dispose_temperature_excursion_handler, get_outbound_order_handler,
+        get_store_dashboard_handler, list_driver_today_tasks_handler, list_outbound_orders_handler,
+        list_pending_temperature_excursions_handler, wave4_router, ListOutboundOrdersQuery,
         Wave4AppState, Wave4HandlerError,
     };
     use crate::{
@@ -574,6 +637,39 @@ mod tests {
         .expect_err("Idempotency-Key should be required before repository access");
 
         assert_eq!(result, Wave4HandlerError::InvalidIdempotencyKey);
+    }
+
+    #[tokio::test]
+    async fn outbound_read_handlers_require_m4_read_or_write_before_postgres() {
+        let owner_id = Uuid::new_v4();
+        let pool = PgPool::connect_lazy("postgres://localhost/wms")
+            .expect("lazy pool should not connect during handler read auth test");
+        let state = Wave4AppState::with_postgres(pool);
+
+        let list_denied = list_outbound_orders_handler(
+            ctx(owner_id, &[]),
+            State(state.clone()),
+            Query(ListOutboundOrdersQuery::default()),
+        )
+        .await
+        .expect_err("outbound list should require m4.read or m4.write before repository access");
+        assert!(matches!(
+            list_denied,
+            Wave4HandlerError::Auth(AuthError::PermissionDenied(permission))
+                if permission == "m4.read|m4.write"
+        ));
+
+        let detail_denied =
+            get_outbound_order_handler(ctx(owner_id, &[]), State(state), Path(Uuid::new_v4()))
+                .await
+                .expect_err(
+                    "outbound detail should require m4.read or m4.write before repository access",
+                );
+        assert!(matches!(
+            detail_denied,
+            Wave4HandlerError::Auth(AuthError::PermissionDenied(permission))
+                if permission == "m4.read|m4.write"
+        ));
     }
 
     #[tokio::test]

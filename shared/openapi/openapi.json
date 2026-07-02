@@ -2944,6 +2944,68 @@
       }
     },
     "/api/v1/outbound/orders": {
+      "get": {
+        "tags": [
+          "outbound"
+        ],
+        "operationId": "list_outbound_orders",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "description": "按出库订单状态过滤",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "按 WMS/ERP 单号模糊查询",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "返回条数，默认 50，最大 200",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "出库订单列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutboundOrderListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "tags": [
           "outbound"
@@ -3003,6 +3065,58 @@
           },
           "409": {
             "description": "单号或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/outbound/orders/{id}": {
+      "get": {
+        "tags": [
+          "outbound"
+        ],
+        "operationId": "get_outbound_order",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "出库订单 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "出库订单详情",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutboundOrder"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "出库订单不存在",
             "content": {
               "application/json": {
                 "schema": {

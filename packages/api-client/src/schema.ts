@@ -747,9 +747,25 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["list_outbound_orders"];
         put?: never;
         post: operations["create_outbound_order"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/outbound/orders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_outbound_order"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -5025,6 +5041,42 @@ export interface operations {
             };
         };
     };
+    list_outbound_orders: {
+        parameters: {
+            query?: {
+                /** @description 按出库订单状态过滤 */
+                status?: string | null;
+                /** @description 按 WMS/ERP 单号模糊查询 */
+                q?: string | null;
+                /** @description 返回条数，默认 50，最大 200 */
+                limit?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 出库订单列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutboundOrderListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     create_outbound_order: {
         parameters: {
             query?: never;
@@ -5070,6 +5122,47 @@ export interface operations {
             };
             /** @description 单号或幂等冲突 */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_outbound_order: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 出库订单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 出库订单详情 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutboundOrder"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 出库订单不存在 */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
