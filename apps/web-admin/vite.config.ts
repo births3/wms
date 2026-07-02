@@ -70,8 +70,35 @@ interface DevProduct {
   updated_at: string;
 }
 
+interface DevSupplier {
+  id: string;
+  owner_id: string;
+  supplier_code: string;
+  supplier_name: string;
+  license_no: string | null;
+  contact_name: string | null;
+  source?: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface DevCustomer {
+  id: string;
+  owner_id: string;
+  customer_code: string;
+  customer_name: string;
+  license_no: string | null;
+  source?: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
 const devCreatedOrders: DevOrder[] = [];
 const devCreatedProducts: DevProduct[] = [];
+const devCreatedSuppliers: DevSupplier[] = [];
+const devCreatedCustomers: DevCustomer[] = [];
 const devSeedOrderStatusOverrides = new Map<string, string>();
 
 const devUser = {
@@ -186,6 +213,22 @@ async function handleDevMockRequest(
     return true;
   }
 
+  if (req.method === "POST" && pathname === "/api/v1/master-data/suppliers") {
+    const body = await readJsonBody(req);
+    const created = devSupplierFromCreateRequest(body);
+    devCreatedSuppliers.unshift(created);
+    sendJson(res, 200, created);
+    return true;
+  }
+
+  if (req.method === "POST" && pathname === "/api/v1/master-data/customers") {
+    const body = await readJsonBody(req);
+    const created = devCustomerFromCreateRequest(body);
+    devCreatedCustomers.unshift(created);
+    sendJson(res, 200, created);
+    return true;
+  }
+
   if (req.method === "GET" && pathname === "/api/v1/inbound/receiving-orders") {
     const data = allDevOrders();
     sendJson(res, 200, { data, page: { count: data.length, next_cursor: null } });
@@ -243,39 +286,18 @@ function devMasterDataResponse(pathname: string): Record<string, unknown> | null
   }
 
   if (pathname === "/api/v1/master-data/suppliers") {
+    const data = [...devCreatedSuppliers, ...devSeedSuppliers(updatedAt)];
     return {
-      data: [
-        {
-          id: "00000000-0000-0000-0000-000000001101",
-          owner_id: devOwnerId,
-          supplier_code: "S-M1-001",
-          supplier_name: "鹏鹞示例供应商",
-          license_no: "SPL-2026-001",
-          contact_name: "王供应",
-          status: "active",
-          created_at: updatedAt,
-          updated_at: updatedAt,
-        },
-      ],
-      page,
+      data,
+      page: { count: data.length, next_cursor: null },
     };
   }
 
   if (pathname === "/api/v1/master-data/customers") {
+    const data = [...devCreatedCustomers, ...devSeedCustomers(updatedAt)];
     return {
-      data: [
-        {
-          id: "00000000-0000-0000-0000-000000001201",
-          owner_id: devOwnerId,
-          customer_code: "C-M1-001",
-          customer_name: "鹏鹞示例门店",
-          license_no: "CPL-2026-001",
-          status: "active",
-          created_at: updatedAt,
-          updated_at: updatedAt,
-        },
-      ],
-      page,
+      data,
+      page: { count: data.length, next_cursor: null },
     };
   }
 
@@ -399,6 +421,39 @@ function devSeedProducts(updatedAt: string): DevProduct[] {
   ];
 }
 
+function devSeedSuppliers(updatedAt: string): DevSupplier[] {
+  return [
+    {
+      id: "00000000-0000-0000-0000-000000001101",
+      owner_id: devOwnerId,
+      supplier_code: "S-M1-001",
+      supplier_name: "鹏鹞示例供应商",
+      license_no: "SPL-2026-001",
+      contact_name: "王供应",
+      source: "api_import",
+      status: "active",
+      created_at: updatedAt,
+      updated_at: updatedAt,
+    },
+  ];
+}
+
+function devSeedCustomers(updatedAt: string): DevCustomer[] {
+  return [
+    {
+      id: "00000000-0000-0000-0000-000000001201",
+      owner_id: devOwnerId,
+      customer_code: "C-M1-001",
+      customer_name: "鹏鹞示例门店",
+      license_no: "CPL-2026-001",
+      source: "api_import",
+      status: "active",
+      created_at: updatedAt,
+      updated_at: updatedAt,
+    },
+  ];
+}
+
 function devProductFromCreateRequest(body: Record<string, unknown>): DevProduct {
   const now = new Date().toISOString();
   const attrs = asRecord(body.attrs);
@@ -416,6 +471,37 @@ function devProductFromCreateRequest(body: Record<string, unknown>): DevProduct 
       storage_condition: asString(attrs.storage_condition, "normal"),
       source: asString(attrs.source, "api_import"),
     },
+    status: "active",
+    created_at: now,
+    updated_at: now,
+  };
+}
+
+function devSupplierFromCreateRequest(body: Record<string, unknown>): DevSupplier {
+  const now = new Date().toISOString();
+  return {
+    id: `00000000-0000-0000-0000-${String(2100 + devCreatedSuppliers.length + 1).padStart(12, "0")}`,
+    owner_id: devOwnerId,
+    supplier_code: asString(body.supplier_code, "S-M1-NEW"),
+    supplier_name: asString(body.supplier_name, "新建供应商"),
+    license_no: asNullableString(body.license_no),
+    contact_name: asNullableString(body.contact_name),
+    source: asString(body.source, "api_import"),
+    status: "active",
+    created_at: now,
+    updated_at: now,
+  };
+}
+
+function devCustomerFromCreateRequest(body: Record<string, unknown>): DevCustomer {
+  const now = new Date().toISOString();
+  return {
+    id: `00000000-0000-0000-0000-${String(2200 + devCreatedCustomers.length + 1).padStart(12, "0")}`,
+    owner_id: devOwnerId,
+    customer_code: asString(body.customer_code, "C-M1-NEW"),
+    customer_name: asString(body.customer_name, "新建客户"),
+    license_no: asNullableString(body.license_no),
+    source: asString(body.source, "api_import"),
     status: "active",
     created_at: now,
     updated_at: now,

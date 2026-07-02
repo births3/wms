@@ -7,7 +7,7 @@ import {
 
 export { productSourceLabel };
 
-const productSourceColumn: DataGridColumn<MasterDataRow> = {
+const sourceColumn: DataGridColumn<MasterDataRow> = {
   key: "source",
   header: "来源",
   width: 160,
@@ -32,13 +32,18 @@ export function masterDataColumns(
   baseColumns: DataGridColumn<MasterDataRow>[],
   locationColumns: DataGridColumn<MasterDataRow>[],
 ) {
-  if (viewId === "m1-products") return [...baseColumns, productSourceColumn];
+  if (viewId === "m1-products" || viewId === "m1-suppliers" || viewId === "m1-customers") {
+    return [...baseColumns, sourceColumn];
+  }
   if (viewId === "m1-locations") return locationColumns;
   return baseColumns;
 }
 
-export function productActionLabels(viewId: MasterDataViewId) {
-  return viewId === "m1-products" ? ["新建商品", "批量导入"] : [];
+export function masterDataActionLabels(viewId: MasterDataViewId) {
+  if (viewId === "m1-products") return ["新建商品", "批量导入"];
+  if (viewId === "m1-suppliers") return ["新建供应商", "批量导入"];
+  if (viewId === "m1-customers") return ["新建客户", "批量导入"];
+  return [];
 }
 
 export function productTableClassName(viewId: MasterDataViewId) {

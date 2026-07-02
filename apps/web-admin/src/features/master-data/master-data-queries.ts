@@ -19,6 +19,8 @@ type Warehouse = components["schemas"]["Warehouse"];
 type Location = components["schemas"]["Location"];
 export type UpdateProductRequest = components["schemas"]["UpdateProductRequest"];
 export type CreateProductRequest = components["schemas"]["CreateProductRequest"];
+export type CreateSupplierRequest = components["schemas"]["CreateSupplierRequest"];
+export type CreateCustomerRequest = components["schemas"]["CreateCustomerRequest"];
 export type BatchCreateLocationsRequest = components["schemas"]["BatchCreateLocationsRequest"];
 export type SystemDictionaryItem = components["schemas"]["SystemDictionaryItem"];
 export type UpsertSystemDictionaryItemRequest =
@@ -232,6 +234,22 @@ export async function createProduct(request: CreateProductRequest): Promise<Mast
   return productRow(result.data);
 }
 
+export async function createSupplier(request: CreateSupplierRequest): Promise<MasterDataRow> {
+  const result = await api.POST("/api/v1/master-data/suppliers", { body: request });
+  if (!result.data) {
+    throw new ApiError(result.error, "新建供应商失败", result.response.status);
+  }
+  return supplierRow(result.data);
+}
+
+export async function createCustomer(request: CreateCustomerRequest): Promise<MasterDataRow> {
+  const result = await api.POST("/api/v1/master-data/customers", { body: request });
+  if (!result.data) {
+    throw new ApiError(result.error, "新建客户失败", result.response.status);
+  }
+  return customerRow(result.data);
+}
+
 async function listSystemDictionaryItems(): Promise<MasterDataRow[]> {
   return (await fetchDocumentTypeDictionaryItems()).map(systemDictionaryRow);
 }
@@ -342,6 +360,7 @@ function supplierRow(item: Supplier): MasterDataRow {
     extraLabel: "档案类型",
     extraValue: "供应商",
     createdAt: item.created_at,
+    sourceValue: supplierSource(item),
     updatedAt: item.updated_at,
   });
 }
@@ -361,6 +380,7 @@ function customerRow(item: Customer): MasterDataRow {
     extraLabel: "货主",
     extraValue: item.owner_id,
     createdAt: item.created_at,
+    sourceValue: customerSource(item),
     updatedAt: item.updated_at,
   });
 }
@@ -496,6 +516,14 @@ export function productSourceLabel(value: unknown) {
     return "API接口导入";
   }
   return value.trim();
+}
+
+function supplierSource(item: Supplier) {
+  return productSourceLabel(item.source);
+}
+
+function customerSource(item: Customer) {
+  return productSourceLabel(item.source);
 }
 
 function activeStatusLabel(status: string) {

@@ -17,9 +17,13 @@ import { ArrowLeft, Plus, RefreshCw, Search, Upload } from "lucide-react";
 
 import {
   batchCreateLocations,
+  createCustomer,
   createProduct,
+  createSupplier,
   useMasterDataRowsQuery,
+  type CreateCustomerRequest,
   type CreateProductRequest,
+  type CreateSupplierRequest,
   type LocationMasterDataFields,
   type MasterDataRow,
   type MasterDataViewId,
@@ -29,12 +33,13 @@ import {
   defaultLocationBatchType,
   initialLocationBatchRange,
 } from "./LocationBatchDialog";
+import { MasterDataSourceActions } from "./MasterDataSourceActions";
 import { ProductCreateDialog } from "./ProductCreateDialog";
 import { ProductEditDialog } from "./ProductEditDialog";
 import { productColumns } from "./ProductEditTable";
 import {
+  masterDataActionLabels,
   masterDataColumns,
-  productActionLabels,
   productTableClassName,
 } from "./m1-product-page-model";
 import { M1SystemDictionaryPage } from "./SystemDictionaryPage";
@@ -394,7 +399,7 @@ function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
     locationBatchScopes.find((scope) => scope.key === locationBatchScopeKey) ??
     locationBatchScopes[0] ??
     null;
-  const productActions = productActionLabels(viewId);
+  const masterDataActions = masterDataActionLabels(viewId);
   const baseGridColumns = masterDataColumns(viewId, columns, locationColumns);
   const gridColumns =
     viewId === "m1-products" ? productColumns(baseGridColumns, productEdit.openDialog) : baseGridColumns;
@@ -418,6 +423,47 @@ function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
 
   function triggerProductBatchImport() {
     setLastEvent("批量导入入口已记录，导入记录来源将显示为批量导入");
+  }
+
+  async function createSupplierFromDialog(request: CreateSupplierRequest) {
+    const created = await createSupplier(request);
+    await rowsQuery.refetch();
+    setLastEvent(`${created.code} 已新建供应商`);
+  }
+
+  async function importSuppliersFromDialog(requests: CreateSupplierRequest[]) {
+    await importSourceRows(requests, createSupplier, "供应商");
+  }
+
+  async function createCustomerFromDialog(request: CreateCustomerRequest) {
+    const created = await createCustomer(request);
+    await rowsQuery.refetch();
+    setLastEvent(`${created.code} 已新建客户`);
+  }
+
+  async function importCustomersFromDialog(requests: CreateCustomerRequest[]) {
+    await importSourceRows(requests, createCustomer, "客户");
+  }
+
+  async function importSourceRows<Request>(
+    requests: Request[],
+    createOne: (request: Request) => Promise<MasterDataRow>,
+    entityName: string,
+  ) {
+    const createdRows: MasterDataRow[] = [];
+    try {
+      for (const request of requests) {
+        createdRows.push(await createOne(request));
+      }
+    } catch (error) {
+      if (createdRows.length > 0) {
+        await rowsQuery.refetch();
+        setLastEvent(`已批量导入 ${createdRows.length} 个${entityName}，后续行失败`);
+      }
+      throw error;
+    }
+    await rowsQuery.refetch();
+    setLastEvent(`已批量导入 ${createdRows.length} 个${entityName}`);
   }
 
   function updateLocationBatchRange(patch: Partial<LocationBatchRange>) {
@@ -471,17 +517,31 @@ function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
                 {lastEvent}
               </span>
             )}
-            {productActions.includes("新建商品") && (
+            {viewId === "m1-products" && masterDataActions.includes("新建商品") && (
               <Button type="button" onClick={() => setProductCreateOpen(true)}>
                 <Plus className="size-4" aria-hidden />
                 新建商品
               </Button>
             )}
-            {productActions.includes("批量导入") && (
+            {viewId === "m1-products" && masterDataActions.includes("批量导入") && (
               <Button type="button" variant="outline" onClick={triggerProductBatchImport}>
                 <Upload className="size-4" aria-hidden />
                 批量导入
               </Button>
+            )}
+            {viewId === "m1-suppliers" && (
+              <MasterDataSourceActions
+                kind="supplier"
+                onCreate={createSupplierFromDialog}
+                onImport={importSuppliersFromDialog}
+              />
+            )}
+            {viewId === "m1-customers" && (
+              <MasterDataSourceActions
+                kind="customer"
+                onCreate={createCustomerFromDialog}
+                onImport={importCustomersFromDialog}
+              />
             )}
             {viewId === "m1-locations" && (
               <Button type="button" onClick={() => setLocationBatchOpen(true)}>
