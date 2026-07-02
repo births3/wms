@@ -60,6 +60,7 @@ TIER_SCRIPTS: dict[str, list[str]] = {
         "check_project_rtm.py",
         "check_owner_scope_sql.py",
         "check_web_design_rtm.py",
+        "check_admin_list_pages_use_datagrid.py",
         "check_admin_datagrid_system_fields.py",
         "check_baseline_health.py",
         "check_governance_consistency.py",
