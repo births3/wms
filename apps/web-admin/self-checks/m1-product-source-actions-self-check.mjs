@@ -10,7 +10,7 @@ const server = await createServer({
 });
 
 try {
-  const { productSourceLabel, productActionLabels, productTableClassName } =
+  const { productSourceLabel, productActionLabels, productTableClassName, masterDataColumns } =
     await server.ssrLoadModule("/src/pages/master-data/m1-product-page-model.ts");
   const { productRow } = await server.ssrLoadModule(
     "/src/features/master-data/master-data-queries.ts",
@@ -45,6 +45,11 @@ try {
   assert.equal(row.secondaryValue, "国药准字H20260001");
   assert.equal(row.sourceValue, "API接口导入");
   assert.match(row.searchText, /api接口导入/i);
+
+  const sourceColumn = masterDataColumns("m1-products", [], []).find(
+    (column) => column.key === "source",
+  );
+  assert.equal(sourceColumn?.render?.(row), "API接口导入");
 } finally {
   await server.close();
 }

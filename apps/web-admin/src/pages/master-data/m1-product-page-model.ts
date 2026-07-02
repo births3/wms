@@ -16,6 +16,7 @@ const productSourceColumn: DataGridColumn<MasterDataRow> = {
   sortValue: (row) => row.sourceValue ?? "-",
   filterValue: (row) => row.sourceValue ?? "-",
   copyValue: (row) => row.sourceValue ?? "-",
+  render: (row) => row.sourceValue ?? "-",
   filter: {
     type: "multiSelect",
     options: [
