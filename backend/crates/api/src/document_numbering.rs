@@ -1,7 +1,8 @@
 //! Internal M-CG document numbering service exports.
 
 pub use crate::document_numbering_repository::{
-    DocumentNumberingError, GenerateDocumentNumberRequest, IdempotentMutation,
-    PgDocumentNumberingService,
+    DocumentNumberRule, DocumentNumberRuleListResponse, DocumentNumberingError,
+    GenerateDocumentNumberRequest, IdempotentMutation, PgDocumentNumberingService,
+    SetDocumentNumberRuleEnabledRequest, UpsertDocumentNumberRuleRequest,
 };
 pub use wms_domain::DocumentNumberAllocation;

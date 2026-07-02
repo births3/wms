@@ -34,6 +34,10 @@ pub mod wave4_repository;
 pub mod wave5_handlers;
 pub mod wave5_repository;
 
+use crate::document_numbering::{
+    DocumentNumberRule, DocumentNumberRuleListResponse, SetDocumentNumberRuleEnabledRequest,
+    UpsertDocumentNumberRuleRequest,
+};
 use utoipa::OpenApi;
 use wms_domain::{
     AuditActor, AuditEvent, AuditEventListResponse, BatchCreateLocationsRequest, BillingAccount,
@@ -368,6 +372,64 @@ fn disable_system_dictionary_item() {}
 
 #[utoipa::path(
     get,
+    path = "/api/v1/code-generator/document-number-rules",
+    tag = "code-generator",
+    params(
+        ("document_type" = Option<String>, Query, description = "按单据类型过滤"),
+    ),
+    responses(
+        (status = 200, description = "单据号规则列表", body = DocumentNumberRuleListResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+fn list_document_number_rules() {}
+
+#[utoipa::path(
+    put,
+    path = "/api/v1/code-generator/document-number-rules/{rule_code}",
+    tag = "code-generator",
+    params(
+        ("rule_code" = String, Path, description = "规则编码"),
+        ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键"),
+    ),
+    request_body = UpsertDocumentNumberRuleRequest,
+    responses(
+        (status = 200, description = "创建或更新单据号规则", body = DocumentNumberRule),
+        (status = 400, description = "缺少或非法幂等键", body = ErrorResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+        (status = 409, description = "幂等冲突", body = ErrorResponse),
+        (status = 422, description = "规则非法", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+fn upsert_document_number_rule() {}
+
+#[utoipa::path(
+    patch,
+    path = "/api/v1/code-generator/document-number-rules/{rule_code}/enabled",
+    tag = "code-generator",
+    params(
+        ("rule_code" = String, Path, description = "规则编码"),
+        ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键"),
+    ),
+    request_body = SetDocumentNumberRuleEnabledRequest,
+    responses(
+        (status = 200, description = "启用或停用单据号规则", body = DocumentNumberRule),
+        (status = 400, description = "缺少或非法幂等键", body = ErrorResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+        (status = 404, description = "规则不存在", body = ErrorResponse),
+        (status = 409, description = "幂等冲突", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+fn set_document_number_rule_enabled() {}
+
+#[utoipa::path(
+    get,
     path = "/api/v1/code-generator/document-number-allocations",
     tag = "code-generator",
     params(
@@ -669,6 +731,9 @@ fn confirm_container_recovery() {}
         preview_system_dictionary_item_impact,
         upsert_system_dictionary_item,
         disable_system_dictionary_item,
+        list_document_number_rules,
+        upsert_document_number_rule,
+        set_document_number_rule_enabled,
         list_document_number_allocations,
         list_receiving_orders,
         create_receiving_order,
@@ -766,6 +831,8 @@ fn confirm_container_recovery() {}
         CurrentUser,
         Customer,
         CustomerListResponse,
+        DocumentNumberRule,
+        DocumentNumberRuleListResponse,
         DriverTask,
         DriverTaskListResponse,
         DocumentNumberAllocation,
@@ -858,7 +925,9 @@ fn confirm_container_recovery() {}
         UpdateSpecialDrugCategoryRequest,
         UpdateSupplierRequest,
         UpdateWarehouseRequest,
+        SetDocumentNumberRuleEnabledRequest,
         UpsertSystemDictionaryItemRequest,
+        UpsertDocumentNumberRuleRequest,
         WeighPackJobRequest,
         Warehouse,
         WarehouseListResponse,
@@ -922,6 +991,9 @@ mod tests {
             "/api/v1/system-dictionaries/{dict_code}/items/{item_code}",
             "/api/v1/system-dictionaries/{dict_code}/items/{item_code}/impact-preview",
             "/api/v1/system-dictionaries/{dict_code}/items/{item_code}/disable",
+            "/api/v1/code-generator/document-number-rules",
+            "/api/v1/code-generator/document-number-rules/{rule_code}",
+            "/api/v1/code-generator/document-number-rules/{rule_code}/enabled",
             "/api/v1/code-generator/document-number-allocations",
             "/api/v1/inbound/receiving-orders",
             "/api/v1/inbound/receiving-orders/{id}",
@@ -1015,6 +1087,10 @@ mod tests {
             "\"SystemDictionaryImpactReference\"",
             "\"UpsertSystemDictionaryItemRequest\"",
             "\"DisableSystemDictionaryItemRequest\"",
+            "\"DocumentNumberRule\"",
+            "\"DocumentNumberRuleListResponse\"",
+            "\"UpsertDocumentNumberRuleRequest\"",
+            "\"SetDocumentNumberRuleEnabledRequest\"",
             "\"DocumentNumberAllocation\"",
             "\"DocumentNumberAllocationListResponse\"",
             "\"GspLedgerReport\"",

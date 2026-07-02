@@ -15,7 +15,8 @@ use wms_api::{
     },
     document_numbering::{
         DocumentNumberAllocation, DocumentNumberingError, GenerateDocumentNumberRequest,
-        IdempotentMutation, PgDocumentNumberingService,
+        IdempotentMutation, PgDocumentNumberingService, SetDocumentNumberRuleEnabledRequest,
+        UpsertDocumentNumberRuleRequest,
     },
     document_numbering_handlers::{document_numbering_router, DocumentNumberingAppState},
 };
@@ -126,17 +127,34 @@ fn request_for(document_type: &str, idempotency_key: &str) -> GenerateDocumentNu
     }
 }
 
-fn bearer_token(owner_id: Uuid) -> String {
+fn bearer_token(owner_id: Uuid, permissions: Vec<&str>) -> String {
     std::env::set_var(JWT_SECRET_ENV, "test-secret");
     let claims = build_access_claims(
         Uuid::new_v4(),
         owner_id,
         "document-numbering-reader",
-        vec![],
+        permissions.into_iter().map(str::to_string).collect(),
         Uuid::new_v4().to_string(),
         Utc::now(),
     );
     encode_access_token(&claims, "test-secret").expect("token should encode")
+}
+
+fn rule_request(width: i32) -> UpsertDocumentNumberRuleRequest {
+    UpsertDocumentNumberRuleRequest {
+        document_type: DOCUMENT_TYPE_PURCHASE_INBOUND.to_string(),
+        rule_name: "采购入库 API 日流水".to_string(),
+        template: "{OWNER}-{DOCUMENT_TYPE}-{YYYY}{MM}{DD}-{SEQ}".to_string(),
+        reset_policy: "daily".to_string(),
+        sequence_width: width,
+        enabled: true,
+        effective_from: Some(
+            Utc.with_ymd_and_hms(2026, 7, 1, 0, 0, 0)
+                .single()
+                .expect("valid time"),
+        ),
+        effective_to: None,
+    }
 }
 
 async fn generate_and_commit(
@@ -150,6 +168,107 @@ async fn generate_and_commit(
     let generated = service.generate_in_tx(&mut tx, ctx, req, now).await?;
     tx.commit().await.expect("transaction should commit");
     Ok(generated)
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn document_number_rule_management_is_owner_scoped_idempotent_and_audited(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let other_owner_id = Uuid::new_v4();
+    seed_owner(&pool, owner_id, "HZ005").await;
+    seed_owner(&pool, other_owner_id, "HZ006").await;
+    let service = PgDocumentNumberingService::new();
+    let auth = ctx(owner_id);
+    let now = Utc
+        .with_ymd_and_hms(2026, 7, 2, 9, 0, 0)
+        .single()
+        .expect("valid time");
+
+    let created = service
+        .upsert_rule(
+            &pool,
+            &auth,
+            "purchase-inbound-api",
+            rule_request(6),
+            now,
+            "mcg-rule-upsert-1",
+        )
+        .await
+        .expect("rule should upsert");
+    let replay = service
+        .upsert_rule(
+            &pool,
+            &auth,
+            "purchase-inbound-api",
+            rule_request(6),
+            now,
+            "mcg-rule-upsert-1",
+        )
+        .await
+        .expect("same rule idempotency key should replay");
+    assert_eq!(created.value.id, replay.value.id);
+    assert!(replay.replayed);
+
+    let disabled = service
+        .set_rule_enabled(
+            &pool,
+            &auth,
+            "purchase-inbound-api",
+            SetDocumentNumberRuleEnabledRequest { enabled: false },
+            now,
+            "mcg-rule-disable-1",
+        )
+        .await
+        .expect("rule should disable");
+    assert!(!disabled.value.enabled);
+    service
+        .set_rule_enabled(
+            &pool,
+            &auth,
+            "purchase-inbound-api",
+            SetDocumentNumberRuleEnabledRequest { enabled: true },
+            now,
+            "mcg-rule-enable-1",
+        )
+        .await
+        .expect("rule should enable");
+
+    let rules = service
+        .list_rules(&pool, &auth, Some(DOCUMENT_TYPE_PURCHASE_INBOUND))
+        .await
+        .expect("rules should list");
+    assert_eq!(rules.len(), 1);
+    assert_eq!(rules[0].rule_code, "purchase-inbound-api");
+
+    let other_owner_rules = service
+        .list_rules(
+            &pool,
+            &ctx(other_owner_id),
+            Some(DOCUMENT_TYPE_PURCHASE_INBOUND),
+        )
+        .await
+        .expect("other owner rules should list");
+    assert!(other_owner_rules.is_empty());
+
+    let generated = generate_and_commit(&pool, &service, &auth, request("mcg-api-generate-1"), now)
+        .await
+        .expect("number should generate with public-managed rule");
+    assert_eq!(
+        generated.value.generated_no,
+        "HZ005-purchase_inbound-20260702-000001"
+    );
+
+    let audit_count: i64 = sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*)::BIGINT
+          FROM audit_event
+         WHERE owner_id = $1 AND module = 'M-CG'
+        "#,
+    )
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("audit count should query");
+    assert_eq!(audit_count, 4);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -350,7 +469,7 @@ async fn allocation_list_route_filters_by_owner_document_type_date_and_limit(poo
     .await
     .expect("other owner number should generate");
 
-    let token = bearer_token(owner_id);
+    let token = bearer_token(owner_id, vec!["mcg.document_numbering.read"]);
     let app = document_numbering_router(DocumentNumberingAppState::with_postgres(pool)).layer(
         auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(AllowAllRevocationStore))),
     );
@@ -407,10 +526,33 @@ async fn allocation_list_route_requires_auth_context() {
 }
 
 #[tokio::test]
+async fn allocation_list_route_requires_document_numbering_permission() {
+    let pool = PgPool::connect_lazy("postgres://localhost/wms")
+        .expect("lazy pool should not connect during permission rejection test");
+    let token = bearer_token(Uuid::new_v4(), vec![]);
+    let app = document_numbering_router(DocumentNumberingAppState::with_postgres(pool)).layer(
+        auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(AllowAllRevocationStore))),
+    );
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/code-generator/document-number-allocations")
+                .header(AUTHORIZATION, format!("Bearer {token}"))
+                .body(Body::empty())
+                .expect("request should build"),
+        )
+        .await
+        .expect("router should reject missing M-CG permission");
+
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
 async fn allocation_list_route_rejects_invalid_date_query() {
     let pool = PgPool::connect_lazy("postgres://localhost/wms")
         .expect("lazy pool should not connect during query rejection test");
-    let token = bearer_token(Uuid::new_v4());
+    let token = bearer_token(Uuid::new_v4(), vec!["mcg.document_numbering.read"]);
     let app = document_numbering_router(DocumentNumberingAppState::with_postgres(pool)).layer(
         auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(AllowAllRevocationStore))),
     );
