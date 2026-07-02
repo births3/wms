@@ -26,12 +26,13 @@ export type OutboundWave = components["schemas"]["OutboundWave"];
 export interface PurchaseReturnOrder {
   id: string;
   return_no: string;
+  document_type: "purchase_return_outbound";
   source_purchase_order_no: string;
   supplier_name: string;
   reason: string;
+  approval_source: "purchase_return_approval";
   status: string;
   product_code: string;
-  batch_no: string;
   qty: number;
   created_at: string;
   updated_at: string;
@@ -153,17 +154,18 @@ function ReturnDetail({ returnOrder }: { returnOrder: PurchaseReturnOrder }) {
           title="采购退货信息"
           rows={[
             ["采购退货单号", returnOrder.return_no],
+            ["单据类型", purchaseReturnDocumentTypeLabel(returnOrder.document_type)],
             ["原采购入库单", returnOrder.source_purchase_order_no],
             ["供应商", returnOrder.supplier_name],
             ["退货原因", returnOrder.reason],
+            ["审批来源", returnOrder.approval_source],
           ]}
         />
         <DetailBlock
-          title="商品信息"
+          title="商品与数量"
           rows={[
             ["当前状态", statusLabel(returnOrder.status)],
             ["商品编码", returnOrder.product_code],
-            ["批号", returnOrder.batch_no],
             ["数量", `${returnOrder.qty} 件`],
           ]}
         />
@@ -309,6 +311,10 @@ export function statusLabel(status: string) {
     completed: "已完成",
   };
   return labels[status] ?? status;
+}
+
+function purchaseReturnDocumentTypeLabel(value: PurchaseReturnOrder["document_type"]) {
+  return value === "purchase_return_outbound" ? "采购退货出库" : value;
 }
 
 function totalPlannedQty(order: OutboundOrder) {

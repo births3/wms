@@ -83,12 +83,13 @@ const seedReturns: PurchaseReturnOrder[] = [
   {
     id: "00000000-0000-0000-0000-000000008001",
     return_no: "PRTN-M4-PC-0001",
+    document_type: "purchase_return_outbound",
     source_purchase_order_no: "ASN-M2-PC-0001",
     supplier_name: "华东医药供应商",
     reason: "供应商召回",
+    approval_source: "purchase_return_approval",
     status: "pending_approval",
     product_code: "P-M4-001",
-    batch_no: "BATCH-OUT-202606",
     qty: 6,
     created_at: "2026-06-27T10:00:00.000Z",
     updated_at: "2026-06-27T10:00:00.000Z",
@@ -156,10 +157,10 @@ export function M4OutboundPage({ mode, onBack }: M4OutboundPageProps) {
   ];
 
   const returnColumns: DataGridColumn<PurchaseReturnOrder>[] = [
-    { key: "return_no", header: "采购退货单", mono: true, minWidth: 180, render: (row) => <span className="text-primary">{row.return_no}</span> },
+    { key: "return_no", header: "采购退货单 / 类型", mono: true, minWidth: 190, render: (row) => <TwoLine top={row.return_no} bottom={purchaseReturnDocumentTypeLabel(row.document_type)} /> },
     { key: "source_purchase_order_no", header: "原采购入库单", mono: true, minWidth: 180 },
     { key: "supplier_name", header: "供应商 / 原因", minWidth: 200, render: (row) => <TwoLine top={row.supplier_name} bottom={row.reason} /> },
-    { key: "product", header: "商品 / 批号 / 数量", minWidth: 200, render: (row) => <TwoLine top={`${row.product_code} / ${row.qty} 件`} bottom={row.batch_no} /> },
+    { key: "product", header: "商品 / 数量", minWidth: 160, render: (row) => <TwoLine top={row.product_code} bottom={`${row.qty} 件`} /> },
     { key: "created_at", header: "创建时间", minWidth: 150, filter: { type: "dateRange" }, render: (row) => formatDate(row.created_at) },
     { key: "status", header: "状态", minWidth: 130, filter: { type: "multiSelect", options: statusOptions(mode).map(([value, label]) => ({ value, label })) }, render: (row) => <StatusBadge status={statusKey(row.status)} label={statusLabel(row.status)} size="sm" /> },
     { key: "actions", header: "操作", align: "right", minWidth: 360, filter: false, sortable: false, copyable: false, hideable: false, render: (row) => <ReturnActions row={row} onDetail={openReturnDetail} onAction={openAction} /> },
@@ -414,7 +415,7 @@ function FilterBar({ keyword, statusFilter, dateFilter, mode, onKeywordChange, o
   return (
     <Card className="rounded-lg shadow-sm">
       <CardContent className="grid gap-3 p-4 md:grid-cols-[minmax(18rem,1fr)_10rem_9rem_auto] md:items-end">
-        <TextField label="关键字" value={keyword} onChange={onKeywordChange} placeholder="单号 / 商品 / 批号 / 客户或供应商" />
+        <TextField label="关键字" value={keyword} onChange={onKeywordChange} placeholder={keywordPlaceholder(mode)} />
         <div>
           <label className="mb-1 block text-xs text-muted-foreground">状态</label>
           <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={statusFilter} onChange={(event) => onStatusFilterChange(event.target.value)}>
@@ -436,6 +437,11 @@ function TextField({ label, value, onChange, type = "text", placeholder, classNa
       <Input type={type} value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
     </label>
   );
+}
+
+function keywordPlaceholder(mode: M4OutboundMode) {
+  if (mode === "returns") return "采购退货单 / 原采购入库单 / 商品 / 供应商";
+  return "单号 / 商品 / 批号 / 客户";
 }
 
 function Metric({ label, value, tone }: { label: string; value: number; tone: "primary" | "warning" | "success" | "muted" }) {
@@ -484,6 +490,10 @@ function TwoLine({ top, bottom }: { top: string; bottom: string }) {
   );
 }
 
+function purchaseReturnDocumentTypeLabel(value: PurchaseReturnOrder["document_type"]) {
+  return value === "purchase_return_outbound" ? "采购退货出库" : value;
+}
+
 function ActionExtraFields({ kind }: { kind: ActionKind }) {
   return <>{extraActionFields(kind).map(([label, value]) => <StaticField key={label} label={label} defaultValue={value} />)}</>;
 }
@@ -492,7 +502,15 @@ function extraActionFields(kind: ActionKind): Array<[string, string]> {
   if (kind === "release-wave" || kind === "create-wave") return [["路径策略", "S 型最短路径"], ["温区", "常温"], ["容量上限", "100 单 / 10000 件"]];
   if (kind === "review") return [["工位码", "PK-STATION-01"], ["实际复核数量", "按扫码累计"], ["短拣标识", "否"], ["复核人", "当前用户"]];
   if (kind === "ship") return [["配送方类型", "第三方快递"], ["包裹数量", "1"], ["车牌号", "沪A-12345"], ["装车温度", "冷链时必填"], ["签字", "交接双方签字"]];
-  if (kind.includes("return")) return [["原采购入库单", "ASN-M2-PC-0001"], ["供应商", "华东医药供应商"], ["退货原因", "供应商召回"]];
+  if (kind.includes("return")) return [
+    ["单据类型", "采购退货出库"],
+    ["原采购入库单", "ASN-M2-PC-0001"],
+    ["供应商", "华东医药供应商"],
+    ["退货原因", "供应商召回"],
+    ["商品", "P-M4-001"],
+    ["数量", "3 件"],
+    ["审批来源", "purchase_return_approval"],
+  ];
   return [["校验结果", "指定批号库存充足"], ["审批来源", "企业微信"]];
 }
 
@@ -562,7 +580,7 @@ function actionMeta(kind: ActionKind) {
     "create-return": { title: "新建采购退货单", description: "创建退供应商的出库申请。", submitLabel: "创建采购退货单" },
     "approve-return": { title: "采购退货审批", description: "审批退供应商出库申请。", submitLabel: "审批通过" },
     "pick-return": { title: "采购退货拣货", description: "记录退供应商出库拣货结果。", submitLabel: "确认拣货" },
-    "review-return": { title: "采购退货复核", description: "复核退供应商商品、批号和数量。", submitLabel: "提交复核" },
+    "review-return": { title: "采购退货复核", description: "复核退供应商商品和数量。", submitLabel: "提交复核" },
     "ship-return": { title: "采购退货出库交接", description: "确认退供应商出库交接。", submitLabel: "确认出库" },
   };
   return map[kind];
@@ -594,7 +612,7 @@ function filterWaves(waves: OutboundWave[], keyword: string, status: string) {
 }
 
 function filterReturns(returns: PurchaseReturnOrder[], keyword: string, status: string) {
-  return returns.filter((item) => matches(`${item.return_no} ${item.source_purchase_order_no} ${item.supplier_name} ${item.product_code} ${item.batch_no}`.toLowerCase(), keyword) && (status === "all" || item.status === status));
+  return returns.filter((item) => matches(`${item.return_no} ${item.document_type} ${item.source_purchase_order_no} ${item.supplier_name} ${item.reason} ${item.product_code} ${item.approval_source}`.toLowerCase(), keyword) && (status === "all" || item.status === status));
 }
 
 function matches(searchable: string, keyword: string) {
@@ -626,7 +644,20 @@ function makeWave(waveNo: string, orderIds: string[]): OutboundWave {
 
 function makeReturn(returnNo: string): PurchaseReturnOrder {
   const now = new Date().toISOString();
-  return { id: crypto.randomUUID(), return_no: returnNo, source_purchase_order_no: "ASN-M2-PC-0001", supplier_name: "华东医药供应商", reason: "供应商召回", status: "pending_approval", product_code: "P-M4-001", batch_no: "BATCH-OUT-202606", qty: 3, created_at: now, updated_at: now };
+  return {
+    id: crypto.randomUUID(),
+    return_no: returnNo,
+    document_type: "purchase_return_outbound",
+    source_purchase_order_no: "ASN-M2-PC-0001",
+    supplier_name: "华东医药供应商",
+    reason: "供应商召回",
+    approval_source: "purchase_return_approval",
+    status: "pending_approval",
+    product_code: "P-M4-001",
+    qty: 3,
+    created_at: now,
+    updated_at: now,
+  };
 }
 
 function countOrders(orders: OutboundOrder[], status: string) {
