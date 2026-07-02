@@ -22,6 +22,7 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUT_DIR = REPO_ROOT / ".codex" / "issue-agent"
+ISSUE_WORKTREE_PARENT = REPO_ROOT.parent
 ANALYSIS_MARKER = "<!-- wms-issue-agent:analysis:v2 -->"
 TMUX_MARKER = "<!-- wms-issue-agent:tmux:v1 -->"
 MERGE_MARKER = "<!-- wms-issue-agent:merge:v1 -->"
@@ -503,7 +504,7 @@ def build_fix_prompt(issue: dict[str, Any], comments: list[dict[str, Any]]) -> s
 用户已在 issue 评论中确认执行。请按 WMS 仓库规则处理：
 1. 使用 `wms-loop-engineering` 定义目标、输入、检查、反馈和停止条件。
 2. 使用 `wms-execution-retrospective` 从 issue 标题、正文、评论和附件中先判断是否存在共性问题；若是共性问题，必须同步补规则、脚本或矩阵，不能只修一个页面。
-3. 必须使用 `wms-worktree-subagent` 或独立 git worktree 隔离开发；禁止直接修改当前主工作区。
+3. 当前 `codex exec` 应运行在 issue 专属 worktree 中；先运行 `pwd`、`git status --short --branch` 和 `git worktree list` 核对。必须使用 `wms-worktree-subagent` 或该独立 git worktree 隔离开发；禁止 checkout、修改或提交主工作区。
 4. 只修复 issue 指向的问题。新增字段、状态、角色、模块或业务默认值时停止并向用户确认。
 5. 完成后运行相关测试，至少 `git diff --check` 和 `just gov-t1`。
 6. 涉及前端或用户可见行为时，禁止在子 worktree 中启动或占用 9002；9002 只允许主工作区固定会话 `wms-web-admin-9002`。需要真实截图或重启证据时，合并到主工作区后由主代理运行 `just dev-web-restart` 和 `just dev-web-verify`，后端按仓库现有运行方式启动并检查 `/healthz`。重启后必须校验运行的是本次修复版本：记录当前提交哈希，并用 `just dev-web-verify` 输出、页面可见变更、接口响应版本字段或等价证据证明不是旧进程缓存；把端口、URL、提交哈希和版本校验结果写入 PR 与 issue。
@@ -572,6 +573,24 @@ def display_path(path: Path) -> str:
         return str(path)
 
 
+def issue_worktree(issue_number: int, stamp: str) -> tuple[Path, str]:
+    name = f"{REPO_ROOT.name}-agent-issue-{issue_number}-{stamp}"
+    branch = f"fix/issue-{issue_number}-{stamp}"
+    return ISSUE_WORKTREE_PARENT / name, branch
+
+
+def build_codex_command(work_dir: Path, prompt_path: Path, log_path: Path, *, exec_mode: bool) -> str:
+    if exec_mode:
+        return (
+            f"codex exec --dangerously-bypass-approvals-and-sandbox -C {quote(str(work_dir))} "
+            f"- < {quote(str(prompt_path))} 2>&1 | tee {quote(str(log_path))}"
+        )
+    return (
+        f"codex --dangerously-bypass-approvals-and-sandbox -C {quote(str(work_dir))} "
+        f"\"$(cat {quote(str(prompt_path))})\""
+    )
+
+
 def inject_tmux(target: str, prompt: str) -> str:
     run(["tmux", "display-message", "-p", "-t", target, "#{session_name}:#{window_index}.#{pane_index}"])
     with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as f:
@@ -587,25 +606,19 @@ def inject_tmux(target: str, prompt: str) -> str:
 
 
 def start_tmux_session(issue_number: int, prompt_path: Path, session_prefix: str, *, exec_mode: bool) -> str:
-    session = f"{session_prefix}-{issue_number}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    stamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    session = f"{session_prefix}-{issue_number}-{stamp}"
     script = prompt_path.with_suffix(".run.sh")
     log_path = prompt_path.with_suffix(".log")
-    if exec_mode:
-        command = (
-            f"codex exec --dangerously-bypass-approvals-and-sandbox -C {quote(str(REPO_ROOT))} "
-            f"- < {quote(str(prompt_path))} 2>&1 | tee {quote(str(log_path))}"
-        )
-    else:
-        command = (
-            f"codex --dangerously-bypass-approvals-and-sandbox -C {quote(str(REPO_ROOT))} "
-            f"\"$(cat {quote(str(prompt_path))})\""
-        )
+    work_dir, branch = issue_worktree(issue_number, stamp)
+    run(["git", "worktree", "add", "-b", branch, str(work_dir), "HEAD"])
+    command = build_codex_command(work_dir, prompt_path, log_path, exec_mode=exec_mode)
     script.write_text(
         "\n".join(
             [
                 "#!/usr/bin/env bash",
                 "set -euo pipefail",
-                f"cd {quote(str(REPO_ROOT))}",
+                f"cd {quote(str(work_dir))}",
                 command,
             ]
         )
@@ -613,7 +626,7 @@ def start_tmux_session(issue_number: int, prompt_path: Path, session_prefix: str
         encoding="utf-8",
     )
     script.chmod(0o700)
-    run(["tmux", "new-session", "-d", "-s", session, "-c", str(REPO_ROOT), str(script)])
+    run(["tmux", "new-session", "-d", "-s", session, "-c", str(work_dir), str(script)])
     return session
 
 
@@ -783,6 +796,17 @@ def self_test() -> int:
     issue = {"number": 7, "title": "测试", "body": "正文", "labels": [], "user": {"login": "u"}}
     assert display_path(REPO_ROOT / "justfile") == "justfile"
     assert display_path(Path("/tmp/wms-issue-agent-preview.txt")) == "/tmp/wms-issue-agent-preview.txt"
+    worktree_path, branch = issue_worktree(7, "20260702010101")
+    assert worktree_path.name == "wms-agent-issue-7-20260702010101"
+    assert branch == "fix/issue-7-20260702010101"
+    command = build_codex_command(
+        worktree_path,
+        DEFAULT_OUT_DIR / "issue-7-tmux.txt",
+        DEFAULT_OUT_DIR / "issue-7-tmux.log",
+        exec_mode=True,
+    )
+    assert f"-C {quote(str(worktree_path))}" in command
+    assert f"-C {quote(str(REPO_ROOT))} " not in command
     t0 = "2026-07-01T00:00:00Z"
     t1 = "2026-07-01T00:01:00Z"
     comments = [{"created_at": t0, "body": build_analysis_comment(issue, [])}]

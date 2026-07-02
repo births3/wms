@@ -105,7 +105,7 @@ python3 scripts/agents/issue_runner.py self-test
 - 默认 dry-run。
 - 一轮只处理一个 issue。
 - 未确认前只评论判断，不改代码。
-- 默认新开独立 tmux 任务会话并运行 `codex exec`，避免依赖交互式 TUI 粘贴状态。
+- 默认新开独立 tmux 任务会话，并先创建 `../wms-agent-issue-<编号>-<时间>` worktree，再在该 worktree 中运行 `codex exec`；禁止在主工作区直接执行 issue 修复。
 - 使用 `--tmux-mode paste` 时，发送前必须能找到目标 pane。
 - 长期 watcher 必须用 `just issue-agent-restart` 启动，并用 `just issue-agent-verify` 确认；只看到 `wms-issue-agent` tmux 会话存在不算健康，必须有 `scripts/agents/issue_runner.py watch` 进程。
 - prompt 要求 Codex 禁止推 main、禁止强推。
@@ -122,7 +122,7 @@ python3 scripts/agents/issue_runner.py self-test
 - 重启后必须校验运行的是本次修复版本：主代理在主工作区运行 `just dev-web-restart` 和 `just dev-web-verify`，记录提交哈希，并用校验输出、页面可见变更、接口响应版本字段或等价证据证明不是旧进程缓存。
 - 前端或用户可见行为修复必须采集真实前端截图，用 `POST /repos/{owner}/{repo}/issues/<编号>/assets` 上传为 Gitea 附件，并用 Markdown 图片同时评论到 PR 与 issue；不能只写本地路径。
 - 新增字段、状态、角色、模块或业务默认值时，Codex 必须停止并询问用户。
-- `session` 和 `paste` 只用于调试；无人值守定时任务必须使用默认 `exec` 模式。
+- `session` 和 `paste` 只用于调试；无人值守定时任务必须使用默认 `exec` 模式。`paste` 目标 pane 必须已经位于独立 worktree，不能指向主工作区。
 
 ## Loop 迭代检查
 
@@ -134,7 +134,7 @@ python3 scripts/agents/issue_runner.py self-test
 | 判断评论 | 内容中文，包含结论、置信度、代码核查证据、依据、预计影响范围、建议动作、验证要求和停止条件；不能只要求 `/confirm`，不能只复述 issue |
 | 输入附件 | issue 本体和 issue 评论中的截图 / 附件必须以可下载 URL 写入判断评论和执行 prompt |
 | 确认识别 | `/confirm` 或 `codex:confirmed` 才触发 tmux |
-| tmux 投递 | 默认新建 issue 任务会话并运行 `codex exec`；paste 模式只发送到固定 pane，目标不存在则失败停止 |
+| tmux 投递 | 默认新建 issue 任务会话、创建独立 worktree 并在该 worktree 运行 `codex exec`；paste 模式只发送到固定 pane，目标不存在则失败停止 |
 | WMS 执行 | Codex 使用 WMS skills，完成验证；前端截图和 9002 重启证据由主代理在主工作区校验后补齐，且不自行合并 PR |
 | 证据回写 | PR 与 issue 都包含真实截图附件、本地测试环境重启结果、重启后版本校验、tmux 任务会话状态、PR 合并前置条件和剩余风险 |
 | 状态评论 | 已交付 PR、等待合并、阻塞、状态更正等评论不能触发新一轮判断；只有后续人工补充真实新需求时才重新判断 |
