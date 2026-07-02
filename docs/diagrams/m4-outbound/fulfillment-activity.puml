@@ -36,18 +36,24 @@ else (否)
   :拣选完成;
 endif
 
+:复核前查询 M-VR\nprocess=出库, node=复核;
+:复核人和拣选人不同;
 if (复核模式 = 包装站?) then (是)
   :包装站 PC + 扫码枪复核;
-  :必要时称重校验;
 elseif (复核模式 = PDA 整件?) then (是)
   :PDA 扫容器 LPN 复核;
 else (PDA 零件)
   :PDA 逐件扫追溯码复核;
 endif
 
-:复核前查询 M-VR\nprocess=出库, node=复核;
-:复核人和拣选人不同;
 :复核确认，订单状态 = 已复核;
+:装箱前查询 M-VR\nprocess=出库, node=装箱;
+if (装箱模式 = 包装站?) then (是)
+  :M-PK 包装站装箱;
+  :M-PK 称重校验;
+else (PDA 整件直发)
+  :M-PK PDA 装箱;
+endif
 :追溯码出库核销 / M-TC 上报;
 :打印随货同行单\n多货主使用货主抬头;
 :接收 M10 / H5 配送方结果;
@@ -66,12 +72,17 @@ endif
 :交接前查询 M-VR\nprocess=出库, node=发货交接;
 :发货交接确认;
 :发货时扣减库存;
-:写 H2 审计并异步反馈 ERP 已出库;
+:校验 H1 权限和 Idempotency-Key\n写 H2 审计并异步反馈 ERP 已出库;
 :订单状态 = 已发货;
 stop
 
 note right
 复核无“不通过”状态。
 发现问题按故事记录差异并走后续退回流程。
+end note
+
+note bottom
+所有写操作需要 H1 权限、Idempotency-Key 和 H2 审计。
+M-VR 查询必须发生在对应作业提交前。
 end note
 @enduml

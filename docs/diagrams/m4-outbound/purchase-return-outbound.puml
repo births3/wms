@@ -18,7 +18,7 @@ if (仓库主管审批通过?) then (是)
   :状态 = 待拣货;
 else (否)
   :状态 = 已拒绝;
-  :写 H2 审计;
+  :校验 H1 权限和 Idempotency-Key\n写 H2 审计;
   stop
 endif
 
@@ -31,7 +31,12 @@ endif
 :审批源 = purchase_return_approval;
 :交接确认后扣减库存;
 :状态 = 已发货;
-:申请、审批、拣货、复核、交接、扣减均写 H2 审计;
+:申请、审批、拣货、复核、交接、扣减均校验 H1 权限和 Idempotency-Key，并写 H2 审计;
 stop
+
+note bottom
+采购退货出库复用 M4 出库链路。
+所有写操作需要 H1 权限、Idempotency-Key 和 H2 审计。
+end note
 
 @enduml
