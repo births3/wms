@@ -17,6 +17,7 @@ type Supplier = components["schemas"]["Supplier"];
 type Customer = components["schemas"]["Customer"];
 type Warehouse = components["schemas"]["Warehouse"];
 type Location = components["schemas"]["Location"];
+export type UpdateProductRequest = components["schemas"]["UpdateProductRequest"];
 export type BatchCreateLocationsRequest = components["schemas"]["BatchCreateLocationsRequest"];
 export type SystemDictionaryItem = components["schemas"]["SystemDictionaryItem"];
 export type UpsertSystemDictionaryItemRequest =
@@ -39,8 +40,19 @@ export interface MasterDataRow {
   extraValue: string;
   createdAt: string;
   updatedAt: string;
+  productFields?: ProductMasterDataFields;
   locationFields?: LocationMasterDataFields;
   searchText: string;
+}
+
+export interface ProductMasterDataFields {
+  approvalNo?: string | null;
+  attrs: Record<string, unknown>;
+  dosageForm?: string | null;
+  manufacturer?: string | null;
+  specialDrugCategoryCode?: string | null;
+  spec?: string | null;
+  storageCondition?: string | null;
 }
 
 export interface LocationMasterDataFields {
@@ -114,6 +126,16 @@ export function useDisableSystemDictionaryItemMutation() {
   });
 }
 
+export function useUpdateProductMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: updateProduct,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: [...masterDataQueryKey, "m1-products"] });
+    },
+  });
+}
+
 async function listMasterDataRows(viewId: MasterDataViewId): Promise<MasterDataRow[]> {
   switch (viewId) {
     case "m1-products":
@@ -137,6 +159,20 @@ async function listProducts(): Promise<MasterDataRow[]> {
     throw new ApiError(result.error, "读取商品档案失败", result.response.status);
   }
   return result.data.data.map(productRow);
+}
+
+async function updateProduct(input: {
+  id: string;
+  request: UpdateProductRequest;
+}): Promise<Product> {
+  const result = await api.PATCH("/api/v1/master-data/products/{id}", {
+    params: { path: { id: input.id } },
+    body: input.request,
+  });
+  if (!result.data) {
+    throw new ApiError(result.error, "保存商品档案失败", result.response.status);
+  }
+  return result.data;
 }
 
 async function listSuppliers(): Promise<MasterDataRow[]> {
@@ -251,6 +287,7 @@ async function disableSystemDictionaryItem(input: {
 }
 
 function productRow(item: Product): MasterDataRow {
+  const storageCondition = text(item.attrs.storage_condition ?? item.attrs.storage);
   return row({
     id: item.id,
     code: item.product_code,
@@ -263,9 +300,18 @@ function productRow(item: Product): MasterDataRow {
     secondaryLabel: "批准文号",
     secondaryValue: text(item.approval_no),
     extraLabel: "储存条件",
-    extraValue: text(item.attrs.storage_condition ?? item.attrs.storage),
+    extraValue: storageCondition,
     createdAt: item.created_at,
     updatedAt: item.updated_at,
+    productFields: {
+      approvalNo: item.approval_no,
+      attrs: item.attrs,
+      dosageForm: item.dosage_form,
+      manufacturer: item.manufacturer,
+      specialDrugCategoryCode: item.special_drug_category_code,
+      spec: item.spec,
+      storageCondition,
+    },
   });
 }
 

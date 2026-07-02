@@ -27,10 +27,11 @@ import {
   defaultLocationBatchType,
   initialLocationBatchRange,
 } from "./LocationBatchDialog";
+import { ProductEditDialog } from "./ProductEditDialog";
+import { masterDataGridClassName, productColumns } from "./ProductEditTable";
 import { M1SystemDictionaryPage } from "./SystemDictionaryPage";
-
+import { useProductEditDialog } from "./use-product-edit-dialog";
 export type { MasterDataViewId } from "@/features/master-data/master-data-queries";
-
 export const masterDataViewMeta: Record<
   MasterDataViewId,
   { title: string; subtitle: string; emptyTitle: string; storageKey: string }
@@ -77,7 +78,6 @@ interface M1MasterDataPageProps {
   viewId: MasterDataViewId;
   onBack: () => void;
 }
-
 const columns: DataGridColumn<MasterDataRow>[] = [
   {
     key: "code",
@@ -325,6 +325,10 @@ function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
   const rowsQuery = useMasterDataRowsQuery(viewId);
   const [keyword, setKeyword] = React.useState("");
   const [lastEvent, setLastEvent] = React.useState<string | null>(null);
+  const productEdit = useProductEditDialog({
+    refetchRows: rowsQuery.refetch,
+    onSaved: (productCode) => setLastEvent(`${productCode} 已保存`),
+  });
   const [locationBatchOpen, setLocationBatchOpen] = React.useState(false);
   const [locationBatchRange, setLocationBatchRange] =
     React.useState<LocationBatchRange>(initialLocationBatchRange);
@@ -381,7 +385,12 @@ function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
     locationBatchScopes.find((scope) => scope.key === locationBatchScopeKey) ??
     locationBatchScopes[0] ??
     null;
-  const gridColumns = viewId === "m1-locations" ? locationColumns : columns;
+  const gridColumns =
+    viewId === "m1-products"
+      ? productColumns(columns, productEdit.openDialog)
+      : viewId === "m1-locations"
+        ? locationColumns
+        : columns;
 
   React.useEffect(() => {
     if (viewId !== "m1-locations") return;
@@ -505,7 +514,16 @@ function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
         caption={rowsQuery.isPending ? "加载基础档案..." : undefined}
         emptyTitle={meta.emptyTitle}
         storageKey={meta.storageKey}
-        tableClassName={viewId === "m1-locations" ? "min-w-[1910px]" : "min-w-[1650px]"}
+        tableClassName={masterDataGridClassName(viewId)}
+      />
+
+      <ProductEditDialog
+        form={productEdit.form}
+        pending={productEdit.pending}
+        error={productEdit.error}
+        onFormChange={productEdit.updateForm}
+        onOpenChange={productEdit.closeDialog}
+        onSubmit={productEdit.submit}
       />
 
       {viewId === "m1-locations" && (

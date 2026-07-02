@@ -54,6 +54,22 @@ interface DevOrder {
   lines: DevOrderLine[];
 }
 
+interface DevProduct {
+  id: string;
+  owner_id: string;
+  product_code: string;
+  product_name: string;
+  spec: string;
+  dosage_form: string | null;
+  approval_no: string | null;
+  manufacturer: string | null;
+  special_drug_category_code: string | null;
+  attrs: Record<string, unknown>;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
 const devCreatedOrders: DevOrder[] = [];
 const devSeedOrderStatusOverrides = new Map<string, string>();
 
@@ -65,6 +81,22 @@ const devUser = {
   display_name: "Test Admin",
   roles: ["admin", "receiving"],
   permissions: ["h1.auth.me", "m2.receive", "m2.inspect", "m2.sign", "m2.putaway"],
+};
+
+let devProduct: DevProduct = {
+  id: "00000000-0000-0000-0000-000000001001",
+  owner_id: devOwnerId,
+  product_code: "P-M1-001",
+  product_name: "冷藏胰岛素注射液",
+  spec: "10ml*1支",
+  dosage_form: "注射剂",
+  approval_no: "国药准字H20260001",
+  manufacturer: "鹏鹞示例药业",
+  special_drug_category_code: "none",
+  attrs: { storage_condition: "cold" } as Record<string, unknown>,
+  status: "active",
+  created_at: "2026-06-29T00:00:00.000Z",
+  updated_at: "2026-06-29T00:00:00.000Z",
 };
 
 function webAdminDevMock(): Plugin {
@@ -131,6 +163,12 @@ async function handleDevMockRequest(
     return true;
   }
 
+  const productDetail = pathname.match(/^\/api\/v1\/master-data\/products\/([^/]+)$/);
+  if (req.method === "PATCH" && productDetail) {
+    await handleProductUpdate(req, res, productDetail[1]);
+    return true;
+  }
+
   if (req.method === "GET") {
     const masterDataResponse = devMasterDataResponse(pathname);
     if (masterDataResponse) {
@@ -184,23 +222,7 @@ function devMasterDataResponse(pathname: string): Record<string, unknown> | null
 
   if (pathname === "/api/v1/master-data/products") {
     return {
-      data: [
-        {
-          id: "00000000-0000-0000-0000-000000001001",
-          owner_id: devOwnerId,
-          product_code: "P-M1-001",
-          product_name: "冷藏胰岛素注射液",
-          spec: "10ml*1支",
-          dosage_form: "注射剂",
-          approval_no: "国药准字H20260001",
-          manufacturer: "鹏鹞示例药业",
-          special_drug_category_code: "none",
-          attrs: { storage_condition: "cold" },
-          status: "active",
-          created_at: updatedAt,
-          updated_at: updatedAt,
-        },
-      ],
+      data: [devProduct],
       page,
       inventory_alert_count: 0,
       pending_receipt_orders: 0,
@@ -329,6 +351,34 @@ function devMasterDataResponse(pathname: string): Record<string, unknown> | null
   }
 
   return null;
+}
+
+async function handleProductUpdate(req: IncomingMessage, res: ServerResponse, id: string) {
+  if (id !== devProduct.id) {
+    sendJson(res, 404, {
+      code: "DEV_MOCK_NOT_FOUND",
+      message: "Product not found",
+      trace_id: "dev-mock",
+    });
+    return;
+  }
+
+  const body = await readJsonBody(req);
+  const attrs = asRecord(body.attrs);
+  const storageCondition = asString(attrs.storage_condition, asString(devProduct.attrs.storage_condition, "normal"));
+  devProduct = {
+    ...devProduct,
+    product_name: asString(body.product_name, devProduct.product_name),
+    spec: asNullableString(body.spec) ?? devProduct.spec,
+    dosage_form: asNullableString(body.dosage_form),
+    approval_no: asNullableString(body.approval_no),
+    manufacturer: asNullableString(body.manufacturer),
+    special_drug_category_code: asNullableString(body.special_drug_category_code),
+    attrs: { ...devProduct.attrs, ...attrs, storage_condition: storageCondition },
+    status: asString(body.status, devProduct.status),
+    updated_at: new Date().toISOString(),
+  };
+  sendJson(res, 200, devProduct);
 }
 
 async function handleInboundAction(req: IncomingMessage, res: ServerResponse, action: string | undefined, orderId: string) {
