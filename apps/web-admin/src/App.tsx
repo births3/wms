@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Button, Card, CardContent, Input, PageHeader, StatusBadge } from "@wms/ui";
+import { Button, Card, CardContent, Input, PageHeader, StatusBadge, cn } from "@wms/ui";
 import {
   Activity,
   BookOpen,
@@ -11,6 +11,8 @@ import {
   LogOut,
   MapPinned,
   PackageCheck,
+  PanelLeftClose,
+  PanelLeftOpen,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -233,6 +235,7 @@ function AppShell({
 }) {
   const [menuFilter, setMenuFilter] = React.useState("");
   const [menuFilterOpen, setMenuFilterOpen] = React.useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
   const normalizedMenuFilter = menuFilter.trim().toLowerCase();
   const visibleMenuSections = menuSections
     .map((section) => ({
@@ -244,15 +247,37 @@ function AppShell({
     .filter((section) => section.items.length > 0);
 
   return (
-    <div className="min-h-screen bg-muted/30 text-foreground lg:grid lg:grid-cols-[14rem_1fr]">
+    <div
+      className={cn(
+        "min-h-screen bg-muted/30 text-foreground lg:grid",
+        sidebarCollapsed ? "lg:grid-cols-[4.5rem_1fr]" : "lg:grid-cols-[14rem_1fr]",
+      )}
+    >
       <aside className="hidden border-r bg-background lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col">
-        <div className="border-b px-5 py-5">
-          <div className="text-lg font-semibold tracking-normal">WMS Admin</div>
-          <div className="mt-1 text-xs text-muted-foreground">{currentUser.owner_code}</div>
+        <div className={cn("flex items-center gap-3 border-b py-5", sidebarCollapsed ? "justify-center px-3" : "justify-between px-5")}>
+          {!sidebarCollapsed && (
+            <div className="min-w-0">
+              <div className="truncate text-lg font-semibold tracking-normal">WMS Admin</div>
+              <div className="mt-1 truncate text-xs text-muted-foreground">{currentUser.owner_code}</div>
+            </div>
+          )}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={sidebarCollapsed ? "展开侧边栏" : "收缩侧边栏"}
+            title={sidebarCollapsed ? "展开侧边栏" : "收缩侧边栏"}
+            onClick={() => {
+              setSidebarCollapsed((value) => !value);
+              setMenuFilterOpen(false);
+            }}
+          >
+            {sidebarCollapsed ? <PanelLeftOpen className="size-4" aria-hidden /> : <PanelLeftClose className="size-4" aria-hidden />}
+          </Button>
         </div>
 
-        <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
-          {menuFilterOpen ? (
+        <nav className={cn("flex-1 overflow-y-auto py-4", sidebarCollapsed ? "space-y-2 px-2" : "space-y-5 px-3")}>
+          {!sidebarCollapsed && menuFilterOpen ? (
             <div className="space-y-2">
               <label className="relative block">
                 <Search className="pointer-events-none absolute left-2.5 top-2.5 size-4 text-muted-foreground" aria-hidden />
@@ -278,12 +303,12 @@ function AppShell({
                 收起筛选
               </Button>
             </div>
-          ) : (
+          ) : !sidebarCollapsed ? (
             <Button type="button" variant="outline" className="w-full justify-start" onClick={() => setMenuFilterOpen(true)}>
               <Search className="size-4" aria-hidden />
               筛选菜单
             </Button>
-          )}
+          ) : null}
           {visibleMenuSections.map((section) => (
             <MenuSection
               key={section.label}
@@ -292,18 +317,27 @@ function AppShell({
               onNavigate={onNavigate}
               items={section.items}
               forceOpen={Boolean(normalizedMenuFilter)}
+              collapsed={sidebarCollapsed}
             />
           ))}
         </nav>
 
-        <div className="mt-auto border-t px-4 py-4">
-          <div className="mb-3 min-w-0">
+        <div className={cn("mt-auto border-t py-4", sidebarCollapsed ? "px-2" : "px-4")}>
+          {!sidebarCollapsed && <div className="mb-3 min-w-0">
             <div className="truncate text-sm font-medium">{currentUser.display_name}</div>
             <div className="truncate text-xs text-muted-foreground">{currentUser.username}</div>
-          </div>
-          <Button type="button" variant="outline" className="w-full justify-start" onClick={onLogout}>
+          </div>}
+          <Button
+            type="button"
+            variant="outline"
+            size={sidebarCollapsed ? "icon" : "default"}
+            className={cn("w-full", !sidebarCollapsed && "justify-start")}
+            aria-label={sidebarCollapsed ? "退出登录" : undefined}
+            title={sidebarCollapsed ? "退出登录" : undefined}
+            onClick={onLogout}
+          >
             <LogOut className="size-4" aria-hidden />
-            退出登录
+            {!sidebarCollapsed && "退出登录"}
           </Button>
         </div>
       </aside>
@@ -339,20 +373,52 @@ function MenuSection({
   activeView,
   onNavigate,
   forceOpen = false,
+  collapsed = false,
 }: {
   label: string;
   items: MenuItem[];
   activeView: AdminView;
   onNavigate: (view: AdminView) => void;
   forceOpen?: boolean;
+  collapsed?: boolean;
 }) {
   const hasActive = items.some((item) => item.id === activeView);
   const [open, setOpen] = React.useState(() => hasActive || label === "工作台" || label === "入库业务");
-  const visible = forceOpen || open;
+  const visible = collapsed || forceOpen || open;
 
   React.useEffect(() => {
     if (hasActive) setOpen(true);
   }, [hasActive]);
+
+  if (collapsed) {
+    return (
+      <section aria-label={label}>
+        <div className="space-y-1">
+          {items.map((item) => {
+            const Icon = item.icon;
+            const active = item.id === activeView;
+            return (
+              <button
+                key={item.title}
+                type="button"
+                aria-current={active ? "page" : undefined}
+                aria-label={item.title}
+                title={item.title}
+                disabled={item.disabled}
+                onClick={() => item.id && onNavigate(item.id)}
+                className={cn(
+                  "flex size-10 w-full items-center justify-center rounded-md disabled:cursor-not-allowed disabled:opacity-45",
+                  active ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-muted"
+                )}
+              >
+                <Icon className="size-4" aria-hidden />
+              </button>
+            );
+          })}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section>
