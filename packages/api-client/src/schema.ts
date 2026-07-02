@@ -1438,6 +1438,7 @@ export interface components {
             customer_code: string;
             customer_name: string;
             license_no?: string | null;
+            source?: string | null;
         };
         CreateLocationRequest: {
             /** Format: uuid */
@@ -1552,6 +1553,7 @@ export interface components {
         CreateSupplierRequest: {
             contact_name?: string | null;
             license_no?: string | null;
+            source?: string | null;
             supplier_code: string;
             supplier_name: string;
         };
@@ -1611,6 +1613,7 @@ export interface components {
             license_no?: string | null;
             /** Format: uuid */
             owner_id: string;
+            source: string;
             status: string;
             /** Format: date-time */
             updated_at: string;
@@ -2405,6 +2408,7 @@ export interface components {
             license_no?: string | null;
             /** Format: uuid */
             owner_id: string;
+            source: string;
             status: string;
             supplier_code: string;
             supplier_name: string;

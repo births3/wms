@@ -7,14 +7,15 @@ use sha2::{Digest, Sha256};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{
-    BatchCreateLocationsRequest, Customer, Location, LocationListResponse, PageMeta, Product,
+    BatchCreateLocationsRequest, CreateCustomerRequest, CreateProductRequest,
+    CreateSupplierRequest, Customer, Location, LocationListResponse, PageMeta, Product,
     SpecialDrugCategory, Supplier, Warehouse,
 };
 
 use crate::{
     audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
     auth::AuthContext,
-    master_data::MasterDataError,
+    master_data::{product_attrs_with_default_source, MasterDataError},
 };
 
 const SPECIAL_DRUG_CATEGORY_DICT: &str = "special_drug_category";
@@ -37,6 +38,7 @@ struct ProductRow {
     special_drug_category: String,
     approval_no: Option<String>,
     manufacturer: Option<String>,
+    source: String,
     status: String,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
@@ -50,6 +52,7 @@ struct SupplierRow {
     supplier_name: String,
     uscc: String,
     contact_name: Option<String>,
+    source: String,
     status: String,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
@@ -61,6 +64,7 @@ struct CustomerRow {
     owner_id: Uuid,
     customer_code: String,
     customer_name: String,
+    source: String,
     status: String,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
@@ -119,7 +123,7 @@ impl PgMasterDataReadRepository {
             r#"
             SELECT id, owner_id, product_code, product_name, specification, dosage_form,
                    storage_condition, special_drug_category, approval_no, manufacturer,
-                   status, created_at, updated_at
+                   source, status, created_at, updated_at
               FROM products
              WHERE owner_id = $1
              ORDER BY updated_at DESC, product_code
@@ -132,13 +136,70 @@ impl PgMasterDataReadRepository {
         Ok(rows.into_iter().map(Product::from).collect())
     }
 
+    pub async fn create_product(
+        &self,
+        ctx: &AuthContext,
+        req: CreateProductRequest,
+        now: DateTime<Utc>,
+    ) -> Result<Product, MasterDataError> {
+        let mut tx = self.pool.begin().await.map_err(map_db_error)?;
+        let id = Uuid::new_v4();
+        let attrs = product_attrs_with_default_source(req.attrs, "api_import");
+        let specification = non_empty_or(req.spec, "-");
+        let storage_condition =
+            string_attr(&attrs, "storage_condition").unwrap_or_else(|| "normal".to_string());
+        let source = string_attr(&attrs, "source").unwrap_or_else(|| "api_import".to_string());
+        let special_drug_category = non_empty_or(req.special_drug_category_code, "normal");
+        let row = sqlx::query_as::<_, ProductRow>(
+            r#"
+            INSERT INTO products (
+                id, owner_id, product_code, product_name, specification, dosage_form,
+                storage_condition, special_drug_category, approval_no, manufacturer,
+                source, status, created_at, updated_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'active', $12, $12)
+            RETURNING id, owner_id, product_code, product_name, specification, dosage_form,
+                      storage_condition, special_drug_category, approval_no, manufacturer,
+                      source, status, created_at, updated_at
+            "#,
+        )
+        .bind(id)
+        .bind(ctx.owner_id)
+        .bind(&req.product_code)
+        .bind(&req.product_name)
+        .bind(&specification)
+        .bind(&req.dosage_form)
+        .bind(&storage_condition)
+        .bind(&special_drug_category)
+        .bind(&req.approval_no)
+        .bind(&req.manufacturer)
+        .bind(&source)
+        .bind(now)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(|error| map_catalog_write_error(error, &req.product_code))?;
+        let product = Product::from(row);
+        append_master_data_audit(
+            &mut tx,
+            ctx,
+            "create_product",
+            "product",
+            product.id,
+            &product,
+            now,
+        )
+        .await?;
+        tx.commit().await.map_err(map_db_error)?;
+        Ok(product)
+    }
+
     pub async fn list_suppliers(
         &self,
         ctx: &AuthContext,
     ) -> Result<Vec<Supplier>, MasterDataError> {
         let rows = sqlx::query_as::<_, SupplierRow>(
             r#"
-            SELECT id, owner_id, supplier_code, supplier_name, uscc, contact_name,
+            SELECT id, owner_id, supplier_code, supplier_name, uscc, contact_name, source,
                    status, created_at, updated_at
               FROM suppliers
              WHERE owner_id = $1
@@ -158,7 +219,7 @@ impl PgMasterDataReadRepository {
     ) -> Result<Vec<Customer>, MasterDataError> {
         let rows = sqlx::query_as::<_, CustomerRow>(
             r#"
-            SELECT id, owner_id, customer_code, customer_name, status, created_at, updated_at
+            SELECT id, owner_id, customer_code, customer_name, source, status, created_at, updated_at
               FROM customers
              WHERE owner_id = $1
              ORDER BY updated_at DESC, customer_code
@@ -169,6 +230,100 @@ impl PgMasterDataReadRepository {
         .await
         .map_err(map_db_error)?;
         Ok(rows.into_iter().map(Customer::from).collect())
+    }
+
+    pub async fn create_supplier(
+        &self,
+        ctx: &AuthContext,
+        req: CreateSupplierRequest,
+        now: DateTime<Utc>,
+    ) -> Result<Supplier, MasterDataError> {
+        let mut tx = self.pool.begin().await.map_err(map_db_error)?;
+        let id = Uuid::new_v4();
+        let source = req.source.unwrap_or_else(|| "api_import".to_string());
+        let uscc = req
+            .license_no
+            .clone()
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or_else(|| req.supplier_code.clone());
+        let row = sqlx::query_as::<_, SupplierRow>(
+            r#"
+            INSERT INTO suppliers (
+                id, owner_id, supplier_code, supplier_name, uscc, contact_name,
+                source, status, created_at, updated_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', $8, $8)
+            RETURNING id, owner_id, supplier_code, supplier_name, uscc, contact_name,
+                      source, status, created_at, updated_at
+            "#,
+        )
+        .bind(id)
+        .bind(ctx.owner_id)
+        .bind(&req.supplier_code)
+        .bind(&req.supplier_name)
+        .bind(&uscc)
+        .bind(&req.contact_name)
+        .bind(&source)
+        .bind(now)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(|error| map_catalog_write_error(error, &req.supplier_code))?;
+        let supplier = Supplier::from(row);
+        append_master_data_audit(
+            &mut tx,
+            ctx,
+            "create_supplier",
+            "supplier",
+            supplier.id,
+            &supplier,
+            now,
+        )
+        .await?;
+        tx.commit().await.map_err(map_db_error)?;
+        Ok(supplier)
+    }
+
+    pub async fn create_customer(
+        &self,
+        ctx: &AuthContext,
+        req: CreateCustomerRequest,
+        now: DateTime<Utc>,
+    ) -> Result<Customer, MasterDataError> {
+        let mut tx = self.pool.begin().await.map_err(map_db_error)?;
+        let id = Uuid::new_v4();
+        let source = req.source.unwrap_or_else(|| "api_import".to_string());
+        let row = sqlx::query_as::<_, CustomerRow>(
+            r#"
+            INSERT INTO customers (
+                id, owner_id, customer_code, customer_name, customer_type,
+                source, status, created_at, updated_at
+            )
+            VALUES ($1, $2, $3, $4, 'customer', $5, 'active', $6, $6)
+            RETURNING id, owner_id, customer_code, customer_name, source, status, created_at, updated_at
+            "#,
+        )
+        .bind(id)
+        .bind(ctx.owner_id)
+        .bind(&req.customer_code)
+        .bind(&req.customer_name)
+        .bind(&source)
+        .bind(now)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(|error| map_catalog_write_error(error, &req.customer_code))?;
+        let customer = Customer::from(row);
+        append_master_data_audit(
+            &mut tx,
+            ctx,
+            "create_customer",
+            "customer",
+            customer.id,
+            &customer,
+            now,
+        )
+        .await?;
+        tx.commit().await.map_err(map_db_error)?;
+        Ok(customer)
     }
 
     pub async fn list_warehouses(
@@ -578,6 +733,32 @@ async fn store_idempotency_success<T: Serialize>(
     Ok(())
 }
 
+async fn append_master_data_audit<T: Serialize>(
+    tx: &mut Transaction<'_, Postgres>,
+    ctx: &AuthContext,
+    action: &str,
+    resource_type: &str,
+    resource_id: Uuid,
+    response: &T,
+    now: DateTime<Utc>,
+) -> Result<(), MasterDataError> {
+    let response_body = serde_json::to_value(response)
+        .map_err(|error| MasterDataError::Serialize(error.to_string()))?;
+    let mut audit = AuditWriteRequest::from_auth_context(
+        ctx,
+        action,
+        "M1",
+        resource_type,
+        resource_id.to_string(),
+        Some(AuditDiff::compute(json!({}), response_body)),
+    );
+    audit.occurred_at = now;
+    append_event_in_tx(tx, &audit)
+        .await
+        .map(|_| ())
+        .map_err(|error| MasterDataError::Audit(format!("{error:?}")))
+}
+
 fn request_hash(value: &Value) -> Result<String, MasterDataError> {
     let text = serde_json::to_string(value)
         .map_err(|error| MasterDataError::Serialize(error.to_string()))?;
@@ -610,7 +791,7 @@ impl From<ProductRow> for Product {
             manufacturer: row.manufacturer,
             special_drug_category_code: Some(row.special_drug_category),
             status: row.status,
-            attrs: json!({ "storage_condition": row.storage_condition, "source": "api_import" }),
+            attrs: json!({ "storage_condition": row.storage_condition, "source": row.source }),
             created_at: row.created_at,
             updated_at: row.updated_at,
         }
@@ -626,6 +807,7 @@ impl From<SupplierRow> for Supplier {
             supplier_name: row.supplier_name,
             license_no: Some(row.uscc),
             contact_name: row.contact_name,
+            source: row.source,
             status: row.status,
             created_at: row.created_at,
             updated_at: row.updated_at,
@@ -641,6 +823,7 @@ impl From<CustomerRow> for Customer {
             customer_code: row.customer_code,
             customer_name: row.customer_name,
             license_no: None,
+            source: row.source,
             status: row.status,
             created_at: row.created_at,
             updated_at: row.updated_at,
@@ -689,10 +872,35 @@ fn map_db_error(error: sqlx::Error) -> MasterDataError {
     MasterDataError::Database(error.to_string())
 }
 
+fn string_attr(attrs: &Value, key: &str) -> Option<String> {
+    attrs
+        .get(key)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+}
+
+fn non_empty_or(value: Option<String>, default_value: &str) -> String {
+    value
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| default_value.to_string())
+}
+
 fn map_location_write_error(error: sqlx::Error) -> MasterDataError {
     if let sqlx::Error::Database(db_error) = &error {
         if db_error.code().as_deref() == Some("23505") {
             return MasterDataError::DuplicateLocationCode("warehouse_location".to_string());
+        }
+    }
+    map_db_error(error)
+}
+
+fn map_catalog_write_error(error: sqlx::Error, code: &str) -> MasterDataError {
+    if let sqlx::Error::Database(db_error) = &error {
+        if db_error.code().as_deref() == Some("23505") {
+            return MasterDataError::DuplicateCode(code.to_string());
         }
     }
     map_db_error(error)

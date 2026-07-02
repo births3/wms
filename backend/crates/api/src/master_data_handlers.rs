@@ -93,6 +93,18 @@ impl MasterDataAppState {
         Ok(self.read_store()?.list_products(ctx))
     }
 
+    async fn create_product(
+        &self,
+        ctx: &AuthContext,
+        req: CreateProductRequest,
+        now: chrono::DateTime<chrono::Utc>,
+    ) -> Result<Product, MasterDataHandlerError> {
+        if let Some(repository) = &self.read_repository {
+            return Ok(repository.create_product(ctx, req, now).await?);
+        }
+        Ok(self.write_store()?.create_product(ctx, req, now)?)
+    }
+
     async fn list_suppliers(
         &self,
         ctx: &AuthContext,
@@ -111,6 +123,30 @@ impl MasterDataAppState {
             return Ok(repository.list_customers(ctx).await?);
         }
         Ok(self.read_store()?.list_customers(ctx))
+    }
+
+    async fn create_supplier(
+        &self,
+        ctx: &AuthContext,
+        req: CreateSupplierRequest,
+        now: chrono::DateTime<chrono::Utc>,
+    ) -> Result<Supplier, MasterDataHandlerError> {
+        if let Some(repository) = &self.read_repository {
+            return Ok(repository.create_supplier(ctx, req, now).await?);
+        }
+        Ok(self.write_store()?.create_supplier(ctx, req, now)?)
+    }
+
+    async fn create_customer(
+        &self,
+        ctx: &AuthContext,
+        req: CreateCustomerRequest,
+        now: chrono::DateTime<chrono::Utc>,
+    ) -> Result<Customer, MasterDataHandlerError> {
+        if let Some(repository) = &self.read_repository {
+            return Ok(repository.create_customer(ctx, req, now).await?);
+        }
+        Ok(self.write_store()?.create_customer(ctx, req, now)?)
     }
 
     async fn list_warehouses(
@@ -322,11 +358,10 @@ async fn create_product_handler(
     State(state): State<MasterDataAppState>,
     Json(req): Json<CreateProductRequest>,
 ) -> Result<Json<Product>, MasterDataHandlerError> {
-    Ok(Json(state.write_store()?.create_product(
-        &ctx,
-        req,
-        chrono::Utc::now(),
-    )?))
+    ctx.require_permission(MASTER_DATA_WRITE_PERMISSION)?;
+    Ok(Json(
+        state.create_product(&ctx, req, chrono::Utc::now()).await?,
+    ))
 }
 
 async fn get_product_handler(
@@ -375,11 +410,10 @@ async fn create_supplier_handler(
     State(state): State<MasterDataAppState>,
     Json(req): Json<CreateSupplierRequest>,
 ) -> Result<Json<Supplier>, MasterDataHandlerError> {
-    Ok(Json(state.write_store()?.create_supplier(
-        &ctx,
-        req,
-        chrono::Utc::now(),
-    )?))
+    ctx.require_permission(MASTER_DATA_WRITE_PERMISSION)?;
+    Ok(Json(
+        state.create_supplier(&ctx, req, chrono::Utc::now()).await?,
+    ))
 }
 
 async fn update_supplier_handler(
@@ -420,11 +454,10 @@ async fn create_customer_handler(
     State(state): State<MasterDataAppState>,
     Json(req): Json<CreateCustomerRequest>,
 ) -> Result<Json<Customer>, MasterDataHandlerError> {
-    Ok(Json(state.write_store()?.create_customer(
-        &ctx,
-        req,
-        chrono::Utc::now(),
-    )?))
+    ctx.require_permission(MASTER_DATA_WRITE_PERMISSION)?;
+    Ok(Json(
+        state.create_customer(&ctx, req, chrono::Utc::now()).await?,
+    ))
 }
 
 async fn update_customer_handler(

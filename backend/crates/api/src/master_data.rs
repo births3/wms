@@ -194,6 +194,7 @@ impl MasterDataStore {
             supplier_name: req.supplier_name,
             license_no: req.license_no,
             contact_name: req.contact_name,
+            source: req.source.unwrap_or_else(|| "api_import".to_string()),
             status: "active".to_string(),
             created_at: now,
             updated_at: now,
@@ -251,6 +252,7 @@ impl MasterDataStore {
             customer_code: req.customer_code,
             customer_name: req.customer_name,
             license_no: req.license_no,
+            source: req.source.unwrap_or_else(|| "api_import".to_string()),
             status: "active".to_string(),
             created_at: now,
             updated_at: now,
@@ -469,7 +471,7 @@ impl MasterDataStore {
     }
 }
 
-fn product_attrs_with_default_source(
+pub(crate) fn product_attrs_with_default_source(
     attrs: serde_json::Value,
     default_source: &str,
 ) -> serde_json::Value {
@@ -670,11 +672,13 @@ mod tests {
             supplier_name: "国药控股".to_string(),
             license_no: Some("LIC-001".to_string()),
             contact_name: Some("张三".to_string()),
+            source: Some("manual".to_string()),
         };
 
-        store
+        let created = store
             .create_supplier(&ctx, req.clone(), now)
             .expect("first supplier");
+        assert_eq!(created.source, "manual");
         let duplicate = store.create_supplier(&ctx, req, now);
 
         assert!(matches!(duplicate, Err(MasterDataError::DuplicateCode(code)) if code == "S-001"));

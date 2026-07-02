@@ -231,6 +231,7 @@ pub struct Supplier {
     pub supplier_name: String,
     pub license_no: Option<String>,
     pub contact_name: Option<String>,
+    pub source: String,
     pub status: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -242,6 +243,7 @@ pub struct CreateSupplierRequest {
     pub supplier_name: String,
     pub license_no: Option<String>,
     pub contact_name: Option<String>,
+    pub source: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -266,6 +268,7 @@ pub struct Customer {
     pub customer_code: String,
     pub customer_name: String,
     pub license_no: Option<String>,
+    pub source: String,
     pub status: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -276,6 +279,7 @@ pub struct CreateCustomerRequest {
     pub customer_code: String,
     pub customer_name: String,
     pub license_no: Option<String>,
+    pub source: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]

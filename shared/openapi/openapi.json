@@ -5547,6 +5547,10 @@
           "license_no": {
             "type": "string",
             "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -5924,6 +5928,10 @@
             "type": "string",
             "nullable": true
           },
+          "source": {
+            "type": "string",
+            "nullable": true
+          },
           "supplier_code": {
             "type": "string"
           },
@@ -6056,6 +6064,7 @@
           "owner_id",
           "customer_code",
           "customer_name",
+          "source",
           "status",
           "created_at",
           "updated_at"
@@ -6082,6 +6091,9 @@
           "owner_id": {
             "type": "string",
             "format": "uuid"
+          },
+          "source": {
+            "type": "string"
           },
           "status": {
             "type": "string"
@@ -8430,6 +8442,7 @@
           "owner_id",
           "supplier_code",
           "supplier_name",
+          "source",
           "status",
           "created_at",
           "updated_at"
@@ -8454,6 +8467,9 @@
           "owner_id": {
             "type": "string",
             "format": "uuid"
+          },
+          "source": {
+            "type": "string"
           },
           "status": {
             "type": "string"
