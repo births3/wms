@@ -92,6 +92,7 @@ nav:
       - 拣选/复核/发货: domain/user-stories-m4-outbound-pick.md
       - 退货处理: domain/user-stories-m4-outbound-return.md
       - PC Web 页面设计规划: m4-outbound-web-design-plan.md
+      - 出库流程 PlantUML 图文: diagrams/m4-outbound/docu.md
     - M5 冷链数据集成: domain/user-stories-m5-cold-chain.md
     - M6 报表与审计: domain/user-stories-m6-audit-report.md
     - M8 连锁药店: domain/user-stories-m8-retail-chain.md
