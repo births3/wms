@@ -30,7 +30,7 @@ export type { PageHeaderProps } from "./PageHeader";
 export { DataTable } from "./DataTable";
 export type { DataTableProps, DataTableColumn } from "./DataTable";
 export { DataGrid } from "./DataGrid";
-export type { DataGridProps, DataGridColumn } from "./DataGrid";
+export type { DataGridProps, DataGridColumn, DataGridCsvExportState } from "./DataGrid";
 export { EmptyState } from "./EmptyState";
 export type { EmptyStateProps } from "./EmptyState";
 export { SystemDictionaryTwoPane } from "./SystemDictionaryTwoPane";

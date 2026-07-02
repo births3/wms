@@ -35,6 +35,7 @@ interface M2InboundOrderTableProps {
   onSelectOrder: (id: string) => void;
   onOpenDetail: (id: string) => void;
   onOpenDialog: (id: string, dialog: InboundDialog) => void;
+  onCsvExportStateChange?: (state: { disabled: boolean; exportCsv: () => void } | null) => void;
 }
 
 export function M2InboundOrderTable({
@@ -46,6 +47,7 @@ export function M2InboundOrderTable({
   onSelectOrder,
   onOpenDetail,
   onOpenDialog,
+  onCsvExportStateChange,
 }: M2InboundOrderTableProps) {
   const orderColumns: DataGridColumn<ReceivingOrder>[] = [
     {
@@ -136,6 +138,18 @@ export function M2InboundOrderTable({
       render: (row) => formatDateTime(row.expected_arrival_at),
     },
     {
+      key: "created_at",
+      header: "创建时间",
+      width: 190,
+      minWidth: 180,
+      sortable: true,
+      sortValue: (row) => row.created_at,
+      filterValue: (row) => row.created_at,
+      copyValue: (row) => formatDateTime(row.created_at),
+      filter: { type: "dateRange" },
+      render: (row) => formatDateTime(row.created_at),
+    },
+    {
       key: "status",
       header: "状态",
       width: 170,
@@ -209,7 +223,9 @@ export function M2InboundOrderTable({
       caption={isPending ? "加载入库单..." : undefined}
       emptyTitle="暂无入库单"
       storageKey="m2-inbound-datagrid"
-      tableClassName="min-w-[1880px]"
+      tableClassName="min-w-[2070px]"
+      csvExportPlacement="external"
+      onCsvExportStateChange={onCsvExportStateChange}
       selectable
     />
   );

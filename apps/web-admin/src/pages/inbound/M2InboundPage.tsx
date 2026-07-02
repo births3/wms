@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Button, PageHeader } from "@wms/ui";
-import { ArrowLeft, Plus, Printer, RefreshCw } from "lucide-react";
+import { ArrowLeft, Download, Plus, Printer, RefreshCw } from "lucide-react";
 
 import {
   useCreateReceivingOrderMutation,
@@ -75,6 +75,14 @@ export function M2InboundPage({ mode, currentOwner, onBack }: M2InboundPageProps
   const [activeDialog, setActiveDialog] = React.useState<InboundDialog | null>(null);
   const [detailOpen, setDetailOpen] = React.useState(false);
   const [lastEvent, setLastEvent] = React.useState<string | null>(null);
+  const [csvExportState, setCsvExportState] = React.useState<{
+    disabled: boolean;
+    exportCsv: () => void;
+  } | null>(null);
+  const handleCsvExportStateChange = React.useCallback(
+    (state: { disabled: boolean; exportCsv: () => void } | null) => setCsvExportState(state),
+    [],
+  );
   const [createForm, setCreateForm] = React.useState<CreateFormState>({
     receiptNo: "ASN-M2-PC-0002",
     documentType: "purchase_inbound",
@@ -377,6 +385,15 @@ export function M2InboundPage({ mode, currentOwner, onBack }: M2InboundPageProps
                 <Printer className="size-4" aria-hidden />
                 打印
               </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!csvExportState || csvExportState.disabled}
+                onClick={() => csvExportState?.exportCsv()}
+              >
+                <Download className="size-4" aria-hidden />
+                导出 CSV
+              </Button>
               {mode === "receiving" && (
                 <Button type="button" onClick={() => setActiveDialog("create")}>
                   <Plus className="size-4" aria-hidden />
@@ -434,6 +451,7 @@ export function M2InboundPage({ mode, currentOwner, onBack }: M2InboundPageProps
           onSelectOrder={setSelectedId}
           onOpenDetail={openRowDetail}
           onOpenDialog={openRowDialog}
+          onCsvExportStateChange={handleCsvExportStateChange}
         />
 
         <M2InboundDialogs

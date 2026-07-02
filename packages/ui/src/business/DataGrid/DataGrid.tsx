@@ -61,6 +61,11 @@ export interface DataGridColumn<T> extends DataTableColumn<T> {
   filter?: DataGridFilterConfig | false;
 }
 
+export interface DataGridCsvExportState {
+  disabled: boolean;
+  exportCsv: () => void;
+}
+
 export interface DataGridProps<T>
   extends Omit<DataTableProps<T>, "columns" | "data" | "footer">,
     Omit<React.HTMLAttributes<HTMLDivElement>, "onSelect"> {
@@ -72,6 +77,8 @@ export interface DataGridProps<T>
   selectable?: boolean;
   selectedRowKeys?: string[];
   onSelectedRowKeysChange?: (keys: string[]) => void;
+  csvExportPlacement?: "toolbar" | "external";
+  onCsvExportStateChange?: (state: DataGridCsvExportState | null) => void;
 }
 
 const defaultPageSizeOptions = [10, 20, 50, 100];
@@ -92,6 +99,8 @@ function DataGridInner<T>(
     selectable = false,
     selectedRowKeys,
     onSelectedRowKeysChange,
+    csvExportPlacement = "toolbar",
+    onCsvExportStateChange,
     className,
     tableClassName,
     ...rest
@@ -247,6 +256,18 @@ function DataGridInner<T>(
   const orderedHideableColumns = orderedColumns.filter((column) => column.hideable !== false);
   const fixedColumns = orderedColumns.filter((column) => column.hideable === false);
   const visibleColumns = [...orderedHideableColumns.filter((column) => visibleKeys.has(column.key)), ...fixedColumns];
+  const csvExportSnapshotRef = React.useRef<{
+    columns: DataGridColumn<T>[];
+    visibleColumnKeys: string[];
+    rows: T[];
+    storageKey: string | undefined;
+  } | null>(null);
+  csvExportSnapshotRef.current = {
+    columns,
+    visibleColumnKeys: visibleColumns.map((column) => column.key),
+    rows: page.filteredRows,
+    storageKey,
+  };
   const lastVisibleColumnKey = visibleColumns.at(-1)?.key;
   const hideableColumns = orderedHideableColumns;
   const visibleHideableCount = hideableColumns.filter((column) => visibleKeys.has(column.key)).length;
@@ -375,19 +396,28 @@ function DataGridInner<T>(
     }
   }
 
-  function exportCsv() {
+  const exportCsv = React.useCallback(() => {
+    const snapshot = csvExportSnapshotRef.current;
+    if (!snapshot) return;
+
     const csv = buildDataGridCsv({
-      columns,
-      visibleColumnKeys: visibleColumns.map((column) => column.key),
-      rows: page.filteredRows,
+      columns: snapshot.columns,
+      visibleColumnKeys: snapshot.visibleColumnKeys,
+      rows: snapshot.rows,
     });
 
     downloadDataGridCsv({
       csv,
-      fileName: storageKey ? `${storageKey}.csv` : "data-grid.csv",
+      fileName: snapshot.storageKey ? `${snapshot.storageKey}.csv` : "data-grid.csv",
       document: typeof document === "undefined" ? undefined : document,
     });
-  }
+  }, []);
+
+  React.useEffect(() => {
+    if (csvExportPlacement !== "external" || !onCsvExportStateChange) return;
+    onCsvExportStateChange({ disabled: page.filteredRows.length === 0, exportCsv });
+    return () => onCsvExportStateChange(null);
+  }, [csvExportPlacement, exportCsv, onCsvExportStateChange, page.filteredRows.length]);
 
   function applyNamedViewState(state: DataGridLogicState) {
     setSettings(state);
@@ -434,6 +464,16 @@ function DataGridInner<T>(
           fieldButtonRef={fieldButtonRef}
           fieldsOpen={fieldsOpen}
           hideableColumnsLength={hideableColumns.length}
+          namedViewsControl={
+            <DataGridNamedViewsToolbar
+              storageKey={storageKey}
+              columns={columns}
+              pageSizeOptions={safePageSizeOptions}
+              defaultPageSize={defaultPageSize}
+              settings={settings}
+              onApplyView={applyNamedViewState}
+            />
+          }
           onSort={updateSort}
           onToggleFilter={(key) => {
             setFieldsOpen(false);
@@ -497,25 +537,19 @@ function DataGridInner<T>(
           onClearAll={() => setColumnFilters({})}
         />
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 self-end md:ml-auto">
-          <DataGridNamedViewsToolbar
-            storageKey={storageKey}
-            columns={columns}
-            pageSizeOptions={safePageSizeOptions}
-            defaultPageSize={defaultPageSize}
-            settings={settings}
-            onApplyView={applyNamedViewState}
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-8 shrink-0"
-            disabled={page.filteredRows.length === 0}
-            onClick={exportCsv}
-          >
-            <Download className="size-4" aria-hidden />
-            导出 CSV
-          </Button>
+          {csvExportPlacement === "toolbar" && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 shrink-0"
+              disabled={page.filteredRows.length === 0}
+              onClick={exportCsv}
+            >
+              <Download className="size-4" aria-hidden />
+              导出 CSV
+            </Button>
+          )}
         </div>
       </div>
       <DataTable

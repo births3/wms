@@ -104,6 +104,14 @@ const dataGridSource = readFileSync(
   new URL("../src/business/DataGrid/DataGrid.tsx", import.meta.url),
   "utf8",
 );
+const inboundPageSource = readFileSync(
+  new URL("../../../apps/web-admin/src/pages/inbound/M2InboundPage.tsx", import.meta.url),
+  "utf8",
+);
+const inboundTableSource = readFileSync(
+  new URL("../../../apps/web-admin/src/pages/inbound/M2InboundOrderTable.tsx", import.meta.url),
+  "utf8",
+);
 
 assert.match(
   dataGridSource,
@@ -113,11 +121,11 @@ assert.match(dataGridSource, /import \{ Button \} from "\.\.\/\.\.\/ui\/button";
 assert.match(dataGridSource, /import \{ Download \} from "lucide-react";/);
 assert.match(
   dataGridSource,
-  /const csv = buildDataGridCsv\(\{\s*columns,\s*visibleColumnKeys: visibleColumns\.map\(\(column\) => column\.key\),\s*rows: page\.filteredRows,\s*\}\);/s,
+  /const csv = buildDataGridCsv\(\{\s*columns: snapshot\.columns,\s*visibleColumnKeys: snapshot\.visibleColumnKeys,\s*rows: snapshot\.rows,\s*\}\);/s,
 );
 assert.match(
   dataGridSource,
-  /fileName: storageKey \? `\$\{storageKey\}\.csv` : "data-grid\.csv"/,
+  /fileName: snapshot\.storageKey \? `\$\{snapshot\.storageKey\}\.csv` : "data-grid\.csv"/,
 );
 assert.match(
   dataGridSource,
@@ -125,5 +133,9 @@ assert.match(
 );
 assert.match(
   dataGridSource,
-  /<Button[\s\S]*disabled=\{page\.filteredRows\.length === 0\}[\s\S]*导出 CSV[\s\S]*<\/Button>/,
+  /csvExportPlacement === "toolbar"[\s\S]*<Button[\s\S]*disabled=\{page\.filteredRows\.length === 0\}[\s\S]*导出 CSV[\s\S]*<\/Button>/,
 );
+assert.match(dataGridSource, /csvExportPlacement\?: "toolbar" \| "external";/);
+assert.match(dataGridSource, /onCsvExportStateChange\?: \(state: DataGridCsvExportState \| null\) => void;/);
+assert.match(inboundPageSource, /<Printer className="size-4" aria-hidden \/>\s*打印[\s\S]*<Download className="size-4" aria-hidden \/>\s*导出 CSV/);
+assert.match(inboundTableSource, /csvExportPlacement="external"/);
