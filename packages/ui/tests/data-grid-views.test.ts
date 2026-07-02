@@ -71,7 +71,16 @@ const namedViewSelectPattern =
 assert.match(toolbarSource, namedViewSelectPattern);
 assert.doesNotMatch(toolbarSource, /<datalist/);
 assert.match(toolbarSource, /import \{ Bookmark \} from "lucide-react";/);
+assert.match(toolbarSource, /import \{ createPortal \} from "react-dom";/);
+assert.match(toolbarSource, /dataGridFloatingPanelPosition\(rect,[\s\S]*320/);
+assert.match(toolbarSource, /createPortal\(/);
+assert.match(toolbarSource, /className="fixed z-50 w-80/);
+assert.doesNotMatch(toolbarSource, /className="absolute right-0 top-full/);
 assert.match(dataGridSource, /namedViewsControl=\{\s*<DataGridNamedViewsToolbar/);
 assert.doesNotMatch(dataGridSource, /<div className="flex shrink-0 flex-wrap items-center justify-end gap-2 self-end md:ml-auto">\s*<DataGridNamedViewsToolbar/);
 assert.match(headerCellSource, /namedViewsControl\?: React\.ReactNode;/);
 assert.match(headerCellSource, /\{namedViewsControl\}[\s\S]*aria-label="字段设置"/);
+assert.match(headerCellSource, /import \{ createPortal \} from "react-dom";/);
+assert.match(headerCellSource, /className="fixed z-50 w-56/);
+assert.match(headerCellSource, /createPortal\(/);
+assert.doesNotMatch(headerCellSource, /absolute top-full z-30/);
