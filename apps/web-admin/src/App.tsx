@@ -244,7 +244,7 @@ function AppShell({
     .filter((section) => section.items.length > 0);
 
   return (
-    <div className="min-h-screen bg-muted/30 text-foreground lg:grid lg:grid-cols-[16rem_1fr]">
+    <div className="min-h-screen bg-muted/30 text-foreground lg:grid lg:grid-cols-[14rem_1fr]">
       <aside className="hidden border-r bg-background lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col">
         <div className="border-b px-5 py-5">
           <div className="text-lg font-semibold tracking-normal">WMS Admin</div>
