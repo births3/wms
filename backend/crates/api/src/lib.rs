@@ -10,6 +10,7 @@ pub mod cold_chain;
 pub mod config_center;
 pub mod deploy_audit;
 pub mod document_numbering;
+pub mod document_numbering_handlers;
 mod document_numbering_repository;
 pub mod feature_flags;
 pub mod inbound;
@@ -47,7 +48,8 @@ use wms_domain::{
     CreateReceivingOrderRequest, CreateRetailReplenishmentSuggestionRequest,
     CreateSpecialDrugCategoryRequest, CreateSupplierRequest, CreateWarehouseRequest, CrossdockPlan,
     CurrentUser, Customer, CustomerListResponse, DisableSystemDictionaryItemRequest,
-    DisposeTemperatureExcursionRequest, DriverTask, DriverTaskListResponse, ErrorResponse,
+    DisposeTemperatureExcursionRequest, DocumentNumberAllocation,
+    DocumentNumberAllocationListResponse, DriverTask, DriverTaskListResponse, ErrorResponse,
     ExecuteMappingRequest, ExecuteMappingResponse, FeatureFlagArchiveRequest,
     FeatureFlagArchiveResult, FeatureFlagBatchImportRequest, FeatureFlagBatchImportResult,
     FeatureFlagConfig, FeatureFlagExportResponse, FeatureFlagMigrationResult,
@@ -364,6 +366,24 @@ fn upsert_system_dictionary_item() {}
 #[allow(dead_code)]
 fn disable_system_dictionary_item() {}
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/code-generator/document-number-allocations",
+    tag = "code-generator",
+    params(
+        ("document_type" = Option<String>, Query, description = "按单据类型过滤"),
+        ("from" = Option<chrono::DateTime<chrono::Utc>>, Query, description = "生成时间起点（RFC3339，含）"),
+        ("to" = Option<chrono::DateTime<chrono::Utc>>, Query, description = "生成时间终点（RFC3339，含）"),
+        ("limit" = Option<u32>, Query, description = "返回条数，默认 50，最大 100"),
+    ),
+    responses(
+        (status = 200, description = "单据号生成记录列表", body = DocumentNumberAllocationListResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+fn list_document_number_allocations() {}
+
 #[utoipa::path(get, path = "/api/v1/inbound/receiving-orders", tag = "inbound", responses((status = 200, description = "收货单列表", body = ReceivingOrderListResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 fn list_receiving_orders() {}
@@ -618,6 +638,7 @@ fn confirm_container_recovery() {}
         preview_system_dictionary_item_impact,
         upsert_system_dictionary_item,
         disable_system_dictionary_item,
+        list_document_number_allocations,
         list_receiving_orders,
         create_receiving_order,
         get_receiving_order,
@@ -714,6 +735,8 @@ fn confirm_container_recovery() {}
         CustomerListResponse,
         DriverTask,
         DriverTaskListResponse,
+        DocumentNumberAllocation,
+        DocumentNumberAllocationListResponse,
         DisposeTemperatureExcursionRequest,
         ErrorResponse,
         ExecuteMappingRequest,
@@ -814,6 +837,7 @@ fn confirm_container_recovery() {}
         (name = "audit", description = "审计追踪"),
         (name = "master-data", description = "M1 基础档案"),
         (name = "system-dictionary", description = "US-M1-011 系统字典中心"),
+        (name = "code-generator", description = "M-CG 单据号生成"),
         (name = "inbound", description = "M2 入库业务规则"),
         (name = "inventory", description = "M3 库存批次与状态"),
         (name = "outbound", description = "M4 出库闭环"),
@@ -865,6 +889,7 @@ mod tests {
             "/api/v1/system-dictionaries/{dict_code}/items/{item_code}",
             "/api/v1/system-dictionaries/{dict_code}/items/{item_code}/impact-preview",
             "/api/v1/system-dictionaries/{dict_code}/items/{item_code}/disable",
+            "/api/v1/code-generator/document-number-allocations",
             "/api/v1/inbound/receiving-orders",
             "/api/v1/inbound/receiving-orders/{id}",
             "/api/v1/inbound/receiving-orders/{id}/receive",
@@ -956,6 +981,8 @@ mod tests {
             "\"SystemDictionaryImpactReference\"",
             "\"UpsertSystemDictionaryItemRequest\"",
             "\"DisableSystemDictionaryItemRequest\"",
+            "\"DocumentNumberAllocation\"",
+            "\"DocumentNumberAllocationListResponse\"",
             "\"GspLedgerReport\"",
             "\"GspLedgerRow\"",
             "\"TraceabilityOutboundReport\"",

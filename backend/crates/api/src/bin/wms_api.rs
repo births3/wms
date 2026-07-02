@@ -23,6 +23,7 @@ use wms_api::{
     },
     auth_handlers::{auth_router, AuthAppState},
     config_center::{config_center_router, ConfigCenterAppState},
+    document_numbering_handlers::{document_numbering_router, DocumentNumberingAppState},
     feature_flags::FeatureFlagRegistry,
     master_data_handlers::{master_data_router, MasterDataAppState},
     system_dictionary_handlers::{system_dictionary_router, SystemDictionaryAppState},
@@ -190,6 +191,9 @@ fn app(
     master_data_state: MasterDataAppState,
     system_dictionary_state: SystemDictionaryAppState,
 ) -> Router {
+    let document_numbering_state =
+        DocumentNumberingAppState::with_postgres(audit_query_state.pool.clone());
+
     Router::new()
         .route("/healthz", get(healthz))
         .route("/readyz", get(healthz))
@@ -199,6 +203,7 @@ fn app(
         .merge(config_center_router(config_center_state))
         .merge(master_data_router(master_data_state))
         .merge(system_dictionary_router(system_dictionary_state))
+        .merge(document_numbering_router(document_numbering_state))
         .merge(wave3_router(wave3_state))
         .merge(wave4_router(wave4_state))
         .merge(wave5_router(wave5_state))
@@ -609,6 +614,18 @@ mod tests {
 
             assert_eq!(response.status(), StatusCode::UNAUTHORIZED, "{uri}");
         }
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/code-generator/document-number-allocations")
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     }
 
     #[test]

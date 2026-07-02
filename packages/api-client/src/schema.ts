@@ -148,6 +148,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/code-generator/document-number-allocations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_document_number_allocations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/cold-chain/devices": {
         parameters: {
             query?: never;
@@ -1630,6 +1646,28 @@ export interface components {
         DisposeTemperatureExcursionRequest: {
             selected_batch_ids: string[];
         };
+        DocumentNumberAllocation: {
+            counter_key: string;
+            /** Format: date-time */
+            created_at: string;
+            document_type: string;
+            generated_no: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: uuid */
+            rule_id: string;
+            /** Format: int64 */
+            sequence_value: number;
+            /** Format: uuid */
+            source_document_id?: string | null;
+            source_module: string;
+        };
+        DocumentNumberAllocationListResponse: {
+            data: components["schemas"]["DocumentNumberAllocation"][];
+            page: components["schemas"]["PageMeta"];
+        };
         DriverTask: {
             cold_chain: boolean;
             customer_name: string;
@@ -3102,6 +3140,44 @@ export interface operations {
             };
             /** @description 账单状态不可确认 */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_document_number_allocations: {
+        parameters: {
+            query?: {
+                /** @description 按单据类型过滤 */
+                document_type?: string | null;
+                /** @description 生成时间起点（RFC3339，含） */
+                from?: string | null;
+                /** @description 生成时间终点（RFC3339，含） */
+                to?: string | null;
+                /** @description 返回条数，默认 50，最大 100 */
+                limit?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 单据号生成记录列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentNumberAllocationListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

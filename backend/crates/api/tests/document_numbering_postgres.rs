@@ -1,14 +1,60 @@
+use std::sync::Arc;
+
+use axum::{
+    body::{to_bytes, Body},
+    http::{header::AUTHORIZATION, Request, StatusCode},
+};
 use chrono::{TimeZone, Utc};
 use sqlx::PgPool;
+use tower::ServiceExt;
 use uuid::Uuid;
 use wms_api::{
-    auth::AuthContext,
+    auth::{
+        auth_runtime_layer, build_access_claims, encode_access_token, AuthContext,
+        AuthRevocationStore, AuthRevocationStoreError, AuthRuntimePolicy, JWT_SECRET_ENV,
+    },
     document_numbering::{
         DocumentNumberAllocation, DocumentNumberingError, GenerateDocumentNumberRequest,
         IdempotentMutation, PgDocumentNumberingService,
     },
+    document_numbering_handlers::{document_numbering_router, DocumentNumberingAppState},
 };
-use wms_domain::DOCUMENT_TYPE_PURCHASE_INBOUND;
+use wms_domain::{
+    DocumentNumberAllocationListResponse, DOCUMENT_TYPE_PURCHASE_INBOUND,
+    DOCUMENT_TYPE_SALES_RETURN,
+};
+
+struct AllowAllRevocationStore;
+
+#[axum::async_trait]
+impl AuthRevocationStore for AllowAllRevocationStore {
+    async fn jti_is_blacklisted(&self, _jti: &str) -> Result<bool, AuthRevocationStoreError> {
+        Ok(false)
+    }
+
+    async fn permissions_changed_at(
+        &self,
+        _user_id: Uuid,
+    ) -> Result<Option<i64>, AuthRevocationStoreError> {
+        Ok(None)
+    }
+
+    async fn blacklist_jti(
+        &self,
+        _jti: &str,
+        _ttl_seconds: u64,
+    ) -> Result<(), AuthRevocationStoreError> {
+        Ok(())
+    }
+
+    async fn set_permissions_changed_at(
+        &self,
+        _user_id: Uuid,
+        _changed_at_unix: i64,
+    ) -> Result<(), AuthRevocationStoreError> {
+        Ok(())
+    }
+}
 
 fn ctx(owner_id: Uuid) -> AuthContext {
     AuthContext {
@@ -37,6 +83,7 @@ async fn seed_owner(pool: &PgPool, owner_id: Uuid, owner_code: &str) {
 
 async fn seed_daily_rule(pool: &PgPool, owner_id: Uuid, document_type: &str, width: i32) -> Uuid {
     let rule_id = Uuid::new_v4();
+    let rule_code = format!("{document_type}-daily");
     sqlx::query(
         r#"
         INSERT INTO document_number_rules (
@@ -44,7 +91,7 @@ async fn seed_daily_rule(pool: &PgPool, owner_id: Uuid, document_type: &str, wid
             reset_policy, sequence_width, enabled, effective_from, created_at, updated_at
         )
         VALUES (
-            $1, $2, $3, 'purchase-inbound-daily', '采购入库日流水',
+            $1, $2, $3, $6, '单据号日流水',
             '{OWNER}-{DOCUMENT_TYPE}-{YYYY}{MM}{DD}-{SEQ}',
             'daily', $4, TRUE, $5, $5, $5
         )
@@ -59,6 +106,7 @@ async fn seed_daily_rule(pool: &PgPool, owner_id: Uuid, document_type: &str, wid
             .single()
             .expect("valid time"),
     )
+    .bind(rule_code)
     .execute(pool)
     .await
     .expect("document number rule seed should insert");
@@ -66,12 +114,29 @@ async fn seed_daily_rule(pool: &PgPool, owner_id: Uuid, document_type: &str, wid
 }
 
 fn request(idempotency_key: &str) -> GenerateDocumentNumberRequest {
+    request_for(DOCUMENT_TYPE_PURCHASE_INBOUND, idempotency_key)
+}
+
+fn request_for(document_type: &str, idempotency_key: &str) -> GenerateDocumentNumberRequest {
     GenerateDocumentNumberRequest {
-        document_type: DOCUMENT_TYPE_PURCHASE_INBOUND.to_string(),
+        document_type: document_type.to_string(),
         idempotency_key: idempotency_key.to_string(),
         source_module: "M2".to_string(),
         source_document_id: Some(Uuid::new_v4()),
     }
+}
+
+fn bearer_token(owner_id: Uuid) -> String {
+    std::env::set_var(JWT_SECRET_ENV, "test-secret");
+    let claims = build_access_claims(
+        Uuid::new_v4(),
+        owner_id,
+        "document-numbering-reader",
+        vec![],
+        Uuid::new_v4().to_string(),
+        Utc::now(),
+    );
+    encode_access_token(&claims, "test-secret").expect("token should encode")
 }
 
 async fn generate_and_commit(
@@ -219,4 +284,147 @@ async fn missing_document_number_rule_returns_rule_not_found(pool: PgPool) {
     .expect_err("valid document_type without rule should fail closed");
 
     assert_eq!(error, DocumentNumberingError::RuleNotFound);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn allocation_list_route_filters_by_owner_document_type_date_and_limit(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let other_owner_id = Uuid::new_v4();
+    seed_owner(&pool, owner_id, "HZ005").await;
+    seed_owner(&pool, other_owner_id, "HZ006").await;
+    seed_daily_rule(&pool, owner_id, DOCUMENT_TYPE_PURCHASE_INBOUND, 4).await;
+    seed_daily_rule(&pool, owner_id, DOCUMENT_TYPE_SALES_RETURN, 4).await;
+    seed_daily_rule(&pool, other_owner_id, DOCUMENT_TYPE_PURCHASE_INBOUND, 4).await;
+    let service = PgDocumentNumberingService::new();
+    let july_first = Utc
+        .with_ymd_and_hms(2026, 7, 1, 9, 0, 0)
+        .single()
+        .expect("valid time");
+    let july_second_purchase = Utc
+        .with_ymd_and_hms(2026, 7, 2, 9, 0, 0)
+        .single()
+        .expect("valid time");
+    let july_second_sales_return = Utc
+        .with_ymd_and_hms(2026, 7, 2, 10, 0, 0)
+        .single()
+        .expect("valid time");
+    let other_owner_later = Utc
+        .with_ymd_and_hms(2026, 7, 2, 11, 0, 0)
+        .single()
+        .expect("valid time");
+
+    generate_and_commit(
+        &pool,
+        &service,
+        &ctx(owner_id),
+        request_for(DOCUMENT_TYPE_PURCHASE_INBOUND, "mcg-list-old"),
+        july_first,
+    )
+    .await
+    .expect("old owner number should generate");
+    generate_and_commit(
+        &pool,
+        &service,
+        &ctx(owner_id),
+        request_for(DOCUMENT_TYPE_PURCHASE_INBOUND, "mcg-list-match"),
+        july_second_purchase,
+    )
+    .await
+    .expect("matching owner number should generate");
+    generate_and_commit(
+        &pool,
+        &service,
+        &ctx(owner_id),
+        request_for(DOCUMENT_TYPE_SALES_RETURN, "mcg-list-other-type"),
+        july_second_sales_return,
+    )
+    .await
+    .expect("other document type should generate");
+    generate_and_commit(
+        &pool,
+        &service,
+        &ctx(other_owner_id),
+        request_for(DOCUMENT_TYPE_PURCHASE_INBOUND, "mcg-list-other-owner"),
+        other_owner_later,
+    )
+    .await
+    .expect("other owner number should generate");
+
+    let token = bearer_token(owner_id);
+    let app = document_numbering_router(DocumentNumberingAppState::with_postgres(pool)).layer(
+        auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(AllowAllRevocationStore))),
+    );
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/code-generator/document-number-allocations?document_type=purchase_inbound&from=2026-07-02T00:00:00Z&to=2026-07-02T23:59:59Z&limit=1")
+                .header(AUTHORIZATION, format!("Bearer {token}"))
+                .body(Body::empty())
+                .expect("request should build"),
+        )
+        .await
+        .expect("router should respond");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body should read");
+    let payload: DocumentNumberAllocationListResponse =
+        serde_json::from_slice(&body).expect("response should be allocation list");
+
+    assert_eq!(payload.page.count, 1);
+    assert_eq!(payload.data.len(), 1);
+    assert_eq!(payload.data[0].owner_id, owner_id);
+    assert_eq!(
+        payload.data[0].document_type,
+        DOCUMENT_TYPE_PURCHASE_INBOUND
+    );
+    assert_eq!(
+        payload.data[0].generated_no,
+        "HZ005-purchase_inbound-20260702-0001"
+    );
+}
+
+#[tokio::test]
+async fn allocation_list_route_requires_auth_context() {
+    let pool = PgPool::connect_lazy("postgres://localhost/wms")
+        .expect("lazy pool should not connect during auth rejection test");
+    let app = document_numbering_router(DocumentNumberingAppState::with_postgres(pool)).layer(
+        auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(AllowAllRevocationStore))),
+    );
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/code-generator/document-number-allocations")
+                .body(Body::empty())
+                .expect("request should build"),
+        )
+        .await
+        .expect("router should reject unauthenticated request");
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn allocation_list_route_rejects_invalid_date_query() {
+    let pool = PgPool::connect_lazy("postgres://localhost/wms")
+        .expect("lazy pool should not connect during query rejection test");
+    let token = bearer_token(Uuid::new_v4());
+    let app = document_numbering_router(DocumentNumberingAppState::with_postgres(pool)).layer(
+        auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(AllowAllRevocationStore))),
+    );
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/code-generator/document-number-allocations?from=not-a-date")
+                .header(AUTHORIZATION, format!("Bearer {token}"))
+                .body(Body::empty())
+                .expect("request should build"),
+        )
+        .await
+        .expect("router should reject malformed query");
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }

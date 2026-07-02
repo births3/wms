@@ -437,6 +437,26 @@ pub const DOCUMENT_TYPE_SALES_RETURN: &str = "sales_return";
 pub const DOCUMENT_TYPE_PURCHASE_RETURN_OUTBOUND: &str = "purchase_return_outbound";
 pub const DOCUMENT_TYPE_SALES_OUTBOUND: &str = "sales_outbound";
 
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct DocumentNumberAllocation {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub rule_id: Uuid,
+    pub document_type: String,
+    pub generated_no: String,
+    pub sequence_value: i64,
+    pub counter_key: String,
+    pub source_module: String,
+    pub source_document_id: Option<Uuid>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct DocumentNumberAllocationListResponse {
+    pub data: Vec<DocumentNumberAllocation>,
+    pub page: PageMeta,
+}
+
 /// 系统字典分类。
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct SystemDictionaryCategory {

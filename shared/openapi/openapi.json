@@ -549,6 +549,82 @@
         }
       }
     },
+    "/api/v1/code-generator/document-number-allocations": {
+      "get": {
+        "tags": [
+          "code-generator"
+        ],
+        "operationId": "list_document_number_allocations",
+        "parameters": [
+          {
+            "name": "document_type",
+            "in": "query",
+            "description": "按单据类型过滤",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "生成时间起点（RFC3339，含）",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "nullable": true
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "生成时间终点（RFC3339，含）",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "nullable": true
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "返回条数，默认 50，最大 100",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "单据号生成记录列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentNumberAllocationListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/cold-chain/devices": {
       "post": {
         "tags": [
@@ -6151,6 +6227,77 @@
           }
         }
       },
+      "DocumentNumberAllocation": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "rule_id",
+          "document_type",
+          "generated_no",
+          "sequence_value",
+          "counter_key",
+          "source_module",
+          "created_at"
+        ],
+        "properties": {
+          "counter_key": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "document_type": {
+            "type": "string"
+          },
+          "generated_no": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rule_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sequence_value": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "source_document_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "source_module": {
+            "type": "string"
+          }
+        }
+      },
+      "DocumentNumberAllocationListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DocumentNumberAllocation"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
       "DriverTask": {
         "type": "object",
         "required": [
@@ -9407,6 +9554,10 @@
     {
       "name": "system-dictionary",
       "description": "US-M1-011 系统字典中心"
+    },
+    {
+      "name": "code-generator",
+      "description": "M-CG 单据号生成"
     },
     {
       "name": "inbound",

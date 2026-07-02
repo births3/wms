@@ -1,16 +1,20 @@
 //! US-CG-001 / US-CG-002 no-gap document numbering service.
 
 use chrono::{DateTime, Datelike, Utc};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use sqlx::{FromRow, Postgres, Transaction};
+use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
+use wms_domain::DocumentNumberAllocation;
 
 use crate::{
     audit::{append_event_in_tx, AuditWriteRequest},
     auth::AuthContext,
 };
+
+pub const DEFAULT_DOCUMENT_NUMBER_ALLOCATION_LIMIT: u32 = 50;
+pub const MAX_DOCUMENT_NUMBER_ALLOCATION_LIMIT: u32 = 100;
 
 #[derive(Clone, Debug)]
 pub struct PgDocumentNumberingService;
@@ -40,18 +44,12 @@ pub struct GenerateDocumentNumberRequest {
     pub source_document_id: Option<Uuid>,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct DocumentNumberAllocation {
-    pub id: Uuid,
-    pub owner_id: Uuid,
-    pub rule_id: Uuid,
-    pub document_type: String,
-    pub generated_no: String,
-    pub sequence_value: i64,
-    pub counter_key: String,
-    pub source_module: String,
-    pub source_document_id: Option<Uuid>,
-    pub created_at: DateTime<Utc>,
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DocumentNumberAllocationQuery {
+    pub document_type: Option<String>,
+    pub from: Option<DateTime<Utc>>,
+    pub to: Option<DateTime<Utc>>,
+    pub limit: u32,
 }
 
 #[derive(Clone, Debug, FromRow)]
@@ -143,6 +141,39 @@ impl PgDocumentNumberingService {
             value: allocation,
             replayed: false,
         })
+    }
+
+    pub async fn list_allocations(
+        &self,
+        pool: &PgPool,
+        ctx: &AuthContext,
+        query: DocumentNumberAllocationQuery,
+    ) -> Result<Vec<DocumentNumberAllocation>, DocumentNumberingError> {
+        let rows = sqlx::query_as::<_, AllocationRow>(
+            r#"
+            SELECT id, owner_id, rule_id, document_type, generated_no, sequence_value,
+                   counter_key, source_module, source_document_id, created_at
+              FROM document_number_allocations
+             WHERE owner_id = $1
+               AND ($2::TEXT IS NULL OR document_type = $2)
+               AND ($3::TIMESTAMPTZ IS NULL OR created_at >= $3)
+               AND ($4::TIMESTAMPTZ IS NULL OR created_at <= $4)
+             ORDER BY created_at DESC, id DESC
+             LIMIT $5
+            "#,
+        )
+        .bind(ctx.owner_id)
+        .bind(query.document_type)
+        .bind(query.from)
+        .bind(query.to)
+        .bind(i64::from(
+            query.limit.clamp(1, MAX_DOCUMENT_NUMBER_ALLOCATION_LIMIT),
+        ))
+        .fetch_all(pool)
+        .await
+        .map_err(map_db_error)?;
+
+        Ok(rows.into_iter().map(Into::into).collect())
     }
 }
 
