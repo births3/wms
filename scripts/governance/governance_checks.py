@@ -76,6 +76,7 @@ TIER_SCRIPTS: dict[str, list[str]] = {
         "check_component_no_inline_style.py",
         "check_component_props_classname.py",
         "check_component_registry_consistency.py",
+        "check_datagrid_popover_portal.py",
         "check_page_size.py",
         "check_prototype_fidelity.py",
         "check_prototype_navigation.py",

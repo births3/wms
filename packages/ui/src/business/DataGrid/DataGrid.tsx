@@ -12,6 +12,7 @@ import { DataGridNamedViewsToolbar } from "./DataGridNamedViewsToolbar";
 import { DataGridPaginationFooter } from "./DataGridPaginationFooter";
 import { buildDataGridCsv, downloadDataGridCsv } from "./data-grid-export";
 import { clearDataGridFilterKey } from "./data-grid-filter-summary";
+import { useDataGridPopoverDismiss } from "./data-grid-popover-dismiss";
 import {
   getDataGridCopyText,
   dataGridFloatingPanelPosition,
@@ -193,32 +194,13 @@ function DataGridInner<T>(
     };
   }, [resizingColumn]);
 
-  React.useEffect(() => {
-    if (!fieldsOpen && !openFilterKey) return;
-
-    function closePanels(event: PointerEvent) {
-      const target = event.target instanceof Element ? event.target : null;
-      if (target?.closest("[data-datagrid-popover]")) return;
+  useDataGridPopoverDismiss({
+    open: fieldsOpen || openFilterKey !== null,
+    onDismiss: () => {
       setFieldsOpen(false);
       setOpenFilterKey(null);
-    }
-
-    document.addEventListener("pointerdown", closePanels);
-    return () => document.removeEventListener("pointerdown", closePanels);
-  }, [fieldsOpen, openFilterKey]);
-
-  React.useEffect(() => {
-    if (!fieldsOpen && !openFilterKey) return;
-
-    function closePanelsByKeyboard(event: KeyboardEvent) {
-      if (event.key !== "Escape") return;
-      setFieldsOpen(false);
-      setOpenFilterKey(null);
-    }
-
-    document.addEventListener("keydown", closePanelsByKeyboard);
-    return () => document.removeEventListener("keydown", closePanelsByKeyboard);
-  }, [fieldsOpen, openFilterKey]);
+    },
+  });
 
   React.useEffect(() => {
     if (!fieldsOpen) return;

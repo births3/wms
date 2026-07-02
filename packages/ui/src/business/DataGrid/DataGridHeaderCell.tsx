@@ -1,4 +1,5 @@
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { ArrowDown, ArrowUp, ArrowUpDown, Filter, Settings2, X } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { Button } from "../../ui/button";
@@ -6,8 +7,10 @@ import { DataGridColumnFilter } from "./DataGridColumnFilter";
 import type { DataGridColumn } from "./DataGrid";
 import {
   dataGridFilterActive,
+  dataGridFloatingPanelPosition,
   type DataGridColumnFilterValue,
   type DataGridFilterConfig,
+  type DataGridFloatingPanelPosition,
   type DataGridSortState,
 } from "./data-grid-logic";
 
@@ -68,6 +71,28 @@ export function DataGridHeaderCell<T>({
   onNudgeColumnWidth,
 }: DataGridHeaderCellProps<T>) {
   const label = columnLabel(column);
+  const filterButtonRef = React.useRef<HTMLButtonElement | null>(null);
+  const [filterPanelPosition, setFilterPanelPosition] = React.useState<DataGridFloatingPanelPosition | null>(null);
+
+  React.useEffect(() => {
+    if (!filterOpen) return;
+
+    function updatePosition() {
+      const rect = filterButtonRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setFilterPanelPosition(
+        dataGridFloatingPanelPosition(rect, { width: window.innerWidth, height: window.innerHeight }, 224),
+      );
+    }
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [filterOpen]);
 
   return (
     <div className={cn("relative flex min-w-0 items-center gap-1 pr-2", column.align === "right" && "justify-end", className)}>
@@ -84,6 +109,7 @@ export function DataGridHeaderCell<T>({
       {columnFilterable(column) && (
         <>
           <Button
+            ref={filterButtonRef}
             type="button"
             variant={dataGridFilterActive(filterValue) ? "secondary" : "ghost"}
             size="icon"
@@ -95,32 +121,38 @@ export function DataGridHeaderCell<T>({
           >
             <Filter className="size-3.5" aria-hidden />
           </Button>
-          {filterOpen && (
-            <div
-              className={cn(
-                "absolute top-full z-30 mt-2 w-56 rounded-md border bg-background p-3 text-left shadow-lg",
-                column.align === "right" ? "right-0" : "left-0",
-              )}
-              data-datagrid-popover
-            >
-              <DataGridColumnFilter
-                columnKey={column.key}
-                label={label}
-                filter={filter}
-                value={filterValue}
-                onChange={(value) => onFilterChange(column.key, value)}
-              />
-              <div className="mt-2 flex justify-end gap-2">
-                <Button type="button" variant="ghost" size="sm" onClick={() => onFilterChange(column.key, "")}>
-                  <X className="size-3.5" aria-hidden />
-                  清除
-                </Button>
-                <Button type="button" variant="outline" size="sm" onClick={onCloseFilter}>
-                  关闭
-                </Button>
-              </div>
-            </div>
-          )}
+          {filterOpen && filterPanelPosition && typeof document !== "undefined"
+            ? createPortal(
+                <div
+                  className="fixed z-50 w-56 overflow-auto rounded-md border bg-background p-3 text-left shadow-lg"
+                  // 动态：字段筛选浮层跟随筛选按钮位置和视口高度。
+                  style={{
+                    top: filterPanelPosition.top,
+                    left: filterPanelPosition.left,
+                    maxHeight: filterPanelPosition.maxHeight,
+                  }}
+                  data-datagrid-popover
+                >
+                  <DataGridColumnFilter
+                    columnKey={column.key}
+                    label={label}
+                    filter={filter}
+                    value={filterValue}
+                    onChange={(value) => onFilterChange(column.key, value)}
+                  />
+                  <div className="mt-2 flex justify-end gap-2">
+                    <Button type="button" variant="ghost" size="sm" onClick={() => onFilterChange(column.key, "")}>
+                      <X className="size-3.5" aria-hidden />
+                      清除
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={onCloseFilter}>
+                      关闭
+                    </Button>
+                  </div>
+                </div>,
+                document.body,
+              )
+            : null}
         </>
       )}
       {isLastVisibleColumn && (

@@ -1,9 +1,15 @@
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { Bookmark } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { Button } from "../../ui/button";
 import type { DataGridColumn } from "./DataGrid";
-import type { DataGridLogicState } from "./data-grid-logic";
+import {
+  dataGridFloatingPanelPosition,
+  type DataGridFloatingPanelPosition,
+  type DataGridLogicState,
+} from "./data-grid-logic";
+import { useDataGridPopoverDismiss } from "./data-grid-popover-dismiss";
 import {
   dataGridNamedViewsStorageKey,
   loadDataGridNamedViewsFromStorage,
@@ -59,10 +65,12 @@ export function DataGridNamedViewsToolbar<T>({
   const [views, setViews] = React.useState<DataGridNamedView[]>(() =>
     loadDataGridNamedViewsFromStorage(storage, storageKey, options),
   );
+  const buttonRef = React.useRef<HTMLButtonElement | null>(null);
   const [viewName, setViewName] = React.useState(
     () => pickDefaultDataGridNamedView(views)?.name ?? "",
   );
   const [open, setOpen] = React.useState(false);
+  const [panelPosition, setPanelPosition] = React.useState<DataGridFloatingPanelPosition | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const panelId = React.useId();
 
@@ -83,24 +91,28 @@ export function DataGridNamedViewsToolbar<T>({
     setError(null);
   }, [options, storage, storageKey]);
 
+  useDataGridPopoverDismiss({
+    open,
+    onDismiss: () => setOpen(false),
+  });
+
   React.useEffect(() => {
     if (!open) return;
 
-    function closePanel(event: PointerEvent) {
-      const target = event.target instanceof Element ? event.target : null;
-      if (target?.closest("[data-datagrid-popover]")) return;
-      setOpen(false);
+    function updatePosition() {
+      const rect = buttonRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setPanelPosition(
+        dataGridFloatingPanelPosition(rect, { width: window.innerWidth, height: window.innerHeight }, 320),
+      );
     }
 
-    function closePanelByKeyboard(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
-    }
-
-    document.addEventListener("pointerdown", closePanel);
-    document.addEventListener("keydown", closePanelByKeyboard);
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
     return () => {
-      document.removeEventListener("pointerdown", closePanel);
-      document.removeEventListener("keydown", closePanelByKeyboard);
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
     };
   }, [open]);
 
@@ -154,12 +166,13 @@ export function DataGridNamedViewsToolbar<T>({
 
   return (
     <div
-      className={cn("relative inline-flex", className)}
+      className={cn("inline-flex", className)}
       data-datagrid-named-views
       data-storage-key={dataGridNamedViewsStorageKey(storageKey)}
       {...rest}
     >
       <Button
+        ref={buttonRef}
         type="button"
         variant="outline"
         size="icon"
@@ -172,71 +185,76 @@ export function DataGridNamedViewsToolbar<T>({
       >
         <Bookmark className="size-3.5" aria-hidden />
       </Button>
-      {open && (
-        <div
-          id={panelId}
-          className="absolute right-0 top-full z-30 mt-2 w-80 rounded-md border bg-background p-3 text-left text-sm shadow-lg"
-          data-datagrid-popover
-        >
-          <div className="grid gap-2">
-            <input
-              type="text"
-              value={viewName}
-              onChange={(event) => setViewName(event.target.value)}
-              placeholder="命名视图"
-              aria-label="命名视图"
-              className="h-8 rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            />
-            <select
-              value={selectedView ? selectedView.name : ""}
-              aria-label="选择命名视图"
-              onChange={(event) => setViewName(event.target.value)}
-              className="h-8 rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      {open && panelPosition && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              id={panelId}
+              className="fixed z-50 w-80 overflow-auto rounded-md border bg-background p-3 text-left text-sm shadow-lg"
+              // 动态：命名视图浮层跟随触发按钮位置和视口高度。
+              style={{ top: panelPosition.top, left: panelPosition.left, maxHeight: panelPosition.maxHeight }}
+              data-datagrid-popover
             >
-              <option value="">选择视图</option>
-              {views.map((view) => (
-                <option key={view.name} value={view.name}>
-                  {view.name}
-                </option>
-              ))}
-            </select>
-            <div className="flex flex-wrap justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={!viewName.trim()}
-                onClick={saveView}
-              >
-                保存视图
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={!selectedView}
-                onClick={applyView}
-              >
-                应用视图
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={!selectedView}
-                onClick={deleteView}
-              >
-                删除视图
-              </Button>
-            </div>
-            {error ? (
-              <span role="status" className="text-xs text-destructive">
-                {error}
-              </span>
-            ) : null}
-          </div>
-        </div>
-      )}
+              <div className="grid gap-2">
+                <input
+                  type="text"
+                  value={viewName}
+                  onChange={(event) => setViewName(event.target.value)}
+                  placeholder="命名视图"
+                  aria-label="命名视图"
+                  className="h-8 rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+                <select
+                  value={selectedView ? selectedView.name : ""}
+                  aria-label="选择命名视图"
+                  onChange={(event) => setViewName(event.target.value)}
+                  className="h-8 rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <option value="">选择视图</option>
+                  {views.map((view) => (
+                    <option key={view.name} value={view.name}>
+                      {view.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!viewName.trim()}
+                    onClick={saveView}
+                  >
+                    保存视图
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!selectedView}
+                    onClick={applyView}
+                  >
+                    应用视图
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!selectedView}
+                    onClick={deleteView}
+                  >
+                    删除视图
+                  </Button>
+                </div>
+                {error ? (
+                  <span role="status" className="text-xs text-destructive">
+                    {error}
+                  </span>
+                ) : null}
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
