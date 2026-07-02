@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """Gitea issue agent runner.
 
-默认只 dry-run：读取 issue 和评论，生成判断评论或 tmux prompt。
-只有传 `--apply` 才会评论 Gitea 或发送 prompt 到 tmux。
+默认只 dry-run：读取 issue 和评论，生成方案提案或 codex exec prompt。
+只有传 `--apply` 才会评论 Gitea 或在独立 worktree 中直接运行 codex exec。
 """
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import subprocess
 import sys
@@ -23,14 +22,16 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUT_DIR = REPO_ROOT / ".codex" / "issue-agent"
 ISSUE_WORKTREE_PARENT = REPO_ROOT.parent
-ANALYSIS_MARKER = "<!-- wms-issue-agent:analysis:v2 -->"
-TMUX_MARKER = "<!-- wms-issue-agent:tmux:v1 -->"
+PROPOSAL_MARKER = "<!-- wms-issue-agent:proposal:v1 -->"
+REVISION_PROPOSAL_MARKER = "<!-- wms-issue-agent:revision-proposal:v1 -->"
+EXEC_MARKER = "<!-- wms-issue-agent:exec:v1 -->"
+DELIVERY_MARKER = "<!-- wms-issue-agent:delivery:v1 -->"
 MERGE_MARKER = "<!-- wms-issue-agent:merge:v1 -->"
 MERGE_FAILED_MARKER = "<!-- wms-issue-agent:merge-failed:v1 -->"
 MERGE_CORRECTION_MARKER = "<!-- wms-issue-agent:merge-correction:v1 -->"
 STATUS_CORRECTION_MARKER = "<!-- wms-issue-agent:status-correction:v1 -->"
 MERGE_RETRY_COMMAND = "/retry-merge"
-CONFIRM_PHRASES = ("确认方案", "开始处理")
+CONFIRM_PHRASE = "确认方案"
 
 STATUS_COMMENT_TOKENS = (
     "最终交付 PR",
@@ -43,6 +44,7 @@ STATUS_COMMENT_TOKENS = (
     "本轮不会自行合并",
     "本 PR 不自行合并",
     "已按确认处理 issue",
+    "codex exec 日志",
 )
 
 
@@ -127,6 +129,13 @@ def latest_marker_time(comments: list[dict[str, Any]], marker: str) -> datetime 
     return max(times) if times else None
 
 
+def latest_marker_comment(comments: list[dict[str, Any]], markers: tuple[str, ...]) -> dict[str, Any] | None:
+    matches = [c for c in comments if any(marker in body_of(c) for marker in markers)]
+    if not matches:
+        return None
+    return max(matches, key=lambda c: parse_time(str(c["created_at"])))
+
+
 def has_command_after(comments: list[dict[str, Any]], since: datetime, command: str) -> bool:
     for comment in comments:
         created = parse_time(str(comment["created_at"]))
@@ -143,23 +152,17 @@ def has_active_merge_marker(comments: list[dict[str, Any]]) -> bool:
     return correction_time is None or correction_time < merge_time
 
 
-def has_label(issue: dict[str, Any], name: str) -> bool:
-    return any(str(label.get("name")) == name for label in issue.get("labels") or [])
-
-
 def has_command(text: str, command: str) -> bool:
     pattern = re.compile(rf"^\s*{re.escape(command)}(?:\s|$)")
     return any(pattern.match(line) for line in text.splitlines())
 
 
-def has_confirm_after(comments: list[dict[str, Any]], since: datetime, token: str) -> bool:
+def has_confirm_after(comments: list[dict[str, Any]], since: datetime) -> bool:
     for comment in comments:
         created = parse_time(str(comment["created_at"]))
-        text = body_of(comment)
-        phrase_confirmed = any(line.strip() in CONFIRM_PHRASES for line in text.splitlines())
-        if created > since and (
-            has_command(text, token) or has_command(text, "/codex run") or phrase_confirmed
-        ):
+        if created <= since or is_agent_comment(comment):
+            continue
+        if is_confirm_comment(comment):
             return True
     return False
 
@@ -186,6 +189,21 @@ def is_agent_comment(comment: dict[str, Any]) -> bool:
 def is_status_comment(comment: dict[str, Any]) -> bool:
     text = body_of(comment)
     return is_agent_comment(comment) or any(token in text for token in STATUS_COMMENT_TOKENS)
+
+
+def is_obsolete_control_comment(comment: dict[str, Any]) -> bool:
+    if is_agent_comment(comment):
+        return False
+    text = body_of(comment)
+    return (
+        has_command(text, "/confirm")
+        or has_command(text, "/codex run")
+        or any(line.strip() == "开始处理" for line in text.splitlines())
+    )
+
+
+def is_confirm_comment(comment: dict[str, Any]) -> bool:
+    return body_of(comment).strip() == CONFIRM_PHRASE
 
 
 def comment_summary(comments: list[dict[str, Any]], limit: int = 5) -> str:
@@ -404,7 +422,11 @@ def latest_human_time(comments: list[dict[str, Any]]) -> datetime | None:
 
 
 def latest_actionable_human_time(comments: list[dict[str, Any]]) -> datetime | None:
-    times = [parse_time(str(c["created_at"])) for c in comments if not is_status_comment(c)]
+    times = [
+        parse_time(str(c["created_at"]))
+        for c in comments
+        if not is_status_comment(c) and not is_obsolete_control_comment(c) and not is_confirm_comment(c)
+    ]
     return max(times) if times else None
 
 
@@ -413,7 +435,7 @@ def latest_status_time(comments: list[dict[str, Any]]) -> datetime | None:
     return max(times) if times else None
 
 
-def build_analysis_comment(issue: dict[str, Any], comments: list[dict[str, Any]]) -> str:
+def build_proposal_comment(issue: dict[str, Any], comments: list[dict[str, Any]], *, revision: bool = False) -> str:
     labels = ", ".join(label["name"] for label in issue.get("labels") or []) or "无"
     scope = "待确认"
     text = f"{issue.get('title', '')} {issue.get('body', '')} {comment_summary(comments, limit=10)}"
@@ -428,19 +450,22 @@ def build_analysis_comment(issue: dict[str, Any], comments: list[dict[str, Any]]
         conclusion = "建议执行"
         confidence = "中"
         reason = "描述指向可复现故障，优先用日志、接口或页面复现定位。"
-        action = "评论 `/confirm`、`确认方案` 或 `开始处理` 后执行最小修复；如复现信息不足，执行时会先停止补问。"
+        action = "回复裸一行 `确认方案` 后执行最小修复；如复现信息不足，执行时会先停止补问。"
     elif any(word in text for word in ("截图", "图片", "红框", "圈", "页面")):
         conclusion = "建议执行"
         confidence = "中"
         reason = "已有截图或页面位置补充，可以按当前范围做最小修复。"
-        action = "评论 `/confirm`、`确认方案` 或 `开始处理` 后执行最小修复；未确认前继续只评论判断。"
+        action = "回复裸一行 `确认方案` 后执行最小修复；未确认前继续只评论判断。"
     elif any(word in text for word in ("新增", "增加", "字段", "状态", "流程", "规则")):
         conclusion = "需要人工决策"
         confidence = "中"
         reason = "可能引入字段、状态、流程或业务规则变化，不能直接由 agent 拍板。"
-        action = "先补业务边界和验收标准，再决定是否 `/confirm`。"
-    return f"""{ANALYSIS_MARKER}
-## WMS Issue Agent 判断
+        action = "先补业务边界和验收标准，再决定是否确认执行。"
+    marker = REVISION_PROPOSAL_MARKER if revision else PROPOSAL_MARKER
+    title = "修正方案" if revision else "方案提案"
+    feedback_note = "\n本轮是用户验收反馈后的修正方案；旧确认不得复用。\n" if revision else ""
+    return f"""{marker}
+## WMS Issue Agent {title}
 
 - Issue：#{issue["number"]} {issue["title"]}
 - 作者：{(issue.get("user") or {}).get("login", "unknown")}
@@ -449,6 +474,7 @@ def build_analysis_comment(issue: dict[str, Any], comments: list[dict[str, Any]]
 - 可能影响范围：{scope}
 - 结论：{conclusion}
 - 置信度：{confidence}
+{feedback_note}
 
 ### 问题复述
 
@@ -462,9 +488,17 @@ def build_analysis_comment(issue: dict[str, Any], comments: list[dict[str, Any]]
 
 {attachment_summary(comments, issue=issue)}
 
-### 代码核查
+### 根因文件和代码核查
 
 {code_context}
+
+### 改动计划
+
+- 前端：按根因文件定位；若是用户可见行为，补真实页面验证和截图。
+- 后端：暂未发现必须改动；如果执行中发现 API / 数据模型缺口，停止并重新提案。
+- 数据：暂未发现必须改动；新增字段、状态、角色、模块或业务默认值必须停止确认。
+- 文档：如修复暴露共性规则，更新对应 runbook / skill / 规范。
+- 测试：先补最小回归测试，再做实现。
 
 ### 判断依据
 
@@ -494,31 +528,34 @@ def build_analysis_comment(issue: dict[str, Any], comments: list[dict[str, Any]]
 
 ### 请确认
 
-- 同意按上述范围执行：评论 `/confirm`、`确认方案` 或 `开始处理`
+- 同意按上述方案执行：回复裸一行 `确认方案`
 - 需要补充：直接继续评论需求细节或截图
 - 暂不执行：评论 `/reject`
 """
 
 
 def build_fix_prompt(issue: dict[str, Any], comments: list[dict[str, Any]]) -> str:
+    proposal = latest_marker_comment(comments, (PROPOSAL_MARKER, REVISION_PROPOSAL_MARKER))
+    proposal_url = str(proposal.get("html_url") or "") if proposal else ""
     return f"""请处理 Gitea issue #{issue["number"]}：{issue["title"]}
 
 来源：{issue.get("html_url", "")}
+确认对应方案：{proposal_url or "未提供"}
 
-用户已在 issue 评论中确认执行。请按 WMS 仓库规则处理：
-1. 使用 `wms-loop-engineering` 定义目标、输入、检查、反馈和停止条件。
-2. 使用 `wms-execution-retrospective` 从 issue 标题、正文、评论和附件中先判断是否存在共性问题；若是共性问题，必须同步补规则、脚本或矩阵，不能只修一个页面。
-3. 当前 `codex exec` 应运行在 issue 专属 worktree 中；先运行 `pwd`、`git status --short --branch` 和 `git worktree list` 核对。必须使用 `wms-worktree-subagent` 或该独立 git worktree 隔离开发；禁止 checkout、修改或提交主工作区。
-4. 只修复 issue 指向的问题。新增字段、状态、角色、模块或业务默认值时停止并向用户确认。
-5. 完成后运行相关测试，至少 `git diff --check` 和 `just gov-t1`。
-6. 涉及前端或用户可见行为时，禁止在子 worktree 中启动或占用 9002；9002 只允许主工作区固定会话 `wms-web-admin-9002`。需要真实截图或重启证据时，合并到主工作区后由主代理运行 `just dev-web-restart` 和 `just dev-web-verify`，后端按仓库现有运行方式启动并检查 `/healthz`。重启后必须校验运行的是本次修复版本：记录当前提交哈希，并用 `just dev-web-verify` 输出、页面可见变更、接口响应版本字段或等价证据证明不是旧进程缓存；把端口、URL、提交哈希和版本校验结果写入 PR 与 issue。
-7. 如果 issue 评论包含截图 / 附件，必须先打开或下载附件辅助定位，不能只按文字猜测。
-8. 涉及前端或用户可见行为时，必须采集真实前端截图；必须用 `POST /repos/{{owner}}/{{repo}}/issues/<编号>/assets` 把截图上传为 Gitea 附件，并用 Markdown 图片同时评论到 PR 和 issue；不能只写本地路径。
-9. 当前可用截图 / 附件如下：
+用户已在最新方案后回复裸一行“确认方案”。请按 WMS 仓库规则处理：
+1. 使用 `wms-issue-codex-exec`、`wms-loop-engineering` 和 `wms-execution-retrospective` 执行；先判断是否属于共性问题，若是共性问题，必须同步补规则、脚本或矩阵，不能只修一个页面。
+2. 当前命令已由 issue-agent 在 issue 专属 worktree 中用 `codex exec` 直接启动；先运行 `pwd`、`git status --short --branch` 和 `git worktree list` 核对，禁止修改主工作区。
+3. 只修复 issue 指向的问题。新增字段、状态、角色、模块或业务默认值时停止并向用户确认。
+4. 完成后运行相关测试，至少 `git diff --check` 和 `just gov-t1`。
+5. 涉及前端或用户可见行为时，禁止在子 worktree 中启动或占用 9002；9002 只允许主工作区固定会话 `wms-web-admin-9002`。需要真实截图或重启证据时，合并到主工作区后由主代理运行 `just dev-web-restart` 和 `just dev-web-verify`，后端按仓库现有运行方式启动并检查 `/healthz`。重启后必须校验运行的是本次修复版本：记录当前提交哈希，并用 `just dev-web-verify` 输出、页面可见变更、接口响应版本字段或等价证据证明不是旧进程缓存；把端口、URL、提交哈希和版本校验结果写入 PR 与 issue。
+6. 如果 issue 评论包含截图 / 附件，必须先打开或下载附件辅助定位，不能只按文字猜测。
+7. 涉及前端或用户可见行为时，必须采集真实前端截图；必须用 `POST /repos/{{owner}}/{{repo}}/issues/<编号>/assets` 把截图上传为 Gitea 附件，并用 Markdown 图片同时评论到 PR 和 issue；不能只写本地路径。
+8. 当前可用截图 / 附件如下：
 {attachment_summary(comments, issue=issue, limit=10)}
-10. 读取 Gitea issue、评论、PR 或附件元数据必须使用 `tea api`，例如 `tea api /repos/{{owner}}/{{repo}}/issues/{issue["number"]}`；禁止裸 `curl` 访问 Gitea API。
-11. 用户已授权：创建修复分支、推送到远端并创建 Gitea PR；禁止推 main，禁止强推，禁止自行合并 PR。
-12. PR 创建不是完成。最后必须把 PR 链接、提交哈希、验证结果、截图证据、本地测试环境重启结果、tmux 任务会话状态、PR 合并前置条件和剩余风险评论回 issue，并明确下一步是“等待用户确认关闭 issue 后由 issue watcher 自动合并”或“阻塞”；子代理和主代理都不得直接合并 issue-agent PR。
+9. 读取 Gitea issue、评论、PR 或附件元数据必须使用 `tea api`，例如 `tea api /repos/{{owner}}/{{repo}}/issues/{issue["number"]}`；禁止裸 `curl` 访问 Gitea API。
+10. 用户已授权：创建修复分支、推送到远端并创建 Gitea PR；禁止推 main，禁止强推，禁止自行合并 PR。
+11. PR 创建不是完成。最后必须评论 `{DELIVERY_MARKER}` delivery 信息：PR 链接、提交哈希、验证结果、截图证据、本地测试环境重启结果、codex exec 日志位置、PR 合并前置条件和剩余风险，并明确下一步是“等待用户验收并关闭 issue 后由 issue watcher 自动合并”或“阻塞”。
+12. 如果用户验收反馈不对，不得继续复用本次确认；必须等待 issue-agent 重新生成修正方案并由用户再次回复“确认方案”。
 
 Issue 正文：
 {issue.get("body") or ""}
@@ -531,35 +568,28 @@ Issue 正文：
 def choose_action(
     issue: dict[str, Any],
     comments: list[dict[str, Any]],
-    *,
-    confirm_token: str,
-    confirm_label: str,
-    force_dispatch: bool = False,
 ) -> Action | None:
-    tmux_time = latest_marker_time(comments, TMUX_MARKER)
     human_time = latest_actionable_human_time(comments)
-    analysis_time = latest_marker_time(comments, ANALYSIS_MARKER)
+    proposal = latest_marker_comment(comments, (PROPOSAL_MARKER, REVISION_PROPOSAL_MARKER))
+    proposal_time = parse_time(str(proposal["created_at"])) if proposal else None
+    exec_time = latest_marker_time(comments, EXEC_MARKER)
     status_time = latest_status_time(comments)
-    confirmed = has_label(issue, confirm_label) or (
-        analysis_time is not None and has_confirm_after(comments, analysis_time, confirm_token)
-    )
-    if status_time and not force_dispatch and not confirmed and (human_time is None or human_time <= status_time):
+    confirmed = proposal_time is not None and has_confirm_after(comments, proposal_time)
+    if status_time and not confirmed and (human_time is None or human_time <= status_time):
         return None
-    if analysis_time is None:
-        return Action(issue=issue, kind="analysis", body=build_analysis_comment(issue, comments))
-    if has_reject_after(comments, analysis_time):
+    if proposal_time is None:
+        return Action(issue=issue, kind="proposal", body=build_proposal_comment(issue, comments))
+    if has_reject_after(comments, proposal_time):
         return None
+    if human_time and human_time > proposal_time:
+        if exec_time and exec_time > proposal_time:
+            return Action(issue=issue, kind="revision-proposal", body=build_proposal_comment(issue, comments, revision=True))
+        return Action(issue=issue, kind="proposal", body=build_proposal_comment(issue, comments))
     if confirmed:
-        if force_dispatch or tmux_time is None or tmux_time < analysis_time:
-            return Action(issue=issue, kind="tmux", body=build_fix_prompt(issue, comments))
-    if tmux_time and tmux_time > analysis_time:
-        if human_time and human_time > tmux_time:
-            return Action(issue=issue, kind="analysis", body=build_analysis_comment(issue, comments))
+        if exec_time is None or exec_time < proposal_time:
+            return Action(issue=issue, kind="exec", body=build_fix_prompt(issue, comments))
+    if exec_time and exec_time > proposal_time:
         return None
-    if force_dispatch and has_label(issue, confirm_label):
-        return Action(issue=issue, kind="tmux", body=build_fix_prompt(issue, comments))
-    if human_time and human_time > analysis_time:
-        return Action(issue=issue, kind="analysis", body=build_analysis_comment(issue, comments))
     return None
 
 
@@ -583,40 +613,20 @@ def issue_worktree(issue_number: int, stamp: str) -> tuple[Path, str]:
     return ISSUE_WORKTREE_PARENT / name, branch
 
 
-def build_codex_command(work_dir: Path, prompt_path: Path, log_path: Path, *, exec_mode: bool) -> str:
-    if exec_mode:
-        return (
-            f"codex exec --dangerously-bypass-approvals-and-sandbox -C {quote(str(work_dir))} "
-            f"- < {quote(str(prompt_path))} 2>&1 | tee {quote(str(log_path))}"
-        )
+def build_codex_command(work_dir: Path, prompt_path: Path, log_path: Path) -> str:
     return (
-        f"codex --dangerously-bypass-approvals-and-sandbox -C {quote(str(work_dir))} "
-        f"\"$(cat {quote(str(prompt_path))})\""
+        f"codex exec --dangerously-bypass-approvals-and-sandbox -C {quote(str(work_dir))} "
+        f"- < {quote(str(prompt_path))} 2>&1 | tee {quote(str(log_path))}"
     )
 
 
-def inject_tmux(target: str, prompt: str) -> str:
-    run(["tmux", "display-message", "-p", "-t", target, "#{session_name}:#{window_index}.#{pane_index}"])
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as f:
-        f.write(prompt)
-        prompt_path = f.name
-    try:
-        run(["tmux", "load-buffer", prompt_path])
-        run(["tmux", "paste-buffer", "-t", target])
-        run(["tmux", "send-keys", "-t", target, "Enter"])
-        return target
-    finally:
-        Path(prompt_path).unlink(missing_ok=True)
-
-
-def start_tmux_session(issue_number: int, prompt_path: Path, session_prefix: str, *, exec_mode: bool) -> str:
+def prepare_codex_exec(issue_number: int, prompt_path: Path) -> tuple[Path, str, Path, Path]:
     stamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    session = f"{session_prefix}-{issue_number}-{stamp}"
     script = prompt_path.with_suffix(".run.sh")
     log_path = prompt_path.with_suffix(".log")
     work_dir, branch = issue_worktree(issue_number, stamp)
     run(["git", "worktree", "add", "-b", branch, str(work_dir), "HEAD"])
-    command = build_codex_command(work_dir, prompt_path, log_path, exec_mode=exec_mode)
+    command = build_codex_command(work_dir, prompt_path, log_path)
     script.write_text(
         "\n".join(
             [
@@ -630,26 +640,12 @@ def start_tmux_session(issue_number: int, prompt_path: Path, session_prefix: str
         encoding="utf-8",
     )
     script.chmod(0o700)
-    run(["tmux", "new-session", "-d", "-s", session, "-c", str(work_dir), str(script)])
-    return session
+    return work_dir, branch, script, log_path
 
 
-def dispatch_tmux(
-    *,
-    issue_number: int,
-    prompt: str,
-    prompt_path: Path,
-    mode: str,
-    target: str,
-    session_prefix: str,
-) -> str:
-    if mode == "paste":
-        return inject_tmux(target, prompt)
-    if mode == "exec":
-        return start_tmux_session(issue_number, prompt_path, session_prefix, exec_mode=True)
-    if mode == "session":
-        return start_tmux_session(issue_number, prompt_path, session_prefix, exec_mode=False)
-    raise ValueError(f"不支持的 tmux 投递模式：{mode}")
+def run_codex_exec(script: Path, *, work_dir: Path) -> int:
+    result = subprocess.run([str(script)], cwd=work_dir, check=False)
+    return int(result.returncode)
 
 
 def execute_action(
@@ -657,33 +653,47 @@ def execute_action(
     *,
     apply: bool,
     out_dir: Path,
-    tmux_target: str,
-    tmux_mode: str,
-    tmux_session_prefix: str,
 ) -> None:
     issue_number = int(action.issue["number"])
     preview = write_preview(out_dir, issue_number, action.kind, action.body)
     print(f"{action.kind}: issue #{issue_number} preview={display_path(preview)}", flush=True)
     if not apply:
-        print("dry-run: 未评论 Gitea，未发送到 tmux", flush=True)
+        print("dry-run: 未评论 Gitea，未运行 codex exec", flush=True)
         return
-    if action.kind == "analysis":
+    if action.kind in {"proposal", "revision-proposal"}:
         post_comment(issue_number, action.body)
         print(f"applied: 已评论 issue #{issue_number}", flush=True)
         return
-    destination = dispatch_tmux(
-        issue_number=issue_number,
-        prompt=action.body,
-        prompt_path=preview,
-        mode=tmux_mode,
-        target=tmux_target,
-        session_prefix=tmux_session_prefix,
-    )
+    work_dir, branch, script, log_path = prepare_codex_exec(issue_number, preview)
     post_comment(
         issue_number,
-        f"{TMUX_MARKER}\n已通过 `{tmux_mode}` 发送到 tmux `{destination}`，等待 Codex 执行。",
+        (
+            f"{EXEC_MARKER}\n"
+            "已开始直接运行 `codex exec`，等待 Codex 执行并回写 delivery 证据。\n"
+            f"- worktree：`{work_dir}`\n"
+            f"- 分支：`{branch}`\n"
+            f"- 日志：`{log_path}`\n"
+            f"- prompt：`{preview}`\n"
+        ),
     )
-    print(f"applied: 已通过 {tmux_mode} 发送到 tmux {destination} 并评论 issue #{issue_number}", flush=True)
+    print(f"applied: 已开始 codex exec issue #{issue_number} worktree={work_dir}", flush=True)
+    exit_code = run_codex_exec(script, work_dir=work_dir)
+    if exit_code != 0:
+        post_comment(
+            issue_number,
+            (
+                f"{STATUS_CORRECTION_MARKER}\n"
+                "`codex exec` 执行失败，未形成完成闭环。\n"
+                f"- issue：#{issue_number}\n"
+                f"- 分支：`{branch}`\n"
+                f"- worktree：`{work_dir}`\n"
+                f"- 日志：`{log_path}`\n"
+                f"- 退出码：{exit_code}\n"
+                "- 下一步：修复执行失败原因后，重新发修正方案并等待新的 `确认方案`。\n"
+            ),
+        )
+        raise RuntimeError(f"codex exec failed: exit={exit_code}, log={log_path}")
+    print(f"applied: codex exec 已结束 issue #{issue_number} exit=0", flush=True)
 
 
 def merge_pull(pr_number: int) -> str:
@@ -760,21 +770,12 @@ def run_once(args: argparse.Namespace) -> int:
     for raw_issue in raw_issues:
         issue = get_issue(int(raw_issue["number"]))
         comments = get_comments(int(issue["number"]))
-        action = choose_action(
-            issue,
-            comments,
-            confirm_token=args.confirm_token,
-            confirm_label=args.confirm_label,
-            force_dispatch=getattr(args, "force_dispatch", False),
-        )
+        action = choose_action(issue, comments)
         if action is not None:
             execute_action(
                 action,
                 apply=args.apply,
                 out_dir=Path(args.out_dir),
-                tmux_target=args.tmux_target,
-                tmux_mode=args.tmux_mode,
-                tmux_session_prefix=args.tmux_session_prefix,
             )
             return 0
     print("no-action: 没有需要处理的 issue", flush=True)
@@ -805,32 +806,41 @@ def self_test() -> int:
     assert branch == "fix/issue-7-20260702010101"
     command = build_codex_command(
         worktree_path,
-        DEFAULT_OUT_DIR / "issue-7-tmux.txt",
-        DEFAULT_OUT_DIR / "issue-7-tmux.log",
-        exec_mode=True,
+        DEFAULT_OUT_DIR / "issue-7-exec.txt",
+        DEFAULT_OUT_DIR / "issue-7-exec.log",
     )
     assert f"-C {quote(str(worktree_path))}" in command
     assert f"-C {quote(str(REPO_ROOT))} " not in command
     t0 = "2026-07-01T00:00:00Z"
     t1 = "2026-07-01T00:01:00Z"
-    comments = [{"created_at": t0, "body": build_analysis_comment(issue, [])}]
-    assert "### 代码核查" in comments[0]["body"]
-    assert choose_action(issue, [], confirm_token="/confirm", confirm_label="codex:confirmed").kind == "analysis"
-    assert choose_action(issue, comments, confirm_token="/confirm", confirm_label="codex:confirmed") is None
+    comments = [{"created_at": t0, "body": build_proposal_comment(issue, [])}]
+    assert "### 根因文件和代码核查" in comments[0]["body"]
+    assert "/confirm" not in comments[0]["body"]
+    assert "开始处理" not in comments[0]["body"]
+    assert choose_action(issue, []).kind == "proposal"
+    assert choose_action(issue, comments) is None
     confirmed = [*comments, {"created_at": t1, "body": "/confirm"}]
-    assert choose_action(issue, confirmed, confirm_token="/confirm", confirm_label="codex:confirmed").kind == "tmux"
+    assert choose_action(issue, confirmed) is None
     confirmed_zh = [*comments, {"created_at": t1, "body": "确认方案"}]
-    assert choose_action(issue, confirmed_zh, confirm_token="/confirm", confirm_label="codex:confirmed").kind == "tmux"
+    assert choose_action(issue, confirmed_zh).kind == "exec"
+    multiline_confirm = [*comments, {"created_at": t1, "body": "确认方案\n补充：需要截图"}]
+    assert choose_action(issue, multiline_confirm).kind == "proposal"
+    detail_then_confirm = [
+        *comments,
+        {"created_at": t1, "body": "补充：需要截图"},
+        {"created_at": "2026-07-01T00:02:00Z", "body": "确认方案"},
+    ]
+    assert choose_action(issue, detail_then_confirm).kind == "proposal"
     start_zh = [*comments, {"created_at": t1, "body": "开始处理"}]
-    assert choose_action(issue, start_zh, confirm_token="/confirm", confirm_label="codex:confirmed").kind == "tmux"
+    assert choose_action(issue, start_zh) is None
     mentioned = [*comments, {"created_at": t1, "body": "不要 /confirm，先补截图"}]
-    assert choose_action(issue, mentioned, confirm_token="/confirm", confirm_label="codex:confirmed").kind == "analysis"
+    assert choose_action(issue, mentioned).kind == "proposal"
     mentioned_zh = [*comments, {"created_at": t1, "body": "不要确认方案，先补截图"}]
-    assert choose_action(issue, mentioned_zh, confirm_token="/confirm", confirm_label="codex:confirmed").kind == "analysis"
-    refreshed = [*mentioned, {"created_at": "2026-07-01T00:02:00Z", "body": build_analysis_comment(issue, mentioned)}]
-    assert choose_action(issue, refreshed, confirm_token="/confirm", confirm_label="codex:confirmed") is None
-    sent = [*confirmed, {"created_at": "2026-07-01T00:02:00Z", "body": TMUX_MARKER}]
-    assert choose_action(issue, sent, confirm_token="/confirm", confirm_label="codex:confirmed") is None
+    assert choose_action(issue, mentioned_zh).kind == "proposal"
+    refreshed = [*mentioned, {"created_at": "2026-07-01T00:02:00Z", "body": build_proposal_comment(issue, mentioned)}]
+    assert choose_action(issue, refreshed) is None
+    sent = [*confirmed_zh, {"created_at": "2026-07-01T00:02:00Z", "body": EXEC_MARKER}]
+    assert choose_action(issue, sent) is None
     delivered = [
         *sent,
         {
@@ -838,29 +848,20 @@ def self_test() -> int:
             "body": "已按确认处理 issue #7，最终交付 PR 为 #9。PR 合并前置条件：等待用户确认合并。",
         },
     ]
-    assert choose_action(issue, delivered, confirm_token="/confirm", confirm_label="codex:confirmed") is None
+    assert choose_action(issue, delivered) is None
     after_delivery = [*delivered, {"created_at": "2026-07-01T00:04:00Z", "body": "补充：按钮还缺一个"}]
-    assert choose_action(issue, after_delivery, confirm_token="/confirm", confirm_label="codex:confirmed").kind == "analysis"
-    after_tmux = [*sent, {"created_at": "2026-07-01T00:03:00Z", "body": "补充：还有下拉异常"}]
-    assert choose_action(issue, after_tmux, confirm_token="/confirm", confirm_label="codex:confirmed").kind == "analysis"
-    after_tmux_refreshed = [
-        *after_tmux,
-        {"created_at": "2026-07-01T00:04:00Z", "body": build_analysis_comment(issue, after_tmux)},
+    assert choose_action(issue, after_delivery).kind == "revision-proposal"
+    after_exec = [*sent, {"created_at": "2026-07-01T00:03:00Z", "body": "不对，还缺下拉异常"}]
+    assert choose_action(issue, after_exec).kind == "revision-proposal"
+    after_exec_refreshed = [
+        *after_exec,
+        {"created_at": "2026-07-01T00:04:00Z", "body": build_proposal_comment(issue, after_exec)},
     ]
-    assert choose_action(issue, after_tmux_refreshed, confirm_token="/confirm", confirm_label="codex:confirmed") is None
-    after_tmux_confirmed = [*after_tmux_refreshed, {"created_at": "2026-07-01T00:05:00Z", "body": "/confirm"}]
-    assert choose_action(issue, after_tmux_confirmed, confirm_token="/confirm", confirm_label="codex:confirmed").kind == "tmux"
-    assert choose_action(
-        issue,
-        sent,
-        confirm_token="/confirm",
-        confirm_label="codex:confirmed",
-        force_dispatch=True,
-    ).kind == "tmux"
+    assert choose_action(issue, after_exec_refreshed) is None
+    after_exec_confirmed = [*after_exec_refreshed, {"created_at": "2026-07-01T00:05:00Z", "body": "确认方案"}]
+    assert choose_action(issue, after_exec_confirmed).kind == "exec"
     rejected = [*comments, {"created_at": t1, "body": "/reject 不执行 /confirm"}]
-    assert choose_action(issue, rejected, confirm_token="/confirm", confirm_label="codex:confirmed") is None
-    labeled = {**issue, "labels": [{"name": "codex:confirmed"}]}
-    assert choose_action(labeled, comments, confirm_token="/confirm", confirm_label="codex:confirmed").kind == "tmux"
+    assert choose_action(issue, rejected) is None
     with_asset = [
         *comments,
         {
@@ -869,20 +870,26 @@ def self_test() -> int:
             "user": {"login": "u"},
             "assets": [{"name": "image.png", "browser_download_url": "http://gitea/attachments/a"}],
         },
-        {"created_at": "2026-07-01T00:02:00Z", "body": "/confirm"},
     ]
-    prompt = choose_action(issue, with_asset, confirm_token="/confirm", confirm_label="codex:confirmed").body
+    assert choose_action(issue, [*with_asset, {"created_at": "2026-07-01T00:02:00Z", "body": "确认方案"}]).kind == "proposal"
+    with_asset_refreshed = [
+        *with_asset,
+        {"created_at": "2026-07-01T00:02:00Z", "body": build_proposal_comment(issue, with_asset)},
+        {"created_at": "2026-07-01T00:03:00Z", "body": "确认方案"},
+    ]
+    prompt = choose_action(issue, with_asset_refreshed).body
     assert "http://gitea/attachments/a" in prompt
     assert "上传为 Gitea 附件" in prompt
     assert "wms-execution-retrospective" in prompt
     assert "共性问题" in prompt
+    assert DELIVERY_MARKER in prompt
     assert "tea api" in prompt
     assert "禁止裸 `curl`" in prompt
     issue_asset = {
         **issue,
         "assets": [{"name": "issue.png", "browser_download_url": "http://gitea/attachments/issue"}],
     }
-    assert "http://gitea/attachments/issue" in build_analysis_comment(issue_asset, [])
+    assert "http://gitea/attachments/issue" in build_proposal_comment(issue_asset, [])
     assert "http://gitea/attachments/issue" in build_fix_prompt(issue_asset, [])
     closed_issue = {"number": 8, "state": "closed", "body": "已验收"}
     pr = {
@@ -945,7 +952,7 @@ def self_test() -> int:
         pr,
     )
     assert "缺少验证、截图或重启证据" in merge_blockers(closed_issue, [], {**pr, "body": "关联 issue #8"})
-    assert merge_blockers(closed_issue, [{"created_at": t1, "body": f"{ANALYSIS_MARKER}\n评论 `/reject`"}], pr) == []
+    assert merge_blockers(closed_issue, [{"created_at": t1, "body": f"{PROPOSAL_MARKER}\n评论 `/reject`"}], pr) == []
     assert "存在阻塞或拒绝合并评论" in merge_blockers(
         closed_issue,
         [{"created_at": t1, "body": "不要合并"}],
@@ -956,23 +963,17 @@ def self_test() -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Gitea issue → tmux Codex runner")
+    parser = argparse.ArgumentParser(description="Gitea issue → codex exec runner")
     sub = parser.add_subparsers(dest="command", required=True)
 
     def add_common(p: argparse.ArgumentParser) -> None:
-        p.add_argument("--apply", action="store_true", help="执行写操作：评论 Gitea 或发送到 tmux")
+        p.add_argument("--apply", action="store_true", help="执行写操作：评论 Gitea 或运行 codex exec")
         p.add_argument("--issue", type=int, help="只处理指定 issue 编号")
         p.add_argument("--limit", type=int, default=20, help="每轮最多扫描 open issue 数")
         p.add_argument("--out-dir", default=str(DEFAULT_OUT_DIR), help="本地预览输出目录")
-        p.add_argument("--tmux-target", default=os.getenv("WMS_ISSUE_AGENT_TMUX_TARGET", "wms-codex:0.0"))
-        p.add_argument("--tmux-mode", choices=["exec", "session", "paste"], default="exec")
-        p.add_argument("--tmux-session-prefix", default="wms-issue")
-        p.add_argument("--confirm-token", default="/confirm")
-        p.add_argument("--confirm-label", default="codex:confirmed")
 
     once = sub.add_parser("once", help="执行一轮扫描")
     add_common(once)
-    once.add_argument("--force-dispatch", action="store_true", help="即使 issue 已有 tmux 标记，也重新投递一次")
     once.set_defaults(func=run_once)
 
     watch = sub.add_parser("watch", help="循环扫描")

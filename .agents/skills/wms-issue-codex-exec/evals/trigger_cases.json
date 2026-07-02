@@ -1,0 +1,49 @@
+{
+  "recommended_threshold": 0.17,
+  "should_trigger": [
+    {
+      "text": "不要用 tmux 了，Gitea issue 先发方案提案，确认方案后直接 codex exec 执行。",
+      "family": "issue_codex_exec"
+    },
+    {
+      "text": "issue-agent 要先列根因文件、改动计划、验证和风险，用户确认方案后再执行。",
+      "family": "proposal_confirm"
+    },
+    {
+      "text": "用户验收反馈不对时，不能复用旧确认，要重新发修正方案再跑。",
+      "family": "revision_confirm"
+    },
+    {
+      "text": "把 issue 修复完成后的测试结果和真实截图附件回写到 PR 和 issue。",
+      "family": "delivery_evidence"
+    }
+  ],
+  "should_not_trigger": [
+    {
+      "text": "用 worktree 子代理拆分 M2 前端任务。",
+      "family": "worktree_subagent"
+    },
+    {
+      "text": "review 修复再 review，然后分组提交。",
+      "family": "review_commit"
+    },
+    {
+      "text": "帮我解释 codex exec 和 tmux 的区别。",
+      "family": "explain_only"
+    },
+    {
+      "text": "本地修一个无 issue 的 DataGrid bug。",
+      "family": "local_dev"
+    }
+  ],
+  "near_neighbor": [
+    {
+      "text": "清理遗留 worktree 和 agent 分支。",
+      "family": "worktree_closeout"
+    },
+    {
+      "text": "把一次执行漏项复盘进流程。",
+      "family": "retrospective"
+    }
+  ]
+}

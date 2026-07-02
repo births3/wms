@@ -28,8 +28,8 @@ DEV_WEB_SESSION := "wms-web-admin-9002"
 DEV_WEB_PORT := "9002"
 DEV_WEB_CWD := MAIN_ROOT / "apps/web-admin"
 DEV_WEB_LOG := "/tmp/wms-web-admin-9002.log"
-ISSUE_AGENT_SESSION := "wms-issue-agent"
 ISSUE_AGENT_LOG := MAIN_ROOT / ".codex/issue-agent/watch.log"
+ISSUE_AGENT_PID := MAIN_ROOT / ".codex/issue-agent/watch.pid"
 
 # 默认显示帮助
 default:
@@ -265,11 +265,11 @@ status:
     @echo ""
     @if [ -f TODO.md ]; then echo "── TODO.md ──"; head -20 TODO.md; fi
 
-# Gitea issue agent：执行一轮扫描；默认 dry-run，传 --apply 才评论或发送到 tmux
+# Gitea issue agent：执行一轮扫描；默认 dry-run，传 --apply 才评论或运行 codex exec
 issue-agent-once *args:
     @python3 -u scripts/agents/issue_runner.py once {{args}}
 
-# Gitea issue agent：循环扫描；默认 dry-run，传 --apply 才评论或发送到 tmux
+# Gitea issue agent：循环扫描；默认 dry-run，传 --apply 才评论或运行 codex exec
 issue-agent-watch *args:
     @python3 -u scripts/agents/issue_runner.py watch {{args}}
 
@@ -277,8 +277,19 @@ issue-agent-watch *args:
 issue-agent-status:
     #!/usr/bin/env bash
     set -euo pipefail
-    echo "tmux:"
-    tmux ls 2>/dev/null | grep -E '^{{ISSUE_AGENT_SESSION}}:' || true
+    pid_file="{{ISSUE_AGENT_PID}}"
+    echo "pid:"
+    if [[ -f "$pid_file" ]]; then
+      pid="$(cat "$pid_file" 2>/dev/null || true)"
+      echo "${pid:-empty}"
+      if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+        ps -fp "$pid" || true
+      else
+        echo "not-running"
+      fi
+    else
+      echo "no pid file"
+    fi
     echo "process:"
     pgrep -af 'scripts/agents/issue_runner.py watch' || true
     echo "recent-log:"
@@ -288,17 +299,47 @@ issue-agent-status:
 issue-agent-verify:
     #!/usr/bin/env bash
     set -euo pipefail
-    tmux has-session -t "{{ISSUE_AGENT_SESSION}}" 2>/dev/null
-    pgrep -f 'scripts/agents/issue_runner.py watch' >/dev/null
+    pid_file="{{ISSUE_AGENT_PID}}"
+    [[ -f "$pid_file" ]] || { echo "issue-agent pid 文件不存在：$pid_file" >&2; exit 1; }
+    pid="$(cat "$pid_file" 2>/dev/null || true)"
+    [[ "$pid" =~ ^[0-9]+$ ]] || { echo "issue-agent pid 无效：${pid:-empty}" >&2; exit 1; }
+    kill -0 "$pid" 2>/dev/null || { echo "issue-agent 进程不存在：$pid" >&2; exit 1; }
+    cmd="$(ps -p "$pid" -o args= 2>/dev/null || true)"
+    grep -F 'scripts/agents/issue_runner.py watch' <<<"$cmd" >/dev/null || {
+      echo "issue-agent pid 不是 watcher：$cmd" >&2
+      exit 1
+    }
 
 # Gitea issue agent：重启长期 watcher
 issue-agent-restart:
     #!/usr/bin/env bash
     set -euo pipefail
     mkdir -p "$(dirname "{{ISSUE_AGENT_LOG}}")"
-    tmux kill-session -t "{{ISSUE_AGENT_SESSION}}" 2>/dev/null || true
-    tmux new-session -d -s "{{ISSUE_AGENT_SESSION}}" -c "{{MAIN_ROOT}}" \
-      'just issue-agent-watch --interval "${WMS_ISSUE_AGENT_INTERVAL:-60}" --apply --merge-closed 2>&1 | tee -a "{{ISSUE_AGENT_LOG}}"'
+    pid_file="{{ISSUE_AGENT_PID}}"
+    stop_pid() {
+      local pid="$1"
+      [[ "$pid" =~ ^[0-9]+$ ]] || return 0
+      [[ "$pid" != "$$" && "$pid" != "$BASHPID" ]] || return 0
+      kill -0 "$pid" 2>/dev/null || return 0
+      kill "$pid" 2>/dev/null || true
+      for _ in {1..20}; do
+        kill -0 "$pid" 2>/dev/null || return 0
+        sleep 0.2
+      done
+      kill -KILL "$pid" 2>/dev/null || true
+    }
+    if [[ -f "$pid_file" ]]; then
+      pid="$(cat "$pid_file" 2>/dev/null || true)"
+      stop_pid "$pid"
+    fi
+    mapfile -t legacy_pids < <(ps -eo pid=,args= | awk '/[p]ython3 -u scripts\/agents\/issue_runner\.py watch/ {print $1}')
+    for pid in "${legacy_pids[@]}"; do
+      stop_pid "$pid"
+    done
+    rm -f "$pid_file"
+    cd "{{MAIN_ROOT}}"
+    nohup python3 -u scripts/agents/issue_runner.py watch --interval "${WMS_ISSUE_AGENT_INTERVAL:-60}" --apply --merge-closed >> "{{ISSUE_AGENT_LOG}}" 2>&1 &
+    echo "$!" > "$pid_file"
     sleep 2
     just issue-agent-verify
 
