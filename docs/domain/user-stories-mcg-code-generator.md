@@ -103,14 +103,15 @@
 |------|------|
 | L4 错误路径 | 规则不存在 → CG_RULE_NOT_FOUND; 序列号溢出（达到最大值）→ CG_SEQUENCE_OVERFLOW + 告警; 并发生成冲突 → 自动重试（乐观锁） |
 | L5 数据一致 | 生成的编码全局唯一; 序列号严格递增不跳号; 并发安全（不重复） |
-| L8 权限 | 系统内部调用（各模块创建业务单据时自动调用）; 不对外暴露 |
+| L8 权限 | 各模块创建业务单据时自动调用内部服务; 规则管理和生成记录查询公开 API 必须校验 `mcg.document_numbering.read` / `mcg.document_numbering.write` |
 | L11 幂等 | 同一业务请求（Idempotency-Key）重复调用 → 返回首次生成的编码 |
 
 #### 后端第一切片（2026-07-02）
 
 - 已落 `document_number_rules`、`document_number_counters`、`document_number_allocations` 三张表。
 - 已提供内部 `PgDocumentNumberingService::generate_in_tx`，供业务模块在自身创建单据事务内申请单据号。
-- 暂不新增公开 HTTP API、前端页面、角色或审批源；规则管理页、查询 API 和配置审批后续按独立切片确认。
+- 已提供 `code-generator` 公开 API：规则列表、规则 upsert、规则启停、生成记录查询，并同步 OpenAPI / api-client。
+- PC 规则管理页、规则预览、审计展示、9002 真实截图、配置审批和 M2/M3/M4 创建单据接入仍按后续切片补齐。
 
 ### PDA 弹性
 
