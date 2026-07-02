@@ -8,17 +8,27 @@
 |---|---|---|
 | `AGENTS.md` | 项目原则、常用命令、验证要求、协作约定、禁止事项 | 本文件 |
 | `*/AGENTS.override.md` | 模块独有规则，例如后端、前端应用、原型、部署、治理脚本 | 见下方模块规则 |
-| `.agents/skills/<skill>/SKILL.md` | 复杂流程，例如需求确认、治理修复、审计流程、worktree 子代理流程 | 见 `.agents/skills/wms-governance-workflow/SKILL.md`、`.agents/skills/wms-loop-engineering/SKILL.md`、`.agents/skills/wms-review-fix-commit/SKILL.md` 与 `.agents/skills/wms-worktree-subagent/SKILL.md` |
+| `.agents/skills/<skill>/SKILL.md` | 复杂流程，例如需求确认、治理修复、审计流程、PlantUML 图文沉淀、worktree 子代理流程 | 见 `.agents/skills/wms-governance-workflow/SKILL.md`、`.agents/skills/wms-loop-engineering/SKILL.md`、`.agents/skills/wms-review-fix-commit/SKILL.md`、`.agents/skills/wms-plantuml-docs/SKILL.md` 与 `.agents/skills/wms-worktree-subagent/SKILL.md` |
 | `.codex/config.toml` | 模型、沙箱、MCP、钩子、审批默认值 | 本仓库不跟踪；`.gitignore` 标记为本机配置 |
 | `.codex/rules/*.rules` | 命令允许 / 提示 / 禁止规则 | 本仓库不跟踪；`.gitignore` 标记为本机配置 |
 | `docs/*.md` | 详细说明、经验手册、长规范、背景材料 | 见 [docs/agent-collaboration.md](docs/agent-collaboration.md) 与 [docs/agent-document-index.md](docs/agent-document-index.md) |
+
+## 项目定位
+
+- 本项目是面向医药 / 多货主 / 多仓运营的大型企业级 WMS，不是普通 CRUD 后台、小型库存工具或原型演示系统。
+- 设计默认要覆盖 PC 管理端、PDA 作业端、后端 API、PostgreSQL 数据模型、审计追踪、权限、幂等、截图证据、治理脚本和运行手册。
+- 业务必须按模块闭环理解：M1 基础档案 / 系统字典、M2 入库、M3 库内、M4 出库、M5 冷链、M6 报表审计、M-VR 规则引擎、M-PM 参数对照、横向能力 H1/H2/H-INT 等相互依赖。
+- 医药 GSP、批号、效期、温控、特殊药品、双人作业、审计留痕和货主级配置是核心约束，不能当作可选增强。
+- 单据类型、流程模板、批号策略、编号规则、状态机、审批源和货主覆盖属于平台级能力；新增或调整时必须考虑前端、后端、数据库、OpenAPI、RTM、用户故事、治理脚本和迁移兼容。
+- 默认按“可配置但受控”的企业系统设计：运营可维护受控配置，不能用自由文本或临时代码绕过字典、规则、审批和审计。
+- 发现需求看似简单时，必须先判断是否是共性平台能力；如果跨两个以上模块或会影响历史单据解释，不得只做单页面局部实现。
 
 ## 项目原则
 
 - 回复语言：中文。
 - 开发模式：外向内 TDD，先写失败测试再写代码。
 - 脚本优先：能被治理脚本检查的问题，先修脚本可验证的问题，再处理人工语义判断。
-- 复用优先：前后端改动先查现有模块、组件、类型、接口、工具函数和测试夹具；没有现成能力时，再按分层边界补标准可复用单元。
+- 复用优先：前后端改动先查现有模块、组件、类型、接口、工具函数和测试夹具；再查 GitHub、成熟开源方案或已安装依赖，能复用就不造轮子；确实没有合适方案，或需要在现有轮子基础上形成更适合 WMS 的能力时，再按分层边界补标准可复用单元，并沉淀为后续可复用的组件、工具函数、服务或治理脚本。
 - 缺口确认：发现新增模块、故事、基础设施、字段、状态、审批源、跨模块语义变化时，必须先向用户确认。
 - 分层边界：后端 `bin/runtime -> handler -> service -> domain/repository`；前端 `app shell -> page -> feature -> api-client` 与 `page -> @wms/ui business -> @wms/ui ui`。这些英文为代码分层名。
 - 规范引用：本文件不复制长规范，细节以被引用文档为唯一事实源。
@@ -53,11 +63,12 @@
 - 有风险决策给 2-3 个候选方案、影响和建议，等待用户确认；无风险治理修复可直接做。
 - 业务/法规/安全最终结论不由 AI 拍板；AI 只给可验证参考意见。
 - DO NOT send optional commentary。
-- 复杂流程按对应 `.agents/skills/*/SKILL.md` 执行；治理修复用 `wms-governance-workflow`，闭环执行用 `wms-loop-engineering`，审查修复后分组提交用 `wms-review-fix-commit`，worktree 子代理执行用 `wms-worktree-subagent`，执行漏项复盘迭代用 `wms-execution-retrospective`。
+- 默认本地提交按 [docs/agent-commit-rules.md](docs/agent-commit-rules.md)；满足条件时不再额外询问是否提交。
+- 复杂流程按对应 `.agents/skills/*/SKILL.md` 执行；治理修复用 `wms-governance-workflow`，闭环执行用 `wms-loop-engineering`，PlantUML 图文沉淀用 `wms-plantuml-docs`，审查修复后分组提交用 `wms-review-fix-commit`，worktree 子代理执行用 `wms-worktree-subagent`，执行漏项复盘迭代用 `wms-execution-retrospective`。
 
 ## 禁止事项
 
-- 禁止主动 `git commit`，除非用户明确说“提交/commit/打 tag”，或明确调用 `wms-review-fix-commit` / “review 技能”且未要求只审查不提交。
+- 禁止主动 `git commit`，除非满足 [docs/agent-commit-rules.md](docs/agent-commit-rules.md)，或用户明确说“提交/commit/打 tag”，或明确调用 `wms-review-fix-commit` / “review 技能”且未要求只审查不提交。
 - 禁止主动推送；推 main 分支必须额外显式确认。
 - 禁止强制推送、`git reset --hard`、`git clean -f`、删除分支，除非用户明示。
 - 禁止修改 git 全局配置、hooks、远程配置。
@@ -84,20 +95,21 @@
 ## 必读文档（按优先级）
 
 1. [docs/agent-collaboration.md](docs/agent-collaboration.md) — AI 协作细则与确认流程
-2. [docs/coding-standards.md](docs/coding-standards.md) — 代码书写规范
-3. [docs/frontend-coding-standards.md](docs/frontend-coding-standards.md) — 前端编码规范
-4. [docs/layered-design.md](docs/layered-design.md) — 前后端分层设计规范
-5. [docs/governance.md](docs/governance.md) — 治理体系
-6. [docs/adr/0006-tdd-and-test-layers.md](docs/adr/0006-tdd-and-test-layers.md) — TDD + 11 层测试
-7. [docs/adr/0029-frontend-as-prototype-workflow.md](docs/adr/0029-frontend-as-prototype-workflow.md) — 前端原型先行工作流
-8. [docs/prototypes/prototype-to-production.md](docs/prototypes/prototype-to-production.md) — 原型转生产清单
-9. [docs/prototypes/matrix-e2e-screenshot-gate.md](docs/prototypes/matrix-e2e-screenshot-gate.md) — Matrix E2E 截图门禁
-10. [docs/architecture-dependencies.md](docs/architecture-dependencies.md) — 模块依赖图
-11. [docs/adr/README.md](docs/adr/README.md) — ADR 索引
-12. [docs/infra/technical-specs.md](docs/infra/technical-specs.md) — 基础设施技术规格
-13. [docs/concept-audit.md](docs/concept-audit.md) — 概念审计报告
-14. [docs/domain/clarifications.md](docs/domain/clarifications.md) — 业务澄清记录
-15. [docs/glossary.md](docs/glossary.md) — 术语表
+2. [docs/agent-commit-rules.md](docs/agent-commit-rules.md) — AI 默认本地提交规则
+3. [docs/coding-standards.md](docs/coding-standards.md) — 代码书写规范
+4. [docs/frontend-coding-standards.md](docs/frontend-coding-standards.md) — 前端编码规范
+5. [docs/layered-design.md](docs/layered-design.md) — 前后端分层设计规范
+6. [docs/governance.md](docs/governance.md) — 治理体系
+7. [docs/adr/0006-tdd-and-test-layers.md](docs/adr/0006-tdd-and-test-layers.md) — TDD + 11 层测试
+8. [docs/adr/0029-frontend-as-prototype-workflow.md](docs/adr/0029-frontend-as-prototype-workflow.md) — 前端原型先行工作流
+9. [docs/prototypes/prototype-to-production.md](docs/prototypes/prototype-to-production.md) — 原型转生产清单
+10. [docs/prototypes/matrix-e2e-screenshot-gate.md](docs/prototypes/matrix-e2e-screenshot-gate.md) — Matrix E2E 截图门禁
+11. [docs/architecture-dependencies.md](docs/architecture-dependencies.md) — 模块依赖图
+12. [docs/adr/README.md](docs/adr/README.md) — ADR 索引
+13. [docs/infra/technical-specs.md](docs/infra/technical-specs.md) — 基础设施技术规格
+14. [docs/concept-audit.md](docs/concept-audit.md) — 概念审计报告
+15. [docs/domain/clarifications.md](docs/domain/clarifications.md) — 业务澄清记录
+16. [docs/glossary.md](docs/glossary.md) — 术语表
 
 ## 模块规则
 

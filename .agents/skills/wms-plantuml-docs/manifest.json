@@ -1,0 +1,14 @@
+{
+  "name": "wms-plantuml-docs",
+  "version": "0.2.0",
+  "owner": "WMS 项目维护者",
+  "updated_at": "2026-07-01",
+  "review_cadence": "quarterly",
+  "status": "active",
+  "maturity_tier": "scaffold",
+  "lifecycle_stage": "scaffold",
+  "target_platforms": ["codex"],
+  "input_files": ["SKILL.md", "agents/interface.yaml"],
+  "output_contract": "生成或审查 docs/diagrams/<topic>/*.puml 与配套中文 docu.md；完成后执行自我 review；发现共性漏项时小步迭代本技能；不替代用户故事、ADR、RTM、OpenAPI 或数据库文档。",
+  "rollback_boundary": "删除 .agents/skills/wms-plantuml-docs 目录并移除 AGENTS.md 中的技能入口。"
+}

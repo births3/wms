@@ -1,0 +1,19 @@
+interface:
+  display_name: WMS PlantUML 文档
+  short_description: 为 WMS 复杂流程补充 PlantUML 图和配套中文 docu.md 说明，并做自我 review 与小步迭代。
+  default_prompt: 请使用 WMS PlantUML 文档技能，为当前 WMS 模块补充可审查的 PlantUML 图和配套中文说明，并完成自我 review。
+compatibility:
+  canonical_format: codex-skill
+  adapter_targets:
+    - codex
+  activation:
+    mode: description
+  execution:
+    context: inline
+    shell: bash
+  trust:
+    source_tier: local
+    remote_inline_execution: forbid
+    remote_metadata_policy: ignore
+  degradation:
+    codex: 无 PlantUML 渲染器时仍可维护 .puml 文本和 docu.md；渲染截图需另行配置工具链。
