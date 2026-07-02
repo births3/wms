@@ -15,8 +15,9 @@
 4. `--apply` 模式下，脚本默认新建 `wms-issue-<issue>-<时间>` tmux 会话，并在其中运行 `codex exec`。
 5. Codex 任务会话按 WMS `AGENTS.md` 和 skills 修复、验证、重启本地测试前后端、采集截图、分支推送并创建 PR。
 6. Codex 把 PR 链接、提交哈希、验证结果、截图附件、本地测试环境重启结果、tmux 任务会话状态、PR 合并前置条件和剩余风险评论回 PR 与 issue。
-7. 主代理把 PR 纳入收口队列：复审、合并或等待用户确认合并；合并后清理 worktree、agent 分支和已结束的 tmux 任务会话。
-8. 启用 `--merge-closed` 后，watcher 还会扫描已关闭 issue；只有关联 PR 满足闭环证据、可合并、无阻塞评论且分支为 `agent/*` 时，才会自动合并并写回 marker。
+7. 主代理把 issue-agent PR 纳入收口队列：复审、补证据、修冲突、决定是否关闭 issue；不直接合并 issue-agent PR。
+8. 启用 `--merge-closed` 后，watcher 还会扫描已关闭 issue；只有关联 PR 满足闭环证据、可合并、base 为当前工作分支、无阻塞评论且 head 为 `agent/*` 或匹配当前 issue 编号的 `fix/issue-<编号>-*` 时，才会自动合并。合并命令返回后必须重新读取 PR，确认 `merged=true`、`merged_at` 或 `merge_commit_sha` 之一存在，才能写回合并 marker。
+9. 已创建 PR、已回写验证或“等待用户确认合并”属于状态评论，不是新需求评论；watcher 不能因此再次生成“请确认 /confirm”的判断评论。
 
 ## 前置条件
 
@@ -109,8 +110,12 @@ python3 scripts/agents/issue_runner.py self-test
 - 长期 watcher 必须用 `just issue-agent-restart` 启动，并用 `just issue-agent-verify` 确认；只看到 `wms-issue-agent` tmux 会话存在不算健康，必须有 `scripts/agents/issue_runner.py watch` 进程。
 - prompt 要求 Codex 禁止推 main、禁止强推。
 - prompt 要求 Codex 禁止自行合并 PR；PR 创建后必须写清合并前置条件和 tmux 任务会话状态。
+- issue-agent PR 只有一个合并 owner：`wms-issue-agent` watcher。主代理负责 review、补证据、修冲突和关闭 issue，不直接合并该类 PR；如果用户明确要求主代理手动合并，必须先停用 watcher 或写入阻塞评论，避免双入口同时合并。
+- PR 创建不等于 issue 完成。issue / PR 评论只能写“已创建待合并 PR / 等待用户确认关闭 issue 后由 issue watcher 自动合并 / 阻塞”，禁止在 PR 未合并、主工作区未验证和未收口前写“已完成”。
 - 自动合并只由 issue watcher 在 `--merge-closed --apply` 下执行，合并策略固定为 squash；子代理仍禁止自行合并 PR。
-- 自动合并前必须满足：issue 已关闭、PR open、PR `mergeable=true`、PR 未合并、PR head 分支为 `agent/*`、已有验证 / 截图 / 重启证据、没有 `/reject` / `不要合并` / `阻塞` / `blocked` 评论。
+- 自动合并前必须满足：issue 已关闭、PR open、PR `mergeable=true`、PR 未合并、PR base 为当前工作分支、PR head 分支为 `agent/*` 或匹配当前 issue 编号的 `fix/issue-<编号>-*`、已有验证 / 截图 / 重启证据、没有 `/reject` / `不要合并` / `阻塞` / `blocked` 评论。
+- 自动合并后必须二次读取 PR 状态；只有确认 `merged=true`、`merged_at` 或 `merge_commit_sha` 之一存在，才能评论 `wms-issue-agent:merge`。如果合并命令返回但 PR 仍未合并，只能评论 `wms-issue-agent:merge-failed`，并要求修复 PR 可合并状态后人工评论 `/retry-merge` 再重试。
+- 如果历史评论里已有错误的 `wms-issue-agent:merge`，但 PR API 显示仍未合并，必须补 `wms-issue-agent:merge-correction` 更正评论；未更正前 watcher 不得继续尝试自动合并。
 - issue 评论包含截图 / 附件时，prompt 必须列出附件下载 URL；Codex 必须先打开或下载附件辅助定位。
 - 前端或用户可见行为修复必须重启本地测试前后端，并把端口、URL、`/healthz` 或等价健康检查结果写回 PR 与 issue。
 - 9002 只允许主工作区固定会话 `wms-web-admin-9002` 占用；子 worktree 不得启动或占用 9002。
@@ -127,12 +132,14 @@ python3 scripts/agents/issue_runner.py self-test
 |---|---|
 | issue 读取 | 能读取标题、正文、评论 |
 | 判断评论 | 内容中文，包含结论、置信度、代码核查证据、依据、预计影响范围、建议动作、验证要求和停止条件；不能只要求 `/confirm`，不能只复述 issue |
-| 输入附件 | issue 评论中的截图 / 附件必须以可下载 URL 写入判断评论和执行 prompt |
+| 输入附件 | issue 本体和 issue 评论中的截图 / 附件必须以可下载 URL 写入判断评论和执行 prompt |
 | 确认识别 | `/confirm` 或 `codex:confirmed` 才触发 tmux |
 | tmux 投递 | 默认新建 issue 任务会话并运行 `codex exec`；paste 模式只发送到固定 pane，目标不存在则失败停止 |
 | WMS 执行 | Codex 使用 WMS skills，完成验证；前端截图和 9002 重启证据由主代理在主工作区校验后补齐，且不自行合并 PR |
 | 证据回写 | PR 与 issue 都包含真实截图附件、本地测试环境重启结果、重启后版本校验、tmux 任务会话状态、PR 合并前置条件和剩余风险 |
-| PR 收口 | issue 关闭后，watcher dry-run 能发现关联 PR；`--apply --merge-closed` 下满足条件才自动合并并写回 marker，不能停在“已创建 PR” |
+| 状态评论 | 已交付 PR、等待合并、阻塞、状态更正等评论不能触发新一轮判断；只有后续人工补充真实新需求时才重新判断 |
+| 合并 owner | issue-agent PR 只由 watcher 在 issue 关闭后自动合并；主代理不直接合并，除非先停 watcher 或写阻塞评论 |
+| PR 收口 | issue 关闭后，watcher dry-run 能发现关联 PR；`--apply --merge-closed` 下满足条件才自动合并；合并后必须二次读取 PR 状态，确认已合并才写回 marker，不能停在“已创建 PR”或只信 CLI 返回值 |
 | tmux 清理 | 任务会话完成后应自然退出；未退出时记录会话名、原因和下一步，用户确认清理后再 `tmux kill-session -t <session>` |
 
 失败时只修失败点，不扩大流程。

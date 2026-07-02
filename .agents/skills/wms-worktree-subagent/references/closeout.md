@@ -1,17 +1,21 @@
 # WMS Worktree Subagent 收口参考
 
-本参考承接 `wms-worktree-subagent` 的 PR、tmux、worktree 和 `agent/*` 分支收口细节。`SKILL.md` 只保留路由和停止条件；执行到收口阶段时读取本文件。
+本参考承接 `wms-worktree-subagent` 的 tmux、worktree、`agent/*` 分支和 issue-agent PR 收口细节。`SKILL.md` 只保留路由和停止条件；执行到收口阶段时读取本文件。
 
 ## PR 与 tmux 收口
 
-子代理或 issue agent 创建 PR 后，PR 不是完成态。主代理必须把每个 PR 分到以下状态之一，并在 issue / PR 评论中写清：
+普通 worktree 子代理默认不创建远端 PR，只交付本地 diff 给主代理审查、接入和分组提交。Gitea issue-agent 是例外：它必须创建 PR 承载截图、评论和审计证据。
+
+issue-agent PR 只有一个合并 owner：`wms-issue-agent` watcher。主代理不直接合并这类 PR，只负责复审、补证据、修冲突和决定是否关闭 issue。主代理必须把每个 issue-agent PR 分到以下状态之一，并在 issue / PR 评论中写清：
 
 | 状态 | 条件 | 下一步 |
 |---|---|---|
-| 可合并待确认 | 主工作区复审和验证通过，但合并会进入远端主线 | 等用户明确确认合并；确认前不 merge |
-| 已合并待清理 | 用户已确认合并，PR 已 merge，主工作区验证通过 | 进入 worktree、agent 分支和 tmux 清理 |
+| 等待关闭 issue 自动合并 | 主工作区复审和验证通过，证据齐全，PR 可合并 | 等用户关闭 issue；watcher 自动合并 |
+| 已合并待清理 | watcher 已 merge，主工作区验证通过 | 进入 worktree、agent 分支和 tmux 清理 |
 | 阻塞 | 验证失败、冲突、缺截图、缺前后端重启证据、缺用户业务确认 | 写明阻塞命令、退出码、owner 和下一步 |
-| 放弃待清理 | 用户确认放弃，或 PR 被更完整实现替代 | 清理 worktree 和分支；未确认前不强删 |
+| superseded 待清理 | PR 被更完整实现替代，或改动已被主工作区本地提交吸收 | 关闭 PR，清理对应 worktree 和本地分支；远端分支不主动删除 |
+
+如果用户明确要求主代理手动合并 issue-agent PR，必须先停止 watcher 或在 issue / PR 写入阻塞评论，避免主代理和 watcher 双入口同时合并。
 
 tmux 收口规则：
 
@@ -112,7 +116,7 @@ git branch --list 'agent/*' --format='%(refname:short) %(objectname:short) %(sub
 
 最终汇报必须包含：
 
-- PR 收口状态：已合并、可合并待确认、阻塞或放弃待清理。
+- PR 收口状态：已合并、等待关闭 issue 自动合并、阻塞或 superseded 待清理。
 - tmux 任务会话状态：已自然退出、已清理、仍运行或需用户确认。
 - 已移除 worktree 列表。
 - 已删除 agent 分支列表；若用户要求删除但未删除，说明未合并或未确认原因。

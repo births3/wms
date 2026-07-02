@@ -5,12 +5,13 @@ description: WMS 仓库用独立 worktree 和 codex exec 运行子代理、复�
 
 # WMS Worktree Subagent
 
-用于把一个 WMS 缺口拆给子代理执行：每个子代理只拥有一个 worktree、一个任务、一个写入范围。主代理负责拆题、发任务、审查、合并和迭代本技能。
+用于把一个 WMS 缺口拆给子代理执行：每个子代理只拥有一个 worktree、一个任务、一个写入范围。主代理负责拆题、发任务、审查、本地接入和迭代本技能。
 
 ## 子代理原则
 
 - 一个任务一个 worktree，不共享主工作区。
 - 子代理只改授权范围；不推送、不改 main。
+- 对话中启动的普通 worktree 子代理默认不创建远端 PR；只交付本地 diff、验证结果和清理建议。只有 Gitea issue-agent 异步任务才创建 PR。
 - 默认使用 `wms-loop-engineering` 和 `wms-review-fix-commit` 做自审；子代理默认不 `git add` / `git commit`，只留可审查 diff、验证结果和可合并结论，由主代理提交。
 - 只读校准用 `read-only`，只输出下一轮切片、允许文件、停止条件、验证命令和技能缺口。
 - 外部设备、TMS、冷链平台、生产数据和凭据类 evidence 不能交给子代理伪造；只能让子代理整理采集步骤或验证已有证据。
@@ -56,7 +57,7 @@ codex exec -C ../wms-agent-<slug> -s read-only -o ../wms-agent-<slug>.out.md "<�
 
 ## 主代理复盘与合并
 
-子代理完成后，主代理在主工作区按 [references/closeout.md](references/closeout.md) 检查 worktree、提交、diff、忽略产物、PR、tmux 和分支。
+子代理完成后，主代理在主工作区按 [references/closeout.md](references/closeout.md) 检查 worktree、提交、diff、忽略产物、tmux 和分支；PR 只按 issue-agent 例外流程处理。
 
 主代理只在以下条件全部满足时考虑合并：
 
@@ -87,7 +88,7 @@ codex exec -C ../wms-agent-<slug> -s read-only -o ../wms-agent-<slug>.out.md "<�
 
 ## PR、tmux 与 worktree 收口
 
-详细矩阵、命令和分支清理规则见 [references/closeout.md](references/closeout.md)。每次合并、放弃或审查结束后，主代理必须归类 PR/tmux/worktree/agent 分支；前端或用户可见修复必须把截图作为 Gitea 附件评论到 PR 和 issue。清理前必须完成主工作区 review、验证和提交；最终汇报要区分子代理结果、主工作区结果、未合并产物和收尾状态。
+详细矩阵、命令和分支清理规则见 [references/closeout.md](references/closeout.md)。每次合并、放弃或审查结束后，主代理必须归类 tmux/worktree/agent 分支；issue-agent PR 另按 `docs/runbooks/gitea-issue-agent.md` 收口。前端或用户可见修复必须把截图作为 Gitea 附件评论到对应 issue；如存在 issue-agent PR，也同步评论到 PR。清理前必须完成主工作区 review、验证和提交；最终汇报要区分子代理结果、主工作区结果、未合并产物和收尾状态。
 
 ## 迭代本技能
 

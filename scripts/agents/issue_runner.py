@@ -25,6 +25,23 @@ DEFAULT_OUT_DIR = REPO_ROOT / ".codex" / "issue-agent"
 ANALYSIS_MARKER = "<!-- wms-issue-agent:analysis:v2 -->"
 TMUX_MARKER = "<!-- wms-issue-agent:tmux:v1 -->"
 MERGE_MARKER = "<!-- wms-issue-agent:merge:v1 -->"
+MERGE_FAILED_MARKER = "<!-- wms-issue-agent:merge-failed:v1 -->"
+MERGE_CORRECTION_MARKER = "<!-- wms-issue-agent:merge-correction:v1 -->"
+STATUS_CORRECTION_MARKER = "<!-- wms-issue-agent:status-correction:v1 -->"
+MERGE_RETRY_COMMAND = "/retry-merge"
+
+STATUS_COMMENT_TOKENS = (
+    "最终交付 PR",
+    "PR 合并前置条件",
+    "等待用户确认合并",
+    "等待主代理合并",
+    "等待 issue watcher 自动合并",
+    "等待自动合并",
+    "已创建待合并 PR",
+    "本轮不会自行合并",
+    "本 PR 不自行合并",
+    "已按确认处理 issue",
+)
 
 
 @dataclass(frozen=True)
@@ -108,6 +125,22 @@ def latest_marker_time(comments: list[dict[str, Any]], marker: str) -> datetime 
     return max(times) if times else None
 
 
+def has_command_after(comments: list[dict[str, Any]], since: datetime, command: str) -> bool:
+    for comment in comments:
+        created = parse_time(str(comment["created_at"]))
+        if created > since and not is_agent_comment(comment) and has_command(body_of(comment), command):
+            return True
+    return False
+
+
+def has_active_merge_marker(comments: list[dict[str, Any]]) -> bool:
+    merge_time = latest_marker_time(comments, MERGE_MARKER)
+    if merge_time is None:
+        return False
+    correction_time = latest_marker_time(comments, MERGE_CORRECTION_MARKER)
+    return correction_time is None or correction_time < merge_time
+
+
 def has_label(issue: dict[str, Any], name: str) -> bool:
     return any(str(label.get("name")) == name for label in issue.get("labels") or [])
 
@@ -141,8 +174,17 @@ def short(text: str, limit: int) -> str:
     return normalized[: limit - 1] + "…"
 
 
+def is_agent_comment(comment: dict[str, Any]) -> bool:
+    return "wms-issue-agent:" in body_of(comment)
+
+
+def is_status_comment(comment: dict[str, Any]) -> bool:
+    text = body_of(comment)
+    return is_agent_comment(comment) or any(token in text for token in STATUS_COMMENT_TOKENS)
+
+
 def comment_summary(comments: list[dict[str, Any]], limit: int = 5) -> str:
-    human_comments = [c for c in comments if "wms-issue-agent:" not in body_of(c)]
+    human_comments = [c for c in comments if not is_agent_comment(c)]
     if not human_comments:
         return "暂无人工评论。"
     lines: list[str] = []
@@ -162,10 +204,21 @@ def normalize_attachment_links(text: str) -> str:
     return text.replace("](/attachments/", f"]({root}/attachments/").replace("(/attachments/", f"({root}/attachments/")
 
 
-def attachment_summary(comments: list[dict[str, Any]], limit: int = 10) -> str:
+def attachment_summary(
+    comments: list[dict[str, Any]],
+    *,
+    issue: dict[str, Any] | None = None,
+    limit: int = 10,
+) -> str:
     lines: list[str] = []
+    if issue:
+        author = (issue.get("user") or {}).get("login", "issue")
+        for asset in issue.get("assets") or []:
+            url = asset.get("browser_download_url")
+            if url:
+                lines.append(f"- {author}: {asset.get('name', 'attachment')} {url}")
     for c in comments[-limit:]:
-        if "wms-issue-agent:" in body_of(c):
+        if is_agent_comment(c):
             continue
         author = (c.get("user") or {}).get("login", "unknown")
         for asset in c.get("assets") or []:
@@ -191,6 +244,12 @@ CODE_CONTEXT_GLOBS = [
 ]
 
 DOMAIN_KEYWORDS = [
+    "供应商",
+    "客户",
+    "来源",
+    "批量导入",
+    "新建供应商",
+    "新建客户",
     "DataGrid",
     "datagrid",
     "视图",
@@ -214,17 +273,27 @@ DOMAIN_KEYWORDS = [
     "字典",
 ]
 
+KEYWORD_ALIASES = {
+    "供应商": ["m1-suppliers", "supplier"],
+    "客户": ["m1-customers", "customer"],
+    "来源": ["sourceValue", "source"],
+    "批量导入": ["批量导入", "import"],
+    "新建供应商": ["createSupplier", "新建供应商"],
+    "新建客户": ["createCustomer", "新建客户"],
+}
+
 
 def issue_keywords(text: str) -> list[str]:
     keywords: list[str] = []
     for word in DOMAIN_KEYWORDS:
         if word in text:
+            keywords.extend(KEYWORD_ALIASES.get(word, []))
             keywords.append(word)
     for word in re.findall(r"[A-Za-z][A-Za-z0-9_-]{2,}|M\d+", text):
         if word.lower() not in {"issue", "http", "https"}:
             keywords.append(word)
     seen: set[str] = set()
-    return [word for word in keywords if not (word in seen or seen.add(word))][:6]
+    return [word for word in keywords if not (word in seen or seen.add(word))][:10]
 
 
 def code_context_summary(issue: dict[str, Any], comments: list[dict[str, Any]]) -> str:
@@ -269,23 +338,54 @@ def has_merge_evidence(text: str) -> bool:
     return "验证" in text and ("截图" in text or "附件" in text) and ("重启" in text or "healthz" in text)
 
 
+def is_auto_merge_branch(head_ref: str, issue_number: int) -> bool:
+    return head_ref.startswith("agent/") or head_ref.startswith(f"fix/issue-{issue_number}-")
+
+
+def current_branch() -> str:
+    return run(["git", "branch", "--show-current"]).strip()
+
+
+def pull_is_merged(pr: dict[str, Any]) -> bool:
+    return bool(pr.get("merged") or pr.get("merged_at") or pr.get("merge_commit_sha"))
+
+
+def merge_verification_error(pr: dict[str, Any]) -> str | None:
+    if pull_is_merged(pr):
+        return None
+    return (
+        f"state={pr.get('state')}, merged={pr.get('merged')}, "
+        f"mergeable={pr.get('mergeable')}, merged_at={pr.get('merged_at')}, "
+        f"merge_commit_sha={pr.get('merge_commit_sha')}"
+    )
+
+
 def merge_blockers(issue: dict[str, Any], comments: list[dict[str, Any]], pr: dict[str, Any]) -> list[str]:
     human_comments = [body_of(c) for c in comments if "wms-issue-agent:" not in body_of(c)]
     text = text_blob(issue.get("body"), pr.get("body"), *human_comments)
     head_ref = str((pr.get("head") or {}).get("ref") or "")
+    base_ref = str((pr.get("base") or {}).get("ref") or "")
     blockers: list[str] = []
     if issue.get("state") != "closed":
         blockers.append("issue 未关闭")
-    if latest_marker_time(comments, MERGE_MARKER):
-        blockers.append("issue 已有合并 marker")
+    if base_ref and base_ref != current_branch():
+        blockers.append(f"PR base 不是当前工作分支：{base_ref}")
+    if has_active_merge_marker(comments):
+        if pull_is_merged(pr):
+            blockers.append("issue 已有合并 marker")
+        else:
+            blockers.append("issue 有未纠正的合并 marker 但 PR 未合并")
+    failure_time = latest_marker_time(comments, MERGE_FAILED_MARKER)
+    if failure_time and not has_command_after(comments, failure_time, MERGE_RETRY_COMMAND):
+        blockers.append(f"已有自动合并失败 marker，需人工评论 {MERGE_RETRY_COMMAND} 后重试")
     if pr.get("state") != "open":
         blockers.append("PR 不是 open")
-    if pr.get("merged"):
+    if pull_is_merged(pr):
         blockers.append("PR 已合并")
     if not pr.get("mergeable"):
         blockers.append("PR 不可自动合并")
-    if not head_ref.startswith("agent/"):
-        blockers.append("PR 分支不是 agent/*")
+    if not is_auto_merge_branch(head_ref, int(issue["number"])):
+        blockers.append("PR 分支不是 agent/* 或 fix/issue-<编号>-*")
     if has_merge_blocker(text):
         blockers.append("存在阻塞或拒绝合并评论")
     if not has_merge_evidence(text):
@@ -294,7 +394,17 @@ def merge_blockers(issue: dict[str, Any], comments: list[dict[str, Any]], pr: di
 
 
 def latest_human_time(comments: list[dict[str, Any]]) -> datetime | None:
-    times = [parse_time(str(c["created_at"])) for c in comments if "wms-issue-agent:" not in body_of(c)]
+    times = [parse_time(str(c["created_at"])) for c in comments if not is_agent_comment(c)]
+    return max(times) if times else None
+
+
+def latest_actionable_human_time(comments: list[dict[str, Any]]) -> datetime | None:
+    times = [parse_time(str(c["created_at"])) for c in comments if not is_status_comment(c)]
+    return max(times) if times else None
+
+
+def latest_status_time(comments: list[dict[str, Any]]) -> datetime | None:
+    times = [parse_time(str(c["created_at"])) for c in comments if is_status_comment(c)]
     return max(times) if times else None
 
 
@@ -345,7 +455,7 @@ def build_analysis_comment(issue: dict[str, Any], comments: list[dict[str, Any]]
 
 ### 截图 / 附件
 
-{attachment_summary(comments)}
+{attachment_summary(comments, issue=issue)}
 
 ### 代码核查
 
@@ -400,10 +510,10 @@ def build_fix_prompt(issue: dict[str, Any], comments: list[dict[str, Any]]) -> s
 7. 如果 issue 评论包含截图 / 附件，必须先打开或下载附件辅助定位，不能只按文字猜测。
 8. 涉及前端或用户可见行为时，必须采集真实前端截图；必须用 `POST /repos/{{owner}}/{{repo}}/issues/<编号>/assets` 把截图上传为 Gitea 附件，并用 Markdown 图片同时评论到 PR 和 issue；不能只写本地路径。
 9. 当前可用截图 / 附件如下：
-{attachment_summary(comments, limit=10)}
+{attachment_summary(comments, issue=issue, limit=10)}
 10. 读取 Gitea issue、评论、PR 或附件元数据必须使用 `tea api`，例如 `tea api /repos/{{owner}}/{{repo}}/issues/{issue["number"]}`；禁止裸 `curl` 访问 Gitea API。
 11. 用户已授权：创建修复分支、推送到远端并创建 Gitea PR；禁止推 main，禁止强推，禁止自行合并 PR。
-12. PR 创建不是完成。最后必须把 PR 链接、提交哈希、验证结果、截图证据、本地测试环境重启结果、tmux 任务会话状态、PR 合并前置条件和剩余风险评论回 issue，并明确下一步是“等待主代理合并”“等待用户确认合并”或“阻塞”。
+12. PR 创建不是完成。最后必须把 PR 链接、提交哈希、验证结果、截图证据、本地测试环境重启结果、tmux 任务会话状态、PR 合并前置条件和剩余风险评论回 issue，并明确下一步是“等待用户确认关闭 issue 后由 issue watcher 自动合并”或“阻塞”；子代理和主代理都不得直接合并 issue-agent PR。
 
 Issue 正文：
 {issue.get("body") or ""}
@@ -422,13 +532,19 @@ def choose_action(
     force_dispatch: bool = False,
 ) -> Action | None:
     tmux_time = latest_marker_time(comments, TMUX_MARKER)
-    human_time = latest_human_time(comments)
+    human_time = latest_actionable_human_time(comments)
     analysis_time = latest_marker_time(comments, ANALYSIS_MARKER)
+    status_time = latest_status_time(comments)
+    confirmed = has_label(issue, confirm_label) or (
+        analysis_time is not None and has_confirm_after(comments, analysis_time, confirm_token)
+    )
+    if status_time and not force_dispatch and not confirmed and (human_time is None or human_time <= status_time):
+        return None
     if analysis_time is None:
         return Action(issue=issue, kind="analysis", body=build_analysis_comment(issue, comments))
     if has_reject_after(comments, analysis_time):
         return None
-    if has_label(issue, confirm_label) or has_confirm_after(comments, analysis_time, confirm_token):
+    if confirmed:
         if force_dispatch or tmux_time is None or tmux_time < analysis_time:
             return Action(issue=issue, kind="tmux", body=build_fix_prompt(issue, comments))
     if tmux_time and tmux_time > analysis_time:
@@ -557,6 +673,27 @@ def merge_pull(pr_number: int) -> str:
     return run(["tea", "pulls", "merge", str(pr_number), "--style", "squash"])
 
 
+def merge_pull_checked(pr_number: int) -> dict[str, Any]:
+    merge_pull(pr_number)
+    refreshed = get_pull(pr_number)
+    error = merge_verification_error(refreshed)
+    if error:
+        raise RuntimeError(f"合并命令已返回但 PR #{pr_number} 未处于已合并状态：{error}")
+    return refreshed
+
+
+def build_merge_failed_comment(issue_number: int, pr: dict[str, Any], error: str) -> str:
+    return (
+        f"{MERGE_FAILED_MARKER}\n"
+        "自动合并已停止：合并命令执行后复查 PR，未确认进入已合并状态，因此没有写入合并 marker。\n"
+        f"- issue：#{issue_number}\n"
+        f"- PR：#{pr['number']}\n"
+        f"- 分支：`{(pr.get('head') or {}).get('ref', '')}`\n"
+        f"- 复查结果：{short(error, 500)}\n"
+        f"- 处理方式：修复 PR 可合并状态后，人工评论 `{MERGE_RETRY_COMMAND}` 再允许 watcher 重试。\n"
+    )
+
+
 def run_merge_closed(args: argparse.Namespace) -> int:
     issues = [get_issue(args.issue)] if args.issue else list_closed_issues(args.limit)
     pulls = list_open_pulls(args.pr_limit)
@@ -578,11 +715,19 @@ def run_merge_closed(args: argparse.Namespace) -> int:
             if not args.apply:
                 print(f"dry-run: 将合并 issue #{issue_number} PR #{pr['number']}", flush=True)
                 return 0
-            merge_pull(int(pr["number"]))
+            try:
+                merged_pr = merge_pull_checked(int(pr["number"]))
+            except Exception as exc:  # noqa: BLE001
+                body = build_merge_failed_comment(issue_number, pr, str(exc))
+                post_comment(issue_number, body)
+                post_comment(int(pr["number"]), body)
+                print(f"merge-failed: issue #{issue_number} PR #{pr['number']}：{short(str(exc), 240)}", flush=True)
+                return 2
             body = (
                 f"{MERGE_MARKER}\n"
                 f"issue 已关闭，PR #{pr['number']} 已按闭环规则自动合并。\n"
                 f"- 分支：`{(pr.get('head') or {}).get('ref', '')}`\n"
+                f"- 合并提交：`{merged_pr.get('merge_commit_sha', '')}`\n"
                 f"- 触发：closed issue #{issue_number}\n"
             )
             post_comment(issue_number, body)
@@ -594,8 +739,9 @@ def run_merge_closed(args: argparse.Namespace) -> int:
 
 
 def run_once(args: argparse.Namespace) -> int:
-    issues = [get_issue(args.issue)] if args.issue else list_open_issues(args.limit)
-    for issue in issues:
+    raw_issues = [get_issue(args.issue)] if args.issue else list_open_issues(args.limit)
+    for raw_issue in raw_issues:
+        issue = get_issue(int(raw_issue["number"]))
         comments = get_comments(int(issue["number"]))
         action = choose_action(
             issue,
@@ -651,6 +797,16 @@ def self_test() -> int:
     assert choose_action(issue, refreshed, confirm_token="/confirm", confirm_label="codex:confirmed") is None
     sent = [*confirmed, {"created_at": "2026-07-01T00:02:00Z", "body": TMUX_MARKER}]
     assert choose_action(issue, sent, confirm_token="/confirm", confirm_label="codex:confirmed") is None
+    delivered = [
+        *sent,
+        {
+            "created_at": "2026-07-01T00:03:00Z",
+            "body": "已按确认处理 issue #7，最终交付 PR 为 #9。PR 合并前置条件：等待用户确认合并。",
+        },
+    ]
+    assert choose_action(issue, delivered, confirm_token="/confirm", confirm_label="codex:confirmed") is None
+    after_delivery = [*delivered, {"created_at": "2026-07-01T00:04:00Z", "body": "补充：按钮还缺一个"}]
+    assert choose_action(issue, after_delivery, confirm_token="/confirm", confirm_label="codex:confirmed").kind == "analysis"
     after_tmux = [*sent, {"created_at": "2026-07-01T00:03:00Z", "body": "补充：还有下拉异常"}]
     assert choose_action(issue, after_tmux, confirm_token="/confirm", confirm_label="codex:confirmed").kind == "analysis"
     after_tmux_refreshed = [
@@ -688,6 +844,12 @@ def self_test() -> int:
     assert "共性问题" in prompt
     assert "tea api" in prompt
     assert "禁止裸 `curl`" in prompt
+    issue_asset = {
+        **issue,
+        "assets": [{"name": "issue.png", "browser_download_url": "http://gitea/attachments/issue"}],
+    }
+    assert "http://gitea/attachments/issue" in build_analysis_comment(issue_asset, [])
+    assert "http://gitea/attachments/issue" in build_fix_prompt(issue_asset, [])
     closed_issue = {"number": 8, "state": "closed", "body": "已验收"}
     pr = {
         "number": 9,
@@ -701,6 +863,53 @@ def self_test() -> int:
     assert pr_mentions_issue(pr, 8)
     assert not pr_mentions_issue({**pr, "title": "普通变更", "body": "普通 PR #8，不是 issue 关联"}, 8)
     assert merge_blockers(closed_issue, [], pr) == []
+    assert merge_blockers(closed_issue, [], {**pr, "head": {"ref": "fix/issue-8-datagrid-views"}}) == []
+    assert "PR 分支不是 agent/* 或 fix/issue-<编号>-*" in merge_blockers(
+        closed_issue,
+        [],
+        {**pr, "head": {"ref": "fix/issue-9-other"}},
+    )
+    assert f"PR base 不是当前工作分支：other-branch" in merge_blockers(
+        closed_issue,
+        [],
+        {**pr, "base": {"ref": "other-branch"}},
+    )
+    assert pull_is_merged({**pr, "merged": True})
+    assert pull_is_merged({**pr, "merged_at": "2026-07-01T00:00:00Z"})
+    assert pull_is_merged({**pr, "merge_commit_sha": "abc"})
+    assert not pull_is_merged(pr)
+    assert merge_verification_error(pr) == (
+        "state=open, merged=False, mergeable=True, merged_at=None, merge_commit_sha=None"
+    )
+    false_merge_marker = [{"created_at": t1, "body": MERGE_MARKER}]
+    assert "issue 有未纠正的合并 marker 但 PR 未合并" in merge_blockers(closed_issue, false_merge_marker, pr)
+    corrected_marker = [
+        *false_merge_marker,
+        {"created_at": "2026-07-01T00:02:00Z", "body": MERGE_CORRECTION_MARKER},
+    ]
+    assert "issue 有未纠正的合并 marker 但 PR 未合并" not in merge_blockers(
+        closed_issue,
+        corrected_marker,
+        pr,
+    )
+    failed_marker = [
+        *corrected_marker,
+        {"created_at": "2026-07-01T00:03:00Z", "body": MERGE_FAILED_MARKER},
+    ]
+    assert f"已有自动合并失败 marker，需人工评论 {MERGE_RETRY_COMMAND} 后重试" in merge_blockers(
+        closed_issue,
+        failed_marker,
+        pr,
+    )
+    retried = [
+        *failed_marker,
+        {"created_at": "2026-07-01T00:04:00Z", "body": MERGE_RETRY_COMMAND},
+    ]
+    assert f"已有自动合并失败 marker，需人工评论 {MERGE_RETRY_COMMAND} 后重试" not in merge_blockers(
+        closed_issue,
+        retried,
+        pr,
+    )
     assert "缺少验证、截图或重启证据" in merge_blockers(closed_issue, [], {**pr, "body": "关联 issue #8"})
     assert merge_blockers(closed_issue, [{"created_at": t1, "body": f"{ANALYSIS_MARKER}\n评论 `/reject`"}], pr) == []
     assert "存在阻塞或拒绝合并评论" in merge_blockers(
