@@ -16,6 +16,10 @@
     {
       "text": "把 issue 修复完成后的测试结果和真实截图附件回写到 PR 和 issue。",
       "family": "delivery_evidence"
+    },
+    {
+      "text": "issue-agent 的方案提案要包含相似共性问题判断，并说明是否一起修改和如何沉淀治理规则。",
+      "family": "commonality_proposal"
     }
   ],
   "should_not_trigger": [

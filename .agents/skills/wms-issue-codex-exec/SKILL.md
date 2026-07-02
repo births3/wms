@@ -5,7 +5,7 @@ description: WMS Gitea issue 自动处理的 codex exec 两段式确认流程。
 
 # WMS Issue Codex Exec
 
-用于替代旧的 tmux 投递式 issue-agent 流程。核心规则：先提案，后执行；一次确认只对应一次方案；用户验收反馈不对时，必须重新提修正方案并等待新的“确认方案”。
+替代旧 tmux 流程。核心规则：先提案，后执行；一次确认只对应一次方案；验收反馈不对时，重新提修正方案并等待新的“确认方案”。
 
 ## 先读
 
@@ -22,13 +22,14 @@ description: WMS Gitea issue 自动处理的 codex exec 两段式确认流程。
 3. 评论 `wms-issue-agent:proposal:v1` 方案提案，必须包含：
    - 问题复述和判断结论。
    - 根因文件和关键行号。
+   - 相似 / 共性判断：影响哪些同类页面、组件、字段、流程或脚本；是否一起修；规则落到 prompt、skill、runbook、规范还是 T1 脚本。
    - 改动计划，按前端、后端、数据、文档、测试分层列出；不涉及的层写“不涉及”。
    - 验证计划，至少包含 `git diff --check`、`just gov-t1` 和任务相关测试；前端可见变更必须包含真实截图计划。
    - 风险、停止条件和需要用户补充的信息。
    - 明确等待用户回复裸一行 `确认方案`。
 4. 只有在最新 proposal 之后出现人工评论且正文整行等于 `确认方案` 时，才执行。`/confirm`、`开始处理`、旧确认、否定句或 agent 自己的评论都不能触发。
 5. 执行时新建独立 worktree 和分支，直接运行 `codex exec -C <worktree> - < <prompt>`；禁止 tmux、禁止交互式 Codex TUI、禁止在主工作区直接修 issue。
-6. `codex exec` prompt 必须带上 issue、评论、附件 URL、根因文件、确认对应的 proposal 评论 URL、允许写入范围、验证命令和禁止项。
+6. `codex exec` prompt 必须带上 issue、评论、附件 URL、根因文件、proposal URL、共性判断、写入范围、验证命令和禁止项。
 7. 修复完成后回写 `wms-issue-agent:delivery:v1`：
    - PR 链接或本地提交状态。
    - 提交哈希。
@@ -40,8 +41,9 @@ description: WMS Gitea issue 自动处理的 codex exec 两段式确认流程。
 
 ## 执行约束
 
-- 禁止使用 tmux 作为 issue 修复任务载体。
+- 禁止用 tmux 承载 issue 修复任务。
 - 禁止因为 issue 有历史确认就自动继续跑；确认必须晚于最新 proposal 或 revision-proposal。
+- 禁止只修当前页面而不判断共性；proposal 判定共性时，必须查共享组件、字段矩阵、prompt / skill / runbook 和治理脚本。
 - 禁止把“已创建 PR”写成“已完成”；没有测试、截图和回写证据就只能写阻塞或待验收。
 - 禁止自动合并 PR；issue 关闭后的合并规则仍按 runbook 执行。
 - 新增字段、状态、角色、模块、业务默认值或跨模块语义变化时，停止并向用户确认。

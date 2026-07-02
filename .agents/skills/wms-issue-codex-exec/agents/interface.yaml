@@ -1,7 +1,7 @@
 interface:
   display_name: WMS Issue Codex Exec
-  short_description: Gitea issue 先提方案、确认后直接 codex exec 执行、完成后回写测试和截图，验收反馈需重新提修正方案。
-  default_prompt: 请使用 WMS Issue Codex Exec 技能处理当前 Gitea issue：先评论方案提案，等待用户回复“确认方案”，再用独立 worktree 直接 codex exec 执行，并回写测试、截图附件和风险。
+  short_description: Gitea issue 两段式确认后用 codex exec 执行，并回写测试、截图和风险。
+  default_prompt: 先发方案提案，等“确认方案”后用独立 worktree 直接 codex exec，并回写测试、截图和风险。
 compatibility:
   canonical_format: codex-skill
   adapter_targets:
@@ -16,4 +16,4 @@ compatibility:
     remote_inline_execution: forbid
     remote_metadata_policy: ignore
   degradation:
-    codex: 如果 codex exec 不可用，只能评论阻塞状态，不能退回 tmux 或交互式 TUI。
+    codex: codex exec 不可用时只能评论阻塞，不能退回 tmux 或 TUI。

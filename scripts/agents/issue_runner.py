@@ -280,6 +280,9 @@ DOMAIN_KEYWORDS = [
     "下拉",
     "输入值",
     "登录",
+    "按钮",
+    "弹窗",
+    "窗口",
     "菜单",
     "导航",
     "9002",
@@ -303,6 +306,8 @@ KEYWORD_ALIASES = {
     "批量导入": ["批量导入", "import"],
     "新建供应商": ["createSupplier", "新建供应商"],
     "新建客户": ["createCustomer", "新建客户"],
+    "弹窗": ["Dialog", "Popover", "Modal"],
+    "窗口": ["Dialog", "Popover", "Modal"],
 }
 
 
@@ -346,6 +351,55 @@ def code_context_summary(issue: dict[str, Any], comments: list[dict[str, Any]]) 
     if not lines:
         return "未在前端、后端、脚本或文档中命中 issue 关键词；执行前必须补充更具体的页面、接口、截图或复现步骤。"
     return "\n".join(lines[:12])
+
+
+COMMONALITY_RULES = [
+    (
+        ("弹窗", "弹出", "窗口", "遮罩", "关闭", "外边", "外部"),
+        "弹层 / 弹窗关闭交互",
+        "共享 Dialog / Popover / Dropdown / DataGrid 弹层组件，以及页面私有弹窗",
+        "先查是否走共享组件；能在共享组件修就一起修同类弹层，不能只补单页。若是页面私有实现，先修当前页并把关闭规则沉淀到前端规范和回归检查。",
+    ),
+    (
+        ("字段", "创建时间", "货主", "状态", "单据类型", "筛选", "分页", "列设置"),
+        "列表字段 / DataGrid 规则",
+        "所有管理端 DataGrid 列表、字段矩阵、查询条件和列设置",
+        "先对齐字段矩阵和 DataGrid 规范；同类页面缺口一起补，并扩展 T1 静态检查。",
+    ),
+    (
+        ("截图", "附件", "回写", "证据", "重启", "版本"),
+        "证据回写闭环",
+        "issue / PR 评论、截图附件、本地测试环境重启和版本校验证据",
+        "先补当前证据，再更新 issue-agent prompt、runbook 或执行复盘技能，避免只写本地路径或漏传附件。",
+    ),
+    (
+        ("按钮", "菜单", "导航", "查询", "新增", "导入"),
+        "管理端动作入口一致性",
+        "同类业务页面的按钮、菜单入口、弹窗动作和权限状态",
+        "先查同模块同类页面；如果模式重复，抽到共享页面模型或组件，并补页面动作矩阵。",
+    ),
+]
+
+
+def commonality_summary(issue: dict[str, Any], comments: list[dict[str, Any]]) -> str:
+    text = f"{issue.get('title', '')} {issue.get('body', '')} {comment_summary(comments, limit=10)}"
+    matched: list[tuple[str, str, str]] = []
+    for words, category, scope, action in COMMONALITY_RULES:
+        if any(word in text for word in words):
+            matched.append((category, scope, action))
+    if not matched:
+        return (
+            "- 初判：暂未证明是共性问题。\n"
+            "- 是否一起修改：先按当前 issue 定位；执行中若发现同类页面、组件、字段、流程或治理脚本也受影响，停止并升级为共性修复。\n"
+            "- 预防治理：若能脚本化，补 T1 检查；否则更新对应 skill、runbook 或规范文档。"
+        )
+    lines = ["- 初判：可能是共性问题，执行前必须先核查同类范围。"]
+    for category, scope, action in matched[:2]:
+        lines.append(f"- 共性类型：{category}")
+        lines.append(f"- 相似范围：{scope}")
+        lines.append(f"- 是否一起修改：{action}")
+    lines.append("- 预防治理：把可复发规则写入 prompt / skill / runbook；能静态检查的再补治理脚本。")
+    return "\n".join(lines)
 
 
 def pr_mentions_issue(pr: dict[str, Any], issue_number: int) -> bool:
@@ -440,6 +494,7 @@ def build_proposal_comment(issue: dict[str, Any], comments: list[dict[str, Any]]
     scope = "待确认"
     text = f"{issue.get('title', '')} {issue.get('body', '')} {comment_summary(comments, limit=10)}"
     code_context = code_context_summary(issue, comments)
+    commonality = commonality_summary(issue, comments)
     if "菜单" in text or "导航" in text:
         scope = "可能是管理端左侧导航 / 菜单交互"
     conclusion = "需要补充"
@@ -492,12 +547,16 @@ def build_proposal_comment(issue: dict[str, Any], comments: list[dict[str, Any]]
 
 {code_context}
 
+### 相似 / 共性问题判断
+
+{commonality}
+
 ### 改动计划
 
 - 前端：按根因文件定位；若是用户可见行为，补真实页面验证和截图。
 - 后端：暂未发现必须改动；如果执行中发现 API / 数据模型缺口，停止并重新提案。
 - 数据：暂未发现必须改动；新增字段、状态、角色、模块或业务默认值必须停止确认。
-- 文档：如修复暴露共性规则，更新对应 runbook / skill / 规范。
+- 文档：如共性成立，更新对应 prompt / runbook / skill / 规范；能脚本化的补治理脚本。
 - 测试：先补最小回归测试，再做实现。
 
 ### 判断依据
@@ -537,13 +596,14 @@ def build_proposal_comment(issue: dict[str, Any], comments: list[dict[str, Any]]
 def build_fix_prompt(issue: dict[str, Any], comments: list[dict[str, Any]]) -> str:
     proposal = latest_marker_comment(comments, (PROPOSAL_MARKER, REVISION_PROPOSAL_MARKER))
     proposal_url = str(proposal.get("html_url") or "") if proposal else ""
+    commonality = commonality_summary(issue, comments)
     return f"""请处理 Gitea issue #{issue["number"]}：{issue["title"]}
 
 来源：{issue.get("html_url", "")}
 确认对应方案：{proposal_url or "未提供"}
 
 用户已在最新方案后回复裸一行“确认方案”。请按 WMS 仓库规则处理：
-1. 使用 `wms-issue-codex-exec`、`wms-loop-engineering` 和 `wms-execution-retrospective` 执行；先判断是否属于共性问题，若是共性问题，必须同步补规则、脚本或矩阵，不能只修一个页面。
+1. 使用 `wms-issue-codex-exec`、`wms-loop-engineering` 和 `wms-execution-retrospective` 执行；先按 proposal 的“相似 / 共性问题判断”核查同类页面、组件、字段、流程和治理脚本，若共性成立，必须同步补规则、脚本或矩阵，不能只修一个页面。
 2. 当前命令已由 issue-agent 在 issue 专属 worktree 中用 `codex exec` 直接启动；先运行 `pwd`、`git status --short --branch` 和 `git worktree list` 核对，禁止修改主工作区。
 3. 只修复 issue 指向的问题。新增字段、状态、角色、模块或业务默认值时停止并向用户确认。
 4. 完成后运行相关测试，至少 `git diff --check` 和 `just gov-t1`。
@@ -556,6 +616,9 @@ def build_fix_prompt(issue: dict[str, Any], comments: list[dict[str, Any]]) -> s
 10. 用户已授权：创建修复分支、推送到远端并创建 Gitea PR；禁止推 main，禁止强推，禁止自行合并 PR。
 11. PR 创建不是完成。最后必须评论 `{DELIVERY_MARKER}` delivery 信息：PR 链接、提交哈希、验证结果、截图证据、本地测试环境重启结果、codex exec 日志位置、PR 合并前置条件和剩余风险，并明确下一步是“等待用户验收并关闭 issue 后由 issue watcher 自动合并”或“阻塞”。
 12. 如果用户验收反馈不对，不得继续复用本次确认；必须等待 issue-agent 重新生成修正方案并由用户再次回复“确认方案”。
+
+当前相似 / 共性问题判断：
+{commonality}
 
 Issue 正文：
 {issue.get("body") or ""}
@@ -815,8 +878,16 @@ def self_test() -> int:
     t1 = "2026-07-01T00:01:00Z"
     comments = [{"created_at": t0, "body": build_proposal_comment(issue, [])}]
     assert "### 根因文件和代码核查" in comments[0]["body"]
+    assert "### 相似 / 共性问题判断" in comments[0]["body"]
+    assert "暂未证明是共性问题" in comments[0]["body"]
     assert "/confirm" not in comments[0]["body"]
     assert "开始处理" not in comments[0]["body"]
+    popup_issue = {**issue, "title": "点击按钮弹出新窗口时点击外边区域不会关闭"}
+    popup_proposal = build_proposal_comment(popup_issue, [])
+    assert "弹层 / 弹窗关闭交互" in popup_proposal
+    assert "是否一起修改" in popup_proposal
+    assert "prompt / runbook / skill / 规范" in popup_proposal
+    assert "弹层 / 弹窗关闭交互" in build_fix_prompt(popup_issue, [])
     assert choose_action(issue, []).kind == "proposal"
     assert choose_action(issue, comments) is None
     confirmed = [*comments, {"created_at": t1, "body": "/confirm"}]

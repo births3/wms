@@ -9,6 +9,7 @@
    - 复述 issue。
    - 摘要已有人工评论。
    - 列出根因文件、关键行号、改动计划、验证计划、风险和停止条件。
+   - 列出相似 / 共性问题判断：是否影响同类页面、组件、字段、流程或治理脚本；是否需要一起修改；预防规则落到 prompt、skill、runbook、规范还是 T1 治理脚本。
    - 明确本轮不改代码、不提交、不推送。
    - 只有判断为可执行或用户接受风险后，才提示回复裸一行 `确认方案`。
 3. 最新 proposal 之后出现人工评论且正文整行等于 `确认方案`，才生成修复 prompt；`/confirm`、`开始处理`、历史确认、否定句和 agent 评论都不能触发。
@@ -87,6 +88,7 @@ python3 scripts/agents/issue_runner.py self-test
 - 长期 watcher 必须用 `just issue-agent-restart` 启动，并用 `just issue-agent-verify` 确认 pid 文件对应 `scripts/agents/issue_runner.py watch` 进程。
 - prompt 要求 Codex 禁止推 main、禁止强推。
 - prompt 要求 Codex 禁止自行合并 PR；PR 创建后必须写清合并前置条件和 codex exec 日志位置。
+- prompt 要求 Codex 先执行 proposal 中的相似 / 共性问题判断；共性成立时必须一起修共享组件、字段矩阵、规范或治理脚本，不能只修当前页面。
 - issue-agent PR 只有一个合并 owner：`wms-issue-agent` watcher。主代理负责 review、补证据、修冲突和关闭 issue，不直接合并该类 PR；如果用户明确要求主代理手动合并，必须先停用 watcher 或写入阻塞评论，避免双入口同时合并。
 - PR 创建不等于 issue 完成。issue / PR 评论只能写“已创建待合并 PR / 等待用户确认关闭 issue 后由 issue watcher 自动合并 / 阻塞”，禁止在 PR 未合并、主工作区未验证和未收口前写“已完成”。
 - 自动合并只由 issue watcher 在 `--merge-closed --apply` 下执行，合并策略固定为 squash；子代理仍禁止自行合并 PR。
@@ -109,6 +111,7 @@ python3 scripts/agents/issue_runner.py self-test
 |---|---|
 | issue 读取 | 能读取标题、正文、评论 |
 | 判断评论 | 内容中文，包含结论、置信度、代码核查证据、依据、预计影响范围、建议动作、验证要求和停止条件；不能只要求确认，不能只复述 issue |
+| 共性判断 | proposal 必须说明是否存在相似 / 共性问题、是否一起修改、规则落到 prompt / skill / runbook / 规范 / 治理脚本中的哪一类 |
 | 输入附件 | issue 本体和 issue 评论中的截图 / 附件必须以可下载 URL 写入判断评论和执行 prompt |
 | 确认识别 | 最新 proposal 或 revision-proposal 之后，人工评论裸一行 `确认方案` 才触发执行；否定句和旧确认不能触发 |
 | codex exec 执行 | 创建独立 worktree 和分支，直接在该 worktree 运行 `codex exec`；禁止 tmux、paste 模式和交互式 TUI |
