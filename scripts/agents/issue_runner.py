@@ -398,7 +398,7 @@ def commonality_summary(issue: dict[str, Any], comments: list[dict[str, Any]]) -
         lines.append(f"- 共性类型：{category}")
         lines.append(f"- 相似范围：{scope}")
         lines.append(f"- 是否一起修改：{action}")
-    lines.append("- 预防治理：把可复发规则写入 prompt / skill / runbook；能静态检查的再补治理脚本。")
+    lines.append("- 预防治理：把可复发约束写入 prompt / skill / runbook；能静态检查的再补治理脚本。")
     return "\n".join(lines)
 
 
