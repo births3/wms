@@ -30,6 +30,7 @@ DEV_WEB_CWD := MAIN_ROOT / "apps/web-admin"
 DEV_WEB_LOG := "/tmp/wms-web-admin-9002.log"
 ISSUE_AGENT_LOG := MAIN_ROOT / ".codex/issue-agent/watch.log"
 ISSUE_AGENT_PID := MAIN_ROOT / ".codex/issue-agent/watch.pid"
+ISSUE_AGENT_CRON_TAG := "wms-issue-agent-watchdog"
 
 # 默认显示帮助
 default:
@@ -292,6 +293,8 @@ issue-agent-status:
     fi
     echo "process:"
     pgrep -af 'scripts/agents/issue_runner.py watch' || true
+    echo "watchdog:"
+    crontab -l 2>/dev/null | grep -F "{{ISSUE_AGENT_CRON_TAG}}" || true
     echo "recent-log:"
     tail -20 "{{ISSUE_AGENT_LOG}}" 2>/dev/null || true
 
@@ -315,6 +318,7 @@ issue-agent-restart:
     #!/usr/bin/env bash
     set -euo pipefail
     mkdir -p "$(dirname "{{ISSUE_AGENT_LOG}}")"
+    just_bin="${JUST_BIN:-$(command -v just)}"
     pid_file="{{ISSUE_AGENT_PID}}"
     stop_pid() {
       local pid="$1"
@@ -341,7 +345,36 @@ issue-agent-restart:
     nohup python3 -u scripts/agents/issue_runner.py watch --interval "${WMS_ISSUE_AGENT_INTERVAL:-60}" --apply --merge-closed >> "{{ISSUE_AGENT_LOG}}" 2>&1 &
     echo "$!" > "$pid_file"
     sleep 2
-    just issue-agent-verify
+    "$just_bin" issue-agent-verify
+
+# Gitea issue agent：保活检查；进程不在则重启
+issue-agent-ensure:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    just_bin="${JUST_BIN:-$(command -v just)}"
+    if "$just_bin" issue-agent-verify >/dev/null 2>&1; then
+      echo "issue-agent running"
+      exit 0
+    fi
+    echo "issue-agent not running; restarting"
+    "$just_bin" issue-agent-restart
+
+# Gitea issue agent：安装 cron watchdog，每分钟执行一次保活检查
+issue-agent-install-watchdog:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mkdir -p "$(dirname "{{ISSUE_AGENT_LOG}}")"
+    just_bin="$(command -v just)"
+    path_value="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    line="* * * * * cd {{MAIN_ROOT}} && PATH=$path_value JUST_BIN=$just_bin $just_bin issue-agent-ensure >> {{ISSUE_AGENT_LOG}} 2>&1 # {{ISSUE_AGENT_CRON_TAG}}"
+    (crontab -l 2>/dev/null | grep -v -F "{{ISSUE_AGENT_CRON_TAG}}" || true; echo "$line") | crontab -
+    "$just_bin" issue-agent-ensure
+
+# Gitea issue agent：卸载 cron watchdog；不停止当前 watcher
+issue-agent-uninstall-watchdog:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    { crontab -l 2>/dev/null || true; } | { grep -v -F "{{ISSUE_AGENT_CRON_TAG}}" || true; } | crontab -
 
 # 报告 Wave 1 完成度（默认不阻塞；出口检查用 --strict）
 wave-1-status:

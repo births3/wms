@@ -65,9 +65,10 @@ python3 scripts/agents/issue_runner.py merge-closed
 python3 scripts/agents/issue_runner.py merge-closed --issue 3
 ```
 
-长期运行 watcher（pid 文件后台进程，不使用 tmux）：
+长期运行 watcher（pid 文件后台进程 + cron watchdog，不使用 tmux）：
 
 ```bash
+just issue-agent-install-watchdog
 just issue-agent-restart
 just issue-agent-verify
 ```
@@ -85,7 +86,8 @@ python3 scripts/agents/issue_runner.py self-test
 - 未确认前只评论判断，不改代码。
 - 默认创建 `../wms-agent-issue-<编号>-<时间>` worktree，再在该 worktree 中直接运行 `codex exec`；禁止在主工作区直接执行 issue 修复。
 - 禁止使用 tmux、`--tmux-mode session`、`--tmux-mode paste` 或交互式 Codex TUI 承载 issue 修复任务。
-- 长期 watcher 必须用 `just issue-agent-restart` 启动，并用 `just issue-agent-verify` 确认 pid 文件对应 `scripts/agents/issue_runner.py watch` 进程。
+- 长期 watcher 必须用 `just issue-agent-install-watchdog` 安装 cron watchdog；watchdog 每分钟执行 `just issue-agent-ensure`，进程不存在时自动 `issue-agent-restart`。
+- `just issue-agent-verify` 必须确认 pid 文件对应 `scripts/agents/issue_runner.py watch` 进程。
 - prompt 要求 Codex 禁止推 main、禁止强推。
 - prompt 要求 Codex 禁止自行合并 PR；PR 创建后必须写清合并前置条件和 codex exec 日志位置。
 - prompt 要求 Codex 先执行 proposal 中的相似 / 共性问题判断；共性成立时必须一起修共享组件、字段矩阵、规范或治理脚本，不能只修当前页面。
@@ -115,6 +117,7 @@ python3 scripts/agents/issue_runner.py self-test
 | 输入附件 | issue 本体和 issue 评论中的截图 / 附件必须以可下载 URL 写入判断评论和执行 prompt |
 | 确认识别 | 最新 proposal 或 revision-proposal 之后，人工评论裸一行 `确认方案` 才触发执行；否定句和旧确认不能触发 |
 | codex exec 执行 | 创建独立 worktree 和分支，直接在该 worktree 运行 `codex exec`；禁止 tmux、paste 模式和交互式 TUI |
+| watcher 保活 | `just issue-agent-status` 必须显示 cron watchdog；杀掉 watcher 后，下一分钟应由 `issue-agent-ensure` 自动拉起 |
 | WMS 执行 | Codex 使用 WMS skills，完成验证；前端截图和 9002 重启证据由主代理在主工作区校验后补齐，且不自行合并 PR |
 | 证据回写 | PR 与 issue 都包含真实截图附件、本地测试环境重启结果、重启后版本校验、codex exec 日志位置、PR 合并前置条件和剩余风险 |
 | 状态评论 | 已交付 PR、等待合并、阻塞、状态更正等评论不能触发新一轮判断；只有后续人工补充真实新需求时才重新判断 |
