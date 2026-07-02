@@ -236,6 +236,18 @@ function AppShell({
   const [menuFilter, setMenuFilter] = React.useState("");
   const [menuFilterOpen, setMenuFilterOpen] = React.useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
+  const sidebarRef = React.useRef<HTMLElement | null>(null);
+  const closeMenuFilter = React.useCallback(() => {
+    setMenuFilter("");
+    setMenuFilterOpen(false);
+  }, []);
+  const navigateFromMenu = React.useCallback(
+    (nextView: AdminView) => {
+      closeMenuFilter();
+      onNavigate(nextView);
+    },
+    [closeMenuFilter, onNavigate],
+  );
   const normalizedMenuFilter = menuFilter.trim().toLowerCase();
   const visibleMenuSections = menuSections
     .map((section) => ({
@@ -246,6 +258,32 @@ function AppShell({
     }))
     .filter((section) => section.items.length > 0);
 
+  React.useEffect(() => {
+    if (!menuFilterOpen) return;
+
+    function closeMenuFilterOnOutsidePointer(event: PointerEvent) {
+      const target = event.target instanceof Element ? event.target : null;
+      if (target && sidebarRef.current?.contains(target)) return;
+      closeMenuFilter();
+    }
+
+    document.addEventListener("pointerdown", closeMenuFilterOnOutsidePointer);
+    return () => document.removeEventListener("pointerdown", closeMenuFilterOnOutsidePointer);
+  }, [closeMenuFilter, menuFilterOpen]);
+
+  React.useEffect(() => {
+    if (!menuFilterOpen) return;
+
+    function closeMenuFilterByKeyboard(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      closeMenuFilter();
+    }
+
+    document.addEventListener("keydown", closeMenuFilterByKeyboard);
+    return () => document.removeEventListener("keydown", closeMenuFilterByKeyboard);
+  }, [closeMenuFilter, menuFilterOpen]);
+
   return (
     <div
       className={cn(
@@ -253,7 +291,7 @@ function AppShell({
         sidebarCollapsed ? "lg:grid-cols-[4.5rem_1fr]" : "lg:grid-cols-[16rem_1fr]"
       )}
     >
-      <aside className="hidden border-r bg-background lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col">
+      <aside ref={sidebarRef} className="hidden border-r bg-background lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col">
         <div className={cn("flex items-center gap-3 border-b py-5", sidebarCollapsed ? "justify-center px-3" : "justify-between px-5")}>
           {!sidebarCollapsed && (
             <div className="min-w-0">
@@ -269,7 +307,7 @@ function AppShell({
             title={sidebarCollapsed ? "展开侧边栏" : "收缩侧边栏"}
             onClick={() => {
               setSidebarCollapsed((value) => !value);
-              setMenuFilterOpen(false);
+              closeMenuFilter();
             }}
           >
             {sidebarCollapsed ? <PanelLeftOpen className="size-4" aria-hidden /> : <PanelLeftClose className="size-4" aria-hidden />}
@@ -295,10 +333,7 @@ function AppShell({
                 variant="ghost"
                 size="sm"
                 className="w-full justify-start"
-                onClick={() => {
-                  setMenuFilter("");
-                  setMenuFilterOpen(false);
-                }}
+                onClick={closeMenuFilter}
               >
                 收起筛选
               </Button>
@@ -314,7 +349,7 @@ function AppShell({
               key={section.label}
               label={section.label}
               activeView={activeView}
-              onNavigate={onNavigate}
+              onNavigate={navigateFromMenu}
               items={section.items}
               forceOpen={Boolean(normalizedMenuFilter)}
               collapsed={sidebarCollapsed}
