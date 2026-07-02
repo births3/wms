@@ -88,7 +88,8 @@ python3 scripts/agents/issue_runner.py merge-closed --issue 3
 在 tmux 中长期运行：
 
 ```bash
-tmux new -d -s wms-issue-agent 'cd /home/test1/workspace/wms && just issue-agent-watch --interval 60 --apply --merge-closed 2>&1 | tee -a .codex/issue-agent/watch.log'
+just issue-agent-restart
+just issue-agent-verify
 tmux attach -t wms-issue-agent
 ```
 
@@ -105,13 +106,15 @@ python3 scripts/agents/issue_runner.py self-test
 - 未确认前只评论判断，不改代码。
 - 默认新开独立 tmux 任务会话并运行 `codex exec`，避免依赖交互式 TUI 粘贴状态。
 - 使用 `--tmux-mode paste` 时，发送前必须能找到目标 pane。
+- 长期 watcher 必须用 `just issue-agent-restart` 启动，并用 `just issue-agent-verify` 确认；只看到 `wms-issue-agent` tmux 会话存在不算健康，必须有 `scripts/agents/issue_runner.py watch` 进程。
 - prompt 要求 Codex 禁止推 main、禁止强推。
 - prompt 要求 Codex 禁止自行合并 PR；PR 创建后必须写清合并前置条件和 tmux 任务会话状态。
 - 自动合并只由 issue watcher 在 `--merge-closed --apply` 下执行，合并策略固定为 squash；子代理仍禁止自行合并 PR。
 - 自动合并前必须满足：issue 已关闭、PR open、PR `mergeable=true`、PR 未合并、PR head 分支为 `agent/*`、已有验证 / 截图 / 重启证据、没有 `/reject` / `不要合并` / `阻塞` / `blocked` 评论。
 - issue 评论包含截图 / 附件时，prompt 必须列出附件下载 URL；Codex 必须先打开或下载附件辅助定位。
 - 前端或用户可见行为修复必须重启本地测试前后端，并把端口、URL、`/healthz` 或等价健康检查结果写回 PR 与 issue。
-- 重启后必须校验运行的是本次修复版本：记录提交哈希，并用页面可见变更、接口响应版本字段或等价证据证明不是旧进程缓存。
+- 9002 只允许主工作区固定会话 `wms-web-admin-9002` 占用；子 worktree 不得启动或占用 9002。
+- 重启后必须校验运行的是本次修复版本：主代理在主工作区运行 `just dev-web-restart` 和 `just dev-web-verify`，记录提交哈希，并用校验输出、页面可见变更、接口响应版本字段或等价证据证明不是旧进程缓存。
 - 前端或用户可见行为修复必须采集真实前端截图，用 `POST /repos/{owner}/{repo}/issues/<编号>/assets` 上传为 Gitea 附件，并用 Markdown 图片同时评论到 PR 与 issue；不能只写本地路径。
 - 新增字段、状态、角色、模块或业务默认值时，Codex 必须停止并询问用户。
 - `session` 和 `paste` 只用于调试；无人值守定时任务必须使用默认 `exec` 模式。
@@ -123,11 +126,11 @@ python3 scripts/agents/issue_runner.py self-test
 | 检查 | 通过标准 |
 |---|---|
 | issue 读取 | 能读取标题、正文、评论 |
-| 判断评论 | 内容中文，包含结论、置信度、依据、预计影响范围、建议动作、验证要求和停止条件；不能只要求 `/confirm` |
+| 判断评论 | 内容中文，包含结论、置信度、代码核查证据、依据、预计影响范围、建议动作、验证要求和停止条件；不能只要求 `/confirm`，不能只复述 issue |
 | 输入附件 | issue 评论中的截图 / 附件必须以可下载 URL 写入判断评论和执行 prompt |
 | 确认识别 | `/confirm` 或 `codex:confirmed` 才触发 tmux |
 | tmux 投递 | 默认新建 issue 任务会话并运行 `codex exec`；paste 模式只发送到固定 pane，目标不存在则失败停止 |
-| WMS 执行 | Codex 使用 WMS skills，完成验证、截图、前后端重启后创建 PR，且不自行合并 PR |
+| WMS 执行 | Codex 使用 WMS skills，完成验证；前端截图和 9002 重启证据由主代理在主工作区校验后补齐，且不自行合并 PR |
 | 证据回写 | PR 与 issue 都包含真实截图附件、本地测试环境重启结果、重启后版本校验、tmux 任务会话状态、PR 合并前置条件和剩余风险 |
 | PR 收口 | issue 关闭后，watcher dry-run 能发现关联 PR；`--apply --merge-closed` 下满足条件才自动合并并写回 marker，不能停在“已创建 PR” |
 | tmux 清理 | 任务会话完成后应自然退出；未退出时记录会话名、原因和下一步，用户确认清理后再 `tmux kill-session -t <session>` |

@@ -179,6 +179,83 @@ def text_blob(*parts: Any) -> str:
     return "\n".join(str(part or "") for part in parts)
 
 
+CODE_CONTEXT_GLOBS = [
+    "packages/ui/src",
+    "packages/ui/self-checks",
+    "apps/web-admin/src",
+    "apps/web-admin/vite.config.ts",
+    "backend/crates/api/src",
+    "docs",
+    "scripts",
+    "justfile",
+]
+
+DOMAIN_KEYWORDS = [
+    "DataGrid",
+    "datagrid",
+    "视图",
+    "保存",
+    "下拉",
+    "输入值",
+    "登录",
+    "菜单",
+    "导航",
+    "9002",
+    "字段",
+    "创建时间",
+    "截图",
+    "收货",
+    "验收",
+    "上架",
+    "出库",
+    "库位",
+    "商品",
+    "客商",
+    "字典",
+]
+
+
+def issue_keywords(text: str) -> list[str]:
+    keywords: list[str] = []
+    for word in DOMAIN_KEYWORDS:
+        if word in text:
+            keywords.append(word)
+    for word in re.findall(r"[A-Za-z][A-Za-z0-9_-]{2,}|M\d+", text):
+        if word.lower() not in {"issue", "http", "https"}:
+            keywords.append(word)
+    seen: set[str] = set()
+    return [word for word in keywords if not (word in seen or seen.add(word))][:6]
+
+
+def code_context_summary(issue: dict[str, Any], comments: list[dict[str, Any]]) -> str:
+    text = f"{issue.get('title', '')} {issue.get('body', '')} {comment_summary(comments, limit=10)}"
+    keywords = issue_keywords(text)
+    if not keywords:
+        return "未提取到可检索关键词；当前判断只能基于 issue 文本，执行前必须补充页面、接口、截图或复现步骤。"
+
+    lines: list[str] = []
+    for keyword in keywords:
+        matches: list[str] = []
+        for target in CODE_CONTEXT_GLOBS:
+            cmd = ["rg", "-n", "--with-filename", "--fixed-strings", keyword, target]
+            result = subprocess.run(cmd, capture_output=True, text=True, cwd=REPO_ROOT, check=False)
+            for line in result.stdout.splitlines():
+                if line.strip() and not line.startswith("scripts/agents/issue_runner.py:"):
+                    matches.append(line)
+                if len(matches) >= 3:
+                    break
+            if len(matches) >= 3:
+                break
+        if matches:
+            lines.append(f"- `{keyword}` 命中：")
+            lines.extend(f"  - `{short(match, 180)}`" for match in matches)
+        if len(lines) >= 9:
+            break
+    if not lines:
+        return "未在前端、后端、脚本或文档中命中 issue 关键词；执行前必须补充更具体的页面、接口、截图或复现步骤。"
+    return "\n".join(lines[:12])
+
+
 def pr_mentions_issue(pr: dict[str, Any], issue_number: int) -> bool:
     text = text_blob(pr.get("title"), pr.get("body"))
     return bool(re.search(rf"(?:issue|关联|关闭|close[sd]?)\s*#?{issue_number}\b", text, re.I))
@@ -225,6 +302,7 @@ def build_analysis_comment(issue: dict[str, Any], comments: list[dict[str, Any]]
     labels = ", ".join(label["name"] for label in issue.get("labels") or []) or "无"
     scope = "待确认"
     text = f"{issue.get('title', '')} {issue.get('body', '')} {comment_summary(comments, limit=10)}"
+    code_context = code_context_summary(issue, comments)
     if "菜单" in text or "导航" in text:
         scope = "可能是管理端左侧导航 / 菜单交互"
     conclusion = "需要补充"
@@ -269,9 +347,14 @@ def build_analysis_comment(issue: dict[str, Any], comments: list[dict[str, Any]]
 
 {attachment_summary(comments)}
 
+### 代码核查
+
+{code_context}
+
 ### 判断依据
 
 - {reason}
+- 上方代码核查是本轮判断的仓库证据；如果没有命中代码，执行前必须先补充复现信息。
 - 当前步骤只做判断和确认，不改代码、不提交、不推送。
 
 ### 预计影响范围
@@ -313,13 +396,14 @@ def build_fix_prompt(issue: dict[str, Any], comments: list[dict[str, Any]]) -> s
 3. 必须使用 `wms-worktree-subagent` 或独立 git worktree 隔离开发；禁止直接修改当前主工作区。
 4. 只修复 issue 指向的问题。新增字段、状态、角色、模块或业务默认值时停止并向用户确认。
 5. 完成后运行相关测试，至少 `git diff --check` 和 `just gov-t1`。
-6. 涉及前端或用户可见行为时，必须重启本地测试环境前端和后端；前端优先使用 `pnpm -C apps/web-admin dev --host 0.0.0.0 --port 9002 --strictPort`，后端按仓库现有运行方式启动并检查 `/healthz`。重启后必须校验运行的是本次修复版本：记录当前提交哈希，并用页面可见变更、接口响应版本字段或等价证据证明不是旧进程缓存；把端口、URL、提交哈希和版本校验结果写入 PR 与 issue。
+6. 涉及前端或用户可见行为时，禁止在子 worktree 中启动或占用 9002；9002 只允许主工作区固定会话 `wms-web-admin-9002`。需要真实截图或重启证据时，合并到主工作区后由主代理运行 `just dev-web-restart` 和 `just dev-web-verify`，后端按仓库现有运行方式启动并检查 `/healthz`。重启后必须校验运行的是本次修复版本：记录当前提交哈希，并用 `just dev-web-verify` 输出、页面可见变更、接口响应版本字段或等价证据证明不是旧进程缓存；把端口、URL、提交哈希和版本校验结果写入 PR 与 issue。
 7. 如果 issue 评论包含截图 / 附件，必须先打开或下载附件辅助定位，不能只按文字猜测。
 8. 涉及前端或用户可见行为时，必须采集真实前端截图；必须用 `POST /repos/{{owner}}/{{repo}}/issues/<编号>/assets` 把截图上传为 Gitea 附件，并用 Markdown 图片同时评论到 PR 和 issue；不能只写本地路径。
 9. 当前可用截图 / 附件如下：
 {attachment_summary(comments, limit=10)}
-10. 用户已授权：创建修复分支、推送到远端并创建 Gitea PR；禁止推 main，禁止强推，禁止自行合并 PR。
-11. PR 创建不是完成。最后必须把 PR 链接、提交哈希、验证结果、截图证据、本地测试环境重启结果、tmux 任务会话状态、PR 合并前置条件和剩余风险评论回 issue，并明确下一步是“等待主代理合并”“等待用户确认合并”或“阻塞”。
+10. 读取 Gitea issue、评论、PR 或附件元数据必须使用 `tea api`，例如 `tea api /repos/{{owner}}/{{repo}}/issues/{issue["number"]}`；禁止裸 `curl` 访问 Gitea API。
+11. 用户已授权：创建修复分支、推送到远端并创建 Gitea PR；禁止推 main，禁止强推，禁止自行合并 PR。
+12. PR 创建不是完成。最后必须把 PR 链接、提交哈希、验证结果、截图证据、本地测试环境重启结果、tmux 任务会话状态、PR 合并前置条件和剩余风险评论回 issue，并明确下一步是“等待主代理合并”“等待用户确认合并”或“阻塞”。
 
 Issue 正文：
 {issue.get("body") or ""}
@@ -337,16 +421,22 @@ def choose_action(
     confirm_label: str,
     force_dispatch: bool = False,
 ) -> Action | None:
-    if latest_marker_time(comments, TMUX_MARKER) and not force_dispatch:
-        return None
+    tmux_time = latest_marker_time(comments, TMUX_MARKER)
+    human_time = latest_human_time(comments)
     analysis_time = latest_marker_time(comments, ANALYSIS_MARKER)
     if analysis_time is None:
         return Action(issue=issue, kind="analysis", body=build_analysis_comment(issue, comments))
     if has_reject_after(comments, analysis_time):
         return None
     if has_label(issue, confirm_label) or has_confirm_after(comments, analysis_time, confirm_token):
+        if force_dispatch or tmux_time is None or tmux_time < analysis_time:
+            return Action(issue=issue, kind="tmux", body=build_fix_prompt(issue, comments))
+    if tmux_time and tmux_time > analysis_time:
+        if human_time and human_time > tmux_time:
+            return Action(issue=issue, kind="analysis", body=build_analysis_comment(issue, comments))
+        return None
+    if force_dispatch and has_label(issue, confirm_label):
         return Action(issue=issue, kind="tmux", body=build_fix_prompt(issue, comments))
-    human_time = latest_human_time(comments)
     if human_time and human_time > analysis_time:
         return Action(issue=issue, kind="analysis", body=build_analysis_comment(issue, comments))
     return None
@@ -357,6 +447,13 @@ def write_preview(out_dir: Path, issue_number: int, kind: str, body: str) -> Pat
     path = out_dir / f"issue-{issue_number}-{kind}.txt"
     path.write_text(body, encoding="utf-8")
     return path
+
+
+def display_path(path: Path) -> str:
+    try:
+        return str(path.relative_to(REPO_ROOT))
+    except ValueError:
+        return str(path)
 
 
 def inject_tmux(target: str, prompt: str) -> str:
@@ -433,7 +530,7 @@ def execute_action(
 ) -> None:
     issue_number = int(action.issue["number"])
     preview = write_preview(out_dir, issue_number, action.kind, action.body)
-    print(f"{action.kind}: issue #{issue_number} preview={preview.relative_to(REPO_ROOT)}", flush=True)
+    print(f"{action.kind}: issue #{issue_number} preview={display_path(preview)}", flush=True)
     if not apply:
         print("dry-run: 未评论 Gitea，未发送到 tmux", flush=True)
         return
@@ -538,9 +635,12 @@ def run_watch(args: argparse.Namespace) -> int:
 
 def self_test() -> int:
     issue = {"number": 7, "title": "测试", "body": "正文", "labels": [], "user": {"login": "u"}}
+    assert display_path(REPO_ROOT / "justfile") == "justfile"
+    assert display_path(Path("/tmp/wms-issue-agent-preview.txt")) == "/tmp/wms-issue-agent-preview.txt"
     t0 = "2026-07-01T00:00:00Z"
     t1 = "2026-07-01T00:01:00Z"
     comments = [{"created_at": t0, "body": build_analysis_comment(issue, [])}]
+    assert "### 代码核查" in comments[0]["body"]
     assert choose_action(issue, [], confirm_token="/confirm", confirm_label="codex:confirmed").kind == "analysis"
     assert choose_action(issue, comments, confirm_token="/confirm", confirm_label="codex:confirmed") is None
     confirmed = [*comments, {"created_at": t1, "body": "/confirm"}]
@@ -551,6 +651,15 @@ def self_test() -> int:
     assert choose_action(issue, refreshed, confirm_token="/confirm", confirm_label="codex:confirmed") is None
     sent = [*confirmed, {"created_at": "2026-07-01T00:02:00Z", "body": TMUX_MARKER}]
     assert choose_action(issue, sent, confirm_token="/confirm", confirm_label="codex:confirmed") is None
+    after_tmux = [*sent, {"created_at": "2026-07-01T00:03:00Z", "body": "补充：还有下拉异常"}]
+    assert choose_action(issue, after_tmux, confirm_token="/confirm", confirm_label="codex:confirmed").kind == "analysis"
+    after_tmux_refreshed = [
+        *after_tmux,
+        {"created_at": "2026-07-01T00:04:00Z", "body": build_analysis_comment(issue, after_tmux)},
+    ]
+    assert choose_action(issue, after_tmux_refreshed, confirm_token="/confirm", confirm_label="codex:confirmed") is None
+    after_tmux_confirmed = [*after_tmux_refreshed, {"created_at": "2026-07-01T00:05:00Z", "body": "/confirm"}]
+    assert choose_action(issue, after_tmux_confirmed, confirm_token="/confirm", confirm_label="codex:confirmed").kind == "tmux"
     assert choose_action(
         issue,
         sent,
@@ -577,6 +686,8 @@ def self_test() -> int:
     assert "上传为 Gitea 附件" in prompt
     assert "wms-execution-retrospective" in prompt
     assert "共性问题" in prompt
+    assert "tea api" in prompt
+    assert "禁止裸 `curl`" in prompt
     closed_issue = {"number": 8, "state": "closed", "body": "已验收"}
     pr = {
         "number": 9,

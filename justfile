@@ -23,6 +23,13 @@ set dotenv-load := true
 
 # 仓库根目录的绝对路径（所有 worktree 内行为一致）
 ROOT := justfile_directory()
+MAIN_ROOT := "/home/test1/workspace/wms"
+DEV_WEB_SESSION := "wms-web-admin-9002"
+DEV_WEB_PORT := "9002"
+DEV_WEB_CWD := MAIN_ROOT / "apps/web-admin"
+DEV_WEB_LOG := "/tmp/wms-web-admin-9002.log"
+ISSUE_AGENT_SESSION := "wms-issue-agent"
+ISSUE_AGENT_LOG := MAIN_ROOT / ".codex/issue-agent/watch.log"
 
 # 默认显示帮助
 default:
@@ -179,6 +186,63 @@ matrix-e2e-full *args:
 web-admin-m1-real-e2e:
     @pnpm --dir apps/web-admin run test:e2e:m1-real
 
+# 管理端 9002 当前占用状态
+dev-web-status:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "tmux:"
+    tmux ls 2>/dev/null | grep -E '^{{DEV_WEB_SESSION}}:' || true
+    echo "process:"
+    pgrep -af 'vite .*--port[[:space:]]+{{DEV_WEB_PORT}}|pnpm -C apps/web-admin dev .*--port[[:space:]]+{{DEV_WEB_PORT}}' || true
+    echo "cwd:"
+    for pid in $(pgrep -f 'vite .*--port[[:space:]]+{{DEV_WEB_PORT}}' || true); do
+      printf '%s ' "$pid"
+      readlink "/proc/$pid/cwd" || true
+    done
+
+# 从主工作区重启管理端 9002
+dev-web-restart:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    tmux kill-session -t "{{DEV_WEB_SESSION}}" 2>/dev/null || true
+    for pid in $(pgrep -f 'vite .*--port[[:space:]]+{{DEV_WEB_PORT}}' || true); do
+      cwd=$(readlink "/proc/$pid/cwd" 2>/dev/null || true)
+      if [[ "$cwd" != "{{DEV_WEB_CWD}}" ]]; then
+        kill "$pid" 2>/dev/null || true
+      fi
+    done
+    if [[ "${WMS_WEB_ADMIN_DEV_MOCK:-1}" == "1" ]]; then
+      dev_env='WMS_WEB_ADMIN_DEV_MOCK=1'
+    else
+      dev_env="WMS_WEB_ADMIN_DEV_MOCK=0 VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://192.168.124.10:18080}"
+    fi
+    tmux new-session -d -s "{{DEV_WEB_SESSION}}" -c "{{MAIN_ROOT}}" \
+      "$dev_env pnpm -C apps/web-admin dev --host 0.0.0.0 --port {{DEV_WEB_PORT}} --strictPort 2>&1 | tee {{DEV_WEB_LOG}}"
+    sleep 2
+    just dev-web-verify
+
+# 校验 9002 来自主工作区，不是 agent worktree
+dev-web-verify:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ok=0
+    for pid in $(pgrep -f 'vite .*--port[[:space:]]+{{DEV_WEB_PORT}}' || true); do
+      cwd=$(readlink "/proc/$pid/cwd" 2>/dev/null || true)
+      echo "$pid $cwd"
+      if [[ "$cwd" == "{{DEV_WEB_CWD}}" ]]; then
+        ok=1
+      fi
+      if [[ "$cwd" == *"/wms-agent-"* ]]; then
+        echo "9002 被 agent worktree 占用：$cwd" >&2
+        exit 1
+      fi
+    done
+    if [[ "$ok" != 1 ]]; then
+      echo "9002 未由主工作区 {{DEV_WEB_CWD}} 提供" >&2
+      exit 1
+    fi
+    curl -fsS --max-time 3 "http://127.0.0.1:{{DEV_WEB_PORT}}/" >/dev/null
+
 # 生成主仓 OpenAPI JSON 并刷新 @wms/api-client 类型
 openapi-sync:
     @cd backend && cargo run --quiet --bin openapi-export > ../shared/openapi/openapi.json
@@ -208,6 +272,35 @@ issue-agent-once *args:
 # Gitea issue agent：循环扫描；默认 dry-run，传 --apply 才评论或发送到 tmux
 issue-agent-watch *args:
     @python3 -u scripts/agents/issue_runner.py watch {{args}}
+
+# Gitea issue agent：查看长期 watcher 状态
+issue-agent-status:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "tmux:"
+    tmux ls 2>/dev/null | grep -E '^{{ISSUE_AGENT_SESSION}}:' || true
+    echo "process:"
+    pgrep -af 'scripts/agents/issue_runner.py watch' || true
+    echo "recent-log:"
+    tail -20 "{{ISSUE_AGENT_LOG}}" 2>/dev/null || true
+
+# Gitea issue agent：校验长期 watcher 真的在跑
+issue-agent-verify:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    tmux has-session -t "{{ISSUE_AGENT_SESSION}}" 2>/dev/null
+    pgrep -f 'scripts/agents/issue_runner.py watch' >/dev/null
+
+# Gitea issue agent：重启长期 watcher
+issue-agent-restart:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mkdir -p "$(dirname "{{ISSUE_AGENT_LOG}}")"
+    tmux kill-session -t "{{ISSUE_AGENT_SESSION}}" 2>/dev/null || true
+    tmux new-session -d -s "{{ISSUE_AGENT_SESSION}}" -c "{{MAIN_ROOT}}" \
+      'just issue-agent-watch --interval "${WMS_ISSUE_AGENT_INTERVAL:-60}" --apply --merge-closed 2>&1 | tee -a "{{ISSUE_AGENT_LOG}}"'
+    sleep 2
+    just issue-agent-verify
 
 # 报告 Wave 1 完成度（默认不阻塞；出口检查用 --strict）
 wave-1-status:
