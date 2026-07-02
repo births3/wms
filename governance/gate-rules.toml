@@ -446,7 +446,7 @@ tier = "T1"
 # Layer 2 业务复合组件 + 页面级文件触发组件治理
 [[rules]]
 match = "packages/ui/src/business/**"
-checks = ["check_component_doc_header", "check_component_no_inline_style", "check_component_props_classname", "check_component_registry_consistency"]
+checks = ["check_component_doc_header", "check_component_no_inline_style", "check_component_props_classname", "check_component_registry_consistency", "check_datagrid_popover_portal"]
 tier = "T1"
 
 [[rules]]
@@ -462,6 +462,21 @@ tier = "T1"
 [[rules]]
 match = "apps/web-admin/src/pages/**"
 checks = ["check_page_size"]
+tier = "T1"
+
+[[rules]]
+match = "apps/web-admin/src/pages/master-data/**"
+checks = ["check_m1_master_data_source_actions"]
+tier = "T1"
+
+[[rules]]
+match = "apps/web-admin/src/features/master-data/**"
+checks = ["check_m1_master_data_source_actions"]
+tier = "T1"
+
+[[rules]]
+match = "apps/web-admin/vite.config.ts"
+checks = ["check_m1_master_data_source_actions"]
 tier = "T1"
 
 [[rules]]
