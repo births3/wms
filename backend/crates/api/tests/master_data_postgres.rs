@@ -118,7 +118,10 @@ async fn products_are_read_from_postgres_by_owner(pool: PgPool) {
         rows[0].special_drug_category_code.as_deref(),
         Some("normal")
     );
-    assert_eq!(rows[0].attrs, json!({"storage_condition": "cold"}));
+    assert_eq!(
+        rows[0].attrs,
+        json!({"storage_condition": "cold", "source": "api_import"})
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -164,6 +167,7 @@ async fn product_list_route_reads_postgres_by_owner(pool: PgPool) {
     assert_eq!(payload.page.count, 1);
     assert_eq!(payload.data.len(), 1);
     assert_eq!(payload.data[0].product_code, "P-M1-101");
+    assert_eq!(payload.data[0].attrs["source"], "api_import");
 }
 
 #[sqlx::test(migrations = "../../migrations")]

@@ -59,7 +59,7 @@ interface DevProduct {
   owner_id: string;
   product_code: string;
   product_name: string;
-  spec: string;
+  spec: string | null;
   dosage_form: string | null;
   approval_no: string | null;
   manufacturer: string | null;
@@ -71,6 +71,7 @@ interface DevProduct {
 }
 
 const devCreatedOrders: DevOrder[] = [];
+const devCreatedProducts: DevProduct[] = [];
 const devSeedOrderStatusOverrides = new Map<string, string>();
 
 const devUser = {
@@ -93,7 +94,7 @@ let devProduct: DevProduct = {
   approval_no: "国药准字H20260001",
   manufacturer: "鹏鹞示例药业",
   special_drug_category_code: "none",
-  attrs: { storage_condition: "cold" } as Record<string, unknown>,
+  attrs: { storage_condition: "cold", source: "api_import" } as Record<string, unknown>,
   status: "active",
   created_at: "2026-06-29T00:00:00.000Z",
   updated_at: "2026-06-29T00:00:00.000Z",
@@ -177,6 +178,14 @@ async function handleDevMockRequest(
     }
   }
 
+  if (req.method === "POST" && pathname === "/api/v1/master-data/products") {
+    const body = await readJsonBody(req);
+    const created = devProductFromCreateRequest(body);
+    devCreatedProducts.unshift(created);
+    sendJson(res, 200, created);
+    return true;
+  }
+
   if (req.method === "GET" && pathname === "/api/v1/inbound/receiving-orders") {
     const data = allDevOrders();
     sendJson(res, 200, { data, page: { count: data.length, next_cursor: null } });
@@ -221,9 +230,10 @@ function devMasterDataResponse(pathname: string): Record<string, unknown> | null
   const page = { count: 1, next_cursor: null };
 
   if (pathname === "/api/v1/master-data/products") {
+    const data = [...devCreatedProducts, ...devSeedProducts(updatedAt)];
     return {
-      data: [devProduct],
-      page,
+      data,
+      page: { count: data.length, next_cursor: null },
       inventory_alert_count: 0,
       pending_receipt_orders: 0,
       returns_this_month: 0,
@@ -353,8 +363,69 @@ function devMasterDataResponse(pathname: string): Record<string, unknown> | null
   return null;
 }
 
+function devSeedProducts(updatedAt: string): DevProduct[] {
+  return [
+    devProduct,
+    {
+      id: "00000000-0000-0000-0000-000000001002",
+      owner_id: devOwnerId,
+      product_code: "P-M1-002",
+      product_name: "批量导入感冒灵颗粒",
+      spec: "10g*9袋",
+      dosage_form: "颗粒剂",
+      approval_no: "国药准字Z20260002",
+      manufacturer: "鹏鹞示例药业",
+      special_drug_category_code: "none",
+      attrs: { storage_condition: "normal", source: "batch_import" },
+      status: "active",
+      created_at: updatedAt,
+      updated_at: updatedAt,
+    },
+    {
+      id: "00000000-0000-0000-0000-000000001003",
+      owner_id: devOwnerId,
+      product_code: "P-M1-003",
+      product_name: "手工新建维生素片",
+      spec: "100片/瓶",
+      dosage_form: "片剂",
+      approval_no: "国药准字H20260003",
+      manufacturer: "鹏鹞示例药业",
+      special_drug_category_code: "none",
+      attrs: { storage_condition: "normal", source: "manual" },
+      status: "active",
+      created_at: updatedAt,
+      updated_at: updatedAt,
+    },
+  ];
+}
+
+function devProductFromCreateRequest(body: Record<string, unknown>): DevProduct {
+  const now = new Date().toISOString();
+  const attrs = asRecord(body.attrs);
+  return {
+    id: `00000000-0000-0000-0000-${String(1900 + devCreatedProducts.length + 1).padStart(12, "0")}`,
+    owner_id: devOwnerId,
+    product_code: asString(body.product_code, "P-M1-NEW"),
+    product_name: asString(body.product_name, "新建商品"),
+    spec: asNullableString(body.spec),
+    dosage_form: asNullableString(body.dosage_form),
+    approval_no: asNullableString(body.approval_no),
+    manufacturer: asNullableString(body.manufacturer),
+    special_drug_category_code: asNullableString(body.special_drug_category_code),
+    attrs: {
+      storage_condition: asString(attrs.storage_condition, "normal"),
+      source: asString(attrs.source, "api_import"),
+    },
+    status: "active",
+    created_at: now,
+    updated_at: now,
+  };
+}
+
 async function handleProductUpdate(req: IncomingMessage, res: ServerResponse, id: string) {
-  if (id !== devProduct.id) {
+  const createdProductIndex = devCreatedProducts.findIndex((product) => product.id === id);
+  const product = id === devProduct.id ? devProduct : devCreatedProducts[createdProductIndex];
+  if (!product) {
     sendJson(res, 404, {
       code: "DEV_MOCK_NOT_FOUND",
       message: "Product not found",
@@ -365,20 +436,26 @@ async function handleProductUpdate(req: IncomingMessage, res: ServerResponse, id
 
   const body = await readJsonBody(req);
   const attrs = asRecord(body.attrs);
-  const storageCondition = asString(attrs.storage_condition, asString(devProduct.attrs.storage_condition, "normal"));
-  devProduct = {
-    ...devProduct,
-    product_name: asString(body.product_name, devProduct.product_name),
-    spec: asNullableString(body.spec) ?? devProduct.spec,
+  const storageCondition = asString(attrs.storage_condition, asString(product.attrs.storage_condition, "normal"));
+  const updatedProduct: DevProduct = {
+    ...product,
+    product_name: asString(body.product_name, product.product_name),
+    spec: asNullableString(body.spec) ?? product.spec,
     dosage_form: asNullableString(body.dosage_form),
     approval_no: asNullableString(body.approval_no),
     manufacturer: asNullableString(body.manufacturer),
     special_drug_category_code: asNullableString(body.special_drug_category_code),
-    attrs: { ...devProduct.attrs, ...attrs, storage_condition: storageCondition },
-    status: asString(body.status, devProduct.status),
+    attrs: { ...product.attrs, ...attrs, storage_condition: storageCondition },
+    status: asString(body.status, product.status),
     updated_at: new Date().toISOString(),
   };
-  sendJson(res, 200, devProduct);
+
+  if (id === devProduct.id) {
+    devProduct = updatedProduct;
+  } else {
+    devCreatedProducts[createdProductIndex] = updatedProduct;
+  }
+  sendJson(res, 200, updatedProduct);
 }
 
 async function handleInboundAction(req: IncomingMessage, res: ServerResponse, action: string | undefined, orderId: string) {

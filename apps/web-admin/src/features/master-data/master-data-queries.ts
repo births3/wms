@@ -18,6 +18,7 @@ type Customer = components["schemas"]["Customer"];
 type Warehouse = components["schemas"]["Warehouse"];
 type Location = components["schemas"]["Location"];
 export type UpdateProductRequest = components["schemas"]["UpdateProductRequest"];
+export type CreateProductRequest = components["schemas"]["CreateProductRequest"];
 export type BatchCreateLocationsRequest = components["schemas"]["BatchCreateLocationsRequest"];
 export type SystemDictionaryItem = components["schemas"]["SystemDictionaryItem"];
 export type UpsertSystemDictionaryItemRequest =
@@ -39,6 +40,7 @@ export interface MasterDataRow {
   extraLabel: string;
   extraValue: string;
   createdAt: string;
+  sourceValue?: string;
   updatedAt: string;
   productFields?: ProductMasterDataFields;
   locationFields?: LocationMasterDataFields;
@@ -222,6 +224,14 @@ export async function batchCreateLocations(
   return result.data.data.map(locationRow);
 }
 
+export async function createProduct(request: CreateProductRequest): Promise<MasterDataRow> {
+  const result = await api.POST("/api/v1/master-data/products", { body: request });
+  if (!result.data) {
+    throw new ApiError(result.error, "新建商品失败", result.response.status);
+  }
+  return productRow(result.data);
+}
+
 async function listSystemDictionaryItems(): Promise<MasterDataRow[]> {
   return (await fetchDocumentTypeDictionaryItems()).map(systemDictionaryRow);
 }
@@ -286,8 +296,9 @@ async function disableSystemDictionaryItem(input: {
   return result.data;
 }
 
-function productRow(item: Product): MasterDataRow {
+export function productRow(item: Product): MasterDataRow {
   const storageCondition = text(item.attrs.storage_condition ?? item.attrs.storage);
+  const sourceValue = productSourceLabel(item.attrs.source);
   return row({
     id: item.id,
     code: item.product_code,
@@ -302,6 +313,7 @@ function productRow(item: Product): MasterDataRow {
     extraLabel: "储存条件",
     extraValue: storageCondition,
     createdAt: item.created_at,
+    sourceValue,
     updatedAt: item.updated_at,
     productFields: {
       approvalNo: item.approval_no,
@@ -462,11 +474,28 @@ function row(input: Omit<MasterDataRow, "searchText">): MasterDataRow {
       input.secondaryValue,
       input.extraValue,
       input.createdAt,
+      input.sourceValue ?? "",
       ...locationSearchText,
     ]
       .join(" ")
       .toLowerCase(),
   };
+}
+
+export function productSourceLabel(value: unknown) {
+  if (typeof value !== "string") return "-";
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return "-";
+  if (["manual", "manual_create", "manual_created", "hand_created", "手工新建"].includes(normalized)) {
+    return "手工新建";
+  }
+  if (["batch_import", "batch", "excel_import", "import", "批量导入"].includes(normalized)) {
+    return "批量导入";
+  }
+  if (["api_import", "api", "erp", "external_api", "接口导入", "api接口导入"].includes(normalized)) {
+    return "API接口导入";
+  }
+  return value.trim();
 }
 
 function activeStatusLabel(status: string) {

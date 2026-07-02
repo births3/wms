@@ -610,7 +610,7 @@ impl From<ProductRow> for Product {
             manufacturer: row.manufacturer,
             special_drug_category_code: Some(row.special_drug_category),
             status: row.status,
-            attrs: json!({ "storage_condition": row.storage_condition }),
+            attrs: json!({ "storage_condition": row.storage_condition, "source": "api_import" }),
             created_at: row.created_at,
             updated_at: row.updated_at,
         }

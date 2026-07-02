@@ -13,11 +13,13 @@ import {
   type StatusKey,
   validateLocationBatchRange,
 } from "@wms/ui";
-import { ArrowLeft, Plus, RefreshCw, Search } from "lucide-react";
+import { ArrowLeft, Plus, RefreshCw, Search, Upload } from "lucide-react";
 
 import {
   batchCreateLocations,
+  createProduct,
   useMasterDataRowsQuery,
+  type CreateProductRequest,
   type LocationMasterDataFields,
   type MasterDataRow,
   type MasterDataViewId,
@@ -27,8 +29,14 @@ import {
   defaultLocationBatchType,
   initialLocationBatchRange,
 } from "./LocationBatchDialog";
+import { ProductCreateDialog } from "./ProductCreateDialog";
 import { ProductEditDialog } from "./ProductEditDialog";
-import { masterDataGridClassName, productColumns } from "./ProductEditTable";
+import { productColumns } from "./ProductEditTable";
+import {
+  masterDataColumns,
+  productActionLabels,
+  productTableClassName,
+} from "./m1-product-page-model";
 import { M1SystemDictionaryPage } from "./SystemDictionaryPage";
 import { useProductEditDialog } from "./use-product-edit-dialog";
 export type { MasterDataViewId } from "@/features/master-data/master-data-queries";
@@ -329,6 +337,7 @@ function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
     refetchRows: rowsQuery.refetch,
     onSaved: (productCode) => setLastEvent(`${productCode} 已保存`),
   });
+  const [productCreateOpen, setProductCreateOpen] = React.useState(false);
   const [locationBatchOpen, setLocationBatchOpen] = React.useState(false);
   const [locationBatchRange, setLocationBatchRange] =
     React.useState<LocationBatchRange>(initialLocationBatchRange);
@@ -385,12 +394,10 @@ function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
     locationBatchScopes.find((scope) => scope.key === locationBatchScopeKey) ??
     locationBatchScopes[0] ??
     null;
+  const productActions = productActionLabels(viewId);
+  const baseGridColumns = masterDataColumns(viewId, columns, locationColumns);
   const gridColumns =
-    viewId === "m1-products"
-      ? productColumns(columns, productEdit.openDialog)
-      : viewId === "m1-locations"
-        ? locationColumns
-        : columns;
+    viewId === "m1-products" ? productColumns(baseGridColumns, productEdit.openDialog) : baseGridColumns;
 
   React.useEffect(() => {
     if (viewId !== "m1-locations") return;
@@ -401,6 +408,16 @@ function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
   async function refreshRows() {
     await rowsQuery.refetch();
     setLastEvent(`${meta.title} 已刷新`);
+  }
+
+  async function submitProductCreate(request: CreateProductRequest) {
+    const created = await createProduct(request);
+    await rowsQuery.refetch();
+    setLastEvent(`${created.code} 已新建`);
+  }
+
+  function triggerProductBatchImport() {
+    setLastEvent("批量导入入口已记录，导入记录来源将显示为批量导入");
   }
 
   function updateLocationBatchRange(patch: Partial<LocationBatchRange>) {
@@ -453,6 +470,18 @@ function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
               <span className="text-sm text-muted-foreground" role="status">
                 {lastEvent}
               </span>
+            )}
+            {productActions.includes("新建商品") && (
+              <Button type="button" onClick={() => setProductCreateOpen(true)}>
+                <Plus className="size-4" aria-hidden />
+                新建商品
+              </Button>
+            )}
+            {productActions.includes("批量导入") && (
+              <Button type="button" variant="outline" onClick={triggerProductBatchImport}>
+                <Upload className="size-4" aria-hidden />
+                批量导入
+              </Button>
             )}
             {viewId === "m1-locations" && (
               <Button type="button" onClick={() => setLocationBatchOpen(true)}>
@@ -514,7 +543,7 @@ function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
         caption={rowsQuery.isPending ? "加载基础档案..." : undefined}
         emptyTitle={meta.emptyTitle}
         storageKey={meta.storageKey}
-        tableClassName={masterDataGridClassName(viewId)}
+        tableClassName={productTableClassName(viewId)}
       />
 
       <ProductEditDialog
@@ -525,6 +554,14 @@ function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
         onOpenChange={productEdit.closeDialog}
         onSubmit={productEdit.submit}
       />
+
+      {viewId === "m1-products" && (
+        <ProductCreateDialog
+          open={productCreateOpen}
+          onOpenChange={setProductCreateOpen}
+          onCreate={submitProductCreate}
+        />
+      )}
 
       {viewId === "m1-locations" && (
         <LocationBatchDialog

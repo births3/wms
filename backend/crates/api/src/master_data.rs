@@ -124,7 +124,7 @@ impl MasterDataStore {
             manufacturer: req.manufacturer,
             special_drug_category_code: req.special_drug_category_code,
             status: "active".to_string(),
-            attrs: req.attrs,
+            attrs: product_attrs_with_default_source(req.attrs, "api_import"),
             created_at: now,
             updated_at: now,
         })
@@ -469,6 +469,20 @@ impl MasterDataStore {
     }
 }
 
+fn product_attrs_with_default_source(
+    attrs: serde_json::Value,
+    default_source: &str,
+) -> serde_json::Value {
+    let mut attrs = attrs;
+    if let Some(object) = attrs.as_object_mut() {
+        object
+            .entry("source")
+            .or_insert_with(|| serde_json::Value::String(default_source.to_string()));
+        return attrs;
+    }
+    serde_json::json!({ "source": default_source })
+}
+
 impl CatalogEntity for Product {
     fn id(&self) -> Uuid {
         self.id
@@ -611,6 +625,7 @@ mod tests {
             .expect("create product");
 
         assert_eq!(store.list_products(&ctx_a).len(), 1);
+        assert_eq!(created.attrs["source"], "api_import");
         assert!(matches!(
             store.get_product(&ctx_b, created.id),
             Err(MasterDataError::NotFound)
