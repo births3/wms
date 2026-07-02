@@ -27,6 +27,8 @@ use wms_api::{
     master_data_handlers::{master_data_router, MasterDataAppState},
     system_dictionary_handlers::{system_dictionary_router, SystemDictionaryAppState},
     wave3_handlers::{wave3_router, Wave3AppState},
+    wave4_handlers::{wave4_router, Wave4AppState},
+    wave5_handlers::{wave5_router, Wave5AppState},
 };
 use wms_domain::{AuditActor, AuditEvent, AuditEventListResponse, ErrorResponse, HealthzResponse};
 
@@ -108,10 +110,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let system_dictionary_state = SystemDictionaryAppState::with_postgres(pool.clone());
     let wave3_state =
         Wave3AppState::with_postgres(pool.clone()).with_config_center(config_center_state.clone());
+    let wave4_state = Wave4AppState::with_postgres(pool.clone());
+    let wave5_state = Wave5AppState::with_postgres(pool.clone());
     let app = app(
         config_center_state,
         auth_state,
         wave3_state,
+        wave4_state,
+        wave5_state,
         audit_query_state,
         master_data_state,
         system_dictionary_state,
@@ -178,6 +184,8 @@ fn app(
     config_center_state: ConfigCenterAppState,
     auth_state: AuthAppState,
     wave3_state: Wave3AppState,
+    wave4_state: Wave4AppState,
+    wave5_state: Wave5AppState,
     audit_query_state: AuditQueryState,
     master_data_state: MasterDataAppState,
     system_dictionary_state: SystemDictionaryAppState,
@@ -192,6 +200,8 @@ fn app(
         .merge(master_data_router(master_data_state))
         .merge(system_dictionary_router(system_dictionary_state))
         .merge(wave3_router(wave3_state))
+        .merge(wave4_router(wave4_state))
+        .merge(wave5_router(wave5_state))
 }
 
 async fn healthz() -> Json<HealthzResponse> {
@@ -515,6 +525,8 @@ mod tests {
             config_center_state(),
             AuthAppState::new(pool.clone()),
             Wave3AppState::default(),
+            Wave4AppState::with_postgres(pool.clone()),
+            Wave5AppState::with_postgres(pool.clone()),
             AuditQueryState { pool: pool.clone() },
             MasterDataAppState::default(),
             SystemDictionaryAppState::with_postgres(pool),
@@ -544,6 +556,8 @@ mod tests {
             config_center_state(),
             AuthAppState::new(pool.clone()),
             Wave3AppState::default(),
+            Wave4AppState::with_postgres(pool.clone()),
+            Wave5AppState::with_postgres(pool.clone()),
             AuditQueryState { pool: pool.clone() },
             MasterDataAppState::default(),
             SystemDictionaryAppState::with_postgres(pool),
@@ -563,6 +577,38 @@ mod tests {
             .expect("router should respond");
 
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn runtime_mounts_wave4_and_wave5_routes() {
+        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/wms")
+            .expect("lazy pool should not connect during runtime route test");
+        let app = app(
+            config_center_state(),
+            AuthAppState::new(pool.clone()),
+            Wave3AppState::default(),
+            Wave4AppState::with_postgres(pool.clone()),
+            Wave5AppState::with_postgres(pool.clone()),
+            AuditQueryState { pool: pool.clone() },
+            MasterDataAppState::default(),
+            SystemDictionaryAppState::with_postgres(pool),
+        );
+
+        for uri in ["/api/v1/outbound/orders", "/api/v1/packing/stations"] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method("POST")
+                        .uri(uri)
+                        .body(Body::empty())
+                        .expect("request should build"),
+                )
+                .await
+                .expect("router should respond");
+
+            assert_eq!(response.status(), StatusCode::UNAUTHORIZED, "{uri}");
+        }
     }
 
     #[test]
@@ -658,6 +704,8 @@ mod tests {
             config_center_state(),
             AuthAppState::new(pool.clone()),
             Wave3AppState::default(),
+            Wave4AppState::with_postgres(pool.clone()),
+            Wave5AppState::with_postgres(pool.clone()),
             AuditQueryState { pool: pool.clone() },
             MasterDataAppState::default(),
             SystemDictionaryAppState::with_postgres(pool.clone()),
@@ -758,6 +806,8 @@ mod tests {
             config_center_state(),
             AuthAppState::new(pool.clone()),
             Wave3AppState::default(),
+            Wave4AppState::with_postgres(pool.clone()),
+            Wave5AppState::with_postgres(pool.clone()),
             AuditQueryState { pool: pool.clone() },
             MasterDataAppState::default(),
             SystemDictionaryAppState::with_postgres(pool),
