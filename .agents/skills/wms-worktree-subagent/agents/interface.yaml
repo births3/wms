@@ -1,0 +1,19 @@
+interface:
+  display_name: WMS Worktree 子代理
+  short_description: 用独立 worktree 和 codex exec 拆分 WMS 子任务，并由主代理复盘、合并、验证、收口和迭代。
+  default_prompt: 请使用 WMS Worktree 子代理技能，把当前 WMS 缺口拆成有完整性边界、写入范围、验证命令和收口规则的独立子代理任务。
+compatibility:
+  canonical_format: codex-skill
+  adapter_targets:
+    - codex
+  activation:
+    mode: description
+  execution:
+    context: inline
+    shell: bash
+  trust:
+    source_tier: local
+    remote_inline_execution: forbid
+    remote_metadata_policy: ignore
+  degradation:
+    codex: 子代理不可用时，主代理仍按完整性矩阵、写入范围、验证和收口规则人工执行。

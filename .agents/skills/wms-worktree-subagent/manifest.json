@@ -1,0 +1,20 @@
+{
+  "name": "wms-worktree-subagent",
+  "version": "0.3.0",
+  "owner": "WMS 项目维护者",
+  "updated_at": "2026-07-02",
+  "review_cadence": "monthly",
+  "status": "active",
+  "maturity_tier": "production",
+  "lifecycle_stage": "production",
+  "target_platforms": ["codex"],
+  "input_files": [
+    "SKILL.md",
+    "agents/interface.yaml",
+    "references/closeout.md",
+    "references/module-slice-boundary.md",
+    "references/subagent-task-template.md"
+  ],
+  "output_contract": "为 WMS 子代理任务生成完整性边界、写入范围、覆盖矩阵、验证命令、合并条件和收口结果；禁止把切片完成误报为模块完成。",
+  "rollback_boundary": "删除 .agents/skills/wms-worktree-subagent/agents/interface.yaml、manifest.json、references/module-slice-boundary.md、references/subagent-task-template.md，并还原 SKILL.md 中对覆盖矩阵和任务模板引用的改动。"
+}
