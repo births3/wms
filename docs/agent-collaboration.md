@@ -89,14 +89,16 @@ AI 向用户提出需要确认的问题时，使用下列表格：
 - 不提交可疑文件：`.env`、私钥、真实令牌、真实密钥。
 - 跨主题工作区不使用 `git add .`。
 
-用户要求提交时：
+默认本地提交按 [agent-commit-rules.md](agent-commit-rules.md) 执行；满足条件时不再额外询问用户是否提交。
+
+提交时：
 
 1. `git status --short`。
 2. `git diff --stat`。
 3. 跨主题或 `>= 800` 行先拆分。
 4. 单主题 `600-799` 行提示接近上限。
 5. 起草符合 [docs/governance.md §3.2](governance.md#32-conventional-commits) 的提交信息。
-6. 等用户确认后执行提交。
+6. 满足默认提交规则则直接提交；不满足时说明阻塞。
 7. 报告 lefthook pre-commit / commit-msg 结果。
 
 用户要求推送时：先确认目标分支；main 分支必须显式确认；推送前建议 T3 预检。

@@ -214,6 +214,7 @@ nav:
     - 治理总文档: governance.md
     - 项目级 RTM: requirements-traceability-matrix.md
     - AI 协作规范: agent-collaboration.md
+    - AI 默认本地提交规则: agent-commit-rules.md
     - AI Loop Engineering: agent-loop-engineering.md
     - AI 常用文档索引: agent-document-index.md
     - 编码规范: coding-standards.md
