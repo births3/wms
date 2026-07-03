@@ -1,0 +1,245 @@
+import * as React from "react";
+import {
+  Button,
+  Card,
+  CardContent,
+  DataGrid,
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  PageHeader,
+  StatusBadge,
+  cn,
+  type DataGridColumn,
+} from "@wms/ui";
+import { Archive, ArrowLeft, Database, Download, RefreshCw, Shuffle, Upload } from "lucide-react";
+
+import {
+  parseFeatureFlagImportJson,
+  useArchiveFeatureFlagSourceMutation,
+  useFeatureFlagReconcileQuery,
+  useFeatureFlagsQuery,
+  useImportFeatureFlagsMutation,
+  useMigrateFeatureFlagsMutation,
+  useSwitchFeatureFlagSourceMutation,
+  type FeatureFlagConfig,
+} from "@/features/config-center/feature-flag-queries";
+
+interface FeatureFlagConfigCenterPageProps {
+  onBack: () => void;
+}
+
+type Notice = { type: "success" | "error"; text: string } | null;
+
+const sourceOptions = [
+  ["config_center", "配置中心"],
+  ["file", "TOML 文件"],
+  ["environment", "环境变量"],
+] as const;
+
+const columns: DataGridColumn<FeatureFlagConfig>[] = [
+  textColumn("key", "Flag Key", 280),
+  {
+    key: "enabled",
+    header: "状态",
+    width: 110,
+    sortable: true,
+    sortValue: (row) => String(row.enabled),
+    filterValue: (row) => (row.enabled ? "enabled" : "disabled"),
+    copyValue: (row) => (row.enabled ? "启用" : "关闭"),
+    filter: { type: "multiSelect", options: [{ label: "启用", value: "enabled" }, { label: "关闭", value: "disabled" }] },
+    render: (row) => <StatusBadge status={row.enabled ? "completed" : "offline_cached"} label={row.enabled ? "启用" : "关闭"} size="sm" />,
+  },
+  { ...textColumn("source", "来源", 140), render: (row) => sourceLabel(row.source), sortValue: (row) => sourceLabel(row.source) },
+  textColumn("owner", "Owner", 150),
+  {
+    key: "created_at",
+    header: "创建时间",
+    width: 140,
+    minWidth: 100,
+    sortable: true,
+    sortValue: (row) => row.created_at,
+    filterValue: (row) => row.created_at,
+    copyValue: (row) => row.created_at,
+    filter: { type: "text" },
+  },
+  textColumn("cleanup_by", "清理期限", 140),
+];
+
+export function FeatureFlagConfigCenterPage({ onBack }: FeatureFlagConfigCenterPageProps) {
+  const flagsQuery = useFeatureFlagsQuery();
+  const reconcileQuery = useFeatureFlagReconcileQuery();
+  const migrateMutation = useMigrateFeatureFlagsMutation();
+  const importMutation = useImportFeatureFlagsMutation();
+  const switchMutation = useSwitchFeatureFlagSourceMutation();
+  const archiveMutation = useArchiveFeatureFlagSourceMutation();
+  const [notice, setNotice] = React.useState<Notice>(null);
+  const [targetSource, setTargetSource] = React.useState("config_center");
+  const [archiveRef, setArchiveRef] = React.useState("deploy/feature_flags.toml");
+  const [importOpen, setImportOpen] = React.useState(false);
+  const [importText, setImportText] = React.useState("");
+  const flags = flagsQuery.data?.flags ?? [];
+  const busy = migrateMutation.isPending || importMutation.isPending || switchMutation.isPending || archiveMutation.isPending;
+
+  async function act<T>(task: Promise<T>, success: (result: T) => string, fallback: string) {
+    setNotice(null);
+    try {
+      setNotice({ type: "success", text: success(await task) });
+    } catch (error) {
+      setNotice({ type: "error", text: errorMessage(error, fallback) });
+    }
+  }
+
+  async function submitImport(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    let flags: FeatureFlagConfig[];
+    try {
+      flags = parseFeatureFlagImportJson(importText);
+    } catch (error) {
+      setNotice({ type: "error", text: errorMessage(error, "导入 Feature Flag 失败") });
+      return;
+    }
+    await act(
+      importMutation.mutateAsync(flags),
+      (result) => {
+        setImportOpen(false);
+        setImportText("");
+        return `已导入 ${result.imported_count} 条到 ${result.target}`;
+      },
+      "导入 Feature Flag 失败",
+    );
+  }
+
+  return (
+    <section className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-6 py-8">
+      <PageHeader
+        title="M1 配置中心 / Feature Flag"
+        subtitle={`读取源：${sourceLabel(flagsQuery.data?.source ?? "unknown")} · ${flags.length} 条`}
+        actions={
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button type="button" variant="outline" onClick={onBack}><ArrowLeft className="size-4" aria-hidden />返回</Button>
+            <Button type="button" variant="outline" onClick={() => { setNotice(null); void flagsQuery.refetch(); void reconcileQuery.refetch(); }} disabled={flagsQuery.isFetching || reconcileQuery.isFetching}>
+              <RefreshCw className={cn("size-4", (flagsQuery.isFetching || reconcileQuery.isFetching) && "animate-spin")} aria-hidden />刷新
+            </Button>
+            <Button type="button" variant="outline" onClick={() => downloadJson(flagsQuery.data)} disabled={!flagsQuery.data}><Download className="size-4" aria-hidden />导出 JSON</Button>
+            <Button type="button" onClick={() => { setNotice(null); setImportOpen(true); }} disabled={busy}><Upload className="size-4" aria-hidden />导入 JSON</Button>
+          </div>
+        }
+      />
+      <NoticePanel notice={notice} />
+
+      <div className="grid gap-4 lg:grid-cols-[1fr_22rem]">
+        <Card className="rounded-lg shadow-sm">
+          <CardContent className="p-5">
+            <DataGrid
+              storageKey="m1.config-center.feature-flags"
+              columns={columns}
+              data={flags}
+              rowKey={(row) => row.key}
+              emptyTitle={flagsQuery.isError ? "读取 Feature Flag 失败" : "暂无 Feature Flag"}
+              emptyDescription={flagsQuery.isError ? errorMessage(flagsQuery.error, "请检查后端接口") : "当前导出结果为空"}
+            />
+          </CardContent>
+        </Card>
+
+        <div className="space-y-4">
+          <Card className="rounded-lg shadow-sm">
+            <CardContent className="space-y-3 p-5">
+              <h2 className="text-base font-semibold tracking-normal">对账</h2>
+              {reconcileQuery.error ? (
+                <p className="text-sm text-destructive" role="alert">{errorMessage(reconcileQuery.error, "读取对账报告失败")}</p>
+              ) : (
+                <>
+                  <Metric label="已匹配" value={reconcileQuery.data?.matched ?? 0} />
+                  <Metric label="缺失" value={reconcileQuery.data?.missing_in_config_center.length ?? 0} />
+                  <Metric label="不一致" value={reconcileQuery.data?.mismatched.length ?? 0} />
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-lg shadow-sm">
+            <CardContent className="space-y-4 p-5">
+              <h2 className="text-base font-semibold tracking-normal">迁移与读取源</h2>
+              <Button type="button" className="w-full justify-start" disabled={busy} onClick={() => void act(migrateMutation.mutateAsync(), (r) => `迁移完成：${r.source} → ${r.target}，${r.migrated_count} 条`, "迁移 Feature Flag 失败")}>
+                <Database className="size-4" aria-hidden />{migrateMutation.isPending ? "迁移中..." : "从文件源迁移"}
+              </Button>
+              <label className="grid gap-1 text-xs text-muted-foreground">
+                目标读取源
+                <select className="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground shadow-sm" value={targetSource} onChange={(event) => setTargetSource(event.target.value)}>
+                  {sourceOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
+              </label>
+              <Button type="button" variant="outline" className="w-full justify-start" disabled={busy} onClick={() => void act(switchMutation.mutateAsync(targetSource), (r) => `读取源已切换为 ${sourceLabel(r.active_source)}`, "切换读取源失败")}>
+                <Shuffle className="size-4" aria-hidden />{switchMutation.isPending ? "切换中..." : "切换读取源"}
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-lg shadow-sm">
+            <CardContent className="space-y-4 p-5">
+              <h2 className="text-base font-semibold tracking-normal">文件源归档</h2>
+              <label className="grid gap-1 text-xs text-muted-foreground">归档引用<Input value={archiveRef} onChange={(event) => setArchiveRef(event.target.value)} /></label>
+              <Button type="button" variant="outline" className="w-full justify-start" disabled={busy || !archiveRef.trim()} onClick={() => void act(archiveMutation.mutateAsync(archiveRef.trim()), (r) => `已归档 ${r.archived_source} 到 ${r.archive_ref}`, "归档文件源失败")}>
+                <Archive className="size-4" aria-hidden />{archiveMutation.isPending ? "归档中..." : "归档 W1 文件源"}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      <Dialog open={importOpen} onOpenChange={(open) => !importMutation.isPending && setImportOpen(open)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <form className="grid gap-4" onSubmit={submitImport}>
+            <DialogHeader><DialogTitle>导入 Feature Flag JSON</DialogTitle><DialogDescription>支持数组，或包含 flags 数组的导出对象。</DialogDescription></DialogHeader>
+            <NoticePanel notice={notice?.type === "error" ? notice : null} />
+            <textarea className="min-h-72 rounded-md border border-input bg-background px-3 py-2 font-mono text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" value={importText} onChange={(event) => setImportText(event.target.value)} aria-label="Feature Flag JSON" placeholder={importPlaceholder} />
+            <DialogFooter>
+              <DialogClose asChild><Button type="button" variant="outline" disabled={importMutation.isPending}>取消</Button></DialogClose>
+              <Button type="submit" disabled={importMutation.isPending}><Upload className="size-4" aria-hidden />{importMutation.isPending ? "导入中..." : "确认导入"}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </section>
+  );
+}
+
+function textColumn(key: keyof FeatureFlagConfig, header: string, width: number): DataGridColumn<FeatureFlagConfig> {
+  return { key, header, width, minWidth: Math.max(width - 40, 100), mono: key === "key", sortable: true, sortValue: (row) => row[key], filterValue: (row) => row[key], copyValue: (row) => String(row[key]), filter: { type: "text" } };
+}
+
+function Metric({ label, value }: { label: string; value: number }) {
+  return <div className="flex items-center justify-between border-t pt-3 text-sm"><span className="text-muted-foreground">{label}</span><span className="font-medium">{value}</span></div>;
+}
+
+function NoticePanel({ notice }: { notice: Notice }) {
+  if (!notice) return null;
+  const success = notice.type === "success";
+  return <div className={cn("rounded-md border px-3 py-2 text-sm", success ? "border-wms-success/30 bg-wms-success/10 text-wms-success" : "border-destructive/30 bg-destructive/10 text-destructive")} role={success ? "status" : "alert"}>{notice.text}</div>;
+}
+
+function sourceLabel(value: string) {
+  return sourceOptions.find(([source]) => source === value)?.[1] ?? value;
+}
+
+function errorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
+
+function downloadJson(payload: unknown) {
+  if (!payload || typeof document === "undefined") return;
+  const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = "feature-flags.json";
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+const importPlaceholder = JSON.stringify({ flags: [{ key: "m4_outbound_v2_picker_stage1", owner: "platform", created_at: "2026-07-03", cleanup_by: "2026-10-01", enabled: false, source: "config_center" }] }, null, 2);

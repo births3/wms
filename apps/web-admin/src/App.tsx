@@ -25,6 +25,7 @@ import { useCurrentUserQuery, useLogout, type CurrentUser } from "@/features/aut
 import { apiBaseUrl, wave1ContractPaths } from "@/lib/api";
 import { clearAuthSession, hasActiveAuthSession } from "@/lib/auth-session";
 import { LoginPage } from "@/pages/auth/LoginPage";
+import { FeatureFlagConfigCenterPage } from "@/pages/config-center/FeatureFlagConfigCenterPage";
 import { M2InboundPage, type M2InboundMode } from "@/pages/inbound/M2InboundPage";
 import { M1MasterDataPage, type MasterDataViewId } from "@/pages/master-data/M1MasterDataPage";
 import { M4OutboundPage, type M4OutboundMode } from "@/pages/outbound/M4OutboundPage";
@@ -32,6 +33,7 @@ import { M4OutboundPage, type M4OutboundMode } from "@/pages/outbound/M4Outbound
 type AdminView =
   | "dashboard"
   | MasterDataViewId
+  | "m1-feature-flags"
   | "m2-receiving"
   | "m2-inspecting"
   | "m2-putaway"
@@ -83,7 +85,9 @@ const menuSections: Array<{ label: string; items: MenuItem[] }> = [
       { id: "m1-customers", title: "M1 客户档案", subtitle: "客户 / 门店", icon: Users },
       { id: "m1-warehouses", title: "M1 仓库管理", subtitle: "仓库 / 状态", icon: Warehouse },
       { id: "m1-locations", title: "M1 库位管理", subtitle: "库位 / 容量", icon: MapPinned },
+      { id: "m1-special-drug-categories", title: "M1 特殊药品分类", subtitle: "分类 / 双签", icon: ShieldCheck },
       { id: "m1-system-dictionary", title: "M1 系统字典", subtitle: "document_type", icon: BookOpen },
+      { id: "m1-feature-flags", title: "M1 Feature Flag", subtitle: "配置中心 / 灰度", icon: KeyRound },
     ],
   },
   {
@@ -159,7 +163,9 @@ export function App() {
 
   return (
     <AppShell currentUser={currentUserQuery.data} activeView={view} onNavigate={setView} onLogout={handleLogout}>
-      {masterDataViewId ? (
+      {view === "m1-feature-flags" ? (
+        <FeatureFlagConfigCenterPage onBack={() => setView("dashboard")} />
+      ) : masterDataViewId ? (
         <M1MasterDataPage viewId={masterDataViewId} onBack={() => setView("dashboard")} />
       ) : inboundMode ? (
         <M2InboundPage
@@ -194,6 +200,7 @@ function masterDataViewToId(view: AdminView): MasterDataViewId | null {
     view === "m1-customers" ||
     view === "m1-warehouses" ||
     view === "m1-locations" ||
+    view === "m1-special-drug-categories" ||
     view === "m1-system-dictionary"
   ) {
     return view;

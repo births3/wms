@@ -33,6 +33,17 @@ import {
   defaultLocationBatchType,
   initialLocationBatchRange,
 } from "./LocationBatchDialog";
+import {
+  MasterDataCrudDialog,
+  crudTargetForRow,
+  disableMasterDataCrudRow,
+  isMasterDataCrudView,
+  masterDataCrudColumns,
+  saveMasterDataCrudForm,
+  type LocationScopeOption,
+  type MasterDataCrudForm,
+  type MasterDataCrudTarget,
+} from "./MasterDataCrudDialog";
 import { MasterDataSourceActions } from "./MasterDataSourceActions";
 import { ProductCreateDialog } from "./ProductCreateDialog";
 import { ProductEditDialog } from "./ProductEditDialog";
@@ -42,6 +53,7 @@ import {
   masterDataColumns,
   productTableClassName,
 } from "./m1-product-page-model";
+import { SpecialDrugCategoriesPage } from "./SpecialDrugCategoriesPage";
 import { M1SystemDictionaryPage } from "./SystemDictionaryPage";
 import { useProductEditDialog } from "./use-product-edit-dialog";
 export type { MasterDataViewId } from "@/features/master-data/master-data-queries";
@@ -78,6 +90,12 @@ export const masterDataViewMeta: Record<
     subtitle: "库位编码、容量、类型与状态",
     emptyTitle: "暂无库位档案",
     storageKey: "m1-locations-datagrid",
+  },
+  "m1-special-drug-categories": {
+    title: "M1 特殊药品分类",
+    subtitle: "特殊管理药品分类、双人作业要求与启停状态",
+    emptyTitle: "暂无特殊药品分类",
+    storageKey: "m1-special-drug-categories-datagrid",
   },
   "m1-system-dictionary": {
     title: "M1 系统字典",
@@ -326,6 +344,10 @@ const locationColumns: DataGridColumn<MasterDataRow>[] = [
 ];
 
 export function M1MasterDataPage({ viewId, onBack }: M1MasterDataPageProps) {
+  if (viewId === "m1-special-drug-categories") {
+    return <SpecialDrugCategoriesPage meta={masterDataViewMeta[viewId]} onBack={onBack} />;
+  }
+
   if (viewId === "m1-system-dictionary") {
     return <M1SystemDictionaryPage meta={masterDataViewMeta[viewId]} onBack={onBack} />;
   }
@@ -338,6 +360,9 @@ function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
   const rowsQuery = useMasterDataRowsQuery(viewId);
   const [keyword, setKeyword] = React.useState("");
   const [lastEvent, setLastEvent] = React.useState<string | null>(null);
+  const [rowActionError, setRowActionError] = React.useState<string | null>(null);
+  const [disablingId, setDisablingId] = React.useState<string | null>(null);
+  const [crudTarget, setCrudTarget] = React.useState<MasterDataCrudTarget | null>(null);
   const productEdit = useProductEditDialog({
     refetchRows: rowsQuery.refetch,
     onSaved: (productCode) => setLastEvent(`${productCode} 已保存`),
@@ -375,10 +400,7 @@ function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
   );
   const locationBatchScopes = React.useMemo(() => {
     if (viewId !== "m1-locations") return [];
-    const scopes = new Map<
-      string,
-      { key: string; label: string; warehouseId: string; zoneId: string; ownerId: string | null }
-    >();
+    const scopes = new Map<string, LocationScopeOption>();
     for (const row of rowsQuery.data ?? []) {
       const fields = row.locationFields;
       if (!fields || fields.warehouse === "-" || fields.zone === "-") continue;
@@ -402,7 +424,11 @@ function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
   const masterDataActions = masterDataActionLabels(viewId);
   const baseGridColumns = masterDataColumns(viewId, columns, locationColumns);
   const gridColumns =
-    viewId === "m1-products" ? productColumns(baseGridColumns, productEdit.openDialog) : baseGridColumns;
+    viewId === "m1-products"
+      ? productColumns(baseGridColumns, productEdit.openDialog)
+      : isMasterDataCrudView(viewId)
+        ? masterDataCrudColumns(baseGridColumns, viewId, openCrudEdit, disableCrudRow, disablingId)
+        : baseGridColumns;
 
   React.useEffect(() => {
     if (viewId !== "m1-locations") return;
@@ -412,6 +438,7 @@ function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
 
   async function refreshRows() {
     await rowsQuery.refetch();
+    setRowActionError(null);
     setLastEvent(`${meta.title} 已刷新`);
   }
 
@@ -443,6 +470,34 @@ function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
 
   async function importCustomersFromDialog(requests: CreateCustomerRequest[]) {
     await importSourceRows(requests, createCustomer, "客户");
+  }
+
+  function openCrudEdit(row: MasterDataRow) {
+    if (!isMasterDataCrudView(viewId)) return;
+    setRowActionError(null);
+    setCrudTarget(crudTargetForRow(viewId, row));
+  }
+
+  async function disableCrudRow(row: MasterDataRow) {
+    if (!isMasterDataCrudView(viewId)) return;
+    setDisablingId(row.id);
+    setRowActionError(null);
+    try {
+      const saved = await disableMasterDataCrudRow(viewId, row);
+      await rowsQuery.refetch();
+      setLastEvent(`${saved.code} 已停用`);
+    } catch (error) {
+      setRowActionError(error instanceof Error ? error.message : "停用基础档案失败");
+    } finally {
+      setDisablingId(null);
+    }
+  }
+
+  async function submitCrudForm(form: MasterDataCrudForm) {
+    const saved = await saveMasterDataCrudForm(form, locationBatchScopes);
+    await rowsQuery.refetch();
+    setRowActionError(null);
+    setLastEvent(`${saved.code} ${form.mode === "create" ? "已新建" : "已保存"}`);
   }
 
   async function importSourceRows<Request>(
@@ -543,6 +598,18 @@ function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
                 onImport={importCustomersFromDialog}
               />
             )}
+            {viewId === "m1-warehouses" && (
+              <Button type="button" onClick={() => setCrudTarget({ kind: "warehouse", mode: "create" })}>
+                <Plus className="size-4" aria-hidden />
+                新建仓库
+              </Button>
+            )}
+            {viewId === "m1-locations" && (
+              <Button type="button" onClick={() => setCrudTarget({ kind: "location", mode: "create" })}>
+                <Plus className="size-4" aria-hidden />
+                新建库位
+              </Button>
+            )}
             {viewId === "m1-locations" && (
               <Button type="button" onClick={() => setLocationBatchOpen(true)}>
                 <Plus className="size-4" aria-hidden />
@@ -590,9 +657,9 @@ function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
         </CardContent>
       </Card>
 
-      {rowsQuery.error && (
+      {(rowsQuery.error || rowActionError) && (
         <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {rowsQuery.error.message}
+          {rowsQuery.error?.message ?? rowActionError}
         </div>
       )}
 
@@ -646,6 +713,13 @@ function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
           onConfirm={confirmLocationBatchPreview}
         />
       )}
+
+      <MasterDataCrudDialog
+        target={crudTarget}
+        locationScopes={locationBatchScopes}
+        onOpenChange={(open) => !open && setCrudTarget(null)}
+        onSubmit={submitCrudForm}
+      />
     </section>
   );
 }

@@ -18,6 +18,10 @@ import {
 } from "@wms/ui";
 
 import {
+  specialDrugCategoryOptions,
+  useSpecialDrugCategoriesQuery,
+} from "@/features/master-data/master-data-queries";
+import {
   productStatusOptions,
   productStorageConditionOptions,
   type ProductEditFormState,
@@ -40,7 +44,15 @@ export function ProductEditDialog({
   onOpenChange,
   onSubmit,
 }: ProductEditDialogProps) {
+  const categoriesQuery = useSpecialDrugCategoriesQuery(Boolean(form));
+
+  React.useEffect(() => {
+    if (form && !form.specialDrugCategoryCode) onFormChange({ specialDrugCategoryCode: "none" });
+  }, [form?.id, form?.specialDrugCategoryCode, onFormChange]);
+
   if (!form) return null;
+  const categoryValue = form.specialDrugCategoryCode || "none";
+  const categoryOptions = specialDrugCategoryOptions(categoriesQuery.data ?? [], categoryValue, true);
 
   return (
     <Dialog open={true} onOpenChange={onOpenChange}>
@@ -86,9 +98,10 @@ export function ProductEditDialog({
               value={form.manufacturer}
               onChange={(value) => onFormChange({ manufacturer: value })}
             />
-            <TextField
+            <SelectField
               label="特殊药品分类"
-              value={form.specialDrugCategoryCode}
+              value={categoryValue}
+              options={categoryOptions}
               onChange={(value) => onFormChange({ specialDrugCategoryCode: value })}
             />
             <SelectField

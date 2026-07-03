@@ -9,10 +9,19 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@wms/ui";
 import { Plus } from "lucide-react";
 
-import type { CreateProductRequest } from "@/features/master-data/master-data-queries";
+import {
+  specialDrugCategoryOptions,
+  useSpecialDrugCategoriesQuery,
+  type CreateProductRequest,
+} from "@/features/master-data/master-data-queries";
 
 interface ProductCreateDialogProps {
   open: boolean;
@@ -38,7 +47,7 @@ const emptyProductForm: ProductFormState = {
   spec: "",
   dosageForm: "",
   manufacturer: "",
-  specialDrugCategoryCode: "",
+  specialDrugCategoryCode: "none",
   storageCondition: "normal",
 };
 
@@ -46,6 +55,12 @@ export function ProductCreateDialog({ open, onOpenChange, onCreate }: ProductCre
   const [form, setForm] = React.useState<ProductFormState>(emptyProductForm);
   const [message, setMessage] = React.useState<string | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
+  const categoriesQuery = useSpecialDrugCategoriesQuery(open);
+  const categoryOptions = specialDrugCategoryOptions(
+    categoriesQuery.data ?? [],
+    form.specialDrugCategoryCode,
+    true,
+  );
 
   function updateForm(patch: Partial<ProductFormState>) {
     setForm((value) => ({ ...value, ...patch }));
@@ -98,9 +113,10 @@ export function ProductCreateDialog({ open, onOpenChange, onCreate }: ProductCre
             value={form.storageCondition}
             onChange={(storageCondition) => updateForm({ storageCondition })}
           />
-          <TextField
-            label="特殊药品分类编码"
+          <SelectField
+            label="特殊药品分类"
             value={form.specialDrugCategoryCode}
+            options={categoryOptions}
             onChange={(specialDrugCategoryCode) => updateForm({ specialDrugCategoryCode })}
           />
           {message && (
@@ -140,6 +156,32 @@ function TextField({
     <label className="grid gap-1 text-xs text-muted-foreground">
       {label}
       <Input required={required} value={value} onChange={(event) => onChange(event.target.value)} />
+    </label>
+  );
+}
+
+function SelectField({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: readonly { value: string; label: string }[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="grid gap-1 text-xs text-muted-foreground">
+      {label}
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger><SelectValue /></SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </label>
   );
 }

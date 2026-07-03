@@ -10,6 +10,7 @@ export type MasterDataViewId =
   | "m1-customers"
   | "m1-warehouses"
   | "m1-locations"
+  | "m1-special-drug-categories"
   | "m1-system-dictionary";
 
 type Product = components["schemas"]["Product"];
@@ -17,10 +18,21 @@ type Supplier = components["schemas"]["Supplier"];
 type Customer = components["schemas"]["Customer"];
 type Warehouse = components["schemas"]["Warehouse"];
 type Location = components["schemas"]["Location"];
+export type SpecialDrugCategory = components["schemas"]["SpecialDrugCategory"];
 export type UpdateProductRequest = components["schemas"]["UpdateProductRequest"];
 export type CreateProductRequest = components["schemas"]["CreateProductRequest"];
 export type CreateSupplierRequest = components["schemas"]["CreateSupplierRequest"];
+export type UpdateSupplierRequest = components["schemas"]["UpdateSupplierRequest"];
 export type CreateCustomerRequest = components["schemas"]["CreateCustomerRequest"];
+export type UpdateCustomerRequest = components["schemas"]["UpdateCustomerRequest"];
+export type CreateWarehouseRequest = components["schemas"]["CreateWarehouseRequest"];
+export type UpdateWarehouseRequest = components["schemas"]["UpdateWarehouseRequest"];
+export type CreateLocationRequest = components["schemas"]["CreateLocationRequest"];
+export type UpdateLocationRequest = components["schemas"]["UpdateLocationRequest"];
+export type CreateSpecialDrugCategoryRequest =
+  components["schemas"]["CreateSpecialDrugCategoryRequest"];
+export type UpdateSpecialDrugCategoryRequest =
+  components["schemas"]["UpdateSpecialDrugCategoryRequest"];
 export type BatchCreateLocationsRequest = components["schemas"]["BatchCreateLocationsRequest"];
 export type SystemDictionaryItem = components["schemas"]["SystemDictionaryItem"];
 export type UpsertSystemDictionaryItemRequest =
@@ -68,7 +80,10 @@ export interface LocationMasterDataFields {
   columnNo: string;
   layerNo: string;
   locationType: string;
+  locationTypeCode: string;
   volume: string;
+  maxVolumeCm3: string;
+  usedVolumeCm3: string;
   maxSku: string;
 }
 
@@ -92,6 +107,13 @@ export interface SystemDictionaryPaneGroup {
   items: SystemDictionaryPaneItem[];
 }
 
+export interface SpecialDrugCategoryOption {
+  value: string;
+  label: string;
+  status: string;
+  requiresDualSign: boolean;
+}
+
 export const masterDataQueryKey = ["master-data"] as const;
 const systemDictionaryGroupsQueryKey = [
   ...masterDataQueryKey,
@@ -99,6 +121,11 @@ const systemDictionaryGroupsQueryKey = [
   "two-pane",
 ] as const;
 const systemDictionaryRowsQueryKey = [...masterDataQueryKey, "m1-system-dictionary"] as const;
+const specialDrugCategoriesQueryKey = [
+  ...masterDataQueryKey,
+  "m1-special-drug-categories",
+  "records",
+] as const;
 
 export function useMasterDataRowsQuery(viewId: MasterDataViewId) {
   return useQuery<MasterDataRow[], ApiError>({
@@ -114,6 +141,14 @@ export function useSystemDictionaryGroupsQuery() {
   });
 }
 
+export function useSpecialDrugCategoriesQuery(enabled = true) {
+  return useQuery<SpecialDrugCategory[], ApiError>({
+    queryKey: specialDrugCategoriesQueryKey,
+    queryFn: listSpecialDrugCategories,
+    enabled,
+  });
+}
+
 export function useUpsertSystemDictionaryItemMutation() {
   const invalidate = useInvalidateSystemDictionary();
   return useMutation({
@@ -126,6 +161,22 @@ export function useDisableSystemDictionaryItemMutation() {
   const invalidate = useInvalidateSystemDictionary();
   return useMutation({
     mutationFn: disableSystemDictionaryItem,
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useCreateSpecialDrugCategoryMutation() {
+  const invalidate = useInvalidateSpecialDrugCategories();
+  return useMutation({
+    mutationFn: createSpecialDrugCategory,
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useUpdateSpecialDrugCategoryMutation() {
+  const invalidate = useInvalidateSpecialDrugCategories();
+  return useMutation({
+    mutationFn: updateSpecialDrugCategory,
     onSuccess: () => invalidate(),
   });
 }
@@ -152,6 +203,8 @@ async function listMasterDataRows(viewId: MasterDataViewId): Promise<MasterDataR
       return listWarehouses();
     case "m1-locations":
       return listLocations();
+    case "m1-special-drug-categories":
+      return [];
     case "m1-system-dictionary":
       return listSystemDictionaryItems();
   }
@@ -250,6 +303,78 @@ export async function createCustomer(request: CreateCustomerRequest): Promise<Ma
   return customerRow(result.data);
 }
 
+export async function updateSupplier(input: {
+  id: string;
+  request: UpdateSupplierRequest;
+}): Promise<MasterDataRow> {
+  const result = await api.PATCH("/api/v1/master-data/suppliers/{id}", {
+    params: { path: { id: input.id } },
+    body: input.request,
+  });
+  if (!result.data) {
+    throw new ApiError(result.error, "保存供应商失败", result.response.status);
+  }
+  return supplierRow(result.data);
+}
+
+export async function updateCustomer(input: {
+  id: string;
+  request: UpdateCustomerRequest;
+}): Promise<MasterDataRow> {
+  const result = await api.PATCH("/api/v1/master-data/customers/{id}", {
+    params: { path: { id: input.id } },
+    body: input.request,
+  });
+  if (!result.data) {
+    throw new ApiError(result.error, "保存客户失败", result.response.status);
+  }
+  return customerRow(result.data);
+}
+
+export async function createWarehouse(request: CreateWarehouseRequest): Promise<MasterDataRow> {
+  const result = await api.POST("/api/v1/master-data/warehouses", { body: request });
+  if (!result.data) {
+    throw new ApiError(result.error, "新建仓库失败", result.response.status);
+  }
+  return warehouseRow(result.data);
+}
+
+export async function updateWarehouse(input: {
+  id: string;
+  request: UpdateWarehouseRequest;
+}): Promise<MasterDataRow> {
+  const result = await api.PATCH("/api/v1/master-data/warehouses/{id}", {
+    params: { path: { id: input.id } },
+    body: input.request,
+  });
+  if (!result.data) {
+    throw new ApiError(result.error, "保存仓库失败", result.response.status);
+  }
+  return warehouseRow(result.data);
+}
+
+export async function createLocation(request: CreateLocationRequest): Promise<MasterDataRow> {
+  const result = await api.POST("/api/v1/master-data/locations", { body: request });
+  if (!result.data) {
+    throw new ApiError(result.error, "新建库位失败", result.response.status);
+  }
+  return locationRow(result.data);
+}
+
+export async function updateLocation(input: {
+  id: string;
+  request: UpdateLocationRequest;
+}): Promise<MasterDataRow> {
+  const result = await api.PATCH("/api/v1/master-data/locations/{id}", {
+    params: { path: { id: input.id } },
+    body: input.request,
+  });
+  if (!result.data) {
+    throw new ApiError(result.error, "保存库位失败", result.response.status);
+  }
+  return locationRow(result.data);
+}
+
 async function listSystemDictionaryItems(): Promise<MasterDataRow[]> {
   return (await fetchDocumentTypeDictionaryItems()).map(systemDictionaryRow);
 }
@@ -263,6 +388,14 @@ async function listSystemDictionaryGroups(): Promise<SystemDictionaryPaneGroup[]
       items: items.map(systemDictionaryPaneItem),
     },
   ];
+}
+
+async function listSpecialDrugCategories(): Promise<SpecialDrugCategory[]> {
+  const result = await api.GET("/api/v1/master-data/special-drug-categories");
+  if (!result.data) {
+    throw new ApiError(result.error, "读取特殊药品分类失败", result.response.status);
+  }
+  return result.data.data;
 }
 
 async function fetchDocumentTypeDictionaryItems(): Promise<SystemDictionaryItem[]> {
@@ -310,6 +443,32 @@ async function disableSystemDictionaryItem(input: {
   );
   if (!result.data) {
     throw new ApiError(result.error, "停用系统字典项失败", result.response.status);
+  }
+  return result.data;
+}
+
+async function createSpecialDrugCategory(
+  request: CreateSpecialDrugCategoryRequest,
+): Promise<SpecialDrugCategory> {
+  const result = await api.POST("/api/v1/master-data/special-drug-categories", {
+    body: request,
+  });
+  if (!result.data) {
+    throw new ApiError(result.error, "新增特殊药品分类失败", result.response.status);
+  }
+  return result.data;
+}
+
+async function updateSpecialDrugCategory(input: {
+  id: string;
+  request: UpdateSpecialDrugCategoryRequest;
+}): Promise<SpecialDrugCategory> {
+  const result = await api.PATCH("/api/v1/master-data/special-drug-categories/{id}", {
+    params: { path: { id: input.id } },
+    body: input.request,
+  });
+  if (!result.data) {
+    throw new ApiError(result.error, "保存特殊药品分类失败", result.response.status);
   }
   return result.data;
 }
@@ -431,7 +590,10 @@ function locationRow(item: Location): MasterDataRow {
       columnNo: String(item.column_no),
       layerNo: String(item.layer_no),
       locationType,
+      locationTypeCode: item.location_type,
       volume,
+      maxVolumeCm3: String(item.max_volume_cm3),
+      usedVolumeCm3: String(item.used_volume_cm3),
       maxSku: String(item.max_sku_count),
     },
   });
@@ -478,6 +640,37 @@ function useInvalidateSystemDictionary() {
     void queryClient.invalidateQueries({ queryKey: systemDictionaryGroupsQueryKey });
     void queryClient.invalidateQueries({ queryKey: systemDictionaryRowsQueryKey });
   };
+}
+
+function useInvalidateSpecialDrugCategories() {
+  const queryClient = useQueryClient();
+  return () => {
+    void queryClient.invalidateQueries({ queryKey: specialDrugCategoriesQueryKey });
+  };
+}
+
+export function specialDrugCategoryOptions(
+  categories: readonly SpecialDrugCategory[],
+  currentValue = "none",
+  activeOnly = true,
+): SpecialDrugCategoryOption[] {
+  const options = categories
+    .filter((category) => !activeOnly || category.status === "active" || category.category_code === currentValue)
+    .map((category) => ({
+      value: category.category_code,
+      label: specialDrugCategoryLabel(category),
+      status: category.status,
+      requiresDualSign: category.requires_dual_sign,
+    }));
+  if (currentValue && !options.some((option) => option.value === currentValue)) {
+    options.unshift({
+      value: currentValue,
+      label: currentValue === "none" ? "普通药品（none）" : currentValue,
+      status: "unknown",
+      requiresDualSign: false,
+    });
+  }
+  return options;
 }
 
 function row(input: Omit<MasterDataRow, "searchText">): MasterDataRow {
@@ -568,4 +761,10 @@ function paramsText(params: Record<string, unknown>) {
     .slice(0, 3)
     .map(([key, value]) => `${key}=${text(value)}`)
     .join(" / ");
+}
+
+function specialDrugCategoryLabel(category: SpecialDrugCategory) {
+  const dualSign = category.requires_dual_sign ? "双签" : "单人";
+  const status = category.status === "active" ? "" : "，已停用";
+  return `${category.category_name}（${category.category_code} / ${dualSign}${status}）`;
 }
