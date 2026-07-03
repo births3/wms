@@ -218,7 +218,7 @@ dev-web-restart:
       dev_env="WMS_WEB_ADMIN_DEV_MOCK=0 VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://192.168.124.10:18080}"
     fi
     tmux new-session -d -s "{{DEV_WEB_SESSION}}" -c "{{MAIN_ROOT}}" \
-      "$dev_env pnpm -C apps/web-admin dev --host 0.0.0.0 --port {{DEV_WEB_PORT}} --strictPort 2>&1 | tee {{DEV_WEB_LOG}}"
+      "$dev_env pnpm -C apps/web-admin dev 2>&1 | tee {{DEV_WEB_LOG}}"
     sleep 2
     just dev-web-verify
 
@@ -242,7 +242,75 @@ dev-web-verify:
       echo "9002 未由主工作区 {{DEV_WEB_CWD}} 提供" >&2
       exit 1
     fi
-    curl -fsS --max-time 3 "http://127.0.0.1:{{DEV_WEB_PORT}}/" >/dev/null
+    curl --noproxy '*' -fsS --max-time 3 "http://127.0.0.1:{{DEV_WEB_PORT}}/" >/dev/null
+    lan_ip="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i=1;i<=NF;i++) if ($i=="src") {print $(i+1); exit}}')"
+    if [[ -n "$lan_ip" && "$lan_ip" != 127.* ]]; then
+      curl --noproxy '*' -fsS --max-time 3 "http://$lan_ip:{{DEV_WEB_PORT}}/" >/dev/null
+      echo "LAN URL: http://$lan_ip:{{DEV_WEB_PORT}}/"
+    fi
+
+# 从指定 worktree 启动管理端预览；9002 保留给主工作区，worktree 默认 9003
+dev-web-worktree-restart path port="9003":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    worktree="$(realpath "{{path}}")"
+    port="{{port}}"
+    if [[ "$port" == "{{DEV_WEB_PORT}}" || ! "$port" =~ ^9[0-9]{3}$ || "$port" -lt 9003 || "$port" -gt 9099 ]]; then
+      echo "worktree 前端端口必须是 9003-9099，9002 保留给主工作区" >&2
+      exit 1
+    fi
+    [[ -d "$worktree/apps/web-admin" ]] || { echo "不是 WMS worktree：$worktree" >&2; exit 1; }
+    slug="$(basename "$worktree" | tr -c '[:alnum:]_-' '-')"
+    session="wms-web-admin-${port}-${slug}"
+    log="/tmp/${session}.log"
+    tmux kill-session -t "$session" 2>/dev/null || true
+    for pid in $(pgrep -f "vite .*--port[[:space:]]+$port" || true); do
+      cwd="$(readlink "/proc/$pid/cwd" 2>/dev/null || true)"
+      if [[ "$cwd" == "$worktree" || "$cwd" == "$worktree/apps/web-admin" ]]; then
+        kill "$pid" 2>/dev/null || true
+      else
+        echo "端口 $port 已被其他进程占用：$pid $cwd" >&2
+        exit 1
+      fi
+    done
+    if [[ "${WMS_WEB_ADMIN_DEV_MOCK:-1}" == "1" ]]; then
+      dev_env='WMS_WEB_ADMIN_DEV_MOCK=1'
+    else
+      dev_env="WMS_WEB_ADMIN_DEV_MOCK=0 VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://192.168.124.10:18080}"
+    fi
+    tmux new-session -d -s "$session" -c "$worktree" \
+      "$dev_env pnpm -C apps/web-admin exec vite --host 0.0.0.0 --port $port --strictPort 2>&1 | tee $log"
+    sleep 2
+    just dev-web-worktree-verify "$worktree" "$port"
+
+# 校验指定 worktree 的管理端预览端口和 LAN 地址
+dev-web-worktree-verify path port="9003":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    worktree="$(realpath "{{path}}")"
+    port="{{port}}"
+    if [[ "$port" == "{{DEV_WEB_PORT}}" || ! "$port" =~ ^9[0-9]{3}$ || "$port" -lt 9003 || "$port" -gt 9099 ]]; then
+      echo "worktree 前端端口必须是 9003-9099，9002 保留给主工作区" >&2
+      exit 1
+    fi
+    ok=0
+    for pid in $(pgrep -f "vite .*--port[[:space:]]+$port" || true); do
+      cwd="$(readlink "/proc/$pid/cwd" 2>/dev/null || true)"
+      echo "$pid $cwd"
+      if [[ "$cwd" == "$worktree" || "$cwd" == "$worktree/apps/web-admin" ]]; then
+        ok=1
+      fi
+    done
+    if [[ "$ok" != 1 ]]; then
+      echo "$port 未由 worktree $worktree 提供" >&2
+      exit 1
+    fi
+    lan_ip="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i=1;i<=NF;i++) if ($i=="src") {print $(i+1); exit}}')"
+    curl --noproxy '*' -fsS --max-time 3 "http://127.0.0.1:$port/" >/dev/null
+    if [[ -n "$lan_ip" && "$lan_ip" != 127.* ]]; then
+      curl --noproxy '*' -fsS --max-time 3 "http://$lan_ip:$port/" >/dev/null
+      echo "LAN URL: http://$lan_ip:$port/"
+    fi
 
 # 生成主仓 OpenAPI JSON 并刷新 @wms/api-client 类型
 openapi-sync:
@@ -273,6 +341,10 @@ issue-agent-once *args:
 # Gitea issue agent：循环扫描；默认 dry-run，传 --apply 才评论或运行 codex exec
 issue-agent-watch *args:
     @python3 -u scripts/agents/issue_runner.py watch {{args}}
+
+# Gitea issue agent：验证后台环境能否真正启动 codex exec
+issue-agent-codex-smoke *args:
+    @python3 -u scripts/agents/issue_runner.py codex-smoke {{args}}
 
 # Gitea issue agent：查看长期 watcher 状态
 issue-agent-status:
@@ -342,7 +414,7 @@ issue-agent-restart:
     done
     rm -f "$pid_file"
     cd "{{MAIN_ROOT}}"
-    nohup python3 -u scripts/agents/issue_runner.py watch --interval "${WMS_ISSUE_AGENT_INTERVAL:-60}" --apply --merge-closed >> "{{ISSUE_AGENT_LOG}}" 2>&1 &
+    nohup python3 -u scripts/agents/issue_runner.py watch --interval "${WMS_ISSUE_AGENT_INTERVAL:-60}" --apply >> "{{ISSUE_AGENT_LOG}}" 2>&1 &
     echo "$!" > "$pid_file"
     sleep 2
     "$just_bin" issue-agent-verify

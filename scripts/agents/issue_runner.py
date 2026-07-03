@@ -8,7 +8,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import shlex
+import signal
 import subprocess
 import sys
 import tempfile
@@ -21,6 +24,8 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUT_DIR = REPO_ROOT / ".codex" / "issue-agent"
+CONSUMED_CONFIRMATIONS_FILE = DEFAULT_OUT_DIR / "consumed-confirmations.json"
+ISSUE_AGENT_ENV_FILE = DEFAULT_OUT_DIR / "env"
 ISSUE_WORKTREE_PARENT = REPO_ROOT.parent
 PROPOSAL_MARKER = "<!-- wms-issue-agent:proposal:v1 -->"
 REVISION_PROPOSAL_MARKER = "<!-- wms-issue-agent:revision-proposal:v1 -->"
@@ -32,6 +37,16 @@ MERGE_CORRECTION_MARKER = "<!-- wms-issue-agent:merge-correction:v1 -->"
 STATUS_CORRECTION_MARKER = "<!-- wms-issue-agent:status-correction:v1 -->"
 MERGE_RETRY_COMMAND = "/retry-merge"
 CONFIRM_PHRASE = "确认方案"
+CODEX_ENV_KEYS = (
+    "http_proxy",
+    "https_proxy",
+    "all_proxy",
+    "no_proxy",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "NO_PROXY",
+)
 
 STATUS_COMMENT_TOKENS = (
     "最终交付 PR",
@@ -53,6 +68,7 @@ class Action:
     issue: dict[str, Any]
     kind: str
     body: str
+    confirm_key: str | None = None
 
 
 def run(cmd: list[str], *, input_text: str | None = None) -> str:
@@ -158,13 +174,51 @@ def has_command(text: str, command: str) -> bool:
 
 
 def has_confirm_after(comments: list[dict[str, Any]], since: datetime) -> bool:
+    return latest_confirm_after(comments, since) is not None
+
+
+def latest_confirm_after(comments: list[dict[str, Any]], since: datetime) -> dict[str, Any] | None:
+    matches: list[dict[str, Any]] = []
     for comment in comments:
         created = parse_time(str(comment["created_at"]))
         if created <= since or is_agent_comment(comment):
             continue
         if is_confirm_comment(comment):
-            return True
-    return False
+            matches.append(comment)
+    if not matches:
+        return None
+    return max(matches, key=lambda c: parse_time(str(c["created_at"])))
+
+
+def confirm_key(comment: dict[str, Any]) -> str:
+    if comment.get("id") is not None:
+        return str(comment["id"])
+    return f"{comment.get('created_at', '')}:{body_of(comment).strip()}"
+
+
+def load_consumed_confirmations() -> dict[str, list[str]]:
+    try:
+        data = json.loads(CONSUMED_CONFIRMATIONS_FILE.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    return {str(k): [str(item) for item in v] for k, v in data.items() if isinstance(v, list)}
+
+
+def confirmation_consumed(issue_number: int, key: str) -> bool:
+    return key in set(load_consumed_confirmations().get(str(issue_number), []))
+
+
+def mark_confirmation_consumed(issue_number: int, key: str) -> None:
+    data = load_consumed_confirmations()
+    values = data.setdefault(str(issue_number), [])
+    if key not in values:
+        values.append(key)
+    CONSUMED_CONFIRMATIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = CONSUMED_CONFIRMATIONS_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    tmp.replace(CONSUMED_CONFIRMATIONS_FILE)
 
 
 def has_reject_after(comments: list[dict[str, Any]], since: datetime) -> bool:
@@ -607,14 +661,14 @@ def build_fix_prompt(issue: dict[str, Any], comments: list[dict[str, Any]]) -> s
 2. 当前命令已由 issue-agent 在 issue 专属 worktree 中用 `codex exec` 直接启动；先运行 `pwd`、`git status --short --branch` 和 `git worktree list` 核对，禁止修改主工作区。
 3. 只修复 issue 指向的问题。新增字段、状态、角色、模块或业务默认值时停止并向用户确认。
 4. 完成后运行相关测试，至少 `git diff --check` 和 `just gov-t1`。
-5. 涉及前端或用户可见行为时，禁止在子 worktree 中启动或占用 9002；9002 只允许主工作区固定会话 `wms-web-admin-9002`。需要真实截图或重启证据时，合并到主工作区后由主代理运行 `just dev-web-restart` 和 `just dev-web-verify`，后端按仓库现有运行方式启动并检查 `/healthz`。重启后必须校验运行的是本次修复版本：记录当前提交哈希，并用 `just dev-web-verify` 输出、页面可见变更、接口响应版本字段或等价证据证明不是旧进程缓存；把端口、URL、提交哈希和版本校验结果写入 PR 与 issue。
+5. 涉及前端或用户可见行为时，禁止在子 worktree 中启动或占用 9002；9002 只允许主工作区固定会话 `wms-web-admin-9002`。需要真实截图或重启证据时，合并到主工作区后由主代理运行 `just dev-web-restart` 和 `just dev-web-verify`，后端按仓库现有运行方式启动并检查 `/healthz`。重启后必须校验运行的是本次修复版本：记录当前提交哈希，并用 `just dev-web-verify` 输出、页面可见变更、接口响应版本字段或等价证据证明不是旧进程缓存；把端口、URL、提交哈希和版本校验结果写入 issue。
 6. 如果 issue 评论包含截图 / 附件，必须先打开或下载附件辅助定位，不能只按文字猜测。
-7. 涉及前端或用户可见行为时，必须采集真实前端截图；必须用 `POST /repos/{{owner}}/{{repo}}/issues/<编号>/assets` 把截图上传为 Gitea 附件，并用 Markdown 图片同时评论到 PR 和 issue；不能只写本地路径。
+7. 涉及前端或用户可见行为时，必须采集真实前端截图；必须用 `POST /repos/{{owner}}/{{repo}}/issues/<编号>/assets` 把截图上传为 Gitea 附件，并用 Markdown 图片评论到 issue；不能只写本地路径。
 8. 当前可用截图 / 附件如下：
 {attachment_summary(comments, issue=issue, limit=10)}
-9. 读取 Gitea issue、评论、PR 或附件元数据必须使用 `tea api`，例如 `tea api /repos/{{owner}}/{{repo}}/issues/{issue["number"]}`；禁止裸 `curl` 访问 Gitea API。
-10. 用户已授权：创建修复分支、推送到远端并创建 Gitea PR；禁止推 main，禁止强推，禁止自行合并 PR。
-11. PR 创建不是完成。最后必须评论 `{DELIVERY_MARKER}` delivery 信息：PR 链接、提交哈希、验证结果、截图证据、本地测试环境重启结果、codex exec 日志位置、PR 合并前置条件和剩余风险，并明确下一步是“等待用户验收并关闭 issue 后由 issue watcher 自动合并”或“阻塞”。
+9. 读取 Gitea issue、评论或附件元数据必须使用 `tea api`，例如 `tea api /repos/{{owner}}/{{repo}}/issues/{issue["number"]}`；禁止裸 `curl` 访问 Gitea API。
+10. 当前暂停 Gitea PR：允许在 issue 专属 worktree 的本地分支上提交，禁止推送远端、禁止创建 Gitea PR、禁止自行合并到主工作区。
+11. 最后必须评论 `{DELIVERY_MARKER}` delivery 信息：本地 worktree、分支、提交哈希或 diff 状态、验证结果、截图证据、本地测试环境重启结果、codex exec 日志位置、本地合并前置条件和剩余风险，并明确下一步是“等待主代理本地 review 后合并”或“阻塞”。
 12. 如果用户验收反馈不对，不得继续复用本次确认；必须等待 issue-agent 重新生成修正方案并由用户再次回复“确认方案”。
 
 当前相似 / 共性问题判断：
@@ -637,7 +691,9 @@ def choose_action(
     proposal_time = parse_time(str(proposal["created_at"])) if proposal else None
     exec_time = latest_marker_time(comments, EXEC_MARKER)
     status_time = latest_status_time(comments)
-    confirmed = proposal_time is not None and has_confirm_after(comments, proposal_time)
+    confirm = latest_confirm_after(comments, proposal_time) if proposal_time else None
+    key = confirm_key(confirm) if confirm else None
+    confirmed = confirm is not None and not confirmation_consumed(int(issue["number"]), key or "")
     if status_time and not confirmed and (human_time is None or human_time <= status_time):
         return None
     if proposal_time is None:
@@ -650,7 +706,7 @@ def choose_action(
         return Action(issue=issue, kind="proposal", body=build_proposal_comment(issue, comments))
     if confirmed:
         if exec_time is None or exec_time < proposal_time:
-            return Action(issue=issue, kind="exec", body=build_fix_prompt(issue, comments))
+            return Action(issue=issue, kind="exec", body=build_fix_prompt(issue, comments), confirm_key=key)
     if exec_time and exec_time > proposal_time:
         return None
     return None
@@ -676,6 +732,72 @@ def issue_worktree(issue_number: int, stamp: str) -> tuple[Path, str]:
     return ISSUE_WORKTREE_PARENT / name, branch
 
 
+def read_issue_agent_env(path: Path = ISSUE_AGENT_ENV_FILE) -> dict[str, str]:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except FileNotFoundError:
+        return {}
+    values: dict[str, str] = {}
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        try:
+            parts = shlex.split(stripped, comments=True, posix=True)
+        except ValueError:
+            continue
+        if parts and parts[0] == "export":
+            parts = parts[1:]
+        for part in parts:
+            if "=" not in part:
+                continue
+            key, value = part.split("=", 1)
+            if key in CODEX_ENV_KEYS:
+                values[key] = value
+    return values
+
+
+def codex_env_exports() -> list[str]:
+    env = codex_exec_env()
+    exports = []
+    for key in CODEX_ENV_KEYS:
+        value = env.get(key)
+        if value:
+            exports.append(f"export {key}={quote(value)}")
+    return exports
+
+
+def codex_exec_env() -> dict[str, str]:
+    env = dict(os.environ)
+    env.update(read_issue_agent_env())
+    return env
+
+
+def run_codex_smoke(args: argparse.Namespace) -> int:
+    timeout_seconds = args.timeout
+    env = codex_exec_env()
+    present = [key for key in CODEX_ENV_KEYS if env.get(key)]
+    print(f"codex-smoke: env={','.join(present) if present else 'none'}", flush=True)
+    result = subprocess.run(
+        [
+            "codex",
+            "exec",
+            "--dangerously-bypass-approvals-and-sandbox",
+            "-C",
+            str(REPO_ROOT),
+            "-",
+        ],
+        input="pwd\n",
+        text=True,
+        cwd=REPO_ROOT,
+        env=env,
+        timeout=timeout_seconds,
+        check=False,
+    )
+    print(f"codex-smoke: exit={result.returncode}", flush=True)
+    return int(result.returncode)
+
+
 def build_codex_command(work_dir: Path, prompt_path: Path, log_path: Path) -> str:
     return (
         f"codex exec --dangerously-bypass-approvals-and-sandbox -C {quote(str(work_dir))} "
@@ -695,6 +817,7 @@ def prepare_codex_exec(issue_number: int, prompt_path: Path) -> tuple[Path, str,
             [
                 "#!/usr/bin/env bash",
                 "set -euo pipefail",
+                *codex_env_exports(),
                 f"cd {quote(str(work_dir))}",
                 command,
             ]
@@ -706,9 +829,61 @@ def prepare_codex_exec(issue_number: int, prompt_path: Path) -> tuple[Path, str,
     return work_dir, branch, script, log_path
 
 
-def run_codex_exec(script: Path, *, work_dir: Path) -> int:
-    result = subprocess.run([str(script)], cwd=work_dir, check=False)
-    return int(result.returncode)
+def codex_progress_signature(work_dir: Path, log_path: Path) -> tuple[str, str, str]:
+    try:
+        stat = log_path.stat()
+        log_state = f"{stat.st_size}:{stat.st_mtime_ns}"
+    except FileNotFoundError:
+        log_state = "missing"
+    status = subprocess.run(
+        ["git", "status", "--porcelain=v1"],
+        capture_output=True,
+        text=True,
+        cwd=work_dir,
+        check=False,
+    ).stdout
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        cwd=work_dir,
+        check=False,
+    ).stdout.strip()
+    return log_state, status, head
+
+
+def run_codex_exec(script: Path, *, work_dir: Path, log_path: Path) -> int:
+    idle_seconds = int(os.environ.get("WMS_ISSUE_AGENT_CODEX_IDLE_SECONDS", "900"))
+    max_seconds = int(os.environ.get("WMS_ISSUE_AGENT_CODEX_MAX_SECONDS", "0"))
+    process = subprocess.Popen([str(script)], cwd=work_dir, start_new_session=True)
+    started_at = last_progress_at = time.monotonic()
+    last_signature = codex_progress_signature(work_dir, log_path)
+    try:
+        while True:
+            try:
+                return int(process.wait(timeout=5))
+            except subprocess.TimeoutExpired:
+                now = time.monotonic()
+                signature = codex_progress_signature(work_dir, log_path)
+                if signature != last_signature:
+                    last_signature = signature
+                    last_progress_at = now
+                timed_out = (idle_seconds > 0 and now - last_progress_at >= idle_seconds) or (
+                    max_seconds > 0 and now - started_at >= max_seconds
+                )
+                if not timed_out:
+                    continue
+                os.killpg(process.pid, signal.SIGTERM)
+                try:
+                    process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    os.killpg(process.pid, signal.SIGKILL)
+                    process.wait()
+                return 124
+    finally:
+        if process.poll() is None:
+            os.killpg(process.pid, signal.SIGKILL)
+            process.wait()
 
 
 def execute_action(
@@ -739,20 +914,31 @@ def execute_action(
             f"- prompt：`{preview}`\n"
         ),
     )
+    if action.confirm_key:
+        mark_confirmation_consumed(issue_number, action.confirm_key)
     print(f"applied: 已开始 codex exec issue #{issue_number} worktree={work_dir}", flush=True)
-    exit_code = run_codex_exec(script, work_dir=work_dir)
+    exit_code = run_codex_exec(script, work_dir=work_dir, log_path=log_path)
     if exit_code != 0:
+        if exit_code == 124:
+            reason = "执行空闲超时"
+            next_step = "排查 Codex 连接或执行卡住原因后，由人工补充新评论触发下一轮判断；旧确认不会复用。"
+        elif exit_code < 0:
+            reason = f"收到信号 {-exit_code} 终止"
+            next_step = "本轮视为外部停止，只记录状态；不会自动重发方案，也不会复用旧确认。"
+        else:
+            reason = "执行失败"
+            next_step = "排查失败原因后，由人工补充新评论触发下一轮判断；旧确认不会复用。"
         post_comment(
             issue_number,
             (
                 f"{STATUS_CORRECTION_MARKER}\n"
-                "`codex exec` 执行失败，未形成完成闭环。\n"
+                f"`codex exec` {reason}，未形成完成闭环。\n"
                 f"- issue：#{issue_number}\n"
                 f"- 分支：`{branch}`\n"
                 f"- worktree：`{work_dir}`\n"
                 f"- 日志：`{log_path}`\n"
                 f"- 退出码：{exit_code}\n"
-                "- 下一步：修复执行失败原因后，重新发修正方案并等待新的 `确认方案`。\n"
+                f"- 下一步：{next_step}\n"
             ),
         )
         raise RuntimeError(f"codex exec failed: exit={exit_code}, log={log_path}")
@@ -861,12 +1047,31 @@ def run_watch(args: argparse.Namespace) -> int:
 
 
 def self_test() -> int:
+    global CONSUMED_CONFIRMATIONS_FILE
+    CONSUMED_CONFIRMATIONS_FILE = Path(tempfile.mkdtemp(prefix="wms-issue-agent-test-")) / "consumed.json"
     issue = {"number": 7, "title": "测试", "body": "正文", "labels": [], "user": {"login": "u"}}
     assert display_path(REPO_ROOT / "justfile") == "justfile"
     assert display_path(Path("/tmp/wms-issue-agent-preview.txt")) == "/tmp/wms-issue-agent-preview.txt"
     worktree_path, branch = issue_worktree(7, "20260702010101")
     assert worktree_path.name == "wms-agent-issue-7-20260702010101"
     assert branch == "fix/issue-7-20260702010101"
+    tmp_env = Path(tempfile.mkdtemp(prefix="wms-issue-agent-env-")) / "env"
+    tmp_env.write_text(
+        "\n".join(
+            [
+                "# comment",
+                "export https_proxy=http://127.0.0.1:7894",
+                "http_proxy='http://127.0.0.1:7894'",
+                "IGNORED=value",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    assert read_issue_agent_env(tmp_env) == {
+        "https_proxy": "http://127.0.0.1:7894",
+        "http_proxy": "http://127.0.0.1:7894",
+    }
     command = build_codex_command(
         worktree_path,
         DEFAULT_OUT_DIR / "issue-7-exec.txt",
@@ -893,7 +1098,13 @@ def self_test() -> int:
     confirmed = [*comments, {"created_at": t1, "body": "/confirm"}]
     assert choose_action(issue, confirmed) is None
     confirmed_zh = [*comments, {"created_at": t1, "body": "确认方案"}]
-    assert choose_action(issue, confirmed_zh).kind == "exec"
+    action = choose_action(issue, confirmed_zh)
+    assert action.kind == "exec"
+    assert action.confirm_key
+    mark_confirmation_consumed(7, action.confirm_key)
+    assert choose_action(issue, confirmed_zh) is None
+    later_confirmed_zh = [*comments, {"created_at": "2026-07-01T00:02:00Z", "body": "确认方案"}]
+    assert choose_action(issue, later_confirmed_zh).kind == "exec"
     multiline_confirm = [*comments, {"created_at": t1, "body": "确认方案\n补充：需要截图"}]
     assert choose_action(issue, multiline_confirm).kind == "proposal"
     detail_then_confirm = [
@@ -912,6 +1123,27 @@ def self_test() -> int:
     assert choose_action(issue, refreshed) is None
     sent = [*confirmed_zh, {"created_at": "2026-07-01T00:02:00Z", "body": EXEC_MARKER}]
     assert choose_action(issue, sent) is None
+    failed_exec = [
+        *sent,
+        {
+            "created_at": "2026-07-01T00:03:00Z",
+            "body": f"{STATUS_CORRECTION_MARKER}\n`codex exec` 执行超时，未形成完成闭环。",
+        },
+    ]
+    assert choose_action(issue, failed_exec) is None
+    failed_exec_with_feedback = [
+        *failed_exec,
+        {"created_at": "2026-07-01T00:04:00Z", "body": "重新执行，继续处理"},
+    ]
+    assert choose_action(issue, failed_exec_with_feedback).kind == "revision-proposal"
+    failed_exec_refreshed = [
+        *failed_exec_with_feedback,
+        {
+            "created_at": "2026-07-01T00:05:00Z",
+            "body": build_proposal_comment(issue, failed_exec_with_feedback, revision=True),
+        },
+    ]
+    assert choose_action(issue, failed_exec_refreshed) is None
     delivered = [
         *sent,
         {
@@ -1064,6 +1296,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     test = sub.add_parser("self-test", help="运行内置测试")
     test.set_defaults(func=lambda _args: self_test())
+
+    smoke = sub.add_parser("codex-smoke", help="用 issue-agent 环境运行最小 codex exec")
+    smoke.add_argument("--timeout", type=int, default=90, help="smoke 超时秒数")
+    smoke.set_defaults(func=run_codex_smoke)
     return parser
 
 

@@ -1,11 +1,11 @@
 ---
 name: wms-execution-retrospective
-description: WMS 执行复盘和流程迭代技能。用户指出“为什么没检查出来”“流程没闭环”“截图/PR/tmux/worktree 没带上”“这类问题下次如何避免”“从 issue 学习共性问题”，或任务执行中发现脚本、技能、runbook、prompt、验证、证据回写、清理收尾缺口时使用；用于先补当前事故，再把可复用规则迭代进项目流程。
+description: WMS 执行复盘和流程迭代技能。用户问为什么没检查出来、流程没闭环，或发现 issue-agent、截图证据、PR/tmux/worktree、脚本、skill、runbook、prompt、验证、清理收口缺口时使用；先补事故，再固化最小可复用规则。
 ---
 
 # WMS Execution Retrospective
 
-用于把执行过程中的漏项变成可复用规则。不要只解释原因；要先补当前事故，再用最小改动固化到脚本、技能、runbook 或 AGENTS。
+把执行漏项变成可复用规则：先补事故，再最小改动固化到脚本、skill、runbook 或 AGENTS。
 
 ## 先读
 
@@ -13,7 +13,7 @@ description: WMS 执行复盘和流程迭代技能。用户指出“为什么没
 - 本次任务实际使用的 `.agents/skills/*/SKILL.md`
 - 相关 runbook、脚本和 issue / PR 评论
 - 当前失败证据：tmux 日志、agent prompt、截图、PR、worktree 状态或验证输出
-- 当前 issue 的标题、正文、评论、附件、PR 讨论和修复提交
+- 当前 issue / PR 评论和修复提交
 
 ## 闭环步骤
 
@@ -77,7 +77,7 @@ description: WMS 执行复盘和流程迭代技能。用户指出“为什么没
 
 ## 共性字段分析
 
-遇到“缺少创建日期 / 创建时间 / created_at”等字段问题时，必须先判断是否共性，不要只修一个页面。
+遇到“缺少创建日期 / 创建时间 / created_at”等字段问题时，先判断共性。
 
 按这条链路检查：
 
@@ -100,6 +100,10 @@ description: WMS 执行复盘和流程迭代技能。用户指出“为什么没
 - 断点位于哪一层：矩阵、契约、映射、列定义、筛选、治理脚本。
 - 本次修了哪些实例。
 - 已新增或扩展哪个脚本防止复发。
+
+## 外部 Skill 引入
+
+引入外部 skill 时，先临时目录只读审计，禁止先跑 `npx`、安装脚本或仓库脚本；检查脚本、hooks、网络、提交/推送、secret 和跳过确认风险。只装 skill 本体；安装后跑 yao 结构和资源边界检查。入口过重或触发过宽时先收窄触发、加确认、禁 secret、补接口元数据；学习写回现有 skill / runbook。
 
 ## 判断标准
 

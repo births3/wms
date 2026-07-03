@@ -1,28 +1,30 @@
 # WMS Worktree Subagent 收口参考
 
-本参考承接 `wms-worktree-subagent` 的 tmux、worktree、`agent/*` 分支和 issue-agent PR 收口细节。`SKILL.md` 只保留路由和停止条件；执行到收口阶段时读取本文件。
+本参考承接 `wms-worktree-subagent` 的 tmux、worktree、`agent/*` 分支和 issue-agent 本地分支收口细节。`SKILL.md` 只保留路由和停止条件；执行到收口阶段时读取本文件。
 
-## PR 与 tmux 收口
+## 分支与 tmux 收口
 
-普通 worktree 子代理默认不创建远端 PR，只交付本地 diff 给主代理审查、接入和分组提交。Gitea issue-agent 是例外：它必须创建 PR 承载截图、评论和审计证据。
+worktree 子代理默认不创建远端 PR，只交付本地 diff 或本地分支给主代理审查、接入和分组提交。当前 Gitea issue-agent 也暂停 PR，只在 issue 评论里回写本地 worktree、分支、提交或 diff 状态和截图附件。
 
-issue-agent PR 只有一个合并 owner：`wms-issue-agent` watcher。主代理不直接合并这类 PR，只负责复审、补证据、修冲突和决定是否关闭 issue。主代理必须把每个 issue-agent PR 分到以下状态之一，并在 issue / PR 评论中写清：
+issue-agent 本地分支只有一个合并 owner：主代理。watcher 只启动执行和回写状态，不合并。主代理必须把每个 issue-agent 本地分支分到以下状态之一，并在 issue 评论中写清：
 
 | 状态 | 条件 | 下一步 |
 |---|---|---|
-| 等待关闭 issue 自动合并 | 主工作区复审和验证通过，证据齐全，PR 可合并 | 等用户关闭 issue；watcher 自动合并 |
-| 已合并待清理 | watcher 已 merge，主工作区验证通过 | 进入 worktree、agent 分支和 tmux 清理 |
+| 待主代理本地合并 | 子 worktree 验证通过，证据齐全，范围可审查 | 主代理 review、接入、验证、提交 |
+| 已合并待清理 | 主代理已本地合并并提交，主工作区验证通过 | 进入 worktree、agent 分支和 tmux 清理 |
 | 阻塞 | 验证失败、冲突、缺截图、缺前后端重启证据、缺用户业务确认 | 写明阻塞命令、退出码、owner 和下一步 |
-| superseded 待清理 | PR 被更完整实现替代，或改动已被主工作区本地提交吸收 | 关闭 PR，清理对应 worktree 和本地分支；远端分支不主动删除 |
+| superseded 待清理 | 改动被更完整实现替代，或已被主工作区本地提交吸收 | 清理对应 worktree 和本地分支 |
 
-如果用户明确要求主代理手动合并 issue-agent PR，必须先停止 watcher 或在 issue / PR 写入阻塞评论，避免主代理和 watcher 双入口同时合并。
+历史远端 PR 不再自动合并。暂停 PR 期间发现 open PR 时，先在 PR 评论关闭原因，再关闭 PR；保留 head 分支、worktree、提交哈希或 diff 状态，归入本地分支状态矩阵。只有用户重新启用远端 PR 流程时，才恢复 PR review / merge 入口。
 
 tmux 收口规则：
 
 - `wms-issue-<issue>-<时间>` 任务会话正常跑完后应自然退出；主代理用 `tmux has-session -t <session>` 或 `tmux ls` 记录结果。
+- `wms-web-admin-9002` 只属于主工作区；worktree 前端预览使用 `wms-web-admin-<端口>-<worktree>`，端口范围 9003-9099，必须通过 `just dev-web-worktree-verify <worktree> <端口>` 校验 LAN URL。
+- `codex exec` 完成即退出，不负责保活前端；需要人工测试时保留对应 worktree 预览 tmux 会话，不需要时按本节清理。
 - 会话仍在运行时，先 `tmux capture-pane -pt <session>` 看是否仍在执行、等待输入或卡死；不能把正在执行的会话当垃圾清理。
 - 已合并或已放弃且不再需要保留日志时，用户已要求“清理/收尾”即可 `tmux kill-session -t <session>`；未确认放弃的阻塞会话只记录，不强杀。
-- 最终汇报必须写：PR 状态、是否已 merge、tmux 会话是否仍存在、清理动作或保留原因。
+- 最终汇报必须写：本地分支状态、是否已合并、tmux 会话是否仍存在、清理动作或保留原因。
 
 ## 主代理强制收尾门禁
 
@@ -116,7 +118,7 @@ git branch --list 'agent/*' --format='%(refname:short) %(objectname:short) %(sub
 
 最终汇报必须包含：
 
-- PR 收口状态：已合并、等待关闭 issue 自动合并、阻塞或 superseded 待清理。
+- issue-agent 本地分支收口状态：已合并、待主代理本地合并、阻塞或 superseded 待清理。
 - tmux 任务会话状态：已自然退出、已清理、仍运行或需用户确认。
 - 已移除 worktree 列表。
 - 已删除 agent 分支列表；若用户要求删除但未删除，说明未合并或未确认原因。
