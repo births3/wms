@@ -124,13 +124,18 @@ interface DevLocation {
   updated_at: string;
 }
 
-interface DevSpecialDrugCategory {
+interface DevSystemDictionaryItem {
   id: string;
-  owner_id: string;
-  category_code: string;
-  category_name: string;
-  requires_dual_sign: boolean;
-  status: string;
+  dict_code: string;
+  item_code: string;
+  item_name: string;
+  owner_id: string | null;
+  params: Record<string, unknown>;
+  source: string;
+  enabled: boolean;
+  effective_from: string | null;
+  effective_to: string | null;
+  disabled_reason: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -242,28 +247,74 @@ let devLocation: DevLocation = {
   updated_at: "2026-06-29T00:00:00.000Z",
 };
 
-const devSpecialDrugCategories: DevSpecialDrugCategory[] = [
-  {
-    id: "00000000-0000-0000-0000-000000001601",
-    owner_id: devOwnerId,
-    category_code: "none",
-    category_name: "普通药品",
-    requires_dual_sign: false,
-    status: "active",
-    created_at: "2026-06-29T00:00:00.000Z",
-    updated_at: "2026-06-29T00:00:00.000Z",
-  },
-  {
-    id: "00000000-0000-0000-0000-000000001602",
-    owner_id: devOwnerId,
-    category_code: "psychotropic",
-    category_name: "第二类精神药品",
-    requires_dual_sign: true,
-    status: "active",
-    created_at: "2026-06-29T00:00:00.000Z",
-    updated_at: "2026-06-29T00:00:00.000Z",
-  },
-];
+const devSystemDictionaryItemsByCode: Record<string, DevSystemDictionaryItem[]> = {
+  document_type: [
+    devSystemDictionaryItem("00000000-0000-0000-0000-000000001501", "document_type", "purchase_inbound", "采购入库", {
+      batch_policy: "standard_batch",
+      direction: "inbound",
+      workflow_template: "purchase_inbound",
+    }),
+    devSystemDictionaryItem("00000000-0000-0000-0000-000000001502", "document_type", "sales_return", "销售退货入库", {
+      batch_policy: "standard_batch",
+      direction: "inbound",
+      workflow_template: "sales_return",
+    }),
+    devSystemDictionaryItem(
+      "00000000-0000-0000-0000-000000001503",
+      "document_type",
+      "purchase_return_outbound",
+      "采购退货出库",
+      {
+        batch_policy: "standard_batch",
+        direction: "outbound",
+        workflow_template: "purchase_return_outbound",
+      },
+    ),
+    devSystemDictionaryItem("00000000-0000-0000-0000-000000001504", "document_type", "sales_outbound", "销售出库", {
+      batch_policy: "standard_batch",
+      direction: "outbound",
+      workflow_template: "sales_outbound",
+    }),
+  ],
+  special_drug_category: [
+    devSystemDictionaryItem("00000000-0000-0000-0000-000000001601", "special_drug_category", "none", "普通药品", {
+      requires_dual_sign: false,
+    }),
+    devSystemDictionaryItem("00000000-0000-0000-0000-000000001602", "special_drug_category", "narcotic", "麻醉药品", {
+      requires_dual_sign: true,
+    }),
+    devSystemDictionaryItem(
+      "00000000-0000-0000-0000-000000001603",
+      "special_drug_category",
+      "psychotropic_1",
+      "第一类精神药品",
+      { requires_dual_sign: true },
+    ),
+    devSystemDictionaryItem(
+      "00000000-0000-0000-0000-000000001604",
+      "special_drug_category",
+      "psychotropic_2",
+      "第二类精神药品",
+      { requires_dual_sign: true },
+    ),
+    devSystemDictionaryItem(
+      "00000000-0000-0000-0000-000000001605",
+      "special_drug_category",
+      "toxic_medical",
+      "医疗用毒性药品",
+      { requires_dual_sign: true },
+    ),
+    devSystemDictionaryItem("00000000-0000-0000-0000-000000001606", "special_drug_category", "radioactive", "放射性药品", {
+      requires_dual_sign: true,
+    }),
+    devSystemDictionaryItem("00000000-0000-0000-0000-000000001607", "special_drug_category", "vaccine", "疫苗", {
+      requires_dual_sign: true,
+    }),
+    devSystemDictionaryItem("00000000-0000-0000-0000-000000001608", "special_drug_category", "blood_product", "血液制品", {
+      requires_dual_sign: true,
+    }),
+  ],
+};
 
 let devFeatureFlagSource = "config_center";
 let devFeatureFlags: DevFeatureFlagConfig[] = [
@@ -384,9 +435,17 @@ async function handleDevMockRequest(
     return true;
   }
 
-  const specialDrugCategoryDetail = pathname.match(/^\/api\/v1\/master-data\/special-drug-categories\/([^/]+)$/);
-  if (req.method === "PATCH" && specialDrugCategoryDetail) {
-    await handleSpecialDrugCategoryUpdate(req, res, specialDrugCategoryDetail[1]);
+  const systemDictionaryDisable = pathname.match(
+    /^\/api\/v1\/system-dictionaries\/([^/]+)\/items\/([^/]+)\/disable$/,
+  );
+  if (req.method === "PATCH" && systemDictionaryDisable) {
+    await handleSystemDictionaryDisable(req, res, systemDictionaryDisable[1], systemDictionaryDisable[2]);
+    return true;
+  }
+
+  const systemDictionaryItem = pathname.match(/^\/api\/v1\/system-dictionaries\/([^/]+)\/items\/([^/]+)$/);
+  if (req.method === "PUT" && systemDictionaryItem) {
+    await handleSystemDictionaryUpsert(req, res, systemDictionaryItem[1], systemDictionaryItem[2]);
     return true;
   }
 
@@ -434,14 +493,6 @@ async function handleDevMockRequest(
     const body = await readJsonBody(req);
     const created = devLocationFromCreateRequest(body);
     devCreatedLocations.unshift(created);
-    sendJson(res, 200, created);
-    return true;
-  }
-
-  if (req.method === "POST" && pathname === "/api/v1/master-data/special-drug-categories") {
-    const body = await readJsonBody(req);
-    const created = devSpecialDrugCategoryFromCreateRequest(body);
-    devSpecialDrugCategories.unshift(created);
     sendJson(res, 200, created);
     return true;
   }
@@ -533,48 +584,13 @@ function devMasterDataResponse(pathname: string): Record<string, unknown> | null
     };
   }
 
-  if (pathname === "/api/v1/master-data/special-drug-categories") {
+  const systemDictionaryList = pathname.match(/^\/api\/v1\/system-dictionaries\/([^/]+)\/items$/);
+  if (systemDictionaryList) {
+    const data = devSystemDictionaryItemsByCode[decodeURIComponent(systemDictionaryList[1])];
+    if (!data) return null;
     return {
-      data: devSpecialDrugCategories,
-      page: { count: devSpecialDrugCategories.length, next_cursor: null },
-    };
-  }
-
-  if (pathname === "/api/v1/system-dictionaries/document_type/items") {
-    return {
-      data: [
-        {
-          id: "00000000-0000-0000-0000-000000001501",
-          dict_code: "document_type",
-          item_code: "purchase_inbound",
-          item_name: "采购入库",
-          owner_id: null,
-          params: { direction: "inbound", batch_policy: "none" },
-          source: "global",
-          enabled: true,
-          effective_from: null,
-          effective_to: null,
-          disabled_reason: null,
-          created_at: updatedAt,
-          updated_at: updatedAt,
-        },
-        {
-          id: "00000000-0000-0000-0000-000000001502",
-          dict_code: "document_type",
-          item_code: "sales_return",
-          item_name: "销售退货入库",
-          owner_id: null,
-          params: { direction: "inbound", batch_policy: "required" },
-          source: "global",
-          enabled: true,
-          effective_from: null,
-          effective_to: null,
-          disabled_reason: null,
-          created_at: updatedAt,
-          updated_at: updatedAt,
-        },
-      ],
-      page: { count: 2, next_cursor: null },
+      data,
+      page: { count: data.length, next_cursor: null },
     };
   }
 
@@ -735,20 +751,6 @@ function devLocationFromCreateRequest(body: Record<string, unknown>): DevLocatio
   };
 }
 
-function devSpecialDrugCategoryFromCreateRequest(body: Record<string, unknown>): DevSpecialDrugCategory {
-  const now = new Date().toISOString();
-  return {
-    id: crypto.randomUUID(),
-    owner_id: devOwnerId,
-    category_code: asString(body.category_code, "special_new"),
-    category_name: asString(body.category_name, "新特殊分类"),
-    requires_dual_sign: asBoolean(body.requires_dual_sign, false),
-    status: "active",
-    created_at: now,
-    updated_at: now,
-  };
-}
-
 async function handleFeatureFlagRequest(req: IncomingMessage, res: ServerResponse, pathname: string) {
   if (req.method === "GET" && pathname === "/api/v1/config-center/feature-flags/export") {
     sendJson(res, 200, { source: devFeatureFlagSource, flags: devFeatureFlags });
@@ -807,6 +809,101 @@ function devFeatureFlagConfig(body: Record<string, unknown>): DevFeatureFlagConf
     enabled: asBoolean(body.enabled, false),
     source: asString(body.source, devFeatureFlagSource),
   };
+}
+
+function devSystemDictionaryItem(
+  id: string,
+  dictCode: string,
+  itemCode: string,
+  itemName: string,
+  params: Record<string, unknown>,
+): DevSystemDictionaryItem {
+  return {
+    id,
+    dict_code: dictCode,
+    item_code: itemCode,
+    item_name: itemName,
+    owner_id: null,
+    params,
+    source: "global",
+    enabled: true,
+    effective_from: null,
+    effective_to: null,
+    disabled_reason: null,
+    created_at: "2026-06-29T00:00:00.000Z",
+    updated_at: "2026-06-29T00:00:00.000Z",
+  };
+}
+
+async function handleSystemDictionaryUpsert(
+  req: IncomingMessage,
+  res: ServerResponse,
+  dictCode: string,
+  itemCode: string,
+) {
+  const decodedDictCode = decodeURIComponent(dictCode);
+  const decodedItemCode = decodeURIComponent(itemCode);
+  const items = devSystemDictionaryItemsByCode[decodedDictCode];
+  if (!items) {
+    sendJson(res, 404, { code: "DEV_MOCK_NOT_FOUND", message: "Dictionary not found", trace_id: "dev-mock" });
+    return;
+  }
+
+  const body = await readJsonBody(req);
+  const now = new Date().toISOString();
+  const ownerId = asNullableString(body.owner_id);
+  const existingIndex = items.findIndex(
+    (item) => item.item_code === decodedItemCode && item.owner_id === ownerId,
+  );
+  const next: DevSystemDictionaryItem = {
+    id: existingIndex >= 0 ? items[existingIndex].id : crypto.randomUUID(),
+    dict_code: decodedDictCode,
+    item_code: decodedItemCode,
+    item_name: asString(body.item_name, decodedItemCode),
+    owner_id: ownerId,
+    params: asRecord(body.params),
+    source: ownerId ? "owner" : "global",
+    enabled: asBoolean(body.enabled, true),
+    effective_from: asNullableString(body.effective_from),
+    effective_to: asNullableString(body.effective_to),
+    disabled_reason: existingIndex >= 0 ? items[existingIndex].disabled_reason : null,
+    created_at: existingIndex >= 0 ? items[existingIndex].created_at : now,
+    updated_at: now,
+  };
+  if (existingIndex >= 0) items[existingIndex] = next;
+  else items.unshift(next);
+  sendJson(res, 200, next);
+}
+
+async function handleSystemDictionaryDisable(
+  req: IncomingMessage,
+  res: ServerResponse,
+  dictCode: string,
+  itemCode: string,
+) {
+  const decodedDictCode = decodeURIComponent(dictCode);
+  const decodedItemCode = decodeURIComponent(itemCode);
+  const items = devSystemDictionaryItemsByCode[decodedDictCode];
+  if (!items) {
+    sendJson(res, 404, { code: "DEV_MOCK_NOT_FOUND", message: "Dictionary not found", trace_id: "dev-mock" });
+    return;
+  }
+
+  const body = await readJsonBody(req);
+  const ownerId = asNullableString(body.owner_id);
+  const index = items.findIndex((item) => item.item_code === decodedItemCode && item.owner_id === ownerId);
+  if (index < 0) {
+    sendJson(res, 404, { code: "DEV_MOCK_NOT_FOUND", message: "Dictionary item not found", trace_id: "dev-mock" });
+    return;
+  }
+
+  items[index] = {
+    ...items[index],
+    enabled: false,
+    disabled_reason: asNullableString(body.disabled_reason),
+    updated_at: new Date().toISOString(),
+  };
+  sendJson(res, 200, items[index]);
 }
 
 async function handleProductUpdate(req: IncomingMessage, res: ServerResponse, id: string) {
@@ -935,25 +1032,6 @@ async function handleLocationUpdate(req: IncomingMessage, res: ServerResponse, i
   if (id === devLocation.id) devLocation = updated;
   else devCreatedLocations[createdIndex] = updated;
   sendJson(res, 200, updated);
-}
-
-async function handleSpecialDrugCategoryUpdate(req: IncomingMessage, res: ServerResponse, id: string) {
-  const index = devSpecialDrugCategories.findIndex((category) => category.id === id);
-  if (index < 0) {
-    sendJson(res, 404, { code: "DEV_MOCK_NOT_FOUND", message: "Special category not found", trace_id: "dev-mock" });
-    return;
-  }
-
-  const body = await readJsonBody(req);
-  const current = devSpecialDrugCategories[index];
-  devSpecialDrugCategories[index] = {
-    ...current,
-    category_name: asNullableString(body.category_name) ?? current.category_name,
-    requires_dual_sign: asBoolean(body.requires_dual_sign, current.requires_dual_sign),
-    status: asString(body.status, current.status),
-    updated_at: new Date().toISOString(),
-  };
-  sendJson(res, 200, devSpecialDrugCategories[index]);
 }
 
 async function handleInboundAction(req: IncomingMessage, res: ServerResponse, action: string | undefined, orderId: string) {
