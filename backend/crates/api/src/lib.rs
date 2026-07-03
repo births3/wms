@@ -18,6 +18,7 @@ pub mod inventory;
 pub mod master_data;
 pub mod master_data_handlers;
 pub mod master_data_postgres;
+mod openapi_contract;
 pub mod outbound;
 pub mod packing_station;
 pub mod parameter_mapping;
@@ -38,6 +39,7 @@ use crate::document_numbering::{
     DocumentNumberRule, DocumentNumberRuleListResponse, SetDocumentNumberRuleEnabledRequest,
     UpsertDocumentNumberRuleRequest,
 };
+use crate::openapi_contract::ContractSecurityAddon;
 use utoipa::OpenApi;
 use wms_domain::{
     AuditActor, AuditEvent, AuditEventListResponse, BatchCreateLocationsRequest, BillingAccount,
@@ -691,6 +693,7 @@ fn confirm_container_recovery() {}
 
 #[derive(OpenApi)]
 #[openapi(
+    modifiers(&ContractSecurityAddon),
     info(
         title = "WMS API",
         version = "0.0.5-wave-5-value-added",
@@ -961,6 +964,10 @@ pub struct ApiDoc;
 #[cfg(test)]
 mod tests {
     use super::ApiDoc;
+    use crate::openapi_contract::{
+        AUTH_EXEMPT_REASON, BEARER_AUTH_SCHEME, COLD_CHAIN_API_KEY_SCHEME,
+        IDEMPOTENCY_EXEMPT_REASON,
+    };
     use utoipa::OpenApi;
 
     #[test]
@@ -1128,5 +1135,111 @@ mod tests {
                 "missing required schema: {required_schema}"
             );
         }
+    }
+
+    #[test]
+    fn openapi_declares_h3_security_and_idempotency_contract() {
+        let doc: serde_json::Value = serde_json::from_str(
+            &ApiDoc::openapi()
+                .to_pretty_json()
+                .expect("openapi json should serialize"),
+        )
+        .expect("openapi json should parse as value");
+
+        assert_eq!(
+            doc.pointer("/components/securitySchemes/BearerAuth/type"),
+            Some(&serde_json::json!("http")),
+        );
+        assert_eq!(
+            doc.pointer("/components/securitySchemes/BearerAuth/scheme"),
+            Some(&serde_json::json!("bearer")),
+        );
+        assert_eq!(
+            doc.pointer("/components/securitySchemes/BearerAuth/bearerFormat"),
+            Some(&serde_json::json!("JWT")),
+        );
+        assert_eq!(
+            doc.pointer("/components/securitySchemes/ColdChainApiKeyAuth/type"),
+            Some(&serde_json::json!("apiKey")),
+        );
+        assert_eq!(
+            doc.pointer("/components/securitySchemes/ColdChainApiKeyAuth/name"),
+            Some(&serde_json::json!("X-WMS-API-Key")),
+        );
+
+        let global_security = doc
+            .get("security")
+            .and_then(serde_json::Value::as_array)
+            .expect("openapi should declare global security");
+        assert!(
+            global_security
+                .iter()
+                .any(|requirement| requirement.get(BEARER_AUTH_SCHEME).is_some()),
+            "global security should require BearerAuth",
+        );
+
+        for public_operation in [
+            "/paths/~1api~1v1~1healthz/get",
+            "/paths/~1api~1v1~1auth~1login/post",
+        ] {
+            let security = doc
+                .pointer(&format!("{public_operation}/security"))
+                .and_then(serde_json::Value::as_array)
+                .expect("public operation should override security");
+            assert!(
+                security.is_empty(),
+                "public operation should be unauthenticated"
+            );
+            assert!(
+                doc.pointer(&format!("{public_operation}/{AUTH_EXEMPT_REASON}"))
+                    .and_then(serde_json::Value::as_str)
+                    .is_some_and(|reason| !reason.is_empty()),
+                "public operation should declare auth exemption reason",
+            );
+        }
+
+        for cold_chain_operation in [
+            "/paths/~1api~1v1~1cold-chain~1readings/post",
+            "/paths/~1api~1v1~1cold-chain~1excursions/post",
+        ] {
+            let security = doc
+                .pointer(&format!("{cold_chain_operation}/security"))
+                .and_then(serde_json::Value::as_array)
+                .expect("cold-chain external operation should declare security");
+            assert!(
+                security
+                    .iter()
+                    .any(|requirement| requirement.get(COLD_CHAIN_API_KEY_SCHEME).is_some()),
+                "cold-chain external operation should require API key",
+            );
+        }
+
+        let login_idempotency_pointer =
+            format!("/paths/~1api~1v1~1auth~1login/post/{IDEMPOTENCY_EXEMPT_REASON}");
+        assert!(
+            doc.pointer(&login_idempotency_pointer)
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|reason| !reason.is_empty()),
+            "login should document idempotency exemption",
+        );
+        let master_data_idempotency_pointer =
+            format!("/paths/~1api~1v1~1master-data~1products/post/{IDEMPOTENCY_EXEMPT_REASON}");
+        assert!(
+            doc.pointer(&master_data_idempotency_pointer)
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|reason| !reason.is_empty()),
+            "master-data legacy write should document idempotency exemption",
+        );
+        let outbound_parameters = doc
+            .pointer("/paths/~1api~1v1~1outbound~1orders/post/parameters")
+            .and_then(serde_json::Value::as_array)
+            .expect("outbound order creation should declare parameters");
+        assert!(
+            outbound_parameters.iter().any(|parameter| {
+                parameter.get("name") == Some(&serde_json::json!("Idempotency-Key"))
+                    && parameter.get("in") == Some(&serde_json::json!("header"))
+            }),
+            "newer write contracts should keep Idempotency-Key header",
+        );
     }
 }

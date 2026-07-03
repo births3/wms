@@ -141,7 +141,22 @@ REQUIRED_SCHEMAS = (
     "CreateBillingRuleRequest",
 )
 HTTP_METHODS = {"get", "post", "put", "patch", "delete", "options", "head"}
+WRITE_METHODS = {"post", "put", "patch", "delete"}
 ERROR_RESPONSE_REF = "#/components/schemas/ErrorResponse"
+AUTH_EXEMPT_REASON = "x-auth-exempt-reason"
+IDEMPOTENCY_EXEMPT_REASON = "x-idempotency-exempt-reason"
+BEARER_AUTH_SCHEME = "BearerAuth"
+COLD_CHAIN_API_KEY_SCHEME = "ColdChainApiKeyAuth"
+IDEMPOTENCY_HEADER = "Idempotency-Key"
+COLD_CHAIN_API_KEY_HEADER = "X-WMS-API-Key"
+AUTH_EXEMPT_OPERATIONS = {
+    ("/api/v1/healthz", "get"): "健康探针不依赖登录态，用于负载均衡和运行时就绪检查。",
+    ("/api/v1/auth/login", "post"): "登录接口用于签发 JWT，调用前尚无 Bearer token。",
+}
+COLD_CHAIN_API_KEY_OPERATIONS = {
+    ("/api/v1/cold-chain/readings", "post"),
+    ("/api/v1/cold-chain/excursions", "post"),
+}
 REQUIRED_FREE_FORM_PROPERTIES = {
     "AuditEvent": ("diff",),
     "ConfigEntry": ("config_value",),
@@ -180,6 +195,57 @@ def _has_error_response(operation: object) -> bool:
     return isinstance(schema, dict) and schema.get("$ref") == ERROR_RESPONSE_REF
 
 
+def _has_security_requirement(security: object, scheme_name: str) -> bool:
+    if not isinstance(security, list):
+        return False
+    return any(isinstance(item, dict) and scheme_name in item for item in security)
+
+
+def _is_public_security_override(operation: object) -> bool:
+    if not isinstance(operation, dict):
+        return False
+    security = operation.get("security")
+    if security == []:
+        return True
+    return isinstance(security, list) and any(item == {} for item in security)
+
+
+def _has_non_empty_string(obj: object, key: str) -> bool:
+    return isinstance(obj, dict) and isinstance(obj.get(key), str) and bool(obj[key].strip())
+
+
+def _has_header_parameter(operation: object, header_name: str) -> bool:
+    if not isinstance(operation, dict):
+        return False
+    parameters = operation.get("parameters")
+    if not isinstance(parameters, list):
+        return False
+    return any(
+        isinstance(parameter, dict)
+        and parameter.get("name") == header_name
+        and str(parameter.get("in", "")).lower() == "header"
+        for parameter in parameters
+    )
+
+
+def _is_bearer_jwt_scheme(scheme: object) -> bool:
+    return (
+        isinstance(scheme, dict)
+        and scheme.get("type") == "http"
+        and scheme.get("scheme") == "bearer"
+        and scheme.get("bearerFormat") == "JWT"
+    )
+
+
+def _is_cold_chain_api_key_scheme(scheme: object) -> bool:
+    return (
+        isinstance(scheme, dict)
+        and scheme.get("type") == "apiKey"
+        and scheme.get("in") == "header"
+        and scheme.get("name") == COLD_CHAIN_API_KEY_HEADER
+    )
+
+
 def check_openapi_contract(data: object) -> tuple[list[Issue], dict[str, object]]:
     issues: list[Issue] = []
     if not isinstance(data, dict):
@@ -200,6 +266,34 @@ def check_openapi_contract(data: object) -> tuple[list[Issue], dict[str, object]
         if required_path not in paths:
             issues.append(Issue("missing_path", f"缺少必需 path: {required_path}"))
 
+    components = data.get("components")
+    schemas = components.get("schemas") if isinstance(components, dict) else {}
+    security_schemes = (
+        components.get("securitySchemes")
+        if isinstance(components, dict)
+        else {}
+    )
+    if not isinstance(security_schemes, dict):
+        security_schemes = {}
+
+    if not _is_bearer_jwt_scheme(security_schemes.get(BEARER_AUTH_SCHEME)):
+        issues.append(Issue(
+            "missing_security_scheme",
+            "components.securitySchemes.BearerAuth 必须声明 http bearer JWT",
+        ))
+
+    if not _is_cold_chain_api_key_scheme(security_schemes.get(COLD_CHAIN_API_KEY_SCHEME)):
+        issues.append(Issue(
+            "missing_security_scheme",
+            "components.securitySchemes.ColdChainApiKeyAuth 必须声明 header X-WMS-API-Key",
+        ))
+
+    if not _has_security_requirement(data.get("security"), BEARER_AUTH_SCHEME):
+        issues.append(Issue(
+            "missing_global_bearer_auth",
+            "OpenAPI 顶层 security 必须默认要求 BearerAuth",
+        ))
+
     for path, path_item in paths.items():
         if path == "/api/v1/healthz" or not isinstance(path_item, dict):
             continue
@@ -212,8 +306,59 @@ def check_openapi_contract(data: object) -> tuple[list[Issue], dict[str, object]
                     f"{path} {method.upper()} 缺少 401 ErrorResponse",
                 ))
 
-    components = data.get("components")
-    schemas = components.get("schemas") if isinstance(components, dict) else {}
+    for (path, method), _reason in AUTH_EXEMPT_OPERATIONS.items():
+        path_item = paths.get(path)
+        operation = path_item.get(method) if isinstance(path_item, dict) else None
+        if operation is None:
+            continue
+        if not _is_public_security_override(operation):
+            issues.append(Issue(
+                "missing_auth_exempt_security",
+                f"{path} {method.upper()} 必须显式覆盖全局 BearerAuth",
+            ))
+        if not _has_non_empty_string(operation, AUTH_EXEMPT_REASON):
+            issues.append(Issue(
+                "missing_auth_exempt_reason",
+                f"{path} {method.upper()} 必须声明 {AUTH_EXEMPT_REASON}",
+            ))
+
+    for path, path_item in paths.items():
+        if not isinstance(path_item, dict):
+            continue
+        for method, operation in path_item.items():
+            method_lower = method.lower()
+            if method_lower not in HTTP_METHODS or not isinstance(operation, dict):
+                continue
+            if (
+                (path, method_lower) not in AUTH_EXEMPT_OPERATIONS
+                and _is_public_security_override(operation)
+            ):
+                issues.append(Issue(
+                    "unexpected_auth_exempt_security",
+                    f"{path} {method.upper()} 不在公开免鉴权白名单内，不能覆盖全局鉴权",
+                ))
+
+            if (path, method_lower) in COLD_CHAIN_API_KEY_OPERATIONS:
+                requires_cold_chain_api_key = _has_security_requirement(
+                    operation.get("security"),
+                    COLD_CHAIN_API_KEY_SCHEME,
+                )
+                if not requires_cold_chain_api_key:
+                    issues.append(Issue(
+                        "missing_cold_chain_api_key_auth",
+                        f"{path} {method.upper()} 必须声明 ColdChainApiKeyAuth",
+                    ))
+
+            if method_lower in WRITE_METHODS:
+                if not (
+                    _has_header_parameter(operation, IDEMPOTENCY_HEADER)
+                    or _has_non_empty_string(operation, IDEMPOTENCY_EXEMPT_REASON)
+                ):
+                    issues.append(Issue(
+                        "missing_idempotency_contract",
+                        f"{path} {method.upper()} 必须声明 Idempotency-Key 或 {IDEMPOTENCY_EXEMPT_REASON}",
+                    ))
+
     if isinstance(schemas, dict):
         for schema_name, property_names in REQUIRED_FREE_FORM_PROPERTIES.items():
             schema = schemas.get(schema_name)
@@ -237,6 +382,18 @@ def check_openapi_contract(data: object) -> tuple[list[Issue], dict[str, object]
         "required_free_form_properties": {
             key: list(value) for key, value in REQUIRED_FREE_FORM_PROPERTIES.items()
         },
+        "required_security_schemes": [
+            BEARER_AUTH_SCHEME,
+            COLD_CHAIN_API_KEY_SCHEME,
+        ],
+        "auth_exempt_operations": [
+            {"path": path, "method": method, "reason": reason}
+            for (path, method), reason in sorted(AUTH_EXEMPT_OPERATIONS.items())
+        ],
+        "cold_chain_api_key_operations": [
+            {"path": path, "method": method}
+            for path, method in sorted(COLD_CHAIN_API_KEY_OPERATIONS)
+        ],
     }
     if isinstance(schemas, dict):
         present_schemas = set(schemas)

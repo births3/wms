@@ -21,6 +21,22 @@
 | 测试证据 RTM | 故事到测试命令和证据对象 | 本文 §6 + 运行证据文档 | `check_project_rtm.py` |
 | 合规风险 RTM | GSP、审计、幂等、权限、冷链等控制闭环 | `docs/compliance/` + 本文 §7 | `check_project_rtm.py` |
 
+### 2.1 H3 OpenAPI 契约 P0 切片覆盖矩阵
+
+| 层 | 需要 | 本轮覆盖 | 证据 | 缺口 |
+|---|---|---|---|---|
+| 用户故事 | 是 | 是 | [user-stories-h3-contract.md](domain/user-stories-h3-contract.md) 的 US-H3-001 / US-H3-002 | US-H3-003 限流熔断、US-H3-004 Swagger / ReDoc 不在本轮。 |
+| RTM | 是 | 是 | 本节 | 完整 H3 模块 RTM 仍需后续补齐运行时文档、前端、PDA 和 E2E 证据。 |
+| 数据库 | 不适用 | 否 | 本轮只声明契约红线，不新增表或迁移。 | 业务幂等运行时实现和审计落库沿用后续模块切片补证据。 |
+| 后端服务 | 不适用 | 否 | 本轮不改 service / domain / repository。 | 运行时鉴权、API Key 校验、业务幂等拦截不在本轮。 |
+| 公开 API | 是 | 是 | `backend/crates/api/src/lib.rs` 的 utoipa 聚合声明 | 仅覆盖 OpenAPI 安全与幂等声明，不声明模块完成。 |
+| OpenAPI / api-client | 是 | 是 | `shared/openapi/openapi.json`；`packages/api-client/src/schema.ts` | Swagger / ReDoc 运行时站点不在本轮。 |
+| PC 前端 | 是 | 否 | 本轮不改 PC 前端。 | 若 api-client 类型影响现有调用，需后续补前端 typecheck 和调用侧 header。 |
+| PDA | 是 | 否 | 本轮不改 PDA。 | PDA 复用 api-client 与离线兼容证据后续补齐。 |
+| E2E / 截图 | 是 | 否 | 本轮不采集截图。 | PC / PDA 真实截图和 Matrix E2E 证据后续补齐。 |
+| 治理脚本 | 是 | 是 | `scripts/governance/check_openapi_contract.py`；`scripts/governance/tests/test_openapi_governance.py` | 只覆盖契约红线静态检查，不替代运行时安全测试。 |
+| 文档 / runbook | 是 | 否 | 本轮仅更新 RTM。 | Swagger / ReDoc、限流熔断和外部对接 runbook 后续补齐。 |
+
 ## 3. 故事总 RTM
 
 | 模块/能力 | 用户故事源 | 故事数量 | 当前 RTM |

@@ -143,7 +143,10 @@
               }
             }
           }
-        }
+        },
+        "security": [],
+        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。",
+        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。"
       }
     },
     "/api/v1/auth/me": {
@@ -213,7 +216,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "Wave 5 计费首批切片尚未接入业务幂等，本契约先显式标记豁免。"
       }
     },
     "/api/v1/billing/charges/calculate": {
@@ -334,7 +338,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "Wave 5 计费首批切片尚未接入业务幂等，本契约先显式标记豁免。"
       }
     },
     "/api/v1/billing/rules": {
@@ -374,7 +379,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "Wave 5 计费首批切片尚未接入业务幂等，本契约先显式标记豁免。"
       }
     },
     "/api/v1/billing/statements": {
@@ -914,7 +920,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "冷链首批切片尚未接入业务幂等，本契约先显式标记豁免。"
       }
     },
     "/api/v1/cold-chain/excursions": {
@@ -984,7 +991,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ColdChainApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/cold-chain/excursions/pending-disposition": {
@@ -1085,7 +1097,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "冷链首批切片尚未接入业务幂等，本契约先显式标记豁免。"
       }
     },
     "/api/v1/cold-chain/readings": {
@@ -1155,7 +1168,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ColdChainApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/config-center/feature-flags/archive-file-source": {
@@ -1195,7 +1213,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "配置中心迁移类受控运维动作后续补运行时幂等证据。"
       }
     },
     "/api/v1/config-center/feature-flags/export": {
@@ -1265,7 +1284,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "配置中心迁移类受控运维动作后续补运行时幂等证据。"
       }
     },
     "/api/v1/config-center/feature-flags/migrate": {
@@ -1295,7 +1315,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "配置中心迁移类受控运维动作后续补运行时幂等证据。"
       }
     },
     "/api/v1/config-center/feature-flags/reconcile": {
@@ -1365,7 +1386,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "配置中心迁移类受控运维动作后续补运行时幂等证据。"
       }
     },
     "/api/v1/driver/tasks/today": {
@@ -1415,7 +1437,9 @@
               }
             }
           }
-        }
+        },
+        "security": [],
+        "x-auth-exempt-reason": "健康探针不依赖登录态，用于负载均衡和运行时就绪检查。"
       }
     },
     "/api/v1/inbound/receiving-orders": {
@@ -1483,7 +1507,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "收货单 CRUD 旧契约未接入 L11 幂等，本轮不扩大调用侧 header 面。"
       }
     },
     "/api/v1/inbound/receiving-orders/{id}": {
@@ -1565,7 +1590,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "收货单 CRUD 旧契约未接入 L11 幂等，本轮不扩大调用侧 header 面。"
       },
       "patch": {
         "tags": [
@@ -1615,7 +1641,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "收货单 CRUD 旧契约未接入 L11 幂等，本轮不扩大调用侧 header 面。"
       }
     },
     "/api/v1/inbound/receiving-orders/{id}/inspect": {
@@ -2040,7 +2067,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "库存上架旧契约未接入 L11 幂等，本轮仅声明豁免并保留后续补齐路径。"
       }
     },
     "/api/v1/inventory/batches/status": {
@@ -2169,7 +2197,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "M1 基础档案 CRUD 旧契约未接入 L11 幂等，本轮不扩大调用侧 header 面。"
       }
     },
     "/api/v1/master-data/customers/{id}": {
@@ -2211,7 +2240,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "M1 基础档案 CRUD 旧契约未接入 L11 幂等，本轮不扩大调用侧 header 面。"
       },
       "patch": {
         "tags": [
@@ -2261,7 +2291,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "M1 基础档案 CRUD 旧契约未接入 L11 幂等，本轮不扩大调用侧 header 面。"
       }
     },
     "/api/v1/master-data/locations": {
@@ -2329,7 +2360,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "M1 基础档案 CRUD 旧契约未接入 L11 幂等，本轮不扩大调用侧 header 面。"
       }
     },
     "/api/v1/master-data/locations/batch-create": {
@@ -2462,7 +2494,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "M1 基础档案 CRUD 旧契约未接入 L11 幂等，本轮不扩大调用侧 header 面。"
       },
       "patch": {
         "tags": [
@@ -2512,7 +2545,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "M1 基础档案 CRUD 旧契约未接入 L11 幂等，本轮不扩大调用侧 header 面。"
       }
     },
     "/api/v1/master-data/products": {
@@ -2580,7 +2614,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "M1 基础档案 CRUD 旧契约未接入 L11 幂等，本轮不扩大调用侧 header 面。"
       }
     },
     "/api/v1/master-data/products/{id}": {
@@ -2662,7 +2697,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "M1 基础档案 CRUD 旧契约未接入 L11 幂等，本轮不扩大调用侧 header 面。"
       },
       "patch": {
         "tags": [
@@ -2712,7 +2748,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "M1 基础档案 CRUD 旧契约未接入 L11 幂等，本轮不扩大调用侧 header 面。"
       }
     },
     "/api/v1/master-data/special-drug-categories": {
@@ -2780,7 +2817,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "M1 基础档案 CRUD 旧契约未接入 L11 幂等，本轮不扩大调用侧 header 面。"
       }
     },
     "/api/v1/master-data/special-drug-categories/{id}": {
@@ -2822,7 +2860,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "M1 基础档案 CRUD 旧契约未接入 L11 幂等，本轮不扩大调用侧 header 面。"
       },
       "patch": {
         "tags": [
@@ -2872,7 +2911,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "M1 基础档案 CRUD 旧契约未接入 L11 幂等，本轮不扩大调用侧 header 面。"
       }
     },
     "/api/v1/master-data/suppliers": {
@@ -2940,7 +2980,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "M1 基础档案 CRUD 旧契约未接入 L11 幂等，本轮不扩大调用侧 header 面。"
       }
     },
     "/api/v1/master-data/suppliers/{id}": {
@@ -2982,7 +3023,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "M1 基础档案 CRUD 旧契约未接入 L11 幂等，本轮不扩大调用侧 header 面。"
       },
       "patch": {
         "tags": [
@@ -3032,7 +3074,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "M1 基础档案 CRUD 旧契约未接入 L11 幂等，本轮不扩大调用侧 header 面。"
       }
     },
     "/api/v1/master-data/warehouses": {
@@ -3100,7 +3143,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "M1 基础档案 CRUD 旧契约未接入 L11 幂等，本轮不扩大调用侧 header 面。"
       }
     },
     "/api/v1/master-data/warehouses/{id}": {
@@ -3142,7 +3186,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "M1 基础档案 CRUD 旧契约未接入 L11 幂等，本轮不扩大调用侧 header 面。"
       },
       "patch": {
         "tags": [
@@ -3192,7 +3237,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "M1 基础档案 CRUD 旧契约未接入 L11 幂等，本轮不扩大调用侧 header 面。"
       }
     },
     "/api/v1/outbound/orders": {
@@ -4065,7 +4111,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "参数对照执行使用业务追踪 ID，L11 幂等运行时证据后续切片补齐。"
       }
     },
     "/api/v1/parameter-mapping/traces/{execution_id}": {
@@ -4147,7 +4194,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "报表查询为只读语义，使用 POST 承载复杂查询条件，不要求 Idempotency-Key。"
       }
     },
     "/api/v1/reports/gsp/inventory-ledger": {
@@ -4187,7 +4235,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "报表查询为只读语义，使用 POST 承载复杂查询条件，不要求 Idempotency-Key。"
       }
     },
     "/api/v1/reports/gsp/outbound-ledger": {
@@ -4227,7 +4276,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "报表查询为只读语义，使用 POST 承载复杂查询条件，不要求 Idempotency-Key。"
       }
     },
     "/api/v1/reports/query": {
@@ -4267,7 +4317,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "报表查询为只读语义，使用 POST 承载复杂查询条件，不要求 Idempotency-Key。"
       }
     },
     "/api/v1/retail/crossdock-plans": {
@@ -5144,7 +5195,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "追溯码上报首批契约未接入 L11 幂等，本轮仅声明豁免并保留后续补齐路径。"
       }
     }
   },
@@ -10044,8 +10096,26 @@
           }
         }
       }
+    },
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      },
+      "ColdChainApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-WMS-API-Key",
+        "description": "外部冷链系统 API Key"
+      }
     }
   },
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
   "tags": [
     {
       "name": "system",
