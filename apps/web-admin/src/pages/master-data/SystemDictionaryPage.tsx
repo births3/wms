@@ -14,7 +14,6 @@ import {
   Input,
   Label,
   PageHeader,
-  StatusBadge,
   SystemDictionaryTwoPane,
 } from "@wms/ui";
 import { ArrowLeft, Ban, Pencil, Plus, RefreshCw } from "lucide-react";
@@ -59,9 +58,9 @@ interface DisableFormState {
   reason: string;
 }
 
-const dictCode = "document_type";
 const emptySystemDictionaryGroups: SystemDictionaryPaneGroup[] = [
-  { code: dictCode, name: "单据类型", items: [] },
+  { code: "document_type", name: "单据类型", items: [] },
+  { code: "special_drug_category", name: "特殊药品分类", items: [] },
 ];
 
 const emptyItemForm: ItemFormState = {
@@ -91,11 +90,21 @@ export function M1SystemDictionaryPage({ meta, onBack }: M1SystemDictionaryPageP
   const [itemForm, setItemForm] = React.useState<ItemFormState>(emptyItemForm);
   const [disableForm, setDisableForm] = React.useState<DisableFormState>(emptyDisableForm);
   const [dialogError, setDialogError] = React.useState<string | null>(null);
+  const [selectedDictCode, setSelectedDictCode] = React.useState<string | null>(null);
   const groups = groupsQuery.data ?? emptySystemDictionaryGroups;
-  const items = React.useMemo(() => groups.flatMap((group) => group.items), [groups]);
-  const totalCount = items.length;
-  const activeCount = items.filter((item) => item.enabled).length;
+  const activeGroup =
+    groups.find((group) => group.code === selectedDictCode) ?? groups[0] ?? emptySystemDictionaryGroups[0];
+  const totalCount = groups.reduce((count, group) => count + group.items.length, 0);
+  const activeCount = groups.reduce(
+    (count, group) => count + group.items.filter((item) => item.enabled).length,
+    0,
+  );
   const pending = upsertMutation.isPending || disableMutation.isPending;
+
+  React.useEffect(() => {
+    if (groups.some((group) => group.code === selectedDictCode)) return;
+    setSelectedDictCode(groups[0]?.code ?? null);
+  }, [groups, selectedDictCode]);
 
   async function refreshRows() {
     await groupsQuery.refetch();
@@ -148,7 +157,11 @@ export function M1SystemDictionaryPage({ meta, onBack }: M1SystemDictionaryPageP
         effective_from: dateTimeLocalToIsoOrNull(itemForm.effectiveFrom),
         effective_to: dateTimeLocalToIsoOrNull(itemForm.effectiveTo),
       };
-      const saved = await upsertMutation.mutateAsync({ dictCode, itemCode, request });
+      const saved = await upsertMutation.mutateAsync({
+        dictCode: activeGroup.code,
+        itemCode,
+        request,
+      });
       await groupsQuery.refetch();
       setActiveDialog(null);
       setLastEvent(`${saved.item_code} 已保存`);
@@ -166,7 +179,7 @@ export function M1SystemDictionaryPage({ meta, onBack }: M1SystemDictionaryPageP
         owner_id: nullableText(disableForm.ownerId),
       };
       const disabled = await disableMutation.mutateAsync({
-        dictCode,
+        dictCode: activeGroup.code,
         itemCode: requiredText(disableForm.itemCode, "item_code"),
         request,
       });
@@ -190,10 +203,6 @@ export function M1SystemDictionaryPage({ meta, onBack }: M1SystemDictionaryPageP
                 {lastEvent}
               </span>
             )}
-            <Button type="button" onClick={openCreateDialog}>
-              <Plus className="size-4" aria-hidden />
-              新增字典项
-            </Button>
             <Button type="button" variant="outline" onClick={refreshRows}>
               <RefreshCw className="size-4" aria-hidden />
               刷新
@@ -220,19 +229,44 @@ export function M1SystemDictionaryPage({ meta, onBack }: M1SystemDictionaryPageP
 
       <SystemDictionaryTwoPane
         groups={groups}
+        selectedGroupCode={activeGroup.code}
+        onSelectedGroupCodeChange={setSelectedDictCode}
+        headerActions={
+          <Button type="button" size="sm" onClick={openCreateDialog}>
+            <Plus className="size-4" aria-hidden />
+            新增
+          </Button>
+        }
+        renderItemActions={(item) => {
+          const actionItem = activeGroup.items.find(
+            (candidate) => candidate.code === item.code && candidate.source === item.source,
+          );
+          if (!actionItem) return null;
+          return (
+            <>
+              <Button type="button" variant="outline" size="sm" onClick={() => openUpsertDialog(actionItem)}>
+                <Pencil className="size-4" aria-hidden />
+                更新
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!actionItem.enabled}
+                onClick={() => openDisableDialog(actionItem)}
+              >
+                <Ban className="size-4" aria-hidden />
+                停用
+              </Button>
+            </>
+          );
+        }}
         emptyTitle={meta.emptyTitle}
         emptyDescription={
           groupsQuery.isPending
-            ? "正在读取 document_type 字典项。"
-            : "document_type 暂无可展示字典项。"
+            ? "正在读取系统字典项。"
+            : `${activeGroup.name} 暂无可展示字典项。`
         }
-      />
-
-      <DictionaryMaintenancePanel
-        items={items}
-        onCreate={openCreateDialog}
-        onUpdate={openUpsertDialog}
-        onDisable={openDisableDialog}
       />
 
       <DictionaryDialogs
@@ -240,6 +274,7 @@ export function M1SystemDictionaryPage({ meta, onBack }: M1SystemDictionaryPageP
         editing={Boolean(editingItemCode)}
         itemForm={itemForm}
         disableForm={disableForm}
+        activeGroup={activeGroup}
         pending={pending}
         errorMessage={dialogError}
         onOpenChange={(open) => !open && setActiveDialog(null)}
@@ -252,83 +287,12 @@ export function M1SystemDictionaryPage({ meta, onBack }: M1SystemDictionaryPageP
   );
 }
 
-function DictionaryMaintenancePanel({
-  items,
-  onCreate,
-  onUpdate,
-  onDisable,
-}: {
-  items: SystemDictionaryPaneItem[];
-  onCreate: () => void;
-  onUpdate: (item: SystemDictionaryPaneItem) => void;
-  onDisable: (item: SystemDictionaryPaneItem) => void;
-}) {
-  return (
-    <Card className="rounded-lg shadow-sm">
-      <CardContent className="space-y-3 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold">字典项维护</h2>
-          <Button type="button" size="sm" onClick={onCreate}>
-            <Plus className="size-4" aria-hidden />
-            新增
-          </Button>
-        </div>
-        {items.length > 0 ? (
-          <ul className="divide-y rounded-md border">
-            {items.map((item) => (
-              <li
-                key={`${item.code}-${item.ownerId ?? "global"}`}
-                className="grid gap-3 p-3 md:grid-cols-[minmax(16rem,1fr)_minmax(12rem,18rem)_auto] md:items-center"
-              >
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-medium">{item.name}</div>
-                  <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
-                    {item.code}
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <StatusBadge
-                    status={item.enabled ? "completed" : "isolated"}
-                    label={item.enabled ? "启用" : "停用"}
-                    size="sm"
-                  />
-                  <span>{scopeLabel(item.ownerId)}</span>
-                  <span>{paramsSummary(item.params)}</span>
-                </div>
-                <div className="flex justify-start gap-2 md:justify-end">
-                  <Button type="button" variant="outline" size="sm" onClick={() => onUpdate(item)}>
-                    <Pencil className="size-4" aria-hidden />
-                    更新
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={!item.enabled}
-                    onClick={() => onDisable(item)}
-                  >
-                    <Ban className="size-4" aria-hidden />
-                    停用
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <div className="rounded-md border px-3 py-6 text-sm text-muted-foreground">
-            暂无可维护字典项
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
 function DictionaryDialogs({
   activeDialog,
   editing,
   itemForm,
   disableForm,
+  activeGroup,
   pending,
   errorMessage,
   onOpenChange,
@@ -341,6 +305,7 @@ function DictionaryDialogs({
   editing: boolean;
   itemForm: ItemFormState;
   disableForm: DisableFormState;
+  activeGroup: SystemDictionaryPaneGroup;
   pending: boolean;
   errorMessage: string | null;
   onOpenChange: (open: boolean) => void;
@@ -366,7 +331,9 @@ function DictionaryDialogs({
           <form className="grid gap-3 md:grid-cols-2" onSubmit={onSubmitUpsert}>
             <DialogHeader className="md:col-span-2">
               <DialogTitle>{editing ? "更新字典项" : "新增字典项"}</DialogTitle>
-              <DialogDescription>{dictCode}</DialogDescription>
+              <DialogDescription>
+                {activeGroup.name} / {activeGroup.code}
+              </DialogDescription>
             </DialogHeader>
             <TextField
               label="item_code"
@@ -437,7 +404,7 @@ function DictionaryDialogs({
             <DialogHeader>
               <DialogTitle>停用字典项</DialogTitle>
               <DialogDescription>
-                {disableForm.itemCode} / {disableForm.itemName}
+                {activeGroup.name} / {disableForm.itemCode} / {disableForm.itemName}
               </DialogDescription>
             </DialogHeader>
             <TextField
@@ -545,25 +512,4 @@ function isoToDateTimeLocal(value?: string | null) {
   if (Number.isNaN(date.getTime())) return "";
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
   return local.toISOString().slice(0, 16);
-}
-
-function scopeLabel(ownerId?: string | null) {
-  return ownerId ? "货主覆盖" : "全局";
-}
-
-function paramsSummary(params: Record<string, unknown>) {
-  const entries = Object.entries(params);
-  if (entries.length === 0) return "params {}";
-  const summary = entries
-    .slice(0, 2)
-    .map(([key, value]) => `${key}: ${jsonValueSummary(value)}`)
-    .join(" / ");
-  return entries.length > 2 ? `${summary} ...` : summary;
-}
-
-function jsonValueSummary(value: unknown) {
-  if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
-  if (value === null || value === undefined) return "-";
-  return JSON.stringify(value);
 }

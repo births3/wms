@@ -60,7 +60,7 @@ export function summarizeSystemDictionaryParams(
 
 export function systemDictionarySourceText(source: string) {
   if (source === "global") return "全局";
-  if (source === "owner_override") return "货主覆盖";
+  if (source === "owner" || source === "owner_override") return "货主覆盖";
   return source || "-";
 }
 

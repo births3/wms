@@ -16,6 +16,10 @@ export interface SystemDictionaryTwoPaneProps
   extends Omit<React.HTMLAttributes<HTMLDivElement>, "children"> {
   groups: SystemDictionaryTwoPaneGroup[];
   initialGroupCode?: string;
+  selectedGroupCode?: string;
+  onSelectedGroupCodeChange?: (groupCode: string) => void;
+  headerActions?: React.ReactNode;
+  renderItemActions?: (item: SystemDictionaryTwoPaneItem) => React.ReactNode;
   emptyTitle?: string;
   emptyDescription?: string;
 }
@@ -39,6 +43,10 @@ export const SystemDictionaryTwoPane = React.forwardRef<
     {
       groups,
       initialGroupCode,
+      selectedGroupCode,
+      onSelectedGroupCodeChange,
+      headerActions,
+      renderItemActions,
       emptyTitle = "暂无字典项",
       emptyDescription = "当前分类下还没有可展示的字典项。",
       className,
@@ -46,7 +54,15 @@ export const SystemDictionaryTwoPane = React.forwardRef<
     },
     ref
   ) => {
-    const [selectedCode, setSelectedCode] = React.useState(initialGroupCode);
+    const [internalSelectedCode, setInternalSelectedCode] = React.useState(initialGroupCode);
+    const selectedCode = selectedGroupCode ?? internalSelectedCode;
+    const setSelectedCode = React.useCallback(
+      (groupCode: string) => {
+        setInternalSelectedCode(groupCode);
+        onSelectedGroupCodeChange?.(groupCode);
+      },
+      [onSelectedGroupCodeChange]
+    );
     const selectedGroup = getSystemDictionarySelectedGroup(groups, selectedCode);
 
     if (groups.length === 0) {
@@ -101,15 +117,22 @@ export const SystemDictionaryTwoPane = React.forwardRef<
           <section className="min-w-0 p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
               <h2 className="text-sm font-semibold">字典项</h2>
-              <span className="text-xs text-muted-foreground">
-                共 {selectedGroup?.items.length ?? 0} 项
-              </span>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <span className="text-xs text-muted-foreground">
+                  共 {selectedGroup?.items.length ?? 0} 项
+                </span>
+                {headerActions}
+              </div>
             </div>
 
             {selectedGroup && selectedGroup.items.length > 0 ? (
               <ul className="flex flex-col gap-3">
                 {selectedGroup.items.map((item) => (
-                  <SystemDictionaryItemRow key={item.code} item={item} />
+                  <SystemDictionaryItemRow
+                    key={`${item.code}-${item.source}`}
+                    item={item}
+                    actions={renderItemActions?.(item)}
+                  />
                 ))}
               </ul>
             ) : (
@@ -123,7 +146,13 @@ export const SystemDictionaryTwoPane = React.forwardRef<
 );
 SystemDictionaryTwoPane.displayName = "SystemDictionaryTwoPane";
 
-function SystemDictionaryItemRow({ item }: { item: SystemDictionaryTwoPaneItem }) {
+function SystemDictionaryItemRow({
+  item,
+  actions,
+}: {
+  item: SystemDictionaryTwoPaneItem;
+  actions?: React.ReactNode;
+}) {
   const params = summarizeSystemDictionaryParams(item.params);
 
   return (
@@ -133,11 +162,14 @@ function SystemDictionaryItemRow({ item }: { item: SystemDictionaryTwoPaneItem }
           <div className="truncate text-sm font-medium">{item.name}</div>
           <div className="mt-0.5 font-mono text-xs text-muted-foreground">{item.code}</div>
         </div>
-        <StatusBadge
-          status={item.enabled ? "completed" : "isolated"}
-          label={item.enabled ? "启用" : "停用"}
-          size="sm"
-        />
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <StatusBadge
+            status={item.enabled ? "completed" : "isolated"}
+            label={item.enabled ? "启用" : "停用"}
+            size="sm"
+          />
+          {actions}
+        </div>
       </div>
 
       <div className="mt-3 text-xs text-muted-foreground">

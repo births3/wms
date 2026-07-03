@@ -53,7 +53,6 @@ import {
   masterDataColumns,
   productTableClassName,
 } from "./m1-product-page-model";
-import { SpecialDrugCategoriesPage } from "./SpecialDrugCategoriesPage";
 import { M1SystemDictionaryPage } from "./SystemDictionaryPage";
 import { useProductEditDialog } from "./use-product-edit-dialog";
 export type { MasterDataViewId } from "@/features/master-data/master-data-queries";
@@ -91,16 +90,10 @@ export const masterDataViewMeta: Record<
     emptyTitle: "暂无库位档案",
     storageKey: "m1-locations-datagrid",
   },
-  "m1-special-drug-categories": {
-    title: "M1 特殊药品分类",
-    subtitle: "特殊管理药品分类、双人作业要求与启停状态",
-    emptyTitle: "暂无特殊药品分类",
-    storageKey: "m1-special-drug-categories-datagrid",
-  },
   "m1-system-dictionary": {
     title: "M1 系统字典",
-    subtitle: "document_type 字典项与运行参数",
-    emptyTitle: "暂无 document_type 字典项",
+    subtitle: "单据类型、特殊药品分类等系统字典项",
+    emptyTitle: "暂无系统字典项",
     storageKey: "m1-system-dictionary-datagrid",
   },
 };
@@ -344,10 +337,6 @@ const locationColumns: DataGridColumn<MasterDataRow>[] = [
 ];
 
 export function M1MasterDataPage({ viewId, onBack }: M1MasterDataPageProps) {
-  if (viewId === "m1-special-drug-categories") {
-    return <SpecialDrugCategoriesPage meta={masterDataViewMeta[viewId]} onBack={onBack} />;
-  }
-
   if (viewId === "m1-system-dictionary") {
     return <M1SystemDictionaryPage meta={masterDataViewMeta[viewId]} onBack={onBack} />;
   }

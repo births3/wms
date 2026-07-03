@@ -85,8 +85,7 @@ const menuSections: Array<{ label: string; items: MenuItem[] }> = [
       { id: "m1-customers", title: "M1 客户档案", subtitle: "客户 / 门店", icon: Users },
       { id: "m1-warehouses", title: "M1 仓库管理", subtitle: "仓库 / 状态", icon: Warehouse },
       { id: "m1-locations", title: "M1 库位管理", subtitle: "库位 / 容量", icon: MapPinned },
-      { id: "m1-special-drug-categories", title: "M1 特殊药品分类", subtitle: "分类 / 双签", icon: ShieldCheck },
-      { id: "m1-system-dictionary", title: "M1 系统字典", subtitle: "document_type", icon: BookOpen },
+      { id: "m1-system-dictionary", title: "M1 系统字典", subtitle: "单据类型 / 特殊药品分类", icon: BookOpen },
       { id: "m1-feature-flags", title: "M1 Feature Flag", subtitle: "配置中心 / 灰度", icon: KeyRound },
     ],
   },
@@ -200,7 +199,6 @@ function masterDataViewToId(view: AdminView): MasterDataViewId | null {
     view === "m1-customers" ||
     view === "m1-warehouses" ||
     view === "m1-locations" ||
-    view === "m1-special-drug-categories" ||
     view === "m1-system-dictionary"
   ) {
     return view;
