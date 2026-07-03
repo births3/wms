@@ -9,6 +9,7 @@ import {
   type DataGridFloatingPanelPosition,
   type DataGridLogicState,
 } from "./data-grid-logic";
+import { useDataGridPopoverDismiss } from "./data-grid-popover-dismiss";
 import {
   dataGridNamedViewsStorageKey,
   loadDataGridNamedViewsFromStorage,
@@ -90,26 +91,10 @@ export function DataGridNamedViewsToolbar<T>({
     setError(null);
   }, [options, storage, storageKey]);
 
-  React.useEffect(() => {
-    if (!open) return;
-
-    function closePanel(event: PointerEvent) {
-      const target = event.target instanceof Element ? event.target : null;
-      if (target?.closest("[data-datagrid-popover]")) return;
-      setOpen(false);
-    }
-
-    function closePanelByKeyboard(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
-    }
-
-    document.addEventListener("pointerdown", closePanel);
-    document.addEventListener("keydown", closePanelByKeyboard);
-    return () => {
-      document.removeEventListener("pointerdown", closePanel);
-      document.removeEventListener("keydown", closePanelByKeyboard);
-    };
-  }, [open]);
+  useDataGridPopoverDismiss({
+    open,
+    onDismiss: () => setOpen(false),
+  });
 
   React.useEffect(() => {
     if (!open) return;

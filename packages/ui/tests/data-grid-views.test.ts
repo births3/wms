@@ -67,15 +67,23 @@ const headerCellSource = readFileSync(
 );
 const namedViewSelectPattern =
   /<select[\s\S]*aria-label="选择命名视图"[\s\S]*onChange=\{\(event\) => setViewName\(event\.target\.value\)\}/;
+const dismissHookSource = readFileSync(
+  new URL("../src/business/DataGrid/data-grid-popover-dismiss.ts", import.meta.url),
+  "utf8",
+);
 
 assert.match(toolbarSource, namedViewSelectPattern);
 assert.doesNotMatch(toolbarSource, /<datalist/);
 assert.match(toolbarSource, /import \{ Bookmark \} from "lucide-react";/);
 assert.match(toolbarSource, /import \{ createPortal \} from "react-dom";/);
+assert.match(toolbarSource, /import \{ useDataGridPopoverDismiss \} from "\.\/data-grid-popover-dismiss";/);
+assert.match(toolbarSource, /useDataGridPopoverDismiss\(\{[\s\S]*open,[\s\S]*onDismiss: \(\) => setOpen\(false\),[\s\S]*\}\);/);
 assert.match(toolbarSource, /dataGridFloatingPanelPosition\(rect,[\s\S]*320/);
 assert.match(toolbarSource, /createPortal\(/);
 assert.match(toolbarSource, /className="fixed z-50 w-80/);
 assert.doesNotMatch(toolbarSource, /className="absolute right-0 top-full/);
+assert.match(dataGridSource, /import \{ useDataGridPopoverDismiss \} from "\.\/data-grid-popover-dismiss";/);
+assert.match(dataGridSource, /useDataGridPopoverDismiss\(\{[\s\S]*open: fieldsOpen \|\| openFilterKey !== null,[\s\S]*setFieldsOpen\(false\);[\s\S]*setOpenFilterKey\(null\);[\s\S]*\}\);/);
 assert.match(dataGridSource, /namedViewsControl=\{\s*<DataGridNamedViewsToolbar/);
 assert.doesNotMatch(dataGridSource, /<div className="flex shrink-0 flex-wrap items-center justify-end gap-2 self-end md:ml-auto">\s*<DataGridNamedViewsToolbar/);
 assert.match(headerCellSource, /namedViewsControl\?: React\.ReactNode;/);
@@ -84,3 +92,7 @@ assert.match(headerCellSource, /import \{ createPortal \} from "react-dom";/);
 assert.match(headerCellSource, /className="fixed z-50 w-56/);
 assert.match(headerCellSource, /createPortal\(/);
 assert.doesNotMatch(headerCellSource, /absolute top-full z-30/);
+assert.match(dismissHookSource, /document\.addEventListener\("pointerdown", dismissOnOutsidePointer\);/);
+assert.match(dismissHookSource, /target\?\.closest\("\[data-datagrid-popover\]"\)/);
+assert.match(dismissHookSource, /document\.addEventListener\("keydown", dismissOnEscape\);/);
+assert.match(dismissHookSource, /event\.key !== "Escape"/);

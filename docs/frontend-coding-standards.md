@@ -376,10 +376,11 @@ DataGrid 表头和表格内触发的弹窗 / 浮层，例如字段筛选、字�
 
 - 带 `data-datagrid-popover` 的弹窗浮层必须使用 `createPortal` 渲染到 `document.body`，并使用 `fixed` 定位。
 - 浮层位置必须根据触发按钮 `getBoundingClientRect()` 和视口尺寸计算，避免低行数表格、横向滚动、页面滚动时被遮挡。
+- DataGrid 字段筛选、字段显示和命名视图等按钮触发浮层必须复用共享关闭逻辑，支持点击外部关闭和 `Escape` 关闭。
 - 列宽拖拽 handle 这类非弹窗交互可以继续使用 `absolute`，但不得标记为 `data-datagrid-popover`。
 - 修改 `packages/ui/src/business/DataGrid/**` 后必须运行 `python3 scripts/governance/check_datagrid_popover_portal.py` 或 `just gov-t1`。
 
-门禁：`check_datagrid_popover_portal.py` 会扫描 DataGrid 组件，发现 `data-datagrid-popover` 浮层使用 `absolute` 时直接失败。
+门禁：`check_datagrid_popover_portal.py` 会扫描 DataGrid 组件，发现 `data-datagrid-popover` 浮层使用 `absolute`，或门户浮层未复用点击外部 / `Escape` 关闭逻辑时直接失败。
 
 ---
 
@@ -391,7 +392,7 @@ DataGrid 表头和表格内触发的弹窗 / 浮层，例如字段筛选、字�
 | `check_component_props_classname.py` | T1 | Props 接口含 className + forwardRef + displayName（**泛型函数自动豁免 forwardRef**） | `@governance: skip-classname` |
 | `check_component_no_inline_style.py` | T1 | 业务复合无静态 inline style | 紧邻上方 `// 动态：理由` 注释 |
 | `check_component_registry_consistency.py` | T1 | 业务复合目录 ↔ component-registry.md §3.1 一一对应 | `[[component_exemptions]]` |
-| `check_datagrid_popover_portal.py` | T1 | DataGrid 弹窗浮层使用 `createPortal + fixed`，禁止容器内 `absolute` 裁剪回归 | 无 |
+| `check_datagrid_popover_portal.py` | T1 | DataGrid 弹窗浮层使用 `createPortal + fixed`，并支持点击外部 / `Escape` 关闭 | 无 |
 | `check_page_size.py` | T1 | 页面 < 600 通过 / 600-799 警告 / ≥ 800 门禁 | `@governance: skip-page-size` |
 
 ---
