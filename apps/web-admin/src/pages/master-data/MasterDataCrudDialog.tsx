@@ -31,7 +31,7 @@ import type {
   UpdateWarehouseRequest,
 } from "@/features/master-data/master-data-queries";
 
-export type MasterDataCrudViewId = "m1-suppliers" | "m1-customers" | "m1-warehouses" | "m1-locations";
+export type MasterDataCrudViewId = "m1-business-partners" | "m1-warehouses" | "m1-locations";
 
 export interface LocationScopeOption { key: string; label: string; warehouseId: string; zoneId: string; ownerId: string | null; }
 
@@ -70,12 +70,11 @@ const locationTypeOptions = [
 ] as const;
 
 export function isMasterDataCrudView(viewId: MasterDataViewId): viewId is MasterDataCrudViewId {
-  return ["m1-suppliers", "m1-customers", "m1-warehouses", "m1-locations"].includes(viewId);
+  return ["m1-business-partners", "m1-warehouses", "m1-locations"].includes(viewId);
 }
 
 export function crudTargetForRow(viewId: MasterDataCrudViewId, row: MasterDataRow): MasterDataCrudTarget {
-  if (viewId === "m1-suppliers") return { kind: "supplier", mode: "edit", row };
-  if (viewId === "m1-customers") return { kind: "customer", mode: "edit", row };
+  if (viewId === "m1-business-partners") return businessPartnerCrudTarget(row);
   if (viewId === "m1-warehouses") return { kind: "warehouse", mode: "edit", row };
   return { kind: "location", mode: "edit", row };
 }
@@ -276,12 +275,13 @@ export async function disableMasterDataCrudRow(
   viewId: MasterDataCrudViewId,
   row: MasterDataRow,
 ): Promise<MasterDataRow> {
-  if (viewId === "m1-suppliers") {
+  if (viewId === "m1-business-partners" && row.partnerKind === "supplier") {
     return updateSupplier({ id: row.id, request: { status: "disabled" } });
   }
-  if (viewId === "m1-customers") {
+  if (viewId === "m1-business-partners" && row.partnerKind === "customer") {
     return updateCustomer({ id: row.id, request: { status: "disabled" } });
   }
+  if (viewId === "m1-business-partners") throw new Error("缺少客商类型，无法停用");
   if (viewId === "m1-warehouses") {
     return updateWarehouse({ id: row.id, request: { status: "disabled" } });
   }
@@ -320,6 +320,12 @@ function formFromTarget(target: MasterDataCrudTarget, firstScope: LocationScopeO
     return { kind: "location", mode: "edit", id: target.row.id, scopeKey: fields ? `${fields.warehouse}:${fields.zone}:${fields.owner === "-" ? "none" : fields.owner}` : "", code: target.row.code, rowNo: int(fields?.rowNo, 1), columnNo: int(fields?.columnNo, 1), layerNo: int(fields?.layerNo, 1), maxVolumeCm3: int(fields?.maxVolumeCm3, 5_000_000), usedVolumeCm3: int(fields?.usedVolumeCm3, 0), maxSkuCount: int(fields?.maxSku, 1), locationType: clean(fields?.locationTypeCode) || "storage", status: target.row.status || "available" };
   }
   return { kind: "location", mode: "create", scopeKey: firstScope?.key ?? "", code: "", rowNo: 1, columnNo: 1, layerNo: 1, maxVolumeCm3: 5_000_000, usedVolumeCm3: 0, maxSkuCount: 1, locationType: "storage", status: "available" };
+}
+
+function businessPartnerCrudTarget(row: MasterDataRow): MasterDataCrudTarget {
+  if (row.partnerKind === "supplier") return { kind: "supplier", mode: "edit", row };
+  if (row.partnerKind === "customer") return { kind: "customer", mode: "edit", row };
+  throw new Error("缺少客商类型，无法编辑");
 }
 
 function title(form: MasterDataCrudForm) {

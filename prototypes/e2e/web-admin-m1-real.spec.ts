@@ -18,8 +18,8 @@ test("M1 管理端读取真实后端数据", async ({ page }) => {
 
   const cases = [
     { menu: /M1 商品档案/, title: "M1 商品档案", text: "P-M1-E2E-001", shot: "products.png" },
-    { menu: /M1 供应商档案/, title: "M1 供应商档案", text: "S-M1-E2E-001", shot: "suppliers.png" },
-    { menu: /M1 客户档案/, title: "M1 客户档案", text: "C-M1-E2E-001", shot: "customers.png" },
+    { menu: /M1 客商档案/, title: "M1 客商档案", text: "S-M1-E2E-001", shot: "business-partners-supplier.png" },
+    { menu: /M1 客商档案/, title: "M1 客商档案", text: "C-M1-E2E-001", shot: "business-partners-customer.png" },
     { menu: /M1 仓库管理/, title: "M1 仓库管理", text: "WH-M1-E2E-001", shot: "warehouses.png" },
     { menu: /M1 库位管理/, title: "M1 库位管理", text: "A01-01-02-03", shot: "locations.png" },
     { menu: /M1 系统字典/, title: "M1 系统字典", text: "purchase_inbound", shot: "dictionary.png" },

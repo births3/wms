@@ -13,8 +13,11 @@ try {
   const { productSourceLabel, masterDataActionLabels, productTableClassName, masterDataColumns } =
     await server.ssrLoadModule("/src/pages/master-data/m1-product-page-model.ts");
   const { productColumns } = await server.ssrLoadModule("/src/pages/master-data/ProductEditTable.tsx");
-  const { productRow } = await server.ssrLoadModule(
+  const { productRow, supplierRow, customerRow } = await server.ssrLoadModule(
     "/src/features/master-data/master-data-queries.ts",
+  );
+  const { crudTargetForRow } = await server.ssrLoadModule(
+    "/src/pages/master-data/MasterDataCrudDialog.tsx",
   );
 
   assert.equal(productSourceLabel("manual"), "手工新建");
@@ -23,8 +26,12 @@ try {
   assert.equal(productSourceLabel("erp"), "API接口导入");
   assert.equal(productSourceLabel(undefined), "-");
   assert.deepEqual(masterDataActionLabels("m1-products"), ["新建商品", "批量导入"]);
-  assert.deepEqual(masterDataActionLabels("m1-suppliers"), ["新建供应商", "批量导入"]);
-  assert.deepEqual(masterDataActionLabels("m1-customers"), ["新建客户", "批量导入"]);
+  assert.deepEqual(masterDataActionLabels("m1-business-partners"), [
+    "新建供应商",
+    "导入供应商",
+    "新建客户",
+    "导入客户",
+  ]);
   assert.equal(productTableClassName("m1-products"), "min-w-[2380px]");
 
   const row = productRow({
@@ -76,8 +83,44 @@ try {
   assert.ok(columns.some((column) => column.key === "unitSize"));
   assert.ok(columns.some((column) => column.key === "unitWeightVolume"));
 
-  assert.ok(masterDataColumns("m1-suppliers", [], []).some((column) => column.key === "source"));
-  assert.ok(masterDataColumns("m1-customers", [], []).some((column) => column.key === "source"));
+  const supplier = supplierRow({
+    id: "00000000-0000-0000-0000-000000002001",
+    owner_id: "00000000-0000-0000-0000-000000000001",
+    supplier_code: "S-M1-001",
+    supplier_name: "配送供应商A",
+    license_no: "SPL-001",
+    contact_name: "王供应",
+    status: "active",
+    source: "manual",
+    created_at: "2026-06-29T00:00:00.000Z",
+    updated_at: "2026-06-29T00:00:00.000Z",
+  });
+  const customer = customerRow({
+    id: "00000000-0000-0000-0000-000000003001",
+    owner_id: "00000000-0000-0000-0000-000000000001",
+    customer_code: "C-M1-001",
+    customer_name: "连锁门店A",
+    license_no: "CUS-001",
+    status: "active",
+    source: "batch_import",
+    created_at: "2026-06-29T00:00:00.000Z",
+    updated_at: "2026-06-29T00:00:00.000Z",
+  });
+  assert.equal(supplier.partnerKind, "supplier");
+  assert.equal(supplier.partnerTypeLabel, "供应商");
+  assert.match(supplier.searchText, /供应商/);
+  assert.equal(customer.partnerKind, "customer");
+  assert.equal(customer.partnerTypeLabel, "客户\/门店");
+  assert.match(customer.searchText, /客户\/门店/);
+  const businessPartnerColumns = masterDataColumns("m1-business-partners", [], []);
+  assert.ok(businessPartnerColumns.some((column) => column.key === "businessPartnerType"));
+  assert.ok(businessPartnerColumns.some((column) => column.key === "source"));
+  assert.equal(
+    businessPartnerColumns.find((column) => column.key === "businessPartnerType")?.render?.(supplier),
+    "供应商",
+  );
+  assert.equal(crudTargetForRow("m1-business-partners", supplier).kind, "supplier");
+  assert.equal(crudTargetForRow("m1-business-partners", customer).kind, "customer");
 } finally {
   await server.close();
 }

@@ -6,8 +6,7 @@ import { api } from "@/lib/api";
 
 export type MasterDataViewId =
   | "m1-products"
-  | "m1-suppliers"
-  | "m1-customers"
+  | "m1-business-partners"
   | "m1-warehouses"
   | "m1-locations"
   | "m1-system-dictionary";
@@ -33,6 +32,7 @@ export type UpsertSystemDictionaryItemRequest =
   components["schemas"]["UpsertSystemDictionaryItemRequest"];
 export type DisableSystemDictionaryItemRequest =
   components["schemas"]["DisableSystemDictionaryItemRequest"];
+export type BusinessPartnerKind = "supplier" | "customer";
 
 export interface MasterDataRow {
   id: string;
@@ -52,6 +52,8 @@ export interface MasterDataRow {
   updatedAt: string;
   productFields?: ProductMasterDataFields;
   locationFields?: LocationMasterDataFields;
+  partnerKind?: BusinessPartnerKind;
+  partnerTypeLabel?: string;
   searchText: string;
 }
 
@@ -186,10 +188,8 @@ async function listMasterDataRows(viewId: MasterDataViewId): Promise<MasterDataR
   switch (viewId) {
     case "m1-products":
       return listProducts();
-    case "m1-suppliers":
-      return listSuppliers();
-    case "m1-customers":
-      return listCustomers();
+    case "m1-business-partners":
+      return listBusinessPartners();
     case "m1-warehouses":
       return listWarehouses();
     case "m1-locations":
@@ -235,6 +235,11 @@ async function listCustomers(): Promise<MasterDataRow[]> {
     throw new ApiError(result.error, "读取客户档案失败", result.response.status);
   }
   return result.data.data.map(customerRow);
+}
+
+async function listBusinessPartners(): Promise<MasterDataRow[]> {
+  const [suppliers, customers] = await Promise.all([listSuppliers(), listCustomers()]);
+  return [...suppliers, ...customers];
 }
 
 async function listWarehouses(): Promise<MasterDataRow[]> {
@@ -486,7 +491,7 @@ export function productRow(item: Product): MasterDataRow {
   });
 }
 
-function supplierRow(item: Supplier): MasterDataRow {
+export function supplierRow(item: Supplier): MasterDataRow {
   return row({
     id: item.id,
     code: item.supplier_code,
@@ -503,10 +508,12 @@ function supplierRow(item: Supplier): MasterDataRow {
     createdAt: item.created_at,
     sourceValue: supplierSource(item),
     updatedAt: item.updated_at,
+    partnerKind: "supplier",
+    partnerTypeLabel: "供应商",
   });
 }
 
-function customerRow(item: Customer): MasterDataRow {
+export function customerRow(item: Customer): MasterDataRow {
   return row({
     id: item.id,
     code: item.customer_code,
@@ -523,6 +530,8 @@ function customerRow(item: Customer): MasterDataRow {
     createdAt: item.created_at,
     sourceValue: customerSource(item),
     updatedAt: item.updated_at,
+    partnerKind: "customer",
+    partnerTypeLabel: "客户/门店",
   });
 }
 
@@ -660,6 +669,7 @@ function row(input: Omit<MasterDataRow, "searchText">): MasterDataRow {
       input.extraValue,
       input.createdAt,
       input.sourceValue ?? "",
+      input.partnerTypeLabel ?? "",
       ...productSearchText,
       ...locationSearchText,
     ]

@@ -354,8 +354,8 @@ DOMAIN_KEYWORDS = [
 ]
 
 KEYWORD_ALIASES = {
-    "供应商": ["m1-suppliers", "supplier"],
-    "客户": ["m1-customers", "customer"],
+    "供应商": ["m1-business-partners", "supplier"],
+    "客户": ["m1-business-partners", "customer"],
     "来源": ["sourceValue", "source"],
     "批量导入": ["批量导入", "import"],
     "新建供应商": ["createSupplier", "新建供应商"],

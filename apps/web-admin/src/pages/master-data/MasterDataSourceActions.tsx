@@ -53,6 +53,7 @@ const copy: Record<
     createButton: string;
     codeLabel: string;
     nameLabel: string;
+    importButton: string;
     importTitle: string;
     importPlaceholder: string;
   }
@@ -62,6 +63,7 @@ const copy: Record<
     createButton: "新建供应商",
     codeLabel: "供应商编码",
     nameLabel: "供应商名称",
+    importButton: "导入供应商",
     importTitle: "批量导入供应商",
     importPlaceholder: [
       "supplier_code,supplier_name,license_no,contact_name",
@@ -74,6 +76,7 @@ const copy: Record<
     createButton: "新建客户",
     codeLabel: "客户编码",
     nameLabel: "客户名称",
+    importButton: "导入客户",
     importTitle: "批量导入客户",
     importPlaceholder: [
       "customer_code,customer_name,license_no",
@@ -147,7 +150,7 @@ export function MasterDataSourceActions(props: SourceActionProps) {
       </Button>
       <Button type="button" variant="outline" onClick={() => openDialog("import")} disabled={submitting}>
         <Upload className="size-4" aria-hidden />
-        批量导入
+        {labels.importButton}
       </Button>
 
       <Dialog open={activeDialog !== null} onOpenChange={(open) => !open && !submitting && setActiveDialog(null)}>

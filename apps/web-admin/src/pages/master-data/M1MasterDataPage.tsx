@@ -66,17 +66,11 @@ export const masterDataViewMeta: Record<
     emptyTitle: "暂无商品档案",
     storageKey: "m1-products-datagrid",
   },
-  "m1-suppliers": {
-    title: "M1 供应商档案",
-    subtitle: "供应商编码、资质证号与联系人",
-    emptyTitle: "暂无供应商档案",
-    storageKey: "m1-suppliers-datagrid",
-  },
-  "m1-customers": {
-    title: "M1 客户档案",
-    subtitle: "客户/门店编码、名称与资质信息",
-    emptyTitle: "暂无客户档案",
-    storageKey: "m1-customers-datagrid",
+  "m1-business-partners": {
+    title: "M1 客商档案",
+    subtitle: "供应商、客户/门店与资质来源",
+    emptyTitle: "暂无客商档案",
+    storageKey: "m1-business-partners-datagrid",
   },
   "m1-warehouses": {
     title: "M1 仓库管理",
@@ -573,14 +567,14 @@ function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
                 批量导入
               </Button>
             )}
-            {viewId === "m1-suppliers" && (
+            {viewId === "m1-business-partners" && (
               <MasterDataSourceActions
                 kind="supplier"
                 onCreate={createSupplierFromDialog}
                 onImport={importSuppliersFromDialog}
               />
             )}
-            {viewId === "m1-customers" && (
+            {viewId === "m1-business-partners" && (
               <MasterDataSourceActions
                 kind="customer"
                 onCreate={createCustomerFromDialog}

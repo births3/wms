@@ -3,7 +3,6 @@ import { Button, Card, CardContent, Input, PageHeader, StatusBadge, cn } from "@
 import {
   Activity,
   BookOpen,
-  Building2,
   ChevronDown,
   CheckCircle2,
   ClipboardList,
@@ -81,8 +80,7 @@ const menuSections: Array<{ label: string; items: MenuItem[] }> = [
     label: "基础档案",
     items: [
       { id: "m1-products", title: "M1 商品档案", subtitle: "商品编码 / 规格", icon: PackageCheck },
-      { id: "m1-suppliers", title: "M1 供应商档案", subtitle: "资质 / 联系人", icon: Building2 },
-      { id: "m1-customers", title: "M1 客户档案", subtitle: "客户 / 门店", icon: Users },
+      { id: "m1-business-partners", title: "M1 客商档案", subtitle: "供应商 / 客户门店", icon: Users },
       { id: "m1-warehouses", title: "M1 仓库管理", subtitle: "仓库 / 状态", icon: Warehouse },
       { id: "m1-locations", title: "M1 库位管理", subtitle: "库位 / 容量", icon: MapPinned },
       { id: "m1-system-dictionary", title: "M1 系统字典", subtitle: "单据类型 / 特殊药品分类", icon: BookOpen },
@@ -195,8 +193,7 @@ function inboundViewToMode(view: AdminView): M2InboundMode | null {
 function masterDataViewToId(view: AdminView): MasterDataViewId | null {
   if (
     view === "m1-products" ||
-    view === "m1-suppliers" ||
-    view === "m1-customers" ||
+    view === "m1-business-partners" ||
     view === "m1-warehouses" ||
     view === "m1-locations" ||
     view === "m1-system-dictionary"

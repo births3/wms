@@ -27,13 +27,35 @@ const sourceColumn: DataGridColumn<MasterDataRow> = {
   },
 };
 
+const businessPartnerTypeColumn: DataGridColumn<MasterDataRow> = {
+  key: "businessPartnerType",
+  header: "类型",
+  width: 140,
+  minWidth: 120,
+  sortable: true,
+  sortValue: (row) => row.partnerTypeLabel ?? "-",
+  filterValue: (row) => row.partnerTypeLabel ?? "-",
+  copyValue: (row) => row.partnerTypeLabel ?? "-",
+  render: (row) => row.partnerTypeLabel ?? "-",
+  filter: {
+    type: "multiSelect",
+    options: [
+      { label: "供应商", value: "供应商" },
+      { label: "客户/门店", value: "客户/门店" },
+    ],
+  },
+};
+
 export function masterDataColumns(
   viewId: MasterDataViewId,
   baseColumns: DataGridColumn<MasterDataRow>[],
   locationColumns: DataGridColumn<MasterDataRow>[],
 ) {
-  if (viewId === "m1-products" || viewId === "m1-suppliers" || viewId === "m1-customers") {
+  if (viewId === "m1-products") {
     return [...baseColumns, sourceColumn];
+  }
+  if (viewId === "m1-business-partners") {
+    return [...baseColumns, businessPartnerTypeColumn, sourceColumn];
   }
   if (viewId === "m1-locations") return locationColumns;
   return baseColumns;
@@ -41,13 +63,13 @@ export function masterDataColumns(
 
 export function masterDataActionLabels(viewId: MasterDataViewId) {
   if (viewId === "m1-products") return ["新建商品", "批量导入"];
-  if (viewId === "m1-suppliers") return ["新建供应商", "批量导入"];
-  if (viewId === "m1-customers") return ["新建客户", "批量导入"];
+  if (viewId === "m1-business-partners") return ["新建供应商", "导入供应商", "新建客户", "导入客户"];
   return [];
 }
 
 export function productTableClassName(viewId: MasterDataViewId) {
   if (viewId === "m1-locations") return "min-w-[1720px]";
   if (viewId === "m1-products") return "min-w-[2380px]";
+  if (viewId === "m1-business-partners") return "min-w-[1680px]";
   return "min-w-[1460px]";
 }

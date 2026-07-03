@@ -41,8 +41,7 @@ REQUIRED_ROUTE_MARKERS = (
 
 REQUIRED_NAV_ITEMS = (
     ("m1-products", "M1 商品档案"),
-    ("m1-suppliers", "M1 供应商档案"),
-    ("m1-customers", "M1 客户档案"),
+    ("m1-business-partners", "M1 客商档案"),
     ("m1-warehouses", "M1 仓库管理"),
     ("m1-locations", "M1 库位管理"),
     ("m1-system-dictionary", "M1 系统字典"),
