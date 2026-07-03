@@ -95,10 +95,61 @@ interface DevCustomer {
   updated_at: string;
 }
 
+interface DevWarehouse {
+  id: string;
+  owner_id: string;
+  warehouse_code: string;
+  warehouse_name: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface DevLocation {
+  id: string;
+  owner_id: string;
+  warehouse_id: string;
+  zone_id: string;
+  location_code: string;
+  row_no: number;
+  column_no: number;
+  layer_no: number;
+  max_volume_cm3: number;
+  used_volume_cm3: number;
+  max_sku_count: number;
+  location_type: string;
+  bound_owner_id: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface DevSpecialDrugCategory {
+  id: string;
+  owner_id: string;
+  category_code: string;
+  category_name: string;
+  requires_dual_sign: boolean;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface DevFeatureFlagConfig {
+  key: string;
+  owner: string;
+  created_at: string;
+  cleanup_by: string;
+  enabled: boolean;
+  source: string;
+}
+
 const devCreatedOrders: DevOrder[] = [];
 const devCreatedProducts: DevProduct[] = [];
 const devCreatedSuppliers: DevSupplier[] = [];
 const devCreatedCustomers: DevCustomer[] = [];
+const devCreatedWarehouses: DevWarehouse[] = [];
+const devCreatedLocations: DevLocation[] = [];
 const devSeedOrderStatusOverrides = new Map<string, string>();
 
 const devUser = {
@@ -126,6 +177,103 @@ let devProduct: DevProduct = {
   created_at: "2026-06-29T00:00:00.000Z",
   updated_at: "2026-06-29T00:00:00.000Z",
 };
+
+let devSupplier: DevSupplier = {
+  id: "00000000-0000-0000-0000-000000001101",
+  owner_id: devOwnerId,
+  supplier_code: "S-M1-001",
+  supplier_name: "鹏鹞示例供应商",
+  license_no: "SPL-2026-001",
+  contact_name: "王供应",
+  source: "api_import",
+  status: "active",
+  created_at: "2026-06-29T00:00:00.000Z",
+  updated_at: "2026-06-29T00:00:00.000Z",
+};
+
+let devCustomer: DevCustomer = {
+  id: "00000000-0000-0000-0000-000000001201",
+  owner_id: devOwnerId,
+  customer_code: "C-M1-001",
+  customer_name: "鹏鹞示例门店",
+  license_no: "CPL-2026-001",
+  source: "api_import",
+  status: "active",
+  created_at: "2026-06-29T00:00:00.000Z",
+  updated_at: "2026-06-29T00:00:00.000Z",
+};
+
+let devWarehouse: DevWarehouse = {
+  id: devWarehouseId,
+  owner_id: devOwnerId,
+  warehouse_code: "WH-M1-001",
+  warehouse_name: "鹏鹞冷链仓",
+  status: "active",
+  created_at: "2026-06-29T00:00:00.000Z",
+  updated_at: "2026-06-29T00:00:00.000Z",
+};
+
+let devLocation: DevLocation = {
+  id: devLocationId,
+  owner_id: devOwnerId,
+  warehouse_id: devWarehouseId,
+  zone_id: "00000000-0000-0000-0000-000000003101",
+  location_code: "A01-01-02-03",
+  row_no: 1,
+  column_no: 2,
+  layer_no: 3,
+  max_volume_cm3: 1000000,
+  used_volume_cm3: 120000,
+  max_sku_count: 3,
+  location_type: "storage",
+  bound_owner_id: null,
+  status: "available",
+  created_at: "2026-06-29T00:00:00.000Z",
+  updated_at: "2026-06-29T00:00:00.000Z",
+};
+
+const devSpecialDrugCategories: DevSpecialDrugCategory[] = [
+  {
+    id: "00000000-0000-0000-0000-000000001601",
+    owner_id: devOwnerId,
+    category_code: "none",
+    category_name: "普通药品",
+    requires_dual_sign: false,
+    status: "active",
+    created_at: "2026-06-29T00:00:00.000Z",
+    updated_at: "2026-06-29T00:00:00.000Z",
+  },
+  {
+    id: "00000000-0000-0000-0000-000000001602",
+    owner_id: devOwnerId,
+    category_code: "psychotropic",
+    category_name: "第二类精神药品",
+    requires_dual_sign: true,
+    status: "active",
+    created_at: "2026-06-29T00:00:00.000Z",
+    updated_at: "2026-06-29T00:00:00.000Z",
+  },
+];
+
+let devFeatureFlagSource = "config_center";
+let devFeatureFlags: DevFeatureFlagConfig[] = [
+  {
+    key: "m1.master_data_crud",
+    owner: "M1",
+    created_at: "2026-06-29",
+    cleanup_by: "2026-08-31",
+    enabled: true,
+    source: "config_center",
+  },
+  {
+    key: "m1.special_drug_category",
+    owner: "M1",
+    created_at: "2026-06-29",
+    cleanup_by: "2026-08-31",
+    enabled: true,
+    source: "config_center",
+  },
+];
 
 function webAdminDevMock(): Plugin {
   return {
@@ -191,9 +339,44 @@ async function handleDevMockRequest(
     return true;
   }
 
+  if (pathname.startsWith("/api/v1/config-center/feature-flags")) {
+    await handleFeatureFlagRequest(req, res, pathname);
+    return true;
+  }
+
   const productDetail = pathname.match(/^\/api\/v1\/master-data\/products\/([^/]+)$/);
   if (req.method === "PATCH" && productDetail) {
     await handleProductUpdate(req, res, productDetail[1]);
+    return true;
+  }
+
+  const supplierDetail = pathname.match(/^\/api\/v1\/master-data\/suppliers\/([^/]+)$/);
+  if (req.method === "PATCH" && supplierDetail) {
+    await handleSupplierUpdate(req, res, supplierDetail[1]);
+    return true;
+  }
+
+  const customerDetail = pathname.match(/^\/api\/v1\/master-data\/customers\/([^/]+)$/);
+  if (req.method === "PATCH" && customerDetail) {
+    await handleCustomerUpdate(req, res, customerDetail[1]);
+    return true;
+  }
+
+  const warehouseDetail = pathname.match(/^\/api\/v1\/master-data\/warehouses\/([^/]+)$/);
+  if (req.method === "PATCH" && warehouseDetail) {
+    await handleWarehouseUpdate(req, res, warehouseDetail[1]);
+    return true;
+  }
+
+  const locationDetail = pathname.match(/^\/api\/v1\/master-data\/locations\/([^/]+)$/);
+  if (req.method === "PATCH" && locationDetail) {
+    await handleLocationUpdate(req, res, locationDetail[1]);
+    return true;
+  }
+
+  const specialDrugCategoryDetail = pathname.match(/^\/api\/v1\/master-data\/special-drug-categories\/([^/]+)$/);
+  if (req.method === "PATCH" && specialDrugCategoryDetail) {
+    await handleSpecialDrugCategoryUpdate(req, res, specialDrugCategoryDetail[1]);
     return true;
   }
 
@@ -225,6 +408,30 @@ async function handleDevMockRequest(
     const body = await readJsonBody(req);
     const created = devCustomerFromCreateRequest(body);
     devCreatedCustomers.unshift(created);
+    sendJson(res, 200, created);
+    return true;
+  }
+
+  if (req.method === "POST" && pathname === "/api/v1/master-data/warehouses") {
+    const body = await readJsonBody(req);
+    const created = devWarehouseFromCreateRequest(body);
+    devCreatedWarehouses.unshift(created);
+    sendJson(res, 200, created);
+    return true;
+  }
+
+  if (req.method === "POST" && pathname === "/api/v1/master-data/locations") {
+    const body = await readJsonBody(req);
+    const created = devLocationFromCreateRequest(body);
+    devCreatedLocations.unshift(created);
+    sendJson(res, 200, created);
+    return true;
+  }
+
+  if (req.method === "POST" && pathname === "/api/v1/master-data/special-drug-categories") {
+    const body = await readJsonBody(req);
+    const created = devSpecialDrugCategoryFromCreateRequest(body);
+    devSpecialDrugCategories.unshift(created);
     sendJson(res, 200, created);
     return true;
   }
@@ -270,7 +477,6 @@ async function handleDevMockRequest(
 
 function devMasterDataResponse(pathname: string): Record<string, unknown> | null {
   const updatedAt = "2026-06-29T00:00:00.000Z";
-  const page = { count: 1, next_cursor: null };
 
   if (pathname === "/api/v1/master-data/products") {
     const data = [...devCreatedProducts, ...devSeedProducts(updatedAt)];
@@ -302,45 +508,25 @@ function devMasterDataResponse(pathname: string): Record<string, unknown> | null
   }
 
   if (pathname === "/api/v1/master-data/warehouses") {
+    const data = [...devCreatedWarehouses, devWarehouse];
     return {
-      data: [
-        {
-          id: devWarehouseId,
-          owner_id: devOwnerId,
-          warehouse_code: "WH-M1-001",
-          warehouse_name: "鹏鹞冷链仓",
-          status: "active",
-          created_at: updatedAt,
-          updated_at: updatedAt,
-        },
-      ],
-      page,
+      data,
+      page: { count: data.length, next_cursor: null },
     };
   }
 
   if (pathname === "/api/v1/master-data/locations") {
+    const data = [...devCreatedLocations, devLocation];
     return {
-      data: [
-        {
-          id: devLocationId,
-          owner_id: devOwnerId,
-          warehouse_id: devWarehouseId,
-          zone_id: "00000000-0000-0000-0000-000000003101",
-          location_code: "A01-01-02-03",
-          row_no: 1,
-          column_no: 2,
-          layer_no: 3,
-          max_volume_cm3: 1000000,
-          used_volume_cm3: 120000,
-          max_sku_count: 3,
-          location_type: "storage",
-          bound_owner_id: null,
-          status: "available",
-          created_at: updatedAt,
-          updated_at: updatedAt,
-        },
-      ],
-      page,
+      data,
+      page: { count: data.length, next_cursor: null },
+    };
+  }
+
+  if (pathname === "/api/v1/master-data/special-drug-categories") {
+    return {
+      data: devSpecialDrugCategories,
+      page: { count: devSpecialDrugCategories.length, next_cursor: null },
     };
   }
 
@@ -421,37 +607,12 @@ function devSeedProducts(updatedAt: string): DevProduct[] {
   ];
 }
 
-function devSeedSuppliers(updatedAt: string): DevSupplier[] {
-  return [
-    {
-      id: "00000000-0000-0000-0000-000000001101",
-      owner_id: devOwnerId,
-      supplier_code: "S-M1-001",
-      supplier_name: "鹏鹞示例供应商",
-      license_no: "SPL-2026-001",
-      contact_name: "王供应",
-      source: "api_import",
-      status: "active",
-      created_at: updatedAt,
-      updated_at: updatedAt,
-    },
-  ];
+function devSeedSuppliers(_updatedAt: string): DevSupplier[] {
+  return [devSupplier];
 }
 
-function devSeedCustomers(updatedAt: string): DevCustomer[] {
-  return [
-    {
-      id: "00000000-0000-0000-0000-000000001201",
-      owner_id: devOwnerId,
-      customer_code: "C-M1-001",
-      customer_name: "鹏鹞示例门店",
-      license_no: "CPL-2026-001",
-      source: "api_import",
-      status: "active",
-      created_at: updatedAt,
-      updated_at: updatedAt,
-    },
-  ];
+function devSeedCustomers(_updatedAt: string): DevCustomer[] {
+  return [devCustomer];
 }
 
 function devProductFromCreateRequest(body: Record<string, unknown>): DevProduct {
@@ -508,6 +669,115 @@ function devCustomerFromCreateRequest(body: Record<string, unknown>): DevCustome
   };
 }
 
+function devWarehouseFromCreateRequest(body: Record<string, unknown>): DevWarehouse {
+  const now = new Date().toISOString();
+  return {
+    id: crypto.randomUUID(),
+    owner_id: devOwnerId,
+    warehouse_code: asString(body.warehouse_code, "WH-M1-NEW"),
+    warehouse_name: asString(body.warehouse_name, "新建仓库"),
+    status: "active",
+    created_at: now,
+    updated_at: now,
+  };
+}
+
+function devLocationFromCreateRequest(body: Record<string, unknown>): DevLocation {
+  const now = new Date().toISOString();
+  return {
+    id: crypto.randomUUID(),
+    owner_id: devOwnerId,
+    warehouse_id: asString(body.warehouse_id, devWarehouseId),
+    zone_id: asString(body.zone_id, "00000000-0000-0000-0000-000000003101"),
+    location_code: asString(body.location_code, "A01-NEW-01-01"),
+    row_no: asNumber(body.row_no, 1),
+    column_no: asNumber(body.column_no, 1),
+    layer_no: asNumber(body.layer_no, 1),
+    max_volume_cm3: asNumber(body.max_volume_cm3, 5000000),
+    used_volume_cm3: 0,
+    max_sku_count: asNumber(body.max_sku_count, 1),
+    location_type: asString(body.location_type, "storage"),
+    bound_owner_id: asNullableString(body.bound_owner_id),
+    status: "available",
+    created_at: now,
+    updated_at: now,
+  };
+}
+
+function devSpecialDrugCategoryFromCreateRequest(body: Record<string, unknown>): DevSpecialDrugCategory {
+  const now = new Date().toISOString();
+  return {
+    id: crypto.randomUUID(),
+    owner_id: devOwnerId,
+    category_code: asString(body.category_code, "special_new"),
+    category_name: asString(body.category_name, "新特殊分类"),
+    requires_dual_sign: asBoolean(body.requires_dual_sign, false),
+    status: "active",
+    created_at: now,
+    updated_at: now,
+  };
+}
+
+async function handleFeatureFlagRequest(req: IncomingMessage, res: ServerResponse, pathname: string) {
+  if (req.method === "GET" && pathname === "/api/v1/config-center/feature-flags/export") {
+    sendJson(res, 200, { source: devFeatureFlagSource, flags: devFeatureFlags });
+    return;
+  }
+
+  if (req.method === "GET" && pathname === "/api/v1/config-center/feature-flags/reconcile") {
+    sendJson(res, 200, { matched: devFeatureFlags.length, missing_in_config_center: [], mismatched: [] });
+    return;
+  }
+
+  if (req.method === "POST" && pathname === "/api/v1/config-center/feature-flags/migrate") {
+    devFeatureFlagSource = "config_center";
+    sendJson(res, 200, { source: "file", target: devFeatureFlagSource, migrated_count: devFeatureFlags.length });
+    return;
+  }
+
+  if (req.method === "POST" && pathname === "/api/v1/config-center/feature-flags/import") {
+    const body = await readJsonBody(req);
+    const flags = Array.isArray(body.flags) ? body.flags.map((item) => devFeatureFlagConfig(asRecord(item))) : [];
+    devFeatureFlags = flags;
+    sendJson(res, 200, { imported_count: flags.length, target: devFeatureFlagSource });
+    return;
+  }
+
+  if (req.method === "POST" && pathname === "/api/v1/config-center/feature-flags/source") {
+    const body = await readJsonBody(req);
+    devFeatureFlagSource = asString(body.source, "config_center");
+    sendJson(res, 200, { active_source: devFeatureFlagSource });
+    return;
+  }
+
+  if (req.method === "POST" && pathname === "/api/v1/config-center/feature-flags/archive-file-source") {
+    const body = await readJsonBody(req);
+    sendJson(res, 200, {
+      archived_source: "file",
+      archive_ref: asString(body.archive_ref, "deploy/feature_flags.toml"),
+      archived_at: new Date().toISOString(),
+    });
+    return;
+  }
+
+  sendJson(res, 404, {
+    code: "DEV_MOCK_NOT_FOUND",
+    message: "Feature flag dev mock route not found",
+    trace_id: "dev-mock",
+  });
+}
+
+function devFeatureFlagConfig(body: Record<string, unknown>): DevFeatureFlagConfig {
+  return {
+    key: asString(body.key, "unknown.flag"),
+    owner: asString(body.owner, "M1"),
+    created_at: asString(body.created_at, new Date().toISOString().slice(0, 10)),
+    cleanup_by: asString(body.cleanup_by, "2026-08-31"),
+    enabled: asBoolean(body.enabled, false),
+    source: asString(body.source, devFeatureFlagSource),
+  };
+}
+
 async function handleProductUpdate(req: IncomingMessage, res: ServerResponse, id: string) {
   const createdProductIndex = devCreatedProducts.findIndex((product) => product.id === id);
   const product = id === devProduct.id ? devProduct : devCreatedProducts[createdProductIndex];
@@ -542,6 +812,117 @@ async function handleProductUpdate(req: IncomingMessage, res: ServerResponse, id
     devCreatedProducts[createdProductIndex] = updatedProduct;
   }
   sendJson(res, 200, updatedProduct);
+}
+
+async function handleSupplierUpdate(req: IncomingMessage, res: ServerResponse, id: string) {
+  const createdIndex = devCreatedSuppliers.findIndex((supplier) => supplier.id === id);
+  const supplier = id === devSupplier.id ? devSupplier : devCreatedSuppliers[createdIndex];
+  if (!supplier) {
+    sendJson(res, 404, { code: "DEV_MOCK_NOT_FOUND", message: "Supplier not found", trace_id: "dev-mock" });
+    return;
+  }
+
+  const body = await readJsonBody(req);
+  const updated: DevSupplier = {
+    ...supplier,
+    supplier_name: asString(body.supplier_name, supplier.supplier_name),
+    license_no: asNullableString(body.license_no) ?? supplier.license_no,
+    contact_name: asNullableString(body.contact_name) ?? supplier.contact_name,
+    status: asString(body.status, supplier.status),
+    updated_at: new Date().toISOString(),
+  };
+  if (id === devSupplier.id) devSupplier = updated;
+  else devCreatedSuppliers[createdIndex] = updated;
+  sendJson(res, 200, updated);
+}
+
+async function handleCustomerUpdate(req: IncomingMessage, res: ServerResponse, id: string) {
+  const createdIndex = devCreatedCustomers.findIndex((customer) => customer.id === id);
+  const customer = id === devCustomer.id ? devCustomer : devCreatedCustomers[createdIndex];
+  if (!customer) {
+    sendJson(res, 404, { code: "DEV_MOCK_NOT_FOUND", message: "Customer not found", trace_id: "dev-mock" });
+    return;
+  }
+
+  const body = await readJsonBody(req);
+  const updated: DevCustomer = {
+    ...customer,
+    customer_name: asString(body.customer_name, customer.customer_name),
+    license_no: asNullableString(body.license_no) ?? customer.license_no,
+    status: asString(body.status, customer.status),
+    updated_at: new Date().toISOString(),
+  };
+  if (id === devCustomer.id) devCustomer = updated;
+  else devCreatedCustomers[createdIndex] = updated;
+  sendJson(res, 200, updated);
+}
+
+async function handleWarehouseUpdate(req: IncomingMessage, res: ServerResponse, id: string) {
+  const createdIndex = devCreatedWarehouses.findIndex((warehouse) => warehouse.id === id);
+  const warehouse = id === devWarehouse.id ? devWarehouse : devCreatedWarehouses[createdIndex];
+  if (!warehouse) {
+    sendJson(res, 404, { code: "DEV_MOCK_NOT_FOUND", message: "Warehouse not found", trace_id: "dev-mock" });
+    return;
+  }
+
+  const body = await readJsonBody(req);
+  const updated: DevWarehouse = {
+    ...warehouse,
+    warehouse_name: asString(body.warehouse_name, warehouse.warehouse_name),
+    status: asString(body.status, warehouse.status),
+    updated_at: new Date().toISOString(),
+  };
+  if (id === devWarehouse.id) devWarehouse = updated;
+  else devCreatedWarehouses[createdIndex] = updated;
+  sendJson(res, 200, updated);
+}
+
+async function handleLocationUpdate(req: IncomingMessage, res: ServerResponse, id: string) {
+  const createdIndex = devCreatedLocations.findIndex((location) => location.id === id);
+  const location = id === devLocation.id ? devLocation : devCreatedLocations[createdIndex];
+  if (!location) {
+    sendJson(res, 404, { code: "DEV_MOCK_NOT_FOUND", message: "Location not found", trace_id: "dev-mock" });
+    return;
+  }
+
+  const body = await readJsonBody(req);
+  const updated: DevLocation = {
+    ...location,
+    zone_id: asNullableString(body.zone_id) ?? location.zone_id,
+    location_code: asString(body.location_code, location.location_code),
+    row_no: asNumber(body.row_no, location.row_no),
+    column_no: asNumber(body.column_no, location.column_no),
+    layer_no: asNumber(body.layer_no, location.layer_no),
+    max_volume_cm3: asNumber(body.max_volume_cm3, location.max_volume_cm3),
+    used_volume_cm3: asNumber(body.used_volume_cm3, location.used_volume_cm3),
+    max_sku_count: asNumber(body.max_sku_count, location.max_sku_count),
+    location_type: asString(body.location_type, location.location_type),
+    bound_owner_id: asNullableString(body.bound_owner_id) ?? location.bound_owner_id,
+    status: asString(body.status, location.status),
+    updated_at: new Date().toISOString(),
+  };
+  if (id === devLocation.id) devLocation = updated;
+  else devCreatedLocations[createdIndex] = updated;
+  sendJson(res, 200, updated);
+}
+
+async function handleSpecialDrugCategoryUpdate(req: IncomingMessage, res: ServerResponse, id: string) {
+  const index = devSpecialDrugCategories.findIndex((category) => category.id === id);
+  if (index < 0) {
+    sendJson(res, 404, { code: "DEV_MOCK_NOT_FOUND", message: "Special category not found", trace_id: "dev-mock" });
+    return;
+  }
+
+  const body = await readJsonBody(req);
+  const current = devSpecialDrugCategories[index];
+  devSpecialDrugCategories[index] = {
+    ...current,
+    category_name: asNullableString(body.category_name) ?? current.category_name,
+    requires_dual_sign: asBoolean(body.requires_dual_sign, current.requires_dual_sign),
+    status: asString(body.status, current.status),
+    updated_at: new Date().toISOString(),
+  };
+  sendJson(res, 200, devSpecialDrugCategories[index]);
 }
 
 async function handleInboundAction(req: IncomingMessage, res: ServerResponse, action: string | undefined, orderId: string) {
@@ -815,6 +1196,10 @@ function asString(value: unknown, fallback: string) {
 
 function asNullableString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function asBoolean(value: unknown, fallback: boolean) {
+  return typeof value === "boolean" ? value : fallback;
 }
 
 function asDocumentType(value: unknown): "purchase_inbound" | "sales_return" {
