@@ -56,7 +56,7 @@ export function ProductEditDialog({
 
   return (
     <Dialog open={true} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
         <form className="grid gap-4" onSubmit={onSubmit}>
           <DialogHeader>
             <DialogTitle>编辑商品</DialogTitle>
@@ -115,6 +115,41 @@ export function ProductEditDialog({
               value={form.status}
               options={productStatusOptions}
               onChange={(value) => onFormChange({ status: value })}
+            />
+            <TextField
+              label="商品中包装"
+              value={form.middlePackage}
+              onChange={(value) => onFormChange({ middlePackage: value })}
+            />
+            <TextField
+              label="商品大包装"
+              value={form.largePackage}
+              onChange={(value) => onFormChange({ largePackage: value })}
+            />
+            <TextField
+              label="单位长（mm）"
+              value={form.unitLengthMm}
+              onChange={(value) => onFormChange({ unitLengthMm: value })}
+            />
+            <TextField
+              label="单位宽（mm）"
+              value={form.unitWidthMm}
+              onChange={(value) => onFormChange({ unitWidthMm: value })}
+            />
+            <TextField
+              label="单位高（mm）"
+              value={form.unitHeightMm}
+              onChange={(value) => onFormChange({ unitHeightMm: value })}
+            />
+            <TextField
+              label="单位重量（克）"
+              value={form.unitWeightG}
+              onChange={(value) => onFormChange({ unitWeightG: value })}
+            />
+            <TextField
+              label="单位体积（cm³）"
+              value={form.unitVolumeCm3}
+              onChange={(value) => onFormChange({ unitVolumeCm3: value })}
             />
           </div>
 

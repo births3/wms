@@ -48,6 +48,6 @@ export function masterDataActionLabels(viewId: MasterDataViewId) {
 
 export function productTableClassName(viewId: MasterDataViewId) {
   if (viewId === "m1-locations") return "min-w-[1720px]";
-  if (viewId === "m1-products") return "min-w-[1680px]";
+  if (viewId === "m1-products") return "min-w-[2380px]";
   return "min-w-[1460px]";
 }

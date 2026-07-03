@@ -69,6 +69,13 @@ export interface ProductMasterDataFields {
   specialDrugCategoryCode?: string | null;
   spec?: string | null;
   storageCondition?: string | null;
+  middlePackage: string;
+  largePackage: string;
+  unitLengthMm: string;
+  unitWidthMm: string;
+  unitHeightMm: string;
+  unitWeightG: string;
+  unitVolumeCm3: string;
 }
 
 export interface LocationMasterDataFields {
@@ -476,6 +483,13 @@ async function updateSpecialDrugCategory(input: {
 export function productRow(item: Product): MasterDataRow {
   const storageCondition = text(item.attrs.storage_condition ?? item.attrs.storage);
   const sourceValue = productSourceLabel(item.attrs.source);
+  const middlePackage = productAttrText(item.attrs, "middle_package");
+  const largePackage = productAttrText(item.attrs, "large_package");
+  const unitLengthMm = productAttrText(item.attrs, "unit_length_mm");
+  const unitWidthMm = productAttrText(item.attrs, "unit_width_mm");
+  const unitHeightMm = productAttrText(item.attrs, "unit_height_mm");
+  const unitWeightG = productAttrText(item.attrs, "unit_weight_g");
+  const unitVolumeCm3 = productAttrText(item.attrs, "unit_volume_cm3");
   return row({
     id: item.id,
     code: item.product_code,
@@ -500,6 +514,13 @@ export function productRow(item: Product): MasterDataRow {
       specialDrugCategoryCode: item.special_drug_category_code,
       spec: item.spec,
       storageCondition,
+      middlePackage,
+      largePackage,
+      unitLengthMm,
+      unitWidthMm,
+      unitHeightMm,
+      unitWeightG,
+      unitVolumeCm3,
     },
   });
 }
@@ -675,6 +696,7 @@ export function specialDrugCategoryOptions(
 
 function row(input: Omit<MasterDataRow, "searchText">): MasterDataRow {
   const locationSearchText = input.locationFields ? Object.values(input.locationFields) : [];
+  const productSearchText = input.productFields ? Object.values(input.productFields).filter(isSearchTextValue) : [];
   return {
     ...input,
     searchText: [
@@ -688,11 +710,20 @@ function row(input: Omit<MasterDataRow, "searchText">): MasterDataRow {
       input.extraValue,
       input.createdAt,
       input.sourceValue ?? "",
+      ...productSearchText,
       ...locationSearchText,
     ]
       .join(" ")
       .toLowerCase(),
   };
+}
+
+function productAttrText(attrs: Record<string, unknown>, key: string) {
+  return text(attrs[key]);
+}
+
+function isSearchTextValue(value: unknown): value is string | number {
+  return typeof value === "string" || typeof value === "number";
 }
 
 export function productSourceLabel(value: unknown) {
