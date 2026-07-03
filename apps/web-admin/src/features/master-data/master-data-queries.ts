@@ -8,6 +8,7 @@ export type MasterDataViewId =
   | "m1-products"
   | "m1-business-partners"
   | "m1-warehouses"
+  | "m1-zones"
   | "m1-locations"
   | "m1-system-dictionary";
 
@@ -51,6 +52,7 @@ export interface MasterDataRow {
   sourceValue?: string;
   updatedAt: string;
   productFields?: ProductMasterDataFields;
+  zoneFields?: WarehouseZoneMasterDataFields;
   locationFields?: LocationMasterDataFields;
   partnerKind?: BusinessPartnerKind;
   partnerTypeLabel?: string;
@@ -88,6 +90,14 @@ export interface LocationMasterDataFields {
   maxVolumeCm3: string;
   usedVolumeCm3: string;
   maxSku: string;
+}
+
+export interface WarehouseZoneMasterDataFields {
+  owner: string;
+  warehouse: string;
+  zone: string;
+  locationCount: string;
+  availableLocationCount: string;
 }
 
 export interface SystemDictionaryPaneItem {
@@ -192,6 +202,8 @@ async function listMasterDataRows(viewId: MasterDataViewId): Promise<MasterDataR
       return listBusinessPartners();
     case "m1-warehouses":
       return listWarehouses();
+    case "m1-zones":
+      return listWarehouseZones();
     case "m1-locations":
       return listLocations();
     case "m1-system-dictionary":
@@ -256,6 +268,75 @@ async function listLocations(): Promise<MasterDataRow[]> {
     throw new ApiError(result.error, "读取库位档案失败", result.response.status);
   }
   return result.data.data.map(locationRow);
+}
+
+async function listWarehouseZones(): Promise<MasterDataRow[]> {
+  return warehouseZoneRowsFromLocations(await listLocations());
+}
+
+export function warehouseZoneRowsFromLocations(
+  locations: readonly MasterDataRow[],
+): MasterDataRow[] {
+  const zones = new Map<
+    string,
+    {
+      owner: string;
+      warehouse: string;
+      zone: string;
+      locationCount: number;
+      availableLocationCount: number;
+      createdAt: string;
+      updatedAt: string;
+    }
+  >();
+
+  for (const location of locations) {
+    const fields = location.locationFields;
+    if (!fields || fields.warehouse === "-" || fields.zone === "-") continue;
+    const owner = fields.owner === "-" ? location.ownerId : fields.owner;
+    const key = `${owner}:${fields.warehouse}:${fields.zone}`;
+    const current = zones.get(key);
+    zones.set(key, {
+      owner,
+      warehouse: fields.warehouse,
+      zone: fields.zone,
+      locationCount: (current?.locationCount ?? 0) + 1,
+      availableLocationCount:
+        (current?.availableLocationCount ?? 0) + (location.status === "available" ? 1 : 0),
+      createdAt: current ? minText(current.createdAt, location.createdAt) : location.createdAt,
+      updatedAt: current ? maxText(current.updatedAt, location.updatedAt) : location.updatedAt,
+    });
+  }
+
+  return Array.from(zones.values())
+    .sort((left, right) =>
+      `${left.warehouse}:${left.zone}`.localeCompare(`${right.warehouse}:${right.zone}`, "zh-CN"),
+    )
+    .map((zone) =>
+      row({
+        id: `${zone.owner}:${zone.warehouse}:${zone.zone}`,
+        code: zone.zone,
+        name: `库区 ${shortId(zone.zone)}`,
+        status: "derived_readonly",
+        statusLabel: "只读派生",
+        ownerId: zone.owner,
+        primaryLabel: "仓库 ID",
+        primaryValue: zone.warehouse,
+        secondaryLabel: "库区 ID",
+        secondaryValue: zone.zone,
+        extraLabel: "库位数",
+        extraValue: `${zone.locationCount} 个 / 可用 ${zone.availableLocationCount} 个`,
+        createdAt: zone.createdAt,
+        updatedAt: zone.updatedAt,
+        zoneFields: {
+          owner: zone.owner,
+          warehouse: zone.warehouse,
+          zone: zone.zone,
+          locationCount: String(zone.locationCount),
+          availableLocationCount: String(zone.availableLocationCount),
+        },
+      }),
+    );
 }
 
 export async function batchCreateLocations(
@@ -655,6 +736,7 @@ export function specialDrugCategoryOptions(
 
 function row(input: Omit<MasterDataRow, "searchText">): MasterDataRow {
   const locationSearchText = input.locationFields ? Object.values(input.locationFields) : [];
+  const zoneSearchText = input.zoneFields ? Object.values(input.zoneFields) : [];
   const productSearchText = input.productFields ? Object.values(input.productFields).filter(isSearchTextValue) : [];
   return {
     ...input,
@@ -670,6 +752,7 @@ function row(input: Omit<MasterDataRow, "searchText">): MasterDataRow {
       input.createdAt,
       input.sourceValue ?? "",
       input.partnerTypeLabel ?? "",
+      ...zoneSearchText,
       ...productSearchText,
       ...locationSearchText,
     ]
@@ -737,6 +820,18 @@ function locationAreaCode(locationCode: string) {
 function idempotencyKey(prefix: string) {
   const random = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
   return `${prefix}-${random}`;
+}
+
+function minText(left: string, right: string) {
+  return left <= right ? left : right;
+}
+
+function maxText(left: string, right: string) {
+  return left >= right ? left : right;
+}
+
+function shortId(value: string) {
+  return value.length > 8 ? value.slice(0, 8) : value;
 }
 
 function text(value: unknown) {

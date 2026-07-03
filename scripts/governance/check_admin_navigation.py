@@ -43,6 +43,7 @@ REQUIRED_NAV_ITEMS = (
     ("m1-products", "M1 商品档案"),
     ("m1-business-partners", "M1 客商档案"),
     ("m1-warehouses", "M1 仓库管理"),
+    ("m1-zones", "M1 库区管理"),
     ("m1-locations", "M1 库位管理"),
     ("m1-system-dictionary", "M1 系统字典"),
 )

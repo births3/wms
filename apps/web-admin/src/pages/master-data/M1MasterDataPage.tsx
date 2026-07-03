@@ -78,6 +78,12 @@ export const masterDataViewMeta: Record<
     emptyTitle: "暂无仓库档案",
     storageKey: "m1-warehouses-datagrid",
   },
+  "m1-zones": {
+    title: "M1 库区管理",
+    subtitle: "基于真实库位 API 派生的库区上下文",
+    emptyTitle: "暂无库区上下文",
+    storageKey: "m1-zones-datagrid",
+  },
   "m1-locations": {
     title: "M1 库位管理",
     subtitle: "库位编码、容量、类型与状态",
