@@ -49,6 +49,14 @@ export type {
 } from "./DataGrid";
 export { EmptyState } from "./EmptyState";
 export type { EmptyStateProps } from "./EmptyState";
+export { TwoPaneCatalog } from "./TwoPaneCatalog";
+export type {
+  TwoPaneCatalogField,
+  TwoPaneCatalogGroup,
+  TwoPaneCatalogItemBase,
+  TwoPaneCatalogPreference,
+  TwoPaneCatalogProps,
+} from "./TwoPaneCatalog";
 export { SystemDictionaryTwoPane } from "./SystemDictionaryTwoPane";
 export type {
   SystemDictionaryTwoPaneProps,
