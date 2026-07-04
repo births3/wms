@@ -7,8 +7,16 @@
  */
 
 import * as React from "react";
-import { Button, DataGrid, StatusBadge, type DataGridColumn, type DataGridToolbarAction } from "@wms/ui";
-import { CheckCircle2, ClipboardCheck, Eye, PackageCheck } from "lucide-react";
+import {
+  DataGrid,
+  StatusBadge,
+  type DataGridColumn,
+  type DataGridCreateAction,
+  type DataGridDetailAction,
+  type DataGridRefreshAction,
+  type DataGridToolbarAction,
+} from "@wms/ui";
+import { CheckCircle2, ClipboardCheck, PackageCheck } from "lucide-react";
 
 import type { ReceivingOrder } from "@/features/inbound/inbound-queries";
 import type { InboundDialog } from "./M2InboundDialogs";
@@ -32,10 +40,11 @@ interface M2InboundOrderTableProps {
   orders: ReceivingOrder[];
   selectedId: string | null;
   isPending: boolean;
-  onSelectOrder: (id: string) => void;
+  onSelectOrder: (id: string | null) => void;
   onOpenDetail: (id: string) => void;
   onOpenDialog: (id: string, dialog: InboundDialog) => void;
-  toolbarActions?: DataGridToolbarAction[];
+  refreshAction?: DataGridRefreshAction;
+  createAction?: DataGridCreateAction;
 }
 
 export function M2InboundOrderTable({
@@ -47,8 +56,18 @@ export function M2InboundOrderTable({
   onSelectOrder,
   onOpenDetail,
   onOpenDialog,
-  toolbarActions,
+  refreshAction,
+  createAction,
 }: M2InboundOrderTableProps) {
+  const selectedOrder = orders.find((item) => item.id === selectedId) ?? null;
+  const detailAction: DataGridDetailAction = {
+    label: "详情",
+    disabled: !selectedOrder,
+    onClick: () => {
+      if (selectedOrder) onOpenDetail(selectedOrder.id);
+    },
+  };
+  const privateActions = inboundPrivateActions(mode, selectedOrder, onOpenDialog);
   const orderColumns: DataGridColumn<ReceivingOrder>[] = [
     {
       key: "receipt_no",
@@ -172,45 +191,6 @@ export function M2InboundOrderTable({
       },
       render: (row) => <StatusBadge status={statusKey(row.status)} label={statusLabel(row.status)} size="sm" />,
     },
-    {
-      key: "actions",
-      header: "操作",
-      align: "right",
-      width: 230,
-      minWidth: 220,
-      hideable: false,
-      copyable: false,
-      render: (row) => (
-        <div className="flex justify-end gap-2">
-          <RowButton
-            icon={<Eye className="size-4" aria-hidden />}
-            label="详情"
-            onClick={() => onOpenDetail(row.id)}
-          />
-          {mode === "receiving" && canReceiveOrReject(row.status) && (
-            <RowButton
-              icon={<CheckCircle2 className="size-4" aria-hidden />}
-              label="收货"
-              onClick={() => onOpenDialog(row.id, "receive")}
-            />
-          )}
-          {mode === "inspecting" && (
-            <RowButton
-              icon={<ClipboardCheck className="size-4" aria-hidden />}
-              label="验收"
-              onClick={() => onOpenDialog(row.id, "inspect")}
-            />
-          )}
-          {mode === "putaway" && (
-            <RowButton
-              icon={<PackageCheck className="size-4" aria-hidden />}
-              label="上架"
-              onClick={() => onOpenDialog(row.id, "putaway")}
-            />
-          )}
-        </div>
-      ),
-    },
   ];
 
   return (
@@ -220,39 +200,69 @@ export function M2InboundOrderTable({
       rowKey={(row) => row.id}
       selectedKey={selectedId ?? undefined}
       onRowClick={(row) => onSelectOrder(row.id)}
+      selectedRowKeys={selectedId ? [selectedId] : []}
+      onSelectedRowKeysChange={(keys) => onSelectOrder(keys.at(-1) ?? null)}
       caption={isPending ? "加载入库单..." : undefined}
       emptyTitle="暂无入库单"
       storageKey="m2-inbound-datagrid"
-      tableClassName="min-w-[2070px]"
-      toolbarActions={toolbarActions}
+      tableClassName="min-w-[1840px]"
+      refreshAction={refreshAction}
+      createAction={createAction}
+      detailAction={detailAction}
+      toolbarActions={privateActions}
       selectable
     />
   );
 }
 
-function RowButton({
-  icon,
-  label,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      onClick={(event) => {
-        event.stopPropagation();
-        onClick();
-      }}
-    >
-      {icon}
-      {label}
-    </Button>
-  );
+function inboundPrivateActions(
+  mode: M2InboundMode,
+  selectedOrder: ReceivingOrder | null,
+  onOpenDialog: (id: string, dialog: InboundDialog) => void,
+): DataGridToolbarAction[] {
+  if (mode === "receiving") {
+    return [
+      {
+        key: "receive",
+        label: "收货",
+        icon: <CheckCircle2 className="size-4" aria-hidden />,
+        disabled: !selectedOrder || !canReceiveOrReject(selectedOrder.status),
+        onClick: () => {
+          if (selectedOrder) onOpenDialog(selectedOrder.id, "receive");
+        },
+      },
+    ];
+  }
+
+  if (mode === "inspecting") {
+    return [
+      {
+        key: "inspect",
+        label: "验收",
+        icon: <ClipboardCheck className="size-4" aria-hidden />,
+        disabled: !selectedOrder,
+        onClick: () => {
+          if (selectedOrder) onOpenDialog(selectedOrder.id, "inspect");
+        },
+      },
+    ];
+  }
+
+  if (mode === "putaway") {
+    return [
+      {
+        key: "putaway",
+        label: "上架",
+        icon: <PackageCheck className="size-4" aria-hidden />,
+        disabled: !selectedOrder,
+        onClick: () => {
+          if (selectedOrder) onOpenDialog(selectedOrder.id, "putaway");
+        },
+      },
+    ];
+  }
+
+  return [];
 }
 
 function WorkFieldSummary({ order, mode }: { order: ReceivingOrder; mode: M2InboundMode }) {

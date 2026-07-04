@@ -1,8 +1,18 @@
 export { DataGrid } from "./DataGrid";
 export type {
+  DataGridActionDisabled,
   DataGridColumn,
+  DataGridCreateAction,
   DataGridCsvExportState,
+  DataGridDeleteAction,
+  DataGridDetailAction,
+  DataGridDisableAction,
+  DataGridEditAction,
+  DataGridExportAction,
+  DataGridPrintAction,
   DataGridProps,
+  DataGridQueryAction,
+  DataGridRefreshAction,
   DataGridToolbarAction,
   DataGridToolbarActionContext,
 } from "./DataGrid";

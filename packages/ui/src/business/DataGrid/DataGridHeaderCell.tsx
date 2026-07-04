@@ -1,6 +1,6 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
-import { ArrowDown, ArrowUp, ArrowUpDown, Filter, Settings2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Filter, X } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { Button } from "../../ui/button";
 import { DataGridColumnFilter } from "./DataGridColumnFilter";
@@ -20,7 +20,7 @@ import {
  * 层级：Layer 2 业务复合
  * 关联故事：M2 收货管理列表
  * Wave：Wave 6 M2 管理端表格增强
- * 业务约束：排序、字段筛选、字段设置入口和列宽调整集中在表头
+ * 业务约束：排序、字段筛选和列宽调整集中在表头
  *
  * @example
  *   <DataGridHeaderCell column={column} sort={sort} />
@@ -31,18 +31,11 @@ export interface DataGridHeaderCellProps<T> {
   filter: DataGridFilterConfig | false | undefined;
   filterValue: DataGridColumnFilterValue | undefined;
   filterOpen: boolean;
-  isLastVisibleColumn: boolean;
-  fieldListId: string;
-  fieldButtonRef: React.Ref<HTMLButtonElement>;
-  fieldsOpen: boolean;
-  hideableColumnsLength: number;
-  namedViewsControl?: React.ReactNode;
   className?: string;
   onSort: (column: DataGridColumn<T>) => void;
   onToggleFilter: (key: string) => void;
   onFilterChange: (key: string, value: DataGridColumnFilterValue) => void;
   onCloseFilter: () => void;
-  onToggleFields: () => void;
   onResetColumnWidth: (key: string) => void;
   onStartResize: (handle: HTMLElement, column: DataGridColumn<T>, clientX: number) => void;
   onNudgeColumnWidth: (handle: HTMLElement, column: DataGridColumn<T>, delta: number) => void;
@@ -54,18 +47,11 @@ export function DataGridHeaderCell<T>({
   filter,
   filterValue,
   filterOpen,
-  isLastVisibleColumn,
-  fieldListId,
-  fieldButtonRef,
-  fieldsOpen,
-  hideableColumnsLength,
-  namedViewsControl,
   className,
   onSort,
   onToggleFilter,
   onFilterChange,
   onCloseFilter,
-  onToggleFields,
   onResetColumnWidth,
   onStartResize,
   onNudgeColumnWidth,
@@ -154,26 +140,6 @@ export function DataGridHeaderCell<T>({
               )
             : null}
         </>
-      )}
-      {isLastVisibleColumn && (
-        <div className="relative ml-1 flex items-center gap-1 border-l pl-2">
-          {namedViewsControl}
-          <Button
-            ref={fieldButtonRef}
-            type="button"
-            variant="outline"
-            size="icon"
-            className="size-7 border-primary/40 bg-primary/5 text-primary hover:bg-primary/10"
-            aria-label="字段设置"
-            aria-expanded={fieldsOpen}
-            aria-controls={fieldListId}
-            disabled={hideableColumnsLength === 0}
-            onClick={onToggleFields}
-            data-datagrid-popover
-          >
-            <Settings2 className="size-3.5" aria-hidden />
-          </Button>
-        </div>
       )}
       {column.resizable !== false && (
         <button

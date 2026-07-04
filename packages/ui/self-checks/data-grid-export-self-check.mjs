@@ -104,6 +104,14 @@ const dataGridSource = readFileSync(
   new URL("../src/business/DataGrid/DataGrid.tsx", import.meta.url),
   "utf8",
 );
+const dataGridHeaderSource = readFileSync(
+  new URL("../src/business/DataGrid/DataGridHeaderCell.tsx", import.meta.url),
+  "utf8",
+);
+const dataGridNamedViewsSource = readFileSync(
+  new URL("../src/business/DataGrid/DataGridNamedViewsToolbar.tsx", import.meta.url),
+  "utf8",
+);
 const inboundPageSource = readFileSync(
   new URL("../../../apps/web-admin/src/pages/inbound/M2InboundPage.tsx", import.meta.url),
   "utf8",
@@ -112,13 +120,42 @@ const inboundTableSource = readFileSync(
   new URL("../../../apps/web-admin/src/pages/inbound/M2InboundOrderTable.tsx", import.meta.url),
   "utf8",
 );
+const inboundDetailSource = readFileSync(
+  new URL("../../../apps/web-admin/src/pages/inbound/M2InboundDetailDialog.tsx", import.meta.url),
+  "utf8",
+);
+const inboundDetailViewModelSource = readFileSync(
+  new URL("../../../apps/web-admin/src/pages/inbound/m2-inbound-detail-view-model.ts", import.meta.url),
+  "utf8",
+);
 
 assert.match(
   dataGridSource,
   /import \{\s*buildDataGridCsv,\s*downloadDataGridCsv\s*\} from "\.\/data-grid-export";/s,
 );
 assert.match(dataGridSource, /import \{ Button \} from "\.\.\/\.\.\/ui\/button";/);
-assert.match(dataGridSource, /import \{ Download, Printer \} from "lucide-react";/);
+assert.match(
+  dataGridSource,
+  /import \{ Ban, Download, Eye, Pencil, Plus, Printer, RefreshCw, Search, Settings2, Trash2 \} from "lucide-react";/,
+);
+assert.match(dataGridSource, /export interface DataGridRefreshAction/);
+assert.match(dataGridSource, /export interface DataGridQueryAction/);
+assert.match(dataGridSource, /export interface DataGridCreateAction/);
+assert.match(dataGridSource, /export interface DataGridDetailAction/);
+assert.match(dataGridSource, /export interface DataGridEditAction/);
+assert.match(dataGridSource, /export interface DataGridDeleteAction/);
+assert.match(dataGridSource, /export interface DataGridDisableAction/);
+assert.match(dataGridSource, /export interface DataGridPrintAction/);
+assert.match(dataGridSource, /export interface DataGridExportAction/);
+assert.match(dataGridSource, /refreshAction\?: DataGridRefreshAction;/);
+assert.match(dataGridSource, /queryAction\?: DataGridQueryAction;/);
+assert.match(dataGridSource, /createAction\?: DataGridCreateAction;/);
+assert.match(dataGridSource, /detailAction\?: DataGridDetailAction;/);
+assert.match(dataGridSource, /editAction\?: DataGridEditAction;/);
+assert.match(dataGridSource, /deleteAction\?: DataGridDeleteAction;/);
+assert.match(dataGridSource, /disableAction\?: DataGridDisableAction;/);
+assert.match(dataGridSource, /printAction\?: DataGridPrintAction \| false;/);
+assert.match(dataGridSource, /exportAction\?: DataGridExportAction \| false;/);
 assert.match(
   dataGridSource,
   /const csv = buildDataGridCsv\(\{\s*columns: snapshot\.columns,\s*visibleColumnKeys: snapshot\.visibleColumnKeys,\s*rows: snapshot\.rows,\s*\}\);/s,
@@ -133,10 +170,25 @@ assert.match(
 );
 assert.match(
   dataGridSource,
-  /toolbarActions\.map\(\(action\) =>[\s\S]*action\.label[\s\S]*showPrintAction[\s\S]*打印[\s\S]*showExportAction && csvExportPlacement === "toolbar"[\s\S]*导出 Excel[\s\S]*<\/Button>/,
+  /功能能力[\s\S]*refreshAction[\s\S]*<RefreshCw className="size-4" aria-hidden \/>[\s\S]*refreshAction\.label \?\? "刷新"[\s\S]*queryAction[\s\S]*<Search className="size-4" aria-hidden \/>[\s\S]*queryAction\.label \?\? "查询"[\s\S]*createAction[\s\S]*<Plus className="size-4" aria-hidden \/>[\s\S]*createAction\.label \?\? "新增"[\s\S]*detailAction[\s\S]*<Eye className="size-4" aria-hidden \/>[\s\S]*detailAction\.label \?\? "详情"[\s\S]*editAction[\s\S]*<Pencil className="size-4" aria-hidden \/>[\s\S]*editAction\.label \?\? "修改"[\s\S]*deleteAction[\s\S]*<Trash2 className="size-4" aria-hidden \/>[\s\S]*deleteAction\.label \?\? "删除"[\s\S]*disableAction[\s\S]*<Ban className="size-4" aria-hidden \/>[\s\S]*disableAction\.label \?\? "停用"[\s\S]*<DataGridNamedViewsToolbar[\s\S]*<Settings2 className="size-4" aria-hidden \/>[\s\S]*字段显示[\s\S]*printAction !== false[\s\S]*打印[\s\S]*exportAction !== false[\s\S]*导出 Excel[\s\S]*私有能力[\s\S]*toolbarActions\.map\(\(action\) =>[\s\S]*action\.label/s,
 );
+assert.doesNotMatch(dataGridHeaderSource, /namedViewsControl|onToggleFields|字段设置|Settings2/);
+assert.match(dataGridNamedViewsSource, /aria-label="视图"[\s\S]*<Bookmark className="size-4" aria-hidden \/>[\s\S]*视图/s);
 assert.match(dataGridSource, /csvExportPlacement\?: "toolbar" \| "external";/);
 assert.match(dataGridSource, /onCsvExportStateChange\?: \(state: DataGridCsvExportState \| null\) => void;/);
 assert.doesNotMatch(inboundPageSource, /导出 CSV/);
-assert.match(inboundPageSource, /key: "create-asn"[\s\S]*label: "新建 ASN"/);
-assert.match(inboundTableSource, /toolbarActions=\{toolbarActions\}/);
+assert.match(inboundPageSource, /label: "新建 ASN"[\s\S]*onClick: \(\) => setActiveDialog\("create"\)/);
+assert.match(inboundPageSource, /label: "刷新"[\s\S]*refreshInbound\(\)/);
+assert.doesNotMatch(inboundPageSource, /<RefreshCw className="size-4" aria-hidden \/>/);
+assert.match(inboundTableSource, /refreshAction=\{refreshAction\}/);
+assert.match(inboundTableSource, /createAction=\{createAction\}/);
+assert.match(inboundTableSource, /detailAction=\{detailAction\}/);
+assert.match(inboundTableSource, /toolbarActions=\{privateActions\}/);
+assert.doesNotMatch(inboundTableSource, /header: "操作"/);
+assert.match(inboundDetailViewModelSource, /export const inboundDetailFieldSections/);
+assert.match(inboundDetailViewModelSource, /export const productInfoFieldDefinitions/);
+assert.match(inboundDetailViewModelSource, /export const batchInfoFieldDefinitions/);
+assert.match(inboundDetailSource, /inboundDetailFieldSections\.product\.title/);
+assert.match(inboundDetailSource, /inboundDetailFieldSections\.order\.title/);
+assert.match(inboundDetailSource, /inboundDetailFieldSections\.batch\.title/);
+assert.match(inboundDetailSource, /inboundDetailFieldSections\.process\.title/);

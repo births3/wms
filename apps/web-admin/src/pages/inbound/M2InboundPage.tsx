@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Button, PageHeader } from "@wms/ui";
-import { ArrowLeft, Plus, RefreshCw } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 import {
   useCreateReceivingOrderMutation,
@@ -356,18 +356,19 @@ export function M2InboundPage({ mode, currentOwner, onBack }: M2InboundPageProps
   }
 
   const pageMeta = inboundPageMeta(mode);
-  const tableToolbarActions =
+  const tableRefreshAction = {
+    label: "刷新",
+    onClick: () => {
+      void refreshInbound();
+    },
+  };
+  const tableCreateAction =
     mode === "receiving"
-      ? [
-          {
-            key: "create-asn",
-            label: "新建 ASN",
-            icon: <Plus className="size-4" aria-hidden />,
-            variant: "default" as const,
-            onClick: () => setActiveDialog("create"),
-          },
-        ]
-      : [];
+      ? {
+          label: "新建 ASN",
+          onClick: () => setActiveDialog("create"),
+        }
+      : undefined;
 
   return (
     <section className="mx-auto flex w-full max-w-[1680px] flex-col gap-5 px-4 py-8 xl:px-6">
@@ -381,10 +382,6 @@ export function M2InboundPage({ mode, currentOwner, onBack }: M2InboundPageProps
                   {lastEvent}
                 </span>
               )}
-              <Button type="button" variant="outline" onClick={() => refreshInbound()}>
-                <RefreshCw className="size-4" aria-hidden />
-                刷新
-              </Button>
               <Button type="button" variant="outline" onClick={onBack}>
                 <ArrowLeft className="size-4" aria-hidden />
                 返回工作台
@@ -436,7 +433,8 @@ export function M2InboundPage({ mode, currentOwner, onBack }: M2InboundPageProps
           onSelectOrder={setSelectedId}
           onOpenDetail={openRowDetail}
           onOpenDialog={openRowDialog}
-          toolbarActions={tableToolbarActions}
+          refreshAction={tableRefreshAction}
+          createAction={tableCreateAction}
         />
 
         <M2InboundDialogs

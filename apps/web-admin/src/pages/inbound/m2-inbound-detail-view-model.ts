@@ -1,6 +1,62 @@
 import type { ReceivingOrder } from "@/features/inbound/inbound-queries";
 
 export type InboundDetailStage = "receiving" | "inspection" | "putaway" | "completed";
+export type InboundDetailFieldSection = "product" | "order" | "batch" | "process";
+
+export const inboundDetailFieldSections: Record<InboundDetailFieldSection, { title: string }> = {
+  product: { title: "商品信息" },
+  order: { title: "订单信息" },
+  batch: { title: "批号信息" },
+  process: { title: "流程信息" },
+};
+
+export type ProductInfoFieldKey =
+  | "productCode"
+  | "productName"
+  | "specification"
+  | "manufacturer"
+  | "orderQty"
+  | "unit"
+  | "caseQty"
+  | "looseQty"
+  | "middlePackQty"
+  | "casePackQty";
+
+export const productInfoFieldDefinitions: Array<{ key: ProductInfoFieldKey; label: string; align?: "left" | "right" }> = [
+  { key: "productCode", label: "商品编码" },
+  { key: "productName", label: "品名" },
+  { key: "specification", label: "规格" },
+  { key: "manufacturer", label: "生产厂家" },
+  { key: "orderQty", label: "订单数量", align: "right" },
+  { key: "unit", label: "单位" },
+  { key: "caseQty", label: "件数", align: "right" },
+  { key: "looseQty", label: "零数", align: "right" },
+  { key: "middlePackQty", label: "中包数量" },
+  { key: "casePackQty", label: "件包数量" },
+];
+
+export type BatchInfoFieldKey =
+  | "lineNo"
+  | "batchNo"
+  | "approvalNo"
+  | "importRegistrationCertificate"
+  | "marketingAuthorizationHolder"
+  | "batchQty"
+  | "batchCasePackage"
+  | "productionDate"
+  | "expiryDate";
+
+export const batchInfoFieldDefinitions: Array<{ key: BatchInfoFieldKey; label: string; align?: "left" | "right" }> = [
+  { key: "lineNo", label: "行号" },
+  { key: "batchNo", label: "批号" },
+  { key: "approvalNo", label: "批准文号" },
+  { key: "importRegistrationCertificate", label: "进口注册证" },
+  { key: "marketingAuthorizationHolder", label: "上市持有人" },
+  { key: "batchQty", label: "批号数量", align: "right" },
+  { key: "batchCasePackage", label: "批号件包装" },
+  { key: "productionDate", label: "生产日期" },
+  { key: "expiryDate", label: "有效期" },
+];
 
 export const inboundDetailStages: Array<{ label: string; stage: InboundDetailStage; index: number }> = [
   { label: "收货", stage: "receiving", index: 0 },

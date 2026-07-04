@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Download, Printer } from "lucide-react";
+import { Ban, Download, Eye, Pencil, Plus, Printer, RefreshCw, Search, Settings2, Trash2 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { Button } from "../../ui/button";
 import { Checkbox } from "../../ui/checkbox";
@@ -67,11 +67,67 @@ export interface DataGridCsvExportState {
   exportCsv: () => void;
 }
 
+export type DataGridActionDisabled = boolean | ((context: DataGridToolbarActionContext) => boolean);
+
+export interface DataGridRefreshAction {
+  label?: string;
+  disabled?: DataGridActionDisabled;
+  onClick: (context: DataGridToolbarActionContext) => void;
+}
+
+export interface DataGridQueryAction {
+  label?: string;
+  disabled?: DataGridActionDisabled;
+  onClick: (context: DataGridToolbarActionContext) => void;
+}
+
+export interface DataGridCreateAction {
+  label?: string;
+  disabled?: DataGridActionDisabled;
+  onClick: (context: DataGridToolbarActionContext) => void;
+}
+
+export interface DataGridDetailAction {
+  label?: string;
+  disabled?: DataGridActionDisabled;
+  onClick: (context: DataGridToolbarActionContext) => void;
+}
+
+export interface DataGridEditAction {
+  label?: string;
+  disabled?: DataGridActionDisabled;
+  onClick: (context: DataGridToolbarActionContext) => void;
+}
+
+export interface DataGridDeleteAction {
+  label?: string;
+  disabled?: DataGridActionDisabled;
+  onClick: (context: DataGridToolbarActionContext) => void;
+}
+
+export interface DataGridDisableAction {
+  label?: string;
+  disabled?: DataGridActionDisabled;
+  onClick: (context: DataGridToolbarActionContext) => void;
+}
+
+export interface DataGridPrintAction {
+  label?: string;
+  disabled?: DataGridActionDisabled;
+  onClick?: (context: DataGridToolbarActionContext) => void;
+}
+
+export interface DataGridExportAction {
+  label?: string;
+  disabled?: DataGridActionDisabled;
+  onClick?: (context: DataGridToolbarActionContext) => void;
+}
+
 export interface DataGridToolbarAction {
   key: string;
   label: string;
   icon?: React.ReactNode;
-  disabled?: boolean | ((context: DataGridToolbarActionContext) => boolean);
+  disabled?: DataGridActionDisabled;
   variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
   onClick: (context: DataGridToolbarActionContext) => void;
 }
@@ -93,6 +149,15 @@ export interface DataGridProps<T>
   onSelectedRowKeysChange?: (keys: string[]) => void;
   csvExportPlacement?: "toolbar" | "external";
   onCsvExportStateChange?: (state: DataGridCsvExportState | null) => void;
+  refreshAction?: DataGridRefreshAction;
+  queryAction?: DataGridQueryAction;
+  createAction?: DataGridCreateAction;
+  detailAction?: DataGridDetailAction;
+  editAction?: DataGridEditAction;
+  deleteAction?: DataGridDeleteAction;
+  disableAction?: DataGridDisableAction;
+  printAction?: DataGridPrintAction | false;
+  exportAction?: DataGridExportAction | false;
   toolbarActions?: DataGridToolbarAction[];
   showPrintAction?: boolean;
   showExportAction?: boolean;
@@ -118,6 +183,15 @@ function DataGridInner<T>(
     onSelectedRowKeysChange,
     csvExportPlacement = "toolbar",
     onCsvExportStateChange,
+    refreshAction,
+    queryAction,
+    createAction,
+    detailAction,
+    editAction,
+    deleteAction,
+    disableAction,
+    printAction,
+    exportAction,
     toolbarActions = [],
     showPrintAction = true,
     showExportAction = true,
@@ -269,7 +343,6 @@ function DataGridInner<T>(
     rows: page.filteredRows,
     storageKey,
   };
-  const lastVisibleColumnKey = visibleColumns.at(-1)?.key;
   const hideableColumns = orderedHideableColumns;
   const visibleHideableCount = hideableColumns.filter((column) => visibleKeys.has(column.key)).length;
   const selectedKeys = selectedRowKeys ?? internalSelectedRowKeys;
@@ -461,21 +534,6 @@ function DataGridInner<T>(
           filter={dataGridFilterConfigForData(column, data)}
           filterValue={columnFilters[column.key]}
           filterOpen={openFilterKey === column.key}
-          isLastVisibleColumn={column.key === lastVisibleColumnKey}
-          fieldListId={fieldListId}
-          fieldButtonRef={fieldButtonRef}
-          fieldsOpen={fieldsOpen}
-          hideableColumnsLength={hideableColumns.length}
-          namedViewsControl={
-            <DataGridNamedViewsToolbar
-              storageKey={storageKey}
-              columns={columns}
-              pageSizeOptions={safePageSizeOptions}
-              defaultPageSize={defaultPageSize}
-              settings={settings}
-              onApplyView={applyNamedViewState}
-            />
-          }
           onSort={updateSort}
           onToggleFilter={(key) => {
             setFieldsOpen(false);
@@ -483,10 +541,6 @@ function DataGridInner<T>(
           }}
           onFilterChange={updateColumnFilterValue}
           onCloseFilter={() => setOpenFilterKey(null)}
-          onToggleFields={() => {
-            setOpenFilterKey(null);
-            setFieldsOpen((open) => !open);
-          }}
           onResetColumnWidth={resetColumnWidth}
           onStartResize={startColumnResize}
           onNudgeColumnWidth={nudgeColumnWidth}
@@ -529,39 +583,184 @@ function DataGridInner<T>(
   return (
     <div ref={rootRef} className={cn("space-y-3", className)} {...rest}>
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
-          {toolbarActions.map((action) => (
-            <Button
-              key={action.key}
-              type="button"
-              variant={action.variant ?? "outline"}
-              size="sm"
-              className="h-8 shrink-0"
-              disabled={typeof action.disabled === "function" ? action.disabled(toolbarActionContext) : action.disabled}
-              onClick={() => action.onClick(toolbarActionContext)}
-            >
-              {action.icon}
-              {action.label}
-            </Button>
-          ))}
-          {showPrintAction && (
-            <Button type="button" variant="outline" size="sm" className="h-8 shrink-0" onClick={() => window.print()}>
-              <Printer className="size-4" aria-hidden />
-              打印
-            </Button>
-          )}
-          {showExportAction && csvExportPlacement === "toolbar" && (
+        <div className="flex min-w-0 flex-1 flex-wrap items-start gap-3">
+          <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/20 px-2 py-1.5 [&_svg]:size-4">
+            <span className="text-xs font-medium text-muted-foreground">功能能力</span>
+          {refreshAction && (
             <Button
               type="button"
               variant="outline"
               size="sm"
               className="h-8 shrink-0"
-              disabled={page.filteredRows.length === 0}
-              onClick={exportCsv}
+              disabled={resolveDataGridActionDisabled(refreshAction.disabled, toolbarActionContext)}
+              onClick={() => refreshAction.onClick(toolbarActionContext)}
+            >
+              <RefreshCw className="size-4" aria-hidden />
+              {refreshAction.label ?? "刷新"}
+            </Button>
+          )}
+          {queryAction && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 shrink-0"
+              disabled={resolveDataGridActionDisabled(queryAction.disabled, toolbarActionContext)}
+              onClick={() => queryAction.onClick(toolbarActionContext)}
+            >
+              <Search className="size-4" aria-hidden />
+              {queryAction.label ?? "查询"}
+            </Button>
+          )}
+          {createAction && (
+            <Button
+              type="button"
+              variant="default"
+              size="sm"
+              className="h-8 shrink-0"
+              disabled={resolveDataGridActionDisabled(createAction.disabled, toolbarActionContext)}
+              onClick={() => createAction.onClick(toolbarActionContext)}
+            >
+              <Plus className="size-4" aria-hidden />
+              {createAction.label ?? "新增"}
+            </Button>
+          )}
+          {detailAction && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 shrink-0"
+              disabled={resolveDataGridActionDisabled(detailAction.disabled, toolbarActionContext, selectedKeys.length !== 1)}
+              onClick={() => detailAction.onClick(toolbarActionContext)}
+            >
+              <Eye className="size-4" aria-hidden />
+              {detailAction.label ?? "详情"}
+            </Button>
+          )}
+          {editAction && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 shrink-0"
+              disabled={resolveDataGridActionDisabled(editAction.disabled, toolbarActionContext, selectedKeys.length !== 1)}
+              onClick={() => editAction.onClick(toolbarActionContext)}
+            >
+              <Pencil className="size-4" aria-hidden />
+              {editAction.label ?? "修改"}
+            </Button>
+          )}
+          {deleteAction && (
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              className="h-8 shrink-0"
+              disabled={resolveDataGridActionDisabled(deleteAction.disabled, toolbarActionContext, selectedKeys.length === 0)}
+              onClick={() => deleteAction.onClick(toolbarActionContext)}
+            >
+              <Trash2 className="size-4" aria-hidden />
+              {deleteAction.label ?? "删除"}
+            </Button>
+          )}
+          {disableAction && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 shrink-0"
+              disabled={resolveDataGridActionDisabled(disableAction.disabled, toolbarActionContext, selectedKeys.length === 0)}
+              onClick={() => disableAction.onClick(toolbarActionContext)}
+            >
+              <Ban className="size-4" aria-hidden />
+              {disableAction.label ?? "停用"}
+            </Button>
+          )}
+          <DataGridNamedViewsToolbar
+            storageKey={storageKey}
+            columns={columns}
+            pageSizeOptions={safePageSizeOptions}
+            defaultPageSize={defaultPageSize}
+            settings={settings}
+            onApplyView={applyNamedViewState}
+          />
+          <Button
+            ref={fieldButtonRef}
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 shrink-0"
+            aria-label="字段显示"
+            aria-expanded={fieldsOpen}
+            aria-controls={fieldListId}
+            disabled={hideableColumns.length === 0}
+            onClick={() => {
+              setOpenFilterKey(null);
+              setFieldsOpen((open) => !open);
+            }}
+            data-datagrid-popover
+          >
+            <Settings2 className="size-4" aria-hidden />
+            字段显示
+          </Button>
+          {showPrintAction && printAction !== false && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 shrink-0"
+              disabled={resolveDataGridActionDisabled(printAction?.disabled, toolbarActionContext)}
+              onClick={() => {
+                if (printAction?.onClick) {
+                  printAction.onClick(toolbarActionContext);
+                  return;
+                }
+                if (typeof window !== "undefined") window.print();
+              }}
+            >
+              <Printer className="size-4" aria-hidden />
+              {printAction?.label ?? "打印"}
+            </Button>
+          )}
+          {showExportAction && csvExportPlacement === "toolbar" && exportAction !== false && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 shrink-0"
+              disabled={resolveDataGridActionDisabled(exportAction?.disabled, toolbarActionContext, page.filteredRows.length === 0)}
+              onClick={() => {
+                if (exportAction?.onClick) {
+                  exportAction.onClick(toolbarActionContext);
+                  return;
+                }
+                exportCsv();
+              }}
             >
               <Download className="size-4" aria-hidden />
-              导出 Excel
+              {exportAction?.label ?? "导出 Excel"}
             </Button>
+          )}
+          </div>
+          {toolbarActions.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-md border bg-background px-2 py-1.5 [&_svg]:size-4">
+              <span className="text-xs font-medium text-muted-foreground">私有能力</span>
+              {toolbarActions.map((action) => (
+                <Button
+                  key={action.key}
+                  type="button"
+                  variant={action.variant ?? "outline"}
+                  size="sm"
+                  className="h-8 shrink-0"
+                  disabled={typeof action.disabled === "function" ? action.disabled(toolbarActionContext) : action.disabled}
+                  onClick={() => action.onClick(toolbarActionContext)}
+                >
+                  {action.icon}
+                  {action.label}
+                </Button>
+              ))}
+            </div>
           )}
         </div>
         <DataGridFilterChips
@@ -643,6 +842,15 @@ function currentColumnWidth<T>(handle: HTMLElement, column: DataGridColumn<T>, s
   if (typeof savedWidth === "number") return savedWidth;
   if (typeof column.width === "number") return column.width;
   return handle.closest("th")?.getBoundingClientRect().width ?? 160;
+}
+
+function resolveDataGridActionDisabled(
+  disabled: DataGridActionDisabled | undefined,
+  context: DataGridToolbarActionContext,
+  fallback = false,
+): boolean {
+  if (disabled === undefined) return fallback;
+  return typeof disabled === "function" ? disabled(context) : disabled;
 }
 
 async function writeClipboardText(value: string) {

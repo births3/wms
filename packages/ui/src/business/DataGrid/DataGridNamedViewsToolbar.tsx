@@ -175,15 +175,16 @@ export function DataGridNamedViewsToolbar<T>({
         ref={buttonRef}
         type="button"
         variant="outline"
-        size="icon"
-        className="size-7 border-primary/40 bg-primary/5 text-primary hover:bg-primary/10"
-        aria-label="命名视图"
+        size="sm"
+        className="h-8 shrink-0"
+        aria-label="视图"
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen((current) => !current)}
         data-datagrid-popover
       >
-        <Bookmark className="size-3.5" aria-hidden />
+        <Bookmark className="size-4" aria-hidden />
+        视图
       </Button>
       {open && panelPosition && typeof document !== "undefined"
         ? createPortal(

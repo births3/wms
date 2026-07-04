@@ -31,9 +31,19 @@ export { DataTable } from "./DataTable";
 export type { DataTableProps, DataTableColumn } from "./DataTable";
 export { DataGrid } from "./DataGrid";
 export type {
+  DataGridActionDisabled,
   DataGridProps,
   DataGridColumn,
+  DataGridCreateAction,
   DataGridCsvExportState,
+  DataGridDeleteAction,
+  DataGridDetailAction,
+  DataGridDisableAction,
+  DataGridEditAction,
+  DataGridExportAction,
+  DataGridPrintAction,
+  DataGridQueryAction,
+  DataGridRefreshAction,
   DataGridToolbarAction,
   DataGridToolbarActionContext,
 } from "./DataGrid";

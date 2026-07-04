@@ -22,10 +22,13 @@ import {
 
 import type { ReceivingOrder } from "@/features/inbound/inbound-queries";
 import {
+  batchInfoFieldDefinitions,
   batchInfoRows,
+  inboundDetailFieldSections,
   inboundDetailStageIndex,
   inboundDetailStages,
   orderLicenseRows,
+  productInfoFieldDefinitions,
   productInfoRows,
   processDetail,
   type InboundDetailStage,
@@ -76,14 +79,19 @@ export function M2InboundDetailDialog({ order, currentOwner, defaultStage, open,
           <DialogDescription>{order.receipt_no} · {line ? `${line.product_code}${lineSummary}` : "-"}</DialogDescription>
         </DialogHeader>
 
-        <ProductInfoBlock order={order} />
+        <Section title={inboundDetailFieldSections.product.title}>
+          <ProductInfoBlock order={order} />
+        </Section>
 
-        <Section title="订单信息">
+        <Section title={inboundDetailFieldSections.order.title}>
           <OverviewGrid rows={orderRows} />
+        </Section>
+
+        <Section title={inboundDetailFieldSections.batch.title}>
           <BatchInfoBlock order={order} />
         </Section>
 
-        <Section title="收货信息">
+        <Section title={inboundDetailFieldSections.process.title}>
           <InboundStatusRail currentStage={currentStage} selectedStage={selectedStage} onSelect={setSelectedStage} />
 
           <ProcessBlock title={selectedProcess.title} state={selectedProcess.state} rows={selectedProcess.rows} />
@@ -184,44 +192,32 @@ function ProcessBlock({ title, state, rows }: { title: string; state: ProcessSta
 function ProductInfoBlock({ order }: { order: ReceivingOrder }) {
   const rows = productInfoRows(order);
   return (
-    <Section title="商品信息">
-      <div className="rounded-md border">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1180px] text-sm">
-            <thead className="bg-muted/20 text-xs text-muted-foreground">
-              <tr>
-                <th className="px-4 py-2 text-left font-medium">商品编码</th>
-                <th className="px-4 py-2 text-left font-medium">品名</th>
-                <th className="px-4 py-2 text-left font-medium">规格</th>
-                <th className="px-4 py-2 text-left font-medium">生产厂家</th>
-                <th className="px-4 py-2 text-right font-medium">订单数量</th>
-                <th className="px-4 py-2 text-left font-medium">单位</th>
-                <th className="px-4 py-2 text-right font-medium">件数</th>
-                <th className="px-4 py-2 text-right font-medium">零数</th>
-                <th className="px-4 py-2 text-left font-medium">中包数量</th>
-                <th className="px-4 py-2 text-left font-medium">件包数量</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {rows.map((item) => (
-                <tr key={item.key}>
-                  <td className="px-4 py-2 font-medium">{item.productCode}</td>
-                  <td className="px-4 py-2">{item.productName}</td>
-                  <td className="px-4 py-2">{item.specification}</td>
-                  <td className="px-4 py-2">{item.manufacturer}</td>
-                  <td className="px-4 py-2 text-right">{item.orderQty}</td>
-                  <td className="px-4 py-2">{item.unit}</td>
-                  <td className="px-4 py-2 text-right">{item.caseQty}</td>
-                  <td className="px-4 py-2 text-right">{item.looseQty}</td>
-                  <td className="px-4 py-2">{item.middlePackQty}</td>
-                  <td className="px-4 py-2">{item.casePackQty}</td>
-                </tr>
+    <div className="rounded-md border">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[1180px] text-sm">
+          <thead className="bg-muted/20 text-xs text-muted-foreground">
+            <tr>
+              {productInfoFieldDefinitions.map((field) => (
+                <th key={field.key} className={`px-4 py-2 font-medium ${field.align === "right" ? "text-right" : "text-left"}`}>
+                  {field.label}
+                </th>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {rows.map((item) => (
+              <tr key={item.key}>
+                {productInfoFieldDefinitions.map((field) => (
+                  <td key={field.key} className={`px-4 py-2 ${field.key === "productCode" ? "font-medium" : ""} ${field.align === "right" ? "text-right" : ""}`}>
+                    {item[field.key]}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-    </Section>
+    </div>
   );
 }
 
@@ -229,34 +225,25 @@ function BatchInfoBlock({ order }: { order: ReceivingOrder }) {
   const rows = batchInfoRows(order);
   return (
     <div className="rounded-md border">
-      <div className="border-b bg-muted/40 px-4 py-2.5 text-xs font-medium text-muted-foreground">批号明细</div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1280px] text-sm">
           <thead className="bg-muted/20 text-xs text-muted-foreground">
             <tr>
-              <th className="px-4 py-2 text-left font-medium">行号</th>
-              <th className="px-4 py-2 text-left font-medium">批号</th>
-              <th className="px-4 py-2 text-left font-medium">批准文号</th>
-              <th className="px-4 py-2 text-left font-medium">进口注册证</th>
-              <th className="px-4 py-2 text-left font-medium">上市持有人</th>
-              <th className="px-4 py-2 text-right font-medium">批号数量</th>
-              <th className="px-4 py-2 text-left font-medium">批号件包装</th>
-              <th className="px-4 py-2 text-left font-medium">生产日期</th>
-              <th className="px-4 py-2 text-left font-medium">有效期</th>
+              {batchInfoFieldDefinitions.map((field) => (
+                <th key={field.key} className={`px-4 py-2 font-medium ${field.align === "right" ? "text-right" : "text-left"}`}>
+                  {field.label}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody className="divide-y">
             {rows.map((item) => (
               <tr key={item.key}>
-                <td className="px-4 py-2 text-muted-foreground">{item.lineNo}</td>
-                <td className="px-4 py-2">{item.batchNo}</td>
-                <td className="px-4 py-2">{item.approvalNo}</td>
-                <td className="px-4 py-2">{item.importRegistrationCertificate}</td>
-                <td className="px-4 py-2">{item.marketingAuthorizationHolder}</td>
-                <td className="px-4 py-2 text-right">{item.batchQty}</td>
-                <td className="px-4 py-2">{item.batchCasePackage}</td>
-                <td className="px-4 py-2">{item.productionDate}</td>
-                <td className="px-4 py-2">{item.expiryDate}</td>
+                {batchInfoFieldDefinitions.map((field) => (
+                  <td key={field.key} className={`px-4 py-2 ${field.key === "lineNo" ? "text-muted-foreground" : ""} ${field.align === "right" ? "text-right" : ""}`}>
+                    {item[field.key]}
+                  </td>
+                ))}
               </tr>
             ))}
           </tbody>
