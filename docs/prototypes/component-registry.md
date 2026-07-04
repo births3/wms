@@ -94,7 +94,8 @@ shadcn/ui 标准 CSS 变量 + WMS 自定义业务色，一处定义两端共用�
 | 15 | **DataTable** | 跨端 | 通用数据表格：列定义+选中态+空状态+翻页槽（基于 ui/Table） | 全部列表型管理页 | 已开发 |
 | 16 | **DataGrid** | PC | 管理页数据网格：客户端分页、排序、字段筛选、列显隐、列宽拖拽、点击复制、视图保存 | M2 收货管理列表 | 已开发 |
 | 17 | **EmptyState** | 跨端 | 空状态展示：图标+标题+描述+CTA | 全部列表/看板/详情 | 已开发 |
-| 18 | **SystemDictionaryTwoPane** | PC | 系统字典两层展示：左侧字典分类，右侧选中分类的字典项、来源、启停状态与参数摘要 | M1-011 系统字典 / 单据类型参数配置 | 已开发 |
+| 18 | **TwoPaneCatalog** | PC | 分类-明细两栏骨架：左侧分类导航，右侧 DataGrid 风格列表，支持筛选、字段显隐、选择、复制、偏好保存 | M1-011 系统字典 / 库区分类 / 客商分类 | 已开发 |
+| 19 | **SystemDictionaryTwoPane** | PC | 系统字典两层展示：左侧字典分类，右侧选中分类的字典项、来源、启停状态与参数摘要 | M1-011 系统字典 / 单据类型参数配置 | 已开发 |
 
 DataGrid 组件说明：字段筛选、字段显示、视图保存等表格浮层必须使用 `createPortal + fixed`，禁止在表格容器内用 `absolute` 渲染带 `data-datagrid-popover` 的弹窗，避免低行数表格或 `overflow` 容器裁剪；按钮触发浮层必须支持点击外部和 `Escape` 关闭。该约束由 `check_datagrid_popover_portal.py` 强制检查。
 
@@ -164,3 +165,4 @@ interface PdaComponentProps extends WmsComponentProps {
 | 2026-05-23 | **路径迁移**：Layer 0/1/2 全部从 `prototypes/src/` 抽离至 `packages/ui/src/`（commit e3ce5a0），构成 `@wms/ui` 共享包；详见 ADR-0022 v0.2 修订记录 + ADR-0028 |
 | 2026-06-28 | 扩到 17 个组件（+ DataGrid），用于管理页分页、排序、字段筛选、字段显隐、列宽拖拽、点击复制和视图保存 |
 | 2026-06-29 | 扩到 18 个组件（+ SystemDictionaryTwoPane），用于 M1 系统字典左右两层展示 |
+| 2026-07-04 | 扩到 19 个组件（+ TwoPaneCatalog），用于分类-明细两栏页面的公共筛选、字段显隐、选择、复制和偏好保存 |

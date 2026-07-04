@@ -192,7 +192,7 @@ export function M1SystemDictionaryPage({ meta, onBack }: M1SystemDictionaryPageP
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-[1680px] flex-col gap-5 px-4 py-8 xl:px-6">
+    <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
       <PageHeader
         title={meta.title}
         subtitle={meta.subtitle}
@@ -231,6 +231,11 @@ export function M1SystemDictionaryPage({ meta, onBack }: M1SystemDictionaryPageP
         groups={groups}
         selectedGroupCode={activeGroup.code}
         onSelectedGroupCodeChange={setSelectedDictCode}
+        storageKey="m1-system-dictionary-two-pane"
+        selectable
+        loading={groupsQuery.isPending}
+        error={groupsQuery.error?.message}
+        onRefresh={refreshRows}
         headerActions={
           <Button type="button" size="sm" onClick={openCreateDialog}>
             <Plus className="size-4" aria-hidden />
