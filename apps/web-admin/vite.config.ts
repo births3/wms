@@ -124,6 +124,23 @@ interface DevLocation {
   updated_at: string;
 }
 
+interface DevInventoryBatch {
+  id: string;
+  owner_id: string;
+  product_code: string;
+  batch_no: string;
+  production_date: string;
+  expiry_date: string;
+  qty_on_hand: number;
+  qty_locked: number;
+  quality_status: string;
+  location_id: string;
+  location_code: string;
+  recall_flag: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 interface DevSystemDictionaryItem {
   id: string;
   dict_code: string;
@@ -497,6 +514,12 @@ async function handleDevMockRequest(
     return true;
   }
 
+  if (req.method === "GET" && pathname === "/api/v1/inventory/batches") {
+    const data = devSeedInventoryBatches();
+    sendJson(res, 200, { data, page: { count: data.length, next_cursor: null } });
+    return true;
+  }
+
   if (req.method === "GET" && pathname === "/api/v1/inbound/receiving-orders") {
     const data = allDevOrders();
     sendJson(res, 200, { data, page: { count: data.length, next_cursor: null } });
@@ -659,6 +682,44 @@ function devSeedSuppliers(_updatedAt: string): DevSupplier[] {
 
 function devSeedCustomers(_updatedAt: string): DevCustomer[] {
   return [devCustomer];
+}
+
+function devSeedInventoryBatches(): DevInventoryBatch[] {
+  const now = "2026-06-29T00:00:00.000Z";
+  return [
+    {
+      id: "00000000-0000-0000-0000-000000006001",
+      owner_id: devOwnerId,
+      product_code: "P-M1-001",
+      batch_no: "BATCH-M3-202606-01",
+      production_date: "2026-01-01",
+      expiry_date: "2028-01-01",
+      qty_on_hand: 120,
+      qty_locked: 10,
+      quality_status: "qualified",
+      location_id: devLocationId,
+      location_code: devLocation.location_code,
+      recall_flag: false,
+      created_at: now,
+      updated_at: now,
+    },
+    {
+      id: "00000000-0000-0000-0000-000000006002",
+      owner_id: devOwnerId,
+      product_code: "P-M1-002",
+      batch_no: "BATCH-M3-202606-02",
+      production_date: "2026-02-01",
+      expiry_date: "2027-08-01",
+      qty_on_hand: 48,
+      qty_locked: 48,
+      quality_status: "quarantined",
+      location_id: devLocationId,
+      location_code: devLocation.location_code,
+      recall_flag: true,
+      created_at: now,
+      updated_at: now,
+    },
+  ];
 }
 
 function devProductFromCreateRequest(body: Record<string, unknown>): DevProduct {
