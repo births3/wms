@@ -53,7 +53,7 @@ assert.equal(
 );
 assert.equal(csv.includes("隐藏列"), false);
 assert.equal(csv.includes("不应导出"), false);
-assert.equal(downloadDataGridCsv({ csv, fileName: "data-grid.csv" }), false);
+assert.equal(downloadDataGridCsv({ csv, fileName: "data-grid.xls" }), false);
 
 let removed = false;
 let revokedHref = "";
@@ -91,7 +91,7 @@ assert.throws(
   () =>
     downloadDataGridCsv({
       csv,
-      fileName: "data-grid.csv",
+      fileName: "data-grid.xls",
       document: fakeDocument,
       url: fakeUrl,
     }),
@@ -118,14 +118,14 @@ assert.match(
   /import \{\s*buildDataGridCsv,\s*downloadDataGridCsv\s*\} from "\.\/data-grid-export";/s,
 );
 assert.match(dataGridSource, /import \{ Button \} from "\.\.\/\.\.\/ui\/button";/);
-assert.match(dataGridSource, /import \{ Download \} from "lucide-react";/);
+assert.match(dataGridSource, /import \{ Download, Printer \} from "lucide-react";/);
 assert.match(
   dataGridSource,
   /const csv = buildDataGridCsv\(\{\s*columns: snapshot\.columns,\s*visibleColumnKeys: snapshot\.visibleColumnKeys,\s*rows: snapshot\.rows,\s*\}\);/s,
 );
 assert.match(
   dataGridSource,
-  /fileName: snapshot\.storageKey \? `\$\{snapshot\.storageKey\}\.csv` : "data-grid\.csv"/,
+  /fileName: snapshot\.storageKey \? `\$\{snapshot\.storageKey\}\.xls` : "data-grid\.xls"/,
 );
 assert.match(
   dataGridSource,
@@ -133,9 +133,10 @@ assert.match(
 );
 assert.match(
   dataGridSource,
-  /csvExportPlacement === "toolbar"[\s\S]*<Button[\s\S]*disabled=\{page\.filteredRows\.length === 0\}[\s\S]*导出 CSV[\s\S]*<\/Button>/,
+  /toolbarActions\.map\(\(action\) =>[\s\S]*action\.label[\s\S]*showPrintAction[\s\S]*打印[\s\S]*showExportAction && csvExportPlacement === "toolbar"[\s\S]*导出 Excel[\s\S]*<\/Button>/,
 );
 assert.match(dataGridSource, /csvExportPlacement\?: "toolbar" \| "external";/);
 assert.match(dataGridSource, /onCsvExportStateChange\?: \(state: DataGridCsvExportState \| null\) => void;/);
-assert.match(inboundPageSource, /<Printer className="size-4" aria-hidden \/>\s*打印[\s\S]*<Download className="size-4" aria-hidden \/>\s*导出 CSV/);
-assert.match(inboundTableSource, /csvExportPlacement="external"/);
+assert.doesNotMatch(inboundPageSource, /导出 CSV/);
+assert.match(inboundPageSource, /key: "create-asn"[\s\S]*label: "新建 ASN"/);
+assert.match(inboundTableSource, /toolbarActions=\{toolbarActions\}/);

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Download } from "lucide-react";
+import { Download, Printer } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { Button } from "../../ui/button";
 import { Checkbox } from "../../ui/checkbox";
@@ -67,6 +67,19 @@ export interface DataGridCsvExportState {
   exportCsv: () => void;
 }
 
+export interface DataGridToolbarAction {
+  key: string;
+  label: string;
+  icon?: React.ReactNode;
+  disabled?: boolean | ((context: DataGridToolbarActionContext) => boolean);
+  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
+  onClick: (context: DataGridToolbarActionContext) => void;
+}
+
+export interface DataGridToolbarActionContext {
+  selectedRowKeys: string[];
+}
+
 export interface DataGridProps<T>
   extends Omit<DataTableProps<T>, "columns" | "data" | "footer">,
     Omit<React.HTMLAttributes<HTMLDivElement>, "onSelect"> {
@@ -80,6 +93,9 @@ export interface DataGridProps<T>
   onSelectedRowKeysChange?: (keys: string[]) => void;
   csvExportPlacement?: "toolbar" | "external";
   onCsvExportStateChange?: (state: DataGridCsvExportState | null) => void;
+  toolbarActions?: DataGridToolbarAction[];
+  showPrintAction?: boolean;
+  showExportAction?: boolean;
 }
 
 const defaultPageSizeOptions = [10, 20, 50, 100];
@@ -102,6 +118,9 @@ function DataGridInner<T>(
     onSelectedRowKeysChange,
     csvExportPlacement = "toolbar",
     onCsvExportStateChange,
+    toolbarActions = [],
+    showPrintAction = true,
+    showExportAction = true,
     className,
     tableClassName,
     ...rest
@@ -255,6 +274,7 @@ function DataGridInner<T>(
   const visibleHideableCount = hideableColumns.filter((column) => visibleKeys.has(column.key)).length;
   const selectedKeys = selectedRowKeys ?? internalSelectedRowKeys;
   const selectedKeySet = new Set(selectedKeys);
+  const toolbarActionContext = React.useMemo(() => ({ selectedRowKeys: selectedKeys }), [selectedKeys]);
   const pageRowKeys = page.rows.map(rowKey);
   const filteredRowKeys = React.useMemo(() => page.filteredRows.map(rowKey), [page.filteredRows, rowKey]);
   const selectedPageCount = pageRowKeys.filter((key) => selectedKeySet.has(key)).length;
@@ -390,7 +410,7 @@ function DataGridInner<T>(
 
     downloadDataGridCsv({
       csv,
-      fileName: snapshot.storageKey ? `${snapshot.storageKey}.csv` : "data-grid.csv",
+      fileName: snapshot.storageKey ? `${snapshot.storageKey}.xls` : "data-grid.xls",
       document: typeof document === "undefined" ? undefined : document,
     });
   }, []);
@@ -509,17 +529,28 @@ function DataGridInner<T>(
   return (
     <div ref={rootRef} className={cn("space-y-3", className)} {...rest}>
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-        <DataGridFilterChips
-          className="min-w-0 flex-1"
-          filters={columnFilters}
-          fields={filterSummaryFields}
-          onClearFilter={(key) =>
-            setColumnFilters((current) => clearDataGridFilterKey(current, key))
-          }
-          onClearAll={() => setColumnFilters({})}
-        />
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 self-end md:ml-auto">
-          {csvExportPlacement === "toolbar" && (
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {toolbarActions.map((action) => (
+            <Button
+              key={action.key}
+              type="button"
+              variant={action.variant ?? "outline"}
+              size="sm"
+              className="h-8 shrink-0"
+              disabled={typeof action.disabled === "function" ? action.disabled(toolbarActionContext) : action.disabled}
+              onClick={() => action.onClick(toolbarActionContext)}
+            >
+              {action.icon}
+              {action.label}
+            </Button>
+          ))}
+          {showPrintAction && (
+            <Button type="button" variant="outline" size="sm" className="h-8 shrink-0" onClick={() => window.print()}>
+              <Printer className="size-4" aria-hidden />
+              打印
+            </Button>
+          )}
+          {showExportAction && csvExportPlacement === "toolbar" && (
             <Button
               type="button"
               variant="outline"
@@ -529,10 +560,19 @@ function DataGridInner<T>(
               onClick={exportCsv}
             >
               <Download className="size-4" aria-hidden />
-              导出 CSV
+              导出 Excel
             </Button>
           )}
         </div>
+        <DataGridFilterChips
+          className="min-w-0 flex-1 md:justify-end"
+          filters={columnFilters}
+          fields={filterSummaryFields}
+          onClearFilter={(key) =>
+            setColumnFilters((current) => clearDataGridFilterKey(current, key))
+          }
+          onClearAll={() => setColumnFilters({})}
+        />
       </div>
       <DataTable
         className="overflow-visible"

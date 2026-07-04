@@ -1,5 +1,11 @@
 export { DataGrid } from "./DataGrid";
-export type { DataGridColumn, DataGridCsvExportState, DataGridProps } from "./DataGrid";
+export type {
+  DataGridColumn,
+  DataGridCsvExportState,
+  DataGridProps,
+  DataGridToolbarAction,
+  DataGridToolbarActionContext,
+} from "./DataGrid";
 export { DataGridFilterChips } from "./DataGridFilterChips";
 export type { DataGridFilterChipsProps } from "./DataGridFilterChips";
 export { buildDataGridCsv, downloadDataGridCsv } from "./data-grid-export";

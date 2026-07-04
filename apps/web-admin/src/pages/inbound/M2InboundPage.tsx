@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Button, PageHeader } from "@wms/ui";
-import { ArrowLeft, Download, Plus, Printer, RefreshCw } from "lucide-react";
+import { ArrowLeft, Plus, RefreshCw } from "lucide-react";
 
 import {
   useCreateReceivingOrderMutation,
@@ -75,14 +75,6 @@ export function M2InboundPage({ mode, currentOwner, onBack }: M2InboundPageProps
   const [activeDialog, setActiveDialog] = React.useState<InboundDialog | null>(null);
   const [detailOpen, setDetailOpen] = React.useState(false);
   const [lastEvent, setLastEvent] = React.useState<string | null>(null);
-  const [csvExportState, setCsvExportState] = React.useState<{
-    disabled: boolean;
-    exportCsv: () => void;
-  } | null>(null);
-  const handleCsvExportStateChange = React.useCallback(
-    (state: { disabled: boolean; exportCsv: () => void } | null) => setCsvExportState(state),
-    [],
-  );
   const [createForm, setCreateForm] = React.useState<CreateFormState>({
     receiptNo: "ASN-M2-PC-0002",
     documentType: "purchase_inbound",
@@ -364,6 +356,18 @@ export function M2InboundPage({ mode, currentOwner, onBack }: M2InboundPageProps
   }
 
   const pageMeta = inboundPageMeta(mode);
+  const tableToolbarActions =
+    mode === "receiving"
+      ? [
+          {
+            key: "create-asn",
+            label: "新建 ASN",
+            icon: <Plus className="size-4" aria-hidden />,
+            variant: "default" as const,
+            onClick: () => setActiveDialog("create"),
+          },
+        ]
+      : [];
 
   return (
     <section className="mx-auto flex w-full max-w-[1680px] flex-col gap-5 px-4 py-8 xl:px-6">
@@ -381,25 +385,6 @@ export function M2InboundPage({ mode, currentOwner, onBack }: M2InboundPageProps
                 <RefreshCw className="size-4" aria-hidden />
                 刷新
               </Button>
-              <Button type="button" variant="outline" onClick={() => globalThis.print()}>
-                <Printer className="size-4" aria-hidden />
-                打印
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={!csvExportState || csvExportState.disabled}
-                onClick={() => csvExportState?.exportCsv()}
-              >
-                <Download className="size-4" aria-hidden />
-                导出 CSV
-              </Button>
-              {mode === "receiving" && (
-                <Button type="button" onClick={() => setActiveDialog("create")}>
-                  <Plus className="size-4" aria-hidden />
-                  新建 ASN
-                </Button>
-              )}
               <Button type="button" variant="outline" onClick={onBack}>
                 <ArrowLeft className="size-4" aria-hidden />
                 返回工作台
@@ -451,7 +436,7 @@ export function M2InboundPage({ mode, currentOwner, onBack }: M2InboundPageProps
           onSelectOrder={setSelectedId}
           onOpenDetail={openRowDetail}
           onOpenDialog={openRowDialog}
-          onCsvExportStateChange={handleCsvExportStateChange}
+          toolbarActions={tableToolbarActions}
         />
 
         <M2InboundDialogs

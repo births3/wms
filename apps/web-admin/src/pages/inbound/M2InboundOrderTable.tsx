@@ -7,7 +7,7 @@
  */
 
 import * as React from "react";
-import { Button, DataGrid, StatusBadge, type DataGridColumn } from "@wms/ui";
+import { Button, DataGrid, StatusBadge, type DataGridColumn, type DataGridToolbarAction } from "@wms/ui";
 import { CheckCircle2, ClipboardCheck, Eye, PackageCheck } from "lucide-react";
 
 import type { ReceivingOrder } from "@/features/inbound/inbound-queries";
@@ -35,7 +35,7 @@ interface M2InboundOrderTableProps {
   onSelectOrder: (id: string) => void;
   onOpenDetail: (id: string) => void;
   onOpenDialog: (id: string, dialog: InboundDialog) => void;
-  onCsvExportStateChange?: (state: { disabled: boolean; exportCsv: () => void } | null) => void;
+  toolbarActions?: DataGridToolbarAction[];
 }
 
 export function M2InboundOrderTable({
@@ -47,7 +47,7 @@ export function M2InboundOrderTable({
   onSelectOrder,
   onOpenDetail,
   onOpenDialog,
-  onCsvExportStateChange,
+  toolbarActions,
 }: M2InboundOrderTableProps) {
   const orderColumns: DataGridColumn<ReceivingOrder>[] = [
     {
@@ -224,8 +224,7 @@ export function M2InboundOrderTable({
       emptyTitle="暂无入库单"
       storageKey="m2-inbound-datagrid"
       tableClassName="min-w-[2070px]"
-      csvExportPlacement="external"
-      onCsvExportStateChange={onCsvExportStateChange}
+      toolbarActions={toolbarActions}
       selectable
     />
   );
