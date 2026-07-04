@@ -7,7 +7,7 @@
     "dev": "vite --host 0.0.0.0 --port 9002 --strictPort",
     "build": "pnpm run test:self-checks && tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test:self-checks": "node self-checks/m1-feature-flag-import-self-check.mjs && node self-checks/m1-special-drug-system-dictionary-self-check.mjs && node self-checks/m1-zone-derived-self-check.mjs",
+    "test:self-checks": "node self-checks/m1-feature-flag-import-self-check.mjs && node self-checks/m1-special-drug-system-dictionary-self-check.mjs && node self-checks/m1-zone-derived-self-check.mjs && node self-checks/m3-batch-management-slice-self-check.mjs",
     "test:e2e:m1-real": "pnpm --dir ../../prototypes exec playwright test --config=playwright-web-admin-m1-real-config.ts"
   },
   "dependencies": {

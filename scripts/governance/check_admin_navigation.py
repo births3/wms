@@ -35,6 +35,7 @@ QUERY_TS = (
 REQUIRED_SECTION_LABEL = 'label: "基础档案"'
 REQUIRED_ROUTE_MARKERS = (
     "M1MasterDataPage",
+    "M3BatchManagementPage",
     "masterDataViewToId(view)",
     'onBack={() => setView("dashboard")}',
 )
@@ -46,6 +47,7 @@ REQUIRED_NAV_ITEMS = (
     ("m1-zones", "M1 库区管理"),
     ("m1-locations", "M1 库位管理"),
     ("m1-system-dictionary", "M1 系统字典"),
+    ("m3-batches", "M3 批号管理"),
 )
 
 

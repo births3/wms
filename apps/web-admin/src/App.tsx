@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   ClipboardList,
   KeyRound,
+  Layers,
   LogOut,
   MapPinned,
   PackageCheck,
@@ -26,6 +27,7 @@ import { clearAuthSession, hasActiveAuthSession } from "@/lib/auth-session";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { FeatureFlagConfigCenterPage } from "@/pages/config-center/FeatureFlagConfigCenterPage";
 import { M2InboundPage, type M2InboundMode } from "@/pages/inbound/M2InboundPage";
+import { M3BatchManagementPage } from "@/pages/inventory/M3BatchManagementPage";
 import { M1MasterDataPage, type MasterDataViewId } from "@/pages/master-data/M1MasterDataPage";
 import { M4OutboundPage, type M4OutboundMode } from "@/pages/outbound/M4OutboundPage";
 
@@ -36,6 +38,7 @@ type AdminView =
   | "m2-receiving"
   | "m2-inspecting"
   | "m2-putaway"
+  | "m3-batches"
   | "m4-orders"
   | "m4-waves"
   | "m4-review"
@@ -107,7 +110,7 @@ const menuSections: Array<{ label: string; items: MenuItem[] }> = [
   },
   {
     label: "库内业务",
-    items: [{ title: "M3 库存管理", subtitle: "待接入", icon: ShieldCheck, disabled: true }],
+    items: [{ id: "m3-batches", title: "M3 批号管理", subtitle: "批号 / 效期 / 库位", icon: Layers }],
   },
   {
     label: "基础能力",
@@ -171,6 +174,8 @@ export function App() {
           currentOwner={{ ownerId: currentUserQuery.data.owner_id, ownerCode: currentUserQuery.data.owner_code }}
           onBack={() => setView("dashboard")}
         />
+      ) : view === "m3-batches" ? (
+        <M3BatchManagementPage onBack={() => setView("dashboard")} />
       ) : outboundMode ? (
         <M4OutboundPage mode={outboundMode} onBack={() => setView("dashboard")} />
       ) : (

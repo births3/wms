@@ -1,0 +1,245 @@
+/**
+ * M3BatchManagementPage — 库内业务批号列表切片
+ *
+ * 层级：Layer 3 页面
+ * 关联故事：US-M3-001, US-M3-002, US-BA-004
+ * Wave：Wave 6
+ */
+
+import * as React from "react";
+import { Button, DataGrid, PageHeader, StatusBadge, type DataGridColumn, type StatusKey } from "@wms/ui";
+import { ArrowLeft, RefreshCw } from "lucide-react";
+
+import { useInventoryBatchesQuery, type InventoryBatch } from "@/features/inventory/inventory-queries";
+
+interface M3BatchManagementPageProps {
+  onBack: () => void;
+}
+
+const qualityStatusLabels: Record<string, string> = {
+  qualified: "合格",
+  quarantined: "隔离",
+  quarantine: "隔离",
+  unqualified: "不合格",
+  pending_destruction: "待销毁",
+  loss_deducted: "报损扣减",
+};
+
+const columns: DataGridColumn<InventoryBatch>[] = [
+  {
+    key: "batch_no",
+    header: "批号",
+    mono: true,
+    width: 190,
+    minWidth: 170,
+    sortable: true,
+    sortValue: (row) => row.batch_no,
+    filterValue: (row) => row.batch_no,
+    copyValue: (row) => row.batch_no,
+    filter: { type: "text" },
+    render: (row) => <span className="text-primary">{row.batch_no}</span>,
+  },
+  {
+    key: "product_code",
+    header: "商品编码",
+    mono: true,
+    width: 170,
+    minWidth: 150,
+    sortable: true,
+    sortValue: (row) => row.product_code,
+    filterValue: (row) => row.product_code,
+    copyValue: (row) => row.product_code,
+    filter: { type: "text" },
+  },
+  {
+    key: "location_code",
+    header: "库位",
+    mono: true,
+    width: 150,
+    minWidth: 130,
+    sortable: true,
+    sortValue: (row) => row.location_code,
+    filterValue: (row) => row.location_code,
+    copyValue: (row) => row.location_code,
+    filter: { type: "text" },
+  },
+  {
+    key: "quantity",
+    header: "数量",
+    width: 210,
+    minWidth: 190,
+    sortable: true,
+    sortValue: (row) => availableQty(row),
+    filterValue: (row) => availableQty(row),
+    copyValue: (row) => `现存 ${row.qty_on_hand} / 锁定 ${row.qty_locked} / 可用 ${availableQty(row)}`,
+    filter: { type: "numberRange" },
+    render: (row) => (
+      <div className="text-sm">
+        <div className="font-medium">{row.qty_on_hand} 件</div>
+        <div className="text-xs text-muted-foreground">锁定 {row.qty_locked} / 可用 {availableQty(row)}</div>
+      </div>
+    ),
+  },
+  {
+    key: "quality_status",
+    header: "质量状态",
+    width: 150,
+    minWidth: 130,
+    sortable: true,
+    sortValue: (row) => qualityStatusLabel(row.quality_status),
+    filterValue: (row) => row.quality_status,
+    copyValue: (row) => qualityStatusLabel(row.quality_status),
+    filter: {
+      type: "multiSelect",
+      options: [
+        { label: "合格", value: "qualified" },
+        { label: "隔离", value: "quarantined" },
+        { label: "不合格", value: "unqualified" },
+        { label: "待销毁", value: "pending_destruction" },
+        { label: "报损扣减", value: "loss_deducted" },
+      ],
+    },
+    render: (row) => (
+      <StatusBadge status={qualityStatusKey(row.quality_status, row.recall_flag)} label={qualityStatusLabel(row.quality_status)} size="sm" />
+    ),
+  },
+  {
+    key: "recall_flag",
+    header: "召回",
+    width: 120,
+    minWidth: 110,
+    sortable: true,
+    sortValue: (row) => (row.recall_flag ? 1 : 0),
+    filterValue: (row) => (row.recall_flag ? "true" : "false"),
+    copyValue: (row) => (row.recall_flag ? "已标记" : "未标记"),
+    filter: {
+      type: "multiSelect",
+      options: [
+        { label: "已标记", value: "true" },
+        { label: "未标记", value: "false" },
+      ],
+    },
+    render: (row) => row.recall_flag ? <StatusBadge status="isolated" label="已标记" size="sm" /> : <span className="text-muted-foreground">未标记</span>,
+  },
+  {
+    key: "production_date",
+    header: "生产日期",
+    width: 150,
+    minWidth: 130,
+    sortable: true,
+    sortValue: (row) => row.production_date,
+    filterValue: (row) => row.production_date,
+    copyValue: (row) => row.production_date,
+    filter: { type: "dateRange" },
+  },
+  {
+    key: "expiry_date",
+    header: "有效期",
+    width: 150,
+    minWidth: 130,
+    sortable: true,
+    sortValue: (row) => row.expiry_date,
+    filterValue: (row) => row.expiry_date,
+    copyValue: (row) => row.expiry_date,
+    filter: { type: "dateRange" },
+  },
+  {
+    key: "created_at",
+    header: "创建时间",
+    width: 190,
+    minWidth: 180,
+    sortable: true,
+    sortValue: (row) => row.created_at,
+    filterValue: (row) => row.created_at,
+    copyValue: (row) => formatDateTime(row.created_at),
+    filter: { type: "dateRange" },
+    render: (row) => formatDateTime(row.created_at),
+  },
+  {
+    key: "updated_at",
+    header: "更新时间",
+    width: 190,
+    minWidth: 180,
+    sortable: true,
+    sortValue: (row) => row.updated_at,
+    filterValue: (row) => row.updated_at,
+    copyValue: (row) => formatDateTime(row.updated_at),
+    filter: { type: "dateRange" },
+    render: (row) => formatDateTime(row.updated_at),
+  },
+];
+
+export function M3BatchManagementPage({ onBack }: M3BatchManagementPageProps) {
+  const batchesQuery = useInventoryBatchesQuery();
+  const [lastEvent, setLastEvent] = React.useState<string | null>(null);
+
+  async function refreshBatches() {
+    const result = await batchesQuery.refetch();
+    setLastEvent(result.error ? null : "批号列表已刷新");
+  }
+
+  return (
+    <section className="mx-auto flex w-full max-w-[1680px] flex-col gap-5 px-4 py-8 xl:px-6">
+      <PageHeader
+        title="M3 批号管理"
+        subtitle="库存批次、效期、质量状态与库位分布"
+        actions={
+          <div className="flex flex-wrap gap-2">
+            {lastEvent && (
+              <span className="self-center text-sm text-muted-foreground" role="status">
+                {lastEvent}
+              </span>
+            )}
+            <Button type="button" variant="outline" onClick={refreshBatches}>
+              <RefreshCw className="size-4" aria-hidden />
+              刷新
+            </Button>
+            <Button type="button" variant="outline" onClick={onBack}>
+              <ArrowLeft className="size-4" aria-hidden />
+              返回工作台
+            </Button>
+          </div>
+        }
+      />
+
+      {batchesQuery.error && (
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {batchesQuery.error.message}
+        </div>
+      )}
+
+      <DataGrid
+        columns={columns}
+        data={batchesQuery.data ?? []}
+        rowKey={(row) => row.id}
+        caption={batchesQuery.isPending ? "加载库存批次..." : undefined}
+        emptyTitle="暂无库存批次"
+        storageKey="m3-batches-datagrid"
+        tableClassName="min-w-[1670px]"
+      />
+    </section>
+  );
+}
+
+function availableQty(batch: InventoryBatch) {
+  if (batch.quality_status !== "qualified" || batch.recall_flag) return 0;
+  return batch.qty_on_hand - batch.qty_locked;
+}
+
+function qualityStatusLabel(status: string) {
+  return qualityStatusLabels[status] ?? status;
+}
+
+function qualityStatusKey(status: string, recalled: boolean): StatusKey {
+  if (recalled) return "isolated";
+  if (status === "qualified") return "qualified";
+  if (status === "quarantined" || status === "quarantine") return "isolated";
+  if (status === "unqualified" || status === "pending_destruction" || status === "loss_deducted") return "unqualified";
+  return "pending";
+}
+
+function formatDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value || "-";
+  return date.toLocaleString("zh-CN", { hour12: false });
+}
