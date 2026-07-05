@@ -36,18 +36,22 @@ export interface DataGridNamedViewsToolbarProps<T>
   extends Omit<React.HTMLAttributes<HTMLDivElement>, "children"> {
   storageKey?: string;
   columns: DataGridColumn<T>[];
+  actionKeys: string[];
   pageSizeOptions: number[];
   defaultPageSize: number;
   settings: DataGridLogicState;
-  onApplyView: (state: DataGridLogicState) => void;
+  queryState?: unknown;
+  onApplyView: (state: DataGridLogicState, queryState?: unknown) => void;
 }
 
 export function DataGridNamedViewsToolbar<T>({
   storageKey,
   columns,
+  actionKeys,
   pageSizeOptions,
   defaultPageSize,
   settings,
+  queryState,
   onApplyView,
   className,
   ...rest
@@ -56,11 +60,12 @@ export function DataGridNamedViewsToolbar<T>({
   const options = React.useMemo(
     () => ({
       columns,
+      actionKeys,
       pageSizeOptions,
       defaultPageSize,
       now: new Date().toISOString(),
     }),
-    [columns, defaultPageSize, pageSizeOptions],
+    [actionKeys, columns, defaultPageSize, pageSizeOptions],
   );
   const [views, setViews] = React.useState<DataGridNamedView[]>(() =>
     loadDataGridNamedViewsFromStorage(storage, storageKey, options),
@@ -128,6 +133,7 @@ export function DataGridNamedViewsToolbar<T>({
       {
         name: viewName,
         state: settings,
+        queryState,
       },
       { ...options, now: new Date().toISOString() },
     );
@@ -145,7 +151,7 @@ export function DataGridNamedViewsToolbar<T>({
 
   function applyView() {
     if (!selectedView) return;
-    onApplyView(selectedView.state);
+    onApplyView(selectedView.state, selectedView.queryState);
     setError(null);
   }
 
@@ -178,6 +184,7 @@ export function DataGridNamedViewsToolbar<T>({
         size="sm"
         className="h-8 shrink-0"
         aria-label="视图"
+        title="视图保存、应用、删除"
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen((current) => !current)}

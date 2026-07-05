@@ -98,4 +98,6 @@ const dataGridSource = readFileSync(
   "utf8",
 );
 assert.match(dataGridSource, /<DataGridFilterChips\b/);
-assert.match(dataGridSource, /onClearAll=\{\(\) => setColumnFilters\(\{\}\)\}/);
+assert.match(dataGridSource, /className="border-primary\/30 bg-primary\/5 text-primary"/);
+assert.match(dataGridSource, /columnFilters: clearDataGridFilterKey\(current\.columnFilters, key\)/);
+assert.match(dataGridSource, /onClearAll=\{\(\) => setSettings\(\(current\) => \(\{ \.\.\.current, columnFilters: \{\} \}\)\)\}/);

@@ -43,6 +43,9 @@ export interface DataGridLogicColumn<T> {
 export interface DataGridLogicState {
   visibleColumns: string[];
   copyableColumns: string[];
+  frozenColumns: string[];
+  hiddenActions: string[];
+  columnFilters: DataGridColumnFilters;
   columnWidths: Record<string, number>;
   columnOrder: string[];
   pageSize: number;
@@ -77,6 +80,7 @@ export interface DataGridFloatingPanelPosition {
 }
 
 const defaultPageSizeFallback = 20;
+const resizeMinWidthFallback = 80;
 
 export function defaultVisibleColumns<T>(columns: DataGridLogicColumn<T>[]): string[] {
   const visible = columns.filter((column) => !column.defaultHidden).map((column) => column.key);
@@ -96,6 +100,7 @@ export function sanitizeGridState<T>(
   columns: DataGridLogicColumn<T>[],
   pageSizeOptions: number[] = [10, 20, 50, 100],
   defaultPageSize = defaultPageSizeFallback,
+  actionKeys: string[] = [],
 ): DataGridLogicState {
   const columnKeys = new Set(columns.map((column) => column.key));
   const requiredKeys = columns.filter((column) => column.hideable === false).map((column) => column.key);
@@ -103,6 +108,9 @@ export function sanitizeGridState<T>(
   const visible = Array.from(new Set([...requiredKeys, ...requestedVisible])).filter((key) => columnKeys.has(key));
   const requestedOrder = state?.columnOrder?.filter((key) => columnKeys.has(key)) ?? [];
   const columnOrder = Array.from(new Set([...requestedOrder, ...defaultColumnOrder(columns)])).filter((key) => columnKeys.has(key));
+  const frozenColumns = Array.from(new Set(state?.frozenColumns?.filter((key) => columnKeys.has(key)) ?? []));
+  const hiddenActions = sanitizeHiddenActions(state?.hiddenActions, actionKeys);
+  const columnFilters = sanitizeDataGridColumnFiltersForColumns(state?.columnFilters, columns);
   const copyableColumnKeys = new Set(defaultCopyableColumns(columns));
   const requestedCopyable = state?.copyableColumns?.filter((key) => copyableColumnKeys.has(key)) ?? defaultCopyableColumns(columns);
   const copyableColumns = Array.from(new Set(requestedCopyable)).filter((key) => copyableColumnKeys.has(key));
@@ -114,11 +122,26 @@ export function sanitizeGridState<T>(
   return {
     visibleColumns: visible.length > 0 ? visible : defaultVisibleColumns(columns),
     copyableColumns,
+    frozenColumns,
+    hiddenActions,
+    columnFilters,
     columnWidths,
     columnOrder,
     pageSize,
     sort: sortColumn && state?.sort ? state.sort : null,
   };
+}
+
+export function orderedColumnsWithFrozen<T>(
+  columnOrder: string[],
+  frozenColumns: string[],
+  columns: DataGridLogicColumn<T>[],
+): string[] {
+  const columnKeys = new Set(columns.map((column) => column.key));
+  const ordered = Array.from(new Set([...columnOrder, ...defaultColumnOrder(columns)])).filter((key) => columnKeys.has(key));
+  const frozen = Array.from(new Set(frozenColumns)).filter((key) => columnKeys.has(key));
+  const frozenSet = new Set(frozen);
+  return [...frozen, ...ordered.filter((key) => !frozenSet.has(key))];
 }
 
 export function moveColumnBefore<T>(
@@ -172,6 +195,33 @@ export function toggleCopyableColumn<T>(
   return Array.from(current);
 }
 
+export function toggleFrozenColumn<T>(
+  frozenColumns: string[],
+  columns: DataGridLogicColumn<T>[],
+  key: string,
+  frozen: boolean,
+): string[] {
+  const column = columns.find((item) => item.key === key);
+  if (!column) return frozenColumns;
+
+  const current = frozenColumns.filter((item, index, source) => source.indexOf(item) === index && columns.some((column) => column.key === item));
+  if (frozen) return current.includes(key) ? current : [...current, key];
+  return current.filter((item) => item !== key);
+}
+
+export function toggleHiddenAction(
+  hiddenActions: string[],
+  actionKeys: string[],
+  key: string,
+  visible: boolean,
+): string[] {
+  if (!actionKeys.includes(key)) return sanitizeHiddenActions(hiddenActions, actionKeys);
+
+  const current = sanitizeHiddenActions(hiddenActions, actionKeys);
+  if (visible) return current.filter((item) => item !== key);
+  return current.includes(key) ? current : [...current, key];
+}
+
 export function setColumnWidth<T>(
   columnWidths: Record<string, number>,
   columns: DataGridLogicColumn<T>[],
@@ -198,6 +248,23 @@ export function dataGridTableWidth<T>(columns: DataGridLogicColumn<T>[], fallbac
   }
 
   return `calc(${parts.map((part) => (typeof part === "number" ? `${part}px` : part)).join(" + ")})`;
+}
+
+export function dataGridFrozenColumnOffsets<T>(
+  columns: DataGridLogicColumn<T>[],
+  frozenKeys: Set<string>,
+  fallbackWidth = 160,
+): Record<string, number | string> {
+  const offsets: Record<string, number | string> = {};
+  const parts: Array<number | string> = [];
+
+  for (const column of columns) {
+    if (!frozenKeys.has(column.key)) continue;
+    offsets[column.key] = dataGridWidthOffset(parts);
+    parts.push(columnWidthPart(column.width, fallbackWidth));
+  }
+
+  return offsets;
 }
 
 export function reconcileDataGridSelectedRowKeys(selectedKeys: string[], availableKeys: string[]): string[] {
@@ -310,11 +377,17 @@ export function sanitizeDataGridColumnFiltersForData<T>(
 ): DataGridColumnFilters {
   let changed = false;
   const next: DataGridColumnFilters = {};
+  const safeFilters = sanitizeDataGridColumnFiltersForColumns(filters, columns);
 
-  for (const [key, value] of Object.entries(filters)) {
+  for (const [key, value] of Object.entries(safeFilters)) {
     const column = columns.find((item) => item.key === key);
     const filter = column ? dataGridFilterConfigForData(column, data) : undefined;
-    if (!column || !filter || (filter.type !== "select" && filter.type !== "multiSelect")) {
+    if (!column) {
+      changed = true;
+      continue;
+    }
+
+    if (!filter || (filter.type !== "select" && filter.type !== "multiSelect")) {
       next[key] = value;
       continue;
     }
@@ -335,7 +408,27 @@ export function sanitizeDataGridColumnFiltersForData<T>(
     }
   }
 
-  return changed ? next : filters;
+  return changed || safeFilters !== filters ? next : filters;
+}
+
+export function sanitizeDataGridColumnFiltersForColumns<T>(
+  filters: DataGridColumnFilters | undefined,
+  columns: DataGridLogicColumn<T>[],
+): DataGridColumnFilters {
+  if (!filters) return {};
+
+  const columnByKey = new Map(columns.map((column) => [column.key, column]));
+  const next: DataGridColumnFilters = {};
+
+  for (const [key, value] of Object.entries(filters)) {
+    const column = columnByKey.get(key);
+    if (!column || column.hideable === false || column.filter === false) continue;
+
+    const sanitized = sanitizeColumnFilterValue(value, column.filter);
+    if (sanitized !== undefined && dataGridFilterActive(sanitized)) next[key] = sanitized;
+  }
+
+  return next;
 }
 
 function rowMatchesColumnFilter<T>(row: T, column: DataGridLogicColumn<T>, value: DataGridColumnFilterValue): boolean {
@@ -386,6 +479,30 @@ function columnFilterValue<T>(row: T, column: DataGridLogicColumn<T>): unknown {
   return recordValue(row, column.key);
 }
 
+function sanitizeColumnFilterValue(
+  value: DataGridColumnFilterValue,
+  filter: DataGridFilterConfig | false | undefined,
+): DataGridColumnFilterValue | undefined {
+  const type = filter === false ? "text" : filter?.type ?? "text";
+  if (type === "multiSelect") {
+    if (!Array.isArray(value)) return undefined;
+    const selected = value.map((item) => item.trim()).filter(Boolean);
+    return selected.length > 0 ? Array.from(new Set(selected)) : undefined;
+  }
+
+  if (type === "dateRange" || type === "numberRange") {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+    const from = value.from?.trim();
+    const to = value.to?.trim();
+    const range: DataGridRangeFilter = {};
+    if (from) range.from = from;
+    if (to) range.to = to;
+    return dataGridFilterActive(range) ? range : undefined;
+  }
+
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
 export function getDataGridCopyText<T>(row: T, column: DataGridLogicColumn<T>): string {
   if (column.copyValue) return valueToText(column.copyValue(row)).trim();
   if (column.filterValue) return valueToText(column.filterValue(row)).trim();
@@ -415,9 +532,15 @@ function sanitizeColumnWidths<T>(
 }
 
 function clampColumnWidth<T>(width: number, column: DataGridLogicColumn<T>): number {
-  const minWidth = column.minWidth ?? 80;
+  // ponytail: minWidth 保留给初始布局；用户拖动统一允许压到紧凑下限。需要分列下限时再加 resizeMinWidth。
+  const minWidth = Math.min(column.minWidth ?? resizeMinWidthFallback, resizeMinWidthFallback);
   const maxWidth = column.maxWidth ?? 640;
   return Math.min(maxWidth, Math.max(minWidth, Math.round(width)));
+}
+
+function sanitizeHiddenActions(hiddenActions: string[] | undefined, actionKeys: string[]): string[] {
+  const available = new Set(actionKeys);
+  return Array.from(new Set(hiddenActions?.filter((key) => available.has(key)) ?? []));
 }
 
 function valueToText(value: unknown): string {
@@ -480,4 +603,13 @@ function columnWidthPart(width: string | number | undefined, fallbackWidth: numb
   if (typeof width === "number" && Number.isFinite(width)) return width;
   if (typeof width === "string" && width.trim()) return width.trim();
   return fallbackWidth;
+}
+
+function dataGridWidthOffset(parts: Array<number | string>): number | string {
+  if (parts.length === 0) return 0;
+  if (parts.every((part): part is number => typeof part === "number")) {
+    return parts.reduce((total, width) => total + width, 0);
+  }
+
+  return `calc(${parts.map((part) => (typeof part === "number" ? `${part}px` : part)).join(" + ")})`;
 }

@@ -2,16 +2,20 @@ import assert from "node:assert/strict";
 import {
   getDataGridCopyText,
   dataGridFloatingPanelPosition,
+  dataGridFrozenColumnOffsets,
   dataGridTableWidth,
   dataGridFilterConfigForData,
   getDataGridPage,
   moveColumnBefore,
   nextSortState,
+  orderedColumnsWithFrozen,
   reconcileDataGridSelectedRowKeys,
   sanitizeDataGridColumnFiltersForData,
   sanitizeGridState,
   setColumnWidth,
+  toggleHiddenAction,
   toggleCopyableColumn,
+  toggleFrozenColumn,
   toggleVisibleColumn,
 } from "../src/business/DataGrid/data-grid-logic.ts";
 
@@ -48,6 +52,45 @@ assert.deepEqual(moveColumnBefore(settings.columnOrder, columns, "qty", "code"),
 assert.deepEqual(moveColumnBefore(settings.columnOrder, columns, "missing", "code"), settings.columnOrder);
 assert.deepEqual(settings.copyableColumns, ["code", "status", "expectedDate", "qty"]);
 
+const frozenSettings = sanitizeGridState(
+  { columnOrder: ["status", "code", "qty"], frozenColumns: ["qty", "status", "missing"] },
+  columns,
+  [2, 20],
+  20,
+);
+assert.deepEqual(frozenSettings.frozenColumns, ["qty", "status"]);
+assert.deepEqual(orderedColumnsWithFrozen(frozenSettings.columnOrder, frozenSettings.frozenColumns, columns), [
+  "qty",
+  "status",
+  "code",
+  "expectedDate",
+  "action",
+]);
+assert.deepEqual(toggleFrozenColumn(["qty"], columns, "status", true), ["qty", "status"]);
+assert.deepEqual(toggleFrozenColumn(["qty", "status"], columns, "qty", false), ["status"]);
+assert.deepEqual(toggleFrozenColumn(["qty"], columns, "missing", true), ["qty"]);
+assert.deepEqual(
+  dataGridFrozenColumnOffsets(
+    [{ key: "qty", width: 120 }, { key: "status", width: 180 }, { key: "code", width: 160 }],
+    new Set(["qty", "status"]),
+  ),
+  { qty: 0, status: 120 },
+);
+
+const actionSettings = sanitizeGridState(
+  { hiddenActions: ["export", "toolbar:receive", "missing"], columnFilters: { code: " ASN ", missing: "bad", action: "bad" } },
+  columns,
+  [2, 20],
+  20,
+  ["refresh", "export", "toolbar:receive"],
+);
+assert.deepEqual(actionSettings.hiddenActions, ["export", "toolbar:receive"]);
+assert.deepEqual(actionSettings.columnFilters, { code: "ASN" });
+assert.deepEqual(toggleHiddenAction(["export"], ["refresh", "export"], "refresh", true), ["export"]);
+assert.deepEqual(toggleHiddenAction(["export"], ["refresh", "export"], "refresh", false), ["export", "refresh"]);
+assert.deepEqual(toggleHiddenAction(["export", "refresh"], ["refresh", "export"], "export", true), ["refresh"]);
+assert.deepEqual(toggleHiddenAction(["export"], ["refresh", "export"], "missing", false), ["export"]);
+
 const copySettings = sanitizeGridState({ copyableColumns: ["code", "action", "missing"] }, columns, [2, 20], 20);
 assert.deepEqual(copySettings.copyableColumns, ["code"]);
 assert.deepEqual(toggleCopyableColumn(["code"], columns, "status", true), ["code", "status"]);
@@ -70,7 +113,7 @@ const widthSettings = sanitizeGridState(
   20,
 );
 assert.deepEqual(widthSettings.columnWidths, { code: 240, action: 200 });
-assert.deepEqual(setColumnWidth({}, columns, "code", 80), { code: 120 });
+assert.deepEqual(setColumnWidth({}, columns, "code", 80), { code: 80 });
 assert.deepEqual(setColumnWidth({ code: 160, status: 180 }, columns, "code", null), { status: 180 });
 assert.deepEqual(setColumnWidth({}, columns, "missing", 180), {});
 assert.equal(dataGridTableWidth([{ key: "select", width: 44 }, { key: "code", width: 120 }, { key: "notes" }]), 324);

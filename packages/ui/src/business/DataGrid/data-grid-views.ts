@@ -6,6 +6,7 @@ const DATA_GRID_NAMED_VIEW_STORAGE_SUFFIX = ":views";
 export interface DataGridNamedView {
   name: string;
   state: DataGridLogicState;
+  queryState?: unknown;
   createdAt: string;
   updatedAt: string;
 }
@@ -13,10 +14,12 @@ export interface DataGridNamedView {
 export interface DataGridNamedViewInput {
   name: string;
   state: Partial<DataGridLogicState> | null | undefined;
+  queryState?: unknown;
 }
 
 export interface DataGridNamedViewOptions<T> {
   columns: DataGridLogicColumn<T>[];
+  actionKeys?: string[];
   pageSizeOptions?: number[];
   defaultPageSize?: number;
   now: string;
@@ -73,6 +76,7 @@ export function upsertDataGridNamedView<T>(
   const view: DataGridNamedView = {
     name: name.value,
     state: sanitizeViewState(parseStoredGridSettings(input.state), options),
+    queryState: cloneJsonState(input.queryState),
     createdAt: existing?.createdAt ?? options.now,
     updatedAt: options.now,
   };
@@ -176,6 +180,7 @@ function parseStoredNamedView<T>(
   return {
     name,
     state: sanitizeViewState(parseStoredGridSettings(record.state), options),
+    queryState: cloneJsonState(record.queryState),
     createdAt: safeTimestamp(record.createdAt, options.now),
     updatedAt: safeTimestamp(record.updatedAt, options.now),
   };
@@ -204,6 +209,31 @@ function safeTimestamp(value: unknown, fallback: string): string {
   return Number.isNaN(Date.parse(value)) ? fallback : value;
 }
 
+function parseStoredColumnFilters(value: unknown): DataGridLogicState["columnFilters"] | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const filters: DataGridLogicState["columnFilters"] = {};
+  for (const [key, filter] of Object.entries(value)) {
+    if (typeof filter === "string") {
+      filters[key] = filter;
+      continue;
+    }
+
+    if (Array.isArray(filter)) {
+      filters[key] = filter.filter(isString);
+      continue;
+    }
+
+    if (filter && typeof filter === "object") {
+      const record = filter as Record<string, unknown>;
+      const range: { from?: string; to?: string } = {};
+      if (typeof record.from === "string") range.from = record.from;
+      if (typeof record.to === "string") range.to = record.to;
+      filters[key] = range;
+    }
+  }
+  return filters;
+}
+
 function parseStoredGridSettings(value: unknown): Partial<DataGridLogicState> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
@@ -214,6 +244,13 @@ function parseStoredGridSettings(value: unknown): Partial<DataGridLogicState> | 
     copyableColumns: Array.isArray(record.copyableColumns)
       ? record.copyableColumns.filter(isString)
       : undefined,
+    frozenColumns: Array.isArray(record.frozenColumns)
+      ? record.frozenColumns.filter(isString)
+      : undefined,
+    hiddenActions: Array.isArray(record.hiddenActions)
+      ? record.hiddenActions.filter(isString)
+      : undefined,
+    columnFilters: parseStoredColumnFilters(record.columnFilters),
     columnWidths: parseStoredColumnWidths(record.columnWidths),
     columnOrder: Array.isArray(record.columnOrder)
       ? record.columnOrder.filter(isString)
@@ -244,6 +281,16 @@ function isString(value: unknown): value is string {
   return typeof value === "string";
 }
 
+function cloneJsonState(value: unknown): unknown {
+  if (value === undefined) return undefined;
+  try {
+    const serialized = JSON.stringify(value);
+    return serialized === undefined ? undefined : JSON.parse(serialized);
+  } catch {
+    return undefined;
+  }
+}
+
 const defaultPageSizeFallback = 20;
 
 function sanitizeViewState<T>(
@@ -266,6 +313,14 @@ function sanitizeViewState<T>(
   const columnOrder = Array.from(
     new Set([...requestedOrder, ...defaultColumnOrder(columns)]),
   ).filter((key) => columnKeys.has(key));
+  const frozenColumns = Array.from(
+    new Set(state?.frozenColumns?.filter((key) => columnKeys.has(key)) ?? []),
+  );
+  const actionKeys = new Set(options.actionKeys ?? []);
+  const hiddenActions = Array.from(
+    new Set(state?.hiddenActions?.filter((key) => actionKeys.has(key)) ?? []),
+  );
+  const columnFilters = sanitizeViewColumnFilters(state?.columnFilters, columns);
   const copyableColumnKeys = new Set(defaultCopyableColumns(columns));
   const requestedCopyable =
     state?.copyableColumns?.filter((key) => copyableColumnKeys.has(key)) ??
@@ -286,6 +341,9 @@ function sanitizeViewState<T>(
   return {
     visibleColumns: visible.length > 0 ? visible : defaultVisibleColumns(columns),
     copyableColumns,
+    frozenColumns,
+    hiddenActions,
+    columnFilters,
     columnWidths: sanitizeColumnWidths(state?.columnWidths, columns),
     columnOrder,
     pageSize,
@@ -304,6 +362,42 @@ function defaultColumnOrder<T>(columns: DataGridLogicColumn<T>[]): string[] {
 
 function defaultCopyableColumns<T>(columns: DataGridLogicColumn<T>[]): string[] {
   return columns.filter((column) => column.copyable !== false).map((column) => column.key);
+}
+
+function sanitizeViewColumnFilters<T>(
+  filters: DataGridLogicState["columnFilters"] | undefined,
+  columns: DataGridLogicColumn<T>[],
+): DataGridLogicState["columnFilters"] {
+  if (!filters) return {};
+  const columnByKey = new Map(columns.map((column) => [column.key, column]));
+  const next: DataGridLogicState["columnFilters"] = {};
+
+  for (const [key, value] of Object.entries(filters)) {
+    const column = columnByKey.get(key);
+    if (!column || column.hideable === false || column.filter === false) continue;
+
+    const type = column.filter?.type ?? "text";
+    if (type === "multiSelect") {
+      if (Array.isArray(value)) {
+        const selected = value.map((item) => item.trim()).filter(Boolean);
+        if (selected.length > 0) next[key] = Array.from(new Set(selected));
+      }
+      continue;
+    }
+
+    if (type === "dateRange" || type === "numberRange") {
+      if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+      const range: { from?: string; to?: string } = {};
+      if (value.from?.trim()) range.from = value.from.trim();
+      if (value.to?.trim()) range.to = value.to.trim();
+      if (range.from || range.to) next[key] = range;
+      continue;
+    }
+
+    if (typeof value === "string" && value.trim()) next[key] = value.trim();
+  }
+
+  return next;
 }
 
 function sanitizeColumnWidths<T>(

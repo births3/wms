@@ -25,6 +25,8 @@ export interface DataTableColumn<T> {
   key: string;
   header: React.ReactNode;
   render?: (row: T, idx: number) => React.ReactNode;
+  headerProps?: React.ThHTMLAttributes<HTMLTableCellElement>;
+  cellProps?: (row: T, idx: number) => React.TdHTMLAttributes<HTMLTableCellElement>;
   align?: "left" | "center" | "right";
   width?: string | number;
   /** monospace 字体（适合 ID / IP / hash） */
@@ -82,15 +84,20 @@ export function DataTable<T>({
         </colgroup>
         <TableHeader>
           <TableRow>
-            {columns.map((col) => (
-              <TableHead
-                key={col.key}
-                style={columnStyle(col)}
-                className={cn(col.align === "right" && "text-right", col.align === "center" && "text-center")}
-              >
-                {col.header}
-              </TableHead>
-            ))}
+            {columns.map((col) => {
+              const { className: headerClassName, style: headerStyle, ...headerProps } = col.headerProps ?? {};
+              return (
+                <TableHead
+                  key={col.key}
+                  // 动态：列宽和冻结列 left 偏移来自 DataGrid 列配置。
+                  style={{ ...columnStyle(col), ...headerStyle }}
+                  className={cn(col.align === "right" && "text-right", col.align === "center" && "text-center", headerClassName)}
+                  {...headerProps}
+                >
+                  {col.header}
+                </TableHead>
+              );
+            })}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -111,20 +118,26 @@ export function DataTable<T>({
                   onClick={onRowClick ? () => onRowClick(row, idx) : undefined}
                   className={onRowClick ? "cursor-pointer" : ""}
                 >
-                  {columns.map((col) => (
-                    <TableCell
-                      key={col.key}
-                      style={columnStyle(col)}
-                      className={cn(
-                        col.mono && "font-mono text-xs text-muted-foreground",
-                        col.align === "right" && "text-right",
-                        col.align === "center" && "text-center",
-                        col.className,
-                      )}
-                    >
-                      {col.render ? col.render(row, idx) : (row as Record<string, React.ReactNode>)[col.key]}
-                    </TableCell>
-                  ))}
+                  {columns.map((col) => {
+                    const { className: cellClassName, style: cellStyle, ...cellProps } = col.cellProps?.(row, idx) ?? {};
+                    const mergedCellStyle = { ...columnStyle(col), ...cellStyle };
+                    return (
+                      <TableCell
+                        key={col.key}
+                        style={mergedCellStyle}
+                        className={cn(
+                          col.mono && "font-mono text-xs text-muted-foreground",
+                          col.align === "right" && "text-right",
+                          col.align === "center" && "text-center",
+                          col.className,
+                          cellClassName,
+                        )}
+                        {...cellProps}
+                      >
+                        {col.render ? col.render(row, idx) : (row as Record<string, React.ReactNode>)[col.key]}
+                      </TableCell>
+                    );
+                  })}
                 </TableRow>
               );
             })

@@ -13,13 +13,14 @@ import {
 
 const columns = [
   { key: "code", sortable: true, minWidth: 120, maxWidth: 240 },
-  { key: "status", sortable: true },
+  { key: "status", sortable: true, filter: { type: "multiSelect" } },
   { key: "qty", defaultHidden: true },
   { key: "action", hideable: false, copyable: false },
 ];
 
 const options = {
   columns,
+  actionKeys: ["refresh", "summary", "toolbar:receive"],
   pageSizeOptions: [10, 20],
   defaultPageSize: 20,
   now: "2026-06-30T12:00:00.000Z",
@@ -30,9 +31,16 @@ const created = upsertDataGridNamedView(
   [],
   {
     name: "  收货默认  ",
+    queryState: {
+      keyword: "ASN-001",
+      documentTypeFilter: ["purchase_inbound"],
+      createdAt: { from: "2026-04-01", to: "2026-06-30" },
+    },
     state: {
       visibleColumns: ["code", "missing"],
       copyableColumns: ["code", "action"],
+      hiddenActions: ["summary", "toolbar:receive", "missing"],
+      columnFilters: { code: " ASN-001 ", status: ["released"], missing: "bad", action: "bad" },
       columnWidths: { code: 260, missing: 180 },
       columnOrder: ["status", "code"],
       pageSize: 10,
@@ -46,13 +54,24 @@ assert.equal(created.ok, true);
 assert.equal(created.view.name, "收货默认");
 assert.equal(created.view.createdAt, options.now);
 assert.equal(created.view.updatedAt, options.now);
+assert.deepEqual(created.view.queryState, {
+  keyword: "ASN-001",
+  documentTypeFilter: ["purchase_inbound"],
+  createdAt: { from: "2026-04-01", to: "2026-06-30" },
+});
 assert.deepEqual(created.view.state.visibleColumns, ["action", "code"]);
 assert.deepEqual(created.view.state.columnWidths, { code: 240 });
+assert.deepEqual(created.view.state.hiddenActions, ["summary", "toolbar:receive"]);
+assert.deepEqual(created.view.state.columnFilters, { code: "ASN-001", status: ["released"] });
 
 const updated = upsertDataGridNamedView(
   created.views,
   {
     name: "收货默认",
+    queryState: {
+      keyword: "ASN-002",
+      statusFilter: ["receiving", "inspecting"],
+    },
     state: {
       visibleColumns: ["status"],
       pageSize: 999,
@@ -66,6 +85,10 @@ assert.equal(updated.ok, true);
 assert.equal(updated.views.length, 1);
 assert.equal(updated.view.createdAt, options.now);
 assert.equal(updated.view.updatedAt, laterOptions.now);
+assert.deepEqual(updated.view.queryState, {
+  keyword: "ASN-002",
+  statusFilter: ["receiving", "inspecting"],
+});
 assert.deepEqual(updated.view.state.visibleColumns, ["action", "status"]);
 assert.equal(updated.view.state.pageSize, 20);
 assert.equal(updated.view.state.sort, null);
@@ -161,8 +184,11 @@ const namedViewsToolbarSource = readFileSync(
 );
 
 assert.match(dataGridSource, /import \{ DataGridNamedViewsToolbar \} from "\.\/DataGridNamedViewsToolbar";/);
-assert.match(dataGridSource, /function applyNamedViewState\(state: DataGridLogicState\) \{[\s\S]*setSettings\(state\);[\s\S]*setPageIndex\(0\);[\s\S]*\}/);
-assert.match(dataGridSource, /<DataGridNamedViewsToolbar[\s\S]*storageKey=\{storageKey\}[\s\S]*settings=\{settings\}[\s\S]*onApplyView=\{applyNamedViewState\}[\s\S]*\/>/);
+assert.match(dataGridSource, /querySummaryItems\?: DataGridQuerySummaryItem\[\];/);
+assert.match(dataGridSource, /onApplyQueryState\?: \(queryState: unknown\) => void;/);
+assert.match(dataGridSource, /function applyNamedViewState\(state: DataGridLogicState, nextQueryState\?: unknown\) \{[\s\S]*setSettings\(state\);[\s\S]*onApplyQueryState\?\.\(nextQueryState\);[\s\S]*setPageIndex\(0\);[\s\S]*\}/);
+assert.match(dataGridSource, /<DataGridNamedViewsToolbar[\s\S]*storageKey=\{storageKey\}[\s\S]*actionKeys=\{actionKeys\}[\s\S]*settings=\{settings\}[\s\S]*onApplyView=\{applyNamedViewState\}[\s\S]*\/>/);
+assert.match(dataGridSource, /业务查询/);
 
 for (const symbol of [
   "dataGridNamedViewsStorageKey",
@@ -182,6 +208,8 @@ assert.match(namedViewsToolbarSource, /保存视图/);
 assert.match(namedViewsToolbarSource, /应用视图/);
 assert.match(namedViewsToolbarSource, /删除视图/);
 assert.match(namedViewsToolbarSource, /state: settings/);
-assert.match(namedViewsToolbarSource, /onApplyView\(selectedView\.state\)/);
+assert.match(namedViewsToolbarSource, /queryState/);
+assert.match(namedViewsToolbarSource, /actionKeys/);
+assert.match(namedViewsToolbarSource, /onApplyView\(selectedView\.state, selectedView\.queryState\)/);
 assert.match(namedViewsToolbarSource, /saveDataGridNamedViewsToStorage\(storage, storageKey, result\.views\)/);
 assert.match(namedViewsToolbarSource, /saveDataGridNamedViewsToStorage\(storage, storageKey, removed\.views\)/);
