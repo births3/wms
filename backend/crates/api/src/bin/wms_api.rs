@@ -26,6 +26,7 @@ use wms_api::{
     document_numbering_handlers::{document_numbering_router, DocumentNumberingAppState},
     feature_flags::FeatureFlagRegistry,
     master_data_handlers::{master_data_router, MasterDataAppState},
+    print_template_handlers::{print_template_router, PrintTemplateAppState},
     system_dictionary_handlers::{system_dictionary_router, SystemDictionaryAppState},
     wave3_handlers::{wave3_router, Wave3AppState},
     wave4_handlers::{wave4_router, Wave4AppState},
@@ -193,6 +194,7 @@ fn app(
 ) -> Router {
     let document_numbering_state =
         DocumentNumberingAppState::with_postgres(audit_query_state.pool.clone());
+    let print_template_state = PrintTemplateAppState::with_postgres(audit_query_state.pool.clone());
 
     Router::new()
         .route("/healthz", get(healthz))
@@ -204,6 +206,7 @@ fn app(
         .merge(master_data_router(master_data_state))
         .merge(system_dictionary_router(system_dictionary_state))
         .merge(document_numbering_router(document_numbering_state))
+        .merge(print_template_router(print_template_state))
         .merge(wave3_router(wave3_state))
         .merge(wave4_router(wave4_state))
         .merge(wave5_router(wave5_state))

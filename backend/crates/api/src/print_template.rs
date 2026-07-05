@@ -7,7 +7,9 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
+use utoipa::ToSchema;
 use uuid::Uuid;
+use wms_domain::PageMeta;
 
 use crate::{
     audit::{append_event_in_tx, AuditWriteRequest},
@@ -52,7 +54,7 @@ pub struct PublishPrintFieldLibraryRequest {
     pub fields: Vec<PrintFieldDefinitionInput>,
 }
 
-#[derive(Clone, Debug, Deserialize, FromRow, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, FromRow, PartialEq, Serialize, ToSchema)]
 pub struct PrintFieldLibraryVersion {
     pub id: Uuid,
     pub library_id: Uuid,
@@ -64,7 +66,7 @@ pub struct PrintFieldLibraryVersion {
     pub published_by: Uuid,
 }
 
-#[derive(Clone, Debug, Deserialize, FromRow, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, FromRow, PartialEq, Serialize, ToSchema)]
 pub struct PrintFieldDefinition {
     pub id: Uuid,
     pub library_version_id: Uuid,
@@ -76,6 +78,26 @@ pub struct PrintFieldDefinition {
     pub group_name: String,
     pub metadata: Value,
     pub sort_order: i32,
+}
+
+#[derive(Clone, Debug, Deserialize, FromRow, PartialEq, Serialize, ToSchema)]
+pub struct PrintFieldLibrarySummary {
+    pub id: Uuid,
+    pub library_code: String,
+    pub library_name: String,
+    pub source_schema: String,
+    pub latest_version_id: Uuid,
+    pub version_no: i32,
+    pub field_count: i64,
+    pub created_at: DateTime<Utc>,
+    pub published_at: DateTime<Utc>,
+    pub published_by: Uuid,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct PrintFieldLibraryListResponse {
+    pub data: Vec<PrintFieldLibrarySummary>,
+    pub page: PageMeta,
 }
 
 impl PgPrintTemplateRepository {
@@ -198,6 +220,51 @@ impl PgPrintTemplateRepository {
             "#,
         )
         .bind(library_version_id)
+        .fetch_all(pool)
+        .await
+        .map_err(map_db_error)
+    }
+
+    pub async fn list_field_libraries(
+        &self,
+        pool: &PgPool,
+    ) -> Result<Vec<PrintFieldLibrarySummary>, PrintTemplateError> {
+        sqlx::query_as::<_, PrintFieldLibrarySummary>(
+            r#"
+            SELECT
+                libraries.id,
+                libraries.library_code,
+                libraries.library_name,
+                libraries.source_schema,
+                latest_versions.id AS latest_version_id,
+                latest_versions.version_no,
+                COUNT(fields.id)::BIGINT AS field_count,
+                libraries.created_at,
+                latest_versions.published_at,
+                latest_versions.published_by
+              FROM print_field_libraries libraries
+              JOIN LATERAL (
+                SELECT id, version_no, published_at, published_by
+                  FROM print_field_library_versions
+                 WHERE library_id = libraries.id
+                 ORDER BY version_no DESC
+                 LIMIT 1
+              ) latest_versions ON TRUE
+              LEFT JOIN print_field_definitions fields
+                ON fields.library_version_id = latest_versions.id
+             GROUP BY
+                libraries.id,
+                libraries.library_code,
+                libraries.library_name,
+                libraries.source_schema,
+                latest_versions.id,
+                latest_versions.version_no,
+                libraries.created_at,
+                latest_versions.published_at,
+                latest_versions.published_by
+             ORDER BY libraries.library_code ASC
+            "#,
+        )
         .fetch_all(pool)
         .await
         .map_err(map_db_error)

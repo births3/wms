@@ -23,6 +23,7 @@ pub mod outbound;
 pub mod packing_station;
 pub mod parameter_mapping;
 pub mod print_template;
+pub mod print_template_handlers;
 pub mod reports;
 pub mod retail_chain;
 pub mod system_dictionary;
@@ -41,6 +42,7 @@ use crate::document_numbering::{
     UpsertDocumentNumberRuleRequest,
 };
 use crate::openapi_contract::ContractSecurityAddon;
+use crate::print_template::{PrintFieldLibraryListResponse, PrintFieldLibrarySummary};
 use utoipa::OpenApi;
 use wms_domain::{
     AuditActor, AuditEvent, AuditEventListResponse, BatchCreateLocationsRequest, BillingAccount,
@@ -449,6 +451,19 @@ fn set_document_number_rule_enabled() {}
 #[allow(dead_code)]
 fn list_document_number_allocations() {}
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/print-templates/field-libraries",
+    tag = "print-template",
+    responses(
+        (status = 200, description = "打印字段库列表", body = PrintFieldLibraryListResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+fn list_print_field_libraries() {}
+
 #[utoipa::path(get, path = "/api/v1/inbound/receiving-orders", tag = "inbound", responses((status = 200, description = "收货单列表", body = ReceivingOrderListResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 fn list_receiving_orders() {}
@@ -739,6 +754,7 @@ fn confirm_container_recovery() {}
         upsert_document_number_rule,
         set_document_number_rule_enabled,
         list_document_number_allocations,
+        list_print_field_libraries,
         list_receiving_orders,
         create_receiving_order,
         get_receiving_order,
@@ -883,6 +899,8 @@ fn confirm_container_recovery() {}
         PackingStation,
         PageMeta,
         PrintWaybillRequest,
+        PrintFieldLibraryListResponse,
+        PrintFieldLibrarySummary,
         Product,
         ProductListResponse,
         PutawayInventoryRequest,
@@ -944,6 +962,7 @@ fn confirm_container_recovery() {}
         (name = "master-data", description = "M1 基础档案"),
         (name = "system-dictionary", description = "US-M1-011 系统字典中心"),
         (name = "code-generator", description = "M-CG 单据号生成"),
+        (name = "print-template", description = "H9 打印模板引擎"),
         (name = "inbound", description = "M2 入库业务规则"),
         (name = "inventory", description = "M3 库存批次与状态"),
         (name = "outbound", description = "M4 出库闭环"),

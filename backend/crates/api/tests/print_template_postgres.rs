@@ -105,6 +105,15 @@ async fn published_field_library_versions_are_immutable_idempotent_and_audited(p
     assert_eq!(first_fields[0].display_name, "ASN 号");
     assert_eq!(second_fields[0].display_name, "ASN 编号");
 
+    let libraries = repo
+        .list_field_libraries(&pool)
+        .await
+        .expect("latest field libraries should be queryable");
+    assert_eq!(libraries.len(), 1);
+    assert_eq!(libraries[0].library_code, "m2_acceptance_record");
+    assert_eq!(libraries[0].version_no, 2);
+    assert_eq!(libraries[0].field_count, 1);
+
     let audit_count: i64 = sqlx::query_scalar(
         r#"
         SELECT COUNT(*)

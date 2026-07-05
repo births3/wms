@@ -980,6 +980,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/print-templates/field-libraries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_print_field_libraries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/gsp/inbound-ledger": {
         parameters: {
             query?: never;
@@ -2228,6 +2244,29 @@ export interface components {
             count: number;
             /** @description 下一页游标；为空表示无更多数据。 */
             next_cursor?: string | null;
+        };
+        PrintFieldLibraryListResponse: {
+            data: components["schemas"]["PrintFieldLibrarySummary"][];
+            page: components["schemas"]["PageMeta"];
+        };
+        PrintFieldLibrarySummary: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: int64 */
+            field_count: number;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            latest_version_id: string;
+            library_code: string;
+            library_name: string;
+            /** Format: date-time */
+            published_at: string;
+            /** Format: uuid */
+            published_by: string;
+            source_schema: string;
+            /** Format: int32 */
+            version_no: number;
         };
         PrintWaybillRequest: {
             carrier_code: string;
@@ -5986,6 +6025,44 @@ export interface operations {
             };
             /** @description 未登录 */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_print_field_libraries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 打印字段库列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintFieldLibraryListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

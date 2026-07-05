@@ -145,8 +145,8 @@
           }
         },
         "security": [],
-        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。",
-        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。"
+        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。",
+        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。"
       }
     },
     "/api/v1/auth/me": {
@@ -4146,6 +4146,46 @@
           },
           "401": {
             "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/print-templates/field-libraries": {
+      "get": {
+        "tags": [
+          "print-template"
+        ],
+        "operationId": "list_print_field_libraries",
+        "responses": {
+          "200": {
+            "description": "打印字段库列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintFieldLibraryListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
             "content": {
               "application/json": {
                 "schema": {
@@ -8233,6 +8273,78 @@
           }
         }
       },
+      "PrintFieldLibraryListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrintFieldLibrarySummary"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "PrintFieldLibrarySummary": {
+        "type": "object",
+        "required": [
+          "id",
+          "library_code",
+          "library_name",
+          "source_schema",
+          "latest_version_id",
+          "version_no",
+          "field_count",
+          "created_at",
+          "published_at",
+          "published_by"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "field_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "latest_version_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "library_code": {
+            "type": "string"
+          },
+          "library_name": {
+            "type": "string"
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "published_by": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source_schema": {
+            "type": "string"
+          },
+          "version_no": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "PrintWaybillRequest": {
         "type": "object",
         "required": [
@@ -10140,6 +10252,10 @@
     {
       "name": "code-generator",
       "description": "M-CG 单据号生成"
+    },
+    {
+      "name": "print-template",
+      "description": "H9 打印模板引擎"
     },
     {
       "name": "inbound",
