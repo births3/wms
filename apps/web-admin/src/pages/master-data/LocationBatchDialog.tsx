@@ -13,6 +13,7 @@ import {
   type LocationBatchPreview,
   type LocationBatchRange,
 } from "@wms/ui";
+import type { SystemDictionaryOption } from "@/features/master-data/master-data-queries";
 
 export const initialLocationBatchRange: LocationBatchRange = {
   areaCode: "",
@@ -26,12 +27,6 @@ export const initialLocationBatchRange: LocationBatchRange = {
 
 export const defaultLocationBatchType = "storage";
 
-const locationTypeOptions: Array<[string, string]> = [
-  ["storage", "存储位"],
-  ["case_pick", "箱拣位"],
-  ["piece_pick", "零拣位"],
-];
-
 interface LocationBatchDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -42,6 +37,7 @@ interface LocationBatchDialogProps {
   range: LocationBatchRange;
   onRangeChange: (patch: Partial<LocationBatchRange>) => void;
   locationType: string;
+  locationTypeOptions: SystemDictionaryOption[];
   onLocationTypeChange: (value: string) => void;
   errors: string[];
   preview: LocationBatchPreview;
@@ -61,6 +57,7 @@ export function LocationBatchDialog({
   range,
   onRangeChange,
   locationType,
+  locationTypeOptions,
   onLocationTypeChange,
   errors,
   preview,

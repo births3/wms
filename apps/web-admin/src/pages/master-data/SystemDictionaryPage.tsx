@@ -1,8 +1,6 @@
 import * as React from "react";
 import {
   Button,
-  Card,
-  CardContent,
   Checkbox,
   Dialog,
   DialogClose,
@@ -16,7 +14,7 @@ import {
   PageHeader,
   SystemDictionaryTwoPane,
 } from "@wms/ui";
-import { ArrowLeft, Ban, Pencil, Plus, RefreshCw } from "lucide-react";
+import { Ban, Pencil, Plus, RefreshCw } from "lucide-react";
 
 import {
   useDisableSystemDictionaryItemMutation,
@@ -36,7 +34,6 @@ interface SystemDictionaryMeta {
 
 interface M1SystemDictionaryPageProps {
   meta: SystemDictionaryMeta;
-  onBack: () => void;
 }
 
 type ActiveDialog = "upsert" | "disable" | null;
@@ -62,6 +59,7 @@ const emptySystemDictionaryGroups: SystemDictionaryPaneGroup[] = [
   { code: "document_type", name: "单据类型", items: [] },
   { code: "special_drug_category", name: "特殊药品分类", items: [] },
 ];
+const defaultDictionaryGroupCode = "special_drug_category";
 
 const emptyItemForm: ItemFormState = {
   itemCode: "",
@@ -80,7 +78,7 @@ const emptyDisableForm: DisableFormState = {
   reason: "",
 };
 
-export function M1SystemDictionaryPage({ meta, onBack }: M1SystemDictionaryPageProps) {
+export function M1SystemDictionaryPage({ meta }: M1SystemDictionaryPageProps) {
   const groupsQuery = useSystemDictionaryGroupsQuery();
   const upsertMutation = useUpsertSystemDictionaryItemMutation();
   const disableMutation = useDisableSystemDictionaryItemMutation();
@@ -93,17 +91,15 @@ export function M1SystemDictionaryPage({ meta, onBack }: M1SystemDictionaryPageP
   const [selectedDictCode, setSelectedDictCode] = React.useState<string | null>(null);
   const groups = groupsQuery.data ?? emptySystemDictionaryGroups;
   const activeGroup =
-    groups.find((group) => group.code === selectedDictCode) ?? groups[0] ?? emptySystemDictionaryGroups[0];
-  const totalCount = groups.reduce((count, group) => count + group.items.length, 0);
-  const activeCount = groups.reduce(
-    (count, group) => count + group.items.filter((item) => item.enabled).length,
-    0,
-  );
+    groups.find((group) => group.code === selectedDictCode) ??
+    groups.find((group) => group.code === defaultDictionaryGroupCode) ??
+    groups[0] ??
+    emptySystemDictionaryGroups[0];
   const pending = upsertMutation.isPending || disableMutation.isPending;
 
   React.useEffect(() => {
     if (groups.some((group) => group.code === selectedDictCode)) return;
-    setSelectedDictCode(groups[0]?.code ?? null);
+    setSelectedDictCode(groups.find((group) => group.code === defaultDictionaryGroupCode)?.code ?? groups[0]?.code ?? null);
   }, [groups, selectedDictCode]);
 
   async function refreshRows() {
@@ -203,23 +199,13 @@ export function M1SystemDictionaryPage({ meta, onBack }: M1SystemDictionaryPageP
                 {lastEvent}
               </span>
             )}
-            <Button type="button" variant="outline" onClick={refreshRows}>
+            <Button type="button" variant="outline" size="sm" onClick={refreshRows}>
               <RefreshCw className="size-4" aria-hidden />
               刷新
-            </Button>
-            <Button type="button" variant="outline" onClick={onBack}>
-              <ArrowLeft className="size-4" aria-hidden />
-              返回工作台
             </Button>
           </div>
         }
       />
-
-      <div className="grid gap-3 md:grid-cols-3">
-        <Metric label="字典分类" value={groups.length} />
-        <Metric label="启用项" value={activeCount} />
-        <Metric label="API 返回" value={groupsQuery.data ? totalCount : 0} />
-      </div>
 
       {groupsQuery.error && (
         <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -469,17 +455,6 @@ function CancelButton() {
         取消
       </Button>
     </DialogClose>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: number }) {
-  return (
-    <Card className="rounded-lg shadow-sm">
-      <CardContent className="p-4">
-        <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        <p className="mt-2 text-2xl font-semibold tracking-normal text-foreground">{value}</p>
-      </CardContent>
-    </Card>
   );
 }
 

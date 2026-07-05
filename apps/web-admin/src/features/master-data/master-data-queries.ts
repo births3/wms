@@ -127,11 +127,17 @@ export interface SpecialDrugCategoryOption {
   requiresDualSign: boolean;
 }
 
+export type SystemDictionaryOption = readonly [string, string];
+
 export const masterDataQueryKey = ["master-data"] as const;
 export const specialDrugCategoryDictCode = "special_drug_category";
 const systemDictionaryDefinitions = [
   { code: "document_type", name: "单据类型" },
   { code: specialDrugCategoryDictCode, name: "特殊药品分类" },
+  { code: "temperature_zone", name: "库区温区" },
+  { code: "quality_color", name: "库区色标" },
+  { code: "zone_type", name: "库区类型" },
+  { code: "location_type", name: "库位类型" },
 ] as const;
 const systemDictionaryGroupsQueryKey = [
   ...masterDataQueryKey,
@@ -143,6 +149,11 @@ const specialDrugCategoriesQueryKey = [
   ...masterDataQueryKey,
   "m1-system-dictionary",
   specialDrugCategoryDictCode,
+  "options",
+] as const;
+const systemDictionaryOptionsQueryKey = [
+  ...masterDataQueryKey,
+  "m1-system-dictionary",
   "options",
 ] as const;
 
@@ -164,6 +175,14 @@ export function useSpecialDrugCategoriesQuery(enabled = true) {
   return useQuery<SpecialDrugCategoryOption[], ApiError>({
     queryKey: specialDrugCategoriesQueryKey,
     queryFn: listSpecialDrugCategoryOptions,
+    enabled,
+  });
+}
+
+export function useSystemDictionaryItemOptionsQuery(dictCode: string, enabled = true) {
+  return useQuery<SystemDictionaryOption[], ApiError>({
+    queryKey: [...systemDictionaryOptionsQueryKey, dictCode],
+    queryFn: () => listSystemDictionaryItemOptions(dictCode),
     enabled,
   });
 }
@@ -263,11 +282,15 @@ async function listWarehouses(): Promise<MasterDataRow[]> {
 }
 
 async function listLocations(): Promise<MasterDataRow[]> {
-  const result = await api.GET("/api/v1/master-data/locations");
+  const [result, locationTypeOptions] = await Promise.all([
+    api.GET("/api/v1/master-data/locations"),
+    listSystemDictionaryItemOptions("location_type"),
+  ]);
   if (!result.data) {
     throw new ApiError(result.error, "读取库位档案失败", result.response.status);
   }
-  return result.data.data.map(locationRow);
+  const locationTypeLabels = new Map(locationTypeOptions);
+  return result.data.data.map((location) => locationRow(location, locationTypeLabels));
 }
 
 async function listWarehouseZones(): Promise<MasterDataRow[]> {
@@ -342,16 +365,20 @@ export function warehouseZoneRowsFromLocations(
 export async function batchCreateLocations(
   request: BatchCreateLocationsRequest,
 ): Promise<MasterDataRow[]> {
-  const result = await api.POST("/api/v1/master-data/locations/batch-create", {
-    params: {
-      header: { "Idempotency-Key": idempotencyKey("web-m1-location-batch") },
-    },
-    body: request,
-  });
+  const [result, locationTypeOptions] = await Promise.all([
+    api.POST("/api/v1/master-data/locations/batch-create", {
+      params: {
+        header: { "Idempotency-Key": idempotencyKey("web-m1-location-batch") },
+      },
+      body: request,
+    }),
+    listSystemDictionaryItemOptions("location_type"),
+  ]);
   if (!result.data) {
     throw new ApiError(result.error, "批量新增库位失败", result.response.status);
   }
-  return result.data.data.map(locationRow);
+  const locationTypeLabels = new Map(locationTypeOptions);
+  return result.data.data.map((location) => locationRow(location, locationTypeLabels));
 }
 
 export async function createProduct(request: CreateProductRequest): Promise<MasterDataRow> {
@@ -429,25 +456,31 @@ export async function updateWarehouse(input: {
 }
 
 export async function createLocation(request: CreateLocationRequest): Promise<MasterDataRow> {
-  const result = await api.POST("/api/v1/master-data/locations", { body: request });
+  const [result, locationTypeOptions] = await Promise.all([
+    api.POST("/api/v1/master-data/locations", { body: request }),
+    listSystemDictionaryItemOptions("location_type"),
+  ]);
   if (!result.data) {
     throw new ApiError(result.error, "新建库位失败", result.response.status);
   }
-  return locationRow(result.data);
+  return locationRow(result.data, new Map(locationTypeOptions));
 }
 
 export async function updateLocation(input: {
   id: string;
   request: UpdateLocationRequest;
 }): Promise<MasterDataRow> {
-  const result = await api.PATCH("/api/v1/master-data/locations/{id}", {
-    params: { path: { id: input.id } },
-    body: input.request,
-  });
+  const [result, locationTypeOptions] = await Promise.all([
+    api.PATCH("/api/v1/master-data/locations/{id}", {
+      params: { path: { id: input.id } },
+      body: input.request,
+    }),
+    listSystemDictionaryItemOptions("location_type"),
+  ]);
   if (!result.data) {
     throw new ApiError(result.error, "保存库位失败", result.response.status);
   }
-  return locationRow(result.data);
+  return locationRow(result.data, new Map(locationTypeOptions));
 }
 
 async function listSystemDictionaryItems(): Promise<MasterDataRow[]> {
@@ -486,6 +519,13 @@ async function fetchSystemDictionaryItems(dictCode: string): Promise<SystemDicti
 async function listSpecialDrugCategoryOptions(): Promise<SpecialDrugCategoryOption[]> {
   const items = await fetchSystemDictionaryItems(specialDrugCategoryDictCode);
   return items.map(specialDrugCategoryOptionFromDictionaryItem);
+}
+
+async function listSystemDictionaryItemOptions(dictCode: string): Promise<SystemDictionaryOption[]> {
+  const items = await fetchSystemDictionaryItems(dictCode);
+  return items
+    .filter((item) => item.enabled)
+    .map((item) => [item.item_code, item.item_name] as const);
 }
 
 async function upsertSystemDictionaryItem(input: {
@@ -635,8 +675,8 @@ function warehouseRow(item: Warehouse): MasterDataRow {
   });
 }
 
-function locationRow(item: Location): MasterDataRow {
-  const locationType = locationTypeLabel(item.location_type);
+function locationRow(item: Location, locationTypeLabels: ReadonlyMap<string, string>): MasterDataRow {
+  const locationType = locationTypeLabels.get(item.location_type) ?? text(item.location_type);
   const volume = `${item.used_volume_cm3}/${item.max_volume_cm3} cm³`;
   return row({
     id: item.id,
@@ -804,13 +844,6 @@ function locationStatusLabel(status: string) {
   if (status === "occupied") return "占用";
   if (status === "locked") return "锁定";
   return activeStatusLabel(status);
-}
-
-function locationTypeLabel(type: string) {
-  if (type === "storage") return "存储位";
-  if (type === "case_pick" || type === "box_pick" || type === "carton_pick") return "箱拣位";
-  if (type === "piece_pick" || type === "each_pick") return "零拣位";
-  return text(type);
 }
 
 function locationAreaCode(locationCode: string) {

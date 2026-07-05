@@ -8,6 +8,10 @@ const appSource = read("src/App.tsx");
 const queriesSource = read("src/features/master-data/master-data-queries.ts");
 const systemDictionaryPageSource = read("src/pages/master-data/SystemDictionaryPage.tsx");
 const viteConfigSource = read("vite.config.ts");
+const m1WarehouseStoriesSource = fs.readFileSync(
+  path.join(root, "../../docs/domain/user-stories-m1-master-data-warehouse.md"),
+  "utf8",
+);
 
 assert.doesNotMatch(appSource, /m1-special-drug-categories/);
 assert.equal(fs.existsSync(path.join(root, "src/pages/master-data/SpecialDrugCategoriesPage.tsx")), false);
@@ -19,6 +23,12 @@ assert.doesNotMatch(queriesSource, /\/api\/v1\/master-data\/special-drug-categor
 assert.match(systemDictionaryPageSource, /special_drug_category/);
 assert.match(viteConfigSource, /special_drug_category/);
 assert.doesNotMatch(viteConfigSource, /\/api\/v1\/master-data\/special-drug-categories/);
+
+for (const dictCode of ["temperature_zone", "quality_color", "zone_type", "location_type"]) {
+  assert.match(queriesSource, new RegExp(`code: "${dictCode}"`));
+  assert.match(viteConfigSource, new RegExp(`${dictCode}: \\[`));
+  assert.match(m1WarehouseStoriesSource, new RegExp(`\\\`${dictCode}\\\``));
+}
 
 function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), "utf8");

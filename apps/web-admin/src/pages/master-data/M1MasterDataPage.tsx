@@ -1,19 +1,21 @@
 import * as React from "react";
 import {
-  Button,
-  Card,
-  CardContent,
   DataGrid,
-  Input,
   PageHeader,
-  StatusBadge,
+  QueryPanel,
+  buildQueryPanelSummaryItems,
   buildLocationBatchPreview,
-  type DataGridColumn,
+  type DataGridCreateAction,
+  type DataGridDisableAction,
+  type DataGridEditAction,
+  type DataGridRefreshAction,
+  type DataGridToolbarAction,
   type LocationBatchRange,
-  type StatusKey,
+  type QueryPanelField,
+  type QueryPanelValue,
   validateLocationBatchRange,
 } from "@wms/ui";
-import { ArrowLeft, Plus, RefreshCw, Search, Upload } from "lucide-react";
+import { Plus, Upload } from "lucide-react";
 
 import {
   batchCreateLocations,
@@ -21,10 +23,10 @@ import {
   createProduct,
   createSupplier,
   useMasterDataRowsQuery,
+  useSystemDictionaryItemOptionsQuery,
   type CreateCustomerRequest,
   type CreateProductRequest,
   type CreateSupplierRequest,
-  type LocationMasterDataFields,
   type MasterDataRow,
   type MasterDataViewId,
 } from "@/features/master-data/master-data-queries";
@@ -44,12 +46,18 @@ import {
   type MasterDataCrudForm,
   type MasterDataCrudTarget,
 } from "./MasterDataCrudDialog";
-import { MasterDataSourceActions } from "./MasterDataSourceActions";
+import {
+  MasterDataSourceActions,
+  type MasterDataSourceActionsHandle,
+} from "./MasterDataSourceActions";
 import { ProductCreateDialog } from "./ProductCreateDialog";
 import { ProductEditDialog } from "./ProductEditDialog";
 import { productColumns } from "./ProductEditTable";
 import {
-  masterDataActionLabels,
+  baseMasterDataColumns,
+  locationMasterDataColumns,
+} from "./M1MasterDataColumns";
+import {
   masterDataColumns,
   productTableClassName,
 } from "./m1-product-page-model";
@@ -98,260 +106,47 @@ export const masterDataViewMeta: Record<
   },
 };
 
+const m1QueryFields: QueryPanelField[] = [
+  {
+    key: "keyword",
+    label: "关键字",
+    type: "text",
+    placeholder: "搜索编码、名称、状态或字段",
+    ariaLabel: "搜索基础档案",
+  },
+];
+const m1CoreQueryFieldKeys = ["keyword"];
+
 interface M1MasterDataPageProps {
   viewId: MasterDataViewId;
   onBack: () => void;
 }
-const columns: DataGridColumn<MasterDataRow>[] = [
-  {
-    key: "code",
-    header: "编码",
-    mono: true,
-    width: 220,
-    minWidth: 180,
-    sortable: true,
-    sortValue: (row) => row.code,
-    filterValue: (row) => row.code,
-    copyValue: (row) => row.code,
-    filter: { type: "text" },
-    render: (row) => <span className="text-primary">{row.code}</span>,
-  },
-  {
-    key: "name",
-    header: "名称",
-    width: 240,
-    minWidth: 200,
-    sortable: true,
-    sortValue: (row) => row.name,
-    filterValue: (row) => row.name,
-    copyValue: (row) => row.name,
-    filter: { type: "text" },
-  },
-  {
-    key: "status",
-    header: "状态",
-    width: 130,
-    minWidth: 120,
-    sortable: true,
-    sortValue: (row) => row.statusLabel,
-    filterValue: (row) => statusFilterValue(row.status),
-    copyValue: (row) => row.statusLabel,
-    filter: {
-      type: "multiSelect",
-      options: [
-        { label: "启用/可用", value: "active" },
-        { label: "停用", value: "disabled" },
-        { label: "其他", value: "other" },
-      ],
-    },
-    render: (row) => (
-      <StatusBadge status={statusKey(row.status)} label={row.statusLabel} size="sm" />
-    ),
-  },
-  {
-    key: "primary",
-    header: "关键字段",
-    width: 230,
-    minWidth: 190,
-    filterValue: (row) => `${row.primaryLabel} ${row.primaryValue}`,
-    copyValue: (row) => `${row.primaryLabel}: ${row.primaryValue}`,
-    filter: { type: "text" },
-    render: (row) => <FieldText label={row.primaryLabel} value={row.primaryValue} />,
-  },
-  {
-    key: "secondary",
-    header: "扩展字段",
-    width: 240,
-    minWidth: 200,
-    filterValue: (row) => `${row.secondaryLabel} ${row.secondaryValue}`,
-    copyValue: (row) => `${row.secondaryLabel}: ${row.secondaryValue}`,
-    filter: { type: "text" },
-    render: (row) => <FieldText label={row.secondaryLabel} value={row.secondaryValue} />,
-  },
-  {
-    key: "extra",
-    header: "运行字段",
-    width: 260,
-    minWidth: 220,
-    filterValue: (row) => `${row.extraLabel} ${row.extraValue}`,
-    copyValue: (row) => `${row.extraLabel}: ${row.extraValue}`,
-    filter: { type: "text" },
-    render: (row) => <FieldText label={row.extraLabel} value={row.extraValue} />,
-  },
-  {
-    key: "createdAt",
-    header: "创建时间",
-    width: 190,
-    minWidth: 170,
-    sortable: true,
-    sortValue: (row) => row.createdAt,
-    filterValue: (row) => row.createdAt,
-    copyValue: (row) => formatDateTime(row.createdAt),
-    filter: { type: "dateRange" },
-    render: (row) => formatDateTime(row.createdAt),
-  },
-  {
-    key: "updatedAt",
-    header: "更新时间",
-    width: 190,
-    minWidth: 170,
-    sortable: true,
-    sortValue: (row) => row.updatedAt,
-    filterValue: (row) => row.updatedAt,
-    copyValue: (row) => formatDateTime(row.updatedAt),
-    filter: { type: "dateRange" },
-    render: (row) => formatDateTime(row.updatedAt),
-  },
-];
 
-const locationColumns: DataGridColumn<MasterDataRow>[] = [
-  {
-    key: "owner",
-    header: "货主",
-    width: 230,
-    minWidth: 200,
-    sortable: true,
-    sortValue: (row) => locationValue(row, "owner"),
-    filterValue: (row) => locationValue(row, "owner"),
-    copyValue: (row) => locationValue(row, "owner"),
-    filter: { type: "text" },
-  },
-  {
-    key: "warehouse",
-    header: "仓库 / 库区",
-    width: 280,
-    minWidth: 240,
-    filterValue: (row) => `${locationValue(row, "warehouse")} ${locationValue(row, "zone")}`,
-    copyValue: (row) => `仓库 ${locationValue(row, "warehouse")} / 库区 ${locationValue(row, "zone")}`,
-    filter: { type: "text" },
-    render: (row) => (
-      <FieldText label={`库区 ${locationValue(row, "zone")}`} value={`仓库 ${locationValue(row, "warehouse")}`} />
-    ),
-  },
-  {
-    key: "code",
-    header: "库位编码",
-    mono: true,
-    width: 190,
-    minWidth: 170,
-    sortable: true,
-    sortValue: (row) => row.code,
-    filterValue: (row) => row.code,
-    copyValue: (row) => row.code,
-    filter: { type: "text" },
-    render: (row) => <span className="text-primary">{row.code}</span>,
-  },
-  {
-    key: "coordinate",
-    header: "区域 / 排列层",
-    width: 210,
-    minWidth: 190,
-    filterValue: (row) =>
-      `${locationValue(row, "area")} ${locationValue(row, "rowNo")} ${locationValue(row, "columnNo")} ${locationValue(row, "layerNo")}`,
-    copyValue: (row) =>
-      `区域 ${locationValue(row, "area")} / 排 ${locationValue(row, "rowNo")} / 列 ${locationValue(row, "columnNo")} / 层 ${locationValue(row, "layerNo")}`,
-    filter: { type: "text" },
-    render: (row) => (
-      <FieldText
-        label={`排 ${locationValue(row, "rowNo")} / 列 ${locationValue(row, "columnNo")} / 层 ${locationValue(row, "layerNo")}`}
-        value={`区域 ${locationValue(row, "area")}`}
-      />
-    ),
-  },
-  {
-    key: "locationType",
-    header: "库位类型",
-    width: 140,
-    minWidth: 120,
-    sortable: true,
-    sortValue: (row) => locationValue(row, "locationType"),
-    filterValue: (row) => locationValue(row, "locationType"),
-    copyValue: (row) => locationValue(row, "locationType"),
-    filter: { type: "text" },
-  },
-  {
-    key: "status",
-    header: "状态",
-    width: 130,
-    minWidth: 120,
-    sortable: true,
-    sortValue: (row) => row.statusLabel,
-    filterValue: (row) => statusFilterValue(row.status),
-    copyValue: (row) => row.statusLabel,
-    filter: {
-      type: "multiSelect",
-      options: [
-        { label: "可用", value: "active" },
-        { label: "停用/锁定", value: "disabled" },
-        { label: "其他", value: "other" },
-      ],
-    },
-    render: (row) => (
-      <StatusBadge status={statusKey(row.status)} label={row.statusLabel} size="sm" />
-    ),
-  },
-  {
-    key: "volume",
-    header: "已用 / 最大体积",
-    width: 180,
-    minWidth: 160,
-    filterValue: (row) => locationValue(row, "volume"),
-    copyValue: (row) => locationValue(row, "volume"),
-    filter: { type: "text" },
-  },
-  {
-    key: "maxSku",
-    header: "最大 SKU",
-    width: 130,
-    minWidth: 120,
-    sortable: true,
-    sortValue: (row) => Number.parseInt(locationValue(row, "maxSku"), 10) || 0,
-    filterValue: (row) => locationValue(row, "maxSku"),
-    copyValue: (row) => locationValue(row, "maxSku"),
-    filter: { type: "text" },
-  },
-  {
-    key: "createdAt",
-    header: "创建时间",
-    width: 190,
-    minWidth: 170,
-    sortable: true,
-    sortValue: (row) => row.createdAt,
-    filterValue: (row) => row.createdAt,
-    copyValue: (row) => formatDateTime(row.createdAt),
-    filter: { type: "dateRange" },
-    render: (row) => formatDateTime(row.createdAt),
-  },
-  {
-    key: "updatedAt",
-    header: "更新时间",
-    width: 190,
-    minWidth: 170,
-    sortable: true,
-    sortValue: (row) => row.updatedAt,
-    filterValue: (row) => row.updatedAt,
-    copyValue: (row) => formatDateTime(row.updatedAt),
-    filter: { type: "dateRange" },
-    render: (row) => formatDateTime(row.updatedAt),
-  },
-];
-
-export function M1MasterDataPage({ viewId, onBack }: M1MasterDataPageProps) {
+export function M1MasterDataPage({ viewId }: M1MasterDataPageProps) {
   if (viewId === "m1-system-dictionary") {
-    return <M1SystemDictionaryPage meta={masterDataViewMeta[viewId]} onBack={onBack} />;
+    return <M1SystemDictionaryPage meta={masterDataViewMeta[viewId]} />;
   }
 
-  return <M1MasterDataGridPage viewId={viewId} onBack={onBack} />;
+  return <M1MasterDataGridPage viewId={viewId} />;
 }
 
-function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
+function M1MasterDataGridPage({ viewId }: Pick<M1MasterDataPageProps, "viewId">) {
   const meta = masterDataViewMeta[viewId];
   const rowsQuery = useMasterDataRowsQuery(viewId);
-  const [keyword, setKeyword] = React.useState("");
+  const locationTypeOptionsQuery = useSystemDictionaryItemOptionsQuery(
+    "location_type",
+    viewId === "m1-locations",
+  );
+  const locationTypeOptions = locationTypeOptionsQuery.data ?? [];
+  const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(() => defaultM1QueryValue());
+  const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(() => defaultM1QueryValue());
   const [lastEvent, setLastEvent] = React.useState<string | null>(null);
   const [rowActionError, setRowActionError] = React.useState<string | null>(null);
   const [disablingId, setDisablingId] = React.useState<string | null>(null);
+  const [selectedRowKeys, setSelectedRowKeys] = React.useState<string[]>([]);
   const [crudTarget, setCrudTarget] = React.useState<MasterDataCrudTarget | null>(null);
+  const supplierActionsRef = React.useRef<MasterDataSourceActionsHandle>(null);
+  const customerActionsRef = React.useRef<MasterDataSourceActionsHandle>(null);
   const productEdit = useProductEditDialog({
     refetchRows: rowsQuery.refetch,
     onSaved: (productCode) => setLastEvent(`${productCode} 已保存`),
@@ -364,13 +159,16 @@ function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
   const [locationBatchMessage, setLocationBatchMessage] = React.useState<string | null>(null);
   const [locationBatchSubmitting, setLocationBatchSubmitting] = React.useState(false);
   const [locationBatchScopeKey, setLocationBatchScopeKey] = React.useState("");
-  const normalizedKeyword = keyword.trim().toLowerCase();
+  const normalizedKeyword = queryString(appliedQuery.keyword).trim().toLowerCase();
   const rows = React.useMemo(() => {
     const data = rowsQuery.data ?? [];
     if (!normalizedKeyword) return data;
     return data.filter((row) => row.searchText.includes(normalizedKeyword));
   }, [normalizedKeyword, rowsQuery.data]);
-  const activeCount = rows.filter((row) => statusKey(row.status) === "completed").length;
+  const m1QuerySummaryItems = React.useMemo(
+    () => buildQueryPanelSummaryItems(m1QueryFields, appliedQuery),
+    [appliedQuery],
+  );
   const locationAreas = React.useMemo(() => {
     if (viewId !== "m1-locations") return [];
     const areas = new Set<string>();
@@ -410,8 +208,7 @@ function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
     locationBatchScopes.find((scope) => scope.key === locationBatchScopeKey) ??
     locationBatchScopes[0] ??
     null;
-  const masterDataActions = masterDataActionLabels(viewId);
-  const baseGridColumns = masterDataColumns(viewId, columns, locationColumns);
+  const baseGridColumns = masterDataColumns(viewId, baseMasterDataColumns, locationMasterDataColumns);
   const gridColumns =
     viewId === "m1-products"
       ? productColumns(baseGridColumns, productEdit.openDialog)
@@ -420,10 +217,21 @@ function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
         : baseGridColumns;
 
   React.useEffect(() => {
+    setSelectedRowKeys([]);
+    setRowActionError(null);
+  }, [viewId]);
+
+  React.useEffect(() => {
     if (viewId !== "m1-locations") return;
     if (locationBatchScopes.some((scope) => scope.key === locationBatchScopeKey)) return;
     setLocationBatchScopeKey(locationBatchScopes[0]?.key ?? "");
   }, [locationBatchScopeKey, locationBatchScopes, viewId]);
+
+  React.useEffect(() => {
+    if (viewId !== "m1-locations" || locationTypeOptions.length === 0) return;
+    if (locationTypeOptions.some(([value]) => value === locationBatchType)) return;
+    setLocationBatchType(locationTypeOptions[0][0]);
+  }, [locationBatchType, locationTypeOptions, viewId]);
 
   async function refreshRows() {
     await rowsQuery.refetch();
@@ -549,8 +357,133 @@ function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
     }
   }
 
+  function selectedRowFrom(keys: string[]) {
+    if (keys.length !== 1) return null;
+    return rows.find((row) => row.id === keys[0]) ?? null;
+  }
+
+  function selectedCrudRowFrom(keys: string[]) {
+    const row = selectedRowFrom(keys);
+    return row && isMasterDataCrudView(viewId) ? row : null;
+  }
+
+  const gridRefreshAction: DataGridRefreshAction = {
+    label: "刷新",
+    description: `刷新${meta.title}列表`,
+    onClick: () => {
+      void refreshRows();
+    },
+  };
+  const gridCreateAction: DataGridCreateAction | undefined =
+    viewId === "m1-products"
+      ? {
+          label: "新增",
+          description: "新建商品",
+          onClick: () => setProductCreateOpen(true),
+        }
+      : viewId === "m1-warehouses"
+        ? {
+            label: "新增",
+            description: "新建仓库",
+            onClick: () => setCrudTarget({ kind: "warehouse", mode: "create" }),
+          }
+        : viewId === "m1-locations"
+          ? {
+              label: "新增",
+              description: "新建库位",
+              onClick: () => setCrudTarget({ kind: "location", mode: "create" }),
+            }
+          : undefined;
+  const gridEditAction: DataGridEditAction | undefined =
+    viewId === "m1-products" || isMasterDataCrudView(viewId)
+      ? {
+          label: "修改",
+          description: "修改选中档案",
+          disabled: ({ selectedRowKeys: keys }) => keys.length !== 1,
+          onClick: ({ selectedRowKeys: keys }) => {
+            const row = selectedRowFrom(keys);
+            if (!row) return;
+            if (viewId === "m1-products") {
+              productEdit.openDialog(row);
+              return;
+            }
+            openCrudEdit(row);
+          },
+        }
+      : undefined;
+  const gridDisableAction: DataGridDisableAction | undefined = isMasterDataCrudView(viewId)
+    ? {
+        label: "停用",
+        description: "停用选中档案",
+        disabled: ({ selectedRowKeys: keys }) => {
+          const row = selectedCrudRowFrom(keys);
+          return !row || disablingId === row.id || ["disabled", "inactive"].includes(row.status);
+        },
+        onClick: ({ selectedRowKeys: keys }) => {
+          const row = selectedCrudRowFrom(keys);
+          if (row) void disableCrudRow(row);
+        },
+      }
+    : undefined;
+  const gridToolbarActions: DataGridToolbarAction[] = [
+    ...(viewId === "m1-products"
+      ? [
+          {
+            key: "product-import",
+            label: "导入",
+            description: "批量导入商品",
+            icon: <Upload className="size-4" aria-hidden />,
+            onClick: triggerProductBatchImport,
+          },
+        ]
+      : []),
+    ...(viewId === "m1-business-partners"
+      ? [
+          {
+            key: "supplier-create",
+            label: "供应",
+            description: "新建供应商",
+            icon: <Plus className="size-4" aria-hidden />,
+            onClick: () => supplierActionsRef.current?.openCreate(),
+          },
+          {
+            key: "supplier-import",
+            label: "供入",
+            description: "批量导入供应商",
+            icon: <Upload className="size-4" aria-hidden />,
+            onClick: () => supplierActionsRef.current?.openImport(),
+          },
+          {
+            key: "customer-create",
+            label: "客户",
+            description: "新建客户",
+            icon: <Plus className="size-4" aria-hidden />,
+            onClick: () => customerActionsRef.current?.openCreate(),
+          },
+          {
+            key: "customer-import",
+            label: "客入",
+            description: "批量导入客户",
+            icon: <Upload className="size-4" aria-hidden />,
+            onClick: () => customerActionsRef.current?.openImport(),
+          },
+        ]
+      : []),
+    ...(viewId === "m1-locations"
+      ? [
+          {
+            key: "location-batch-create",
+            label: "批量",
+            description: "批量新增库位",
+            icon: <Plus className="size-4" aria-hidden />,
+            onClick: () => setLocationBatchOpen(true),
+          },
+        ]
+      : []),
+  ];
+
   return (
-    <section className="mx-auto flex w-full max-w-[1680px] flex-col gap-5 px-4 py-8 xl:px-6">
+    <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
       <PageHeader
         title={meta.title}
         subtitle={meta.subtitle}
@@ -561,90 +494,45 @@ function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
                 {lastEvent}
               </span>
             )}
-            {viewId === "m1-products" && masterDataActions.includes("新建商品") && (
-              <Button type="button" onClick={() => setProductCreateOpen(true)}>
-                <Plus className="size-4" aria-hidden />
-                新建商品
-              </Button>
-            )}
-            {viewId === "m1-products" && masterDataActions.includes("批量导入") && (
-              <Button type="button" variant="outline" onClick={triggerProductBatchImport}>
-                <Upload className="size-4" aria-hidden />
-                批量导入
-              </Button>
-            )}
             {viewId === "m1-business-partners" && (
               <MasterDataSourceActions
+                ref={supplierActionsRef}
                 kind="supplier"
+                showTriggers={false}
                 onCreate={createSupplierFromDialog}
                 onImport={importSuppliersFromDialog}
               />
             )}
             {viewId === "m1-business-partners" && (
               <MasterDataSourceActions
+                ref={customerActionsRef}
                 kind="customer"
+                showTriggers={false}
                 onCreate={createCustomerFromDialog}
                 onImport={importCustomersFromDialog}
               />
             )}
-            {viewId === "m1-warehouses" && (
-              <Button type="button" onClick={() => setCrudTarget({ kind: "warehouse", mode: "create" })}>
-                <Plus className="size-4" aria-hidden />
-                新建仓库
-              </Button>
-            )}
-            {viewId === "m1-locations" && (
-              <Button type="button" onClick={() => setCrudTarget({ kind: "location", mode: "create" })}>
-                <Plus className="size-4" aria-hidden />
-                新建库位
-              </Button>
-            )}
-            {viewId === "m1-locations" && (
-              <Button type="button" onClick={() => setLocationBatchOpen(true)}>
-                <Plus className="size-4" aria-hidden />
-                批量新增库位
-              </Button>
-            )}
-            <Button type="button" variant="outline" onClick={refreshRows}>
-              <RefreshCw className="size-4" aria-hidden />
-              刷新
-            </Button>
-            <Button type="button" variant="outline" onClick={onBack}>
-              <ArrowLeft className="size-4" aria-hidden />
-              返回工作台
-            </Button>
           </div>
         }
       />
 
-      <div className="grid gap-3 md:grid-cols-3">
-        <Metric label="当前列表" value={rows.length} />
-        <Metric label="启用/可用" value={activeCount} />
-        <Metric label="API 返回" value={rowsQuery.data?.length ?? 0} />
-      </div>
-
-      <Card className="rounded-lg shadow-sm">
-        <CardContent className="grid gap-3 p-4 md:grid-cols-[minmax(16rem,24rem)_auto] md:items-center">
-          <label className="relative block">
-            <Search className="pointer-events-none absolute left-2.5 top-2.5 size-4 text-muted-foreground" aria-hidden />
-            <Input
-              value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
-              placeholder="搜索编码、名称、状态或字段"
-              aria-label="搜索基础档案"
-              className="h-9 pl-9 text-sm"
-            />
-          </label>
-          <Button
-            type="button"
-            variant="outline"
-            className="justify-self-start"
-            onClick={() => setKeyword("")}
-          >
-            清空
-          </Button>
-        </CardContent>
-      </Card>
+      <QueryPanel
+        fields={m1QueryFields}
+        defaultVisibleFieldKeys={m1CoreQueryFieldKeys}
+        value={draftQuery}
+        onValueChange={(next) => setDraftQuery(normalizeM1QueryValue(next))}
+        onQuery={() => {
+          setAppliedQuery(normalizeM1QueryValue(draftQuery));
+          setSelectedRowKeys([]);
+        }}
+        onReset={() => {
+          const defaults = defaultM1QueryValue();
+          setDraftQuery(defaults);
+          setAppliedQuery(defaults);
+          setSelectedRowKeys([]);
+        }}
+        resetLabel="重置"
+      />
 
       {(rowsQuery.error || rowActionError) && (
         <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -656,10 +544,33 @@ function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
         columns={gridColumns}
         data={rows}
         rowKey={(row) => row.id}
+        selectedRowKeys={selectedRowKeys}
+        onSelectedRowKeysChange={setSelectedRowKeys}
         caption={rowsQuery.isPending ? "加载基础档案..." : undefined}
         emptyTitle={meta.emptyTitle}
         storageKey={meta.storageKey}
+        exportFileBaseName={meta.title}
+        refreshAction={gridRefreshAction}
+        createAction={gridCreateAction}
+        editAction={gridEditAction}
+        disableAction={gridDisableAction}
+        toolbarActions={gridToolbarActions}
         tableClassName={productTableClassName(viewId)}
+        queryState={appliedQuery}
+        querySummaryItems={m1QuerySummaryItems}
+        onApplyQueryState={(queryState) => {
+          const next = normalizeM1QueryValue(queryValueFromUnknown(queryState));
+          setDraftQuery(next);
+          setAppliedQuery(next);
+          setSelectedRowKeys([]);
+        }}
+        onClearQueryState={() => {
+          const defaults = defaultM1QueryValue();
+          setDraftQuery(defaults);
+          setAppliedQuery(defaults);
+          setSelectedRowKeys([]);
+        }}
+        selectable
       />
 
       <ProductEditDialog
@@ -693,11 +604,12 @@ function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
           range={locationBatchRange}
           onRangeChange={updateLocationBatchRange}
           locationType={locationBatchType}
+          locationTypeOptions={locationTypeOptions}
           onLocationTypeChange={setLocationBatchType}
           errors={locationBatchErrors}
           preview={locationBatchPreview}
           message={locationBatchMessage}
-          confirmDisabled={!locationBatchScope || locationBatchSubmitting}
+          confirmDisabled={!locationBatchScope || locationBatchSubmitting || locationTypeOptions.length === 0}
           confirmLabel={locationBatchSubmitting ? "提交中..." : "确认新增"}
           onConfirm={confirmLocationBatchPreview}
         />
@@ -706,6 +618,7 @@ function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
       <MasterDataCrudDialog
         target={crudTarget}
         locationScopes={locationBatchScopes}
+        locationTypeOptions={locationTypeOptions}
         onOpenChange={(open) => !open && setCrudTarget(null)}
         onSubmit={submitCrudForm}
       />
@@ -713,48 +626,22 @@ function M1MasterDataGridPage({ viewId, onBack }: M1MasterDataPageProps) {
   );
 }
 
-function FieldText({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="text-sm">
-      <div className="font-medium">{value}</div>
-      <div className="text-xs text-muted-foreground">{label}</div>
-    </div>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: number }) {
-  return (
-    <Card className="rounded-lg shadow-sm">
-      <CardContent className="p-4">
-        <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        <p className="mt-2 text-2xl font-semibold tracking-normal text-foreground">{value}</p>
-      </CardContent>
-    </Card>
-  );
-}
-
-function locationValue(row: MasterDataRow, key: keyof LocationMasterDataFields) {
-  return row.locationFields?.[key] ?? "-";
-}
-
-function statusKey(status: string): StatusKey {
-  if (status === "active" || status === "available") return "completed";
-  if (status === "disabled" || status === "inactive" || status === "locked") return "isolated";
-  return "pending";
-}
-
-function statusFilterValue(status: string) {
-  if (status === "active" || status === "available") return "active";
-  if (status === "disabled" || status === "inactive" || status === "locked") return "disabled";
-  return "other";
-}
-
 function shortId(value: string) {
   return value.length > 8 ? value.slice(0, 8) : value;
 }
 
-function formatDateTime(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value || "-";
-  return date.toLocaleString("zh-CN", { hour12: false });
+function defaultM1QueryValue(): QueryPanelValue {
+  return { keyword: "" };
+}
+
+function normalizeM1QueryValue(value: QueryPanelValue): QueryPanelValue {
+  return { keyword: queryString(value.keyword) };
+}
+
+function queryString(value: QueryPanelValue[string]) {
+  return typeof value === "string" ? value : "";
+}
+
+function queryValueFromUnknown(value: unknown): QueryPanelValue {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as QueryPanelValue) : {};
 }

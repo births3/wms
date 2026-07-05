@@ -29,6 +29,7 @@ import type {
   UpdateLocationRequest,
   UpdateSupplierRequest,
   UpdateWarehouseRequest,
+  SystemDictionaryOption,
 } from "@/features/master-data/master-data-queries";
 
 export type MasterDataCrudViewId = "m1-business-partners" | "m1-warehouses" | "m1-locations";
@@ -63,12 +64,6 @@ const locationStatusOptions = [
   ["locked", "锁定"],
   ["disabled", "停用"],
 ] as const;
-const locationTypeOptions = [
-  ["storage", "存储位"],
-  ["case_pick", "箱拣位"],
-  ["piece_pick", "零拣位"],
-] as const;
-
 export function isMasterDataCrudView(viewId: MasterDataViewId): viewId is MasterDataCrudViewId {
   return ["m1-business-partners", "m1-warehouses", "m1-locations"].includes(viewId);
 }
@@ -119,11 +114,13 @@ export function masterDataCrudColumns(
 export function MasterDataCrudDialog({
   target,
   locationScopes,
+  locationTypeOptions,
   onOpenChange,
   onSubmit,
 }: {
   target: MasterDataCrudTarget | null;
   locationScopes: LocationScopeOption[];
+  locationTypeOptions: SystemDictionaryOption[];
   onOpenChange: (open: boolean) => void;
   onSubmit: (form: MasterDataCrudForm) => Promise<void>;
 }) {
@@ -211,7 +208,7 @@ export function MasterDataCrudDialog({
             <DialogClose asChild>
               <Button type="button" variant="outline" disabled={pending}>取消</Button>
             </DialogClose>
-            <Button type="submit" disabled={pending || !canSubmit(form, locationScopes)}>{pending ? "保存中..." : "保存"}</Button>
+            <Button type="submit" disabled={pending || !canSubmit(form, locationScopes, locationTypeOptions)}>{pending ? "保存中..." : "保存"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -335,10 +332,15 @@ function title(form: MasterDataCrudForm) {
   return form.mode === "create" ? "新建库位" : "编辑库位";
 }
 
-function canSubmit(form: MasterDataCrudForm, scopes: LocationScopeOption[]) {
+function canSubmit(
+  form: MasterDataCrudForm,
+  scopes: LocationScopeOption[],
+  locationTypeOptions: SystemDictionaryOption[],
+) {
   if (form.kind === "location") {
     const hasScope = form.mode === "edit" || scopes.some((scope) => scope.key === form.scopeKey);
-    return hasScope && !!form.code.trim() && form.rowNo > 0 && form.columnNo > 0 && form.layerNo > 0 && form.maxVolumeCm3 > 0 && form.usedVolumeCm3 >= 0 && form.maxSkuCount > 0;
+    const hasLocationType = locationTypeOptions.some(([value]) => value === form.locationType);
+    return hasScope && hasLocationType && !!form.code.trim() && form.rowNo > 0 && form.columnNo > 0 && form.layerNo > 0 && form.maxVolumeCm3 > 0 && form.usedVolumeCm3 >= 0 && form.maxSkuCount > 0;
   }
   return !!form.name.trim() && (form.kind !== "warehouse" || !!form.code.trim());
 }

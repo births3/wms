@@ -25,12 +25,19 @@ type SourceActionProps =
       kind: "supplier";
       onCreate: (request: CreateSupplierRequest) => Promise<void>;
       onImport: (requests: CreateSupplierRequest[]) => Promise<void>;
+      showTriggers?: boolean;
     }
   | {
       kind: "customer";
       onCreate: (request: CreateCustomerRequest) => Promise<void>;
       onImport: (requests: CreateCustomerRequest[]) => Promise<void>;
+      showTriggers?: boolean;
     };
+
+export interface MasterDataSourceActionsHandle {
+  openCreate: () => void;
+  openImport: () => void;
+}
 
 interface SourceActionForm {
   code: string;
@@ -86,8 +93,10 @@ const copy: Record<
   },
 };
 
-export function MasterDataSourceActions(props: SourceActionProps) {
+export const MasterDataSourceActions = React.forwardRef<MasterDataSourceActionsHandle, SourceActionProps>(
+  function MasterDataSourceActions(props, ref) {
   const labels = copy[props.kind];
+  const showTriggers = props.showTriggers ?? true;
   const [activeDialog, setActiveDialog] = React.useState<ActiveDialog>(null);
   const [form, setForm] = React.useState<SourceActionForm>(emptyForm);
   const [importText, setImportText] = React.useState("");
@@ -105,6 +114,11 @@ export function MasterDataSourceActions(props: SourceActionProps) {
     setMessage(null);
     setActiveDialog(dialog);
   }
+
+  React.useImperativeHandle(ref, () => ({
+    openCreate: () => openDialog("create"),
+    openImport: () => openDialog("import"),
+  }));
 
   async function submitCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -144,14 +158,18 @@ export function MasterDataSourceActions(props: SourceActionProps) {
 
   return (
     <>
-      <Button type="button" onClick={() => openDialog("create")} disabled={submitting}>
-        <Plus className="size-4" aria-hidden />
-        {labels.createButton}
-      </Button>
-      <Button type="button" variant="outline" onClick={() => openDialog("import")} disabled={submitting}>
-        <Upload className="size-4" aria-hidden />
-        {labels.importButton}
-      </Button>
+      {showTriggers && (
+        <>
+          <Button type="button" onClick={() => openDialog("create")} disabled={submitting}>
+            <Plus className="size-4" aria-hidden />
+            {labels.createButton}
+          </Button>
+          <Button type="button" variant="outline" onClick={() => openDialog("import")} disabled={submitting}>
+            <Upload className="size-4" aria-hidden />
+            {labels.importButton}
+          </Button>
+        </>
+      )}
 
       <Dialog open={activeDialog !== null} onOpenChange={(open) => !open && !submitting && setActiveDialog(null)}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
@@ -219,7 +237,8 @@ export function MasterDataSourceActions(props: SourceActionProps) {
       </Dialog>
     </>
   );
-}
+});
+MasterDataSourceActions.displayName = "MasterDataSourceActions";
 
 export function parseSupplierImportText(textValue: string): CreateSupplierRequest[] {
   return importRows(textValue, isSupplierImportHeader).map((row) => {

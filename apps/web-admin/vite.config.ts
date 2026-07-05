@@ -331,6 +331,67 @@ const devSystemDictionaryItemsByCode: Record<string, DevSystemDictionaryItem[]> 
       requires_dual_sign: true,
     }),
   ],
+  temperature_zone: [
+    devSystemDictionaryItem("00000000-0000-0000-0000-000000001701", "temperature_zone", "normal", "常温", {
+      max_celsius: 30,
+      min_celsius: 10,
+    }),
+    devSystemDictionaryItem("00000000-0000-0000-0000-000000001702", "temperature_zone", "cool", "阴凉", {
+      max_celsius: 20,
+      min_celsius: 0,
+    }),
+    devSystemDictionaryItem("00000000-0000-0000-0000-000000001703", "temperature_zone", "cold", "冷藏", {
+      max_celsius: 8,
+      min_celsius: 2,
+    }),
+    devSystemDictionaryItem("00000000-0000-0000-0000-000000001704", "temperature_zone", "frozen", "冷冻", {
+      max_celsius: -10,
+    }),
+  ],
+  quality_color: [
+    devSystemDictionaryItem("00000000-0000-0000-0000-000000001711", "quality_color", "qualified_green", "合格绿", {
+      inventory_quality_status: "qualified",
+    }),
+    devSystemDictionaryItem("00000000-0000-0000-0000-000000001712", "quality_color", "quarantine_yellow", "待验黄", {
+      inventory_quality_status: "quarantine",
+    }),
+    devSystemDictionaryItem(
+      "00000000-0000-0000-0000-000000001713",
+      "quality_color",
+      "unqualified_red",
+      "不合格红",
+      { inventory_quality_status: "unqualified" },
+    ),
+  ],
+  zone_type: [
+    devSystemDictionaryItem("00000000-0000-0000-0000-000000001721", "zone_type", "storage", "存储区", {
+      allow_stock: true,
+    }),
+    devSystemDictionaryItem("00000000-0000-0000-0000-000000001722", "zone_type", "receiving", "待验区", {
+      allow_stock: false,
+    }),
+    devSystemDictionaryItem("00000000-0000-0000-0000-000000001723", "zone_type", "return", "退货区", {
+      allow_stock: true,
+    }),
+    devSystemDictionaryItem("00000000-0000-0000-0000-000000001724", "zone_type", "unqualified", "不合格区", {
+      allow_stock: true,
+      quality_color: "unqualified_red",
+    }),
+    devSystemDictionaryItem("00000000-0000-0000-0000-000000001725", "zone_type", "shipping", "发货暂存区", {
+      allow_stock: false,
+    }),
+  ],
+  location_type: [
+    devSystemDictionaryItem("00000000-0000-0000-0000-000000001731", "location_type", "storage", "存储位", {
+      picking_mode: "none",
+    }),
+    devSystemDictionaryItem("00000000-0000-0000-0000-000000001732", "location_type", "case_pick", "箱拣位", {
+      picking_mode: "case",
+    }),
+    devSystemDictionaryItem("00000000-0000-0000-0000-000000001733", "location_type", "piece_pick", "零拣位", {
+      picking_mode: "piece",
+    }),
+  ],
 };
 
 let devFeatureFlagSource = "config_center";
