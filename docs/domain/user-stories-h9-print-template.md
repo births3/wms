@@ -171,3 +171,10 @@ H9 作为横向打印模板引擎，统一管理模板类型、字段库、字�
 | L5 数据一致 | 业务单据数据、模板版本和打印记录同源可追溯 |
 | L8 权限 | 打印权限由业务权限和 H9 权限共同校验 |
 | L11 幂等 | 业务打印接口重复调用不重复生成业务单号 |
+
+#### 后端第一切片（2026-07-05）
+
+- 已落 `print_field_libraries`、`print_field_library_versions`、`print_field_definitions` 三张表。
+- 已提供 `PgPrintTemplateRepository::publish_field_library` 和 `list_field_version_fields`，覆盖字段库发布、幂等重放、版本递增、旧版本字段不可改写和 H2 审计写入。
+- 已提供 `backend/crates/api/tests/print_template_postgres.rs`，验证已发布字段库版本不可改写。
+- 尚未覆盖 `print_template_type` 字典接入、模板主数据、hiprint JSON 版本、打印记录、OpenAPI / api-client、PC 前端页面和真实截图。

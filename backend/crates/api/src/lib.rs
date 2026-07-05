@@ -22,6 +22,7 @@ mod openapi_contract;
 pub mod outbound;
 pub mod packing_station;
 pub mod parameter_mapping;
+pub mod print_template;
 pub mod reports;
 pub mod retail_chain;
 pub mod system_dictionary;
