@@ -96,6 +96,8 @@ shadcn/ui 标准 CSS 变量 + WMS 自定义业务色，一处定义两端共用�
 | 17 | **EmptyState** | 跨端 | 空状态展示：图标+标题+描述+CTA | 全部列表/看板/详情 | 已开发 |
 | 18 | **TwoPaneCatalog** | PC | 分类-明细两栏骨架：左侧分类导航，右侧 DataGrid 风格列表，支持筛选、字段显隐、选择、复制、偏好保存 | M1-011 系统字典 / 库区分类 / 客商分类 | 已开发 |
 | 19 | **SystemDictionaryTwoPane** | PC | 系统字典两层展示：左侧字典分类，右侧选中分类的字典项、来源、启停状态与参数摘要 | M1-011 系统字典 / 单据类型参数配置 | 已开发 |
+| 20 | **QueryPanel** | PC | 管理页通用查询条件区：关键词输入、查询/重置动作和自定义条件插槽 | 全部 PC 管理页列表查询 | 已开发 |
+| 21 | **WorkspaceTabs** | PC | 工作台浏览器式多页签：已打开菜单页、关闭、右键关闭其他 | PC 管理端工作台导航 | 已开发 |
 
 DataGrid 组件说明：字段筛选、字段显示、视图保存等表格浮层必须使用 `createPortal + fixed`，禁止在表格容器内用 `absolute` 渲染带 `data-datagrid-popover` 的弹窗，避免低行数表格或 `overflow` 容器裁剪；按钮触发浮层必须支持点击外部和 `Escape` 关闭。该约束由 `check_datagrid_popover_portal.py` 强制检查。
 

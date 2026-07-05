@@ -179,117 +179,117 @@ function TwoPaneCatalogInner<TItem extends TwoPaneCatalogItemBase>(
   }
 
   return (
-    <Card ref={ref} className={cn("overflow-hidden rounded-lg shadow-sm", className)} {...rest}>
-      <CardContent className="grid gap-0 p-0 md:grid-cols-[minmax(15rem,20rem)_1fr]">
-        <aside className="border-b bg-muted/20 p-3 md:border-b-0 md:border-r">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <div className="text-xs font-medium text-muted-foreground">{groupTitle}</div>
-            <span className="text-xs text-muted-foreground">{visibleGroups.length}/{groups.length}</span>
-          </div>
-          <div className="relative mb-3">
-            <Search className="pointer-events-none absolute left-2 top-2.5 size-4 text-muted-foreground" />
-            <Input
-              value={groupQuery}
-              onChange={(event) => setGroupQuery(event.target.value)}
-              placeholder={`筛选${groupTitle}`}
-              className="pl-8"
-            />
-          </div>
-
-          {groups.length === 0 ? (
-            <EmptyState title={emptyGroupTitle} description={emptyGroupDescription} className="min-h-64" />
-          ) : visibleGroups.length > 0 ? (
-            <div className="flex flex-col gap-2">
-              {visibleGroups.map((group) => {
-                const summary = summarizeTwoPaneCatalogGroup(group);
-                const selected = selectedGroup?.code === group.code;
-                return (
-                  <button
-                    key={group.code}
-                    type="button"
-                    aria-pressed={selected}
-                    onClick={() => selectGroup(group.code)}
-                    className={cn(
-                      "rounded-md border px-3 py-2 text-left transition-colors",
-                      selected
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border bg-background hover:bg-muted/60"
-                    )}
-                  >
-                    <span className="flex min-w-0 items-start justify-between gap-3">
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-medium">{summary.name}</span>
-                        <span className="mt-0.5 block truncate font-mono text-xs text-muted-foreground">
-                          {summary.code}
-                        </span>
-                      </span>
-                      <span className="shrink-0 rounded-md bg-background px-2 py-1 text-xs font-medium text-foreground">
-                        {summary.enabledCount}/{summary.totalCount}
-                      </span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <EmptyState title="没有匹配分类" description="请调整左侧筛选条件。" className="min-h-64" />
-          )}
-        </aside>
-
-        <section className="min-w-0 p-4">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <div className="min-w-0">
-              {title ? <h2 className="truncate text-sm font-semibold">{title}</h2> : null}
-              <div className="text-xs text-muted-foreground">
-                共 {visibleItems.length} 项{selectable ? `，已选 ${visibleSelectedCount} 项` : ""}
+    <div ref={ref} className={cn("grid gap-4 lg:grid-cols-[20rem_minmax(0,1fr)]", className)} {...rest}>
+      <Card className="overflow-hidden rounded-lg border bg-background shadow-sm">
+        <CardContent className="p-0">
+          <aside className="bg-background">
+            <div className="border-b px-4 py-3">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-base font-semibold tracking-normal">{groupTitle}</h2>
+                <span className="text-xs text-muted-foreground">{visibleGroups.length}/{groups.length}</span>
               </div>
             </div>
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              {headerActions}
-              {onRefresh ? (
-                <Button type="button" variant="outline" size="sm" onClick={onRefresh} title="刷新">
-                  <RotateCw className="size-4" />
-                  刷新
-                </Button>
-              ) : null}
-              {fields.length > 0 ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setFieldsOpen((current) => !current)}
-                  aria-expanded={fieldsOpen}
-                  title="字段显示"
-                >
-                  <Settings2 className="size-4" />
-                  字段
-                </Button>
-              ) : null}
+            <div className="border-b bg-muted/20 p-4">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2 top-2.5 size-4 text-muted-foreground" />
+                <Input
+                  value={groupQuery}
+                  onChange={(event) => setGroupQuery(event.target.value)}
+                  placeholder={`搜索${groupTitle}`}
+                  className="pl-8"
+                />
+              </div>
             </div>
-          </div>
 
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            {selectable ? (
-              <Checkbox
-                checked={allVisibleSelected}
-                onCheckedChange={(checked) => toggleVisibleItems(checked === true)}
-                aria-label="全选或取消明细"
-                title={allVisibleSelected ? "取消" : "全选"}
-              />
-            ) : null}
-            <div className="relative min-w-60 flex-1">
-              <Search className="pointer-events-none absolute left-2 top-2.5 size-4 text-muted-foreground" />
-              <Input
-                value={itemQuery}
-                onChange={(event) => setItemQuery(event.target.value)}
-                placeholder={`筛选${itemTitle}`}
-                className="pl-8"
-              />
+            {groups.length === 0 ? (
+              <EmptyState title={emptyGroupTitle} description={emptyGroupDescription} className="min-h-64" />
+            ) : visibleGroups.length > 0 ? (
+              <div className="flex flex-col gap-2 p-3">
+                {visibleGroups.map((group) => {
+                  const summary = summarizeTwoPaneCatalogGroup(group);
+                  const selected = selectedGroup?.code === group.code;
+                  return (
+                    <button
+                      key={group.code}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => selectGroup(group.code)}
+                      className={cn(
+                        "rounded-md border px-3 py-3 text-left transition-colors",
+                        selected
+                          ? "border-primary/50 bg-primary/10 text-primary shadow-sm"
+                          : "border-transparent bg-background text-foreground hover:border-border hover:bg-muted/50"
+                      )}
+                    >
+                      <span className="flex min-w-0 items-start justify-between gap-3">
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-medium">{summary.name}</span>
+                          <span className="mt-0.5 block truncate font-mono text-xs text-muted-foreground">
+                            {summary.code}
+                          </span>
+                        </span>
+                        <span className="shrink-0 rounded-full border bg-background px-2 py-0.5 text-xs font-medium text-foreground">
+                          {summary.totalCount}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <EmptyState title="没有匹配分类" description="请调整左侧筛选条件。" className="min-h-64" />
+            )}
+          </aside>
+        </CardContent>
+      </Card>
+
+      <Card className="overflow-hidden rounded-lg border bg-background shadow-sm">
+        <CardContent className="p-0">
+          <section className="min-w-0">
+            <div className="border-b px-4 py-3">
+              <div className="min-w-0">
+                {title ? <h2 className="truncate text-base font-semibold tracking-normal">{title}</h2> : null}
+                <div className="text-xs text-muted-foreground">
+                  共 {visibleItems.length} 项{selectable ? `，已选 ${visibleSelectedCount} 项` : ""}
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <div className="relative min-w-60 flex-1">
+                  <Search className="pointer-events-none absolute left-2 top-2.5 size-4 text-muted-foreground" />
+                  <Input
+                    value={itemQuery}
+                    onChange={(event) => setItemQuery(event.target.value)}
+                    placeholder={`搜索${itemTitle}`}
+                    className="pl-8"
+                  />
+                </div>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  {headerActions}
+                  {onRefresh ? (
+                    <Button type="button" variant="outline" size="sm" onClick={onRefresh} title="刷新">
+                      <RotateCw className="size-4" />
+                      刷新
+                    </Button>
+                  ) : null}
+                  {fields.length > 0 ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setFieldsOpen((current) => !current)}
+                      aria-expanded={fieldsOpen}
+                      title="字段显示"
+                    >
+                      <Settings2 className="size-4" />
+                      字段
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
             </div>
-          </div>
 
           {fieldsOpen ? (
-            <div className="mb-3 rounded-md border bg-background p-3">
+            <div className="mx-4 mb-3 rounded-md border bg-background p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <div className="text-xs font-medium text-muted-foreground">字段显示</div>
                 <Checkbox
@@ -315,7 +315,7 @@ function TwoPaneCatalogInner<TItem extends TwoPaneCatalogItemBase>(
           ) : null}
 
           {filtersActive ? (
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-primary">
+            <div className="mx-4 mb-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-primary">
               <span>
                 已筛选：{groupQuery ? `${groupTitle}=${groupQuery}` : ""}
                 {groupQuery && itemQuery ? "，" : ""}
@@ -342,9 +342,18 @@ function TwoPaneCatalogInner<TItem extends TwoPaneCatalogItemBase>(
           ) : error ? (
             <EmptyState title="加载失败" description={String(error)} className="min-h-64" />
           ) : selectedGroup && visibleItems.length > 0 ? (
-            <div className="overflow-hidden rounded-md border bg-background">
+            <div className="mx-4 mb-4 overflow-hidden rounded-md border bg-background">
               <div className="flex items-center gap-3 border-b bg-muted/40 px-3 py-2 text-xs font-medium text-muted-foreground">
-                {selectable ? <span className="w-8 shrink-0" /> : null}
+                {selectable ? (
+                  <span className="flex w-8 shrink-0 items-center">
+                    <Checkbox
+                      checked={allVisibleSelected}
+                      onCheckedChange={(checked) => toggleVisibleItems(checked === true)}
+                      aria-label="全选或取消明细"
+                      title={allVisibleSelected ? "取消" : "全选"}
+                    />
+                  </span>
+                ) : null}
                 <span className="min-w-0 flex-[1.1_1_8rem]">名称</span>
                 {visibleFieldGroups.columns.map((field) => (
                   <span key={field.key} className={cn("min-w-0 flex-1 truncate", field.className)}>
@@ -407,10 +416,10 @@ function TwoPaneCatalogInner<TItem extends TwoPaneCatalogItemBase>(
                           return (
                             <div
                               key={field.key}
-                              className={cn("min-w-0 rounded-md bg-muted/50 px-3 py-2", field.className)}
+                              className={cn("min-w-0", field.className)}
                             >
-                              <dt className="text-xs text-muted-foreground">{field.label}</dt>
-                              <dd className="mt-1 min-w-0 text-sm text-foreground">
+                              <dt className="sr-only">{field.label}</dt>
+                              <dd className="min-w-0 text-sm text-foreground">
                                 <CatalogFieldValue
                                   item={item}
                                   field={field}
@@ -432,8 +441,9 @@ function TwoPaneCatalogInner<TItem extends TwoPaneCatalogItemBase>(
             <EmptyState title={emptyItemTitle} description={emptyItemDescription} className="min-h-64" />
           )}
         </section>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 

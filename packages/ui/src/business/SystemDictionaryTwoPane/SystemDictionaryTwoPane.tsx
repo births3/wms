@@ -143,12 +143,13 @@ SystemDictionaryTwoPane.displayName = "SystemDictionaryTwoPane";
 function SystemDictionaryParams({ params }: { params?: Record<string, unknown> }) {
   const items = summarizeSystemDictionaryParams(params);
 
-  if (items.length === 0) return <span className="text-muted-foreground">-</span>;
+  if (items.length === 0) return <span className="text-muted-foreground">参数 -</span>;
 
   return (
-    <span className="grid gap-2">
+    <span className="flex min-w-0 flex-wrap items-center gap-2 rounded-md border bg-muted/40 px-3 py-1.5 text-xs">
+      <span className="font-medium text-muted-foreground">参数</span>
       {items.map((param) => (
-        <span key={param.key} className="grid gap-1 rounded-md bg-muted px-2 py-1 text-xs sm:grid-cols-[10rem_1fr]">
+        <span key={param.key} className="inline-flex min-w-0 items-center gap-1 rounded-full bg-background/80 px-2 py-0.5">
           <span className="font-mono text-muted-foreground">{param.key}</span>
           <span className="break-all text-foreground">{param.value}</span>
         </span>
