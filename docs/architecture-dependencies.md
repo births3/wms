@@ -4,8 +4,8 @@
 > ROADMAP 的波次划分、ADR-0007 的执行顺序、worktree 并行决策，都基于本文档。
 > 修改本文档必须经过 PR，并同步检查是否需要更新 ADR-0007 与 ROADMAP.md。
 
-- 版本：v0.2
-- 日期：2026-05-16
+- 版本：v0.3
+- 日期：2026-07-05
 - 关联：`docs/governance.md`、`docs/adr/0007-roadmap-v03-boundary-alignment.md`、`ROADMAP.md`
 
 ---
@@ -38,7 +38,7 @@
 | H6 | 状态机引擎 | state-machine | 多业务模块状态机统一引擎（详见 infra/technical-specs.md）|
 | H7 | 导入导出引擎 | import-export | Excel/CSV 数据导入导出统一引擎 |
 | H8 | ERP 防腐层 | erp-acl | WMS↔ERP 接口表 + 反馈回写（含档案补录通道）|
-| H9 | 打印模板引擎 | print-template | 标签/单据/PDF 台账统一模板引擎 |
+| H9 | 打印模板引擎 | print-template | 标签/单据模板统一能力；首期 hiprint WebComponent + 浏览器预览打印，详见 [ADR-0036](adr/0036-print-template-engine.md) 与 [H9 用户故事](domain/user-stories-h9-print-template.md) |
 | H10 | 数据库备份与恢复 | db-backup | 全量+WAL+异地 + 加密+演练；与 H2 共同保障 GSP 数据完整性（详见 infra/technical-specs.md）|
 | **H-DOCK** | **月台预约管理（v3.1 新增）** | **dock-management** | **月台档案 + 预约调度 + 实到对账；可启用开关（默认关闭，3PL/冷链优先仓启用）；GSP 6.83/8.116/9.121** |
 | **H-AL** | **告警引擎（v3.1 新增）** | **alert-engine** | **告警分级/升级/生命周期/路由/静默；调用 H4 通道；GSP 5.71 触发响应时间合规** |

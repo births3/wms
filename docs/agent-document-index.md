@@ -38,6 +38,7 @@
 | [domain/user-stories-h3-contract.md](domain/user-stories-h3-contract.md) | H3 跨端契约 |
 | [domain/user-stories-h4-wechat-notify.md](domain/user-stories-h4-wechat-notify.md) | H4 企业微信 |
 | [domain/user-stories-h5-express.md](domain/user-stories-h5-express.md) | H5 快递 |
+| [domain/user-stories-h9-print-template.md](domain/user-stories-h9-print-template.md) | H9 打印模板引擎 |
 | [domain/user-stories-h-driver.md](domain/user-stories-h-driver.md) | H-Driver 司机端 |
 | [domain/user-stories-h-store.md](domain/user-stories-h-store.md) | H-Store 门店用户端 |
 | [domain/user-stories-h-dock-management.md](domain/user-stories-h-dock-management.md) | H-DOCK 月台预约管理 |

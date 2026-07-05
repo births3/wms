@@ -116,6 +116,7 @@ nav:
   - 横向能力:
     - H4 企业微信: domain/user-stories-h4-wechat-notify.md
     - H5 快递: domain/user-stories-h5-express.md
+    - H9 打印模板引擎: domain/user-stories-h9-print-template.md
     - H-Driver 司机端 (W4.E): domain/user-stories-h-driver.md
     - H-Store 门店用户端 (W4.E): domain/user-stories-h-store.md
     - H1 权限与多租户 (W1.A): domain/user-stories-h1-auth-tenant.md
@@ -156,6 +157,7 @@ nav:
     - ADR-0033 H-SCH 调度引擎: adr/0033-scheduler-engine.md
     - ADR-0034 Wave 3 业务表 PG 模型: adr/0034-wave-3-operational-postgres-schema.md
     - ADR-0035 Wave 6 证据收口: adr/0035-wave-6-pre-release-evidence-closeout.md
+    - ADR-0036 打印模板引擎: adr/0036-print-template-engine.md
     - 技术 Spike:
       - Spike 索引: spikes/README.md
       - SPIKE-001 Axum + JWT: spikes/spike-001-axum-jwt.md
