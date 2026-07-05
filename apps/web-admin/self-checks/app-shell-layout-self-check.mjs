@@ -9,6 +9,7 @@ const workspaceTabsPath = resolve(__dirname, "../../../packages/ui/src/business/
 const componentRegistry = readFileSync(resolve(__dirname, "../../../docs/prototypes/component-registry.md"), "utf8");
 const menuPages = [
   "../src/App.tsx",
+  "../src/pages/admin-menu/H1AdminMenuPage.tsx",
   "../src/pages/config-center/FeatureFlagConfigCenterPage.tsx",
   "../src/pages/inbound/M2InboundPage.tsx",
   "../src/pages/inventory/M3BatchManagementPage.tsx",

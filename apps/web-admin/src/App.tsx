@@ -3,7 +3,6 @@ import { Button, Card, CardContent, Input, PageHeader, StatusBadge, WorkspaceTab
 import {
   Activity,
   BookOpen,
-  ChevronDown,
   CheckCircle2,
   ClipboardList,
   KeyRound,
@@ -22,9 +21,20 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import {
+  AdminSidebarMenu,
+  filterSidebarMenuTree,
+  menuGroupKey,
+  menuSectionKey,
+  menuTreeFromAdminNodes,
+  type SidebarMenuItem,
+  type SidebarMenuTreeSection,
+} from "@/app-shell/AdminSidebarMenu";
+import { usePublishedAdminMenuQuery } from "@/features/admin-menu/admin-menu-queries";
 import { useCurrentUserQuery, useLogout, type CurrentUser } from "@/features/auth/auth-queries";
 import { apiBaseUrl, wave1ContractPaths } from "@/lib/api";
 import { clearAuthSession, hasActiveAuthSession } from "@/lib/auth-session";
+import { H1AdminMenuPage } from "@/pages/admin-menu/H1AdminMenuPage";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { FeatureFlagConfigCenterPage } from "@/pages/config-center/FeatureFlagConfigCenterPage";
 import { M2InboundPage, type M2InboundMode } from "@/pages/inbound/M2InboundPage";
@@ -45,6 +55,7 @@ type AdminView =
   | "m4-waves"
   | "m4-review"
   | "m4-returns"
+  | "h1-menu-management"
   | "h9-print-templates";
 
 const foundations = [
@@ -77,7 +88,7 @@ const foundations = [
   },
 ];
 
-const menuSections: Array<{ label: string; items: MenuItem[] }> = [
+const menuSections: Array<{ label: string; items: SidebarMenuItem<AdminView>[] }> = [
   {
     label: "工作台",
     items: [{ id: "dashboard", title: "运营总览", subtitle: "系统基础状态", icon: Activity }],
@@ -121,12 +132,58 @@ const menuSections: Array<{ label: string; items: MenuItem[] }> = [
       { title: "H1 权限租户", subtitle: "已接入接口", icon: ShieldCheck, disabled: true },
       { title: "H2 审计追踪", subtitle: "已接入接口", icon: ClipboardList, disabled: true },
       { title: "H3 OpenAPI", subtitle: "契约同步", icon: KeyRound, disabled: true },
+      { id: "h1-menu-management", title: "H1 菜单管理", subtitle: "三层菜单 / 权限点", icon: ShieldCheck },
       { id: "h9-print-templates", title: "H9 打印模板", subtitle: "字段库 / 模板类型", icon: Printer },
     ],
   },
 ];
 
 const WORKSPACE_TABS_STORAGE_KEY = "wms:web-admin:workspace-tabs:v1";
+const MENU_EXPANDED_STORAGE_KEY = "wms:web-admin:menu-expanded:v1";
+const menuItemById = new Map<AdminView, SidebarMenuItem<AdminView>>(
+  menuSections.flatMap((section) => section.items).flatMap((item): Array<[AdminView, SidebarMenuItem<AdminView>]> => item.id ? [[item.id, item]] : []),
+);
+
+const defaultMenuTree: SidebarMenuTreeSection<AdminView>[] = [
+  { label: "工作台", groups: [{ label: "工作台概览", items: [menuItem("dashboard")] }] },
+  {
+    label: "基础档案",
+    groups: [
+      { label: "主数据", items: [menuItem("m1-products"), menuItem("m1-business-partners")] },
+      { label: "仓储资料", items: [menuItem("m1-warehouses"), menuItem("m1-zones"), menuItem("m1-locations")] },
+      { label: "系统配置", items: [menuItem("m1-system-dictionary"), menuItem("m1-feature-flags")] },
+    ],
+  },
+  {
+    label: "入库业务",
+    groups: [{ label: "入库作业", items: [menuItem("m2-receiving"), menuItem("m2-inspecting"), menuItem("m2-putaway")] }],
+  },
+  {
+    label: "出库业务",
+    groups: [{ label: "出库作业", items: [menuItem("m4-orders"), menuItem("m4-waves"), menuItem("m4-review"), menuItem("m4-returns")] }],
+  },
+  { label: "库内业务", groups: [{ label: "库存管理", items: [menuItem("m3-batches")] }] },
+  {
+    label: "基础能力",
+    groups: [{ label: "平台能力", items: [menuItem("h1-menu-management"), menuItem("h9-print-templates")] }],
+  },
+];
+
+const adminMenuIconByKey: Record<string, LucideIcon> = {
+  Activity,
+  BookOpen,
+  CheckCircle2,
+  ClipboardList,
+  KeyRound,
+  Layers,
+  MapPinned,
+  PackageCheck,
+  PanelLeftOpen,
+  Printer,
+  ShieldCheck,
+  Users,
+  Warehouse,
+};
 
 interface AdminWorkspaceTab {
   view: AdminView;
@@ -317,6 +374,9 @@ function renderAdminView(
   if (outboundMode) {
     return <M4OutboundPage mode={outboundMode} onBack={() => navigateTo("dashboard")} />;
   }
+  if (view === "h1-menu-management") {
+    return <H1AdminMenuPage />;
+  }
   if (view === "h9-print-templates") {
     return <H9PrintTemplatePage />;
   }
@@ -391,7 +451,15 @@ function AppShell({
   const [menuFilter, setMenuFilter] = React.useState("");
   const [menuFilterOpen, setMenuFilterOpen] = React.useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
+  const [expandedMenuKeys, setExpandedMenuKeys] = React.useState<string[]>(readExpandedMenuKeys);
   const sidebarRef = React.useRef<HTMLElement | null>(null);
+  const publishedMenuQuery = usePublishedAdminMenuQuery(true);
+  const menuTree = React.useMemo(() => {
+    const publishedTree = publishedMenuQuery.data?.data;
+    if (!publishedTree?.length) return defaultMenuTree;
+    const parsed = menuTreeFromAdminNodes({ nodes: publishedTree, isView: isAdminView, iconByKey: adminMenuIconByKey });
+    return parsed.length > 0 ? parsed : defaultMenuTree;
+  }, [publishedMenuQuery.data?.data]);
   const closeMenuFilter = React.useCallback(() => {
     setMenuFilter("");
     setMenuFilterOpen(false);
@@ -404,14 +472,20 @@ function AppShell({
     [closeMenuFilter, onNavigate],
   );
   const normalizedMenuFilter = menuFilter.trim().toLowerCase();
-  const visibleMenuSections = menuSections
-    .map((section) => ({
-      ...section,
-      items: normalizedMenuFilter
-        ? section.items.filter((item) => `${item.title} ${item.subtitle}`.toLowerCase().includes(normalizedMenuFilter))
-        : section.items,
-    }))
-    .filter((section) => section.items.length > 0);
+  const visibleMenuSections = React.useMemo(
+    () => filterSidebarMenuTree(menuTree, normalizedMenuFilter),
+    [menuTree, normalizedMenuFilter],
+  );
+  const expandedMenuKeySet = React.useMemo(() => new Set(expandedMenuKeys), [expandedMenuKeys]);
+  const toggleMenuKey = React.useCallback((key: string) => {
+    setExpandedMenuKeys((current) => current.includes(key)
+      ? current.filter((item) => item !== key)
+      : [...current, key]);
+  }, []);
+
+  React.useEffect(() => {
+    writeExpandedMenuKeys(expandedMenuKeys);
+  }, [expandedMenuKeys]);
 
   React.useEffect(() => {
     if (!menuFilterOpen) return;
@@ -543,17 +617,15 @@ function AppShell({
               筛选菜单
             </Button>
           ) : null}
-          {visibleMenuSections.map((section) => (
-            <MenuSection
-              key={section.label}
-              label={section.label}
-              activeView={activeView}
-              onNavigate={navigateFromMenu}
-              items={section.items}
-              forceOpen={Boolean(normalizedMenuFilter)}
-              collapsed={sidebarCollapsed}
-            />
-          ))}
+          <AdminSidebarMenu
+            sections={visibleMenuSections}
+            activeView={activeView}
+            onNavigate={navigateFromMenu}
+            expandedKeys={expandedMenuKeySet}
+            onToggleKey={toggleMenuKey}
+            forceOpen={Boolean(normalizedMenuFilter)}
+            collapsed={sidebarCollapsed}
+          />
         </nav>
       </aside>
 
@@ -574,108 +646,33 @@ function AppShell({
   );
 }
 
-interface MenuItem {
-  id?: AdminView;
-  title: string;
-  subtitle: string;
-  icon: LucideIcon;
-  disabled?: boolean;
+function menuItem(id: AdminView): SidebarMenuItem<AdminView> {
+  const item = menuItemById.get(id);
+  if (!item) throw new Error(`未注册菜单视图: ${id}`);
+  return item;
 }
 
-function MenuSection({
-  label,
-  items,
-  activeView,
-  onNavigate,
-  forceOpen = false,
-  collapsed = false,
-}: {
-  label: string;
-  items: MenuItem[];
-  activeView: AdminView;
-  onNavigate: (view: AdminView) => void;
-  forceOpen?: boolean;
-  collapsed?: boolean;
-}) {
-  const hasActive = items.some((item) => item.id === activeView);
-  const [open, setOpen] = React.useState(() => hasActive || label === "工作台" || label === "入库业务");
-  const visible = collapsed || forceOpen || open;
-
-  React.useEffect(() => {
-    if (hasActive) setOpen(true);
-  }, [hasActive]);
-
-  if (collapsed) {
-    return (
-      <section aria-label={label}>
-        <div className="space-y-1">
-          {items.map((item) => {
-            const Icon = item.icon;
-            const active = item.id === activeView;
-            return (
-              <button
-                key={item.title}
-                type="button"
-                aria-current={active ? "page" : undefined}
-                aria-label={item.title}
-                title={item.title}
-                disabled={item.disabled}
-                onClick={() => item.id && onNavigate(item.id)}
-                className={cn(
-                  "flex size-10 w-full items-center justify-center rounded-md disabled:cursor-not-allowed disabled:opacity-45",
-                  active ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-muted"
-                )}
-              >
-                <Icon className="size-4" aria-hidden />
-              </button>
-            );
-          })}
-        </div>
-      </section>
-    );
+function readExpandedMenuKeys() {
+  const defaultKeys = [
+    menuSectionKey("工作台"),
+    menuGroupKey("工作台", "工作台概览"),
+    menuSectionKey("入库业务"),
+    menuGroupKey("入库业务", "入库作业"),
+  ];
+  if (typeof window === "undefined") return defaultKeys;
+  try {
+    const raw = window.localStorage.getItem(MENU_EXPANDED_STORAGE_KEY);
+    if (!raw) return defaultKeys;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.every((item) => typeof item === "string") ? parsed : defaultKeys;
+  } catch {
+    return defaultKeys;
   }
+}
 
-  return (
-    <section>
-      <button
-        type="button"
-        className="flex w-full items-center justify-between rounded-md px-2 py-1 text-left text-xs font-medium text-muted-foreground hover:bg-muted"
-        aria-expanded={visible}
-        onClick={() => setOpen((value) => !value)}
-      >
-        {label}
-        <ChevronDown className={visible ? "size-3 transition-transform" : "size-3 -rotate-90 transition-transform"} aria-hidden />
-      </button>
-      {visible && <div className="mt-2 space-y-1">
-        {items.map((item) => {
-          const Icon = item.icon;
-          const active = item.id === activeView;
-          return (
-            <button
-              key={item.title}
-              type="button"
-              aria-current={active ? "page" : undefined}
-              disabled={item.disabled}
-              onClick={() => item.id && onNavigate(item.id)}
-              className={
-                active
-                  ? "flex w-full items-center gap-3 rounded-md bg-primary px-3 py-2 text-left text-primary-foreground"
-                  : "flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-45"
-              }
-            >
-              <Icon className="size-4 shrink-0" aria-hidden />
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-medium">{item.title}</span>
-                <span className={active ? "block truncate text-xs text-primary-foreground/80" : "block truncate text-xs text-muted-foreground"}>
-                  {item.subtitle}
-                </span>
-              </span>
-            </button>
-          );
-        })}
-      </div>}
-    </section>
-  );
+function writeExpandedMenuKeys(keys: string[]) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(MENU_EXPANDED_STORAGE_KEY, JSON.stringify(keys));
 }
 
 interface DashboardProps {

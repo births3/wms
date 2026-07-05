@@ -70,6 +70,12 @@
       "reason": "配置中心当前不是大列表查询页"
     },
     {
+      "id": "h1-menu-management",
+      "title": "H1 菜单管理",
+      "required": false,
+      "reason": "菜单管理是三层树和配置编辑页，不使用页面上方 QueryPanel"
+    },
+    {
       "id": "h9-print-templates",
       "title": "H9 打印模板",
       "required": true,
