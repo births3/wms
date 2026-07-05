@@ -4,6 +4,118 @@
  */
 
 export interface paths {
+    "/api/v1/admin/menus/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_draft_admin_menu"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/menus/draft/batch-enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["batch_enable_admin_menu_nodes"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/menus/draft/nodes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create_admin_menu_node"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/menus/draft/nodes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["update_admin_menu_node"];
+        trace?: never;
+    };
+    "/api/v1/admin/menus/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["publish_admin_menu"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/menus/published": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_published_admin_menu"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/menus/rollback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["rollback_admin_menu"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/audit/events": {
         parameters: {
             query?: never;
@@ -1240,6 +1352,57 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description H1 菜单按钮权限点。 */
+        AdminMenuButtonPermission: {
+            action_key: string;
+            action_kind: string;
+            action_label: string;
+            enabled: boolean;
+            /** Format: int32 */
+            sort_order: number;
+        };
+        /** @description H1 管理端菜单节点。 */
+        AdminMenuNode: {
+            button_permissions: components["schemas"]["AdminMenuButtonPermission"][];
+            children: components["schemas"]["AdminMenuNode"][];
+            code: string;
+            /** Format: date-time */
+            created_at: string;
+            enabled: boolean;
+            icon_key: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: int32 */
+            level: number;
+            /** Format: uuid */
+            parent_id?: string | null;
+            path: string;
+            permission_key: string;
+            /** Format: int32 */
+            sort_order: number;
+            title: string;
+            /** Format: date-time */
+            updated_at: string;
+            view_id?: string | null;
+        };
+        /** @description H1 菜单树响应。 */
+        AdminMenuTreeResponse: {
+            data: components["schemas"]["AdminMenuNode"][];
+            page: components["schemas"]["PageMeta"];
+            /** Format: int64 */
+            version_no?: number | null;
+        };
+        AdminMenuVersion: {
+            /** Format: uuid */
+            id: string;
+            note?: string | null;
+            /** Format: date-time */
+            published_at: string;
+            /** Format: uuid */
+            published_by: string;
+            /** Format: int64 */
+            version_no: number;
+        };
         /** @description 审计事件操作者摘要。 */
         AuditActor: {
             /**
@@ -1320,6 +1483,10 @@ export interface components {
             warehouse_id: string;
             /** Format: uuid */
             zone_id: string;
+        };
+        BatchEnableAdminMenuRequest: {
+            enabled: boolean;
+            ids: string[];
         };
         BillingAccount: {
             account_code: string;
@@ -1489,6 +1656,20 @@ export interface components {
             status: string;
             /** Format: date-time */
             updated_at: string;
+        };
+        /** @description 新增 H1 菜单节点请求。 */
+        CreateAdminMenuNodeRequest: {
+            button_permissions: components["schemas"]["UpsertAdminMenuButtonPermissionRequest"][];
+            code: string;
+            enabled: boolean;
+            icon_key: string;
+            /** Format: uuid */
+            parent_id?: string | null;
+            permission_key: string;
+            /** Format: int32 */
+            sort_order: number;
+            title: string;
+            view_id?: string | null;
         };
         CreateBillingAccountRequest: {
             account_code: string;
@@ -2319,6 +2500,9 @@ export interface components {
             data: components["schemas"]["Product"][];
             page: components["schemas"]["PageMeta"];
         };
+        PublishAdminMenuRequest: {
+            note?: string | null;
+        };
         PutawayInventoryRequest: {
             batch_no: string;
             expiry_date: string;
@@ -2515,6 +2699,10 @@ export interface components {
             reviewer_id: string;
             /** Format: uuid */
             second_reviewer_id?: string | null;
+        };
+        RollbackAdminMenuRequest: {
+            /** Format: int64 */
+            target_version_no?: number | null;
         };
         SetDocumentNumberRuleEnabledRequest: {
             enabled: boolean;
@@ -2773,6 +2961,19 @@ export interface components {
             /** Format: double */
             temperature_celsius: number;
         };
+        /** @description 更新 H1 菜单节点请求。 */
+        UpdateAdminMenuNodeRequest: {
+            button_permissions?: components["schemas"]["UpsertAdminMenuButtonPermissionRequest"][] | null;
+            enabled?: boolean | null;
+            icon_key?: string | null;
+            /** Format: uuid */
+            parent_id?: string | null;
+            permission_key?: string | null;
+            /** Format: int32 */
+            sort_order?: number | null;
+            title?: string | null;
+            view_id?: string | null;
+        };
         UpdateCustomerRequest: {
             customer_name?: string | null;
             license_no?: string | null;
@@ -2839,6 +3040,14 @@ export interface components {
             status?: string | null;
             warehouse_name?: string | null;
         };
+        UpsertAdminMenuButtonPermissionRequest: {
+            action_key: string;
+            action_kind: string;
+            action_label: string;
+            enabled: boolean;
+            /** Format: int32 */
+            sort_order: number;
+        };
         UpsertDocumentNumberRuleRequest: {
             document_type: string;
             /** Format: date-time */
@@ -2902,6 +3111,391 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_draft_admin_menu: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 草稿三层菜单树 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminMenuTreeResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无菜单维护权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    batch_enable_admin_menu_nodes: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchEnableAdminMenuRequest"];
+            };
+        };
+        responses: {
+            /** @description 批量启停草稿菜单节点 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminMenuNode"][];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无菜单维护权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_admin_menu_node: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAdminMenuNodeRequest"];
+            };
+        };
+        responses: {
+            /** @description 新增草稿菜单节点 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminMenuNode"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无菜单维护权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 菜单节点非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_admin_menu_node: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 菜单节点 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAdminMenuNodeRequest"];
+            };
+        };
+        responses: {
+            /** @description 更新草稿菜单节点 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminMenuNode"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无菜单维护权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 菜单节点不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 菜单节点非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    publish_admin_menu: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishAdminMenuRequest"];
+            };
+        };
+        responses: {
+            /** @description 发布菜单版本 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminMenuVersion"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无菜单发布权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 草稿菜单非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_published_admin_menu: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 已发布三层菜单树 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminMenuTreeResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    rollback_admin_menu: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RollbackAdminMenuRequest"];
+            };
+        };
+        responses: {
+            /** @description 回滚并生成新菜单版本 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminMenuVersion"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无菜单发布权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 菜单版本不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     list_audit_events: {
         parameters: {
             query?: {

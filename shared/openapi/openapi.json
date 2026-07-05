@@ -9,6 +9,494 @@
     "version": "0.0.5-wave-5-value-added"
   },
   "paths": {
+    "/api/v1/admin/menus/draft": {
+      "get": {
+        "tags": [
+          "admin-menu"
+        ],
+        "operationId": "list_draft_admin_menu",
+        "responses": {
+          "200": {
+            "description": "草稿三层菜单树",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminMenuTreeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无菜单维护权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/menus/draft/batch-enable": {
+      "post": {
+        "tags": [
+          "admin-menu"
+        ],
+        "operationId": "batch_enable_admin_menu_nodes",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchEnableAdminMenuRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "批量启停草稿菜单节点",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdminMenuNode"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无菜单维护权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/menus/draft/nodes": {
+      "post": {
+        "tags": [
+          "admin-menu"
+        ],
+        "operationId": "create_admin_menu_node",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAdminMenuNodeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "新增草稿菜单节点",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminMenuNode"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无菜单维护权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "菜单节点非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/menus/draft/nodes/{id}": {
+      "patch": {
+        "tags": [
+          "admin-menu"
+        ],
+        "operationId": "update_admin_menu_node",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "菜单节点 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAdminMenuNodeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "更新草稿菜单节点",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminMenuNode"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无菜单维护权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "菜单节点不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "菜单节点非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/menus/publish": {
+      "post": {
+        "tags": [
+          "admin-menu"
+        ],
+        "operationId": "publish_admin_menu",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishAdminMenuRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "发布菜单版本",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminMenuVersion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无菜单发布权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "草稿菜单非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/menus/published": {
+      "get": {
+        "tags": [
+          "admin-menu"
+        ],
+        "operationId": "list_published_admin_menu",
+        "responses": {
+          "200": {
+            "description": "已发布三层菜单树",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminMenuTreeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/menus/rollback": {
+      "post": {
+        "tags": [
+          "admin-menu"
+        ],
+        "operationId": "rollback_admin_menu",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RollbackAdminMenuRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "回滚并生成新菜单版本",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminMenuVersion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无菜单发布权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "菜单版本不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/audit/events": {
       "get": {
         "tags": [
@@ -145,8 +633,8 @@
           }
         },
         "security": [],
-        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。",
-        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。"
+        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。",
+        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。"
       }
     },
     "/api/v1/auth/me": {
@@ -5242,6 +5730,170 @@
   },
   "components": {
     "schemas": {
+      "AdminMenuButtonPermission": {
+        "type": "object",
+        "description": "H1 菜单按钮权限点。",
+        "required": [
+          "action_key",
+          "action_label",
+          "action_kind",
+          "enabled",
+          "sort_order"
+        ],
+        "properties": {
+          "action_key": {
+            "type": "string"
+          },
+          "action_kind": {
+            "type": "string"
+          },
+          "action_label": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "sort_order": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "AdminMenuNode": {
+        "type": "object",
+        "description": "H1 管理端菜单节点。",
+        "required": [
+          "id",
+          "level",
+          "code",
+          "path",
+          "title",
+          "icon_key",
+          "permission_key",
+          "sort_order",
+          "enabled",
+          "button_permissions",
+          "children",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "button_permissions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminMenuButtonPermission"
+            }
+          },
+          "children": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminMenuNode"
+            }
+          },
+          "code": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "icon_key": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "level": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "parent_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "path": {
+            "type": "string"
+          },
+          "permission_key": {
+            "type": "string"
+          },
+          "sort_order": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "view_id": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "AdminMenuTreeResponse": {
+        "type": "object",
+        "description": "H1 菜单树响应。",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminMenuNode"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          },
+          "version_no": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          }
+        }
+      },
+      "AdminMenuVersion": {
+        "type": "object",
+        "required": [
+          "id",
+          "version_no",
+          "published_by",
+          "published_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "published_by": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version_no": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "AuditActor": {
         "type": "object",
         "description": "审计事件操作者摘要。",
@@ -5416,6 +6068,25 @@
           "zone_id": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "BatchEnableAdminMenuRequest": {
+        "type": "object",
+        "required": [
+          "ids",
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         }
       },
@@ -5931,6 +6602,55 @@
           "updated_at": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "CreateAdminMenuNodeRequest": {
+        "type": "object",
+        "description": "新增 H1 菜单节点请求。",
+        "required": [
+          "code",
+          "title",
+          "icon_key",
+          "permission_key",
+          "sort_order",
+          "enabled",
+          "button_permissions"
+        ],
+        "properties": {
+          "button_permissions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UpsertAdminMenuButtonPermissionRequest"
+            }
+          },
+          "code": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "icon_key": {
+            "type": "string"
+          },
+          "parent_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "permission_key": {
+            "type": "string"
+          },
+          "sort_order": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "title": {
+            "type": "string"
+          },
+          "view_id": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -8456,6 +9176,15 @@
           }
         }
       },
+      "PublishAdminMenuRequest": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
       "PutawayInventoryRequest": {
         "type": "object",
         "required": [
@@ -9038,6 +9767,16 @@
           "second_reviewer_id": {
             "type": "string",
             "format": "uuid",
+            "nullable": true
+          }
+        }
+      },
+      "RollbackAdminMenuRequest": {
+        "type": "object",
+        "properties": {
+          "target_version_no": {
+            "type": "integer",
+            "format": "int64",
             "nullable": true
           }
         }
@@ -9847,6 +10586,49 @@
           }
         }
       },
+      "UpdateAdminMenuNodeRequest": {
+        "type": "object",
+        "description": "更新 H1 菜单节点请求。",
+        "properties": {
+          "button_permissions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UpsertAdminMenuButtonPermissionRequest"
+            },
+            "nullable": true
+          },
+          "enabled": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "icon_key": {
+            "type": "string",
+            "nullable": true
+          },
+          "parent_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "permission_key": {
+            "type": "string",
+            "nullable": true
+          },
+          "sort_order": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "view_id": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
       "UpdateCustomerRequest": {
         "type": "object",
         "properties": {
@@ -10046,6 +10828,34 @@
           }
         }
       },
+      "UpsertAdminMenuButtonPermissionRequest": {
+        "type": "object",
+        "required": [
+          "action_key",
+          "action_label",
+          "action_kind",
+          "enabled",
+          "sort_order"
+        ],
+        "properties": {
+          "action_key": {
+            "type": "string"
+          },
+          "action_kind": {
+            "type": "string"
+          },
+          "action_label": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "sort_order": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "UpsertDocumentNumberRuleRequest": {
         "type": "object",
         "required": [
@@ -10236,6 +11046,10 @@
     {
       "name": "auth",
       "description": "鉴权与会话"
+    },
+    {
+      "name": "admin-menu",
+      "description": "H1 管理端三层菜单"
     },
     {
       "name": "audit",
