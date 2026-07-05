@@ -37,7 +37,10 @@ REQUIRED_ROUTE_MARKERS = (
     "M1MasterDataPage",
     "M3BatchManagementPage",
     "masterDataViewToId(view)",
+)
+REQUIRED_DASHBOARD_BACK_MARKERS = (
     'onBack={() => setView("dashboard")}',
+    'onBack={() => navigateTo("dashboard")}',
 )
 
 REQUIRED_NAV_ITEMS = (
@@ -75,6 +78,8 @@ def scan() -> list[Issue]:
     for marker in REQUIRED_ROUTE_MARKERS:
         if marker not in text:
             issues.append(Issue(rel(APP_TSX), f"缺少基础档案页面渲染入口标记: {marker}"))
+    if not any(marker in text for marker in REQUIRED_DASHBOARD_BACK_MARKERS):
+        issues.append(Issue(rel(APP_TSX), "缺少基础档案页面回工作台入口标记"))
     for path in (PAGE_TSX, QUERY_TS):
         if not path.exists():
             issues.append(Issue(rel(path), "缺少基础档案管理端页面或查询层文件"))
@@ -97,6 +102,7 @@ def main(argv: list[str] | None = None) -> int:
         "required_section_label": REQUIRED_SECTION_LABEL,
         "required_nav_items": REQUIRED_NAV_ITEMS,
         "required_route_markers": REQUIRED_ROUTE_MARKERS,
+        "required_dashboard_back_markers": REQUIRED_DASHBOARD_BACK_MARKERS,
         "issues": [asdict(issue) for issue in issues],
         "ok": not issues,
     }

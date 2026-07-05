@@ -1,0 +1,153 @@
+{
+  "version": 1,
+  "pages": [
+    {
+      "id": "dashboard",
+      "title": "运营总览",
+      "required": false,
+      "reason": "工作台总览页不承担列表查询"
+    },
+    {
+      "id": "m1-products",
+      "title": "M1 商品档案",
+      "required": true,
+      "source": "apps/web-admin/src/pages/master-data/M1MasterDataPage.tsx",
+      "fieldConstant": "m1QueryFields",
+      "coreConstant": "m1CoreQueryFieldKeys",
+      "core": ["keyword"],
+      "more": []
+    },
+    {
+      "id": "m1-business-partners",
+      "title": "M1 客商档案",
+      "required": true,
+      "source": "apps/web-admin/src/pages/master-data/M1MasterDataPage.tsx",
+      "fieldConstant": "m1QueryFields",
+      "coreConstant": "m1CoreQueryFieldKeys",
+      "core": ["keyword"],
+      "more": []
+    },
+    {
+      "id": "m1-warehouses",
+      "title": "M1 仓库管理",
+      "required": true,
+      "source": "apps/web-admin/src/pages/master-data/M1MasterDataPage.tsx",
+      "fieldConstant": "m1QueryFields",
+      "coreConstant": "m1CoreQueryFieldKeys",
+      "core": ["keyword"],
+      "more": []
+    },
+    {
+      "id": "m1-zones",
+      "title": "M1 库区管理",
+      "required": true,
+      "source": "apps/web-admin/src/pages/master-data/M1MasterDataPage.tsx",
+      "fieldConstant": "m1QueryFields",
+      "coreConstant": "m1CoreQueryFieldKeys",
+      "core": ["keyword"],
+      "more": []
+    },
+    {
+      "id": "m1-locations",
+      "title": "M1 库位管理",
+      "required": true,
+      "source": "apps/web-admin/src/pages/master-data/M1MasterDataPage.tsx",
+      "fieldConstant": "m1QueryFields",
+      "coreConstant": "m1CoreQueryFieldKeys",
+      "core": ["keyword"],
+      "more": []
+    },
+    {
+      "id": "m1-system-dictionary",
+      "title": "M1 系统字典",
+      "required": false,
+      "reason": "系统字典使用双栏目录内部搜索，不使用页面上方 QueryPanel"
+    },
+    {
+      "id": "m1-feature-flags",
+      "title": "M1 Feature Flag",
+      "required": false,
+      "reason": "配置中心当前不是大列表查询页"
+    },
+    {
+      "id": "m2-receiving",
+      "title": "M2 收货管理",
+      "required": true,
+      "source": "apps/web-admin/src/pages/inbound/M2InboundPage.tsx",
+      "fieldConstant": "m2InboundQueryFields",
+      "coreConstant": "m2InboundCoreQueryFieldKeys",
+      "core": ["keyword", "ownerKeyword", "statusFilter"],
+      "more": ["documentTypeFilter", "arrivalDate", "createdAt"]
+    },
+    {
+      "id": "m2-inspecting",
+      "title": "M2 验收管理",
+      "required": true,
+      "source": "apps/web-admin/src/pages/inbound/M2InboundPage.tsx",
+      "fieldConstant": "m2InboundQueryFields",
+      "coreConstant": "m2InboundCoreQueryFieldKeys",
+      "core": ["keyword", "ownerKeyword", "statusFilter"],
+      "more": ["documentTypeFilter", "arrivalDate", "createdAt"]
+    },
+    {
+      "id": "m2-putaway",
+      "title": "M2 上架管理",
+      "required": true,
+      "source": "apps/web-admin/src/pages/inbound/M2InboundPage.tsx",
+      "fieldConstant": "m2InboundQueryFields",
+      "coreConstant": "m2InboundCoreQueryFieldKeys",
+      "core": ["keyword", "ownerKeyword", "statusFilter"],
+      "more": ["documentTypeFilter", "arrivalDate", "createdAt"]
+    },
+    {
+      "id": "m3-batches",
+      "title": "M3 批号管理",
+      "required": true,
+      "source": "apps/web-admin/src/pages/inventory/M3BatchManagementPage.tsx",
+      "fieldConstant": "m3BatchQueryFields",
+      "coreConstant": "m3BatchCoreQueryFieldKeys",
+      "core": ["keyword", "qualityStatus"],
+      "more": ["recallFlag", "productionDate", "expiryDate", "createdAt"]
+    },
+    {
+      "id": "m4-orders",
+      "title": "M4 出库订单管理",
+      "required": true,
+      "source": "apps/web-admin/src/pages/outbound/M4OutboundPage.tsx",
+      "fieldConstant": "m4OutboundQueryFields",
+      "coreConstant": "m4OutboundCoreQueryFieldKeys",
+      "core": ["keyword", "statusFilter"],
+      "more": ["businessDate"]
+    },
+    {
+      "id": "m4-waves",
+      "title": "M4 波次规划",
+      "required": true,
+      "source": "apps/web-admin/src/pages/outbound/M4OutboundPage.tsx",
+      "fieldConstant": "m4OutboundQueryFields",
+      "coreConstant": "m4OutboundCoreQueryFieldKeys",
+      "core": ["keyword", "statusFilter"],
+      "more": ["businessDate"]
+    },
+    {
+      "id": "m4-review",
+      "title": "M4 复核发货",
+      "required": true,
+      "source": "apps/web-admin/src/pages/outbound/M4OutboundPage.tsx",
+      "fieldConstant": "m4OutboundQueryFields",
+      "coreConstant": "m4OutboundCoreQueryFieldKeys",
+      "core": ["keyword", "statusFilter"],
+      "more": ["businessDate"]
+    },
+    {
+      "id": "m4-returns",
+      "title": "M4 采购退货出库",
+      "required": true,
+      "source": "apps/web-admin/src/pages/outbound/M4OutboundPage.tsx",
+      "fieldConstant": "m4OutboundQueryFields",
+      "coreConstant": "m4OutboundCoreQueryFieldKeys",
+      "core": ["keyword", "statusFilter"],
+      "more": ["businessDate"]
+    }
+  ]
+}

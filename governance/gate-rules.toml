@@ -150,6 +150,21 @@ checks = ["validate_environment", "check_governance_coverage"]
 tier = "T1"
 
 [[rules]]
+match = "governance/quality-matrix.toml"
+checks = ["check_quality_matrix"]
+tier = "T1"
+
+[[rules]]
+match = "docs/governance/quality-matrix*.md"
+checks = ["check_quality_matrix", "check_doc_links"]
+tier = "T1"
+
+[[rules]]
+match = "scripts/governance/check_quality_matrix.py"
+checks = ["check_quality_matrix", "check_governance_coverage"]
+tier = "T1"
+
+[[rules]]
 match = "justfile"
 checks = ["check_wave6_evidence_preflight", "check_governance_coverage"]
 tier = "T1"
@@ -426,7 +441,7 @@ tier = "T1"
 
 [[rules]]
 match = "apps/web-admin/src/App.tsx"
-checks = ["check_admin_navigation"]
+checks = ["check_admin_navigation", "check_admin_page_query_panel"]
 tier = "T1"
 
 # ============================================================
@@ -450,6 +465,11 @@ checks = ["check_component_doc_header", "check_component_no_inline_style", "chec
 tier = "T1"
 
 [[rules]]
+match = "packages/ui/src/business/QueryPanel/**"
+checks = ["check_admin_page_query_panel"]
+tier = "T1"
+
+[[rules]]
 match = "prototypes/src/pages/**"
 checks = ["check_component_doc_header", "check_page_size", "check_baseline_completeness"]
 tier = "T1"
@@ -461,7 +481,7 @@ tier = "T1"
 
 [[rules]]
 match = "apps/web-admin/src/pages/**"
-checks = ["check_page_size"]
+checks = ["check_page_size", "check_admin_page_query_panel"]
 tier = "T1"
 
 [[rules]]

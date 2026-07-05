@@ -80,6 +80,13 @@ def test_governance_checks_t1_includes_runtime_and_navigation_guards():
     assert "check_runtime_route_mounts.py" in scripts
 
 
+def test_governance_checks_t1_includes_quality_matrix_guard():
+    """T1 全量入口必须覆盖全链路质量矩阵，避免故事级质量状态漂移。"""
+    from governance_checks import expand_tier_scripts
+
+    assert "check_quality_matrix.py" in expand_tier_scripts("T1")
+
+
 def test_governance_script_changes_trigger_coverage_meta_check():
     """治理脚本变更时，diff gate 必须触发覆盖元检查。"""
     from _diff import load_gate_rules, match_rules
@@ -108,6 +115,36 @@ def test_admin_navigation_sources_trigger_navigation_guard():
     triggered = match_rules(["apps/web-admin/src/App.tsx"], load_gate_rules())
 
     assert "check_admin_navigation" in triggered
+    assert "check_admin_page_query_panel" in triggered
+
+
+def test_admin_page_sources_trigger_query_panel_guard():
+    """管理端页面和 QueryPanel 变更必须触发页面级查询条件检查。"""
+    from _diff import load_gate_rules, match_rules
+
+    rules = load_gate_rules()
+    for changed_file in [
+        "apps/web-admin/src/pages/inbound/M2InboundPage.tsx",
+        "apps/web-admin/src/pages/page-query-core-fields.json",
+        "packages/ui/src/business/QueryPanel/QueryPanel.tsx",
+    ]:
+        triggered = match_rules([changed_file], rules)
+        assert "check_admin_page_query_panel" in triggered
+
+
+def test_quality_matrix_sources_trigger_quality_matrix_guard():
+    """质量矩阵事实源、展示页和检查脚本变更必须触发质量矩阵检查。"""
+    from _diff import load_gate_rules, match_rules
+
+    rules = load_gate_rules()
+    for changed_file in [
+        "governance/quality-matrix.toml",
+        "docs/governance/quality-matrix.md",
+        "docs/governance/quality-matrix-method.md",
+        "scripts/governance/check_quality_matrix.py",
+    ]:
+        triggered = match_rules([changed_file], rules)
+        assert "check_quality_matrix" in triggered
 
 
 def test_runtime_route_sources_trigger_mount_guard():

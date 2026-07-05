@@ -8,7 +8,7 @@
 |---|---|---|
 | `AGENTS.md` | 项目原则、常用命令、验证要求、协作约定、禁止事项 | 本文件 |
 | `*/AGENTS.override.md` | 模块独有规则，例如后端、前端应用、原型、部署、治理脚本 | 见下方模块规则 |
-| `.agents/skills/<skill>/SKILL.md` | 复杂流程，例如需求确认、治理修复、审计流程、PlantUML 图文沉淀、worktree 子代理流程、Gitea issue 执行闭环 | 见 `.agents/skills/wms-governance-workflow/SKILL.md`、`.agents/skills/wms-loop-engineering/SKILL.md`、`.agents/skills/wms-review-fix-commit/SKILL.md`、`.agents/skills/wms-plantuml-docs/SKILL.md`、`.agents/skills/wms-worktree-subagent/SKILL.md` 与 `.agents/skills/wms-issue-codex-exec/SKILL.md` |
+| `.agents/skills/<skill>/SKILL.md` | 复杂流程，例如需求确认、治理修复、页面查询治理、质量矩阵治理、审计流程、PlantUML 图文沉淀、worktree 子代理流程、Gitea issue 执行闭环 | 见 `.agents/skills/wms-governance-workflow/SKILL.md`、`.agents/skills/wms-loop-engineering/SKILL.md`、`.agents/skills/wms-page-query-governance/SKILL.md`、`.agents/skills/wms-quality-matrix-governance/SKILL.md`、`.agents/skills/wms-review-fix-commit/SKILL.md`、`.agents/skills/wms-plantuml-docs/SKILL.md`、`.agents/skills/wms-worktree-subagent/SKILL.md` 与 `.agents/skills/wms-issue-codex-exec/SKILL.md` |
 | `.codex/config.toml` | 模型、沙箱、MCP、钩子、审批默认值 | 本仓库不跟踪；`.gitignore` 标记为本机配置 |
 | `.codex/rules/*.rules` | 命令允许 / 提示 / 禁止规则 | 本仓库不跟踪；`.gitignore` 标记为本机配置 |
 | `docs/*.md` | 详细说明、经验手册、长规范、背景材料 | 见 [docs/agent-collaboration.md](docs/agent-collaboration.md) 与 [docs/agent-document-index.md](docs/agent-document-index.md) |
@@ -22,6 +22,7 @@
 - 单据类型、流程模板、批号策略、编号规则、状态机、审批源和货主覆盖属于平台级能力；新增或调整时必须考虑前端、后端、数据库、OpenAPI、RTM、用户故事、治理脚本和迁移兼容。
 - 默认按“可配置但受控”的企业系统设计：运营可维护受控配置，不能用自由文本或临时代码绕过字典、规则、审批和审计。
 - 发现需求看似简单时，必须先判断是否是共性平台能力；如果跨两个以上模块或会影响历史单据解释，不得只做单页面局部实现。
+- 新增页面必须先做页面族分类和信息分区：列表型、双栏目录型、配置型、详情弹窗型分别套用对应公共组件和展示结构，避免临时拼接页面。
 
 ## 项目原则
 
@@ -50,6 +51,7 @@
 ## 验证要求
 
 - 每次改文件后，至少运行 `just gov-t1` 并报告退出码。
+- 新增或修改用户故事 / 页面 / API / 字段时，必须同步检查 `governance/quality-matrix.toml` 和生成页 `docs/governance/quality-matrix.md`。
 - 提交前按变更范围补充最小相关测试；非平凡逻辑必须留下可运行检查。
 - 正式版发布前，数据库结构、OpenAPI / API 契约、前后端数据模型等破坏性变更或新增必填字段，必须按 [docs/adr/0016-deployment.md](docs/adr/0016-deployment.md) 补兼容迁移、数据回填、灰度和回滚证据；开发阶段直接修改建表脚本或契约不能作为正式发布方案。
 - 前端/原型变更还要遵守截图、视觉基线、页面行数等门禁，详见 [apps/AGENTS.override.md](apps/AGENTS.override.md) 与 [prototypes/AGENTS.override.md](prototypes/AGENTS.override.md)。
@@ -64,7 +66,7 @@
 - 业务/法规/安全最终结论不由 AI 拍板；AI 只给可验证参考意见。
 - DO NOT send optional commentary。
 - 默认本地提交按 [docs/agent-commit-rules.md](docs/agent-commit-rules.md)；满足条件时不再额外询问是否提交。
-- 复杂流程按对应 `.agents/skills/*/SKILL.md` 执行；治理修复用 `wms-governance-workflow`，闭环执行用 `wms-loop-engineering`，PlantUML 图文沉淀用 `wms-plantuml-docs`，审查修复后分组提交用 `wms-review-fix-commit`，worktree 子代理执行用 `wms-worktree-subagent`，Gitea issue 自动处理用 `wms-issue-codex-exec`，执行漏项复盘迭代用 `wms-execution-retrospective`。
+- 复杂流程按对应 `.agents/skills/*/SKILL.md` 执行；治理修复用 `wms-governance-workflow`，闭环执行用 `wms-loop-engineering`，页面查询治理用 `wms-page-query-governance`，质量矩阵治理用 `wms-quality-matrix-governance`，PlantUML 图文沉淀用 `wms-plantuml-docs`，审查修复后分组提交用 `wms-review-fix-commit`，worktree 子代理执行用 `wms-worktree-subagent`，Gitea issue 自动处理用 `wms-issue-codex-exec`，执行漏项复盘迭代用 `wms-execution-retrospective`。
 
 ## 禁止事项
 

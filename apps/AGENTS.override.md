@@ -10,6 +10,8 @@
 - UI 控件遵守 [docs/frontend-coding-standards.md](../docs/frontend-coding-standards.md)。
 - 新增组件前先复用 `@wms/ui` 和现有组件模式。
 - 前端改动必须先查现有页面局部组件、feature hook、api-client、类型和 `lib`/`utils`；能复用就复用。
+- 新增页面必须先分类再实现：列表型页面使用公共 `QueryPanel` + `DataGrid`，双栏目录型页面使用分类 / 明细分栏，配置型页面按配置域分区，详情弹窗按业务信息分区上下展示。
+- 新增菜单页必须登记页面级查询分类；核心查询首屏一行展示，更多查询折叠展示。
 - 没有现成能力时，新增为标准可复用单元：通用 UI 放 `@wms/ui`，业务复合放 `@wms/ui business` 或业务模块，页面私有组件放页面目录，工具函数放现有 `lib`/`utils`。
 - 新增组件或工具函数需说明复用缺口、放置理由和后续复用点；禁止为单一场景复制相似页面、表单或请求逻辑。
 - 不得把 `prototypes/src/pages/*` 直接复制到生产应用；必须走 [docs/prototypes/prototype-to-production.md](../docs/prototypes/prototype-to-production.md)。
