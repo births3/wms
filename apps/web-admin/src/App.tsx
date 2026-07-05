@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Button, Card, CardContent, Input, PageHeader, StatusBadge, cn } from "@wms/ui";
+import { Button, Card, CardContent, Input, PageHeader, StatusBadge, WorkspaceTabs, cn } from "@wms/ui";
 import {
   Activity,
   BookOpen,
@@ -122,12 +122,118 @@ const menuSections: Array<{ label: string; items: MenuItem[] }> = [
   },
 ];
 
+const WORKSPACE_TABS_STORAGE_KEY = "wms:web-admin:workspace-tabs:v1";
+
+interface AdminWorkspaceTab {
+  view: AdminView;
+  label: string;
+  subtitle: string;
+  closable: boolean;
+}
+
+interface AdminWorkspaceState {
+  view: AdminView;
+  openTabs: AdminWorkspaceTab[];
+}
+
+function readWorkspaceTabs(): AdminWorkspaceState {
+  if (typeof window === "undefined") return defaultWorkspaceState();
+  try {
+    const raw = window.localStorage.getItem(WORKSPACE_TABS_STORAGE_KEY);
+    if (!raw) return defaultWorkspaceState();
+    const stored = JSON.parse(raw) as { activeView?: unknown; openTabs?: unknown };
+    const views = Array.isArray(stored.openTabs) ? stored.openTabs.filter(isAdminView) : [];
+    const openViews = normalizeWorkspaceViews(views);
+    const activeView = isAdminView(stored.activeView) && openViews.includes(stored.activeView)
+      ? stored.activeView
+      : openViews[0];
+    return { view: activeView, openTabs: openViews.map(workspaceTabForView) };
+  } catch {
+    return defaultWorkspaceState();
+  }
+}
+
+function writeWorkspaceTabs(state: AdminWorkspaceState) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(
+    WORKSPACE_TABS_STORAGE_KEY,
+    JSON.stringify({ activeView: state.view, openTabs: state.openTabs.map((tab) => tab.view) }),
+  );
+}
+
+function defaultWorkspaceState(): AdminWorkspaceState {
+  return { view: "dashboard", openTabs: [workspaceTabForView("dashboard")] };
+}
+
+function openWorkspaceTab(state: AdminWorkspaceState, nextView: AdminView): AdminWorkspaceState {
+  const exists = state.openTabs.some((tab) => tab.view === nextView);
+  return {
+    view: nextView,
+    openTabs: exists ? state.openTabs : [...state.openTabs, workspaceTabForView(nextView)],
+  };
+}
+
+function closeWorkspaceTab(state: AdminWorkspaceState, targetView: AdminView): AdminWorkspaceState {
+  if (targetView === "dashboard") return state;
+  const targetIndex = state.openTabs.findIndex((tab) => tab.view === targetView);
+  if (targetIndex < 0) return state;
+  const openTabs = state.openTabs.filter((tab) => tab.view !== targetView);
+  if (state.view !== targetView) return { ...state, openTabs };
+  const nextActiveIndex = Math.max(0, targetIndex - 1);
+  return { view: openTabs[nextActiveIndex]?.view ?? "dashboard", openTabs };
+}
+
+function closeOtherWorkspaceTabs(state: AdminWorkspaceState, targetView: AdminView): AdminWorkspaceState {
+  const targetTab = state.openTabs.find((tab) => tab.view === targetView) ?? workspaceTabForView(targetView);
+  const openTabs = targetView === "dashboard"
+    ? [workspaceTabForView("dashboard")]
+    : [workspaceTabForView("dashboard"), targetTab];
+  return { view: targetView, openTabs };
+}
+
+function normalizeWorkspaceViews(views: AdminView[]) {
+  const ordered = views.filter((view, index) => views.indexOf(view) === index);
+  return ["dashboard", ...ordered.filter((view) => view !== "dashboard")] as AdminView[];
+}
+
+function workspaceTabForView(view: AdminView): AdminWorkspaceTab {
+  const item = menuSections.flatMap((section) => section.items).find((menuItem) => menuItem.id === view);
+  return {
+    view,
+    label: item?.title ?? "运营总览",
+    subtitle: item?.subtitle ?? "系统基础状态",
+    closable: view !== "dashboard",
+  };
+}
+
+function isAdminView(value: unknown): value is AdminView {
+  return typeof value === "string" && menuSections.some((section) => section.items.some((item) => item.id === value));
+}
+
 export function App() {
   const logout = useLogout();
-  const [view, setView] = React.useState<AdminView>("dashboard");
+  const [workspaceState, setWorkspaceState] = React.useState<AdminWorkspaceState>(readWorkspaceTabs);
   const [sessionVersion, setSessionVersion] = React.useState(0);
   const hasSession = React.useMemo(() => hasActiveAuthSession(), [sessionVersion]);
   const currentUserQuery = useCurrentUserQuery(hasSession);
+  const view = workspaceState.view;
+  const openTabs = workspaceState.openTabs;
+
+  React.useEffect(() => {
+    writeWorkspaceTabs(workspaceState);
+  }, [workspaceState]);
+
+  const navigateTo = React.useCallback((nextView: AdminView) => {
+    setWorkspaceState((state) => openWorkspaceTab(state, nextView));
+  }, []);
+
+  const closeTab = React.useCallback((targetView: AdminView) => {
+    setWorkspaceState((state) => closeWorkspaceTab(state, targetView));
+  }, []);
+
+  const closeOtherTabs = React.useCallback((targetView: AdminView) => {
+    setWorkspaceState((state) => closeOtherWorkspaceTabs(state, targetView));
+  }, []);
 
   React.useEffect(() => {
     if (hasSession && currentUserQuery.isError) {
@@ -155,37 +261,64 @@ export function App() {
 
   const handleLogout = () => {
     logout();
-    setView("dashboard");
+    setWorkspaceState((state) => ({ ...state, view: "dashboard" }));
     setSessionVersion((value) => value + 1);
   };
+  return (
+    <AppShell
+      currentUser={currentUserQuery.data}
+      activeView={view}
+      openTabs={openTabs}
+      onNavigate={navigateTo}
+      onCloseTab={closeTab}
+      onCloseOtherTabs={closeOtherTabs}
+      onLogout={handleLogout}
+    >
+      {openTabs.map((tab) => (
+        <div key={tab.view} hidden={tab.view !== view}>
+          {renderAdminView(tab.view, currentUserQuery.data, navigateTo)}
+        </div>
+      ))}
+    </AppShell>
+  );
+}
+
+function renderAdminView(
+  view: AdminView,
+  currentUser: CurrentUser,
+  navigateTo: (view: AdminView) => void,
+) {
   const inboundMode = inboundViewToMode(view);
   const outboundMode = outboundViewToMode(view);
   const masterDataViewId = masterDataViewToId(view);
 
+  if (view === "m1-feature-flags") {
+    return <FeatureFlagConfigCenterPage onBack={() => navigateTo("dashboard")} />;
+  }
+  if (masterDataViewId) {
+    return <M1MasterDataPage viewId={masterDataViewId} onBack={() => navigateTo("dashboard")} />;
+  }
+  if (inboundMode) {
+    return (
+      <M2InboundPage
+        mode={inboundMode}
+        currentOwner={{ ownerId: currentUser.owner_id, ownerCode: currentUser.owner_code }}
+        onBack={() => navigateTo("dashboard")}
+      />
+    );
+  }
+  if (view === "m3-batches") {
+    return <M3BatchManagementPage onBack={() => navigateTo("dashboard")} />;
+  }
+  if (outboundMode) {
+    return <M4OutboundPage mode={outboundMode} onBack={() => navigateTo("dashboard")} />;
+  }
   return (
-    <AppShell currentUser={currentUserQuery.data} activeView={view} onNavigate={setView} onLogout={handleLogout}>
-      {view === "m1-feature-flags" ? (
-        <FeatureFlagConfigCenterPage onBack={() => setView("dashboard")} />
-      ) : masterDataViewId ? (
-        <M1MasterDataPage viewId={masterDataViewId} onBack={() => setView("dashboard")} />
-      ) : inboundMode ? (
-        <M2InboundPage
-          mode={inboundMode}
-          currentOwner={{ ownerId: currentUserQuery.data.owner_id, ownerCode: currentUserQuery.data.owner_code }}
-          onBack={() => setView("dashboard")}
-        />
-      ) : view === "m3-batches" ? (
-        <M3BatchManagementPage onBack={() => setView("dashboard")} />
-      ) : outboundMode ? (
-        <M4OutboundPage mode={outboundMode} onBack={() => setView("dashboard")} />
-      ) : (
-        <Dashboard
-          currentUser={currentUserQuery.data}
-          onOpenM2Inbound={() => setView("m2-receiving")}
-          onOpenM4Outbound={() => setView("m4-orders")}
-        />
-      )}
-    </AppShell>
+    <Dashboard
+      currentUser={currentUser}
+      onOpenM2Inbound={() => navigateTo("m2-receiving")}
+      onOpenM4Outbound={() => navigateTo("m4-orders")}
+    />
   );
 }
 
@@ -232,13 +365,19 @@ function LoadingShell() {
 function AppShell({
   currentUser,
   activeView,
+  openTabs,
   onNavigate,
+  onCloseTab,
+  onCloseOtherTabs,
   onLogout,
   children,
 }: {
   currentUser: CurrentUser;
   activeView: AdminView;
+  openTabs: AdminWorkspaceTab[];
   onNavigate: (view: AdminView) => void;
+  onCloseTab: (view: AdminView) => void;
+  onCloseOtherTabs: (view: AdminView) => void;
   onLogout: () => void;
   children: React.ReactNode;
 }) {
@@ -296,16 +435,26 @@ function AppShell({
   return (
     <div
       className={cn(
-        "min-h-screen bg-muted/30 text-foreground lg:grid",
+        "min-h-screen bg-muted/30 text-foreground lg:grid lg:grid-rows-[3.5rem_1fr]",
         sidebarCollapsed ? "lg:grid-cols-[4.5rem_1fr]" : "lg:grid-cols-[14rem_1fr]",
       )}
     >
-      <aside ref={sidebarRef} className="hidden border-r bg-background lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col">
-        <div className={cn("flex items-center gap-3 border-b py-5", sidebarCollapsed ? "justify-center px-3" : "justify-between px-5")}>
+      <header
+        className={cn(
+          "hidden border-b bg-background lg:col-span-2 lg:grid lg:h-14 lg:items-center",
+          sidebarCollapsed ? "lg:grid-cols-[4.5rem_minmax(0,1fr)_auto]" : "lg:grid-cols-[14rem_minmax(0,1fr)_auto]",
+        )}
+      >
+        <div className={cn("flex h-full items-center gap-3 border-r px-3", sidebarCollapsed ? "justify-center" : "justify-between")}>
           {!sidebarCollapsed && (
-            <div className="min-w-0">
-              <div className="truncate text-lg font-semibold tracking-normal">WMS Admin</div>
-              <div className="mt-1 truncate text-xs text-muted-foreground">{currentUser.owner_code}</div>
+            <div className="flex min-w-0 items-center gap-2">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                <Warehouse className="size-5" aria-hidden />
+              </div>
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold tracking-normal">WMS Admin</div>
+                <div className="truncate text-[11px] text-muted-foreground">{currentUser.owner_code}</div>
+              </div>
             </div>
           )}
           <Button
@@ -322,6 +471,40 @@ function AppShell({
             {sidebarCollapsed ? <PanelLeftOpen className="size-4" aria-hidden /> : <PanelLeftClose className="size-4" aria-hidden />}
           </Button>
         </div>
+
+        <WorkspaceTabs
+          className="min-w-0 border-0 bg-transparent"
+          tabs={openTabs.map((tab) => ({
+            value: tab.view,
+            label: tab.label,
+            subtitle: tab.subtitle,
+            closable: tab.closable,
+          }))}
+          activeValue={activeView}
+          onActiveValueChange={(nextView) => {
+            if (isAdminView(nextView)) onNavigate(nextView);
+          }}
+          onCloseTab={(targetView) => {
+            if (isAdminView(targetView)) onCloseTab(targetView);
+          }}
+          onCloseOtherTabs={(targetView) => {
+            if (isAdminView(targetView)) onCloseOtherTabs(targetView);
+          }}
+        />
+
+        <div className="flex h-full items-center gap-3 border-l px-4">
+          <div className="min-w-0 text-right">
+            <div className="truncate text-sm font-medium">{currentUser.display_name}</div>
+            <div className="truncate text-xs text-muted-foreground">{currentUser.username}</div>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={onLogout}>
+            <LogOut className="size-4" aria-hidden />
+            退出
+          </Button>
+        </div>
+      </header>
+
+      <aside ref={sidebarRef} className="hidden border-r bg-background lg:sticky lg:top-14 lg:flex lg:h-[calc(100vh-3.5rem)] lg:flex-col">
 
         <nav className={cn("flex-1 overflow-y-auto py-4", sidebarCollapsed ? "space-y-2 px-2" : "space-y-5 px-3")}>
           {!sidebarCollapsed && menuFilterOpen ? (
@@ -365,25 +548,6 @@ function AppShell({
             />
           ))}
         </nav>
-
-        <div className={cn("mt-auto border-t py-4", sidebarCollapsed ? "px-2" : "px-4")}>
-          {!sidebarCollapsed && <div className="mb-3 min-w-0">
-            <div className="truncate text-sm font-medium">{currentUser.display_name}</div>
-            <div className="truncate text-xs text-muted-foreground">{currentUser.username}</div>
-          </div>}
-          <Button
-            type="button"
-            variant="outline"
-            size={sidebarCollapsed ? "icon" : "default"}
-            className={cn("w-full", !sidebarCollapsed && "justify-start")}
-            aria-label={sidebarCollapsed ? "退出登录" : undefined}
-            title={sidebarCollapsed ? "退出登录" : undefined}
-            onClick={onLogout}
-          >
-            <LogOut className="size-4" aria-hidden />
-            {!sidebarCollapsed && "退出登录"}
-          </Button>
-        </div>
       </aside>
 
       <div className="min-w-0">
@@ -515,7 +679,7 @@ interface DashboardProps {
 
 function Dashboard({ currentUser, onOpenM2Inbound, onOpenM4Outbound }: DashboardProps) {
   return (
-    <section className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8">
+    <section className="flex w-full flex-col gap-6 px-4 py-8 lg:px-8">
       <PageHeader title="WMS Web Admin" subtitle={`${currentUser.owner_code} / ${currentUser.display_name}`} />
 
       <div className="grid gap-4 lg:grid-cols-[18rem_1fr]">

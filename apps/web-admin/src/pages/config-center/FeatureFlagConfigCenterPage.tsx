@@ -16,13 +16,14 @@ import {
   StatusBadge,
   cn,
   type DataGridColumn,
+  type DataGridRefreshAction,
+  type DataGridToolbarAction,
 } from "@wms/ui";
-import { Archive, ArrowLeft, Database, Download, RefreshCw, Shuffle, Upload } from "lucide-react";
+import { Archive, Database, Download, Shuffle, Upload } from "lucide-react";
 
 import {
   parseFeatureFlagImportJson,
   useArchiveFeatureFlagSourceMutation,
-  useFeatureFlagReconcileQuery,
   useFeatureFlagsQuery,
   useImportFeatureFlagsMutation,
   useMigrateFeatureFlagsMutation,
@@ -71,9 +72,8 @@ const columns: DataGridColumn<FeatureFlagConfig>[] = [
   textColumn("cleanup_by", "清理期限", 140),
 ];
 
-export function FeatureFlagConfigCenterPage({ onBack }: FeatureFlagConfigCenterPageProps) {
+export function FeatureFlagConfigCenterPage({}: FeatureFlagConfigCenterPageProps) {
   const flagsQuery = useFeatureFlagsQuery();
-  const reconcileQuery = useFeatureFlagReconcileQuery();
   const migrateMutation = useMigrateFeatureFlagsMutation();
   const importMutation = useImportFeatureFlagsMutation();
   const switchMutation = useSwitchFeatureFlagSourceMutation();
@@ -85,6 +85,37 @@ export function FeatureFlagConfigCenterPage({ onBack }: FeatureFlagConfigCenterP
   const [importText, setImportText] = React.useState("");
   const flags = flagsQuery.data?.flags ?? [];
   const busy = migrateMutation.isPending || importMutation.isPending || switchMutation.isPending || archiveMutation.isPending;
+  const gridRefreshAction: DataGridRefreshAction = {
+    label: "刷新",
+    description: "刷新 Feature Flag 列表",
+    disabled: flagsQuery.isFetching,
+    onClick: () => {
+      void refreshFlags();
+    },
+  };
+  const gridToolbarActions: DataGridToolbarAction[] = [
+    {
+      key: "json-export",
+      label: "JSON",
+      description: "导出 JSON",
+      icon: <Download className="size-4" aria-hidden />,
+      disabled: !flagsQuery.data,
+      onClick: () => {
+        if (flagsQuery.data) downloadJson(flagsQuery.data);
+      },
+    },
+    {
+      key: "json-import",
+      label: "导入",
+      description: "导入 JSON",
+      icon: <Upload className="size-4" aria-hidden />,
+      disabled: busy,
+      onClick: () => {
+        setNotice(null);
+        setImportOpen(true);
+      },
+    },
+  ];
 
   async function act<T>(task: Promise<T>, success: (result: T) => string, fallback: string) {
     setNotice(null);
@@ -93,6 +124,16 @@ export function FeatureFlagConfigCenterPage({ onBack }: FeatureFlagConfigCenterP
     } catch (error) {
       setNotice({ type: "error", text: errorMessage(error, fallback) });
     }
+  }
+
+  async function refreshFlags() {
+    setNotice(null);
+    const result = await flagsQuery.refetch();
+    setNotice(
+      result.error
+        ? { type: "error", text: errorMessage(result.error, "刷新 Feature Flag 失败") }
+        : { type: "success", text: "Feature Flag 列表已刷新" },
+    );
   }
 
   async function submitImport(event: React.FormEvent<HTMLFormElement>) {
@@ -116,20 +157,10 @@ export function FeatureFlagConfigCenterPage({ onBack }: FeatureFlagConfigCenterP
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-6 py-8">
+    <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
       <PageHeader
         title="M1 配置中心 / Feature Flag"
         subtitle={`读取源：${sourceLabel(flagsQuery.data?.source ?? "unknown")} · ${flags.length} 条`}
-        actions={
-          <div className="flex flex-wrap justify-end gap-2">
-            <Button type="button" variant="outline" onClick={onBack}><ArrowLeft className="size-4" aria-hidden />返回</Button>
-            <Button type="button" variant="outline" onClick={() => { setNotice(null); void flagsQuery.refetch(); void reconcileQuery.refetch(); }} disabled={flagsQuery.isFetching || reconcileQuery.isFetching}>
-              <RefreshCw className={cn("size-4", (flagsQuery.isFetching || reconcileQuery.isFetching) && "animate-spin")} aria-hidden />刷新
-            </Button>
-            <Button type="button" variant="outline" onClick={() => downloadJson(flagsQuery.data)} disabled={!flagsQuery.data}><Download className="size-4" aria-hidden />导出 JSON</Button>
-            <Button type="button" onClick={() => { setNotice(null); setImportOpen(true); }} disabled={busy}><Upload className="size-4" aria-hidden />导入 JSON</Button>
-          </div>
-        }
       />
       <NoticePanel notice={notice} />
 
@@ -141,28 +172,17 @@ export function FeatureFlagConfigCenterPage({ onBack }: FeatureFlagConfigCenterP
               columns={columns}
               data={flags}
               rowKey={(row) => row.key}
+              caption={flagsQuery.isPending ? "加载 Feature Flag..." : undefined}
               emptyTitle={flagsQuery.isError ? "读取 Feature Flag 失败" : "暂无 Feature Flag"}
               emptyDescription={flagsQuery.isError ? errorMessage(flagsQuery.error, "请检查后端接口") : "当前导出结果为空"}
+              exportFileBaseName="M1 配置中心 Feature Flag"
+              refreshAction={gridRefreshAction}
+              toolbarActions={gridToolbarActions}
             />
           </CardContent>
         </Card>
 
         <div className="space-y-4">
-          <Card className="rounded-lg shadow-sm">
-            <CardContent className="space-y-3 p-5">
-              <h2 className="text-base font-semibold tracking-normal">对账</h2>
-              {reconcileQuery.error ? (
-                <p className="text-sm text-destructive" role="alert">{errorMessage(reconcileQuery.error, "读取对账报告失败")}</p>
-              ) : (
-                <>
-                  <Metric label="已匹配" value={reconcileQuery.data?.matched ?? 0} />
-                  <Metric label="缺失" value={reconcileQuery.data?.missing_in_config_center.length ?? 0} />
-                  <Metric label="不一致" value={reconcileQuery.data?.mismatched.length ?? 0} />
-                </>
-              )}
-            </CardContent>
-          </Card>
-
           <Card className="rounded-lg shadow-sm">
             <CardContent className="space-y-4 p-5">
               <h2 className="text-base font-semibold tracking-normal">迁移与读取源</h2>
@@ -212,10 +232,6 @@ export function FeatureFlagConfigCenterPage({ onBack }: FeatureFlagConfigCenterP
 
 function textColumn(key: keyof FeatureFlagConfig, header: string, width: number): DataGridColumn<FeatureFlagConfig> {
   return { key, header, width, minWidth: Math.max(width - 40, 100), mono: key === "key", sortable: true, sortValue: (row) => row[key], filterValue: (row) => row[key], copyValue: (row) => String(row[key]), filter: { type: "text" } };
-}
-
-function Metric({ label, value }: { label: string; value: number }) {
-  return <div className="flex items-center justify-between border-t pt-3 text-sm"><span className="text-muted-foreground">{label}</span><span className="font-medium">{value}</span></div>;
 }
 
 function NoticePanel({ notice }: { notice: Notice }) {
