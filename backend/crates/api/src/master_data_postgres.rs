@@ -19,6 +19,7 @@ use crate::{
 };
 
 const SPECIAL_DRUG_CATEGORY_DICT: &str = "special_drug_category";
+const LOCATION_TYPE_DICT: &str = "location_type";
 const LOCATION_BATCH_MAX_COUNT: i32 = 500;
 
 #[derive(Clone, Debug)]
@@ -373,7 +374,6 @@ impl PgMasterDataReadRepository {
         now: DateTime<Utc>,
         idempotency_key: &str,
     ) -> Result<LocationListResponse, MasterDataError> {
-        let drafts = location_drafts(ctx.owner_id, &req, now)?;
         let request_hash = request_hash(&json!({
             "path": "/api/v1/master-data/locations/batch-create",
             "request": &req,
@@ -388,6 +388,15 @@ impl PgMasterDataReadRepository {
 
         ensure_warehouse_zone_in_owner(&mut tx, ctx.owner_id, req.warehouse_id, req.zone_id)
             .await?;
+        ensure_enabled_dictionary_item(
+            &mut tx,
+            ctx.owner_id,
+            LOCATION_TYPE_DICT,
+            &req.location_type,
+            now,
+        )
+        .await?;
+        let drafts = location_drafts(ctx.owner_id, &req, now)?;
         let location_codes = drafts
             .iter()
             .map(|location| location.location_code.clone())
@@ -547,10 +556,7 @@ fn location_drafts(
         && req.layer_end <= 99
         && req.max_volume_cm3 >= 0
         && req.max_sku_count > 0
-        && matches!(
-            req.location_type.as_str(),
-            "storage" | "case_pick" | "piece_pick"
-        )
+        && !req.location_type.trim().is_empty()
         && area_code.len() == 3
         && area_code.chars().all(|item| item.is_ascii_alphanumeric());
     if !valid_range {
@@ -589,6 +595,56 @@ fn location_drafts(
         }
     }
     Ok(locations)
+}
+
+async fn ensure_enabled_dictionary_item(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    dict_code: &str,
+    item_code: &str,
+    now: DateTime<Utc>,
+) -> Result<(), MasterDataError> {
+    let exists: bool = sqlx::query_scalar(
+        r#"
+        WITH scoped_items AS (
+            SELECT
+                item.enabled,
+                ROW_NUMBER() OVER (
+                    PARTITION BY item.item_code
+                    ORDER BY
+                        CASE WHEN item.owner_id = $2 THEN 1 ELSE 0 END DESC,
+                        item.updated_at DESC
+                ) AS scope_rank
+              FROM system_dictionary_items item
+              JOIN system_dictionary_categories category
+                ON category.dict_code = item.dict_code
+               AND category.enabled = TRUE
+             WHERE item.dict_code = $1
+               AND item.item_code = $3
+               AND (item.owner_id IS NULL OR item.owner_id = $2)
+               AND (item.effective_from IS NULL OR item.effective_from <= $4)
+               AND (item.effective_to IS NULL OR item.effective_to > $4)
+        )
+        SELECT EXISTS (
+            SELECT 1
+              FROM scoped_items
+             WHERE scope_rank = 1
+               AND enabled = TRUE
+        )
+        "#,
+    )
+    .bind(dict_code)
+    .bind(owner_id)
+    .bind(item_code)
+    .bind(now)
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(map_db_error)?;
+    if exists {
+        Ok(())
+    } else {
+        Err(MasterDataError::InvalidLocationBatchRange)
+    }
 }
 
 async fn ensure_warehouse_zone_in_owner(

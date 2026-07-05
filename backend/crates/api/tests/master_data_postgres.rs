@@ -556,6 +556,49 @@ async fn location_batch_create_rejects_batches_over_limit(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn location_batch_create_rejects_disabled_location_type_dictionary_item(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let (warehouse_id, zone_id) = seed_warehouse_zone(&pool, owner_id).await;
+    sqlx::query(
+        "UPDATE system_dictionary_items SET enabled = FALSE WHERE dict_code = 'location_type' AND item_code = 'storage' AND owner_id IS NULL",
+    )
+    .execute(&pool)
+    .await
+    .expect("disable location type dictionary item");
+    let token = writer_token(owner_id);
+    let app = master_data_router(MasterDataAppState::with_postgres(pool.clone())).layer(
+        auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(AllowAllRevocationStore))),
+    );
+
+    let response = app
+        .oneshot(batch_create_request(
+            &token,
+            Some("loc-disabled-type"),
+            json!({
+                "warehouse_id": warehouse_id,
+                "zone_id": zone_id,
+                "area_code": "D01",
+                "row_start": 1,
+                "row_end": 1,
+                "column_start": 1,
+                "column_end": 1,
+                "layer_start": 1,
+                "layer_end": 1,
+                "max_volume_cm3": 1_000,
+                "max_sku_count": 1,
+                "location_type": "storage",
+                "bound_owner_id": null
+            }),
+        ))
+        .await
+        .expect("router should respond");
+
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let error = error_response(response).await;
+    assert_eq!(error.code, "M1_LOCATION_BATCH_INVALID");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn location_batch_create_replays_same_idempotency_key_without_duplicates(pool: PgPool) {
     let owner_id = Uuid::new_v4();
     let (warehouse_id, zone_id) = seed_warehouse_zone(&pool, owner_id).await;

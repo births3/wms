@@ -26,6 +26,7 @@
 7. 库位状态：可用/占用/锁定/停用
 8. **批量创建库位**：指定区域编码 + 排范围 + 列范围 + 层范围，系统自动生成所有组合（如区域 A01，排 01-10，列 01-05，层 01-03 → 生成 150 个库位）；批量创建时可统一设置库位类型、最大容积、最大 SKU 数
 9. 仓库/库位变更写入审计追踪
+10. **系统字典边界**：库区和库位仍是主数据实体，由 M1 库区管理 / 库位管理维护；系统字典只维护库区 / 库位属性枚举，包括 `temperature_zone`（库区温区）、`quality_color`（库区色标）、`zone_type`（库区类型）和 `location_type`（库位类型）。
 
 ---
 
@@ -297,6 +298,8 @@
 16. **首批单据类型字典**：`dict_code = document_type`，`scope_mode = owner_override`，首批预置 `purchase_inbound`（采购入库）、`sales_return`（销售退货入库）、`purchase_return_outbound`（采购退货出库）、`sales_outbound`（销售出库）。
 17. **单据类型参数**：`document_type` 字典项必须绑定 `direction`、`workflow_template`、`batch_policy`；三者只能选择系统预置模板或策略，运营不能通过新增字典项创建新流程。
 18. **单据类型接入规则**：M2 入库和 M4 出库创建业务单据时必须校验 `document_type` 存在、启用、在生效期内、作用域匹配、参数有效；不满足时拒绝创建。
+19. **首批库区 / 库位属性字典**：系统预置 `temperature_zone`（库区温区：`normal` / `cool` / `cold` / `frozen`）、`quality_color`（库区色标：`qualified_green` / `quarantine_yellow` / `unqualified_red`）、`zone_type`（库区类型：`storage` / `receiving` / `return` / `unqualified` / `shipping`）和 `location_type`（库位类型：`storage` / `case_pick` / `piece_pick`）。
+20. **库区实体边界**：`zone_type` 是库区类型字典，不代替库区实体表；库区编码、名称、仓库归属、容量和库位集合仍在 M1 库区管理中维护。
 
 ---
 
