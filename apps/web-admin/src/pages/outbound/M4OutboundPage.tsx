@@ -1,8 +1,6 @@
 import * as React from "react";
 import {
   Button,
-  Card,
-  CardContent,
   DataGrid,
   Dialog,
   DialogClose,
@@ -13,11 +11,19 @@ import {
   DialogTitle,
   Input,
   PageHeader,
+  QueryPanel,
   StatusBadge,
+  buildQueryPanelSummaryItems,
   type DataGridColumn,
+  type DataGridCreateAction,
+  type DataGridDetailAction,
+  type DataGridRefreshAction,
+  type QueryPanelField,
+  type QueryPanelRangeValue,
+  type QueryPanelValue,
   type StatusKey,
 } from "@wms/ui";
-import { ArrowLeft, CheckCircle2, ClipboardCheck, Eye, Plus, Printer, RefreshCw, Truck } from "lucide-react";
+import { CheckCircle2, ClipboardCheck, Eye, Printer, Truck } from "lucide-react";
 
 import {
   M4OutboundDetailDialog,
@@ -96,13 +102,50 @@ const seedReturns: PurchaseReturnOrder[] = [
   },
 ];
 
-export function M4OutboundPage({ mode, onBack }: M4OutboundPageProps) {
+const m4OutboundStatusOptions = [
+  { value: "draft", label: "草稿" },
+  { value: "pending_validation", label: "待校验" },
+  { value: "validation_exception", label: "校验异常" },
+  { value: "confirmed", label: "已确认" },
+  { value: "void_requested", label: "作废申请中" },
+  { value: "in_wave", label: "已进波次" },
+  { value: "inventory_locked", label: "库存锁定" },
+  { value: "released", label: "已下发" },
+  { value: "reviewed", label: "已复核" },
+  { value: "shipped", label: "已发货" },
+  { value: "pending_approval", label: "待审批" },
+  { value: "approved", label: "已审批" },
+  { value: "picking", label: "拣货中" },
+  { value: "cancelled", label: "已取消" },
+];
+
+const m4OutboundQueryFields: QueryPanelField[] = [
+  {
+    key: "keyword",
+    label: "关键字",
+    type: "text",
+    placeholder: "单号 / 商品 / 批号 / 客商",
+  },
+  {
+    key: "statusFilter",
+    label: "状态",
+    type: "multiSelect",
+    options: m4OutboundStatusOptions,
+  },
+  {
+    key: "businessDate",
+    label: "业务日期",
+    type: "dateRange",
+  },
+];
+const m4OutboundCoreQueryFieldKeys = ["keyword", "statusFilter"];
+
+export function M4OutboundPage({ mode }: M4OutboundPageProps) {
   const [orders, setOrders] = React.useState<OutboundOrder[]>(seedOrders);
   const [waves, setWaves] = React.useState<OutboundWave[]>(seedWaves);
   const [returns, setReturns] = React.useState<PurchaseReturnOrder[]>(seedReturns);
-  const [keyword, setKeyword] = React.useState("");
-  const [statusFilter, setStatusFilter] = React.useState("all");
-  const [dateFilter, setDateFilter] = React.useState("");
+  const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(() => defaultM4OutboundQueryValue());
+  const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(() => defaultM4OutboundQueryValue());
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [detailOpen, setDetailOpen] = React.useState(false);
   const [detailTarget, setDetailTarget] = React.useState<DetailTarget | null>(null);
@@ -122,9 +165,9 @@ export function M4OutboundPage({ mode, onBack }: M4OutboundPageProps) {
 
   React.useEffect(() => {
     setSelectedId(null);
-    setStatusFilter("all");
-    setKeyword("");
-    setDateFilter("");
+    const next = defaultM4OutboundQueryValue();
+    setDraftQuery(next);
+    setAppliedQuery(next);
     setLastEvent(null);
   }, [mode]);
 
@@ -166,12 +209,49 @@ export function M4OutboundPage({ mode, onBack }: M4OutboundPageProps) {
     { key: "actions", header: "操作", align: "right", minWidth: 360, filter: false, sortable: false, copyable: false, hideable: false, render: (row) => <ReturnActions row={row} onDetail={openReturnDetail} onAction={openAction} /> },
   ];
 
-  const filteredOrders = filterOrders(orders, keyword, statusFilter, dateFilter, mode);
-  const filteredWaves = filterWaves(waves, keyword, statusFilter);
-  const filteredReturns = filterReturns(returns, keyword, statusFilter);
+  const normalizedQuery = normalizeM4OutboundQueryValue(appliedQuery);
+  const filteredOrders = filterOrders(orders, normalizedQuery, mode);
+  const filteredWaves = filterWaves(waves, normalizedQuery);
+  const filteredReturns = filterReturns(returns, normalizedQuery);
+  const querySummaryItems = React.useMemo(
+    () => buildQueryPanelSummaryItems(m4OutboundQueryFields, appliedQuery),
+    [appliedQuery],
+  );
+  const createActionKind = meta.createAction;
+  const gridRefreshAction: DataGridRefreshAction = {
+    label: "刷新",
+    description: `刷新${meta.title}列表`,
+    onClick: refreshOutbound,
+  };
+  const gridCreateAction: DataGridCreateAction | undefined = createActionKind
+    ? {
+        label: "新增",
+        description: meta.createLabel,
+        onClick: () => openAction(createActionKind),
+      }
+    : undefined;
+  const gridDetailAction: DataGridDetailAction = {
+    label: "详情",
+    description: "查看选中单据详情",
+    disabled: ({ selectedRowKeys }) => selectedRowKeys.length !== 1,
+    onClick: ({ selectedRowKeys }) => openSelectedDetail(selectedRowKeys[0]),
+  };
 
   function refreshOutbound() {
     setLastEvent(`${meta.title}已刷新`);
+  }
+
+  function openSelectedDetail(id?: string) {
+    if (!id) return;
+    if (mode === "waves") {
+      openWaveDetail(id);
+      return;
+    }
+    if (mode === "returns") {
+      openReturnDetail(id);
+      return;
+    }
+    openOrderDetail(id);
   }
 
   function openOrderDetail(id: string) {
@@ -265,18 +345,10 @@ export function M4OutboundPage({ mode, onBack }: M4OutboundPageProps) {
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 px-6 py-8">
+    <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
       <PageHeader
         title={meta.title}
         subtitle={meta.subtitle}
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" onClick={refreshOutbound}><RefreshCw className="size-4" aria-hidden />刷新</Button>
-            <Button type="button" variant="outline" onClick={() => globalThis.print()}><Printer className="size-4" aria-hidden />打印</Button>
-            {meta.createAction && <Button type="button" onClick={() => openAction(meta.createAction!)}><Plus className="size-4" aria-hidden />{meta.createLabel}</Button>}
-            <Button type="button" variant="outline" onClick={onBack}><ArrowLeft className="size-4" aria-hidden />返回工作台</Button>
-          </div>
-        }
       />
       {lastEvent && (
         <div
@@ -287,31 +359,119 @@ export function M4OutboundPage({ mode, onBack }: M4OutboundPageProps) {
         </div>
       )}
 
-      <div className="grid gap-3 md:grid-cols-4">
-        {meta.metrics.map((metric) => <Metric key={metric.label} label={metric.label} value={metric.value({ orders, waves, returns })} tone={metric.tone} />)}
-      </div>
-
-      <FilterBar
-        keyword={keyword}
-        statusFilter={statusFilter}
-        dateFilter={dateFilter}
-        mode={mode}
-        onKeywordChange={setKeyword}
-        onStatusFilterChange={setStatusFilter}
-        onDateFilterChange={setDateFilter}
+      <QueryPanel
+        fields={m4OutboundQueryFields}
+        defaultVisibleFieldKeys={m4OutboundCoreQueryFieldKeys}
+        value={draftQuery}
+        onValueChange={(next) => setDraftQuery(normalizeM4OutboundQueryValue(next))}
+        onQuery={() => {
+          setAppliedQuery(normalizeM4OutboundQueryValue(draftQuery));
+          setLastEvent(`${meta.title}已查询`);
+        }}
         onReset={() => {
-          setKeyword("");
-          setStatusFilter("all");
-          setDateFilter("");
+          const next = defaultM4OutboundQueryValue();
+          setDraftQuery(next);
+          setAppliedQuery(next);
+          setSelectedId(null);
         }}
       />
 
       {mode === "waves" ? (
-        <DataGrid storageKey="m4.outbound.waves" columns={waveColumns} data={filteredWaves} rowKey={(row) => row.id} selectedKey={selectedId ?? undefined} onRowClick={(row) => setSelectedId(row.id)} emptyTitle="暂无波次" />
+        <DataGrid
+          storageKey="m4.outbound.waves"
+          columns={waveColumns}
+          data={filteredWaves}
+          rowKey={(row) => row.id}
+          selectedKey={selectedId ?? undefined}
+          selectedRowKeys={selectedId ? [selectedId] : []}
+          onSelectedRowKeysChange={(keys) => setSelectedId(keys.at(-1) ?? null)}
+          onRowClick={(row) => setSelectedId(row.id)}
+          emptyTitle="暂无波次"
+          exportFileBaseName={meta.title}
+          refreshAction={gridRefreshAction}
+          createAction={gridCreateAction}
+          detailAction={gridDetailAction}
+          printAction={{ label: "打印", description: `打印${meta.title}` }}
+          queryState={appliedQuery}
+          querySummaryItems={querySummaryItems}
+          onApplyQueryState={(queryState) => {
+            const next = normalizeM4OutboundQueryValue(queryValueFromUnknown(queryState));
+            setDraftQuery(next);
+            setAppliedQuery(next);
+            setSelectedId(null);
+          }}
+          onClearQueryState={() => {
+            const next = defaultM4OutboundQueryValue();
+            setDraftQuery(next);
+            setAppliedQuery(next);
+            setSelectedId(null);
+          }}
+          selectable
+        />
       ) : mode === "returns" ? (
-        <DataGrid storageKey="m4.outbound.returns" columns={returnColumns} data={filteredReturns} rowKey={(row) => row.id} selectedKey={selectedId ?? undefined} onRowClick={(row) => setSelectedId(row.id)} emptyTitle="暂无采购退货单" />
+        <DataGrid
+          storageKey="m4.outbound.returns"
+          columns={returnColumns}
+          data={filteredReturns}
+          rowKey={(row) => row.id}
+          selectedKey={selectedId ?? undefined}
+          selectedRowKeys={selectedId ? [selectedId] : []}
+          onSelectedRowKeysChange={(keys) => setSelectedId(keys.at(-1) ?? null)}
+          onRowClick={(row) => setSelectedId(row.id)}
+          emptyTitle="暂无采购退货单"
+          exportFileBaseName={meta.title}
+          refreshAction={gridRefreshAction}
+          createAction={gridCreateAction}
+          detailAction={gridDetailAction}
+          printAction={{ label: "打印", description: `打印${meta.title}` }}
+          queryState={appliedQuery}
+          querySummaryItems={querySummaryItems}
+          onApplyQueryState={(queryState) => {
+            const next = normalizeM4OutboundQueryValue(queryValueFromUnknown(queryState));
+            setDraftQuery(next);
+            setAppliedQuery(next);
+            setSelectedId(null);
+          }}
+          onClearQueryState={() => {
+            const next = defaultM4OutboundQueryValue();
+            setDraftQuery(next);
+            setAppliedQuery(next);
+            setSelectedId(null);
+          }}
+          selectable
+        />
       ) : (
-        <DataGrid storageKey={`m4.outbound.${mode}`} columns={orderColumns} data={filteredOrders} rowKey={(row) => row.id} selectedKey={selectedId ?? undefined} onRowClick={(row) => setSelectedId(row.id)} emptyTitle="暂无出库单" />
+        <DataGrid
+          storageKey={`m4.outbound.${mode}`}
+          columns={orderColumns}
+          data={filteredOrders}
+          rowKey={(row) => row.id}
+          selectedKey={selectedId ?? undefined}
+          selectedRowKeys={selectedId ? [selectedId] : []}
+          onSelectedRowKeysChange={(keys) => setSelectedId(keys.at(-1) ?? null)}
+          onRowClick={(row) => setSelectedId(row.id)}
+          emptyTitle="暂无出库单"
+          exportFileBaseName={meta.title}
+          refreshAction={gridRefreshAction}
+          createAction={gridCreateAction}
+          detailAction={gridDetailAction}
+          printAction={{ label: "打印", description: `打印${meta.title}` }}
+          queryState={appliedQuery}
+          querySummaryItems={querySummaryItems}
+          onApplyQueryState={(queryState) => {
+            const next = normalizeM4OutboundQueryValue(queryValueFromUnknown(queryState));
+            setDraftQuery(next);
+            setAppliedQuery(next);
+            setSelectedId(null);
+          }}
+          onClearQueryState={() => {
+            const next = defaultM4OutboundQueryValue();
+            setDraftQuery(next);
+            setAppliedQuery(next);
+            setSelectedId(null);
+          }}
+          selectable
+        />
       )}
 
       <ActionDialog
@@ -402,57 +562,12 @@ function ActionDialog({ action, createForm, note, setCreateForm, setNote, onClos
   );
 }
 
-function FilterBar({ keyword, statusFilter, dateFilter, mode, onKeywordChange, onStatusFilterChange, onDateFilterChange, onReset }: {
-  keyword: string;
-  statusFilter: string;
-  dateFilter: string;
-  mode: M4OutboundMode;
-  onKeywordChange: (value: string) => void;
-  onStatusFilterChange: (value: string) => void;
-  onDateFilterChange: (value: string) => void;
-  onReset: () => void;
-}) {
-  return (
-    <Card className="rounded-lg shadow-sm">
-      <CardContent className="grid gap-3 p-4 md:grid-cols-[minmax(18rem,1fr)_10rem_9rem_auto] md:items-end">
-        <TextField label="关键字" value={keyword} onChange={onKeywordChange} placeholder={keywordPlaceholder(mode)} />
-        <div>
-          <label className="mb-1 block text-xs text-muted-foreground">状态</label>
-          <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={statusFilter} onChange={(event) => onStatusFilterChange(event.target.value)}>
-            <option value="all">全部</option>
-            {statusOptions(mode).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </select>
-        </div>
-        <TextField label="日期" type="date" value={dateFilter} onChange={onDateFilterChange} />
-        <Button type="button" variant="outline" onClick={onReset}>重置</Button>
-      </CardContent>
-    </Card>
-  );
-}
-
 function TextField({ label, value, onChange, type = "text", placeholder, className }: { label: string; value: string; onChange: (value: string) => void; type?: string; placeholder?: string; className?: string }) {
   return (
     <label className={className}>
       <span className="mb-1 block text-xs text-muted-foreground">{label}</span>
       <Input type={type} value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
     </label>
-  );
-}
-
-function keywordPlaceholder(mode: M4OutboundMode) {
-  if (mode === "returns") return "采购退货单 / 原采购入库单 / 商品 / 供应商";
-  return "单号 / 商品 / 批号 / 客户";
-}
-
-function Metric({ label, value, tone }: { label: string; value: number; tone: "primary" | "warning" | "success" | "muted" }) {
-  const toneClass = { primary: "text-primary", warning: "text-wms-warning", success: "text-wms-success", muted: "text-foreground" }[tone];
-  return (
-    <Card className="rounded-lg shadow-sm">
-      <CardContent className="p-4">
-        <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        <p className={`mt-2 text-2xl font-semibold tracking-normal ${toneClass}`}>{value}</p>
-      </CardContent>
-    </Card>
   );
 }
 
@@ -524,46 +639,13 @@ function StaticField({ label, defaultValue }: { label: string; defaultValue: str
 }
 
 function pageMeta(mode: M4OutboundMode) {
-  const metrics = {
-    orders: [
-      metric("待校验", (data: StateData) => countOrders(data.orders, "pending_validation"), "primary"),
-      metric("校验异常", (data: StateData) => countOrders(data.orders, "validation_exception"), "warning"),
-      metric("已确认", (data: StateData) => countOrders(data.orders, "confirmed"), "success"),
-      metric("本页合计", (data: StateData) => data.orders.length, "muted"),
-    ],
-    waves: [
-      metric("待下发", (data: StateData) => countWaves(data.waves, "draft"), "primary"),
-      metric("库存锁定", (data: StateData) => countWaves(data.waves, "inventory_locked"), "warning"),
-      metric("已下发", (data: StateData) => countWaves(data.waves, "released"), "success"),
-      metric("本页合计", (data: StateData) => data.waves.length, "muted"),
-    ],
-    review: [
-      metric("待复核", (data: StateData) => countOrders(data.orders, "inventory_locked"), "primary"),
-      metric("待打印", (data: StateData) => countOrders(data.orders, "reviewed"), "warning"),
-      metric("已发货", (data: StateData) => countOrders(data.orders, "shipped"), "success"),
-      metric("本页合计", (data: StateData) => data.orders.length, "muted"),
-    ],
-    returns: [
-      metric("待审批", (data: StateData) => countReturns(data.returns, "pending_approval"), "primary"),
-      metric("拣货中", (data: StateData) => countReturns(data.returns, "picking"), "warning"),
-      metric("已发货", (data: StateData) => countReturns(data.returns, "shipped"), "success"),
-      metric("本页合计", (data: StateData) => data.returns.length, "muted"),
-    ],
-  } satisfies Record<M4OutboundMode, MetricMeta[]>;
   const map = {
     orders: { title: "M4 出库订单管理", subtitle: "订单校验 · 双单号 · 作废申请", createAction: "create-order" as const, createLabel: "新建出库单" },
     waves: { title: "M4 波次规划", subtitle: "波次合并 · 库存锁定 · 路径策略", createAction: "create-wave" as const, createLabel: "新建波次" },
     review: { title: "M4 复核发货", subtitle: "包装站复核 · 打印 · 发货交接", createAction: null, createLabel: "" },
     returns: { title: "M4 采购退货出库", subtitle: "退供应商申请 · 审批 · 拣货复核 · 出库交接", createAction: "create-return" as const, createLabel: "新建采购退货单" },
   };
-  return { ...map[mode], metrics: metrics[mode] };
-}
-
-interface StateData { orders: OutboundOrder[]; waves: OutboundWave[]; returns: PurchaseReturnOrder[] }
-interface MetricMeta { label: string; value: (data: StateData) => number; tone: "primary" | "warning" | "success" | "muted" }
-
-function metric(label: string, value: (data: StateData) => number, tone: MetricMeta["tone"]): MetricMeta {
-  return { label, value, tone };
+  return map[mode];
 }
 
 function actionMeta(kind: ActionKind) {
@@ -599,25 +681,79 @@ function statusKey(status: string): StatusKey {
   return "pending";
 }
 
-function filterOrders(orders: OutboundOrder[], keyword: string, status: string, date: string, mode: M4OutboundMode) {
+function defaultM4OutboundQueryValue(): QueryPanelValue {
+  return {
+    keyword: "",
+    statusFilter: [],
+    businessDate: { from: "", to: "" },
+  };
+}
+
+function normalizeM4OutboundQueryValue(value: QueryPanelValue): QueryPanelValue {
+  return {
+    keyword: queryString(value.keyword),
+    statusFilter: queryStringArray(value.statusFilter),
+    businessDate: queryRange(value.businessDate),
+  };
+}
+
+function filterOrders(orders: OutboundOrder[], query: QueryPanelValue, mode: M4OutboundMode) {
   const allowed = mode === "review" ? new Set(["inventory_locked", "reviewed", "shipped"]) : null;
+  const keyword = queryString(query.keyword);
+  const statuses = new Set(queryStringArray(query.statusFilter));
+  const businessDate = queryRange(query.businessDate);
   return orders.filter((order) => {
-    const searchable = [order.wms_order_no, order.erp_order_no ?? "", order.status, ...order.lines.flatMap((line) => [line.product_code, line.batch_no])].join(" ").toLowerCase();
-    return (!allowed || allowed.has(order.status)) && matches(searchable, keyword) && (status === "all" || order.status === status) && (!date || order.required_ship_at?.slice(0, 10) === date);
+    const searchable = [order.wms_order_no, order.erp_order_no ?? "", order.customer_id, order.status, ...order.lines.flatMap((line) => [line.product_code, line.batch_no])].join(" ").toLowerCase();
+    return (!allowed || allowed.has(order.status)) && matches(searchable, keyword) && matchesStatus(order.status, statuses) && dateInRange(order.required_ship_at, businessDate);
   });
 }
 
-function filterWaves(waves: OutboundWave[], keyword: string, status: string) {
-  return waves.filter((wave) => matches(`${wave.wave_no} ${wave.status}`.toLowerCase(), keyword) && (status === "all" || wave.status === status));
+function filterWaves(waves: OutboundWave[], query: QueryPanelValue) {
+  const keyword = queryString(query.keyword);
+  const statuses = new Set(queryStringArray(query.statusFilter));
+  const businessDate = queryRange(query.businessDate);
+  return waves.filter((wave) => matches(`${wave.wave_no} ${wave.status}`.toLowerCase(), keyword) && matchesStatus(wave.status, statuses) && dateInRange(wave.created_at, businessDate));
 }
 
-function filterReturns(returns: PurchaseReturnOrder[], keyword: string, status: string) {
-  return returns.filter((item) => matches(`${item.return_no} ${item.document_type} ${item.source_purchase_order_no} ${item.supplier_name} ${item.reason} ${item.product_code} ${item.approval_source}`.toLowerCase(), keyword) && (status === "all" || item.status === status));
+function filterReturns(returns: PurchaseReturnOrder[], query: QueryPanelValue) {
+  const keyword = queryString(query.keyword);
+  const statuses = new Set(queryStringArray(query.statusFilter));
+  const businessDate = queryRange(query.businessDate);
+  return returns.filter((item) => matches(`${item.return_no} ${item.document_type} ${item.source_purchase_order_no} ${item.supplier_name} ${item.reason} ${item.product_code} ${item.approval_source}`.toLowerCase(), keyword) && matchesStatus(item.status, statuses) && dateInRange(item.created_at, businessDate));
 }
 
 function matches(searchable: string, keyword: string) {
   const normalized = keyword.trim().toLowerCase();
   return !normalized || searchable.includes(normalized);
+}
+
+function matchesStatus(status: string, statuses: Set<string>) {
+  return statuses.size === 0 || statuses.has(status);
+}
+
+function queryString(value: QueryPanelValue[string]) {
+  return typeof value === "string" ? value : "";
+}
+
+function queryStringArray(value: QueryPanelValue[string]) {
+  return Array.isArray(value) ? value.filter((item) => typeof item === "string") : [];
+}
+
+function queryRange(value: QueryPanelValue[string]): QueryPanelRangeValue {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return { from: "", to: "" };
+  return {
+    from: typeof value.from === "string" ? value.from : "",
+    to: typeof value.to === "string" ? value.to : "",
+  };
+}
+
+function queryValueFromUnknown(value: unknown): QueryPanelValue {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as QueryPanelValue) : {};
+}
+
+function dateInRange(value: string | null | undefined, range: QueryPanelRangeValue) {
+  const date = value?.slice(0, 10) ?? "";
+  return (!range.from || date >= range.from) && (!range.to || date <= range.to);
 }
 
 function makeOrder(id: string, wmsNo: string, erpNo: string, status: string, qty: number, shortPick: boolean, now = "2026-06-27T09:00:00.000Z"): OutboundOrder {
@@ -658,18 +794,6 @@ function makeReturn(returnNo: string): PurchaseReturnOrder {
     created_at: now,
     updated_at: now,
   };
-}
-
-function countOrders(orders: OutboundOrder[], status: string) {
-  return orders.filter((order) => order.status === status).length;
-}
-
-function countWaves(waves: OutboundWave[], status: string) {
-  return waves.filter((wave) => wave.status === status).length;
-}
-
-function countReturns(returns: PurchaseReturnOrder[], status: string) {
-  return returns.filter((item) => item.status === status).length;
 }
 
 function totalPlannedQty(order: OutboundOrder) {

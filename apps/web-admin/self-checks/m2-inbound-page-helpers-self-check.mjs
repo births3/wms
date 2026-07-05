@@ -24,11 +24,11 @@ try {
   assert.equal(ownerLabel(ownerA, ownerContext), "PY_OWNER");
   assert.equal(ownerLabel(ownerB, ownerContext), "11111111");
   assert.deepEqual(
-    filterOrders(orders, "", [], [], "", "", "", "PY_OWNER", ownerContext).map((item) => item.receipt_no),
+    filterOrders(orders, "", [], [], "", "", "", "", "PY_OWNER", ownerContext).map((item) => item.receipt_no),
     ["ASN-A"],
   );
   assert.deepEqual(
-    filterOrders(orders, "", [], [], "", "", "", "11111111", ownerContext).map((item) => item.receipt_no),
+    filterOrders(orders, "", [], [], "", "", "", "", "11111111", ownerContext).map((item) => item.receipt_no),
     ["ASN-B"],
   );
   assert.equal(createAsnBatchNo("purchase_inbound", "BATCH-001"), null);

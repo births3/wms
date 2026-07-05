@@ -1,6 +1,12 @@
 import * as React from "react";
-import { Button, PageHeader } from "@wms/ui";
-import { ArrowLeft } from "lucide-react";
+import {
+  PageHeader,
+  QueryPanel,
+  buildQueryPanelSummaryItems,
+  type QueryPanelField,
+  type QueryPanelRangeValue,
+  type QueryPanelValue,
+} from "@wms/ui";
 
 import {
   useCreateReceivingOrderMutation,
@@ -41,11 +47,11 @@ import {
   temperatureControlFromProductAttribute,
   toInteger,
   totalExpectedQty,
+  type M2InboundQueryValue,
   type M2InboundMode,
   type OwnerContext,
+  type StatusFilter,
 } from "./m2-inbound-page-helpers";
-import { M2InboundFilterBar, type StatusFilter } from "./M2InboundFilterBar";
-import { M2InboundMetrics } from "./M2InboundMetrics";
 import { M2InboundOrderTable } from "./M2InboundOrderTable";
 
 export type { M2InboundMode } from "./m2-inbound-page-helpers";
@@ -61,17 +67,66 @@ const secondSignerId = "00000000-0000-0000-0000-000000000102";
 const defaultWarehouseId = "00000000-0000-0000-0000-000000003001";
 const defaultLocationId = "00000000-0000-0000-0000-000000000201";
 const defaultLocationCode = "A-01-01";
+const m2InboundQueryFields: QueryPanelField[] = [
+  {
+    key: "keyword",
+    label: "关键字",
+    type: "text",
+    placeholder: "ASN / 商品 / 批号 / 单据类型",
+  },
+  {
+    key: "ownerKeyword",
+    label: "货主",
+    type: "text",
+    placeholder: "货主编码 / ID",
+  },
+  {
+    key: "documentTypeFilter",
+    label: "单据类型",
+    type: "multiSelect",
+    options: [
+      { value: "purchase_inbound", label: "采购入库" },
+      { value: "sales_return", label: "销售退货" },
+    ],
+  },
+  {
+    key: "statusFilter",
+    label: "状态",
+    type: "multiSelect",
+    options: [
+      { value: "receiving", label: "待收货/收货中" },
+      { value: "inspecting", label: "验收中" },
+      { value: "putaway", label: "上架中" },
+      { value: "completed", label: "已完成" },
+      { value: "closed_rejected", label: "已关闭(拒收)" },
+    ],
+  },
+  {
+    key: "arrivalDate",
+    label: "预计到货",
+    type: "dateRange",
+  },
+  {
+    key: "createdAt",
+    label: "创建时间",
+    type: "dateRange",
+  },
+];
+const m2InboundCoreQueryFieldKeys = ["keyword", "ownerKeyword", "statusFilter"];
 
-export function M2InboundPage({ mode, currentOwner, onBack }: M2InboundPageProps) {
+export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
   const ordersQuery = useReceivingOrdersQuery();
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
-  const [keyword, setKeyword] = React.useState("");
-  const [ownerKeyword, setOwnerKeyword] = React.useState(currentOwner.ownerCode);
-  const [documentTypeFilter, setDocumentTypeFilter] = React.useState<InboundDocumentTypeFilter>([]);
-  const [statusFilter, setStatusFilter] = React.useState<StatusFilter>(() => defaultStatusFilter(mode));
-  const [arrivalDate, setArrivalDate] = React.useState("");
-  const [createdAtFrom, setCreatedAtFrom] = React.useState(() => defaultCreatedDateRange().from);
-  const [createdAtTo, setCreatedAtTo] = React.useState(() => defaultCreatedDateRange().to);
+  const defaultQuery = React.useMemo(
+    () => defaultM2InboundQueryValue(mode, currentOwner),
+    [mode, currentOwner.ownerCode, currentOwner.ownerId],
+  );
+  const [draftQuery, setDraftQuery] = React.useState<M2InboundQueryValue>(() =>
+    defaultM2InboundQueryValue(mode, currentOwner),
+  );
+  const [appliedQuery, setAppliedQuery] = React.useState<M2InboundQueryValue>(() =>
+    defaultM2InboundQueryValue(mode, currentOwner),
+  );
   const [activeDialog, setActiveDialog] = React.useState<InboundDialog | null>(null);
   const [detailOpen, setDetailOpen] = React.useState(false);
   const [lastEvent, setLastEvent] = React.useState<string | null>(null);
@@ -158,16 +213,21 @@ export function M2InboundPage({ mode, currentOwner, onBack }: M2InboundPageProps
     () =>
       filterOrders(
         ordersQuery.data ?? [],
-        keyword,
-        documentTypeFilter,
-        statusFilter,
-        arrivalDate,
-        createdAtFrom,
-        createdAtTo,
-        ownerKeyword,
+        appliedQuery.keyword,
+        appliedQuery.documentTypeFilter,
+        appliedQuery.statusFilter,
+        appliedQuery.arrivalDate.from ?? "",
+        appliedQuery.arrivalDate.to ?? "",
+        appliedQuery.createdAt.from ?? "",
+        appliedQuery.createdAt.to ?? "",
+        appliedQuery.ownerKeyword,
         currentOwner,
       ),
-    [ordersQuery.data, keyword, documentTypeFilter, statusFilter, arrivalDate, createdAtFrom, createdAtTo, ownerKeyword, currentOwner],
+    [ordersQuery.data, appliedQuery, currentOwner],
+  );
+  const m2QuerySummaryItems = React.useMemo(
+    () => buildQueryPanelSummaryItems(m2InboundQueryFields, appliedQuery),
+    [appliedQuery],
   );
 
   React.useEffect(() => {
@@ -176,20 +236,11 @@ export function M2InboundPage({ mode, currentOwner, onBack }: M2InboundPageProps
   }, [orders, selectedId]);
 
   React.useEffect(() => {
-    setStatusFilter(defaultStatusFilter(mode));
-    setKeyword("");
-    setOwnerKeyword(currentOwner.ownerCode);
-    setDocumentTypeFilter([]);
-    setArrivalDate("");
-    resetCreatedDateRange();
+    const next = defaultM2InboundQueryValue(mode, currentOwner);
+    setDraftQuery(next);
+    setAppliedQuery(next);
     setLastEvent(null);
-  }, [mode, currentOwner.ownerCode]);
-
-  function resetCreatedDateRange() {
-    const range = defaultCreatedDateRange();
-    setCreatedAtFrom(range.from);
-    setCreatedAtTo(range.to);
-  }
+  }, [mode, currentOwner.ownerCode, currentOwner.ownerId]);
 
   const selectedFromList = ordersQuery.data?.find((order) => order.id === selectedId) ?? null;
   const detailQuery = useReceivingOrderQuery(selectedId);
@@ -365,13 +416,14 @@ export function M2InboundPage({ mode, currentOwner, onBack }: M2InboundPageProps
   const tableCreateAction =
     mode === "receiving"
       ? {
-          label: "新建 ASN",
+          label: "新增",
+          description: "新建 ASN",
           onClick: () => setActiveDialog("create"),
         }
       : undefined;
 
   return (
-    <section className="mx-auto flex w-full max-w-[1680px] flex-col gap-5 px-4 py-8 xl:px-6">
+    <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
         <PageHeader
           title={pageMeta.title}
           subtitle={pageMeta.subtitle}
@@ -382,39 +434,24 @@ export function M2InboundPage({ mode, currentOwner, onBack }: M2InboundPageProps
                   {lastEvent}
                 </span>
               )}
-              <Button type="button" variant="outline" onClick={onBack}>
-                <ArrowLeft className="size-4" aria-hidden />
-                返回工作台
-              </Button>
             </div>
           }
         />
 
-        <M2InboundMetrics orders={ordersQuery.data ?? []} />
-
-        <M2InboundFilterBar
-          keyword={keyword}
-          ownerKeyword={ownerKeyword}
-          documentTypeFilter={documentTypeFilter}
-          statusFilter={statusFilter}
-          arrivalDate={arrivalDate}
-          createdAtFrom={createdAtFrom}
-          createdAtTo={createdAtTo}
-          onKeywordChange={setKeyword}
-          onOwnerKeywordChange={setOwnerKeyword}
-          onDocumentTypeFilterChange={setDocumentTypeFilter}
-          onStatusFilterChange={setStatusFilter}
-          onArrivalDateChange={setArrivalDate}
-          onCreatedAtFromChange={setCreatedAtFrom}
-          onCreatedAtToChange={setCreatedAtTo}
-          onQuery={() => refreshInbound("入库列表已查询")}
+        <QueryPanel
+          fields={m2InboundQueryFields}
+          defaultVisibleFieldKeys={m2InboundCoreQueryFieldKeys}
+          value={draftQuery}
+          onValueChange={(next) => setDraftQuery(normalizeM2InboundQueryValue(next, defaultQuery))}
+          onQuery={() => {
+            setAppliedQuery(normalizeM2InboundQueryValue(draftQuery, defaultQuery));
+            void refreshInbound("入库列表已查询");
+          }}
           onReset={() => {
-            setKeyword("");
-            setOwnerKeyword(currentOwner.ownerCode);
-            setDocumentTypeFilter([]);
-            setStatusFilter([]);
-            setArrivalDate("");
-            resetCreatedDateRange();
+            const next = defaultM2InboundQueryValue(mode, currentOwner);
+            setDraftQuery(next);
+            setAppliedQuery(next);
+            setSelectedId(null);
           }}
         />
 
@@ -428,6 +465,7 @@ export function M2InboundPage({ mode, currentOwner, onBack }: M2InboundPageProps
           mode={mode}
           currentOwner={currentOwner}
           orders={orders}
+          exportFileBaseName={pageMeta.title}
           selectedId={selectedId}
           isPending={ordersQuery.isPending}
           onSelectOrder={setSelectedId}
@@ -435,6 +473,20 @@ export function M2InboundPage({ mode, currentOwner, onBack }: M2InboundPageProps
           onOpenDialog={openRowDialog}
           refreshAction={tableRefreshAction}
           createAction={tableCreateAction}
+          queryState={appliedQuery}
+          querySummaryItems={m2QuerySummaryItems}
+          onApplyQueryState={(queryState) => {
+            const next = normalizeM2InboundQueryValue(queryValueFromUnknown(queryState), defaultQuery);
+            setDraftQuery(next);
+            setAppliedQuery(next);
+            setSelectedId(null);
+          }}
+          onClearQueryState={() => {
+            const next = defaultM2InboundQueryValue(mode, currentOwner);
+            setDraftQuery(next);
+            setAppliedQuery(next);
+            setSelectedId(null);
+          }}
         />
 
         <M2InboundDialogs
@@ -473,4 +525,53 @@ export function M2InboundPage({ mode, currentOwner, onBack }: M2InboundPageProps
         />
     </section>
   );
+}
+
+function defaultM2InboundQueryValue(
+  mode: M2InboundMode,
+  currentOwner: OwnerContext,
+): M2InboundQueryValue {
+  const createdAt = defaultCreatedDateRange();
+  return {
+    keyword: "",
+    ownerKeyword: currentOwner.ownerCode,
+    documentTypeFilter: [],
+    statusFilter: defaultStatusFilter(mode),
+    arrivalDate: { from: "", to: "" },
+    createdAt,
+  };
+}
+
+function normalizeM2InboundQueryValue(
+  value: QueryPanelValue,
+  fallback: M2InboundQueryValue,
+): M2InboundQueryValue {
+  return {
+    keyword: queryString(value.keyword),
+    ownerKeyword: queryString(value.ownerKeyword) || fallback.ownerKeyword,
+    documentTypeFilter: queryStringArray(value.documentTypeFilter) as InboundDocumentTypeFilter,
+    statusFilter: queryStringArray(value.statusFilter) as StatusFilter,
+    arrivalDate: queryRange(value.arrivalDate),
+    createdAt: queryRange(value.createdAt, fallback.createdAt),
+  };
+}
+
+function queryString(value: QueryPanelValue[string]) {
+  return typeof value === "string" ? value : "";
+}
+
+function queryStringArray(value: QueryPanelValue[string]) {
+  return Array.isArray(value) ? value.filter((item) => typeof item === "string") : [];
+}
+
+function queryRange(value: QueryPanelValue[string], fallback?: QueryPanelRangeValue): QueryPanelRangeValue {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return fallback ?? { from: "", to: "" };
+  return {
+    from: typeof value.from === "string" ? value.from : fallback?.from ?? "",
+    to: typeof value.to === "string" ? value.to : fallback?.to ?? "",
+  };
+}
+
+function queryValueFromUnknown(value: unknown): QueryPanelValue {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as QueryPanelValue) : {};
 }

@@ -1,4 +1,4 @@
-import type { StatusKey } from "@wms/ui";
+import type { QueryPanelRangeValue, QueryPanelValue, StatusKey } from "@wms/ui";
 
 import type { ReceivingOrder } from "@/features/inbound/inbound-queries";
 import type { InboundDetailStage } from "./m2-inbound-detail-view-model";
@@ -8,12 +8,21 @@ import {
   matchesInboundDocumentTypeFilter,
   type InboundDocumentTypeFilter,
 } from "./m2-inbound-document-type";
-import type { StatusFilter } from "./M2InboundFilterBar";
 
 export type M2InboundMode = "receiving" | "inspecting" | "putaway";
+export type StatusFilterValue = "receiving" | "inspecting" | "putaway" | "completed" | "closed_rejected";
+export type StatusFilter = StatusFilterValue[];
 export interface OwnerContext {
   ownerId: string;
   ownerCode: string;
+}
+export interface M2InboundQueryValue extends QueryPanelValue {
+  keyword: string;
+  ownerKeyword: string;
+  documentTypeFilter: InboundDocumentTypeFilter;
+  statusFilter: StatusFilter;
+  arrivalDate: QueryPanelRangeValue;
+  createdAt: QueryPanelRangeValue;
 }
 
 export function workFieldText(order: ReceivingOrder, mode: M2InboundMode) {
@@ -39,7 +48,8 @@ export function filterOrders(
   keyword: string,
   documentTypeFilter: InboundDocumentTypeFilter,
   statusFilter: StatusFilter,
-  arrivalDate: string,
+  arrivalDateFrom: string,
+  arrivalDateTo: string,
   createdAtFrom: string,
   createdAtTo: string,
   ownerKeyword = "",
@@ -52,7 +62,8 @@ export function filterOrders(
     const matchesDocumentType = matchesInboundDocumentTypeFilter(order, documentTypeFilter);
     const matchesStatus = matchesStatusFilter(order.status, statusFilter);
     const matchesOwner = matchesOwnerFilter(order.owner_id, normalizedOwner, ownerContext);
-    const matchesDate = !arrivalDate || order.expected_arrival_at?.slice(0, 10) === arrivalDate;
+    const arrivalDate = order.expected_arrival_at?.slice(0, 10) ?? "";
+    const matchesDate = (!arrivalDateFrom || arrivalDate >= arrivalDateFrom) && (!arrivalDateTo || arrivalDate <= arrivalDateTo);
     const createdDate = order.created_at.slice(0, 10);
     const matchesCreatedAt = (!createdAtFrom || createdDate >= createdAtFrom) && (!createdAtTo || createdDate <= createdAtTo);
     const searchable = [
@@ -101,10 +112,6 @@ export function inboundPageMeta(mode: M2InboundMode) {
     },
   };
   return meta[mode];
-}
-
-export function countByStatus(orders: ReceivingOrder[], status: string) {
-  return orders.filter((order) => (status === "receiving" ? canReceiveOrReject(order.status) : order.status === status)).length;
 }
 
 export function canReceiveOrReject(status: string) {

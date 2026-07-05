@@ -13,6 +13,7 @@ import {
   type DataGridColumn,
   type DataGridCreateAction,
   type DataGridDetailAction,
+  type DataGridQuerySummaryItem,
   type DataGridRefreshAction,
   type DataGridToolbarAction,
 } from "@wms/ui";
@@ -30,6 +31,7 @@ import {
   totalExpectedQty,
   workFieldHeader,
   workFieldText,
+  type M2InboundQueryValue,
   type M2InboundMode,
   type OwnerContext,
 } from "./m2-inbound-page-helpers";
@@ -38,6 +40,7 @@ interface M2InboundOrderTableProps {
   mode: M2InboundMode;
   currentOwner: OwnerContext;
   orders: ReceivingOrder[];
+  exportFileBaseName: string;
   selectedId: string | null;
   isPending: boolean;
   onSelectOrder: (id: string | null) => void;
@@ -45,12 +48,17 @@ interface M2InboundOrderTableProps {
   onOpenDialog: (id: string, dialog: InboundDialog) => void;
   refreshAction?: DataGridRefreshAction;
   createAction?: DataGridCreateAction;
+  queryState?: M2InboundQueryValue;
+  querySummaryItems?: DataGridQuerySummaryItem[];
+  onApplyQueryState?: (queryState: unknown) => void;
+  onClearQueryState?: () => void;
 }
 
 export function M2InboundOrderTable({
   mode,
   currentOwner,
   orders,
+  exportFileBaseName,
   selectedId,
   isPending,
   onSelectOrder,
@@ -58,6 +66,10 @@ export function M2InboundOrderTable({
   onOpenDialog,
   refreshAction,
   createAction,
+  queryState,
+  querySummaryItems,
+  onApplyQueryState,
+  onClearQueryState,
 }: M2InboundOrderTableProps) {
   const selectedOrder = orders.find((item) => item.id === selectedId) ?? null;
   const detailAction: DataGridDetailAction = {
@@ -205,11 +217,16 @@ export function M2InboundOrderTable({
       caption={isPending ? "加载入库单..." : undefined}
       emptyTitle="暂无入库单"
       storageKey="m2-inbound-datagrid"
+      exportFileBaseName={exportFileBaseName}
       tableClassName="min-w-[1840px]"
       refreshAction={refreshAction}
       createAction={createAction}
       detailAction={detailAction}
       toolbarActions={privateActions}
+      queryState={queryState}
+      querySummaryItems={querySummaryItems}
+      onApplyQueryState={onApplyQueryState}
+      onClearQueryState={onClearQueryState}
       selectable
     />
   );
@@ -225,6 +242,7 @@ function inboundPrivateActions(
       {
         key: "receive",
         label: "收货",
+        description: "收货操作",
         icon: <CheckCircle2 className="size-4" aria-hidden />,
         disabled: !selectedOrder || !canReceiveOrReject(selectedOrder.status),
         onClick: () => {
@@ -239,6 +257,7 @@ function inboundPrivateActions(
       {
         key: "inspect",
         label: "验收",
+        description: "验收操作",
         icon: <ClipboardCheck className="size-4" aria-hidden />,
         disabled: !selectedOrder,
         onClick: () => {
@@ -253,6 +272,7 @@ function inboundPrivateActions(
       {
         key: "putaway",
         label: "上架",
+        description: "上架操作",
         icon: <PackageCheck className="size-4" aria-hidden />,
         disabled: !selectedOrder,
         onClick: () => {
