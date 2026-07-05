@@ -1,5 +1,10 @@
 //! 主仓 OpenAPI 契约。
 
+pub mod admin_menu;
+pub mod admin_menu_handlers;
+mod admin_menu_idempotency;
+mod admin_menu_model;
+mod admin_menu_repository;
 pub mod audit;
 pub mod auth;
 pub mod auth_handlers;
@@ -45,16 +50,17 @@ use crate::openapi_contract::ContractSecurityAddon;
 use crate::print_template::{PrintFieldLibraryListResponse, PrintFieldLibrarySummary};
 use utoipa::OpenApi;
 use wms_domain::{
-    AuditActor, AuditEvent, AuditEventListResponse, BatchCreateLocationsRequest, BillingAccount,
-    BillingChargeCalculation, BillingContract, BillingRule, BillingStatement,
+    AdminMenuButtonPermission, AdminMenuNode, AdminMenuTreeResponse, AdminMenuVersion, AuditActor,
+    AuditEvent, AuditEventListResponse, BatchCreateLocationsRequest, BatchEnableAdminMenuRequest,
+    BillingAccount, BillingChargeCalculation, BillingContract, BillingRule, BillingStatement,
     CalculateBillingChargesRequest, ChangeInventoryStatusRequest, ColdChainDevice,
     CompletePickTaskRequest, ConfigEntry, ConfirmBillingStatementRequest,
-    ConfirmContainerRecoveryRequest, ContainerRecovery, CreateBillingAccountRequest,
-    CreateBillingContractRequest, CreateBillingRuleRequest, CreateColdChainDeviceRequest,
-    CreateCrossdockPlanRequest, CreateCustomerRequest, CreateLocationRequest,
-    CreateOutboundOrderLineRequest, CreateOutboundOrderRequest, CreateOutboundWaveRequest,
-    CreatePackJobRequest, CreatePackingStationRequest, CreateProductRequest,
-    CreateReceivingOrderRequest, CreateRetailReplenishmentSuggestionRequest,
+    ConfirmContainerRecoveryRequest, ContainerRecovery, CreateAdminMenuNodeRequest,
+    CreateBillingAccountRequest, CreateBillingContractRequest, CreateBillingRuleRequest,
+    CreateColdChainDeviceRequest, CreateCrossdockPlanRequest, CreateCustomerRequest,
+    CreateLocationRequest, CreateOutboundOrderLineRequest, CreateOutboundOrderRequest,
+    CreateOutboundWaveRequest, CreatePackJobRequest, CreatePackingStationRequest,
+    CreateProductRequest, CreateReceivingOrderRequest, CreateRetailReplenishmentSuggestionRequest,
     CreateSpecialDrugCategoryRequest, CreateSupplierRequest, CreateWarehouseRequest, CrossdockPlan,
     CurrentUser, Customer, CustomerListResponse, DisableSystemDictionaryItemRequest,
     DisposeTemperatureExcursionRequest, DocumentNumberAllocation,
@@ -70,21 +76,23 @@ use wms_domain::{
     LoginRequest, LoginResponse, MappingDictionary, MappingQueueItem, MappingRule,
     MappingTraceResponse, OutboundOrder, OutboundOrderLine, OutboundOrderListResponse,
     OutboundWave, PackJob, PackingStation, PageMeta, PrintWaybillRequest, Product,
-    ProductListResponse, PutawayInventoryRequest, PutawayRecord, PutawayRequest,
-    ReceiveReceivingOrderRequest, ReceiveTmsDispatchRequest, ReceivingInspectionRecord,
-    ReceivingOrder, ReceivingOrderLine, ReceivingOrderListResponse, ReceivingOrderReceipt,
-    RejectReceivingOrderRequest, ReportQueryRequest, ReportQueryResponse, ReportRow,
-    RetailReplenishmentSuggestion, ReviewOutboundOrderRequest, ShipOutboundOrderRequest,
-    SignInspectionRequest, SpecialDrugCategory, SpecialDrugCategoryListResponse,
-    StoreDashboardResponse, Supplier, SupplierListResponse, SystemDictionaryCategory,
-    SystemDictionaryImpactPreview, SystemDictionaryImpactReference, SystemDictionaryItem,
-    SystemDictionaryItemListResponse, TemperatureExcursionDispositionResponse,
-    TemperatureExcursionEvent, TemperatureExcursionEventListResponse, TemperatureReading,
-    TmsDispatch, TraceabilityOutboundReport, TraceabilityOutboundReportRequest,
-    TraceabilityStatusChangeEvent, TransitTemperatureReading, UpdateCustomerRequest,
+    ProductListResponse, PublishAdminMenuRequest, PutawayInventoryRequest, PutawayRecord,
+    PutawayRequest, ReceiveReceivingOrderRequest, ReceiveTmsDispatchRequest,
+    ReceivingInspectionRecord, ReceivingOrder, ReceivingOrderLine, ReceivingOrderListResponse,
+    ReceivingOrderReceipt, RejectReceivingOrderRequest, ReportQueryRequest, ReportQueryResponse,
+    ReportRow, RetailReplenishmentSuggestion, ReviewOutboundOrderRequest, RollbackAdminMenuRequest,
+    ShipOutboundOrderRequest, SignInspectionRequest, SpecialDrugCategory,
+    SpecialDrugCategoryListResponse, StoreDashboardResponse, Supplier, SupplierListResponse,
+    SystemDictionaryCategory, SystemDictionaryImpactPreview, SystemDictionaryImpactReference,
+    SystemDictionaryItem, SystemDictionaryItemListResponse,
+    TemperatureExcursionDispositionResponse, TemperatureExcursionEvent,
+    TemperatureExcursionEventListResponse, TemperatureReading, TmsDispatch,
+    TraceabilityOutboundReport, TraceabilityOutboundReportRequest, TraceabilityStatusChangeEvent,
+    TransitTemperatureReading, UpdateAdminMenuNodeRequest, UpdateCustomerRequest,
     UpdateLocationRequest, UpdateProductRequest, UpdateReceivingOrderRequest,
     UpdateSpecialDrugCategoryRequest, UpdateSupplierRequest, UpdateWarehouseRequest,
-    UpsertSystemDictionaryItemRequest, Warehouse, WarehouseListResponse, WeighPackJobRequest,
+    UpsertAdminMenuButtonPermissionRequest, UpsertSystemDictionaryItemRequest, Warehouse,
+    WarehouseListResponse, WeighPackJobRequest,
 };
 
 #[utoipa::path(
@@ -122,6 +130,34 @@ fn login() {}
 )]
 #[allow(dead_code)]
 fn me() {}
+
+#[utoipa::path(get, path = "/api/v1/admin/menus/published", tag = "admin-menu", responses((status = 200, description = "已发布三层菜单树", body = AdminMenuTreeResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn list_published_admin_menu() {}
+
+#[utoipa::path(get, path = "/api/v1/admin/menus/draft", tag = "admin-menu", responses((status = 200, description = "草稿三层菜单树", body = AdminMenuTreeResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "无菜单维护权限", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn list_draft_admin_menu() {}
+
+#[utoipa::path(post, path = "/api/v1/admin/menus/draft/nodes", tag = "admin-menu", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = CreateAdminMenuNodeRequest, responses((status = 200, description = "新增草稿菜单节点", body = AdminMenuNode), (status = 400, description = "缺少幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "无菜单维护权限", body = ErrorResponse), (status = 422, description = "菜单节点非法", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn create_admin_menu_node() {}
+
+#[utoipa::path(patch, path = "/api/v1/admin/menus/draft/nodes/{id}", tag = "admin-menu", params(("id" = uuid::Uuid, Path, description = "菜单节点 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = UpdateAdminMenuNodeRequest, responses((status = 200, description = "更新草稿菜单节点", body = AdminMenuNode), (status = 400, description = "缺少幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "无菜单维护权限", body = ErrorResponse), (status = 404, description = "菜单节点不存在", body = ErrorResponse), (status = 422, description = "菜单节点非法", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn update_admin_menu_node() {}
+
+#[utoipa::path(post, path = "/api/v1/admin/menus/draft/batch-enable", tag = "admin-menu", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = BatchEnableAdminMenuRequest, responses((status = 200, description = "批量启停草稿菜单节点", body = [AdminMenuNode]), (status = 400, description = "缺少幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "无菜单维护权限", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn batch_enable_admin_menu_nodes() {}
+
+#[utoipa::path(post, path = "/api/v1/admin/menus/publish", tag = "admin-menu", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = PublishAdminMenuRequest, responses((status = 200, description = "发布菜单版本", body = AdminMenuVersion), (status = 400, description = "缺少幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "无菜单发布权限", body = ErrorResponse), (status = 422, description = "草稿菜单非法", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn publish_admin_menu() {}
+
+#[utoipa::path(post, path = "/api/v1/admin/menus/rollback", tag = "admin-menu", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = RollbackAdminMenuRequest, responses((status = 200, description = "回滚并生成新菜单版本", body = AdminMenuVersion), (status = 400, description = "缺少幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "无菜单发布权限", body = ErrorResponse), (status = 404, description = "菜单版本不存在", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn rollback_admin_menu() {}
 
 #[utoipa::path(
     get,
@@ -719,6 +755,13 @@ fn confirm_container_recovery() {}
         healthz,
         login,
         me,
+        list_published_admin_menu,
+        list_draft_admin_menu,
+        create_admin_menu_node,
+        update_admin_menu_node,
+        batch_enable_admin_menu_nodes,
+        publish_admin_menu,
+        rollback_admin_menu,
         list_audit_events,
         list_products,
         create_product,
@@ -812,10 +855,15 @@ fn confirm_container_recovery() {}
         confirm_container_recovery,
     ),
     components(schemas(
+        AdminMenuButtonPermission,
+        AdminMenuNode,
+        AdminMenuTreeResponse,
+        AdminMenuVersion,
         AuditActor,
         AuditEvent,
         AuditEventListResponse,
         BatchCreateLocationsRequest,
+        BatchEnableAdminMenuRequest,
         BillingAccount,
         BillingChargeCalculation,
         BillingContract,
@@ -829,6 +877,7 @@ fn confirm_container_recovery() {}
         ConfirmContainerRecoveryRequest,
         ConfigEntry,
         ContainerRecovery,
+        CreateAdminMenuNodeRequest,
         CreateBillingAccountRequest,
         CreateBillingContractRequest,
         CreateBillingRuleRequest,
@@ -906,6 +955,7 @@ fn confirm_container_recovery() {}
         PutawayInventoryRequest,
         PutawayRecord,
         PutawayRequest,
+        PublishAdminMenuRequest,
         ReceiveReceivingOrderRequest,
         ReceiveTmsDispatchRequest,
         ReceivingInspectionRecord,
@@ -919,6 +969,7 @@ fn confirm_container_recovery() {}
         ReportRow,
         RetailReplenishmentSuggestion,
         ReviewOutboundOrderRequest,
+        RollbackAdminMenuRequest,
         ShipOutboundOrderRequest,
         SignInspectionRequest,
         SpecialDrugCategory,
@@ -940,6 +991,7 @@ fn confirm_container_recovery() {}
         TraceabilityOutboundReportRequest,
         TraceabilityStatusChangeEvent,
         TransitTemperatureReading,
+        UpdateAdminMenuNodeRequest,
         UpdateCustomerRequest,
         UpdateLocationRequest,
         UpdateProductRequest,
@@ -948,6 +1000,7 @@ fn confirm_container_recovery() {}
         UpdateSupplierRequest,
         UpdateWarehouseRequest,
         SetDocumentNumberRuleEnabledRequest,
+        UpsertAdminMenuButtonPermissionRequest,
         UpsertSystemDictionaryItemRequest,
         UpsertDocumentNumberRuleRequest,
         WeighPackJobRequest,
@@ -958,6 +1011,7 @@ fn confirm_container_recovery() {}
     tags(
         (name = "system", description = "系统探针"),
         (name = "auth", description = "鉴权与会话"),
+        (name = "admin-menu", description = "H1 管理端三层菜单"),
         (name = "audit", description = "审计追踪"),
         (name = "master-data", description = "M1 基础档案"),
         (name = "system-dictionary", description = "US-M1-011 系统字典中心"),
@@ -1000,6 +1054,13 @@ mod tests {
             "/api/v1/healthz",
             "/api/v1/auth/login",
             "/api/v1/auth/me",
+            "/api/v1/admin/menus/published",
+            "/api/v1/admin/menus/draft",
+            "/api/v1/admin/menus/draft/nodes",
+            "/api/v1/admin/menus/draft/nodes/{id}",
+            "/api/v1/admin/menus/draft/batch-enable",
+            "/api/v1/admin/menus/publish",
+            "/api/v1/admin/menus/rollback",
             "/api/v1/audit/events",
             "/api/v1/master-data/products",
             "/api/v1/master-data/products/{id}",

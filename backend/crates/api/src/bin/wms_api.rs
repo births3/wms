@@ -13,6 +13,7 @@ use sqlx::{postgres::PgPoolOptions, PgPool};
 use tokio::net::TcpListener;
 use uuid::Uuid;
 use wms_api::{
+    admin_menu_handlers::{admin_menu_router, AdminMenuAppState},
     audit::{
         list_events, AuditError, AuditEventPage, AuditEventQuery, AuditEventQueryCursor,
         AuditEventRecord, DEFAULT_AUDIT_EVENT_QUERY_LIMIT, MAX_AUDIT_EVENT_QUERY_LIMIT,
@@ -195,6 +196,7 @@ fn app(
     let document_numbering_state =
         DocumentNumberingAppState::with_postgres(audit_query_state.pool.clone());
     let print_template_state = PrintTemplateAppState::with_postgres(audit_query_state.pool.clone());
+    let admin_menu_state = AdminMenuAppState::with_postgres(audit_query_state.pool.clone());
 
     Router::new()
         .route("/healthz", get(healthz))
@@ -204,6 +206,7 @@ fn app(
         .merge(audit_query_router(audit_query_state))
         .merge(config_center_router(config_center_state))
         .merge(master_data_router(master_data_state))
+        .merge(admin_menu_router(admin_menu_state))
         .merge(system_dictionary_router(system_dictionary_state))
         .merge(document_numbering_router(document_numbering_state))
         .merge(print_template_router(print_template_state))
