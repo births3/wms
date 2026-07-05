@@ -1,0 +1,122 @@
+# WMS 全链路质量矩阵事实源。
+# 展示页由 scripts/governance/check_quality_matrix.py --write-doc 生成。
+
+[[stories]]
+id = "US-M1-011"
+title = "系统字典中心"
+module = "M1"
+story_file = "docs/domain/user-stories-m1-master-data-warehouse.md"
+types = ["write", "config_rule", "frontend_interaction"]
+frontend_pages = ["m1-system-dictionary"]
+api_paths = [
+  "GET /api/v1/system-dictionaries/{dict_code}/items",
+  "PUT /api/v1/system-dictionaries/{dict_code}/items/{item_code}",
+  "PATCH /api/v1/system-dictionaries/{dict_code}/items/{item_code}/disable",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
+
+[[stories]]
+id = "US-M2-002"
+title = "PDA/PC Web 收货"
+module = "M2"
+story_file = "docs/domain/user-stories-m2-inbound-asn.md"
+types = ["write", "inventory_change", "frontend_interaction", "critical_path"]
+frontend_pages = ["m2-receiving"]
+api_paths = [
+  "POST /api/v1/inbound/receiving-orders/{id}/receive",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"]
+
+[[stories]]
+id = "US-M3-002"
+title = "批次与效期管理"
+module = "M3"
+story_file = "docs/domain/user-stories-m3-inventory-query.md"
+types = ["read_only", "frontend_interaction"]
+frontend_pages = ["m3-batches"]
+api_paths = [
+  "GET /api/v1/inventory/batches",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L7", "L8"]
+covered_layers = ["L1", "L2", "L3", "L7", "L8"]
+
+[[stories]]
+id = "US-M4-001"
+title = "出库订单管理"
+module = "M4"
+story_file = "docs/domain/user-stories-m4-outbound-order.md"
+types = ["write", "frontend_interaction", "api_change"]
+frontend_pages = ["m4-outbound-orders"]
+api_paths = [
+  "GET /api/v1/outbound/orders",
+  "POST /api/v1/outbound/orders",
+  "GET /api/v1/outbound/orders/{id}",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]

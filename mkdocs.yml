@@ -213,6 +213,8 @@ nav:
     - 业务规则字段注册表 (v2): compliance/gsp-business-rules-registry.md
   - 治理:
     - 治理总文档: governance.md
+    - 全链路质量矩阵方法: governance/quality-matrix-method.md
+    - 全链路质量矩阵: governance/quality-matrix.md
     - 项目级 RTM: requirements-traceability-matrix.md
     - AI 协作规范: agent-collaboration.md
     - AI 默认本地提交规则: agent-commit-rules.md
