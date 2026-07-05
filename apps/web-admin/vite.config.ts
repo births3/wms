@@ -4,6 +4,8 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
 
+import { handleAdminMenuDevMock } from "./dev-mocks/admin-menu-dev-mock";
+
 const devMockEnabled = process.env.WMS_WEB_ADMIN_DEV_MOCK === "1";
 const e2eApiUrl = process.env.WMS_WEB_ADMIN_E2E_API_URL?.trim();
 const devOwnerId = "00000000-0000-0000-0000-000000000001";
@@ -181,7 +183,7 @@ const devUser = {
   username: "admin",
   display_name: "Test Admin",
   roles: ["admin", "receiving"],
-  permissions: ["h1.auth.me", "m2.receive", "m2.inspect", "m2.sign", "m2.putaway"],
+  permissions: ["h1.auth.me", "h1.menu.read", "h1.menu.write", "h1.menu.publish", "m2.receive", "m2.inspect", "m2.sign", "m2.putaway"],
 };
 
 let devProduct: DevProduct = {
@@ -480,6 +482,11 @@ async function handleDevMockRequest(
 
   if (pathname.startsWith("/api/v1/config-center/feature-flags")) {
     await handleFeatureFlagRequest(req, res, pathname);
+    return true;
+  }
+
+  if (pathname.startsWith("/api/v1/admin/menus")) {
+    await handleAdminMenuDevMock(req, res, pathname);
     return true;
   }
 
