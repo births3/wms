@@ -70,6 +70,16 @@
       "reason": "配置中心当前不是大列表查询页"
     },
     {
+      "id": "h9-print-templates",
+      "title": "H9 打印模板",
+      "required": true,
+      "source": "apps/web-admin/src/pages/print-template/H9PrintTemplatePage.tsx",
+      "fieldConstant": "h9PrintTemplateQueryFields",
+      "coreConstant": "h9PrintTemplateCoreQueryFieldKeys",
+      "core": ["keyword", "sourceSchema"],
+      "more": []
+    },
+    {
       "id": "m2-receiving",
       "title": "M2 收货管理",
       "required": true,

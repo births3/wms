@@ -13,6 +13,7 @@ import {
   PackageCheck,
   PanelLeftClose,
   PanelLeftOpen,
+  Printer,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -30,6 +31,7 @@ import { M2InboundPage, type M2InboundMode } from "@/pages/inbound/M2InboundPage
 import { M3BatchManagementPage } from "@/pages/inventory/M3BatchManagementPage";
 import { M1MasterDataPage, type MasterDataViewId } from "@/pages/master-data/M1MasterDataPage";
 import { M4OutboundPage, type M4OutboundMode } from "@/pages/outbound/M4OutboundPage";
+import { H9PrintTemplatePage } from "@/pages/print-template/H9PrintTemplatePage";
 
 type AdminView =
   | "dashboard"
@@ -42,7 +44,8 @@ type AdminView =
   | "m4-orders"
   | "m4-waves"
   | "m4-review"
-  | "m4-returns";
+  | "m4-returns"
+  | "h9-print-templates";
 
 const foundations = [
   {
@@ -118,6 +121,7 @@ const menuSections: Array<{ label: string; items: MenuItem[] }> = [
       { title: "H1 权限租户", subtitle: "已接入接口", icon: ShieldCheck, disabled: true },
       { title: "H2 审计追踪", subtitle: "已接入接口", icon: ClipboardList, disabled: true },
       { title: "H3 OpenAPI", subtitle: "契约同步", icon: KeyRound, disabled: true },
+      { id: "h9-print-templates", title: "H9 打印模板", subtitle: "字段库 / 模板类型", icon: Printer },
     ],
   },
 ];
@@ -312,6 +316,9 @@ function renderAdminView(
   }
   if (outboundMode) {
     return <M4OutboundPage mode={outboundMode} onBack={() => navigateTo("dashboard")} />;
+  }
+  if (view === "h9-print-templates") {
+    return <H9PrintTemplatePage />;
   }
   return (
     <Dashboard

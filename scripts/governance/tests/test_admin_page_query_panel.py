@@ -53,6 +53,18 @@ def test_page_query_suggestion_for_m4_outbound_page():
     assert suggestion["more"] == ["businessDate"]
 
 
+def test_page_query_suggestion_for_h9_print_template_page():
+    """H9 打印模板字段库列表必须接入公共页面级查询。"""
+    from check_admin_page_query_panel import suggest_page_config
+
+    suggestion = suggest_page_config("h9-print-templates", "H9 打印模板")
+
+    assert suggestion["required"] is True
+    assert suggestion["source"] == "apps/web-admin/src/pages/print-template/H9PrintTemplatePage.tsx"
+    assert suggestion["core"] == ["keyword", "sourceSchema"]
+    assert suggestion["more"] == []
+
+
 def test_page_query_suggestion_requires_confirmation_for_unknown_page():
     """未知页面族不能自动造查询字段，必须进入待确认状态。"""
     from check_admin_page_query_panel import suggest_page_config

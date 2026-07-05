@@ -132,6 +132,17 @@ def suggest_page_config(page_id: str, title: str) -> dict[str, Any]:
             "core": ["keyword", "statusFilter"],
             "more": ["businessDate"],
         }
+    if page_id.startswith("h9-"):
+        return {
+            "id": page_id,
+            "title": title,
+            "required": True,
+            "source": "apps/web-admin/src/pages/print-template/H9PrintTemplatePage.tsx",
+            "fieldConstant": "h9PrintTemplateQueryFields",
+            "coreConstant": "h9PrintTemplateCoreQueryFieldKeys",
+            "core": ["keyword", "sourceSchema"],
+            "more": [],
+        }
     return {
         "id": page_id,
         "title": title,
