@@ -95,17 +95,29 @@ const dataGridSource = readFileSync(
   new URL("../src/business/DataGrid/DataGrid.tsx", import.meta.url),
   "utf8",
 );
+const dataGridToolbarSource = readFileSync(
+  new URL("../src/business/DataGrid/DataGridToolbar.tsx", import.meta.url),
+  "utf8",
+);
+const dataGridContentSource = readFileSync(
+  new URL("../src/business/DataGrid/DataGridContent.tsx", import.meta.url),
+  "utf8",
+);
+const dataGridHelpersSource = readFileSync(
+  new URL("../src/business/DataGrid/data-grid-helpers.ts", import.meta.url),
+  "utf8",
+);
 const summaryDialogSource = readFileSync(
   new URL("../src/business/DataGrid/DataGridSummaryDialog.tsx", import.meta.url),
   "utf8",
 );
 
-assert.match(dataGridSource, /<Calculator className="size-4" aria-hidden \/>[\s\S]*汇总/);
+assert.match(dataGridToolbarSource, /<Calculator className="size-4" aria-hidden \/>[\s\S]*汇总/);
 assert.match(dataGridSource, /summaryConfig/);
 assert.match(dataGridSource, /summaryTable/);
-assert.match(dataGridSource, /退出汇总/);
-assert.match(dataGridSource, /<DataGridSummaryDialog[\s\S]*onApply=\{\(config\) =>/);
-assert.match(dataGridSource, /actions\.push\(\{ key: "summary", label: "汇总", description: "汇总统计" \}\)/);
+assert.match(dataGridContentSource, /退出汇总/);
+assert.match(dataGridContentSource, /<DataGridSummaryDialog[\s\S]*onApply=\{onApplySummary\}/);
+assert.match(dataGridHelpersSource, /actions\.push\(\{ key: "summary", label: "汇总", description: "汇总统计" \}\)/);
 assert.match(summaryDialogSource, /<DialogTitle[\s\S]*汇总统计/);
 assert.match(summaryDialogSource, /分组字段/);
 assert.match(summaryDialogSource, /汇总字段/);

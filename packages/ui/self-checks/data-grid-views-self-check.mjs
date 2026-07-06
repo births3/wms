@@ -178,17 +178,29 @@ const dataGridSource = readFileSync(
   new URL("../src/business/DataGrid/DataGrid.tsx", import.meta.url),
   "utf8",
 );
+const dataGridTypesSource = readFileSync(
+  new URL("../src/business/DataGrid/data-grid-types.ts", import.meta.url),
+  "utf8",
+);
+const dataGridToolbarSource = readFileSync(
+  new URL("../src/business/DataGrid/DataGridToolbar.tsx", import.meta.url),
+  "utf8",
+);
+const dataGridContentSource = readFileSync(
+  new URL("../src/business/DataGrid/DataGridContent.tsx", import.meta.url),
+  "utf8",
+);
 const namedViewsToolbarSource = readFileSync(
   new URL("../src/business/DataGrid/DataGridNamedViewsToolbar.tsx", import.meta.url),
   "utf8",
 );
 
-assert.match(dataGridSource, /import \{ DataGridNamedViewsToolbar \} from "\.\/DataGridNamedViewsToolbar";/);
-assert.match(dataGridSource, /querySummaryItems\?: DataGridQuerySummaryItem\[\];/);
-assert.match(dataGridSource, /onApplyQueryState\?: \(queryState: unknown\) => void;/);
+assert.match(dataGridToolbarSource, /import \{ DataGridNamedViewsToolbar \} from "\.\/DataGridNamedViewsToolbar";/);
+assert.match(dataGridTypesSource, /querySummaryItems\?: DataGridQuerySummaryItem\[\];/);
+assert.match(dataGridTypesSource, /onApplyQueryState\?: \(queryState: unknown\) => void;/);
 assert.match(dataGridSource, /function applyNamedViewState\(state: DataGridLogicState, nextQueryState\?: unknown\) \{[\s\S]*setSettings\(state\);[\s\S]*onApplyQueryState\?\.\(nextQueryState\);[\s\S]*setPageIndex\(0\);[\s\S]*\}/);
-assert.match(dataGridSource, /<DataGridNamedViewsToolbar[\s\S]*storageKey=\{storageKey\}[\s\S]*actionKeys=\{actionKeys\}[\s\S]*settings=\{settings\}[\s\S]*onApplyView=\{applyNamedViewState\}[\s\S]*\/>/);
-assert.match(dataGridSource, /业务查询/);
+assert.match(dataGridToolbarSource, /<DataGridNamedViewsToolbar[\s\S]*storageKey=\{storageKey\}[\s\S]*actionKeys=\{actionKeys\}[\s\S]*settings=\{settings\}[\s\S]*onApplyView=\{onApplyView\}[\s\S]*\/>/);
+assert.match(dataGridContentSource, /业务查询/);
 
 for (const symbol of [
   "dataGridNamedViewsStorageKey",
