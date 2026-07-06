@@ -21,7 +21,7 @@ export type {
   DataGridSelectedArea,
   DataGridToolbarAction,
   DataGridToolbarActionContext,
-} from "./DataGrid";
+} from "./data-grid-types";
 export { DataGridFilterChips } from "./DataGridFilterChips";
 export type { DataGridFilterChipsProps } from "./DataGridFilterChips";
 export { buildDataGridCsv, downloadDataGridCsv } from "./data-grid-export";

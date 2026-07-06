@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../ui/select";
-import type { DataGridColumn } from "./DataGrid";
+import type { DataGridColumn } from "./data-grid-types";
 import {
   type DataGridSummarySelection,
   type DataGridSummaryType,

@@ -1,6 +1,6 @@
 import * as React from "react";
 import { cn } from "../../lib/utils";
-import type { DataGridColumn } from "./DataGrid";
+import type { DataGridColumn } from "./data-grid-types";
 
 /**
  * DataGridCellContent — DataGrid 可复制单元格内容

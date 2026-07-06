@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { Bookmark } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { Button } from "../../ui/button";
-import type { DataGridColumn } from "./DataGrid";
+import type { DataGridColumn } from "./data-grid-types";
 import {
   dataGridFloatingPanelPosition,
   type DataGridFloatingPanelPosition,

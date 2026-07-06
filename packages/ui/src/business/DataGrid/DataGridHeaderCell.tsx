@@ -4,7 +4,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown, Filter, X } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { Button } from "../../ui/button";
 import { DataGridColumnFilter } from "./DataGridColumnFilter";
-import type { DataGridColumn } from "./DataGrid";
+import type { DataGridColumn } from "./data-grid-types";
 import {
   dataGridFilterActive,
   dataGridFloatingPanelPosition,

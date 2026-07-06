@@ -4,7 +4,7 @@ import { ArrowDown, ArrowUp, GripVertical } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { Button } from "../../ui/button";
 import { Checkbox } from "../../ui/checkbox";
-import type { DataGridColumn } from "./DataGrid";
+import type { DataGridColumn } from "./data-grid-types";
 import type { DataGridFloatingPanelPosition } from "./data-grid-logic";
 
 /**
