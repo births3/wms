@@ -313,8 +313,8 @@ function MenuTreeNode({
         onDrop={() => onDrop(node)}
         className={cn(
           "flex cursor-pointer items-center gap-2 rounded-md border px-2 py-2 text-sm",
-          menuLevelIndentClass(node.level),
-          selected ? "border-primary bg-primary/10 text-primary" : "bg-background hover:bg-muted",
+          menuLevelClass(node.level),
+          selected ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted",
         )}
         onClick={() => onSelect(node.id)}
       >
@@ -355,8 +355,8 @@ function flattenNodes(nodes: AdminMenuNode[]): AdminMenuNode[] {
   return nodes.flatMap((node) => [node, ...flattenNodes(node.children)]);
 }
 
-function menuLevelIndentClass(level: number) {
-  if (level === 2) return "ml-4";
-  if (level === 3) return "ml-8";
-  return "";
+function menuLevelClass(level: number) {
+  if (level === 1) return "bg-primary/5 font-semibold";
+  if (level === 2) return "ml-4 bg-muted/60";
+  return "ml-8 bg-background";
 }

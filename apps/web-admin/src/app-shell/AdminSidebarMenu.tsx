@@ -75,9 +75,8 @@ function MenuSection<TView extends string>({
   collapsed?: boolean;
 }) {
   const items = section.groups.flatMap((group) => group.items);
-  const hasActive = items.some((item) => item.id === activeView);
   const sectionKey = menuSectionKey(section.label);
-  const visible = collapsed || forceOpen || expandedKeys.has(sectionKey) || hasActive;
+  const visible = collapsed || forceOpen || expandedKeys.has(sectionKey);
 
   if (collapsed) {
     return (
@@ -93,7 +92,7 @@ function MenuSection<TView extends string>({
     <section>
       <button
         type="button"
-        className="flex w-full items-center justify-between rounded-md px-2 py-1 text-left text-xs font-medium text-muted-foreground hover:bg-muted"
+        className="flex w-full items-center justify-between rounded-md border border-border/70 bg-muted/50 px-3 py-2 text-left text-sm font-semibold text-foreground shadow-sm hover:bg-muted"
         aria-expanded={visible}
         onClick={() => onToggleKey(sectionKey)}
       >
@@ -101,7 +100,7 @@ function MenuSection<TView extends string>({
         <ChevronDown className={visible ? "size-3 transition-transform" : "size-3 -rotate-90 transition-transform"} aria-hidden />
       </button>
       {visible ? (
-        <div className="mt-2 space-y-1">
+        <div className="mt-2 space-y-2 border-l border-border/80 pl-2">
           {section.groups.map((group) => (
             <MenuGroupBlock
               key={group.label}
@@ -137,15 +136,14 @@ function MenuGroupBlock<TView extends string>({
   onToggleKey: (key: string) => void;
   forceOpen: boolean;
 }) {
-  const hasActive = group.items.some((item) => item.id === activeView);
   const groupKey = menuGroupKey(sectionLabel, group.label);
-  const visible = forceOpen || expandedKeys.has(groupKey) || hasActive;
+  const visible = forceOpen || expandedKeys.has(groupKey);
 
   return (
     <div className="space-y-1">
       <button
         type="button"
-        className="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-left text-xs font-medium text-muted-foreground hover:bg-muted/80"
+        className="flex w-full items-center justify-between rounded-md border-l-2 border-primary/30 bg-background px-2 py-1.5 text-left text-xs font-medium text-muted-foreground hover:bg-muted/70"
         aria-expanded={visible}
         onClick={() => onToggleKey(groupKey)}
       >
@@ -153,7 +151,7 @@ function MenuGroupBlock<TView extends string>({
         <ChevronDown className={visible ? "size-3 transition-transform" : "size-3 -rotate-90 transition-transform"} aria-hidden />
       </button>
       {visible ? (
-        <div className="space-y-1 pl-2">
+        <div className="mt-1 space-y-1 pl-3">
           {group.items.map((item) => <MenuItemButton key={item.title} item={item} activeView={activeView} onNavigate={onNavigate} />)}
         </div>
       ) : null}
@@ -201,8 +199,8 @@ function MenuItemButton<TView extends string>({
       onClick={() => item.id && onNavigate(item.id)}
       className={
         active
-          ? "flex w-full items-center gap-3 rounded-md bg-primary px-3 py-2 text-left text-primary-foreground"
-          : "flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-45"
+          ? "flex w-full items-center gap-3 rounded-md border-l-4 border-primary bg-primary px-3 py-2 text-left text-primary-foreground"
+          : "flex w-full items-center gap-3 rounded-md border-l-4 border-transparent bg-background/60 px-3 py-2 text-left text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-45"
       }
     >
       <Icon className="size-4 shrink-0" aria-hidden />

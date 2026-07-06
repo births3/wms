@@ -484,6 +484,15 @@ function AppShell({
   }, []);
 
   React.useEffect(() => {
+    const activeKeys = menuKeysForActiveView(menuTree, activeView);
+    if (activeKeys.length === 0) return;
+    setExpandedMenuKeys((current) => {
+      const missingKeys = activeKeys.filter((key) => !current.includes(key));
+      return missingKeys.length > 0 ? [...current, ...missingKeys] : current;
+    });
+  }, [activeView, menuTree]);
+
+  React.useEffect(() => {
     writeExpandedMenuKeys(expandedMenuKeys);
   }, [expandedMenuKeys]);
 
@@ -673,6 +682,17 @@ function readExpandedMenuKeys() {
 function writeExpandedMenuKeys(keys: string[]) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(MENU_EXPANDED_STORAGE_KEY, JSON.stringify(keys));
+}
+
+function menuKeysForActiveView(sections: SidebarMenuTreeSection<AdminView>[], activeView: AdminView) {
+  for (const section of sections) {
+    for (const group of section.groups) {
+      if (group.items.some((item) => item.id === activeView)) {
+        return [menuSectionKey(section.label), menuGroupKey(section.label, group.label)];
+      }
+    }
+  }
+  return [];
 }
 
 interface DashboardProps {
