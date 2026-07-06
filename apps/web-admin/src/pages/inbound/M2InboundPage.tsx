@@ -64,9 +64,20 @@ interface M2InboundPageProps {
 
 const firstSignerId = "00000000-0000-0000-0000-000000000101";
 const secondSignerId = "00000000-0000-0000-0000-000000000102";
-const defaultWarehouseId = "00000000-0000-0000-0000-000000003001";
 const defaultLocationId = "00000000-0000-0000-0000-000000000201";
 const defaultLocationCode = "A-01-01";
+const emptyCreateForm: CreateFormState = {
+  receiptNo: "",
+  documentType: "",
+  supplierId: "",
+  warehouseId: "",
+  expectedArrivalDate: "",
+  productCode: "",
+  batchNo: "",
+  expectedQty: "",
+  productionDate: "",
+  expiryDate: "",
+};
 const m2InboundQueryFields: QueryPanelField[] = [
   {
     key: "keyword",
@@ -130,18 +141,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
   const [activeDialog, setActiveDialog] = React.useState<InboundDialog | null>(null);
   const [detailOpen, setDetailOpen] = React.useState(false);
   const [lastEvent, setLastEvent] = React.useState<string | null>(null);
-  const [createForm, setCreateForm] = React.useState<CreateFormState>({
-    receiptNo: "ASN-M2-PC-0002",
-    documentType: "purchase_inbound",
-    supplierId: "00000000-0000-0000-0000-000000005001",
-    warehouseId: defaultWarehouseId,
-    expectedArrivalDate: "",
-    productCode: "P-M2-002",
-    batchNo: "",
-    expectedQty: "60",
-    productionDate: "2026-02-01",
-    expiryDate: "2028-02-01",
-  });
+  const [createForm, setCreateForm] = React.useState<CreateFormState>(emptyCreateForm);
   const [receiveForm, setReceiveForm] = React.useState<ReceiveFormState>({
     actualQty: "0",
     shortageQty: "0",
@@ -303,11 +303,18 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
     setActiveDialog(dialog);
   }
 
+  function openCreateDialog() {
+    setCreateForm(emptyCreateForm);
+    setActiveDialog("create");
+  }
+
   async function submitCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!createForm.documentType) return;
+    const documentType = createForm.documentType;
     const request: CreateReceivingOrderRequest = {
       receipt_no: createForm.receiptNo.trim(),
-      document_type: createForm.documentType,
+      document_type: documentType,
       warehouse_id: createForm.warehouseId.trim(),
       expected_arrival_at: dateToIso(createForm.expectedArrivalDate),
       external_ref: null,
@@ -317,7 +324,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
           line_no: 1,
           product_code: createForm.productCode.trim(),
           product_id: null,
-          batch_no: createAsnBatchNo(createForm.documentType, createForm.batchNo),
+          batch_no: createAsnBatchNo(documentType, createForm.batchNo),
           expected_qty: toInteger(createForm.expectedQty),
           production_date: createForm.productionDate || null,
           expiry_date: createForm.expiryDate || null,
@@ -418,7 +425,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
       ? {
           label: "新增",
           description: "新建 ASN",
-          onClick: () => setActiveDialog("create"),
+          onClick: openCreateDialog,
         }
       : undefined;
 

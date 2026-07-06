@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createServer } from "vite";
 
@@ -33,6 +34,20 @@ try {
   );
   assert.equal(createAsnBatchNo("purchase_inbound", "BATCH-001"), null);
   assert.equal(createAsnBatchNo("sales_return", "BATCH-001"), "BATCH-001");
+
+  const pageSource = readFileSync(fileURLToPath(new URL("../src/pages/inbound/M2InboundPage.tsx", import.meta.url)), "utf8");
+  const dialogSource = readFileSync(fileURLToPath(new URL("../src/pages/inbound/M2InboundDialogs.tsx", import.meta.url)), "utf8");
+  const createFormBlock = /const emptyCreateForm: CreateFormState = \{([\s\S]*?)\};/.exec(pageSource)?.[1] ?? "";
+  assert.ok(createFormBlock, "M2 新建 ASN 表单必须使用可复位的空初始值");
+  for (const field of ["receiptNo", "documentType", "supplierId", "warehouseId", "expectedArrivalDate", "productCode", "batchNo", "expectedQty", "productionDate", "expiryDate"]) {
+    assert.match(createFormBlock, new RegExp(`${field}: ""`), `新建 ASN 默认值必须为空: ${field}`);
+  }
+  assert.doesNotMatch(createFormBlock, /ASN-M2-PC-0002|P-M2-002|2026-02-01|2028-02-01|"60"/, "新建 ASN 样例值不能作为表单 value");
+  assert.match(pageSource, /function openCreateDialog\(\) \{[\s\S]*setCreateForm\(emptyCreateForm\);[\s\S]*setActiveDialog\("create"\);[\s\S]*\}/, "点击新建 ASN 必须重置为空表单");
+  assert.match(pageSource, /onClick: openCreateDialog/, "新建 ASN 按钮必须走重置入口");
+  assert.match(dialogSource, /<TextField label="ASN 号" required placeholder="例如 ASN-M2-PC-0002"/, "ASN 样例只允许作为 placeholder");
+  assert.match(dialogSource, /<TextField label="ASN 商品编码" required placeholder="例如 P-M2-002"/, "商品编码样例只允许作为 placeholder");
+  assert.match(dialogSource, /<TextField label="预报数量" type="number" required placeholder="例如 60"/, "预报数量样例只允许作为 placeholder");
 } finally {
   await server.close();
 }

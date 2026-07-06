@@ -30,7 +30,7 @@ export type InboundDialog = "create" | "receive" | "reject" | "inspect" | "putaw
 
 export interface CreateFormState {
   receiptNo: string;
-  documentType: InboundDocumentType;
+  documentType: InboundDocumentType | "";
   supplierId: string;
   warehouseId: string;
   expectedArrivalDate: string;
@@ -178,33 +178,36 @@ export function M2InboundDialogs({
               <DialogTitle>新建 ASN</DialogTitle>
               <DialogDescription>手工创建入库通知单。</DialogDescription>
             </DialogHeader>
-            <TextField label="ASN 号" value={createForm.receiptNo} onChange={(receiptNo) => setCreateForm((value) => ({ ...value, receiptNo }))} />
+            <TextField label="ASN 号" required placeholder="例如 ASN-M2-PC-0002" value={createForm.receiptNo} onChange={(receiptNo) => setCreateForm((value) => ({ ...value, receiptNo }))} />
             <div>
               <label className="mb-1 block text-xs text-muted-foreground">单据类型</label>
               <select
+                aria-label="单据类型"
+                required
                 className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                 value={createForm.documentType}
                 onChange={(event) =>
                   setCreateForm((value) => ({
                     ...value,
-                    documentType: event.target.value as InboundDocumentType,
+                    documentType: event.target.value as CreateFormState["documentType"],
                   }))
                 }
               >
+                <option value="" disabled>请选择单据类型</option>
                 <option value="purchase_inbound">采购入库</option>
                 <option value="sales_return">销售退货</option>
               </select>
             </div>
-            <TextField label="供应商 ID" value={createForm.supplierId} onChange={(supplierId) => setCreateForm((value) => ({ ...value, supplierId }))} />
-            <TextField label="仓库 ID" value={createForm.warehouseId} onChange={(warehouseId) => setCreateForm((value) => ({ ...value, warehouseId }))} />
-            <TextField label="预计到货" type="date" value={createForm.expectedArrivalDate} onChange={(expectedArrivalDate) => setCreateForm((value) => ({ ...value, expectedArrivalDate }))} />
-            <TextField label="ASN 商品编码" value={createForm.productCode} onChange={(productCode) => setCreateForm((value) => ({ ...value, productCode }))} />
+            <TextField label="供应商 ID" placeholder="例如 00000000-0000-0000-0000-000000005001" value={createForm.supplierId} onChange={(supplierId) => setCreateForm((value) => ({ ...value, supplierId }))} />
+            <TextField label="仓库 ID" required placeholder="例如 00000000-0000-0000-0000-000000003001" value={createForm.warehouseId} onChange={(warehouseId) => setCreateForm((value) => ({ ...value, warehouseId }))} />
+            <TextField label="预计到货" type="date" placeholder="例如 2026-06-27" value={createForm.expectedArrivalDate} onChange={(expectedArrivalDate) => setCreateForm((value) => ({ ...value, expectedArrivalDate }))} />
+            <TextField label="ASN 商品编码" required placeholder="例如 P-M2-002" value={createForm.productCode} onChange={(productCode) => setCreateForm((value) => ({ ...value, productCode }))} />
             {createForm.documentType === "sales_return" && (
-              <TextField label="ASN 批号" value={createForm.batchNo} onChange={(batchNo) => setCreateForm((value) => ({ ...value, batchNo }))} />
+              <TextField label="ASN 批号" placeholder="例如 BATCH-202606" value={createForm.batchNo} onChange={(batchNo) => setCreateForm((value) => ({ ...value, batchNo }))} />
             )}
-            <TextField label="预报数量" type="number" value={createForm.expectedQty} onChange={(expectedQty) => setCreateForm((value) => ({ ...value, expectedQty }))} />
-            <TextField label="生产日期" type="date" value={createForm.productionDate} onChange={(productionDate) => setCreateForm((value) => ({ ...value, productionDate }))} />
-            <TextField label="有效期至" type="date" value={createForm.expiryDate} onChange={(expiryDate) => setCreateForm((value) => ({ ...value, expiryDate }))} />
+            <TextField label="预报数量" type="number" required placeholder="例如 60" value={createForm.expectedQty} onChange={(expectedQty) => setCreateForm((value) => ({ ...value, expectedQty }))} />
+            <TextField label="生产日期" type="date" placeholder="例如 2026-02-01" value={createForm.productionDate} onChange={(productionDate) => setCreateForm((value) => ({ ...value, productionDate }))} />
+            <TextField label="有效期至" type="date" placeholder="例如 2028-02-01" value={createForm.expiryDate} onChange={(expiryDate) => setCreateForm((value) => ({ ...value, expiryDate }))} />
             <DialogFooter className="md:col-span-2">
               <CancelButton />
               <Button type="submit" disabled={pending}>
@@ -382,6 +385,7 @@ function TextField({
   value,
   onChange,
   type = "text",
+  placeholder,
   className,
   required = false,
 }: {
@@ -389,13 +393,14 @@ function TextField({
   value: string;
   onChange: (value: string) => void;
   type?: React.HTMLInputTypeAttribute;
+  placeholder?: string;
   className?: string;
   required?: boolean;
 }) {
   return (
     <label className={`grid gap-1 text-xs text-muted-foreground ${className ?? ""}`}>
       {label}
-      <Input type={type} required={required} value={value} onChange={(event) => onChange(event.target.value)} />
+      <Input type={type} required={required} placeholder={placeholder} value={value} onChange={(event) => onChange(event.target.value)} />
     </label>
   );
 }
