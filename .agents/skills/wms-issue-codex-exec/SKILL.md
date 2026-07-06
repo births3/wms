@@ -29,6 +29,7 @@ description: WMS Gitea issue 的 codex exec 两段式确认流程。用户要求
 10. `codex exec` 空闲超时、执行失败或收到外部终止信号只写状态更正，不视为用户验收反馈；不得自动重发修正方案，也不得复用旧确认继续执行。
 11. 用户验收反馈“不对 / 不是这样 / 还缺 / 重新改 / 截图不对”等，视为新一轮反馈；必须评论 `wms-issue-agent:revision-proposal:v1` 修正方案，等待新的 `确认方案`，不得复用旧确认继续执行。
 12. 暂停 PR 期间如果存在 open PR，先评论暂停原因，再关闭 PR；对应 head 分支进入主代理本地 review / 合并队列。
+13. 主代理处理已关闭 issue 的本地分支时，先收口主工作区已有脏区；主工作区干净后再合入 closed issue 分支。禁止把 issue diff 直接揉进未提交脏区，除非只是为了解冲突且随后必须拆回独立提交。
 
 ## 执行约束
 
@@ -39,10 +40,13 @@ description: WMS Gitea issue 的 codex exec 两段式确认流程。用户要求
 - 禁止只检查 watcher 进程存在；后台环境变更后必须跑 `just issue-agent-codex-smoke`。
 - 禁止把 token、密钥、账号密码写入 `.codex/issue-agent/env`；该文件只用于代理变量。
 - 禁止让 `codex exec` 承载长驻前端服务；exec 完成后会退出，人工测试统一用主工作区 `just dev-web-restart` 的 9002 tmux 会话。
+- issue worktree 前端端口必须独立使用 9003-9099；后端端口只在改后端 / API / 数据库时独立使用 18081-18099，纯前端修复共用主后端 18080。
+- worktree 预览或联调必须用 `just dev-web-worktree-restart/verify` 和 `just dev-api-worktree-restart/verify`，校验端口、LAN URL、`/healthz` 和进程 cwd 与 worktree 一致；不能只证明端口可访问。
 - 禁止只修当前页面而不判断共性；proposal 判定共性时，必须查共享组件、字段矩阵、prompt / skill / runbook 和治理脚本。
 - 禁止推送远端、创建 Gitea PR 或自动合并远端 PR；当前只允许本地分支交付，由主代理本地 review 后合并。
 - 禁止把 open PR 留作备用合并入口；暂停 PR 期间关闭 open PR 后，必须登记本地分支、worktree、提交哈希或 diff 状态。
 - 禁止把“已交付本地分支”写成“已完成”；没有测试、截图和回写证据就只能写阻塞或待验收。
+- 禁止在主工作区存在无关脏区时合入 issue 分支；先用 `wms-review-fix-commit` 把现有脏区按主题提交，再合入 closed issue 分支并单独验证、单独提交。
 - 新增字段、状态、角色、模块、业务默认值或跨模块语义变化时，停止并向用户确认。
 
 ## 最小检查

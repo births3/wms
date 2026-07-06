@@ -312,6 +312,71 @@ dev-web-worktree-verify path port="9003":
       echo "LAN URL: http://$lan_ip:$port/"
     fi
 
+# 从指定 worktree 启动后端 API；18080 保留给主工作区，worktree 默认 18081
+dev-api-worktree-restart path port="18081":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    worktree="$(realpath "{{path}}")"
+    port="{{port}}"
+    if [[ "$port" == "18080" || ! "$port" =~ ^18[0-9]{3}$ || "$port" -lt 18081 || "$port" -gt 18099 ]]; then
+      echo "worktree 后端端口必须是 18081-18099，18080 保留给主工作区" >&2
+      exit 1
+    fi
+    [[ -d "$worktree/backend" ]] || { echo "不是 WMS worktree：$worktree" >&2; exit 1; }
+    slug="$(basename "$worktree" | tr -c '[:alnum:]_-' '-')"
+    session="wms-api-${port}-${slug}"
+    log="/tmp/${session}.log"
+    tmux kill-session -t "$session" 2>/dev/null || true
+    mapfile -t pids < <(ss -ltnp "sport = :$port" 2>/dev/null | sed -n 's/.*pid=\([0-9]\+\).*/\1/p' | sort -u)
+    for pid in "${pids[@]}"; do
+      cwd="$(readlink "/proc/$pid/cwd" 2>/dev/null || true)"
+      if [[ "$cwd" == "$worktree" || "$cwd" == "$worktree/backend" ]]; then
+        kill "$pid" 2>/dev/null || true
+      else
+        echo "端口 $port 已被其他进程占用：$pid $cwd" >&2
+        exit 1
+      fi
+    done
+    tmux new-session -d -s "$session" -c "$worktree" \
+      "WMS_BIND_ADDR=0.0.0.0:$port JWT_SECRET=\${JWT_SECRET:-dev-jwt-secret-change-me} WMS_REDIS_URL=\${WMS_REDIS_URL:-redis://127.0.0.1:6379} cargo run --manifest-path backend/Cargo.toml -p wms-api --bin wms-api 2>&1 | tee $log"
+    just dev-api-worktree-verify "$worktree" "$port"
+
+# 校验指定 worktree 的后端 API 端口、/healthz 和 LAN 地址
+dev-api-worktree-verify path port="18081":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    worktree="$(realpath "{{path}}")"
+    port="{{port}}"
+    if [[ "$port" == "18080" || ! "$port" =~ ^18[0-9]{3}$ || "$port" -lt 18081 || "$port" -gt 18099 ]]; then
+      echo "worktree 后端端口必须是 18081-18099，18080 保留给主工作区" >&2
+      exit 1
+    fi
+    for _ in {1..30}; do
+      if curl --noproxy '*' -fsS --max-time 2 "http://127.0.0.1:$port/healthz" >/dev/null; then
+        break
+      fi
+      sleep 1
+    done
+    curl --noproxy '*' -fsS --max-time 3 "http://127.0.0.1:$port/healthz" >/dev/null
+    ok=0
+    mapfile -t pids < <(ss -ltnp "sport = :$port" 2>/dev/null | sed -n 's/.*pid=\([0-9]\+\).*/\1/p' | sort -u)
+    for pid in "${pids[@]}"; do
+      cwd="$(readlink "/proc/$pid/cwd" 2>/dev/null || true)"
+      echo "$pid $cwd"
+      if [[ "$cwd" == "$worktree" || "$cwd" == "$worktree/backend" ]]; then
+        ok=1
+      fi
+    done
+    if [[ "$ok" != 1 ]]; then
+      echo "$port 未由 worktree $worktree 提供" >&2
+      exit 1
+    fi
+    lan_ip="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i=1;i<=NF;i++) if ($i=="src") {print $(i+1); exit}}')"
+    if [[ -n "$lan_ip" && "$lan_ip" != 127.* ]]; then
+      curl --noproxy '*' -fsS --max-time 3 "http://$lan_ip:$port/healthz" >/dev/null
+      echo "LAN URL: http://$lan_ip:$port/"
+    fi
+
 # 生成主仓 OpenAPI JSON 并刷新 @wms/api-client 类型
 openapi-sync:
     @cd backend && cargo run --quiet --bin openapi-export > ../shared/openapi/openapi.json
@@ -414,7 +479,7 @@ issue-agent-restart:
     done
     rm -f "$pid_file"
     cd "{{MAIN_ROOT}}"
-    nohup python3 -u scripts/agents/issue_runner.py watch --interval "${WMS_ISSUE_AGENT_INTERVAL:-60}" --apply >> "{{ISSUE_AGENT_LOG}}" 2>&1 &
+    nohup setsid python3 -u scripts/agents/issue_runner.py watch --interval "${WMS_ISSUE_AGENT_INTERVAL:-60}" --apply >> "{{ISSUE_AGENT_LOG}}" 2>&1 < /dev/null &
     echo "$!" > "$pid_file"
     sleep 2
     "$just_bin" issue-agent-verify

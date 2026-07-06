@@ -12,6 +12,7 @@ import os
 import re
 import shlex
 import signal
+import socket
 import subprocess
 import sys
 import tempfile
@@ -27,6 +28,8 @@ DEFAULT_OUT_DIR = REPO_ROOT / ".codex" / "issue-agent"
 CONSUMED_CONFIRMATIONS_FILE = DEFAULT_OUT_DIR / "consumed-confirmations.json"
 ISSUE_AGENT_ENV_FILE = DEFAULT_OUT_DIR / "env"
 ISSUE_WORKTREE_PARENT = REPO_ROOT.parent
+WORKTREE_WEB_PORT_RANGE = range(9003, 9100)
+WORKTREE_API_PORT_RANGE = range(18081, 18100)
 PROPOSAL_MARKER = "<!-- wms-issue-agent:proposal:v1 -->"
 REVISION_PROPOSAL_MARKER = "<!-- wms-issue-agent:revision-proposal:v1 -->"
 EXEC_MARKER = "<!-- wms-issue-agent:exec:v1 -->"
@@ -661,7 +664,7 @@ def build_fix_prompt(issue: dict[str, Any], comments: list[dict[str, Any]]) -> s
 2. 当前命令已由 issue-agent 在 issue 专属 worktree 中用 `codex exec` 直接启动；先运行 `pwd`、`git status --short --branch` 和 `git worktree list` 核对，禁止修改主工作区。
 3. 只修复 issue 指向的问题。新增字段、状态、角色、模块或业务默认值时停止并向用户确认。
 4. 完成后运行相关测试，至少 `git diff --check` 和 `just gov-t1`。
-5. 涉及前端或用户可见行为时，禁止在子 worktree 中启动或占用 9002；9002 只允许主工作区固定会话 `wms-web-admin-9002`。需要真实截图或重启证据时，合并到主工作区后由主代理运行 `just dev-web-restart` 和 `just dev-web-verify`，后端按仓库现有运行方式启动并检查 `/healthz`。重启后必须校验运行的是本次修复版本：记录当前提交哈希，并用 `just dev-web-verify` 输出、页面可见变更、接口响应版本字段或等价证据证明不是旧进程缓存；把端口、URL、提交哈希和版本校验结果写入 issue。
+5. 涉及前端或用户可见行为时，禁止在子 worktree 中启动或占用 9002；9002 只允许主工作区固定会话 `wms-web-admin-9002`。issue worktree 预览必须使用本 prompt 末尾分配的 `WMS_ISSUE_WEB_PORT`，执行 `just dev-web-worktree-restart <worktree> $WMS_ISSUE_WEB_PORT` 并用 `just dev-web-worktree-verify <worktree> $WMS_ISSUE_WEB_PORT` 校验进程 cwd 与 worktree 一致。纯前端修复默认共用主后端 `18080`；改后端 / API / 数据库时必须使用本 prompt 末尾分配的 `WMS_ISSUE_API_PORT`，执行 `just dev-api-worktree-restart <worktree> $WMS_ISSUE_API_PORT` 并用 `just dev-api-worktree-verify <worktree> $WMS_ISSUE_API_PORT` 校验 `/healthz`、LAN URL 和进程一致性。需要真实截图或重启证据时，合并到主工作区后由主代理运行 `just dev-web-restart` 和 `just dev-web-verify`，后端按仓库现有运行方式启动并检查 `/healthz`。重启后必须校验运行的是本次修复版本：记录当前提交哈希，并用 `just dev-web-verify` 输出、页面可见变更、接口响应版本字段或等价证据证明不是旧进程缓存；把端口、URL、提交哈希、进程一致性和版本校验结果写入 issue。
 6. 如果 issue 评论包含截图 / 附件，必须先打开或下载附件辅助定位，不能只按文字猜测。
 7. 涉及前端或用户可见行为时，必须采集真实前端截图；必须用 `POST /repos/{{owner}}/{{repo}}/issues/<编号>/assets` 把截图上传为 Gitea 附件，并用 Markdown 图片评论到 issue；不能只写本地路径。
 8. 当前可用截图 / 附件如下：
@@ -670,6 +673,13 @@ def build_fix_prompt(issue: dict[str, Any], comments: list[dict[str, Any]]) -> s
 10. 当前暂停 Gitea PR：允许在 issue 专属 worktree 的本地分支上提交，禁止推送远端、禁止创建 Gitea PR、禁止自行合并到主工作区。
 11. 最后必须评论 `{DELIVERY_MARKER}` delivery 信息：本地 worktree、分支、提交哈希或 diff 状态、验证结果、截图证据、本地测试环境重启结果、codex exec 日志位置、本地合并前置条件和剩余风险，并明确下一步是“等待主代理本地 review 后合并”或“阻塞”。
 12. 如果用户验收反馈不对，不得继续复用本次确认；必须等待 issue-agent 重新生成修正方案并由用户再次回复“确认方案”。
+
+端口和进程一致性规则：
+- 主工作区固定：前端 9002，后端 18080。
+- issue worktree 前端：9003-9099，每个 worktree 独立端口。
+- issue worktree 后端：18081-18099；只有改后端 / API / 数据库时启动，纯前端修复共用 18080。
+- 端口验证必须证明端口对应进程来自本 issue worktree；不能只证明端口可访问。
+- delivery 必须写明本轮使用的前端端口、后端端口或共用后端、LAN URL、`/healthz` 结果和进程一致性校验结果。
 
 当前相似 / 共性问题判断：
 {commonality}
@@ -730,6 +740,34 @@ def issue_worktree(issue_number: int, stamp: str) -> tuple[Path, str]:
     name = f"{REPO_ROOT.name}-agent-issue-{issue_number}-{stamp}"
     branch = f"fix/issue-{issue_number}-{stamp}"
     return ISSUE_WORKTREE_PARENT / name, branch
+
+
+def port_in_use(port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(0.2)
+        return sock.connect_ex(("127.0.0.1", port)) == 0
+
+
+def first_free_port(ports: range) -> int:
+    for port in ports:
+        if not port_in_use(port):
+            return port
+    raise RuntimeError(f"没有可用端口：{ports.start}-{ports.stop - 1}")
+
+
+def append_runtime_context(prompt_path: Path, work_dir: Path, web_port: int, api_port: int) -> None:
+    with prompt_path.open("a", encoding="utf-8") as f:
+        f.write(
+            "\n\n"
+            "本轮 issue-agent 运行时分配：\n"
+            f"- worktree：`{work_dir}`\n"
+            f"- WMS_ISSUE_WEB_PORT={web_port}\n"
+            f"- WMS_ISSUE_API_PORT={api_port}\n"
+            f"- 前端预览命令：`just dev-web-worktree-restart {work_dir} {web_port}`\n"
+            f"- 前端校验命令：`just dev-web-worktree-verify {work_dir} {web_port}`\n"
+            f"- 后端联调命令：`just dev-api-worktree-restart {work_dir} {api_port}`\n"
+            f"- 后端校验命令：`just dev-api-worktree-verify {work_dir} {api_port}`\n"
+        )
 
 
 def read_issue_agent_env(path: Path = ISSUE_AGENT_ENV_FILE) -> dict[str, str]:
@@ -805,12 +843,15 @@ def build_codex_command(work_dir: Path, prompt_path: Path, log_path: Path) -> st
     )
 
 
-def prepare_codex_exec(issue_number: int, prompt_path: Path) -> tuple[Path, str, Path, Path]:
+def prepare_codex_exec(issue_number: int, prompt_path: Path) -> tuple[Path, str, Path, Path, int, int]:
     stamp = datetime.now().strftime("%Y%m%d%H%M%S")
     script = prompt_path.with_suffix(".run.sh")
     log_path = prompt_path.with_suffix(".log")
     work_dir, branch = issue_worktree(issue_number, stamp)
     run(["git", "worktree", "add", "-b", branch, str(work_dir), "HEAD"])
+    web_port = first_free_port(WORKTREE_WEB_PORT_RANGE)
+    api_port = first_free_port(WORKTREE_API_PORT_RANGE)
+    append_runtime_context(prompt_path, work_dir, web_port, api_port)
     command = build_codex_command(work_dir, prompt_path, log_path)
     script.write_text(
         "\n".join(
@@ -818,6 +859,8 @@ def prepare_codex_exec(issue_number: int, prompt_path: Path) -> tuple[Path, str,
                 "#!/usr/bin/env bash",
                 "set -euo pipefail",
                 *codex_env_exports(),
+                f"export WMS_ISSUE_WEB_PORT={web_port}",
+                f"export WMS_ISSUE_API_PORT={api_port}",
                 f"cd {quote(str(work_dir))}",
                 command,
             ]
@@ -826,7 +869,7 @@ def prepare_codex_exec(issue_number: int, prompt_path: Path) -> tuple[Path, str,
         encoding="utf-8",
     )
     script.chmod(0o700)
-    return work_dir, branch, script, log_path
+    return work_dir, branch, script, log_path, web_port, api_port
 
 
 def codex_progress_signature(work_dir: Path, log_path: Path) -> tuple[str, str, str]:
@@ -902,7 +945,7 @@ def execute_action(
         post_comment(issue_number, action.body)
         print(f"applied: 已评论 issue #{issue_number}", flush=True)
         return
-    work_dir, branch, script, log_path = prepare_codex_exec(issue_number, preview)
+    work_dir, branch, script, log_path, web_port, api_port = prepare_codex_exec(issue_number, preview)
     post_comment(
         issue_number,
         (
@@ -910,6 +953,8 @@ def execute_action(
             "已开始直接运行 `codex exec`，等待 Codex 执行并回写 delivery 证据。\n"
             f"- worktree：`{work_dir}`\n"
             f"- 分支：`{branch}`\n"
+            f"- 前端预览端口：`{web_port}`\n"
+            f"- 后端联调端口：`{api_port}`（仅改后端 / API / 数据库时使用；纯前端共用 18080）\n"
             f"- 日志：`{log_path}`\n"
             f"- prompt：`{preview}`\n"
         ),
@@ -1188,6 +1233,16 @@ def self_test() -> int:
     assert DELIVERY_MARKER in prompt
     assert "tea api" in prompt
     assert "禁止裸 `curl`" in prompt
+    assert "WMS_ISSUE_WEB_PORT" in prompt
+    assert "WMS_ISSUE_API_PORT" in prompt
+    assert "进程一致性" in prompt
+    runtime_prompt = Path(tempfile.mkdtemp(prefix="wms-issue-agent-runtime-")) / "prompt.txt"
+    runtime_prompt.write_text("base", encoding="utf-8")
+    append_runtime_context(runtime_prompt, Path("/tmp/wms-agent-issue-7-demo"), 9003, 18081)
+    runtime_text = runtime_prompt.read_text(encoding="utf-8")
+    assert "WMS_ISSUE_WEB_PORT=9003" in runtime_text
+    assert "WMS_ISSUE_API_PORT=18081" in runtime_text
+    assert "dev-api-worktree-verify" in runtime_text
     issue_asset = {
         **issue,
         "assets": [{"name": "issue.png", "browser_download_url": "http://gitea/attachments/issue"}],

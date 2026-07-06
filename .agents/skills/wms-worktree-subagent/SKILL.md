@@ -19,6 +19,8 @@ description: WMS 仓库用独立 worktree 和 codex exec 运行子代理、复�
 - `pnpm`、OpenAPI 生成器、数据库、`.env`、网络或外部服务验证失败时最多重试一次；仍失败则不可合并。
 - 最终输出只写结论、摘要、验证和清理建议；完整 diff 由主代理审查。
 - 前端 worktree 预览端口只能用 9003-9099，9002 保留给主工作区固定会话；用 `just dev-web-worktree-restart <worktree> <port>` 启动并用 LAN URL 验证。
+- 后端 worktree 联调端口只能用 18081-18099，18080 保留给主工作区固定后端；纯前端任务共用 18080，改后端 / API / 数据库时才用 `just dev-api-worktree-restart <worktree> <port>` 启动独立后端。
+- worktree 服务验证必须证明端口对应进程 cwd 来自该 worktree；不能只证明 URL 可访问。
 
 ## 建立子代理
 
@@ -61,7 +63,7 @@ codex exec -C ../wms-agent-<slug> -s read-only -o ../wms-agent-<slug>.out.md "<�
 
 主代理只在以下条件全部满足时考虑合并：
 
-- 主工作区没有无关脏改动；否则停下说明。
+- 主工作区没有无关脏改动；否则先按 `wms-review-fix-commit` 把已有脏区 review、验证并按主题提交，再回到当前合并。
 - 子代理输出写明“本切片可合并”，且“是否可合并”为“是”。
 - 覆盖矩阵没有把缺口误写成完成。
 - 子代理列出的验证命令和退出码满足任务提示词。
@@ -73,6 +75,7 @@ codex exec -C ../wms-agent-<slug> -s read-only -o ../wms-agent-<slug>.out.md "<�
 - 有提交：`git merge --no-ff agent/<slug>` 或 `git cherry-pick <hash>`。
 - 无提交：审查 diff 后用 `git diff --binary | git apply --3way` 接入授权文件。
 - 不可合并、验证失败、越权或需业务确认：不合并。
+- 已关闭 issue 分支：主工作区先干净化，再合入 issue 分支；合入后必须单独跑相关测试、`git diff --check` 和 `just gov-t1`，再单独提交或保留合并提交。
 
 ## 旧 worktree 迁移
 

@@ -19,7 +19,7 @@
 7. `codex exec` 空闲超时、失败或收到 `SIGTERM` / `SIGKILL` 等外部终止信号时，只评论失败状态，不自动重发方案，不复用旧确认；需要重跑时由人工补充新评论，再进入下一轮 proposal。
 8. 当前暂停 Gitea PR：Codex exec 只在本地 worktree / 本地分支修复、验证和回写 issue；禁止推送远端、禁止创建 Gitea PR。
 9. Codex 把本地 worktree、分支、提交或 diff 状态、验证结果、截图附件、本地测试环境重启结果、版本校验证据、本地合并前置条件和剩余风险评论回 issue。
-10. 主代理把 issue-agent 本地分支纳入本地收口队列：复审、补证据、修冲突、合并到主工作区、再决定是否关闭 issue。
+10. 主代理把 issue-agent 本地分支纳入本地收口队列：先收口主工作区已有脏区，再复审 issue 分支、补证据、修冲突、合并到主工作区、再决定是否关闭 issue。
 11. 已回写本地交付、等待主代理本地合并、阻塞或状态更正属于状态评论，不是新需求评论；watcher 不能因此再次生成“请回复确认方案”的判断评论。
 12. 用户验收反馈不对时，必须生成 `wms-issue-agent:revision-proposal:v1` 修正方案，等待新的 `确认方案` 后再执行；禁止复用旧确认自动继续跑。
 
@@ -100,6 +100,7 @@ no_proxy=localhost,127.0.0.1,::1,192.168.0.0/16
 - prompt 要求 Codex 禁止自行合并到主工作区；本地分支交付后必须写清本地合并前置条件和 codex exec 日志位置。
 - prompt 要求 Codex 先执行 proposal 中的相似 / 共性问题判断；共性成立时必须一起修共享组件、字段矩阵、规范或治理脚本，不能只修当前页面。
 - issue-agent 本地分支只有一个合并 owner：主代理。watcher 只启动执行和回写状态，不做本地合并。
+- 主代理合并 closed issue 分支前，必须先处理主工作区脏区：已有脏区按主题 review、验证、提交；主工作区干净后再合入 issue 分支。禁止把 issue diff 混入已有脏区提交。
 - 本地分支交付不等于 issue 完成。issue 评论只能写“已交付本地分支 / 等待主代理本地 review 合并 / 阻塞”，禁止在主工作区未验证和未收口前写“已完成”。
 - 自动 PR 合并暂停：长期 watcher 不带 `--merge-closed`，不得因为 issue 关闭就合并远端 PR。
 - 暂停 PR 期间不得保留 open PR 作为合并入口；关闭前必须写明原因，关闭后把 head 分支、worktree、提交哈希或 diff 状态登记为本地待合并对象。
@@ -107,7 +108,8 @@ no_proxy=localhost,127.0.0.1,::1,192.168.0.0/16
 - 前端或用户可见行为修复必须重启本地测试前后端，并把端口、URL、`/healthz` 或等价健康检查结果写回 issue。
 - 9002 只允许主工作区固定会话 `wms-web-admin-9002` 占用；子 worktree 不得启动或占用 9002。
 - `codex exec` 是短生命周期任务，执行完会退出；可人工测试的前端必须由主工作区 `just dev-web-restart` 启动的 `wms-web-admin-9002` 长驻会话提供，不能依赖 exec 进程保活。
-- issue 分支 / worktree 临时预览使用 `just dev-web-worktree-restart <worktree> <端口>`，端口范围 9003-9099；默认 9003，必须输出 LAN URL。
+- issue 分支 / worktree 临时预览使用 `just dev-web-worktree-restart <worktree> <端口>`，端口范围 9003-9099；默认 9003，必须输出 LAN URL，并校验端口对应进程 cwd 来自该 worktree。
+- issue 分支 / worktree 后端联调只在改后端 / API / 数据库时启动，使用 `just dev-api-worktree-restart <worktree> <端口>`，端口范围 18081-18099；纯前端修复共用主后端 18080。后端校验必须包含 `/healthz`、LAN URL 和进程 cwd 一致性。
 - 重启后必须校验运行的是本次修复版本：主代理在主工作区运行 `just dev-web-restart` 和 `just dev-web-verify`，记录提交哈希，并用校验输出、页面可见变更、接口响应版本字段或等价证据证明不是旧进程缓存。
 - 前端或用户可见行为修复必须采集真实前端截图，用 `POST /repos/{owner}/{repo}/issues/<编号>/assets` 上传为 Gitea 附件，并用 Markdown 图片评论到 issue；不能只写本地路径。
 - 新增字段、状态、角色、模块或业务默认值时，Codex 必须停止并询问用户。
@@ -129,10 +131,12 @@ no_proxy=localhost,127.0.0.1,::1,192.168.0.0/16
 | codex exec 卡住 | 依据日志、HEAD 和 worktree 状态的空闲时间判断；超时、失败或外部终止只评论状态，不自动重发方案，旧确认不能复用 |
 | codex exec 连接 | cron / nohup 后台环境必须通过 `.codex/issue-agent/env` 显式带上必要代理；`just issue-agent-codex-smoke` 必须通过 |
 | watcher 保活 | `just issue-agent-status` 必须显示 cron watchdog；杀掉 watcher 后，下一分钟应由 `issue-agent-ensure` 自动拉起 |
+| worktree 端口 | 前端 9003-9099、后端 18081-18099；验证必须证明端口对应进程来自 issue worktree，不能只看 URL 可访问 |
 | WMS 执行 | Codex 使用 WMS skills，完成验证；前端截图和 9002 重启证据由主代理在主工作区校验后补齐，且不自行合并主工作区 |
 | 证据回写 | issue 包含本地 worktree / 分支 / 提交或 diff 状态、真实截图附件、本地测试环境重启结果、重启后版本校验、codex exec 日志位置、本地合并前置条件和剩余风险 |
 | 状态评论 | 已交付本地分支、等待主代理合并、阻塞、状态更正等评论不能触发新一轮判断；只有后续人工补充真实新需求时才重新判断 |
 | 合并 owner | issue-agent 本地分支只由主代理 review 后本地合并；watcher 不合并 |
+| 合并顺序 | 主工作区脏区先按主题提交，closed issue 分支后合入；两者不得混成一个提交 |
 | 验收反馈 | 用户说不对、还缺或截图不符时，必须重新发修正方案并等待新确认，不得复用旧确认自动继续跑 |
 
 失败时只修失败点，不扩大流程。
