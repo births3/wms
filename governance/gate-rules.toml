@@ -40,7 +40,7 @@ tier = "T1"
 
 [[rules]]
 match = "docs/domain/user-stories-*.md"
-checks = ["check_project_rtm", "check_system_dictionary_alignment"]
+checks = ["check_project_rtm", "check_system_dictionary_alignment", "check_scope_gap_discovery"]
 tier = "T1"
 
 [[rules]]
@@ -151,12 +151,12 @@ tier = "T1"
 
 [[rules]]
 match = "governance/quality-matrix.toml"
-checks = ["check_quality_matrix"]
+checks = ["check_quality_matrix", "check_scope_gap_discovery"]
 tier = "T1"
 
 [[rules]]
 match = "docs/governance/quality-matrix*.md"
-checks = ["check_quality_matrix", "check_doc_links"]
+checks = ["check_quality_matrix", "check_scope_gap_discovery", "check_doc_links"]
 tier = "T1"
 
 [[rules]]
@@ -441,7 +441,7 @@ tier = "T1"
 
 [[rules]]
 match = "apps/web-admin/src/App.tsx"
-checks = ["check_admin_navigation", "check_admin_page_query_panel"]
+checks = ["check_admin_navigation", "check_admin_page_query_panel", "check_scope_gap_discovery"]
 tier = "T1"
 
 # ============================================================
@@ -481,7 +481,7 @@ tier = "T1"
 
 [[rules]]
 match = "apps/web-admin/src/pages/**"
-checks = ["check_page_size", "check_admin_page_query_panel"]
+checks = ["check_page_size", "check_admin_page_query_panel", "check_scope_gap_discovery"]
 tier = "T1"
 
 [[rules]]

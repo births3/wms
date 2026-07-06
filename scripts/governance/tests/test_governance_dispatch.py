@@ -87,6 +87,13 @@ def test_governance_checks_t1_includes_quality_matrix_guard():
     assert "check_quality_matrix.py" in expand_tier_scripts("T1")
 
 
+def test_governance_checks_t1_includes_scope_gap_discovery_guard():
+    """T1 全量入口必须覆盖范围缺口自发现，避免故事、菜单和矩阵脱节。"""
+    from governance_checks import expand_tier_scripts
+
+    assert "check_scope_gap_discovery.py" in expand_tier_scripts("T1")
+
+
 def test_governance_script_changes_trigger_coverage_meta_check():
     """治理脚本变更时，diff gate 必须触发覆盖元检查。"""
     from _diff import load_gate_rules, match_rules
@@ -145,6 +152,28 @@ def test_quality_matrix_sources_trigger_quality_matrix_guard():
     ]:
         triggered = match_rules([changed_file], rules)
         assert "check_quality_matrix" in triggered
+
+    for changed_file in [
+        "governance/quality-matrix.toml",
+        "docs/governance/quality-matrix.md",
+        "docs/governance/quality-matrix-method.md",
+    ]:
+        triggered = match_rules([changed_file], rules)
+        assert "check_scope_gap_discovery" in triggered
+
+
+def test_scope_gap_sources_trigger_discovery_guard():
+    """故事、菜单和管理端页面变更必须触发范围缺口自发现。"""
+    from _diff import load_gate_rules, match_rules
+
+    rules = load_gate_rules()
+    for changed_file in [
+        "docs/domain/user-stories-h9-print-template.md",
+        "apps/web-admin/src/App.tsx",
+        "apps/web-admin/src/pages/print-template/H9PrintTemplatePage.tsx",
+    ]:
+        triggered = match_rules([changed_file], rules)
+        assert "check_scope_gap_discovery" in triggered
 
 
 def test_runtime_route_sources_trigger_mount_guard():

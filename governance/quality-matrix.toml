@@ -130,6 +130,38 @@ required_layers = ["L1", "L2", "L3", "L4", "L7", "L8", "L9"]
 covered_layers = ["L1", "L2", "L3", "L4", "L7", "L8", "L9"]
 
 [[stories]]
+id = "US-H9-002"
+title = "字段库生成与字段元数据维护第一切片"
+module = "H9"
+story_file = "docs/domain/user-stories-h9-print-template.md"
+types = ["read_only", "api_change", "frontend_interaction"]
+frontend_pages = ["h9-print-templates"]
+api_paths = [
+  "GET /api/v1/print-templates/field-libraries",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "not_applicable"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.not_applicable_reasons]
+audit = "本矩阵项登记 H9 字段库列表读取切片；字段库发布审计由后续写入切片单独登记。"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L7", "L8", "L9"]
+covered_layers = ["L1", "L2", "L3", "L7", "L8", "L9"]
+
+[[stories]]
 id = "US-M2-002"
 title = "PDA/PC Web 收货"
 module = "M2"
@@ -193,7 +225,7 @@ title = "出库订单管理"
 module = "M4"
 story_file = "docs/domain/user-stories-m4-outbound-order.md"
 types = ["write", "frontend_interaction", "api_change"]
-frontend_pages = ["m4-outbound-orders"]
+frontend_pages = ["m4-orders"]
 api_paths = [
   "GET /api/v1/outbound/orders",
   "POST /api/v1/outbound/orders",

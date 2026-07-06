@@ -88,6 +88,47 @@ def test_quality_matrix_accepts_registered_horizontal_modules():
     ) == []
 
 
+def test_quality_matrix_accepts_h9_field_library_slice():
+    """H9 字段库第一切片必须能独立进入质量矩阵。"""
+    from check_quality_matrix import check_story
+
+    story = {
+        "id": "US-H9-002",
+        "title": "字段库生成与字段元数据维护第一切片",
+        "module": "H9",
+        "types": ["read_only", "api_change", "frontend_interaction"],
+        "story_file": "docs/domain/user-stories-h9-print-template.md",
+        "api_paths": ["GET /api/v1/print-templates/field-libraries"],
+        "dimensions": {
+            "requirement": "verified",
+            "fields": "verified",
+            "frontend": "verified",
+            "api": "verified",
+            "backend": "verified",
+            "database": "verified",
+            "security": "verified",
+            "audit": "not_applicable",
+            "tests": "verified",
+            "evidence": "verified",
+            "docs": "verified",
+            "governance": "verified",
+        },
+        "not_applicable_reasons": {
+            "audit": "本矩阵项登记 H9 字段库列表读取切片；字段库发布审计由后续写入切片单独登记。",
+        },
+        "tests": {
+            "required_layers": ["L1", "L2", "L3", "L7", "L8", "L9"],
+            "covered_layers": ["L1", "L2", "L3", "L7", "L8", "L9"],
+        },
+    }
+
+    assert check_story(
+        story,
+        story_files={"docs/domain/user-stories-h9-print-template.md"},
+        openapi_paths={"GET /api/v1/print-templates/field-libraries"},
+    ) == []
+
+
 def test_quality_matrix_rejects_module_mismatch_and_missing_openapi_method():
     """故事 ID 模块和 OpenAPI method 必须都对齐。"""
     from check_quality_matrix import Issue, check_story

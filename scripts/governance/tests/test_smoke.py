@@ -45,6 +45,7 @@ GOVERNANCE_SCRIPTS = [
     "check_admin_datagrid_system_fields.py",
     "check_admin_page_query_panel.py",
     "check_quality_matrix.py",
+    "check_scope_gap_discovery.py",
     "check_m1_master_data_source_actions.py",
     "check_baseline_health.py",
     "check_governance_consistency.py",
