@@ -253,7 +253,7 @@ wms 是一个**医药冷链 GSP 合规仓储管理系统**，目标是支撑：
 | `check_gsp_field_traceability.py` | 70 GSP 字段在故事字段表中有实现（v25 字段追溯矩阵）| L3 | ✅ 已有（T1，原计划 Wave 3，提前实现）|
 | `check_system_dictionary_alignment.py` | US-M1-011 系统字典故事、M2/M4 单据类型 RTM、项目级 RTM 的关键决策对齐 | L3 | ✅ 已有（T1）|
 | `check_project_rtm.py` | 项目级 RTM 覆盖故事、前端、后端、测试、合规风险矩阵；故事引用有效；部分覆盖项必须写缺口和补齐路径 | L3 | ✅ 已有（T1）|
-| `check_scope_gap_discovery.py` | 从用户故事、质量矩阵和管理端菜单交叉发现活跃模块未登记故事、未覆盖菜单页和矩阵接线错误；默认报告缺口，严格模式按模块硬失败 | L3/L4 | ✅ 已有（T1，自我发现标准线）|
+| `check_scope_gap_discovery.py` | 从用户故事、质量矩阵、延期范围和管理端菜单交叉发现活跃模块未登记故事、未覆盖菜单页和矩阵接线错误；默认报告缺口，严格模式按模块硬失败 | L3/L4 | ✅ 已有（T1，自我发现标准线）|
 | `check_owner_scope_sql.py` | 从 migration 识别含 `owner_id` 的租户表，静态扫描仓储层 SQL 的 owner 写入与过滤谓词 | L3/L5 | ✅ 已有（T1）|
 | `check_baseline_health.py` | baseline 数量单调下降 + 过期检测（防止滥用 baseline 抑制噪音）| 跨层 | ✅ 已有（T1，v0.4 加入）|
 | `check_governance_coverage.py` | 所有 `check_*` / `validate_*` 治理脚本，以及被 gate-rules.toml 用作 evidence gate 的 `report_*` 脚本，必须被运行器覆盖，并纳入 smoke 或记录明确豁免 | 跨层 | ✅ 已有（T1，元治理）|

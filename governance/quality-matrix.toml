@@ -1,6 +1,27 @@
 # WMS 全链路质量矩阵事实源。
 # 展示页由 scripts/governance/check_quality_matrix.py --write-doc 生成。
 
+[[deferred_stories]]
+id = "US-H9-003"
+title = "模板设计与版本管理"
+module = "H9"
+story_file = "docs/domain/user-stories-h9-print-template.md"
+reason = "H9 当前闭环只覆盖模板类型字典和字段库第一切片；模板主数据、hiprint JSON 版本、发布流程和删除限制按 ADR-0036 后续切片实现。"
+
+[[deferred_stories]]
+id = "US-H9-004"
+title = "预览与浏览器打印"
+module = "H9"
+story_file = "docs/domain/user-stories-h9-print-template.md"
+reason = "浏览器预览、打印记录、补打和设备失败策略尚未进入当前实现；按 H9 用户故事和 ADR-0036 后续切片接入。"
+
+[[deferred_stories]]
+id = "US-H9-005"
+title = "业务模块接入规则"
+module = "H9"
+story_file = "docs/domain/user-stories-h9-print-template.md"
+reason = "M2/M4/标签等业务打印接入规则需要在模板版本和预览打印能力完成后落地；当前只登记延期范围。"
+
 [[stories]]
 id = "US-M1-011"
 title = "系统字典中心"

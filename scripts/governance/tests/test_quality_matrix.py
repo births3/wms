@@ -129,6 +129,28 @@ def test_quality_matrix_accepts_h9_field_library_slice():
     ) == []
 
 
+def test_quality_matrix_markdown_lists_deferred_stories():
+    """展示页必须把明确延期的范围展示出来，避免把未实现故事当已完成。"""
+    from check_quality_matrix import build_markdown
+
+    markdown = build_markdown(
+        {
+            "stories": [],
+            "deferred_stories": [
+                {
+                    "id": "US-H9-003",
+                    "title": "模板设计与版本管理",
+                    "module": "H9",
+                    "reason": "后续切片实现模板设计器。",
+                }
+            ],
+        }
+    )
+
+    assert "## 明确延期范围" in markdown
+    assert "| US-H9-003 模板设计与版本管理 | H9 | 后续切片实现模板设计器。 |" in markdown
+
+
 def test_quality_matrix_rejects_module_mismatch_and_missing_openapi_method():
     """故事 ID 模块和 OpenAPI method 必须都对齐。"""
     from check_quality_matrix import Issue, check_story

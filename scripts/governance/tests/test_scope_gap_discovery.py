@@ -77,3 +77,94 @@ def test_scope_gap_module_filter_does_not_scan_other_active_modules():
     assert result.ok
     assert result.strict_ok
     assert result.gaps == []
+
+
+def test_scope_gap_accepts_deferred_story_with_reason():
+    from check_scope_gap_discovery import scan_scope_gaps
+
+    result = scan_scope_gaps(
+        story_docs={
+            "docs/domain/user-stories-h9-print-template.md": "\n".join(
+                [
+                    "## US-H9-001：打印模板类型字典",
+                    "## US-H9-003：模板设计与版本管理",
+                ]
+            )
+        },
+        matrix_stories=[
+            {
+                "id": "US-H9-001",
+                "module": "H9",
+                "frontend_pages": ["h9-print-templates"],
+                "api_paths": [],
+            }
+        ],
+        deferred_stories=[
+            {
+                "id": "US-H9-003",
+                "module": "H9",
+                "story_file": "docs/domain/user-stories-h9-print-template.md",
+                "reason": "后续切片实现模板设计器。",
+            }
+        ],
+        admin_pages={"h9-print-templates": "H9 打印模板"},
+        modules={"H9"},
+    )
+
+    assert result.ok
+    assert result.strict_ok
+    assert result.deferred_story_ids == ["US-H9-003"]
+    assert result.gaps == []
+
+
+def test_scope_gap_blocks_invalid_deferred_story():
+    from check_scope_gap_discovery import scan_scope_gaps
+
+    result = scan_scope_gaps(
+        story_docs={"docs/domain/user-stories-h9-print-template.md": "## US-H9-001：打印模板类型字典"},
+        matrix_stories=[
+            {
+                "id": "US-H9-001",
+                "module": "H9",
+                "frontend_pages": ["h9-print-templates"],
+                "api_paths": [],
+            }
+        ],
+        deferred_stories=[
+            {
+                "id": "US-H9-003",
+                "module": "H9",
+                "story_file": "docs/domain/user-stories-h9-print-template.md",
+                "reason": "",
+            }
+        ],
+        admin_pages={"h9-print-templates": "H9 打印模板"},
+        modules={"H9"},
+    )
+
+    assert not result.ok
+    assert [gap.kind for gap in result.gaps] == [
+        "deferred_story_missing_from_story_docs",
+        "deferred_story_missing_reason",
+    ]
+
+
+def test_scope_gap_blocks_deferred_story_without_id():
+    from check_scope_gap_discovery import scan_scope_gaps
+
+    result = scan_scope_gaps(
+        story_docs={"docs/domain/user-stories-h9-print-template.md": "## US-H9-001：打印模板类型字典"},
+        matrix_stories=[
+            {
+                "id": "US-H9-001",
+                "module": "H9",
+                "frontend_pages": ["h9-print-templates"],
+                "api_paths": [],
+            }
+        ],
+        deferred_stories=[{"reason": "缺少故事 ID。"}],
+        admin_pages={"h9-print-templates": "H9 打印模板"},
+    )
+
+    assert not result.ok
+    assert result.gaps[0].kind == "deferred_story_missing_id"

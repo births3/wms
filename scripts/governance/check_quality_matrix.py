@@ -265,6 +265,26 @@ def build_markdown(matrix: dict[str, Any]) -> str:
                 status="<br>".join(statuses),
             ),
         )
+    deferred = [story for story in matrix.get("deferred_stories", []) if isinstance(story, dict)]
+    if deferred:
+        lines.extend(
+            [
+                "",
+                "## 明确延期范围",
+                "",
+                "| 故事 | 模块 | 原因 |",
+                "|---|---|---|",
+            ]
+        )
+        for story in deferred:
+            lines.append(
+                "| {id} {title} | {module} | {reason} |".format(
+                    id=story.get("id", "-"),
+                    title=story.get("title", "-"),
+                    module=story.get("module", "-"),
+                    reason=story.get("reason", "-"),
+                )
+            )
     lines.append("")
     return "\n".join(lines)
 

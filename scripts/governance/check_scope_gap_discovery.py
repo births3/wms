@@ -55,6 +55,7 @@ class ScopeGap:
 @dataclass(frozen=True)
 class ScopeScanResult:
     active_modules: list[str]
+    deferred_story_ids: list[str]
     matrix_story_ids: list[str]
     story_count: int
     gaps: list[ScopeGap]
@@ -86,9 +87,17 @@ def read_story_docs() -> dict[str, str]:
     }
 
 
-def read_matrix_stories() -> list[dict[str, Any]]:
-    data = tomllib.loads(MATRIX.read_text(encoding="utf-8"))
+def read_matrix() -> dict[str, Any]:
+    return tomllib.loads(MATRIX.read_text(encoding="utf-8"))
+
+
+def matrix_stories(data: dict[str, Any]) -> list[dict[str, Any]]:
     stories = data.get("stories", [])
+    return [story for story in stories if isinstance(story, dict)]
+
+
+def deferred_stories(data: dict[str, Any]) -> list[dict[str, Any]]:
+    stories = data.get("deferred_stories", [])
     return [story for story in stories if isinstance(story, dict)]
 
 
@@ -107,6 +116,7 @@ def scan_scope_gaps(
     *,
     story_docs: dict[str, str],
     matrix_stories: list[dict[str, Any]],
+    deferred_stories: list[dict[str, Any]] | None = None,
     admin_pages: dict[str, str],
     modules: set[str] | None = None,
 ) -> ScopeScanResult:
@@ -136,12 +146,65 @@ def scan_scope_gaps(
         return not active_modules or module in active_modules
 
     gaps: list[ScopeGap] = []
+    deferred_story_ids: set[str] = set()
     matrix_frontend_pages = {
         page_id
         for story in matrix_stories
         for page_id in story.get("frontend_pages", [])
         if isinstance(page_id, str)
     }
+
+    for story in deferred_stories or []:
+        story_id = str(story.get("id", ""))
+        if not story_id:
+            gaps.append(
+                ScopeGap(
+                    severity="block",
+                    kind="deferred_story_missing_id",
+                    module=str(story.get("module", "")).upper(),
+                    story_id="-",
+                    file=rel(MATRIX),
+                    message="延期故事必须填写 id",
+                )
+            )
+            continue
+        module = story_module(story_id) if story_id.startswith("US-") else str(story.get("module", "")).upper()
+        if not should_scan_module(module):
+            continue
+        if story_id in matrix_story_ids:
+            gaps.append(
+                ScopeGap(
+                    severity="block",
+                    kind="deferred_story_already_in_quality_matrix",
+                    module=module,
+                    story_id=story_id,
+                    file=rel(MATRIX),
+                    message="延期故事已进入质量矩阵，不能同时标记为延期",
+                )
+            )
+        if story_id not in stories_by_id:
+            gaps.append(
+                ScopeGap(
+                    severity="block",
+                    kind="deferred_story_missing_from_story_docs",
+                    module=module,
+                    story_id=story_id or "-",
+                    file=rel(MATRIX),
+                    message="延期故事在用户故事文档中没有对应二级标题",
+                )
+            )
+        if not str(story.get("reason", "")).strip():
+            gaps.append(
+                ScopeGap(
+                    severity="block",
+                    kind="deferred_story_missing_reason",
+                    module=module,
+                    story_id=story_id or "-",
+                    file=rel(MATRIX),
+                    message="延期故事必须填写 reason，说明为什么不进入本轮质量矩阵",
+                )
+            )
+        deferred_story_ids.add(story_id)
 
     for story in matrix_stories:
         story_id = str(story.get("id", ""))
@@ -179,6 +242,8 @@ def scan_scope_gaps(
             continue
         if story.story_id in matrix_story_ids:
             continue
+        if story.story_id in deferred_story_ids:
+            continue
         gaps.append(
             ScopeGap(
                 severity="discover",
@@ -210,6 +275,7 @@ def scan_scope_gaps(
     block_gaps = [gap for gap in gaps if gap.severity == "block"]
     return ScopeScanResult(
         active_modules=sorted(active_modules),
+        deferred_story_ids=sorted(deferred_story_ids),
         matrix_story_ids=sorted(matrix_story_ids),
         story_count=len(story_headings),
         gaps=gaps,
@@ -225,9 +291,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--module", action="append", help="只检查指定模块，可重复，例如 --module H9 --module M2")
     args = parser.parse_args(argv)
 
+    matrix = read_matrix()
     result = scan_scope_gaps(
         story_docs=read_story_docs(),
-        matrix_stories=read_matrix_stories(),
+        matrix_stories=matrix_stories(matrix),
+        deferred_stories=deferred_stories(matrix),
         admin_pages=read_admin_pages(),
         modules={module.upper() for module in args.module} if args.module else None,
     )
@@ -237,6 +305,7 @@ def main(argv: list[str] | None = None) -> int:
         "tier": "T1",
         "category": "流程治理",
         "active_modules": result.active_modules,
+        "deferred_story_ids": result.deferred_story_ids,
         "matrix_story_count": len(result.matrix_story_ids),
         "story_count": result.story_count,
         "strict": args.strict,
