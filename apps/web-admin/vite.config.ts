@@ -656,6 +656,12 @@ async function handleDevMockRequest(
     return true;
   }
 
+  if (req.method === "GET" && pathname === "/api/v1/print-templates/field-libraries") {
+    const data = devPrintFieldLibrariesResponse();
+    sendJson(res, 200, { data, page: { count: data.length, next_cursor: null } });
+    return true;
+  }
+
   if (req.method === "GET" && pathname === "/api/v1/inbound/receiving-orders") {
     const data = allDevOrders();
     sendJson(res, 200, { data, page: { count: data.length, next_cursor: null } });
@@ -856,6 +862,38 @@ function devSeedInventoryBatches(): DevInventoryBatch[] {
       updated_at: now,
     },
   ];
+}
+
+function devPrintFieldLibrariesResponse() {
+  const templateTypes = devSystemDictionaryItemsByCode.print_template_type ?? [];
+  return templateTypes.map((type, index) => {
+    const libraryCode = String(type.params.field_library_code ?? type.item_code);
+    return {
+      id: `00000000-0000-0000-0000-0000000028${String(index + 1).padStart(2, "0")}`,
+      library_code: libraryCode,
+      library_name: `${type.item_name}字段库`,
+      source_schema: devPrintSourceSchema(libraryCode),
+      latest_version_id: `00000000-0000-0000-0000-0000000029${String(index + 1).padStart(2, "0")}`,
+      version_no: 1,
+      field_count: devPrintFieldCount(libraryCode),
+      created_at: type.created_at,
+      published_at: type.updated_at,
+      published_by: devUserId,
+    };
+  });
+}
+
+function devPrintSourceSchema(libraryCode: string) {
+  if (libraryCode.startsWith("m2_")) return "ReceivingOrder";
+  if (libraryCode.startsWith("m4_")) return "OutboundOrder";
+  if (libraryCode.startsWith("m3_")) return "InventoryBatch";
+  return "MasterData";
+}
+
+function devPrintFieldCount(libraryCode: string) {
+  if (libraryCode.includes("label")) return 8;
+  if (libraryCode.includes("acceptance")) return 24;
+  return 16;
 }
 
 function devProductFromCreateRequest(body: Record<string, unknown>): DevProduct {

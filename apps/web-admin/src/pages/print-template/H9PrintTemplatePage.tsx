@@ -229,7 +229,7 @@ export function H9PrintTemplatePage() {
       <div className="grid gap-4 lg:grid-cols-[22rem_minmax(0,1fr)]">
         <TreeCatalog
           title="模板树"
-          searchPlaceholder="搜索模板类型、字段库"
+          searchable={false}
           nodes={treeNodes}
           selectedNodeId={selectedTreeNodeId}
           onSelectedNodeIdChange={setSelectedTreeNodeId}

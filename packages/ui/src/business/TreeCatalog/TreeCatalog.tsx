@@ -15,6 +15,7 @@ import {
 export interface TreeCatalogProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "children"> {
   nodes: TreeCatalogNode[];
   title?: string;
+  searchable?: boolean;
   searchPlaceholder?: string;
   selectedNodeId?: string;
   onSelectedNodeIdChange?: (nodeId: string) => void;
@@ -31,7 +32,7 @@ export interface TreeCatalogProps extends Omit<React.HTMLAttributes<HTMLDivEleme
  * 关联故事：US-H9-001 打印模板类型字典 / US-H1-007 PC 管理端三层菜单管理
  * Wave：Wave 6 横向能力收口
  * 适用：模板类型树、菜单树、库区库位树等左侧导航。
- * 业务约束：只负责树的搜索、展开、选择和偏好保存，右侧明细继续由页面复用 DataGrid。
+ * 业务约束：只负责树的搜索、展开、选择和偏好保存；页面已有 QueryPanel 覆盖搜索时可关闭内部搜索，右侧明细继续由页面复用 DataGrid。
  *
  * @example
  *   <TreeCatalog nodes={[{ id: "type:asn", label: "ASN 单" }]} />
@@ -41,6 +42,7 @@ export const TreeCatalog = React.forwardRef<HTMLDivElement, TreeCatalogProps>(
     {
       nodes,
       title = "目录",
+      searchable = true,
       searchPlaceholder = "搜索目录",
       selectedNodeId,
       onSelectedNodeIdChange,
@@ -61,8 +63,9 @@ export const TreeCatalog = React.forwardRef<HTMLDivElement, TreeCatalogProps>(
     const [query, setQuery] = React.useState(storedPreference.query);
     const selectedId = selectedNodeId ?? internalSelectedId;
     const selectedExists = Boolean(findTreeCatalogNode(nodes, selectedId));
-    const visibleNodes = React.useMemo(() => filterTreeCatalogNodes(nodes, query), [nodes, query]);
-    const queryActive = Boolean(query);
+    const effectiveQuery = searchable ? query : "";
+    const visibleNodes = React.useMemo(() => filterTreeCatalogNodes(nodes, effectiveQuery), [effectiveQuery, nodes]);
+    const queryActive = Boolean(effectiveQuery);
 
     React.useEffect(() => {
       if (selectedExists) return;
@@ -78,10 +81,10 @@ export const TreeCatalog = React.forwardRef<HTMLDivElement, TreeCatalogProps>(
         JSON.stringify({
           selectedNodeId: selectedId,
           expandedNodeIds,
-          query,
+          query: effectiveQuery,
         })
       );
-    }, [expandedNodeIds, query, selectedId, storageKey]);
+    }, [effectiveQuery, expandedNodeIds, selectedId, storageKey]);
 
     function selectNode(node: TreeCatalogNode) {
       if (node.disabled) return;
@@ -104,17 +107,19 @@ export const TreeCatalog = React.forwardRef<HTMLDivElement, TreeCatalogProps>(
               <span className="text-xs text-muted-foreground">{nodes.length}</span>
             </div>
           </div>
-          <div className="border-b bg-muted/20 p-4">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-2 top-2.5 size-4 text-muted-foreground" />
-              <Input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder={searchPlaceholder}
-                className="pl-8"
-              />
+          {searchable ? (
+            <div className="border-b bg-muted/20 p-4">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2 top-2.5 size-4 text-muted-foreground" />
+                <Input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder={searchPlaceholder}
+                  className="pl-8"
+                />
+              </div>
             </div>
-          </div>
+          ) : null}
 
           {nodes.length === 0 ? (
             <EmptyState title={emptyTitle} description={emptyDescription} className="min-h-64" />
