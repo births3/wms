@@ -11,6 +11,8 @@ description: WMS 全链路质量矩阵治理技能。用户要求建立或维护
 
 - `AGENTS.md`
 - `docs/governance/quality-matrix-method.md`
+- `.agents/skills/wms-loop-engineering/SKILL.md`
+- `docs/agent-loop-engineering.md`
 - `governance/quality-matrix.toml`
 - `docs/adr/0006-tdd-and-test-layers.md`
 - 目标故事文件、页面文件、OpenAPI path 或后端模块
@@ -24,6 +26,7 @@ description: WMS 全链路质量矩阵治理技能。用户要求建立或维护
 
 ## 工作流
 
+0. 涉及新增维度、漏检复盘、批量补齐或多轮修复时，先按 `wms-loop-engineering` 定义本轮目标、输入边界、检查命令、反馈修复规则和停止条件，再修改质量矩阵。
 1. 先运行 `python3 scripts/governance/check_quality_matrix.py --json`，确认当前矩阵是否干净。
 2. 根据任务判断是否需要新增或修改矩阵行：
    - 新增 / 修改用户故事。
@@ -53,11 +56,11 @@ description: WMS 全链路质量矩阵治理技能。用户要求建立或维护
 
 ## 运行反馈迭代
 
-发现共性问题时，先补矩阵或脚本，再批量修实现：
+发现共性问题时，使用 `wms-loop-engineering` 闭环，先补矩阵或脚本，再批量修实现：
 
 - 三个以上页面出现同类遗漏。
 - 前端页面已构建但后端 / OpenAPI / 数据库 / 权限未跟上。
 - issue 评论、验收反馈或 review 暴露出脚本没有检查到的问题。
 - 新增业务概念影响两个以上模块。
 
-迭代顺序固定为：补事实源 → 补脚本 → 跑失败 → 修实现 → 生成展示页 → 复跑治理。
+迭代顺序固定为：定义目标和停止条件 → 补事实源 → 补脚本 → 跑失败 → 修实现 → 生成展示页 → 复跑治理 → 记录本轮漏检规则。
