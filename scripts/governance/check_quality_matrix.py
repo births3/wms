@@ -45,6 +45,22 @@ DIMENSIONS = (
     "governance",
 )
 STRICT_STATUSES = {"verified", "not_applicable"}
+ALLOWED_MODULES = {
+    "M1",
+    "M2",
+    "M3",
+    "M4",
+    "H1",
+    "H2",
+    "H3",
+    "H4",
+    "H5",
+    "H6",
+    "H7",
+    "H8",
+    "H9",
+    "H10",
+}
 STORY_TYPE_LAYERS = {
     "read_only": {"L1", "L2", "L3", "L8"},
     "write": {"L1", "L2", "L3", "L4", "L5", "L8", "L11"},
@@ -116,10 +132,10 @@ def check_story(story: dict[str, Any], *, story_files: set[str], openapi_paths: 
     if not isinstance(story.get("title"), str) or not story["title"].strip():
         issues.append(Issue(story_id, "requirement", "title 必须填写"))
     module = story.get("module")
-    if module not in {"M1", "M2", "M3", "M4"}:
-        issues.append(Issue(story_id, "requirement", "首版 quality matrix 只允许 M1-M4"))
+    if module not in ALLOWED_MODULES:
+        issues.append(Issue(story_id, "requirement", "quality matrix 只允许已登记的业务模块和横向模块"))
     id_module = story_id.split("-", 2)[1] if story_id.startswith("US-") and len(story_id.split("-", 2)) > 1 else None
-    if module in {"M1", "M2", "M3", "M4"} and id_module != module:
+    if module in ALLOWED_MODULES and id_module != module:
         issues.append(Issue(story_id, "requirement", f"story id 模块 {id_module} 与 module {module} 不一致"))
     requirement = story.get("requirement")
     story_file = story.get("story_file")
@@ -217,7 +233,7 @@ def build_markdown(matrix: dict[str, Any]) -> str:
         "",
         "## 范围",
         "",
-        "- 首版强门禁范围：M1、M2、M3、M4。",
+        "- 强门禁范围：M1、M2、M3、M4 和已进入执行的 H 层横向能力。",
         "- 状态只允许 `verified` 或 `not_applicable`；不适用必须在事实源写原因。",
         "- S2 测试层由故事类型自动推导。",
         "",

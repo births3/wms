@@ -98,6 +98,7 @@ shadcn/ui 标准 CSS 变量 + WMS 自定义业务色，一处定义两端共用�
 | 19 | **SystemDictionaryTwoPane** | PC | 系统字典两层展示：左侧字典分类，右侧选中分类的字典项、来源、启停状态与参数摘要 | M1-011 系统字典 / 单据类型参数配置 | 已开发 |
 | 20 | **QueryPanel** | PC | 管理页通用查询条件区：关键词输入、查询/重置动作和自定义条件插槽 | 全部 PC 管理页列表查询 | 已开发 |
 | 21 | **WorkspaceTabs** | PC | 工作台浏览器式多页签：已打开菜单页、关闭、右键关闭其他 | PC 管理端工作台导航 | 已开发 |
+| 22 | **TreeCatalog** | PC | 管理端树状导航：左侧多层树，支持搜索、展开、选择和偏好保存，右侧明细由页面复用 DataGrid | H9 打印模板 / H1 菜单管理 / 库区库位层级 | 已开发 |
 
 DataGrid 组件说明：字段筛选、字段显示、视图保存等表格浮层必须使用 `createPortal + fixed`，禁止在表格容器内用 `absolute` 渲染带 `data-datagrid-popover` 的弹窗，避免低行数表格或 `overflow` 容器裁剪；按钮触发浮层必须支持点击外部和 `Escape` 关闭。该约束由 `check_datagrid_popover_portal.py` 强制检查。
 
@@ -168,3 +169,4 @@ interface PdaComponentProps extends WmsComponentProps {
 | 2026-06-28 | 扩到 17 个组件（+ DataGrid），用于管理页分页、排序、字段筛选、字段显隐、列宽拖拽、点击复制和视图保存 |
 | 2026-06-29 | 扩到 18 个组件（+ SystemDictionaryTwoPane），用于 M1 系统字典左右两层展示 |
 | 2026-07-04 | 扩到 19 个组件（+ TwoPaneCatalog），用于分类-明细两栏页面的公共筛选、字段显隐、选择、复制和偏好保存 |
+| 2026-07-06 | 扩到 22 个组件（+ TreeCatalog），用于 H9 打印模板等多层树状导航 |

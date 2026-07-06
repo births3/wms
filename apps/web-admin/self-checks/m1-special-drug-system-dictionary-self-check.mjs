@@ -30,6 +30,9 @@ for (const dictCode of ["temperature_zone", "quality_color", "zone_type", "locat
   assert.match(m1WarehouseStoriesSource, new RegExp(`\\\`${dictCode}\\\``));
 }
 
+assert.match(queriesSource, /code: "print_template_type"/);
+assert.match(viteConfigSource, /print_template_type: \[/);
+
 function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), "utf8");
 }

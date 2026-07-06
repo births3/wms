@@ -535,6 +535,13 @@ pub const DOCUMENT_TYPE_PURCHASE_INBOUND: &str = "purchase_inbound";
 pub const DOCUMENT_TYPE_SALES_RETURN: &str = "sales_return";
 pub const DOCUMENT_TYPE_PURCHASE_RETURN_OUTBOUND: &str = "purchase_return_outbound";
 pub const DOCUMENT_TYPE_SALES_OUTBOUND: &str = "sales_outbound";
+pub const SYSTEM_DICTIONARY_PRINT_TEMPLATE_TYPE: &str = "print_template_type";
+pub const PRINT_TEMPLATE_TYPE_ASN: &str = "asn";
+pub const PRINT_TEMPLATE_TYPE_ACCEPTANCE_RECORD: &str = "acceptance_record";
+pub const PRINT_TEMPLATE_TYPE_DELIVERY_NOTE: &str = "delivery_note";
+pub const PRINT_TEMPLATE_TYPE_LOCATION_LABEL: &str = "location_label";
+pub const PRINT_TEMPLATE_TYPE_LPN_LABEL: &str = "lpn_label";
+pub const PRINT_TEMPLATE_TYPE_PRODUCT_LABEL: &str = "product_label";
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct DocumentNumberAllocation {

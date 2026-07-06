@@ -33,6 +33,103 @@ required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
 covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
 
 [[stories]]
+id = "US-H1-007"
+title = "PC 管理端三层菜单管理"
+module = "H1"
+story_file = "docs/domain/user-stories-h1-auth-tenant.md"
+types = ["write", "config_rule", "frontend_interaction"]
+frontend_pages = ["h1-menu-management"]
+api_paths = [
+  "GET /api/v1/admin/menus/draft",
+  "POST /api/v1/admin/menus/draft/nodes",
+  "PATCH /api/v1/admin/menus/draft/nodes/{id}",
+  "POST /api/v1/admin/menus/draft/batch-enable",
+  "POST /api/v1/admin/menus/publish",
+  "GET /api/v1/admin/menus/published",
+  "POST /api/v1/admin/menus/rollback",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
+
+[[stories]]
+id = "US-H3-001"
+title = "OpenAPI 契约生成与前端类型同步"
+module = "H3"
+story_file = "docs/domain/user-stories-h3-contract.md"
+types = ["api_change"]
+frontend_pages = []
+api_paths = []
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "not_applicable"
+security = "verified"
+audit = "not_applicable"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.not_applicable_reasons]
+database = "H3 契约生成不新增业务表。"
+audit = "OpenAPI 产物通过 Git 版本追踪，不写业务审计表。"
+
+[stories.tests]
+required_layers = ["L2", "L9"]
+covered_layers = ["L2", "L9"]
+
+[[stories]]
+id = "US-H9-001"
+title = "打印模板类型字典"
+module = "H9"
+story_file = "docs/domain/user-stories-h9-print-template.md"
+types = ["read_only", "config_rule", "frontend_interaction"]
+frontend_pages = ["m1-system-dictionary", "h9-print-templates"]
+api_paths = [
+  "GET /api/v1/system-dictionaries/{dict_code}/items",
+  "PUT /api/v1/system-dictionaries/{dict_code}/items/{item_code}",
+  "PATCH /api/v1/system-dictionaries/{dict_code}/items/{item_code}/disable",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L7", "L8", "L9"]
+covered_layers = ["L1", "L2", "L3", "L4", "L7", "L8", "L9"]
+
+[[stories]]
 id = "US-M2-002"
 title = "PDA/PC Web 收货"
 module = "M2"

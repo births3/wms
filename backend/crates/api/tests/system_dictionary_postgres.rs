@@ -9,6 +9,9 @@ use wms_api::{
 use wms_domain::{
     DisableSystemDictionaryItemRequest, UpsertSystemDictionaryItemRequest,
     DOCUMENT_TYPE_PURCHASE_INBOUND, DOCUMENT_TYPE_SALES_OUTBOUND, SYSTEM_DICTIONARY_DOCUMENT_TYPE,
+    PRINT_TEMPLATE_TYPE_ACCEPTANCE_RECORD, PRINT_TEMPLATE_TYPE_ASN, PRINT_TEMPLATE_TYPE_DELIVERY_NOTE,
+    PRINT_TEMPLATE_TYPE_LOCATION_LABEL, PRINT_TEMPLATE_TYPE_LPN_LABEL, PRINT_TEMPLATE_TYPE_PRODUCT_LABEL,
+    SYSTEM_DICTIONARY_PRINT_TEMPLATE_TYPE,
 };
 
 fn ctx(owner_id: Uuid) -> AuthContext {
@@ -63,6 +66,63 @@ async fn document_type_presets_are_queryable(pool: PgPool) {
     assert!(items
         .iter()
         .all(|item| item.params.get("batch_policy").is_some()));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn print_template_type_presets_are_queryable_and_require_field_library(pool: PgPool) {
+    let repo = PgSystemDictionaryRepository::new(pool);
+    let owner_id = Uuid::new_v4();
+    let now = Utc
+        .with_ymd_and_hms(2026, 7, 6, 9, 0, 0)
+        .single()
+        .expect("valid time");
+
+    let items = repo
+        .list_effective_items(&ctx(owner_id), SYSTEM_DICTIONARY_PRINT_TEMPLATE_TYPE, now)
+        .await
+        .expect("print_template_type presets should be queryable");
+    let codes: Vec<_> = items.iter().map(|item| item.item_code.as_str()).collect();
+
+    assert_eq!(
+        codes,
+        vec![
+            PRINT_TEMPLATE_TYPE_ACCEPTANCE_RECORD,
+            PRINT_TEMPLATE_TYPE_ASN,
+            PRINT_TEMPLATE_TYPE_DELIVERY_NOTE,
+            PRINT_TEMPLATE_TYPE_LOCATION_LABEL,
+            PRINT_TEMPLATE_TYPE_LPN_LABEL,
+            PRINT_TEMPLATE_TYPE_PRODUCT_LABEL,
+        ]
+    );
+    assert!(items.iter().all(|item| item.source == "global"));
+    assert!(items
+        .iter()
+        .all(|item| item.params.get("field_library_code").is_some()));
+
+    let error = repo
+        .upsert_item(
+            &ctx(owner_id),
+            SYSTEM_DICTIONARY_PRINT_TEMPLATE_TYPE,
+            PRINT_TEMPLATE_TYPE_ASN,
+            UpsertSystemDictionaryItemRequest {
+                owner_id: Some(owner_id),
+                item_name: "坏模板类型".to_string(),
+                enabled: true,
+                params: json!({
+                    "business_module": "M2",
+                    "business_direction": "inbound",
+                    "paper_type": "a4",
+                    "default_scope": "global"
+                }),
+                effective_from: None,
+                effective_to: None,
+            },
+            now,
+            "system-dictionary-print-template-invalid",
+        )
+        .await
+        .expect_err("enabled print template type without field library must be rejected");
+    assert!(matches!(error, SystemDictionaryError::ParamInvalid { .. }));
 }
 
 #[sqlx::test(migrations = "../../migrations")]

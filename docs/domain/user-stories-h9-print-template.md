@@ -177,6 +177,6 @@ H9 作为横向打印模板引擎，统一管理模板类型、字段库、字�
 - 已落 `print_field_libraries`、`print_field_library_versions`、`print_field_definitions` 三张表。
 - 已提供 `PgPrintTemplateRepository::publish_field_library` 和 `list_field_version_fields`，覆盖字段库发布、幂等重放、版本递增、旧版本字段不可改写和 H2 审计写入。
 - 已提供 `GET /api/v1/print-templates/field-libraries`、OpenAPI 契约和 `@wms/api-client` 类型，支持 PC 管理端读取最新字段库版本。
-- 已提供 `apps/web-admin` 的 H9 打印模板菜单和字段库列表页，页面使用公共 `QueryPanel` + `DataGrid`。
+- 已提供 `print_template_type` 系统字典预置、H9 打印模板菜单和字段库列表页，页面使用公共 `TreeCatalog` + `QueryPanel` + `DataGrid`。
 - 已提供 `backend/crates/api/tests/print_template_postgres.rs`，验证已发布字段库版本不可改写和字段库最新版本列表。
-- 尚未覆盖 `print_template_type` 字典接入、模板主数据、hiprint JSON 版本、打印记录、浏览器预览打印、前端动作测试和真实截图。
+- 尚未覆盖模板主数据、hiprint JSON 版本、打印记录、浏览器预览打印、前端动作测试和真实截图。

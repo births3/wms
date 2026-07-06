@@ -50,6 +50,44 @@ def test_quality_matrix_rejects_non_strict_dimension_status():
     ]
 
 
+def test_quality_matrix_accepts_registered_horizontal_modules():
+    """H1/H3/H9 等横向能力进入执行后必须能纳入质量矩阵。"""
+    from check_quality_matrix import check_story
+
+    story = {
+        "id": "US-H9-001",
+        "title": "打印模板类型字典",
+        "module": "H9",
+        "types": ["read_only", "config_rule", "frontend_interaction"],
+        "story_file": "docs/domain/user-stories-h9-print-template.md",
+        "api_paths": ["GET /api/v1/system-dictionaries/print_template_type/items"],
+        "dimensions": {
+            "requirement": "verified",
+            "fields": "verified",
+            "frontend": "verified",
+            "api": "verified",
+            "backend": "verified",
+            "database": "verified",
+            "security": "verified",
+            "audit": "verified",
+            "tests": "verified",
+            "evidence": "verified",
+            "docs": "verified",
+            "governance": "verified",
+        },
+        "tests": {
+            "required_layers": ["L1", "L2", "L3", "L4", "L7", "L8", "L9"],
+            "covered_layers": ["L1", "L2", "L3", "L4", "L7", "L8", "L9"],
+        },
+    }
+
+    assert check_story(
+        story,
+        story_files={"docs/domain/user-stories-h9-print-template.md"},
+        openapi_paths={"GET /api/v1/system-dictionaries/print_template_type/items"},
+    ) == []
+
+
 def test_quality_matrix_rejects_module_mismatch_and_missing_openapi_method():
     """故事 ID 模块和 OpenAPI method 必须都对齐。"""
     from check_quality_matrix import Issue, check_story

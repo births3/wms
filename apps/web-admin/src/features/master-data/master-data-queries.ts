@@ -133,6 +133,7 @@ export const masterDataQueryKey = ["master-data"] as const;
 export const specialDrugCategoryDictCode = "special_drug_category";
 const systemDictionaryDefinitions = [
   { code: "document_type", name: "单据类型" },
+  { code: "print_template_type", name: "打印模板类型" },
   { code: specialDrugCategoryDictCode, name: "特殊药品分类" },
   { code: "temperature_zone", name: "库区温区" },
   { code: "quality_color", name: "库区色标" },

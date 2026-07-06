@@ -4,17 +4,21 @@ import {
   PageHeader,
   QueryPanel,
   StatusBadge,
+  TreeCatalog,
   buildQueryPanelSummaryItems,
   cn,
   type DataGridColumn,
   type DataGridRefreshAction,
   type QueryPanelField,
   type QueryPanelValue,
+  type TreeCatalogNode,
 } from "@wms/ui";
 
 import {
   usePrintFieldLibrariesQuery,
+  usePrintTemplateTypesQuery,
   type PrintFieldLibraryRow,
+  type PrintTemplateTypeRow,
 } from "@/features/print-template/print-template-queries";
 
 const h9PrintTemplateQueryFields: QueryPanelField[] = [
@@ -148,12 +152,22 @@ type Notice = { type: "success" | "error"; text: string } | null;
 
 export function H9PrintTemplatePage() {
   const librariesQuery = usePrintFieldLibrariesQuery();
+  const templateTypesQuery = usePrintTemplateTypesQuery();
   const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(() => defaultH9QueryValue());
   const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(() => defaultH9QueryValue());
+  const [selectedTreeNodeId, setSelectedTreeNodeId] = React.useState("");
   const [notice, setNotice] = React.useState<Notice>(null);
+  const treeNodes = React.useMemo(
+    () => buildH9TreeNodes(templateTypesQuery.data ?? [], librariesQuery.data ?? []),
+    [librariesQuery.data, templateTypesQuery.data],
+  );
+  const treeScopedRows = React.useMemo(
+    () => filterRowsByTree(librariesQuery.data ?? [], templateTypesQuery.data ?? [], selectedTreeNodeId),
+    [librariesQuery.data, selectedTreeNodeId, templateTypesQuery.data],
+  );
   const rows = React.useMemo(
-    () => filterRows(librariesQuery.data ?? [], appliedQuery),
-    [appliedQuery, librariesQuery.data],
+    () => filterRows(treeScopedRows, appliedQuery),
+    [appliedQuery, treeScopedRows],
   );
   const querySummaryItems = React.useMemo(
     () => buildQueryPanelSummaryItems(h9PrintTemplateQueryFields, appliedQuery),
@@ -161,8 +175,8 @@ export function H9PrintTemplatePage() {
   );
   const refreshAction: DataGridRefreshAction = {
     label: "刷新",
-    description: "刷新打印字段库列表",
-    disabled: librariesQuery.isFetching,
+    description: "刷新打印模板树和字段库列表",
+    disabled: librariesQuery.isFetching || templateTypesQuery.isFetching,
     onClick: () => {
       void refreshLibraries();
     },
@@ -170,11 +184,15 @@ export function H9PrintTemplatePage() {
 
   async function refreshLibraries() {
     setNotice(null);
-    const result = await librariesQuery.refetch();
+    const [typesResult, librariesResult] = await Promise.all([
+      templateTypesQuery.refetch(),
+      librariesQuery.refetch(),
+    ]);
+    const error = typesResult.error ?? librariesResult.error;
     setNotice(
-      result.error
-        ? { type: "error", text: result.error.message }
-        : { type: "success", text: "打印字段库已刷新" },
+      error
+        ? { type: "error", text: error.message }
+        : { type: "success", text: "打印模板树已刷新" },
     );
   }
 
@@ -202,31 +220,53 @@ export function H9PrintTemplatePage() {
         resetLabel="重置"
       />
 
-      {librariesQuery.error && (
+      {(librariesQuery.error || templateTypesQuery.error) && (
         <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {librariesQuery.error.message}
+          {templateTypesQuery.error?.message ?? librariesQuery.error?.message}
         </div>
       )}
 
-      <DataGrid
-        storageKey="h9.print-template.field-libraries"
-        columns={columns}
-        data={rows}
-        rowKey={(row) => row.id}
-        caption={librariesQuery.isPending ? "加载打印字段库..." : undefined}
-        emptyTitle={librariesQuery.isError ? "读取打印字段库失败" : "暂无打印字段库"}
-        emptyDescription={librariesQuery.isError ? "请检查后端 H9 接口和账号权限" : "发布字段库后将在这里显示"}
-        exportFileBaseName="H9 打印模板字段库"
-        refreshAction={refreshAction}
-        queryState={appliedQuery}
-        querySummaryItems={querySummaryItems}
-        onApplyQueryState={(queryState) => {
-          const next = normalizeH9QueryValue(queryValueFromUnknown(queryState));
-          setDraftQuery(next);
-          setAppliedQuery(next);
-        }}
-        onClearQueryState={resetQuery}
-      />
+      <div className="grid gap-4 lg:grid-cols-[22rem_minmax(0,1fr)]">
+        <TreeCatalog
+          title="模板树"
+          searchPlaceholder="搜索模板类型、字段库"
+          nodes={treeNodes}
+          selectedNodeId={selectedTreeNodeId}
+          onSelectedNodeIdChange={setSelectedTreeNodeId}
+          storageKey="h9.print-template.tree"
+          emptyTitle={templateTypesQuery.isError ? "读取模板类型失败" : "暂无模板类型"}
+          emptyDescription={
+            templateTypesQuery.isError
+              ? "请检查 print_template_type 字典和账号权限。"
+              : "维护打印模板类型后将在这里显示。"
+          }
+        />
+        <div className="min-w-0">
+          <DataGrid
+            storageKey="h9.print-template.field-libraries"
+            columns={columns}
+            data={rows}
+            rowKey={(row) => row.id}
+            caption={librariesQuery.isPending || templateTypesQuery.isPending ? "加载打印模板..." : undefined}
+            emptyTitle={librariesQuery.isError ? "读取打印字段库失败" : "暂无匹配字段库"}
+            emptyDescription={
+              librariesQuery.isError
+                ? "请检查后端 H9 接口和账号权限"
+                : "请检查左侧模板类型绑定的字段库编码，或调整查询条件。"
+            }
+            exportFileBaseName="H9 打印模板字段库"
+            refreshAction={refreshAction}
+            queryState={appliedQuery}
+            querySummaryItems={querySummaryItems}
+            onApplyQueryState={(queryState) => {
+              const next = normalizeH9QueryValue(queryValueFromUnknown(queryState));
+              setDraftQuery(next);
+              setAppliedQuery(next);
+            }}
+            onClearQueryState={resetQuery}
+          />
+        </div>
+      </div>
     </section>
   );
 }
@@ -253,6 +293,80 @@ function filterRows(rows: PrintFieldLibraryRow[], query: QueryPanelValue) {
     const keywordMatches = !keyword || row.searchText.includes(keyword);
     return sourceMatches && keywordMatches;
   });
+}
+
+function buildH9TreeNodes(
+  templateTypes: PrintTemplateTypeRow[],
+  libraries: PrintFieldLibraryRow[],
+): TreeCatalogNode[] {
+  const libraryByCode = new Map(libraries.map((library) => [library.libraryCode, library]));
+  return templateTypes.map((type) => {
+    const library = libraryByCode.get(type.fieldLibraryCode);
+    const libraryNode: TreeCatalogNode = library
+      ? {
+          id: h9LibraryNodeId(library.libraryCode),
+          label: library.libraryName,
+          description: library.libraryCode,
+          badge: `${library.fieldCount} 字段`,
+          children: [
+            {
+              id: h9VersionNodeId(library.latestVersionId),
+              label: `v${library.versionNo}`,
+              description: formatDateTime(library.publishedAt),
+              badge: "已发布",
+            },
+          ],
+        }
+      : {
+          id: `missing:${type.code}`,
+          label: "未发布字段库",
+          description: type.fieldLibraryCode || "未绑定字段库编码",
+          badge: "缺失",
+          disabled: true,
+        };
+    return {
+      id: h9TypeNodeId(type.code),
+      label: type.name,
+      description: type.code,
+      badge: type.businessModule || "H9",
+      disabled: !type.enabled,
+      children: [libraryNode],
+    };
+  });
+}
+
+function filterRowsByTree(
+  rows: PrintFieldLibraryRow[],
+  templateTypes: PrintTemplateTypeRow[],
+  selectedNodeId: string,
+) {
+  if (!selectedNodeId) return rows;
+  if (selectedNodeId.startsWith("type:")) {
+    const typeCode = selectedNodeId.slice("type:".length);
+    const templateType = templateTypes.find((type) => type.code === typeCode);
+    return templateType ? rows.filter((row) => row.libraryCode === templateType.fieldLibraryCode) : rows;
+  }
+  if (selectedNodeId.startsWith("library:")) {
+    const libraryCode = selectedNodeId.slice("library:".length);
+    return rows.filter((row) => row.libraryCode === libraryCode);
+  }
+  if (selectedNodeId.startsWith("version:")) {
+    const versionId = selectedNodeId.slice("version:".length);
+    return rows.filter((row) => row.latestVersionId === versionId);
+  }
+  return rows;
+}
+
+function h9TypeNodeId(code: string) {
+  return `type:${code}`;
+}
+
+function h9LibraryNodeId(code: string) {
+  return `library:${code}`;
+}
+
+function h9VersionNodeId(id: string) {
+  return `version:${id}`;
 }
 
 function queryString(value: QueryPanelValue[string]) {

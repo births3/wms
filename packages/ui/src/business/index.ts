@@ -88,6 +88,13 @@ export type {
   TwoPaneCatalogPreference,
   TwoPaneCatalogProps,
 } from "./TwoPaneCatalog";
+export { TreeCatalog } from "./TreeCatalog";
+export type {
+  TreeCatalogFlatNode,
+  TreeCatalogNode,
+  TreeCatalogPreference,
+  TreeCatalogProps,
+} from "./TreeCatalog";
 export { SystemDictionaryTwoPane } from "./SystemDictionaryTwoPane";
 export type {
   SystemDictionaryTwoPaneProps,

@@ -289,6 +289,14 @@ PDA 端组件（含 PDA 模式）必须满足 `docs/infra/usability-baseline.md 
 - 边界：不得复制 DataGrid 的右键菜单、区域选择、粘贴、汇总统计、冻结列、拖动列宽；需要这些能力时改用 DataGrid。
 - 业务包装：领域组件只负责把业务字段映射到 `TwoPaneCatalog` 的 `groups`、`fields`、`headerActions` 和 `renderItemActions`，不得把领域规则写进 `TwoPaneCatalog`。
 
+### 7.4.3 TreeCatalog
+
+- 适用：左侧多层树导航 + 右侧明细列表，例如 H9 模板类型 / 字段库 / 版本、H1 菜单树、库区 / 库位层级。
+- 必备公共能力：树节点搜索、展开 / 折叠、选中态、禁用态、加载 / 空状态、localStorage 偏好保存。
+- 右侧展示：树只负责选择上下文；右侧列表、字段、操作、导出和筛选必须继续复用 `DataGrid` 或页面既有组件。
+- 边界：不得在业务页面手写私有树；确有树状导航需求时先复用 `TreeCatalog`，缺能力时补公共组件。
+- 业务包装：领域组件只负责把业务数据映射成 `TreeCatalogNode[]`，不得把 H9/H1 等领域规则写进 `TreeCatalog`。
+
 ---
 
 ## 7.5 页面级文件大小约束（强制）
