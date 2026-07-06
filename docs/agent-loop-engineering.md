@@ -77,6 +77,8 @@
 - 新增长规范进入 `docs/`，复杂流程进入 `.agents/skills/`。
 - 没有引入未经确认的新模块、故事、字段、状态、角色或业务默认值。
 - 脏工作区中只触碰本轮相关文件。
+- 前端页面或 API client 变更时，除了静态脚本，还要检查运行时数据入口：真实后端路由或 `apps/web-admin/vite.config.ts` dev mock 路由至少一边可达；开发 mock 模式下用相关 self-check 或 `curl 9002` 覆盖页面调用的 API，防止 `Dev mock route not found`。
+- 涉及用户故事、菜单页、模块验收、补齐缺失功能或质量矩阵时，先跑 `python3 scripts/governance/check_scope_gap_discovery.py --json`；“全部/闭环/补齐/验收”类任务按模块追加 `--strict --module <模块>`。
 - 可脚本验证的问题优先跑脚本，至少执行 `git diff --check` 和 `just gov-t1`。
 - 最终报告包含验证退出码和未解决风险。
 

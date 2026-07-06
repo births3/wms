@@ -25,6 +25,7 @@ description: WMS 执行复盘和流程迭代技能。用户问为什么没检查
    - 证据缺失：截图、重启结果、版本校验、测试结果没有回写到 PR / issue。
    - 收口缺失：PR、tmux、worktree、agent 分支没有进入明确状态。
    - 字段共性缺失：创建时间、更新时间、创建人、货主、状态、单据类型等公共字段在某页面、接口、矩阵或脚本中缺失。
+   - 范围缺口缺失：用户故事已有，但矩阵、页面、按钮、弹窗、API 或后端没有进入执行范围。
    - 验证缺失：现有脚本没覆盖，或 dry-run 产物污染治理检查。
 4. 先补当前事故：能补评论、截图附件、重启状态或清理状态的，先补；不能补的写明阻塞。
 5. 固化规则：选择最小落点：
@@ -32,6 +33,7 @@ description: WMS 执行复盘和流程迭代技能。用户问为什么没检查
    - 子代理执行缺口：改 `wms-worktree-subagent`。
    - issue agent 流程缺口：改 `docs/runbooks/gitea-issue-agent.md`。
    - 字段共性缺口：先补字段矩阵 / 设计 RTM，再补前后端映射和治理脚本。
+   - 范围缺口：先补 `governance/quality-matrix.toml` 或 `scripts/governance/check_scope_gap_discovery.py`，再补实现；模块验收用 `--strict --module <模块>`。
    - 全局协作习惯：改 `AGENTS.md`。
    - 单次口头提醒：不要建规则，直接说明。
 6. 验证规则真的生效：
@@ -52,20 +54,9 @@ description: WMS 执行复盘和流程迭代技能。用户问为什么没检查
 
 从 issue 或 PR 评论触发复盘时，必须先做一次“共性学习”，避免只修当前报错。
 
-提取信号：
+提取信号：页面 / 模块、业务对象、缺失类型、公共关键词、证据位置。
 
-- 页面 / 模块：例如 M1、M2、收货管理、基础资料、DataGrid、菜单、详情弹窗。
-- 业务对象：例如 ASN 收货单、库位、商品、客商、系统字典、批号。
-- 缺失类型：字段缺失、按钮缺失、筛选缺失、接口未接入、截图未回写、tmux 未清理、worktree 未合并。
-- 公共关键词：创建时间、更新时间、货主、状态、单据类型、查询、分页、列设置、截图、PR、issue、附件。
-- 证据位置：评论编号、截图附件 URL、PR 评论、测试日志、治理脚本输出。
-
-判断是否共性：
-
-- 同一缺失类型影响两个以上页面、模块、单据类型或主数据对象。
-- issue 说的是“这些 / 几个 / 各个 / 都 / 统一 / 为什么没检查出来”。
-- 修复点跨越矩阵、契约、后端、前端、测试、治理脚本中的两层以上。
-- 现有治理脚本不能在改动前报错，或只能报当前页面、不覆盖同类页面。
+判断为共性：影响两个以上页面 / 模块 / 对象；用户说“这些、各个、统一、为什么没检查出来”；修复跨矩阵、契约、后端、前端、测试、治理脚本两层以上；现有脚本不能在改动前报错；用户故事或菜单页已存在但矩阵未登记。
 
 共性学习输出：
 
@@ -75,35 +66,23 @@ description: WMS 执行复盘和流程迭代技能。用户问为什么没检查
 - `规则落点`：补哪个 skill、runbook、脚本、矩阵或 AGENTS 规则。
 - `治理验证`：新增或扩展哪个命令，下一次同类缺失应能失败。
 
+范围类问题的固定验证：
+
+- 默认发现：`python3 scripts/governance/check_scope_gap_discovery.py --json`
+- 模块闭环：`python3 scripts/governance/check_scope_gap_discovery.py --strict --module <模块>`
+- 只有当前事故修了、规则落到矩阵或脚本、严格模式能暴露同类缺口，才算自我迭代完成。
+
 ## 共性字段分析
 
 遇到“缺少创建日期 / 创建时间 / created_at”等字段问题时，先判断共性。
 
-按这条链路检查：
+按链路检查：需求/矩阵 → OpenAPI/DTO/repository → `apps/web-admin/src/features/**` 映射 → `DataGrid` 列与筛选 → `QueryPanel` 查询 → T1 治理脚本。
 
-1. 需求和矩阵：`docs/*-web-design-plan.md`、`docs/requirements-traceability-matrix.md`、用户故事字段表是否声明该字段。
-2. 契约和后端：`shared/openapi/openapi.json`、`packages/api-client/src/schema.ts`、后端 DTO / repository 是否返回该字段。
-3. 前端映射：`apps/web-admin/src/features/**` 是否把 `created_at` 映射成页面行模型字段。
-4. 列和筛选：使用 `DataGrid` 的页面是否展示创建时间列，且字段筛选是 `dateRange`。
-5. 查询条件：列表页是否有创建时间范围；业务列表默认近 90 天时要有明确默认值。
-6. 治理脚本：如果同类字段会跨页面复发，补 T1 静态检查或扩展现有脚本。
-
-判断为共性问题的条件：
-
-- 同一字段出现在契约或矩阵中，但至少一个页面未展示。
-- 同类页面有的展示、有的没展示。
-- 字段属于系统公共字段：`created_at`、`updated_at`、`created_by`、`updated_by`、`owner_id`、`status`、`document_type`。
-- 修复需要同时改矩阵、行模型、列定义、筛选或治理脚本中的两类以上。
-
-最小输出必须包含：
-
-- 断点位于哪一层：矩阵、契约、映射、列定义、筛选、治理脚本。
-- 本次修了哪些实例。
-- 已新增或扩展哪个脚本防止复发。
+公共字段包括 `created_at`、`updated_at`、`created_by`、`updated_by`、`owner_id`、`status`、`document_type`。输出必须写断点层、本次实例、已新增或扩展的防复发脚本。
 
 ## 外部 Skill 引入
 
-引入外部 skill 时，先临时目录只读审计，禁止先跑 `npx`、安装脚本或仓库脚本；检查脚本、hooks、网络、提交/推送、secret 和跳过确认风险。只装 skill 本体；安装后跑 yao 结构和资源边界检查。入口过重或触发过宽时先收窄触发、加确认、禁 secret、补接口元数据；学习写回现有 skill / runbook。
+引入外部 skill 时，先临时目录只读审计脚本、hooks、网络、提交/推送、secret 和跳过确认风险；只装 skill 本体。安装后跑 yao 结构和资源边界检查，入口过重或触发过宽时先收窄。
 
 ## 判断标准
 

@@ -32,5 +32,7 @@ description: 用 Loop Engineering 方式执行 WMS 仓库任务，先定义目�
 - 文档必须中文。
 - 文件位置必须符合 `AGENTS.md` 文件分工。
 - 不复制长篇外部文章原文，只写摘要、规则和链接。
+- 前端页面或 `apps/web-admin/src/features/**` API 调用变更时，必须检查运行时数据入口：真实后端路由或 `apps/web-admin/vite.config.ts` dev mock 路由至少一边可达；开发 mock 模式下还要用 self-check 或 `curl 9002` 证明不会出现 `Dev mock route not found`。
+- 涉及模块验收、补齐缺失功能、用户故事、菜单页或质量矩阵时，先运行 `python3 scripts/governance/check_scope_gap_discovery.py --json`；若用户要求“全部/闭环/补齐/验收”，按模块追加 `--strict --module <模块>`。
 - 修改后至少运行 `git diff --check` 和 `just gov-t1`。
 - 不主动提交或推送，除非用户明确要求。
