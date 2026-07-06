@@ -46,6 +46,26 @@ def test_check_page_size_scans_production_web_admin_pages():
     assert any(page.as_posix() in error for error in errors)
 
 
+def test_check_page_size_scans_shared_business_components():
+    """共享业务组件也必须受行数门禁保护。"""
+    import check_page_size
+
+    component = Path("packages/ui/src/business/__page_size_probe.tsx")
+    component.parent.mkdir(parents=True, exist_ok=True)
+    text = "\n".join(
+        f"export const probe{i} = {i};"
+        for i in range(check_page_size.ERROR_THRESHOLD)
+    ) + "\n"
+
+    try:
+        component.write_text(text, encoding="utf-8")
+        errors, _warnings = check_page_size.run()
+    finally:
+        component.unlink(missing_ok=True)
+
+    assert any(component.as_posix() in error for error in errors)
+
+
 def test_production_page_changes_trigger_page_size_gate():
     """生产前端页面变更必须触发页面行数门禁。"""
     from _diff import load_gate_rules, match_rules
@@ -57,3 +77,13 @@ def test_production_page_changes_trigger_page_size_gate():
     ]:
         triggered = match_rules([changed_file], rules)
         assert "check_page_size" in triggered
+
+
+def test_shared_business_component_changes_trigger_page_size_gate():
+    """共享业务组件变更必须触发行数门禁。"""
+    from _diff import load_gate_rules, match_rules
+
+    rules = load_gate_rules()
+    triggered = match_rules(["packages/ui/src/business/DataGrid/DataGrid.tsx"], rules)
+
+    assert "check_page_size" in triggered

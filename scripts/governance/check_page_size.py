@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""check_page_size.py — 页面/原型支撑组件文件大小约束（600 警告 / 800 门禁）
+"""check_page_size.py — 页面/共享业务组件文件大小约束（600 警告 / 800 门禁）
 
 类别：6. 原型治理
 Tier：T1（< 10s）
-输入：prototypes/src/pages/**/*.tsx + prototypes/src/prototype-kit/**/*.tsx + apps/*/src/pages/**/*.tsx
+输入：prototypes / apps 页面 + packages/ui/src/business 共享业务组件
 输出：人类可读 + --json
 退出码：0 通过 / 1 违规（≥ 800 行）/ 2 脚本错误
 
@@ -11,6 +11,7 @@ Tier：T1（< 10s）
 - 单页面文件 ≥ 600 行 → warning（提示提取组件）
 - 单页面文件 ≥ 800 行 → error（强制提取组件）
 - 原型运行时支撑组件同样受约束，防止 UniversalPrototypePage 类模板绕过治理
+- 共享业务组件同样受约束，防止 DataGrid 等公共控件堆成单文件
 
 豁免方式：文件顶部加 `@governance: skip-page-size` 注释 + 理由
 
@@ -32,7 +33,9 @@ PAGE_DIRS = (
     REPO_ROOT / "prototypes" / "src" / "prototype-kit",
     REPO_ROOT / "apps" / "web-admin" / "src" / "pages",
     REPO_ROOT / "apps" / "pda-mobile" / "src" / "pages",
+    REPO_ROOT / "packages" / "ui" / "src" / "business",
 )
+CHECK_SUFFIXES = (".tsx",)
 
 WARN_THRESHOLD = 600
 ERROR_THRESHOLD = 800
@@ -66,7 +69,7 @@ def run() -> tuple[list[str], list[str]]:
     files: list[Path] = []
     for page_dir in PAGE_DIRS:
         if page_dir.exists():
-            files.extend(page_dir.rglob("*.tsx"))
+            files.extend(path for path in page_dir.rglob("*") if path.suffix in CHECK_SUFFIXES)
     for f in sorted(files):
         if ".stories." in f.name or ".spec." in f.name or ".test." in f.name:
             continue
