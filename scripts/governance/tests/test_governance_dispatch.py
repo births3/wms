@@ -94,6 +94,13 @@ def test_governance_checks_t1_includes_scope_gap_discovery_guard():
     assert "check_scope_gap_discovery.py" in expand_tier_scripts("T1")
 
 
+def test_governance_checks_t1_includes_dialog_overlay_guard():
+    """T1 全量入口必须覆盖共享 Dialog 遮罩规则，避免弹窗内字段点击被遮罩关闭。"""
+    from governance_checks import expand_tier_scripts
+
+    assert "check_dialog_overlay_pointer_events.py" in expand_tier_scripts("T1")
+
+
 def test_governance_script_changes_trigger_coverage_meta_check():
     """治理脚本变更时，diff gate 必须触发覆盖元检查。"""
     from _diff import load_gate_rules, match_rules

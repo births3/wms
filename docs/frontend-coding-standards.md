@@ -369,6 +369,7 @@ PDA 端组件（含 PDA 模式）必须满足 `docs/infra/usability-baseline.md 
 - 弹窗标题必须等于当前动作，说明文本必须带当前单据号或对象名。
 - 弹窗底部统一为“取消 + 主提交按钮”；提交成功关闭弹窗，提交失败保持弹窗并显示错误。
 - 按钮触发的临时弹窗、浮层、筛选面板和菜单必须支持显式关闭、点击外部关闭和 `Escape` 关闭；导航离开当前浮层时必须同步收口。
+- 共享 `<Dialog>` 遮罩只负责视觉遮罩，不得包 `DialogClose` 或抢占 pointer 事件；弹窗内 `Select` 等 portal 浮层打开后，鼠标切换到另一个字段不得关闭整个弹窗。该约束由 `check_dialog_overlay_pointer_events.py` 强制检查。
 - 同一动作不得同时存在“页面内表单”和“弹窗表单”两套入口。
 - 列表型作业页禁止常驻“当前处理单”或“本环节操作”大卡片；当前单据详情和写操作都通过列表行按钮弹窗处理。
 - 列表型作业页禁止常驻入库明细、订单明细或商品行明细表；明细随单据详情弹窗查看。
@@ -486,6 +487,7 @@ DataGrid 表头和表格内触发的弹窗 / 浮层，例如字段筛选、字�
 | `check_component_props_classname.py` | T1 | Props 接口含 className + forwardRef + displayName（**泛型函数自动豁免 forwardRef**） | `@governance: skip-classname` |
 | `check_component_no_inline_style.py` | T1 | 业务复合无静态 inline style | 紧邻上方 `// 动态：理由` 注释 |
 | `check_component_registry_consistency.py` | T1 | 业务复合目录 ↔ component-registry.md §3.1 一一对应 | `[[component_exemptions]]` |
+| `check_dialog_overlay_pointer_events.py` | T1 | 共享 Dialog 遮罩不抢占弹窗内字段点击 | 无 |
 | `check_datagrid_popover_portal.py` | T1 | DataGrid 弹窗浮层使用 `createPortal + fixed`，并支持点击外部 / `Escape` 关闭 | 无 |
 | `check_page_size.py` | T1 | 页面 < 600 通过 / 600-799 警告 / ≥ 800 门禁 | `@governance: skip-page-size` |
 
