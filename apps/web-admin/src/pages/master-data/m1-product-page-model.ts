@@ -46,13 +46,22 @@ const businessPartnerTypeColumn: DataGridColumn<MasterDataRow> = {
   },
 };
 
+function productCoreColumns(baseColumns: DataGridColumn<MasterDataRow>[]): DataGridColumn<MasterDataRow>[] {
+  return baseColumns.map((column) => {
+    if (column.key === "primary") return { ...column, header: "规格" };
+    if (column.key === "secondary") return { ...column, header: "批准文号" };
+    if (column.key === "extra") return { ...column, header: "储存条件" };
+    return column;
+  });
+}
+
 export function masterDataColumns(
   viewId: MasterDataViewId,
   baseColumns: DataGridColumn<MasterDataRow>[],
   locationColumns: DataGridColumn<MasterDataRow>[],
 ) {
   if (viewId === "m1-products") {
-    return [...baseColumns, sourceColumn];
+    return [...productCoreColumns(baseColumns), sourceColumn];
   }
   if (viewId === "m1-business-partners") {
     return [...baseColumns, businessPartnerTypeColumn, sourceColumn];
