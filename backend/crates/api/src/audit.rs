@@ -616,7 +616,91 @@ pub async fn append_event_in_tx(
     .await
     .map_err(|error| AuditError::Database(error.to_string()))?;
 
-    inserted.into_record()
+    let record = inserted.into_record()?;
+    append_audit_event_bus_outbox_in_tx(tx, &record).await?;
+    Ok(record)
+}
+
+async fn append_audit_event_bus_outbox_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    record: &AuditEventRecord,
+) -> Result<(), AuditError> {
+    let event_id = Uuid::new_v4();
+    let event_type = format!("audit.{}.{}", record.resource_type, record.action);
+    let idempotency_key = format!("audit_event:{}", record.id);
+    sqlx::query(
+        r#"
+        INSERT INTO event_bus_event (
+            id, owner_id, idempotency_key, event_type, source_module,
+            resource_type, resource_id, payload, created_at
+        )
+        VALUES ($1, $2, $3, $4, 'H2', $5, $6, $7, $8)
+        ON CONFLICT (owner_id, idempotency_key) DO NOTHING
+        "#,
+    )
+    .bind(event_id)
+    .bind(record.owner_id)
+    .bind(&idempotency_key)
+    .bind(&event_type)
+    .bind(&record.resource_type)
+    .bind(&record.resource_id)
+    .bind(serde_json::json!({
+        "audit_event_id": record.id,
+        "action": record.action,
+        "module": record.module,
+        "resource_type": record.resource_type,
+        "resource_id": record.resource_id,
+        "occurred_at": record.occurred_at,
+    }))
+    .bind(record.occurred_at)
+    .execute(&mut **tx)
+    .await
+    .map_err(|error| AuditError::Database(error.to_string()))?;
+
+    let subscriptions: Vec<(Uuid, String)> = sqlx::query_as(
+        r#"
+        SELECT id, event_pattern
+          FROM event_bus_subscription
+         WHERE owner_id = $1 AND active = TRUE
+        "#,
+    )
+    .bind(record.owner_id)
+    .fetch_all(&mut **tx)
+    .await
+    .map_err(|error| AuditError::Database(error.to_string()))?;
+
+    for (subscription_id, event_pattern) in subscriptions {
+        if !matches_event_pattern(&event_pattern, &event_type) {
+            continue;
+        }
+        sqlx::query(
+            r#"
+            INSERT INTO event_bus_delivery (
+                id, owner_id, event_id, subscription_id, status, attempt_count, next_attempt_at
+            )
+            VALUES ($1, $2, $3, $4, 'pending', 0, $5)
+            ON CONFLICT (event_id, subscription_id) DO NOTHING
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(record.owner_id)
+        .bind(event_id)
+        .bind(subscription_id)
+        .bind(record.occurred_at)
+        .execute(&mut **tx)
+        .await
+        .map_err(|error| AuditError::Database(error.to_string()))?;
+    }
+
+    Ok(())
+}
+
+fn matches_event_pattern(pattern: &str, event_type: &str) -> bool {
+    pattern == "*"
+        || pattern == event_type
+        || pattern
+            .strip_suffix(".*")
+            .is_some_and(|prefix| event_type.starts_with(&format!("{prefix}.")))
 }
 
 pub async fn seal_audit_chain(

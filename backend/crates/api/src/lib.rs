@@ -18,6 +18,7 @@ pub mod document_numbering;
 pub mod document_numbering_handlers;
 mod document_numbering_repository;
 pub mod feature_flags;
+pub mod h2_lifecycle;
 pub mod inbound;
 pub mod inventory;
 pub mod master_data;
