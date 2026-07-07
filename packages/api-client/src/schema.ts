@@ -1108,6 +1108,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/print-templates/field-libraries/{version_id}/fields": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_print_field_definitions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-templates/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["preview_print_template"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-templates/print": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["record_print_template"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-templates/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["resolve_print_template"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-templates/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_print_templates"];
+        put?: never;
+        post: operations["save_print_template"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/gsp/inbound-ledger": {
         parameters: {
             query?: never;
@@ -2426,6 +2506,25 @@ export interface components {
             /** @description 下一页游标；为空表示无更多数据。 */
             next_cursor?: string | null;
         };
+        PrintFieldDefinition: {
+            display_name: string;
+            field_path: string;
+            field_type: string;
+            group_code: string;
+            group_name: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            library_version_id: string;
+            metadata: unknown;
+            /** Format: int32 */
+            sort_order: number;
+            source_schema: string;
+        };
+        PrintFieldDefinitionListResponse: {
+            data: components["schemas"]["PrintFieldDefinition"][];
+            page: components["schemas"]["PageMeta"];
+        };
         PrintFieldLibraryListResponse: {
             data: components["schemas"]["PrintFieldLibrarySummary"][];
             page: components["schemas"]["PageMeta"];
@@ -2446,6 +2545,127 @@ export interface components {
             /** Format: uuid */
             published_by: string;
             source_schema: string;
+            /** Format: int32 */
+            version_no: number;
+        };
+        PrintRecord: {
+            business_document_id: string;
+            business_document_type: string;
+            business_module: string;
+            /** Format: date-time */
+            created_at: string;
+            failure_reason?: string | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            operator_id: string;
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: date-time */
+            printed_at: string;
+            /** Format: int32 */
+            retry_count: number;
+            status: string;
+            /** Format: uuid */
+            template_version_id: string;
+        };
+        PrintTemplateBinding: {
+            field_path: string;
+            required: boolean;
+        };
+        PrintTemplateListResponse: {
+            data: components["schemas"]["PrintTemplateSummary"][];
+            page: components["schemas"]["PageMeta"];
+        };
+        PrintTemplatePreviewRequest: {
+            business_document_id: string;
+            data: unknown;
+            template_code?: string | null;
+            template_type_code: string;
+        };
+        PrintTemplatePreviewResponse: {
+            data: unknown;
+            field_bindings: components["schemas"]["PrintTemplateBinding"][];
+            hiprint_json: unknown;
+            paper: unknown;
+            template_code: string;
+            /** Format: uuid */
+            template_id: string;
+            template_name: string;
+            template_type_code: string;
+            /** Format: uuid */
+            template_version_id: string;
+            /** Format: int32 */
+            version_no: number;
+        };
+        PrintTemplatePrintRequest: {
+            business_document_id: string;
+            business_document_type: string;
+            business_module: string;
+            data: unknown;
+            failure_reason?: string | null;
+            status: string;
+            template_code?: string | null;
+            template_type_code: string;
+        };
+        /** @enum {string} */
+        PrintTemplateScope: "global" | "owner";
+        PrintTemplateSummary: {
+            /** Format: date-time */
+            created_at: string;
+            designer_version: string;
+            enabled: boolean;
+            /** Format: uuid */
+            field_library_version_id: string;
+            /** Format: uuid */
+            id: string;
+            is_default: boolean;
+            /** Format: uuid */
+            latest_version_id: string;
+            /** Format: int32 */
+            latest_version_no: number;
+            latest_version_status: string;
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: date-time */
+            published_at?: string | null;
+            remark?: string | null;
+            scope: components["schemas"]["PrintTemplateScope"];
+            template_code: string;
+            template_name: string;
+            template_type_code: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        PrintTemplateVersion: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            created_by: string;
+            designer_version: string;
+            enabled: boolean;
+            field_bindings: components["schemas"]["PrintTemplateBinding"][];
+            /** Format: uuid */
+            field_library_version_id: string;
+            hiprint_json: unknown;
+            /** Format: uuid */
+            id: string;
+            is_default: boolean;
+            /** Format: uuid */
+            owner_id: string;
+            paper: unknown;
+            /** Format: date-time */
+            published_at?: string | null;
+            /** Format: uuid */
+            published_by?: string | null;
+            remark?: string | null;
+            scope: components["schemas"]["PrintTemplateScope"];
+            status: string;
+            template_code: string;
+            /** Format: uuid */
+            template_id: string;
+            template_name: string;
+            template_type_code: string;
             /** Format: int32 */
             version_no: number;
         };
@@ -2668,6 +2888,14 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        ResolvePrintTemplateRequest: {
+            template_code?: string | null;
+            template_type_code: string;
+        };
+        ResolvePrintTemplateResponse: {
+            template: components["schemas"]["PrintTemplateSummary"];
+            version: components["schemas"]["PrintTemplateVersion"];
+        };
         RetailReplenishmentSuggestion: {
             /** Format: date-time */
             created_at: string;
@@ -2703,6 +2931,22 @@ export interface components {
         RollbackAdminMenuRequest: {
             /** Format: int64 */
             target_version_no?: number | null;
+        };
+        SavePrintTemplateRequest: {
+            designer_version: string;
+            enabled: boolean;
+            field_bindings: components["schemas"]["PrintTemplateBinding"][];
+            /** Format: uuid */
+            field_library_version_id: string;
+            hiprint_json: unknown;
+            is_default: boolean;
+            paper: unknown;
+            publish: boolean;
+            remark?: string | null;
+            scope: components["schemas"]["PrintTemplateScope"];
+            template_code: string;
+            template_name: string;
+            template_type_code: string;
         };
         SetDocumentNumberRuleEnabledRequest: {
             enabled: boolean;
@@ -6657,6 +6901,349 @@ export interface operations {
             };
             /** @description 权限不足 */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_print_field_definitions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 字段库版本 ID */
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 打印字段定义列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintFieldDefinitionListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    preview_print_template: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrintTemplatePreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description 预览打印模板 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintTemplatePreviewResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 模板不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 打印数据缺少必填字段 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    record_print_template: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrintTemplatePrintRequest"];
+            };
+        };
+        responses: {
+            /** @description 记录浏览器打印结果 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintRecord"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 模板不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 打印数据缺少必填字段 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    resolve_print_template: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolvePrintTemplateRequest"];
+            };
+        };
+        responses: {
+            /** @description 解析业务打印模板 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResolvePrintTemplateResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 模板不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 模板已停用 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_print_templates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 打印模板列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintTemplateListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    save_print_template: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavePrintTemplateRequest"];
+            };
+        };
+        responses: {
+            /** @description 保存打印模板版本 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintTemplateVersion"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 字段库未发布或幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 模板 JSON 或字段绑定非法 */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

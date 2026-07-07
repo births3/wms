@@ -633,8 +633,8 @@
           }
         },
         "security": [],
-        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。",
-        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。"
+        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。",
+        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。"
       }
     },
     "/api/v1/auth/me": {
@@ -4674,6 +4674,418 @@
           },
           "403": {
             "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/print-templates/field-libraries/{version_id}/fields": {
+      "get": {
+        "tags": [
+          "print-template"
+        ],
+        "operationId": "list_print_field_definitions",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "description": "字段库版本 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "打印字段定义列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintFieldDefinitionListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/print-templates/preview": {
+      "post": {
+        "tags": [
+          "print-template"
+        ],
+        "operationId": "preview_print_template",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrintTemplatePreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "预览打印模板",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintTemplatePreviewResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "模板不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "打印数据缺少必填字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/print-templates/print": {
+      "post": {
+        "tags": [
+          "print-template"
+        ],
+        "operationId": "record_print_template",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrintTemplatePrintRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "记录浏览器打印结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintRecord"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "模板不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "打印数据缺少必填字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/print-templates/resolve": {
+      "post": {
+        "tags": [
+          "print-template"
+        ],
+        "operationId": "resolve_print_template",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolvePrintTemplateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "解析业务打印模板",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolvePrintTemplateResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "模板不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "模板已停用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/print-templates/templates": {
+      "get": {
+        "tags": [
+          "print-template"
+        ],
+        "operationId": "list_print_templates",
+        "responses": {
+          "200": {
+            "description": "打印模板列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintTemplateListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "print-template"
+        ],
+        "operationId": "save_print_template",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavePrintTemplateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "保存打印模板版本",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintTemplateVersion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "字段库未发布或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "模板 JSON 或字段绑定非法",
             "content": {
               "application/json": {
                 "schema": {
@@ -8993,6 +9405,72 @@
           }
         }
       },
+      "PrintFieldDefinition": {
+        "type": "object",
+        "required": [
+          "id",
+          "library_version_id",
+          "field_path",
+          "field_type",
+          "source_schema",
+          "display_name",
+          "group_code",
+          "group_name",
+          "metadata",
+          "sort_order"
+        ],
+        "properties": {
+          "display_name": {
+            "type": "string"
+          },
+          "field_path": {
+            "type": "string"
+          },
+          "field_type": {
+            "type": "string"
+          },
+          "group_code": {
+            "type": "string"
+          },
+          "group_name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "library_version_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "metadata": {},
+          "sort_order": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "source_schema": {
+            "type": "string"
+          }
+        }
+      },
+      "PrintFieldDefinitionListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrintFieldDefinition"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
       "PrintFieldLibraryListResponse": {
         "type": "object",
         "required": [
@@ -9057,6 +9535,395 @@
             "format": "uuid"
           },
           "source_schema": {
+            "type": "string"
+          },
+          "version_no": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PrintRecord": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "template_version_id",
+          "business_module",
+          "business_document_type",
+          "business_document_id",
+          "status",
+          "retry_count",
+          "printed_at",
+          "operator_id",
+          "created_at"
+        ],
+        "properties": {
+          "business_document_id": {
+            "type": "string"
+          },
+          "business_document_type": {
+            "type": "string"
+          },
+          "business_module": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "failure_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operator_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "printed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "retry_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          },
+          "template_version_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "PrintTemplateBinding": {
+        "type": "object",
+        "required": [
+          "field_path",
+          "required"
+        ],
+        "properties": {
+          "field_path": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PrintTemplateListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrintTemplateSummary"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "PrintTemplatePreviewRequest": {
+        "type": "object",
+        "required": [
+          "template_type_code",
+          "business_document_id",
+          "data"
+        ],
+        "properties": {
+          "business_document_id": {
+            "type": "string"
+          },
+          "data": {},
+          "template_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "template_type_code": {
+            "type": "string"
+          }
+        }
+      },
+      "PrintTemplatePreviewResponse": {
+        "type": "object",
+        "required": [
+          "template_id",
+          "template_version_id",
+          "template_code",
+          "template_name",
+          "template_type_code",
+          "version_no",
+          "hiprint_json",
+          "field_bindings",
+          "paper",
+          "data"
+        ],
+        "properties": {
+          "data": {},
+          "field_bindings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrintTemplateBinding"
+            }
+          },
+          "hiprint_json": {},
+          "paper": {},
+          "template_code": {
+            "type": "string"
+          },
+          "template_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "template_name": {
+            "type": "string"
+          },
+          "template_type_code": {
+            "type": "string"
+          },
+          "template_version_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version_no": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PrintTemplatePrintRequest": {
+        "type": "object",
+        "required": [
+          "template_type_code",
+          "business_module",
+          "business_document_type",
+          "business_document_id",
+          "data",
+          "status"
+        ],
+        "properties": {
+          "business_document_id": {
+            "type": "string"
+          },
+          "business_document_type": {
+            "type": "string"
+          },
+          "business_module": {
+            "type": "string"
+          },
+          "data": {},
+          "failure_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "template_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "template_type_code": {
+            "type": "string"
+          }
+        }
+      },
+      "PrintTemplateScope": {
+        "type": "string",
+        "enum": [
+          "global",
+          "owner"
+        ]
+      },
+      "PrintTemplateSummary": {
+        "type": "object",
+        "required": [
+          "id",
+          "template_code",
+          "template_name",
+          "template_type_code",
+          "owner_id",
+          "scope",
+          "enabled",
+          "is_default",
+          "latest_version_id",
+          "latest_version_no",
+          "latest_version_status",
+          "field_library_version_id",
+          "designer_version",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "designer_version": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "field_library_version_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "is_default": {
+            "type": "boolean"
+          },
+          "latest_version_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "latest_version_no": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "latest_version_status": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "remark": {
+            "type": "string",
+            "nullable": true
+          },
+          "scope": {
+            "$ref": "#/components/schemas/PrintTemplateScope"
+          },
+          "template_code": {
+            "type": "string"
+          },
+          "template_name": {
+            "type": "string"
+          },
+          "template_type_code": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PrintTemplateVersion": {
+        "type": "object",
+        "required": [
+          "id",
+          "template_id",
+          "template_code",
+          "template_name",
+          "template_type_code",
+          "owner_id",
+          "scope",
+          "enabled",
+          "is_default",
+          "field_library_version_id",
+          "version_no",
+          "status",
+          "hiprint_json",
+          "field_bindings",
+          "paper",
+          "designer_version",
+          "created_at",
+          "created_by"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "created_by": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "designer_version": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "field_bindings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrintTemplateBinding"
+            }
+          },
+          "field_library_version_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "hiprint_json": {},
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "is_default": {
+            "type": "boolean"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "paper": {},
+          "published_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "published_by": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "remark": {
+            "type": "string",
+            "nullable": true
+          },
+          "scope": {
+            "$ref": "#/components/schemas/PrintTemplateScope"
+          },
+          "status": {
+            "type": "string"
+          },
+          "template_code": {
+            "type": "string"
+          },
+          "template_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "template_name": {
+            "type": "string"
+          },
+          "template_type_code": {
             "type": "string"
           },
           "version_no": {
@@ -9681,6 +10548,36 @@
           }
         }
       },
+      "ResolvePrintTemplateRequest": {
+        "type": "object",
+        "required": [
+          "template_type_code"
+        ],
+        "properties": {
+          "template_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "template_type_code": {
+            "type": "string"
+          }
+        }
+      },
+      "ResolvePrintTemplateResponse": {
+        "type": "object",
+        "required": [
+          "template",
+          "version"
+        ],
+        "properties": {
+          "template": {
+            "$ref": "#/components/schemas/PrintTemplateSummary"
+          },
+          "version": {
+            "$ref": "#/components/schemas/PrintTemplateVersion"
+          }
+        }
+      },
       "RetailReplenishmentSuggestion": {
         "type": "object",
         "required": [
@@ -9778,6 +10675,65 @@
             "type": "integer",
             "format": "int64",
             "nullable": true
+          }
+        }
+      },
+      "SavePrintTemplateRequest": {
+        "type": "object",
+        "required": [
+          "template_code",
+          "template_name",
+          "template_type_code",
+          "scope",
+          "enabled",
+          "is_default",
+          "field_library_version_id",
+          "hiprint_json",
+          "field_bindings",
+          "paper",
+          "designer_version",
+          "publish"
+        ],
+        "properties": {
+          "designer_version": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "field_bindings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrintTemplateBinding"
+            }
+          },
+          "field_library_version_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "hiprint_json": {},
+          "is_default": {
+            "type": "boolean"
+          },
+          "paper": {},
+          "publish": {
+            "type": "boolean"
+          },
+          "remark": {
+            "type": "string",
+            "nullable": true
+          },
+          "scope": {
+            "$ref": "#/components/schemas/PrintTemplateScope"
+          },
+          "template_code": {
+            "type": "string"
+          },
+          "template_name": {
+            "type": "string"
+          },
+          "template_type_code": {
+            "type": "string"
           }
         }
       },
