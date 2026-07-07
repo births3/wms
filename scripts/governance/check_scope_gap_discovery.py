@@ -134,11 +134,7 @@ def scan_scope_gaps(
     }
     all_active_modules |= {story_module(story_id) for story_id in matrix_story_ids}
     requested_modules = {module.upper() for module in modules} if modules is not None else None
-    active_modules = (
-        all_active_modules & requested_modules
-        if requested_modules is not None
-        else all_active_modules
-    )
+    active_modules = requested_modules if requested_modules is not None else all_active_modules
 
     def should_scan_module(module: str) -> bool:
         if requested_modules is not None:

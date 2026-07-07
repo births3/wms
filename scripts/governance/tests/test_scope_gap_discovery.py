@@ -56,7 +56,7 @@ def test_scope_gap_blocks_matrix_frontend_page_that_is_not_in_menu():
     assert result.gaps[0].severity == "block"
 
 
-def test_scope_gap_module_filter_does_not_scan_other_active_modules():
+def test_scope_gap_module_filter_keeps_requested_module_without_other_gaps():
     from check_scope_gap_discovery import scan_scope_gaps
 
     result = scan_scope_gaps(
@@ -73,10 +73,29 @@ def test_scope_gap_module_filter_does_not_scan_other_active_modules():
         modules={"H9"},
     )
 
-    assert result.active_modules == []
+    assert result.active_modules == ["H9"]
     assert result.ok
     assert result.strict_ok
     assert result.gaps == []
+
+
+def test_scope_gap_module_filter_scans_requested_module_without_existing_matrix_story():
+    from check_scope_gap_discovery import scan_scope_gaps
+
+    result = scan_scope_gaps(
+        story_docs={
+            "docs/domain/user-stories-h2-audit-trail.md": "## US-H2-001：审计事件统一记录"
+        },
+        matrix_stories=[],
+        admin_pages={},
+        modules={"H2"},
+    )
+
+    assert result.active_modules == ["H2"]
+    assert result.ok
+    assert not result.strict_ok
+    assert [gap.story_id for gap in result.gaps] == ["US-H2-001"]
+    assert result.gaps[0].kind == "unregistered_story_in_active_module"
 
 
 def test_scope_gap_accepts_deferred_story_with_reason():

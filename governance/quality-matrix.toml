@@ -32,6 +32,115 @@ governance = "verified"
 required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
 covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
 
+[[deferred_stories]]
+id = "US-H1-002"
+title = "角色与权限管理"
+module = "H1"
+reason = "当前只落地角色、权限、用户绑定底层表和登录态权限读取；角色权限维护 API / UI、批量授权和权限即时变更操作未进入本轮执行。"
+
+[[deferred_stories]]
+id = "US-H1-005"
+title = "Token 失效与登出"
+module = "H1"
+reason = "当前只落地 Redis token 黑名单和 permissions_changed_at 运行策略；登出 API、多设备会话列表和管理员强制踢人未进入本轮执行。"
+
+[[deferred_stories]]
+id = "US-H1-006"
+title = "API Key 生命周期管理"
+module = "H1"
+reason = "当前没有 API Key 创建、轮换、吊销、作用域和审计接口；该能力应与 H-INT 外部系统接入切片一起设计和实现。"
+
+[[stories]]
+id = "US-H1-001"
+title = "用户登录与 token 签发（PC 密码登录切片）"
+module = "H1"
+story_file = "docs/domain/user-stories-h1-auth-tenant.md"
+types = ["write", "api_change", "frontend_interaction"]
+frontend_pages = []
+api_paths = [
+  "POST /api/v1/auth/login",
+  "GET /api/v1/auth/me",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
+
+[[stories]]
+id = "US-H1-003"
+title = "API 鉴权中间件"
+module = "H1"
+story_file = "docs/domain/user-stories-h1-auth-tenant.md"
+types = ["read_only", "api_change"]
+frontend_pages = []
+api_paths = []
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "not_applicable"
+api = "verified"
+backend = "verified"
+database = "not_applicable"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.not_applicable_reasons]
+frontend = "鉴权中间件为后端横向能力，不新增独立管理端页面。"
+database = "本切片不新增业务表；token 撤销和权限变更缓存由 Redis 运行策略承载。"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L8", "L9"]
+covered_layers = ["L1", "L2", "L3", "L8", "L9"]
+
+[[stories]]
+id = "US-H1-004"
+title = "多货主数据隔离（AuthContext 切片）"
+module = "H1"
+story_file = "docs/domain/user-stories-h1-auth-tenant.md"
+types = ["read_only", "api_change"]
+frontend_pages = []
+api_paths = []
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "not_applicable"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.not_applicable_reasons]
+frontend = "多货主隔离为 AuthContext、数据库 owner_id 和业务查询约束，不新增独立管理端页面。"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L8", "L9"]
+covered_layers = ["L1", "L2", "L3", "L8", "L9"]
+
 [[stories]]
 id = "US-H1-007"
 title = "PC 管理端三层菜单管理"
@@ -66,6 +175,193 @@ governance = "verified"
 [stories.tests]
 required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
 covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
+
+[[stories]]
+id = "US-H2-001"
+title = "审计事件统一记录（同步 append-only 切片）"
+module = "H2"
+story_file = "docs/domain/user-stories-h2-audit-trail.md"
+types = ["write", "audit_compliance"]
+frontend_pages = []
+api_paths = []
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "not_applicable"
+api = "not_applicable"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.not_applicable_reasons]
+frontend = "审计写入为后端横向能力，不新增独立管理端页面。"
+api = "当前切片提供后端共享写入 helper，由业务接口调用，不暴露单独写审计 API。"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L8", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L8", "L10", "L11"]
+
+[[stories]]
+id = "US-H2-002"
+title = "审计追踪查询（后端分页查询切片）"
+module = "H2"
+story_file = "docs/domain/user-stories-h2-audit-trail.md"
+types = ["read_only", "api_change"]
+frontend_pages = []
+api_paths = [
+  "GET /api/v1/audit/events",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "not_applicable"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.not_applicable_reasons]
+frontend = "本切片只登记审计追踪后端查询接口；M6 审计报表页面承接查询界面。"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L8", "L9"]
+covered_layers = ["L1", "L2", "L3", "L8", "L9"]
+
+[[stories]]
+id = "US-H2-003"
+title = "append-only 不变量保护"
+module = "H2"
+story_file = "docs/domain/user-stories-h2-audit-trail.md"
+types = ["audit_compliance"]
+frontend_pages = []
+api_paths = []
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "not_applicable"
+api = "not_applicable"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.not_applicable_reasons]
+frontend = "append-only 不变量由数据库 trigger、授权和后端写入路径约束，不新增独立管理端页面。"
+api = "append-only 不变量是数据库和后端写入约束，不暴露独立业务 API。"
+
+[stories.tests]
+required_layers = ["L5", "L8", "L10", "L11"]
+covered_layers = ["L5", "L8", "L10", "L11"]
+
+[[stories]]
+id = "US-H2-004"
+title = "审计数据归档与保留（后端归档运行切片）"
+module = "H2"
+story_file = "docs/domain/user-stories-h2-audit-trail.md"
+types = ["write", "audit_compliance"]
+frontend_pages = []
+api_paths = []
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "not_applicable"
+api = "not_applicable"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.not_applicable_reasons]
+frontend = "审计归档运行是后端横向作业切片，不新增独立管理端页面。"
+api = "当前切片提供后端归档运行服务、状态表和审计记录，不暴露公开 HTTP API。"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L8", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L8", "L10", "L11"]
+
+[[stories]]
+id = "US-H2-005"
+title = "事件总线（DB outbox 与订阅投递切片）"
+module = "H2"
+story_file = "docs/domain/user-stories-h2-audit-trail.md"
+types = ["write", "integration", "audit_compliance"]
+frontend_pages = []
+api_paths = []
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "not_applicable"
+api = "not_applicable"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.not_applicable_reasons]
+frontend = "事件总线为后端横向 outbox 能力，不新增独立管理端页面。"
+api = "当前切片提供后端发布、订阅、投递、重试和死信表能力，不暴露公开 HTTP API。"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L8", "L9", "L10", "L11"]
+
+[[stories]]
+id = "US-H2-006"
+title = "业务数据生命周期归档（后端策略与计划切片）"
+module = "H2"
+story_file = "docs/domain/user-stories-h2-audit-trail.md"
+types = ["write", "config_rule", "audit_compliance"]
+frontend_pages = []
+api_paths = []
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "not_applicable"
+api = "not_applicable"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.not_applicable_reasons]
+frontend = "当前切片实现后端归档策略和计划作业；PC 查询入口后续由配置/审计管理页面承接。"
+api = "当前切片提供后端策略种子、归档计划和审计记录，不暴露公开 HTTP API。"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L8", "L9", "L10", "L11"]
 
 [[stories]]
 id = "US-H3-001"
