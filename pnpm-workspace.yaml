@@ -4,6 +4,7 @@ packages:
   - "apps/*"
 
 allowBuilds:
+  core-js: false
   esbuild: true
 
 # Wave 0.5 起 prototypes 进入 root workspace，与 packages/ui 共享代码。
