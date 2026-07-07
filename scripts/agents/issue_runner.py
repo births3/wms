@@ -337,6 +337,13 @@ DOMAIN_KEYWORDS = [
     "下拉",
     "输入值",
     "登录",
+    "全局勾选",
+    "取消勾选",
+    "自动勾选",
+    "勾选",
+    "全选",
+    "选中",
+    "第一个",
     "按钮",
     "弹窗",
     "窗口",
@@ -363,6 +370,13 @@ KEYWORD_ALIASES = {
     "批量导入": ["批量导入", "import"],
     "新建供应商": ["createSupplier", "新建供应商"],
     "新建客户": ["createCustomer", "新建客户"],
+    "全局勾选": ["updatePageSelected", "onPageSelected", "selectedRowKeys"],
+    "取消勾选": ["updatePageSelected", "selectedRowKeys", "onSelectedRowKeysChange"],
+    "自动勾选": ["selectedRowKeys", "onSelectedRowKeysChange", "selectFirst"],
+    "勾选": ["selectedRowKeys", "onSelectedRowKeysChange", "selectable"],
+    "全选": ["updatePageSelected", "selectedRowKeys", "onPageSelected"],
+    "选中": ["selectedRowKeys", "onSelectedRowKeysChange", "selectedRowFrom"],
+    "第一个": ["keys.at(-1)", "selectedRowKeys", "selectedRowFrom"],
     "弹窗": ["Dialog", "Popover", "Modal"],
     "窗口": ["Dialog", "Popover", "Modal"],
 }
@@ -412,6 +426,12 @@ def code_context_summary(issue: dict[str, Any], comments: list[dict[str, Any]]) 
 
 COMMONALITY_RULES = [
     (
+        ("全局勾选", "取消勾选", "自动勾选", "勾选", "全选", "选中", "第一个", "selectedRowKeys"),
+        "DataGrid 选择状态一致性",
+        "管理端 DataGrid 表头全选、行勾选、详情焦点和页面自动首选逻辑",
+        "先追踪 selectedRowKeys / onSelectedRowKeysChange 的状态所有者，再查页面是否把多选数组压成单选或自动回填第一条；不能只按按钮入口泛搜。",
+    ),
+    (
         ("弹窗", "弹出", "窗口", "遮罩", "关闭", "外边", "外部"),
         "弹层 / 弹窗关闭交互",
         "共享 Dialog / Popover / Dropdown / DataGrid 弹层组件，以及页面私有弹窗",
@@ -444,6 +464,8 @@ def commonality_summary(issue: dict[str, Any], comments: list[dict[str, Any]]) -
     for words, category, scope, action in COMMONALITY_RULES:
         if any(word in text for word in words):
             matched.append((category, scope, action))
+    if any(category == "DataGrid 选择状态一致性" for category, _, _ in matched):
+        matched = [item for item in matched if item[0] != "管理端动作入口一致性"]
     if not matched:
         return (
             "- 初判：暂未证明是共性问题。\n"
@@ -457,6 +479,22 @@ def commonality_summary(issue: dict[str, Any], comments: list[dict[str, Any]]) -
         lines.append(f"- 是否一起修改：{action}")
     lines.append("- 预防治理：把可复发约束写入 prompt / skill / runbook；能静态检查的再补治理脚本。")
     return "\n".join(lines)
+
+
+def has_selection_state_signal(text: str) -> bool:
+    return any(
+        word in text
+        for word in (
+            "全局勾选",
+            "取消勾选",
+            "自动勾选",
+            "勾选",
+            "全选",
+            "选中",
+            "第一个",
+            "selectedRowKeys",
+        )
+    )
 
 
 def pr_mentions_issue(pr: dict[str, Any], issue_number: int) -> bool:
@@ -558,7 +596,19 @@ def build_proposal_comment(issue: dict[str, Any], comments: list[dict[str, Any]]
     confidence = "中"
     reason = "issue 描述较短，缺少截图、页面入口或期望效果，直接开发容易修错位置。"
     action = "建议先补充截图或说明具体页面；如果确认是管理端菜单视觉问题，再按低风险 UI 修复执行。"
-    if any(word in text for word in ("报错", "失败", "打不开", "不能", "无法")):
+    if has_selection_state_signal(text):
+        scope = "可能是管理端 DataGrid 勾选 / 全选状态交互"
+        conclusion = "建议执行"
+        confidence = "中高"
+        reason = (
+            "issue 已指向可复现的选择状态异常，应先核查 DataGrid 与页面 "
+            "selectedRowKeys / onSelectedRowKeysChange / 自动首选第一条逻辑。"
+        )
+        action = (
+            "回复裸一行 `确认方案` 后执行最小修复；执行前先定位选择状态所有者，"
+            "确认是否存在把多选数组压成单选或取消后自动回填第一条的问题。"
+        )
+    elif any(word in text for word in ("报错", "失败", "打不开", "不能", "无法")):
         conclusion = "建议执行"
         confidence = "中"
         reason = "描述指向可复现故障，优先用日志、接口或页面复现定位。"
@@ -1138,6 +1188,17 @@ def self_test() -> int:
     assert "是否一起修改" in popup_proposal
     assert "prompt / runbook / skill / 规范" in popup_proposal
     assert "弹层 / 弹窗关闭交互" in build_fix_prompt(popup_issue, [])
+    selection_issue = {
+        **issue,
+        "title": "全局勾选按钮再点中已勾选按钮，取消勾选，不要自动勾选第一个",
+        "body": "全局勾选按钮再点中已勾选按钮，取消勾选，不要自动勾选第一个",
+    }
+    selection_proposal = build_proposal_comment(selection_issue, [])
+    assert "DataGrid 选择状态一致性" in selection_proposal
+    assert "selectedRowKeys" in selection_proposal
+    assert "可能是管理端 DataGrid 勾选 / 全选状态交互" in selection_proposal
+    assert "管理端动作入口一致性" not in selection_proposal
+    assert "管理端菜单视觉问题" not in selection_proposal
     assert choose_action(issue, []).kind == "proposal"
     assert choose_action(issue, comments) is None
     confirmed = [*comments, {"created_at": t1, "body": "/confirm"}]

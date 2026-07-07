@@ -123,6 +123,7 @@ no_proxy=localhost,127.0.0.1,::1,192.168.0.0/16
 |---|---|
 | issue 读取 | 能读取标题、正文、评论 |
 | 判断评论 | 内容中文，包含结论、置信度、代码核查证据、依据、预计影响范围、建议动作、验证要求和停止条件；不能只要求确认，不能只复述 issue |
+| 真实分析 | proposal 必须把模板字段填成当前 issue 的具体判断；遇到勾选、全选、选中、取消勾选、第一个等选择状态问题时，必须追踪 `selectedRowKeys`、`onSelectedRowKeysChange`、页面自动首选逻辑和共享 DataGrid，不能只按“按钮 / 菜单”泛化 |
 | 共性判断 | proposal 必须说明是否存在相似 / 共性问题、是否一起修改、规则落到 prompt / skill / runbook / 规范 / 治理脚本中的哪一类 |
 | 输入附件 | issue 本体和 issue 评论中的截图 / 附件必须以可下载 URL 写入判断评论和执行 prompt |
 | 确认识别 | 最新 proposal 或 revision-proposal 之后，人工评论裸一行 `确认方案` 才触发执行；否定句和旧确认不能触发 |
