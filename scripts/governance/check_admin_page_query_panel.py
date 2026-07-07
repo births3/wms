@@ -140,7 +140,7 @@ def suggest_page_config(page_id: str, title: str) -> dict[str, Any]:
             "source": "apps/web-admin/src/pages/print-template/H9PrintTemplatePage.tsx",
             "fieldConstant": "h9PrintTemplateQueryFields",
             "coreConstant": "h9PrintTemplateCoreQueryFieldKeys",
-            "core": ["keyword", "sourceSchema"],
+            "core": ["keyword", "templateType"],
             "more": [],
         }
     return {

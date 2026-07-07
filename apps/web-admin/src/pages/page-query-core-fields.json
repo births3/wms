@@ -82,7 +82,7 @@
       "source": "apps/web-admin/src/pages/print-template/H9PrintTemplatePage.tsx",
       "fieldConstant": "h9PrintTemplateQueryFields",
       "coreConstant": "h9PrintTemplateCoreQueryFieldKeys",
-      "core": ["keyword", "sourceSchema"],
+      "core": ["keyword", "templateType"],
       "more": []
     },
     {

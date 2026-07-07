@@ -87,6 +87,11 @@
 7. 引入 hiprint 相关依赖前，必须按依赖治理检查许可证、维护活跃度、漏洞和浏览器兼容性。
 8. M6 法定报表数据口径继续遵守 ADR-0023，H9 只提供模板能力。
 
+## 实施记录
+
+- 2026-07-07：PC H9 首个真实切片引入 `hiprint@0.4.0` 和 `jquery`，以动态导入方式接入设计器、预览和浏览器打印；模板主数据、模板版本、字段绑定和打印记录仍由 WMS 表和 OpenAPI 治理。
+- 依赖治理记录：`hiprint@0.4.0` npm 声明 MIT，包来源为 CcSimple/vue-plugin-hiprint；构建时 Rollup 会提示 hiprint 包内部存在 `eval` 和较大动态 chunk。该风险必须在正式发布前复核，不得把 hiprint JSON 当作唯一业务事实源。
+
 ## 参考
 
 - [用户故事：H9 打印模板引擎](../domain/user-stories-h9-print-template.md)

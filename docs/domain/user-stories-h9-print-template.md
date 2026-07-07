@@ -179,4 +179,11 @@ H9 作为横向打印模板引擎，统一管理模板类型、字段库、字�
 - 已提供 `GET /api/v1/print-templates/field-libraries`、OpenAPI 契约和 `@wms/api-client` 类型，支持 PC 管理端读取最新字段库版本。
 - 已提供 `print_template_type` 系统字典预置、H9 打印模板菜单和字段库列表页，页面使用公共 `TreeCatalog` + `QueryPanel` + `DataGrid`。
 - 已提供 `backend/crates/api/tests/print_template_postgres.rs`，验证已发布字段库版本不可改写和字段库最新版本列表。
-- 尚未覆盖模板主数据、hiprint JSON 版本、打印记录、浏览器预览打印、前端动作测试和真实截图。
+
+#### 后端与 PC 第二切片（2026-07-07）
+
+- 已落 `print_templates`、`print_template_versions`、`print_records` 三张表，模板版本和打印记录不可改写。
+- 已提供 `GET /api/v1/print-templates/templates`、`POST /api/v1/print-templates/templates`、`POST /api/v1/print-templates/resolve`、`POST /api/v1/print-templates/preview`、`POST /api/v1/print-templates/print` 和字段库版本字段读取接口。
+- PC H9 页面已接入 hiprint 设计器、字段绑定、模板保存发布、浏览器预览和浏览器打印记录。
+- 已补 `backend/crates/api/tests/print_template_postgres.rs` 覆盖模板发布、幂等重放、必填字段缺失、打印记录、H2 审计和跨货主不可回退。
+- 仍需后续补真实 9002 截图证据、更多业务模块真实打印数据接入和 hiprint 依赖安全跟踪。
