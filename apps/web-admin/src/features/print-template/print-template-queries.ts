@@ -10,6 +10,9 @@ type PrintTemplateSummary = components["schemas"]["PrintTemplateSummary"];
 type SystemDictionaryItem = components["schemas"]["SystemDictionaryItem"];
 
 export type PrintTemplateBinding = components["schemas"]["PrintTemplateBinding"];
+export type PrintTemplateVersion = components["schemas"]["PrintTemplateVersion"];
+export type ResolvePrintTemplateRequest = components["schemas"]["ResolvePrintTemplateRequest"];
+export type ResolvePrintTemplateResponse = components["schemas"]["ResolvePrintTemplateResponse"];
 export type PrintTemplatePreviewRequest = components["schemas"]["PrintTemplatePreviewRequest"];
 export type PrintTemplatePreviewResponse = components["schemas"]["PrintTemplatePreviewResponse"];
 export type PrintTemplatePrintRequest = components["schemas"]["PrintTemplatePrintRequest"];
@@ -119,6 +122,18 @@ export function useSavePrintTemplateMutation() {
   });
 }
 
+export function useResolvePrintTemplateMutation() {
+  return useMutation<ResolvePrintTemplateResponse, ApiError, ResolvePrintTemplateRequest>({
+    mutationFn: resolvePrintTemplate,
+  });
+}
+
+export function usePrintTemplateVersionsMutation() {
+  return useMutation<PrintTemplateVersion[], ApiError, string>({
+    mutationFn: listPrintTemplateVersions,
+  });
+}
+
 export function usePreviewPrintTemplateMutation() {
   return useMutation<PrintTemplatePreviewResponse, ApiError, PrintTemplatePreviewRequest>({
     mutationFn: previewPrintTemplate,
@@ -176,6 +191,24 @@ async function savePrintTemplate(request: SavePrintTemplateRequest) {
     throw new ApiError(result.error, "保存打印模板失败", result.response.status);
   }
   return result.data;
+}
+
+async function resolvePrintTemplate(request: ResolvePrintTemplateRequest) {
+  const result = await api.POST("/api/v1/print-templates/resolve", { body: request });
+  if (!result.data) {
+    throw new ApiError(result.error, "解析打印模板失败", result.response.status);
+  }
+  return result.data;
+}
+
+async function listPrintTemplateVersions(templateId: string) {
+  const result = await api.GET("/api/v1/print-templates/templates/{template_id}/versions", {
+    params: { path: { template_id: templateId } },
+  });
+  if (!result.data) {
+    throw new ApiError(result.error, "读取打印模板版本历史失败", result.response.status);
+  }
+  return result.data.data;
 }
 
 async function previewPrintTemplate(request: PrintTemplatePreviewRequest) {

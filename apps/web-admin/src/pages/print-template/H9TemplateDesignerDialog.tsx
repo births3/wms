@@ -16,14 +16,19 @@ import { Save } from "lucide-react";
 import {
   usePrintFieldDefinitionsQuery,
   type PrintFieldLibraryRow,
+  type PrintTemplateVersion,
   type PrintTemplateTypeRow,
   type SavePrintTemplateRequest,
 } from "@/features/print-template/print-template-queries";
 
 import { H9HiprintDesigner, type H9HiprintDesignerHandle } from "./H9HiprintDesigner";
 
+export type H9TemplateDesignerMode = "create" | "edit" | "copy";
+
 interface H9TemplateDesignerDialogProps {
   open: boolean;
+  mode?: H9TemplateDesignerMode;
+  initialTemplate?: PrintTemplateVersion | null;
   templateTypes: PrintTemplateTypeRow[];
   libraries: PrintFieldLibraryRow[];
   onOpenChange: (open: boolean) => void;
@@ -32,6 +37,8 @@ interface H9TemplateDesignerDialogProps {
 
 export function H9TemplateDesignerDialog({
   open,
+  mode = "create",
+  initialTemplate = null,
   templateTypes,
   libraries,
   onOpenChange,
@@ -44,12 +51,15 @@ export function H9TemplateDesignerDialog({
   const [templateName, setTemplateName] = React.useState("M2 ASN 默认模板");
   const [templateTypeCode, setTemplateTypeCode] = React.useState(firstType?.code ?? "m2_asn");
   const [scope, setScope] = React.useState<"global" | "owner">("global");
+  const [enabled, setEnabled] = React.useState(true);
+  const [isDefault, setIsDefault] = React.useState(true);
   const [publish, setPublish] = React.useState(true);
   const [paperPreset, setPaperPreset] = React.useState<PaperPreset>("A4");
   const [paperDirection, setPaperDirection] = React.useState<PaperDirection>("portrait");
   const [customPaperWidth, setCustomPaperWidth] = React.useState("100");
   const [customPaperHeight, setCustomPaperHeight] = React.useState("150");
   const [jsonText, setJsonText] = React.useState(() => JSON.stringify(defaultTemplateJson("asn.code", defaultPaper()), null, 2));
+  const [templateSettingsOpen, setTemplateSettingsOpen] = React.useState(true);
   const [jsonOpen, setJsonOpen] = React.useState(false);
   const [boundFields, setBoundFields] = React.useState<string[]>(["asn.code"]);
   const [error, setError] = React.useState<string | null>(null);
@@ -73,12 +83,54 @@ export function H9TemplateDesignerDialog({
       return;
     }
     const libraryVersionId = selectedLibrary?.latestVersionId ?? null;
+    if (initialTemplate) {
+      lastLibraryVersionIdRef.current = libraryVersionId;
+      return;
+    }
     if (!libraryVersionId || fields.length === 0) return;
     if (lastLibraryVersionIdRef.current === libraryVersionId) return;
     lastLibraryVersionIdRef.current = libraryVersionId;
     setBoundFields([fields[0].fieldPath]);
     setJsonText(JSON.stringify(defaultTemplateJson(fields[0].fieldPath, currentPaper()), null, 2));
-  }, [fields, open, selectedLibrary?.latestVersionId]);
+  }, [fields, initialTemplate, open, selectedLibrary?.latestVersionId]);
+
+  React.useEffect(() => {
+    if (!open) return;
+    setError(null);
+    setTemplateSettingsOpen(true);
+    setJsonOpen(false);
+    if (!initialTemplate) {
+      const paper = defaultPaper();
+      setTemplateCode("m2_asn_default");
+      setTemplateName("M2 ASN 默认模板");
+      setTemplateTypeCode(firstType?.code ?? "m2_asn");
+      setScope("global");
+      setEnabled(true);
+      setIsDefault(true);
+      setPublish(true);
+      setPaperPreset("A4");
+      setPaperDirection("portrait");
+      setCustomPaperWidth("100");
+      setCustomPaperHeight("150");
+      setBoundFields(["asn.code"]);
+      setJsonText(JSON.stringify(defaultTemplateJson("asn.code", paper), null, 2));
+      return;
+    }
+    const paperControls = paperControlsFromValue(initialTemplate.paper);
+    setTemplateCode(mode === "copy" ? `${initialTemplate.template_code}_copy` : initialTemplate.template_code);
+    setTemplateName(mode === "copy" ? `${initialTemplate.template_name} 副本` : initialTemplate.template_name);
+    setTemplateTypeCode(initialTemplate.template_type_code);
+    setScope(initialTemplate.scope);
+    setEnabled(mode === "copy" ? true : initialTemplate.enabled);
+    setIsDefault(initialTemplate.is_default);
+    setPublish(initialTemplate.status === "published");
+    setPaperPreset(paperControls.paperPreset);
+    setPaperDirection(paperControls.paperDirection);
+    setCustomPaperWidth(paperControls.customPaperWidth);
+    setCustomPaperHeight(paperControls.customPaperHeight);
+    setBoundFields(initialTemplate.field_bindings.map((binding) => binding.field_path));
+    setJsonText(JSON.stringify(initialTemplate.hiprint_json, null, 2));
+  }, [firstType?.code, initialTemplate, mode, open]);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -91,8 +143,8 @@ export function H9TemplateDesignerDialog({
         template_name: requiredText(templateName, "模板名称"),
         template_type_code: requiredText(templateTypeCode, "模板类型"),
         scope,
-        enabled: true,
-        is_default: true,
+        enabled,
+        is_default: isDefault,
         remark: "PC Web hiprint 设计器保存",
         field_library_version_id: selectedLibrary?.latestVersionId ?? "",
         hiprint_json: hiprintJson,
@@ -146,95 +198,109 @@ export function H9TemplateDesignerDialog({
       </div>
     </>
   );
+  const dialogTitle = mode === "edit" ? "修改打印模板" : mode === "copy" ? "复制打印模板" : "新增打印模板";
+  const saveLabel = mode === "edit" ? "保存版本" : "保存";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] max-w-[96vw] overflow-auto">
         <form className="flex flex-col gap-4" onSubmit={submit}>
           <DialogHeader>
-            <DialogTitle>打印模板设计</DialogTitle>
+            <DialogTitle>{dialogTitle}</DialogTitle>
             <DialogDescription>使用 hiprint 设计模板，保存模板主数据、字段绑定和版本。</DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-3 lg:grid-cols-4">
-            <Field label="模板编码">
-              <Input value={templateCode} onChange={(event) => setTemplateCode(event.target.value)} />
-            </Field>
-            <Field label="模板名称">
-              <Input value={templateName} onChange={(event) => setTemplateName(event.target.value)} />
-            </Field>
-            <Field label="模板类型">
-              <select className="h-9 rounded-md border bg-background px-3 text-sm" value={templateTypeCode} onChange={(event) => setTemplateTypeCode(event.target.value)}>
-                {templateTypes.map((type) => (
-                  <option key={type.code} value={type.code}>
-                    {type.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="作用域">
-              <select className="h-9 rounded-md border bg-background px-3 text-sm" value={scope} onChange={(event) => setScope(event.target.value as "global" | "owner")}>
-                <option value="global">全局默认</option>
-                <option value="owner">货主覆盖</option>
-              </select>
-            </Field>
-          </div>
-
-          <div className="grid grid-cols-[repeat(4,minmax(8rem,1fr))] gap-3 overflow-x-auto">
-            <Field label="纸张大小">
-              <select
-                className="h-9 rounded-md border bg-background px-3 text-sm"
-                value={paperPreset}
-                onChange={(event) => {
-                  const next = event.target.value as PaperPreset;
-                  setPaperPreset(next);
-                  syncPaper({ paperPreset: next });
-                }}
-              >
-                <option value="A4">A4</option>
-                <option value="A5">A5</option>
-                <option value="custom">自定义</option>
-              </select>
-            </Field>
-            <Field label="纸张方向">
-              <select
-                className="h-9 rounded-md border bg-background px-3 text-sm"
-                value={paperDirection}
-                onChange={(event) => {
-                  const next = event.target.value as PaperDirection;
-                  setPaperDirection(next);
-                  syncPaper({ paperDirection: next });
-                }}
-              >
-                <option value="portrait">竖向</option>
-                <option value="landscape">横向</option>
-              </select>
-            </Field>
-            {paperPreset === "custom" && (
-              <>
-                <Field label="自定义宽(mm)">
-                  <Input
-                    type="number"
-                    min="20"
-                    value={customPaperWidth}
-                    onChange={(event) => {
-                      setCustomPaperWidth(event.target.value);
-                      syncPaper({ customPaperWidth: event.target.value });
-                    }}
-                  />
+          <div className="rounded-md border bg-muted/10">
+            <button
+              type="button"
+              className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium"
+              aria-expanded={templateSettingsOpen}
+              onClick={() => setTemplateSettingsOpen((current) => !current)}
+            >
+              <span>模板与纸张设置</span>
+              <span className="text-xs text-muted-foreground">{templateSettingsOpen ? "隐藏" : "展开"}</span>
+            </button>
+            {templateSettingsOpen && (
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(9rem,12rem))] items-end gap-3 border-t p-3">
+                <Field label="模板编码">
+                  <Input className="h-8" value={templateCode} readOnly={mode === "edit"} onChange={(event) => setTemplateCode(event.target.value)} />
                 </Field>
-                <Field label="自定义高(mm)">
-                  <Input
-                    type="number"
-                    min="20"
-                    value={customPaperHeight}
-                    onChange={(event) => {
-                      setCustomPaperHeight(event.target.value);
-                      syncPaper({ customPaperHeight: event.target.value });
-                    }}
-                  />
+                <Field label="模板名称">
+                  <Input className="h-8" value={templateName} onChange={(event) => setTemplateName(event.target.value)} />
                 </Field>
-              </>
+                <Field label="模板类型">
+                  <select className="h-8 w-full rounded-md border bg-background px-2 text-sm" value={templateTypeCode} disabled={mode === "edit"} onChange={(event) => setTemplateTypeCode(event.target.value)}>
+                    {templateTypes.map((type) => (
+                      <option key={type.code} value={type.code}>
+                        {type.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="作用域">
+                  <select className="h-8 w-full rounded-md border bg-background px-2 text-sm" value={scope} onChange={(event) => setScope(event.target.value as "global" | "owner")}>
+                    <option value="global">全局默认</option>
+                    <option value="owner">货主覆盖</option>
+                  </select>
+                </Field>
+                <Field label="纸张大小">
+                  <select
+                    className="h-8 w-full rounded-md border bg-background px-2 text-sm"
+                    value={paperPreset}
+                    onChange={(event) => {
+                      const next = event.target.value as PaperPreset;
+                      setPaperPreset(next);
+                      syncPaper({ paperPreset: next });
+                    }}
+                  >
+                    <option value="A4">A4</option>
+                    <option value="A5">A5</option>
+                    <option value="custom">自定义</option>
+                  </select>
+                </Field>
+                <Field label="纸张方向">
+                  <select
+                    className="h-8 w-full rounded-md border bg-background px-2 text-sm"
+                    value={paperDirection}
+                    onChange={(event) => {
+                      const next = event.target.value as PaperDirection;
+                      setPaperDirection(next);
+                      syncPaper({ paperDirection: next });
+                    }}
+                  >
+                    <option value="portrait">竖向</option>
+                    <option value="landscape">横向</option>
+                  </select>
+                </Field>
+                {paperPreset === "custom" && (
+                  <>
+                    <Field label="自定义宽(mm)">
+                      <Input
+                        className="h-8"
+                        type="number"
+                        min="20"
+                        value={customPaperWidth}
+                        onChange={(event) => {
+                          setCustomPaperWidth(event.target.value);
+                          syncPaper({ customPaperWidth: event.target.value });
+                        }}
+                      />
+                    </Field>
+                    <Field label="自定义高(mm)">
+                      <Input
+                        className="h-8"
+                        type="number"
+                        min="20"
+                        value={customPaperHeight}
+                        onChange={(event) => {
+                          setCustomPaperHeight(event.target.value);
+                          syncPaper({ customPaperHeight: event.target.value });
+                        }}
+                      />
+                    </Field>
+                  </>
+                )}
+              </div>
             )}
           </div>
 
@@ -276,7 +342,7 @@ export function H9TemplateDesignerDialog({
             </DialogClose>
             <Button type="submit" disabled={!selectedLibrary || boundFields.length === 0}>
               <Save className="size-4" aria-hidden />
-              保存
+              {saveLabel}
             </Button>
           </DialogFooter>
         </form>
@@ -311,6 +377,17 @@ const standardPaperSize: Record<Exclude<PaperPreset, "custom">, { width: number;
 
 function defaultPaper() {
   return buildPaper("A4", "portrait", "100", "150");
+}
+
+function paperControlsFromValue(value: unknown): PaperControlState {
+  const record = cloneRecord(value);
+  const paperType = record.paperType === "A4" || record.paperType === "A5" ? record.paperType : "custom";
+  return {
+    paperPreset: paperType,
+    paperDirection: record.direction === "landscape" ? "landscape" : "portrait",
+    customPaperWidth: String(typeof record.width === "number" ? record.width : 100),
+    customPaperHeight: String(typeof record.height === "number" ? record.height : 150),
+  };
 }
 
 function buildPaper(

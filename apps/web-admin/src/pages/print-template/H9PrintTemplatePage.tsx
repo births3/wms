@@ -1,6 +1,12 @@
 import * as React from "react";
 import {
+  Button,
   DataGrid,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
   PageHeader,
   QueryPanel,
   StatusBadge,
@@ -8,16 +14,19 @@ import {
   buildQueryPanelSummaryItems,
   cn,
   type DataGridColumn,
+  type DataGridDisableAction,
+  type DataGridEditAction,
   type DataGridRefreshAction,
   type DataGridToolbarAction,
   type QueryPanelField,
   type QueryPanelValue,
   type TreeCatalogNode,
 } from "@wms/ui";
-import { Eye } from "lucide-react";
+import { Copy, Eye, History } from "lucide-react";
 
 import {
   usePrintFieldLibrariesQuery,
+  usePrintTemplateVersionsMutation,
   usePrintTemplatesQuery,
   usePrintTemplateTypesQuery,
   usePreviewPrintTemplateMutation,
@@ -27,10 +36,11 @@ import {
   type PrintTemplatePreviewResponse,
   type PrintTemplateRow,
   type PrintTemplateTypeRow,
+  type PrintTemplateVersion,
   type SavePrintTemplateRequest,
 } from "@/features/print-template/print-template-queries";
 
-import { H9TemplateDesignerDialog } from "./H9TemplateDesignerDialog";
+import { H9TemplateDesignerDialog, type H9TemplateDesignerMode } from "./H9TemplateDesignerDialog";
 import { H9TemplatePreviewDialog } from "./H9TemplatePreviewDialog";
 
 const h9PrintTemplateQueryFields: QueryPanelField[] = [
@@ -191,6 +201,7 @@ export function H9PrintTemplatePage() {
   const templatesQuery = usePrintTemplatesQuery();
   const templateTypesQuery = usePrintTemplateTypesQuery();
   const saveMutation = useSavePrintTemplateMutation();
+  const versionsMutation = usePrintTemplateVersionsMutation();
   const previewMutation = usePreviewPrintTemplateMutation();
   const printMutation = useRecordPrintTemplateMutation();
   const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(() => defaultH9QueryValue());
@@ -198,8 +209,12 @@ export function H9PrintTemplatePage() {
   const [selectedRowKeys, setSelectedRowKeys] = React.useState<string[]>([]);
   const [selectedTreeNodeId, setSelectedTreeNodeId] = React.useState("");
   const [designerOpen, setDesignerOpen] = React.useState(false);
+  const [designerMode, setDesignerMode] = React.useState<H9TemplateDesignerMode>("create");
+  const [designerTemplate, setDesignerTemplate] = React.useState<PrintTemplateVersion | null>(null);
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [preview, setPreview] = React.useState<PrintTemplatePreviewResponse | null>(null);
+  const [historyOpen, setHistoryOpen] = React.useState(false);
+  const [historyVersions, setHistoryVersions] = React.useState<PrintTemplateVersion[]>([]);
   const [notice, setNotice] = React.useState<Notice>(null);
   const treeNodes = React.useMemo(
     () => buildH9TreeNodes(templateTypesQuery.data ?? [], librariesQuery.data ?? []),
@@ -230,9 +245,38 @@ export function H9PrintTemplatePage() {
     label: "新增",
     description: "打开 hiprint 打印模板设计器",
     disabled: librariesQuery.isPending || templateTypesQuery.isPending,
-    onClick: () => setDesignerOpen(true),
+    onClick: () => openCreateDesigner(),
+  };
+  const editAction: DataGridEditAction = {
+    label: "修改",
+    description: "修改选中模板并保存新版本",
+    disabled: (context) => context.selectedRowKeys.length !== 1 || versionsMutation.isPending,
+    onClick: (context) => void openDesignerFromRow(context.selectedRowKeys[0], "edit"),
+  };
+  const selectedRow = selectedTemplateRow(selectedRowKeys);
+  const disableAction: DataGridDisableAction = {
+    label: selectedRow?.enabled === false ? "启用" : "停用",
+    description: selectedRow?.enabled === false ? "启用选中模板" : "停用选中模板",
+    disabled: (context) => context.selectedRowKeys.length !== 1 || versionsMutation.isPending || saveMutation.isPending,
+    onClick: (context) => void toggleTemplateEnabled(context.selectedRowKeys[0]),
   };
   const toolbarActions: DataGridToolbarAction[] = [
+    {
+      key: "copy-template",
+      label: "复制",
+      description: "复制选中模板并生成副本",
+      icon: <Copy className="size-4" aria-hidden />,
+      disabled: (context) => context.selectedRowKeys.length !== 1 || versionsMutation.isPending,
+      onClick: (context) => void openDesignerFromRow(context.selectedRowKeys[0], "copy"),
+    },
+    {
+      key: "version-history",
+      label: "版本",
+      description: "查看版本历史",
+      icon: <History className="size-4" aria-hidden />,
+      disabled: (context) => context.selectedRowKeys.length !== 1 || versionsMutation.isPending,
+      onClick: (context) => void openVersionHistory(context.selectedRowKeys[0]),
+    },
     {
       key: "preview-template",
       label: "预览",
@@ -267,6 +311,58 @@ export function H9PrintTemplatePage() {
   async function saveTemplate(request: SavePrintTemplateRequest) {
     const saved = await saveMutation.mutateAsync(request);
     setNotice({ type: "success", text: `${saved.template_code} 已保存` });
+  }
+
+  function selectedTemplateRow(keys: string[]) {
+    return keys.length === 1 ? templateById.get(keys[0]) ?? null : null;
+  }
+
+  function openCreateDesigner() {
+    setDesignerMode("create");
+    setDesignerTemplate(null);
+    setDesignerOpen(true);
+  }
+
+  async function openDesignerFromRow(rowId: string, mode: H9TemplateDesignerMode) {
+    try {
+      const latest = await latestTemplateVersion(rowId);
+      setDesignerMode(mode);
+      setDesignerTemplate(latest);
+      setDesignerOpen(true);
+    } catch (errorValue) {
+      setNotice({ type: "error", text: errorValue instanceof Error ? errorValue.message : "读取模板版本失败" });
+    }
+  }
+
+  async function toggleTemplateEnabled(rowId: string) {
+    try {
+      const latest = await latestTemplateVersion(rowId);
+      const saved = await saveMutation.mutateAsync(saveRequestFromVersion(latest, { enabled: !latest.enabled }));
+      setNotice({ type: "success", text: `${saved.template_code} 已${saved.enabled ? "启用" : "停用"}` });
+    } catch (errorValue) {
+      setNotice({ type: "error", text: errorValue instanceof Error ? errorValue.message : "停启模板失败" });
+    }
+  }
+
+  async function openVersionHistory(rowId: string) {
+    try {
+      const row = templateById.get(rowId);
+      if (!row) return;
+      const versions = await versionsMutation.mutateAsync(row.id);
+      setHistoryVersions(versions);
+      setHistoryOpen(true);
+    } catch (errorValue) {
+      setNotice({ type: "error", text: errorValue instanceof Error ? errorValue.message : "读取版本历史失败" });
+    }
+  }
+
+  async function latestTemplateVersion(rowId: string) {
+    const row = templateById.get(rowId);
+    if (!row) throw new Error("未选中打印模板");
+    const versions = await versionsMutation.mutateAsync(row.id);
+    const latest = versions[0];
+    if (!latest) throw new Error("打印模板没有版本");
+    return latest;
   }
 
   async function previewTemplate(rowId: string) {
@@ -359,6 +455,8 @@ export function H9PrintTemplatePage() {
             exportFileBaseName="H9 打印模板"
             refreshAction={refreshAction}
             createAction={createAction}
+            editAction={editAction}
+            disableAction={disableAction}
             printAction={{
               label: "打印",
               description: "预览并打印选中模板",
@@ -379,11 +477,17 @@ export function H9PrintTemplatePage() {
       </div>
       <H9TemplateDesignerDialog
         open={designerOpen}
+        mode={designerMode}
+        initialTemplate={designerTemplate}
         templateTypes={templateTypesQuery.data ?? []}
         libraries={librariesQuery.data ?? []}
-        onOpenChange={setDesignerOpen}
+        onOpenChange={(open) => {
+          setDesignerOpen(open);
+          if (!open) setDesignerTemplate(null);
+        }}
         onSave={saveTemplate}
       />
+      <VersionHistoryDialog open={historyOpen} versions={historyVersions} onOpenChange={setHistoryOpen} />
       <H9TemplatePreviewDialog
         open={previewOpen}
         preview={preview}
@@ -513,6 +617,82 @@ function formatDateTime(value: string) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
+}
+
+function saveRequestFromVersion(
+  version: PrintTemplateVersion,
+  patch: Partial<Pick<SavePrintTemplateRequest, "enabled">> = {},
+): SavePrintTemplateRequest {
+  return {
+    template_code: version.template_code,
+    template_name: version.template_name,
+    template_type_code: version.template_type_code,
+    scope: version.scope,
+    enabled: patch.enabled ?? version.enabled,
+    is_default: version.is_default,
+    remark: version.remark ?? null,
+    field_library_version_id: version.field_library_version_id,
+    hiprint_json: version.hiprint_json,
+    field_bindings: version.field_bindings,
+    paper: version.paper,
+    designer_version: version.designer_version,
+    publish: version.status === "published",
+  };
+}
+
+function VersionHistoryDialog({
+  open,
+  versions,
+  onOpenChange,
+}: {
+  open: boolean;
+  versions: PrintTemplateVersion[];
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>版本历史</DialogTitle>
+          <DialogDescription>按版本号倒序展示当前模板的保存记录。</DialogDescription>
+        </DialogHeader>
+        <div className="overflow-hidden rounded-md border">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 text-left font-medium">版本</th>
+                <th className="px-3 py-2 text-left font-medium">状态</th>
+                <th className="px-3 py-2 text-left font-medium">设计器</th>
+                <th className="px-3 py-2 text-left font-medium">创建时间</th>
+              </tr>
+            </thead>
+            <tbody>
+              {versions.map((version) => (
+                <tr key={version.id} className="border-t">
+                  <td className="px-3 py-2">v{version.version_no}</td>
+                  <td className="px-3 py-2">{version.status === "published" ? "已发布" : "草稿"}</td>
+                  <td className="px-3 py-2">{version.designer_version}</td>
+                  <td className="px-3 py-2">{formatDateTime(version.created_at)}</td>
+                </tr>
+              ))}
+              {versions.length === 0 && (
+                <tr>
+                  <td className="px-3 py-6 text-center text-muted-foreground" colSpan={4}>
+                    暂无版本记录
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="flex justify-end">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            关闭
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 function NoticePanel({ notice }: { notice: Notice }) {

@@ -198,6 +198,7 @@ const devCreatedCustomers: DevCustomer[] = [];
 const devCreatedWarehouses: DevWarehouse[] = [];
 const devCreatedLocations: DevLocation[] = [];
 const devCreatedPrintTemplates: DevPrintTemplate[] = [];
+const devPrintTemplateVersions = new Map<string, DevPrintTemplate[]>();
 const devSeedOrderStatusOverrides = new Map<string, string>();
 
 const devUser = {
@@ -712,10 +713,23 @@ async function handleDevMockRequest(
     return true;
   }
 
+  const printTemplateVersions = pathname.match(/^\/api\/v1\/print-templates\/templates\/([^/]+)\/versions$/);
+  if (req.method === "GET" && printTemplateVersions) {
+    const data = devPrintTemplateVersionsResponse(printTemplateVersions[1]);
+    sendJson(res, 200, { data, page: { count: data.length, next_cursor: null } });
+    return true;
+  }
+
   if (req.method === "POST" && pathname === "/api/v1/print-templates/templates") {
     const body = await readJsonBody(req);
     const saved = devSavePrintTemplateResponse(body);
     sendJson(res, 200, saved);
+    return true;
+  }
+
+  if (req.method === "POST" && pathname === "/api/v1/print-templates/resolve") {
+    const body = await readJsonBody(req);
+    sendJson(res, 200, devResolvePrintTemplateResponse(body));
     return true;
   }
 
@@ -976,7 +990,16 @@ function devPrintFieldDefinitionsResponse(versionId: string) {
 }
 
 function devPrintTemplatesResponse() {
-  if (devCreatedPrintTemplates.length > 0) return devCreatedPrintTemplates;
+  const rows = [...devCreatedPrintTemplates];
+  for (const template of devSeedPrintTemplates()) {
+    if (!rows.some((row) => row.template_code === template.template_code && row.template_type_code === template.template_type_code)) {
+      rows.push(template);
+    }
+  }
+  return rows;
+}
+
+function devSeedPrintTemplates() {
   const library = devPrintFieldLibrariesResponse()[0];
   const now = "2026-07-07T09:00:00.000Z";
   return [
@@ -1007,31 +1030,61 @@ function devPrintTemplatesResponse() {
 
 function devSavePrintTemplateResponse(body: Record<string, unknown>) {
   const now = new Date().toISOString();
-  const id = `00000000-0000-0000-0000-${String(3802 + devCreatedPrintTemplates.length).padStart(12, "0")}`;
-  const versionId = `00000000-0000-0000-0000-${String(3902 + devCreatedPrintTemplates.length).padStart(12, "0")}`;
+  const templateCode = asString(body.template_code, "h9_template");
+  const templateTypeCode = asString(body.template_type_code, "asn");
+  const existing = devPrintTemplatesResponse().find((item) => item.template_code === templateCode && item.template_type_code === templateTypeCode);
+  const id = existing?.id ?? `00000000-0000-0000-0000-${String(3802 + devCreatedPrintTemplates.length).padStart(12, "0")}`;
+  const previousVersions = devPrintTemplateVersionsResponse(id);
+  const nextVersionNo = (previousVersions[0]?.version_no ?? existing?.latest_version_no ?? 0) + 1;
+  const versionId = `00000000-0000-0000-0000-${String(3900 + Date.now() % 100000000).padStart(12, "0")}`;
   const template: DevPrintTemplate = {
     id,
-    template_code: asString(body.template_code, "h9_template"),
+    template_code: templateCode,
     template_name: asString(body.template_name, "H9 打印模板"),
-    template_type_code: asString(body.template_type_code, "asn"),
+    template_type_code: templateTypeCode,
     owner_id: devOwnerId,
     scope: asString(body.scope, "global") === "owner" ? "owner" : "global",
     enabled: asBoolean(body.enabled, true),
     is_default: asBoolean(body.is_default, true),
     remark: asNullableString(body.remark),
     latest_version_id: versionId,
-    latest_version_no: 1,
+    latest_version_no: nextVersionNo,
     latest_version_status: asBoolean(body.publish, true) ? "published" : "draft",
     field_library_version_id: asString(body.field_library_version_id, devPrintFieldLibrariesResponse()[0].latest_version_id),
     designer_version: asString(body.designer_version, "hiprint@0.4.0"),
-    created_at: now,
+    created_at: existing?.created_at ?? now,
     updated_at: now,
     published_at: asBoolean(body.publish, true) ? now : null,
     hiprint_json: asRecord(body.hiprint_json),
     field_bindings: asPrintBindings(body.field_bindings),
     paper: asRecord(body.paper),
   };
-  devCreatedPrintTemplates.unshift(template);
+  const index = devCreatedPrintTemplates.findIndex((item) => item.id === id);
+  if (index >= 0) devCreatedPrintTemplates[index] = template;
+  else devCreatedPrintTemplates.unshift(template);
+  devPrintTemplateVersions.set(id, [template, ...previousVersions]);
+  return devPrintTemplateVersionResponse(template);
+}
+
+function devPrintTemplateVersionsResponse(templateId: string) {
+  const id = decodeURIComponent(templateId);
+  const versions = devPrintTemplateVersions.get(id);
+  if (versions) return versions.map(devPrintTemplateVersionResponse);
+  const template = devPrintTemplatesResponse().find((item) => item.id === id);
+  return template ? [devPrintTemplateVersionResponse(template)] : [];
+}
+
+function devResolvePrintTemplateResponse(body: Record<string, unknown>) {
+  const templateCode = asNullableString(body.template_code);
+  const templateTypeCode = asString(body.template_type_code, "asn");
+  const template =
+    devPrintTemplatesResponse().find((item) => item.template_code === templateCode && item.template_type_code === templateTypeCode) ??
+    devPrintTemplatesResponse().find((item) => item.template_type_code === templateTypeCode) ??
+    devPrintTemplatesResponse()[0];
+  return { template, version: devPrintTemplateVersionResponse(template) };
+}
+
+function devPrintTemplateVersionResponse(template: DevPrintTemplate) {
   return {
     ...template,
     template_id: template.id,
