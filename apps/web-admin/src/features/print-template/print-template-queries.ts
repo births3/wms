@@ -1,11 +1,19 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { components } from "@wms/api-client";
 
 import { ApiError } from "@/features/auth/auth-queries";
 import { api } from "@/lib/api";
 
 type PrintFieldLibrarySummary = components["schemas"]["PrintFieldLibrarySummary"];
+type PrintFieldDefinition = components["schemas"]["PrintFieldDefinition"];
+type PrintTemplateSummary = components["schemas"]["PrintTemplateSummary"];
 type SystemDictionaryItem = components["schemas"]["SystemDictionaryItem"];
+
+export type PrintTemplateBinding = components["schemas"]["PrintTemplateBinding"];
+export type PrintTemplatePreviewRequest = components["schemas"]["PrintTemplatePreviewRequest"];
+export type PrintTemplatePreviewResponse = components["schemas"]["PrintTemplatePreviewResponse"];
+export type PrintTemplatePrintRequest = components["schemas"]["PrintTemplatePrintRequest"];
+export type SavePrintTemplateRequest = components["schemas"]["SavePrintTemplateRequest"];
 
 export interface PrintFieldLibraryRow {
   id: string;
@@ -23,6 +31,19 @@ export interface PrintFieldLibraryRow {
   searchText: string;
 }
 
+export interface PrintFieldDefinitionRow {
+  id: string;
+  libraryVersionId: string;
+  fieldPath: string;
+  fieldType: string;
+  sourceSchema: string;
+  displayName: string;
+  groupCode: string;
+  groupName: string;
+  metadata: unknown;
+  sortOrder: number;
+}
+
 export interface PrintTemplateTypeRow {
   id: string;
   code: string;
@@ -33,6 +54,27 @@ export interface PrintTemplateTypeRow {
   businessDirection: string;
   paperType: string;
   defaultScope: string;
+  searchText: string;
+}
+
+export interface PrintTemplateRow {
+  id: string;
+  templateCode: string;
+  templateName: string;
+  templateTypeCode: string;
+  scope: "global" | "owner";
+  scopeLabel: string;
+  enabled: boolean;
+  isDefault: boolean;
+  latestVersionId: string;
+  latestVersionNo: number;
+  latestVersionStatus: string;
+  fieldLibraryVersionId: string;
+  designerVersion: string;
+  createdAt: string;
+  publishedAt: string | null;
+  updatedAt: string;
+  statusLabel: string;
   searchText: string;
 }
 
@@ -52,6 +94,43 @@ export function usePrintTemplateTypesQuery() {
   });
 }
 
+export function usePrintTemplatesQuery() {
+  return useQuery<PrintTemplateRow[], ApiError>({
+    queryKey: [...printTemplateQueryKey, "templates"],
+    queryFn: listPrintTemplates,
+  });
+}
+
+export function usePrintFieldDefinitionsQuery(libraryVersionId: string | null) {
+  return useQuery<PrintFieldDefinitionRow[], ApiError>({
+    queryKey: [...printTemplateQueryKey, "field-definitions", libraryVersionId],
+    queryFn: () => listPrintFieldDefinitions(libraryVersionId ?? ""),
+    enabled: Boolean(libraryVersionId),
+  });
+}
+
+export function useSavePrintTemplateMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: savePrintTemplate,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: printTemplateQueryKey });
+    },
+  });
+}
+
+export function usePreviewPrintTemplateMutation() {
+  return useMutation<PrintTemplatePreviewResponse, ApiError, PrintTemplatePreviewRequest>({
+    mutationFn: previewPrintTemplate,
+  });
+}
+
+export function useRecordPrintTemplateMutation() {
+  return useMutation({
+    mutationFn: recordPrintTemplate,
+  });
+}
+
 async function listPrintFieldLibraries(): Promise<PrintFieldLibraryRow[]> {
   const result = await api.GET("/api/v1/print-templates/field-libraries");
   if (!result.data) {
@@ -68,6 +147,54 @@ async function listPrintTemplateTypes(): Promise<PrintTemplateTypeRow[]> {
     throw new ApiError(result.error, "读取打印模板类型失败", result.response.status);
   }
   return result.data.data.map(printTemplateTypeRow);
+}
+
+async function listPrintTemplates(): Promise<PrintTemplateRow[]> {
+  const result = await api.GET("/api/v1/print-templates/templates");
+  if (!result.data) {
+    throw new ApiError(result.error, "读取打印模板失败", result.response.status);
+  }
+  return result.data.data.map(printTemplateRow);
+}
+
+async function listPrintFieldDefinitions(libraryVersionId: string): Promise<PrintFieldDefinitionRow[]> {
+  const result = await api.GET("/api/v1/print-templates/field-libraries/{version_id}/fields", {
+    params: { path: { version_id: libraryVersionId } },
+  });
+  if (!result.data) {
+    throw new ApiError(result.error, "读取打印字段定义失败", result.response.status);
+  }
+  return result.data.data.map(printFieldDefinitionRow);
+}
+
+async function savePrintTemplate(request: SavePrintTemplateRequest) {
+  const result = await api.POST("/api/v1/print-templates/templates", {
+    body: request,
+    params: { header: { "Idempotency-Key": idempotencyKey("web-h9-template-save") } },
+  });
+  if (!result.data) {
+    throw new ApiError(result.error, "保存打印模板失败", result.response.status);
+  }
+  return result.data;
+}
+
+async function previewPrintTemplate(request: PrintTemplatePreviewRequest) {
+  const result = await api.POST("/api/v1/print-templates/preview", { body: request });
+  if (!result.data) {
+    throw new ApiError(result.error, "预览打印模板失败", result.response.status);
+  }
+  return result.data;
+}
+
+async function recordPrintTemplate(request: PrintTemplatePrintRequest) {
+  const result = await api.POST("/api/v1/print-templates/print", {
+    body: request,
+    params: { header: { "Idempotency-Key": idempotencyKey("web-h9-print") } },
+  });
+  if (!result.data) {
+    throw new ApiError(result.error, "记录打印结果失败", result.response.status);
+  }
+  return result.data;
 }
 
 function printFieldLibraryRow(row: PrintFieldLibrarySummary): PrintFieldLibraryRow {
@@ -93,6 +220,21 @@ function printFieldLibraryRow(row: PrintFieldLibrarySummary): PrintFieldLibraryR
     ]
       .join(" ")
       .toLowerCase(),
+  };
+}
+
+function printFieldDefinitionRow(row: PrintFieldDefinition): PrintFieldDefinitionRow {
+  return {
+    id: row.id,
+    libraryVersionId: row.library_version_id,
+    fieldPath: row.field_path,
+    fieldType: row.field_type,
+    sourceSchema: row.source_schema,
+    displayName: row.display_name,
+    groupCode: row.group_code,
+    groupName: row.group_name,
+    metadata: row.metadata,
+    sortOrder: row.sort_order,
   };
 }
 
@@ -126,7 +268,44 @@ function printTemplateTypeRow(row: SystemDictionaryItem): PrintTemplateTypeRow {
   };
 }
 
+function printTemplateRow(row: PrintTemplateSummary): PrintTemplateRow {
+  const statusLabel = row.enabled ? "启用" : "停用";
+  return {
+    id: row.id,
+    templateCode: row.template_code,
+    templateName: row.template_name,
+    templateTypeCode: row.template_type_code,
+    scope: row.scope,
+    scopeLabel: row.scope === "owner" ? "货主" : "全局",
+    enabled: row.enabled,
+    isDefault: row.is_default,
+    latestVersionId: row.latest_version_id,
+    latestVersionNo: row.latest_version_no,
+    latestVersionStatus: row.latest_version_status,
+    fieldLibraryVersionId: row.field_library_version_id,
+    designerVersion: row.designer_version,
+    createdAt: row.created_at,
+    publishedAt: row.published_at ?? null,
+    updatedAt: row.updated_at,
+    statusLabel,
+    searchText: [
+      row.template_code,
+      row.template_name,
+      row.template_type_code,
+      row.scope,
+      statusLabel,
+      row.latest_version_no,
+    ]
+      .join(" ")
+      .toLowerCase(),
+  };
+}
+
 function paramText(params: Record<string, unknown>, key: string) {
   const value = params[key];
   return typeof value === "string" ? value : "";
+}
+
+function idempotencyKey(prefix: string) {
+  return `${prefix}-${crypto.randomUUID()}`;
 }

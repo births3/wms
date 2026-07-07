@@ -159,6 +159,29 @@ interface DevSystemDictionaryItem {
   updated_at: string;
 }
 
+interface DevPrintTemplate {
+  id: string;
+  template_code: string;
+  template_name: string;
+  template_type_code: string;
+  owner_id: string;
+  scope: "global" | "owner";
+  enabled: boolean;
+  is_default: boolean;
+  remark: string | null;
+  latest_version_id: string;
+  latest_version_no: number;
+  latest_version_status: string;
+  field_library_version_id: string;
+  designer_version: string;
+  created_at: string;
+  updated_at: string;
+  published_at: string | null;
+  hiprint_json: Record<string, unknown>;
+  field_bindings: Array<{ field_path: string; required: boolean }>;
+  paper: Record<string, unknown>;
+}
+
 interface DevFeatureFlagConfig {
   key: string;
   owner: string;
@@ -174,6 +197,7 @@ const devCreatedSuppliers: DevSupplier[] = [];
 const devCreatedCustomers: DevCustomer[] = [];
 const devCreatedWarehouses: DevWarehouse[] = [];
 const devCreatedLocations: DevLocation[] = [];
+const devCreatedPrintTemplates: DevPrintTemplate[] = [];
 const devSeedOrderStatusOverrides = new Map<string, string>();
 
 const devUser = {
@@ -183,7 +207,20 @@ const devUser = {
   username: "admin",
   display_name: "Test Admin",
   roles: ["admin", "receiving"],
-  permissions: ["h1.auth.me", "h1.menu.read", "h1.menu.write", "h1.menu.publish", "m2.receive", "m2.inspect", "m2.sign", "m2.putaway"],
+  permissions: [
+    "h1.auth.me",
+    "h1.menu.read",
+    "h1.menu.write",
+    "h1.menu.publish",
+    "h9.print_template.read",
+    "h9.print_template.write",
+    "h9.print_template.publish",
+    "h9.print_template.print",
+    "m2.receive",
+    "m2.inspect",
+    "m2.sign",
+    "m2.putaway",
+  ],
 };
 
 let devProduct: DevProduct = {
@@ -662,6 +699,38 @@ async function handleDevMockRequest(
     return true;
   }
 
+  const printFieldDefinitions = pathname.match(/^\/api\/v1\/print-templates\/field-libraries\/([^/]+)\/fields$/);
+  if (req.method === "GET" && printFieldDefinitions) {
+    const data = devPrintFieldDefinitionsResponse(printFieldDefinitions[1]);
+    sendJson(res, 200, { data, page: { count: data.length, next_cursor: null } });
+    return true;
+  }
+
+  if (req.method === "GET" && pathname === "/api/v1/print-templates/templates") {
+    const data = devPrintTemplatesResponse();
+    sendJson(res, 200, { data, page: { count: data.length, next_cursor: null } });
+    return true;
+  }
+
+  if (req.method === "POST" && pathname === "/api/v1/print-templates/templates") {
+    const body = await readJsonBody(req);
+    const saved = devSavePrintTemplateResponse(body);
+    sendJson(res, 200, saved);
+    return true;
+  }
+
+  if (req.method === "POST" && pathname === "/api/v1/print-templates/preview") {
+    const body = await readJsonBody(req);
+    sendJson(res, 200, devPreviewPrintTemplateResponse(body));
+    return true;
+  }
+
+  if (req.method === "POST" && pathname === "/api/v1/print-templates/print") {
+    const body = await readJsonBody(req);
+    sendJson(res, 200, devPrintRecordResponse(body));
+    return true;
+  }
+
   if (req.method === "GET" && pathname === "/api/v1/inbound/receiving-orders") {
     const data = allDevOrders();
     sendJson(res, 200, { data, page: { count: data.length, next_cursor: null } });
@@ -881,6 +950,191 @@ function devPrintFieldLibrariesResponse() {
       published_by: devUserId,
     };
   });
+}
+
+function devPrintFieldDefinitionsResponse(versionId: string) {
+  const library = devPrintFieldLibrariesResponse().find((item) => item.latest_version_id === versionId);
+  const libraryCode = library?.library_code ?? "m2_asn";
+  const paths = devPrintFieldPaths(libraryCode);
+  return paths.map((field, index) => ({
+    id: `00000000-0000-0000-0000-000000004${String(index + 1).padStart(3, "0")}`,
+    library_version_id: versionId,
+    field_path: field.field_path,
+    field_type: field.field_type,
+    source_schema: devPrintSourceSchema(libraryCode),
+    display_name: field.display_name,
+    group_code: field.group_code,
+    group_name: field.group_name,
+    metadata: {
+      printable: true,
+      sensitive: false,
+      sample_value: field.sample_value,
+      support_barcode: field.field_path.endsWith("code"),
+    },
+    sort_order: (index + 1) * 10,
+  }));
+}
+
+function devPrintTemplatesResponse() {
+  if (devCreatedPrintTemplates.length > 0) return devCreatedPrintTemplates;
+  const library = devPrintFieldLibrariesResponse()[0];
+  const now = "2026-07-07T09:00:00.000Z";
+  return [
+    {
+      id: "00000000-0000-0000-0000-000000003801",
+      template_code: "asn_default",
+      template_name: "ASN 单默认模板",
+      template_type_code: "asn",
+      owner_id: devOwnerId,
+      scope: "global" as const,
+      enabled: true,
+      is_default: true,
+      remark: "dev mock hiprint 模板",
+      latest_version_id: "00000000-0000-0000-0000-000000003901",
+      latest_version_no: 1,
+      latest_version_status: "published",
+      field_library_version_id: library.latest_version_id,
+      designer_version: "hiprint@0.4.0",
+      created_at: now,
+      updated_at: now,
+      published_at: now,
+      hiprint_json: devHiprintTemplateJson("asn.code"),
+      field_bindings: [{ field_path: "asn.code", required: true }],
+      paper: { paperType: "A4", width: 210, height: 297, direction: "portrait" },
+    },
+  ];
+}
+
+function devSavePrintTemplateResponse(body: Record<string, unknown>) {
+  const now = new Date().toISOString();
+  const id = `00000000-0000-0000-0000-${String(3802 + devCreatedPrintTemplates.length).padStart(12, "0")}`;
+  const versionId = `00000000-0000-0000-0000-${String(3902 + devCreatedPrintTemplates.length).padStart(12, "0")}`;
+  const template: DevPrintTemplate = {
+    id,
+    template_code: asString(body.template_code, "h9_template"),
+    template_name: asString(body.template_name, "H9 打印模板"),
+    template_type_code: asString(body.template_type_code, "asn"),
+    owner_id: devOwnerId,
+    scope: asString(body.scope, "global") === "owner" ? "owner" : "global",
+    enabled: asBoolean(body.enabled, true),
+    is_default: asBoolean(body.is_default, true),
+    remark: asNullableString(body.remark),
+    latest_version_id: versionId,
+    latest_version_no: 1,
+    latest_version_status: asBoolean(body.publish, true) ? "published" : "draft",
+    field_library_version_id: asString(body.field_library_version_id, devPrintFieldLibrariesResponse()[0].latest_version_id),
+    designer_version: asString(body.designer_version, "hiprint@0.4.0"),
+    created_at: now,
+    updated_at: now,
+    published_at: asBoolean(body.publish, true) ? now : null,
+    hiprint_json: asRecord(body.hiprint_json),
+    field_bindings: asPrintBindings(body.field_bindings),
+    paper: asRecord(body.paper),
+  };
+  devCreatedPrintTemplates.unshift(template);
+  return {
+    ...template,
+    template_id: template.id,
+    version_no: template.latest_version_no,
+    status: template.latest_version_status,
+    field_bindings: template.field_bindings,
+    hiprint_json: template.hiprint_json,
+    paper: template.paper,
+    created_by: devUserId,
+    published_by: template.published_at ? devUserId : null,
+  };
+}
+
+function devPreviewPrintTemplateResponse(body: Record<string, unknown>) {
+  const templateCode = asNullableString(body.template_code);
+  const templateTypeCode = asString(body.template_type_code, "asn");
+  const template =
+    devPrintTemplatesResponse().find((item) => item.template_code === templateCode && item.template_type_code === templateTypeCode) ??
+    devPrintTemplatesResponse().find((item) => item.template_type_code === templateTypeCode) ??
+    devPrintTemplatesResponse()[0];
+  return {
+    template_id: template.id,
+    template_version_id: template.latest_version_id,
+    template_code: template.template_code,
+    template_name: template.template_name,
+    template_type_code: template.template_type_code,
+    version_no: template.latest_version_no,
+    hiprint_json: template.hiprint_json,
+    field_bindings: template.field_bindings,
+    paper: template.paper,
+    data: asRecord(body.data),
+  };
+}
+
+function devPrintRecordResponse(body: Record<string, unknown>) {
+  const preview = devPreviewPrintTemplateResponse(body);
+  const now = new Date().toISOString();
+  return {
+    id: `00000000-0000-0000-0000-${String(Date.now()).slice(-12)}`,
+    owner_id: devOwnerId,
+    template_version_id: preview.template_version_id,
+    business_module: asString(body.business_module, "H9"),
+    business_document_type: asString(body.business_document_type, preview.template_type_code),
+    business_document_id: asString(body.business_document_id, "H9-SAMPLE"),
+    status: asString(body.status, "printed"),
+    failure_reason: asNullableString(body.failure_reason),
+    retry_count: 0,
+    printed_at: now,
+    operator_id: devUserId,
+    created_at: now,
+  };
+}
+
+function devPrintFieldPaths(libraryCode: string) {
+  if (libraryCode === "m2_asn") {
+    return [
+      { field_path: "asn.code", display_name: "ASN 号", field_type: "string", group_code: "order", group_name: "订单信息", sample_value: "ASN-202607070001" },
+      { field_path: "product.name", display_name: "商品名称", field_type: "string", group_code: "product", group_name: "商品信息", sample_value: "冷藏胰岛素注射液" },
+      { field_path: "product.code", display_name: "商品编码", field_type: "string", group_code: "product", group_name: "商品信息", sample_value: "P-M1-001" },
+    ];
+  }
+  if (libraryCode.includes("location")) {
+    return [
+      { field_path: "location.code", display_name: "库位编码", field_type: "string", group_code: "location", group_name: "库位信息", sample_value: "A01-01-02-03" },
+      { field_path: "location.zone", display_name: "库区", field_type: "string", group_code: "location", group_name: "库位信息", sample_value: "A01" },
+    ];
+  }
+  if (libraryCode.includes("lpn")) {
+    return [{ field_path: "lpn.code", display_name: "LPN", field_type: "string", group_code: "lpn", group_name: "LPN 信息", sample_value: "LPN-202607070001" }];
+  }
+  return [
+    { field_path: "asn.code", display_name: "业务单号", field_type: "string", group_code: "order", group_name: "单据信息", sample_value: "DOC-202607070001" },
+    { field_path: "product.name", display_name: "商品名称", field_type: "string", group_code: "product", group_name: "商品信息", sample_value: "冷藏胰岛素注射液" },
+  ];
+}
+
+function devHiprintTemplateJson(fieldPath: string) {
+  return {
+    panels: [
+      {
+        index: 0,
+        paperType: "A4",
+        width: 210,
+        height: 297,
+        orient: "portrait",
+        printElements: [
+          {
+            options: { field: fieldPath, title: "业务单号", left: 20, top: 20, width: 260, height: 20 },
+            printElementType: { type: "text" },
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function asPrintBindings(value: unknown) {
+  return Array.isArray(value)
+    ? value.map((item) => {
+        const record = asRecord(item);
+        return { field_path: asString(record.field_path, "asn.code"), required: asBoolean(record.required, false) };
+      })
+    : [{ field_path: "asn.code", required: true }];
 }
 
 function devPrintSourceSchema(libraryCode: string) {
@@ -1560,6 +1814,7 @@ export default defineConfig(({ command }) => {
     },
     plugins: [react(), webAdminDevMock()],
     resolve: {
+      dedupe: ["jquery"],
       alias: {
         "@": path.resolve(__dirname, "./src"),
       },
