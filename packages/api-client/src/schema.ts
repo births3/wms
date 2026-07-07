@@ -1188,6 +1188,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/print-templates/templates/{template_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_print_template_versions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/gsp/inbound-ledger": {
         parameters: {
             query?: never;
@@ -2668,6 +2684,10 @@ export interface components {
             template_type_code: string;
             /** Format: int32 */
             version_no: number;
+        };
+        PrintTemplateVersionListResponse: {
+            data: components["schemas"]["PrintTemplateVersion"][];
+            page: components["schemas"]["PageMeta"];
         };
         PrintWaybillRequest: {
             carrier_code: string;
@@ -7244,6 +7264,47 @@ export interface operations {
             };
             /** @description 模板 JSON 或字段绑定非法 */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_print_template_versions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 打印模板 ID */
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 打印模板版本历史 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintTemplateVersionListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

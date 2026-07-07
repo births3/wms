@@ -6,8 +6,8 @@ use wms_api::{
     auth::AuthContext,
     print_template::{
         PgPrintTemplateRepository, PrintFieldDefinitionInput, PrintTemplateBinding,
-        PrintTemplatePrintRequest, PrintTemplatePreviewRequest, PrintTemplateScope,
-        SavePrintTemplateRequest, PublishPrintFieldLibraryRequest,
+        PrintTemplatePreviewRequest, PrintTemplatePrintRequest, PrintTemplateScope,
+        PublishPrintFieldLibraryRequest, SavePrintTemplateRequest,
     },
 };
 
@@ -174,6 +174,65 @@ async fn published_field_library_versions_are_immutable_idempotent_and_audited(p
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn print_template_versions_are_listed_by_template_and_owner(pool: PgPool) {
+    let repo = PgPrintTemplateRepository::new();
+    let owner_id = Uuid::new_v4();
+    let auth = ctx(owner_id);
+    let now = Utc
+        .with_ymd_and_hms(2026, 7, 7, 10, 0, 0)
+        .single()
+        .expect("valid time");
+    let field_library = repo
+        .publish_field_library(
+            &pool,
+            &auth,
+            publish_request("ASN 号"),
+            now,
+            "h9-field-publish-version-list",
+        )
+        .await
+        .expect("field library should publish");
+
+    let first = repo
+        .save_template(
+            &pool,
+            &auth,
+            template_request(field_library.value.id),
+            now + chrono::Duration::minutes(1),
+            "h9-template-version-list-1",
+        )
+        .await
+        .expect("first template version should save");
+    let mut second_request = template_request(field_library.value.id);
+    second_request.template_name = "M2 ASN 调整模板".to_string();
+    let second = repo
+        .save_template(
+            &pool,
+            &auth,
+            second_request,
+            now + chrono::Duration::minutes(2),
+            "h9-template-version-list-2",
+        )
+        .await
+        .expect("second template version should save");
+
+    let versions = repo
+        .list_template_versions(&pool, &auth, first.value.template_id)
+        .await
+        .expect("template versions should list");
+    assert_eq!(versions.len(), 2);
+    assert_eq!(versions[0].id, second.value.id);
+    assert_eq!(versions[0].version_no, 2);
+    assert_eq!(versions[1].id, first.value.id);
+
+    let other_owner_versions = repo
+        .list_template_versions(&pool, &ctx(Uuid::new_v4()), first.value.template_id)
+        .await
+        .expect("cross owner version list should not leak data");
+    assert!(other_owner_versions.is_empty());
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn hiprint_template_publish_preview_and_print_are_versioned_idempotent_and_owner_scoped(
     pool: PgPool,
 ) {
@@ -185,7 +244,13 @@ async fn hiprint_template_publish_preview_and_print_are_versioned_idempotent_and
         .single()
         .expect("valid time");
     let field_library = repo
-        .publish_field_library(&pool, &auth, publish_request("ASN 号"), now, "h9-field-publish-template")
+        .publish_field_library(
+            &pool,
+            &auth,
+            publish_request("ASN 号"),
+            now,
+            "h9-field-publish-template",
+        )
         .await
         .expect("field library should publish");
 
@@ -289,7 +354,10 @@ async fn hiprint_template_publish_preview_and_print_are_versioned_idempotent_and
         )
         .await
         .expect_err("template must not cross owner fallback");
-    assert_eq!(cross_owner, wms_api::print_template::PrintTemplateError::TemplateNotFound);
+    assert_eq!(
+        cross_owner,
+        wms_api::print_template::PrintTemplateError::TemplateNotFound
+    );
 
     let audit_count: i64 = sqlx::query_scalar(
         r#"

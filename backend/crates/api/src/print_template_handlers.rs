@@ -14,11 +14,11 @@ use wms_domain::{ErrorResponse, PageMeta};
 use crate::{
     auth::{AuthContext, AuthError},
     print_template::{
-        PgPrintTemplateRepository, PrintFieldLibraryListResponse, PrintRecord,
-        PrintFieldDefinitionListResponse, PrintTemplateError, PrintTemplateListResponse,
-        PrintTemplatePreviewRequest, PrintTemplatePreviewResponse, PrintTemplatePrintRequest,
-        PrintTemplateVersion, ResolvePrintTemplateRequest, ResolvePrintTemplateResponse,
-        SavePrintTemplateRequest,
+        PgPrintTemplateRepository, PrintFieldDefinitionListResponse, PrintFieldLibraryListResponse,
+        PrintRecord, PrintTemplateError, PrintTemplateListResponse, PrintTemplatePreviewRequest,
+        PrintTemplatePreviewResponse, PrintTemplatePrintRequest, PrintTemplateVersion,
+        PrintTemplateVersionListResponse, ResolvePrintTemplateRequest,
+        ResolvePrintTemplateResponse, SavePrintTemplateRequest,
     },
 };
 
@@ -109,9 +109,9 @@ impl IntoResponse for PrintTemplateHandlerError {
                 "模板字段绑定不存在",
                 serde_json::json!({ "fields": fields }),
             ),
-            PrintTemplateHandlerError::PrintTemplate(
-                PrintTemplateError::TemplateFieldMissing(fields),
-            ) => (
+            PrintTemplateHandlerError::PrintTemplate(PrintTemplateError::TemplateFieldMissing(
+                fields,
+            )) => (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "H9_TEMPLATE_FIELD_MISSING",
                 "打印数据缺少必填字段",
@@ -170,6 +170,10 @@ pub fn print_template_router(state: PrintTemplateAppState) -> Router {
         .route(
             "/api/v1/print-templates/templates",
             get(list_print_templates_handler).post(save_print_template_handler),
+        )
+        .route(
+            "/api/v1/print-templates/templates/:template_id/versions",
+            get(list_print_template_versions_handler),
         )
         .route(
             "/api/v1/print-templates/resolve",
@@ -232,7 +236,12 @@ async fn list_print_templates_handler(
 ) -> Result<Json<PrintTemplateListResponse>, PrintTemplateHandlerError> {
     require_any_permission(
         &ctx,
-        &[READ_PERMISSION, WRITE_PERMISSION, PUBLISH_PERMISSION, PRINT_PERMISSION],
+        &[
+            READ_PERMISSION,
+            WRITE_PERMISSION,
+            PUBLISH_PERMISSION,
+            PRINT_PERMISSION,
+        ],
     )?;
     let data = state.repository.list_templates(&state.pool, &ctx).await?;
     Ok(Json(PrintTemplateListResponse {
@@ -263,13 +272,40 @@ async fn save_print_template_handler(
     Ok(Json(result.value))
 }
 
+async fn list_print_template_versions_handler(
+    ctx: AuthContext,
+    State(state): State<PrintTemplateAppState>,
+    Path(template_id): Path<uuid::Uuid>,
+) -> Result<Json<PrintTemplateVersionListResponse>, PrintTemplateHandlerError> {
+    require_any_permission(
+        &ctx,
+        &[READ_PERMISSION, WRITE_PERMISSION, PUBLISH_PERMISSION],
+    )?;
+    let data = state
+        .repository
+        .list_template_versions(&state.pool, &ctx, template_id)
+        .await?;
+    Ok(Json(PrintTemplateVersionListResponse {
+        page: PageMeta {
+            next_cursor: None,
+            count: data.len() as u32,
+        },
+        data,
+    }))
+}
+
 async fn resolve_print_template_handler(
     ctx: AuthContext,
     State(state): State<PrintTemplateAppState>,
     Json(req): Json<ResolvePrintTemplateRequest>,
 ) -> Result<Json<ResolvePrintTemplateResponse>, PrintTemplateHandlerError> {
     require_any_permission(&ctx, &[READ_PERMISSION, PRINT_PERMISSION])?;
-    Ok(Json(state.repository.resolve_template(&state.pool, &ctx, req).await?))
+    Ok(Json(
+        state
+            .repository
+            .resolve_template(&state.pool, &ctx, req)
+            .await?,
+    ))
 }
 
 async fn preview_print_template_handler(
@@ -278,7 +314,12 @@ async fn preview_print_template_handler(
     Json(req): Json<PrintTemplatePreviewRequest>,
 ) -> Result<Json<PrintTemplatePreviewResponse>, PrintTemplateHandlerError> {
     require_any_permission(&ctx, &[READ_PERMISSION, PRINT_PERMISSION])?;
-    Ok(Json(state.repository.preview_template(&state.pool, &ctx, req).await?))
+    Ok(Json(
+        state
+            .repository
+            .preview_template(&state.pool, &ctx, req)
+            .await?,
+    ))
 }
 
 async fn record_print_template_handler(
@@ -296,9 +337,7 @@ async fn record_print_template_handler(
     Ok(Json(result.value))
 }
 
-fn idempotency_key_from_headers(
-    headers: &HeaderMap,
-) -> Result<String, PrintTemplateHandlerError> {
+fn idempotency_key_from_headers(headers: &HeaderMap) -> Result<String, PrintTemplateHandlerError> {
     let Some(value) = headers
         .get(IDEMPOTENCY_KEY_HEADER)
         .or_else(|| headers.get("Idempotency-Key"))

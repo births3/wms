@@ -5097,6 +5097,58 @@
         }
       }
     },
+    "/api/v1/print-templates/templates/{template_id}/versions": {
+      "get": {
+        "tags": [
+          "print-template"
+        ],
+        "operationId": "list_print_template_versions",
+        "parameters": [
+          {
+            "name": "template_id",
+            "in": "path",
+            "description": "打印模板 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "打印模板版本历史",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintTemplateVersionListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/reports/gsp/inbound-ledger": {
       "post": {
         "tags": [
@@ -9929,6 +9981,24 @@
           "version_no": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "PrintTemplateVersionListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrintTemplateVersion"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
           }
         }
       },

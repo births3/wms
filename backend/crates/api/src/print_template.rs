@@ -213,6 +213,12 @@ pub struct PrintTemplateListResponse {
     pub page: PageMeta,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct PrintTemplateVersionListResponse {
+    pub data: Vec<PrintTemplateVersion>,
+    pub page: PageMeta,
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize, ToSchema)]
 pub struct PrintTemplatePreviewRequest {
     pub template_code: Option<String>,
@@ -489,7 +495,56 @@ impl PgPrintTemplateRepository {
         .fetch_all(pool)
         .await
         .map_err(map_db_error)?;
-        rows.into_iter().map(PrintTemplateSummary::try_from).collect()
+        rows.into_iter()
+            .map(PrintTemplateSummary::try_from)
+            .collect()
+    }
+
+    pub async fn list_template_versions(
+        &self,
+        pool: &PgPool,
+        ctx: &AuthContext,
+        template_id: Uuid,
+    ) -> Result<Vec<PrintTemplateVersion>, PrintTemplateError> {
+        let rows = sqlx::query_as::<_, PrintTemplateVersionRow>(
+            r#"
+            SELECT
+                versions.id,
+                templates.id AS template_id,
+                templates.template_code,
+                templates.template_name,
+                templates.template_type_code,
+                templates.owner_id,
+                templates.scope,
+                templates.enabled,
+                templates.is_default,
+                templates.remark,
+                versions.field_library_version_id,
+                versions.version_no,
+                versions.status,
+                versions.hiprint_json,
+                versions.field_bindings,
+                versions.paper,
+                versions.designer_version,
+                versions.created_at,
+                versions.created_by,
+                versions.published_at,
+                versions.published_by
+              FROM print_template_versions versions
+              JOIN print_templates templates ON templates.id = versions.template_id
+             WHERE templates.owner_id = $1
+               AND templates.id = $2
+             ORDER BY versions.version_no DESC
+            "#,
+        )
+        .bind(ctx.owner_id)
+        .bind(template_id)
+        .fetch_all(pool)
+        .await
+        .map_err(map_db_error)?;
+        rows.into_iter()
+            .map(PrintTemplateVersion::try_from)
+            .collect()
     }
 
     pub async fn save_template(
@@ -597,8 +652,15 @@ impl PgPrintTemplateRepository {
             now,
         )
         .await?;
-        append_h9_audit(&mut tx, ctx, "save_print_template", "print_template", version.id, now)
-            .await?;
+        append_h9_audit(
+            &mut tx,
+            ctx,
+            "save_print_template",
+            "print_template",
+            version.id,
+            now,
+        )
+        .await?;
         tx.commit().await.map_err(map_db_error)?;
 
         Ok(IdempotentMutation {
@@ -613,8 +675,9 @@ impl PgPrintTemplateRepository {
         ctx: &AuthContext,
         req: ResolvePrintTemplateRequest,
     ) -> Result<ResolvePrintTemplateResponse, PrintTemplateError> {
-        let version = resolve_template_version(pool, ctx, &req.template_code, &req.template_type_code)
-            .await?;
+        let version =
+            resolve_template_version(pool, ctx, &req.template_code, &req.template_type_code)
+                .await?;
         let summary = PrintTemplateSummary {
             id: version.template_id,
             template_code: version.template_code.clone(),
@@ -647,7 +710,8 @@ impl PgPrintTemplateRepository {
         req: PrintTemplatePreviewRequest,
     ) -> Result<PrintTemplatePreviewResponse, PrintTemplateError> {
         let version =
-            resolve_template_version(pool, ctx, &req.template_code, &req.template_type_code).await?;
+            resolve_template_version(pool, ctx, &req.template_code, &req.template_type_code)
+                .await?;
         validate_required_fields(&version.field_bindings, &req.data)?;
         Ok(PrintTemplatePreviewResponse {
             template_id: version.template_id,
@@ -673,7 +737,8 @@ impl PgPrintTemplateRepository {
     ) -> Result<IdempotentMutation<PrintRecord>, PrintTemplateError> {
         validate_print_request(&req)?;
         let version =
-            resolve_template_version(pool, ctx, &req.template_code, &req.template_type_code).await?;
+            resolve_template_version(pool, ctx, &req.template_code, &req.template_type_code)
+                .await?;
         validate_required_fields(&version.field_bindings, &req.data)?;
         let request_hash = json_request_hash(&serde_json::json!({
             "request": &req,
@@ -728,7 +793,15 @@ impl PgPrintTemplateRepository {
             now,
         )
         .await?;
-        append_h9_audit(&mut tx, ctx, "print_template", "print_record", record.id, now).await?;
+        append_h9_audit(
+            &mut tx,
+            ctx,
+            "print_template",
+            "print_record",
+            record.id,
+            now,
+        )
+        .await?;
         tx.commit().await.map_err(map_db_error)?;
 
         Ok(IdempotentMutation {
@@ -1096,7 +1169,10 @@ async fn resolve_template_version(
     template_code: &Option<String>,
     template_type_code: &str,
 ) -> Result<PrintTemplateVersion, PrintTemplateError> {
-    if let Some(code) = template_code.as_ref().filter(|value| !value.trim().is_empty()) {
+    if let Some(code) = template_code
+        .as_ref()
+        .filter(|value| !value.trim().is_empty())
+    {
         let row = sqlx::query_as::<_, PrintTemplateVersionRow>(
             r#"
             SELECT

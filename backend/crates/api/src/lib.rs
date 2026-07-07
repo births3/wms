@@ -51,8 +51,9 @@ use crate::print_template::{
     PrintFieldDefinition, PrintFieldDefinitionListResponse, PrintFieldLibraryListResponse,
     PrintFieldLibrarySummary, PrintRecord, PrintTemplateBinding, PrintTemplateListResponse,
     PrintTemplatePreviewRequest, PrintTemplatePreviewResponse, PrintTemplatePrintRequest,
-    PrintTemplateScope, PrintTemplateSummary, PrintTemplateVersion, ResolvePrintTemplateRequest,
-    ResolvePrintTemplateResponse, SavePrintTemplateRequest,
+    PrintTemplateScope, PrintTemplateSummary, PrintTemplateVersion,
+    PrintTemplateVersionListResponse, ResolvePrintTemplateRequest, ResolvePrintTemplateResponse,
+    SavePrintTemplateRequest,
 };
 use utoipa::OpenApi;
 use wms_domain::{
@@ -534,6 +535,20 @@ fn list_print_field_definitions() {}
 fn list_print_templates() {}
 
 #[utoipa::path(
+    get,
+    path = "/api/v1/print-templates/templates/{template_id}/versions",
+    tag = "print-template",
+    params(("template_id" = uuid::Uuid, Path, description = "打印模板 ID")),
+    responses(
+        (status = 200, description = "打印模板版本历史", body = PrintTemplateVersionListResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+fn list_print_template_versions() {}
+
+#[utoipa::path(
     post,
     path = "/api/v1/print-templates/templates",
     tag = "print-template",
@@ -901,6 +916,7 @@ fn confirm_container_recovery() {}
         list_print_field_libraries,
         list_print_field_definitions,
         list_print_templates,
+        list_print_template_versions,
         save_print_template,
         resolve_print_template,
         preview_print_template,
@@ -1068,6 +1084,7 @@ fn confirm_container_recovery() {}
         PrintTemplateScope,
         PrintTemplateSummary,
         PrintTemplateVersion,
+        PrintTemplateVersionListResponse,
         ResolvePrintTemplateRequest,
         ResolvePrintTemplateResponse,
         SavePrintTemplateRequest,
