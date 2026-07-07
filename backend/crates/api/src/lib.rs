@@ -47,7 +47,13 @@ use crate::document_numbering::{
     UpsertDocumentNumberRuleRequest,
 };
 use crate::openapi_contract::ContractSecurityAddon;
-use crate::print_template::{PrintFieldLibraryListResponse, PrintFieldLibrarySummary};
+use crate::print_template::{
+    PrintFieldDefinition, PrintFieldDefinitionListResponse, PrintFieldLibraryListResponse,
+    PrintFieldLibrarySummary, PrintRecord, PrintTemplateBinding, PrintTemplateListResponse,
+    PrintTemplatePreviewRequest, PrintTemplatePreviewResponse, PrintTemplatePrintRequest,
+    PrintTemplateScope, PrintTemplateSummary, PrintTemplateVersion, ResolvePrintTemplateRequest,
+    ResolvePrintTemplateResponse, SavePrintTemplateRequest,
+};
 use utoipa::OpenApi;
 use wms_domain::{
     AdminMenuButtonPermission, AdminMenuNode, AdminMenuTreeResponse, AdminMenuVersion, AuditActor,
@@ -500,6 +506,101 @@ fn list_document_number_allocations() {}
 #[allow(dead_code)]
 fn list_print_field_libraries() {}
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/print-templates/field-libraries/{version_id}/fields",
+    tag = "print-template",
+    params(("version_id" = uuid::Uuid, Path, description = "字段库版本 ID")),
+    responses(
+        (status = 200, description = "打印字段定义列表", body = PrintFieldDefinitionListResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+fn list_print_field_definitions() {}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/print-templates/templates",
+    tag = "print-template",
+    responses(
+        (status = 200, description = "打印模板列表", body = PrintTemplateListResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+fn list_print_templates() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/print-templates/templates",
+    tag = "print-template",
+    params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")),
+    request_body = SavePrintTemplateRequest,
+    responses(
+        (status = 200, description = "保存打印模板版本", body = PrintTemplateVersion),
+        (status = 400, description = "缺少幂等键", body = ErrorResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+        (status = 409, description = "字段库未发布或幂等冲突", body = ErrorResponse),
+        (status = 422, description = "模板 JSON 或字段绑定非法", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+fn save_print_template() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/print-templates/resolve",
+    tag = "print-template",
+    request_body = ResolvePrintTemplateRequest,
+    responses(
+        (status = 200, description = "解析业务打印模板", body = ResolvePrintTemplateResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+        (status = 404, description = "模板不存在", body = ErrorResponse),
+        (status = 409, description = "模板已停用", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+fn resolve_print_template() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/print-templates/preview",
+    tag = "print-template",
+    request_body = PrintTemplatePreviewRequest,
+    responses(
+        (status = 200, description = "预览打印模板", body = PrintTemplatePreviewResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+        (status = 404, description = "模板不存在", body = ErrorResponse),
+        (status = 422, description = "打印数据缺少必填字段", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+fn preview_print_template() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/print-templates/print",
+    tag = "print-template",
+    params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")),
+    request_body = PrintTemplatePrintRequest,
+    responses(
+        (status = 200, description = "记录浏览器打印结果", body = PrintRecord),
+        (status = 400, description = "缺少幂等键", body = ErrorResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+        (status = 404, description = "模板不存在", body = ErrorResponse),
+        (status = 422, description = "打印数据缺少必填字段", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+fn record_print_template() {}
+
 #[utoipa::path(get, path = "/api/v1/inbound/receiving-orders", tag = "inbound", responses((status = 200, description = "收货单列表", body = ReceivingOrderListResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 fn list_receiving_orders() {}
@@ -798,6 +899,12 @@ fn confirm_container_recovery() {}
         set_document_number_rule_enabled,
         list_document_number_allocations,
         list_print_field_libraries,
+        list_print_field_definitions,
+        list_print_templates,
+        save_print_template,
+        resolve_print_template,
+        preview_print_template,
+        record_print_template,
         list_receiving_orders,
         create_receiving_order,
         get_receiving_order,
@@ -948,8 +1055,22 @@ fn confirm_container_recovery() {}
         PackingStation,
         PageMeta,
         PrintWaybillRequest,
+        PrintFieldDefinition,
+        PrintFieldDefinitionListResponse,
         PrintFieldLibraryListResponse,
         PrintFieldLibrarySummary,
+        PrintRecord,
+        PrintTemplateBinding,
+        PrintTemplateListResponse,
+        PrintTemplatePreviewRequest,
+        PrintTemplatePreviewResponse,
+        PrintTemplatePrintRequest,
+        PrintTemplateScope,
+        PrintTemplateSummary,
+        PrintTemplateVersion,
+        ResolvePrintTemplateRequest,
+        ResolvePrintTemplateResponse,
+        SavePrintTemplateRequest,
         Product,
         ProductListResponse,
         PutawayInventoryRequest,
