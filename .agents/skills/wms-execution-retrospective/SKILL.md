@@ -26,6 +26,7 @@ description: WMS 执行复盘和流程迭代技能。用户问为什么没检查
    - 收口缺失：PR、tmux、worktree、agent 分支没有进入明确状态。
    - 字段共性缺失：创建时间、更新时间、创建人、货主、状态、单据类型等公共字段在某页面、接口、矩阵或脚本中缺失。
    - 范围缺口缺失：用户故事已有，但矩阵、页面、按钮、弹窗、API 或后端没有进入执行范围。
+   - 闭环语义缺失：用户要求“缺口闭环 / 补齐 / 验收”，执行却只登记矩阵或写延期，没有推动未实现功能、测试和证据。
    - 验证缺失：现有脚本没覆盖，或 dry-run 产物污染治理检查。
 4. 先补当前事故：能补评论、截图附件、重启状态或清理状态的，先补；不能补的写明阻塞。
 5. 固化规则：选择最小落点：
@@ -34,6 +35,7 @@ description: WMS 执行复盘和流程迭代技能。用户问为什么没检查
    - issue agent 流程缺口：改 `docs/runbooks/gitea-issue-agent.md`。
    - 字段共性缺口：先补字段矩阵 / 设计 RTM，再补前后端映射和治理脚本。
    - 范围缺口：先补 `governance/quality-matrix.toml` 或 `scripts/governance/check_scope_gap_discovery.py`，再补实现；模块验收用 `--strict --module <模块>`。
+   - 闭环语义缺口：改触发技能的闭环定义；没有用户确认时，`deferred_stories` 只能标“待确认”，不能作为完成。
    - 全局协作习惯：改 `AGENTS.md`。
    - 单次口头提醒：不要建规则，直接说明。
 6. 验证规则真的生效：
@@ -71,6 +73,7 @@ description: WMS 执行复盘和流程迭代技能。用户问为什么没检查
 - 默认发现：`python3 scripts/governance/check_scope_gap_discovery.py --json`
 - 模块闭环：`python3 scripts/governance/check_scope_gap_discovery.py --strict --module <模块>`
 - 只有当前事故修了、规则落到矩阵或脚本、严格模式能暴露同类缺口，才算自我迭代完成。
+- “缺口闭环”默认是功能闭环；若未实现功能只是被登记或延期，必须回到执行技能拆开发任务。
 
 ## 共性字段分析
 

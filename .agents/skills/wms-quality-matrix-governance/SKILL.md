@@ -1,6 +1,6 @@
 ---
 name: wms-quality-matrix-governance
-description: WMS 全链路质量矩阵治理技能。用户要求建立或维护测试/质量矩阵、检查新增用户故事/页面/API/字段是否进入矩阵、按 S0-S3 分层策略补齐维度、根据 issue/Bug/review 漏检迭代检查维度、修复 check_quality_matrix 失败，或说“缺口闭环 <模块/页面/issue>”时使用。
+description: WMS 全链路质量矩阵治理技能。用户要求建立或维护测试/质量矩阵、检查新增用户故事/页面/API/字段是否进入矩阵、按 S0-S3 分层策略补齐维度、根据 issue/Bug/review 漏检迭代检查维度、修复 check_quality_matrix 失败，或说“缺口闭环 模块/页面/issue”“补齐缺失功能”“验收模块是否完整”时使用；缺口闭环默认必须推动功能实现，不只是登记或延期。
 ---
 
 # WMS Quality Matrix Governance
@@ -29,6 +29,11 @@ description: WMS 全链路质量矩阵治理技能。用户要求建立或维护
 
 短触发语：`缺口闭环 <模块/页面/issue>`。等价于先严格发现范围缺口，再用 `wms-worktree-subagent` 补实现，随后用 `wms-review-fix-commit` 复审提交；若发现漏检，用 `wms-execution-retrospective` 反哺规则。
 
+闭环分两类，未说明时默认选功能闭环：
+
+- 功能闭环：发现未实现故事、页面、按钮、弹窗、API、后端或测试时，必须进入开发任务；只登记矩阵不算完成。
+- 登记闭环：只有用户明确说“只登记 / 暂缓 / 延期 / 先入矩阵”时，才允许用 `deferred_stories` 收口。
+
 0. 新增维度、漏检复盘、批量补齐或多轮修复时，先按 `wms-loop-engineering` 定义目标、检查和停止条件。
 1. 先运行 `python3 scripts/governance/check_quality_matrix.py --json`，确认当前矩阵是否干净。
 2. 根据任务判断是否需要新增或修改矩阵行：
@@ -41,8 +46,13 @@ description: WMS 全链路质量矩阵治理技能。用户要求建立或维护
 6. 由 `types` 自动推导测试层；不要手工压低 L1-L11 覆盖要求。
 7. 改完事实源后运行 `python3 scripts/governance/check_quality_matrix.py --write-doc` 生成展示页。
 8. 跑范围缺口：日常 `python3 scripts/governance/check_scope_gap_discovery.py --json`；模块验收或用户问“是否补齐”时加 `--strict --module <模块>`。
-9. 严格模式发现缺口时，必须补矩阵、故事范围、页面/API/后端实现，或写入经用户确认的延期范围。
-10. 验证：`check_quality_matrix.py --json`、`check_scope_gap_discovery.py --json`、相关 pytest、接线改动跑 dispatch/smoke、最后 `just gov-t1`。
+9. 严格模式发现缺口时，先分类：
+   - 已实现未登记：补矩阵并生成展示页。
+   - 未实现：拆成最小开发任务，优先用 `wms-worktree-subagent` 实现，再补矩阵和证据。
+   - 范围过大或必须业务确认：停止并列出待实现清单、建议拆分和风险，不能把延期登记当完成。
+10. 写入 `deferred_stories` 前必须有本轮用户明确确认；没有确认时只能报告“待实现/待确认”，不能用延期关闭功能缺口。
+11. 最终汇报必须分开写：已实现、已登记、待实现、经确认延期。缺少“已实现”证据时，不能说“闭环完成”。
+12. 验证：`check_quality_matrix.py --json`、`check_scope_gap_discovery.py --json`、相关 pytest、接线改动跑 dispatch/smoke、最后 `just gov-t1`。
 
 ## 页面分类分区联动
 
@@ -62,7 +72,7 @@ description: WMS 全链路质量矩阵治理技能。用户要求建立或维护
 - 硬失败：已进入质量矩阵的故事、页面或 API 与真实菜单 / 文档 / 接线不一致。
 - 发现型缺口：同一活跃模块中还有未登记故事、未覆盖菜单页、用户故事要求的按钮 / 弹窗 / 流程未进入矩阵。
 
-发现型缺口不能在最终汇报中消失；“补齐/闭环/验收/所有模块”任务必须升级为严格模式。
+发现型缺口不能在最终汇报中消失；“补齐/闭环/验收/所有模块”任务必须升级为严格模式，并按功能闭环处理。
 
 ## 运行反馈迭代
 
