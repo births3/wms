@@ -24,6 +24,7 @@ import {
   isColdChainTemperatureControl,
   type CreateFormState,
   type InboundDialog,
+  type InspectFormExamples,
   type InspectFormState,
   type PutawayFormState,
   type ReceiveFormState,
@@ -77,6 +78,27 @@ const emptyCreateForm: CreateFormState = {
   expectedQty: "",
   productionDate: "",
   expiryDate: "",
+};
+const emptyInspectForm: InspectFormState = {
+  batchNo: "",
+  acceptedQty: "",
+  rejectedQty: "",
+  productionDate: "",
+  expiryDate: "",
+  qualityStatus: "",
+  traceCodes: "",
+  appearanceCheck: "",
+  packageCheck: "",
+  instructionCheck: "",
+  labelCheck: "",
+  note: "",
+};
+const emptySignForm: SignFormState = {
+  firstSignerId: "",
+  secondSignerId: "",
+  dualRequired: true,
+  strategyNote: "",
+  note: "",
 };
 const m2InboundQueryFields: QueryPanelField[] = [
   {
@@ -168,27 +190,8 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
   const [rejectForm, setRejectForm] = React.useState<RejectFormState>({
     reason: "",
   });
-  const [inspectForm, setInspectForm] = React.useState<InspectFormState>({
-    batchNo: "",
-    acceptedQty: "0",
-    rejectedQty: "0",
-    productionDate: "2026-01-01",
-    expiryDate: "2028-01-01",
-    qualityStatus: "qualified",
-    traceCodes: "TC-M2-0001",
-    appearanceCheck: "外观合格",
-    packageCheck: "包装合格",
-    instructionCheck: "说明书合格",
-    labelCheck: "标签合格",
-    note: "",
-  });
-  const [signForm, setSignForm] = React.useState<SignFormState>({
-    firstSignerId,
-    secondSignerId,
-    dualRequired: true,
-    strategyNote: "process=入库，node=验收，dual_scan",
-    note: "",
-  });
+  const [inspectForm, setInspectForm] = React.useState<InspectFormState>(emptyInspectForm);
+  const [signForm, setSignForm] = React.useState<SignFormState>(emptySignForm);
   const [putawayForm, setPutawayForm] = React.useState<PutawayFormState>({
     lpn: "LPN-M2-PC-0001",
     productCode: "",
@@ -246,6 +249,22 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
   const detailQuery = useReceivingOrderQuery(selectedId);
   const order = detailQuery.data ?? selectedFromList;
   const line = order?.lines[0];
+  const totalQty = order ? String(totalExpectedQty(order)) : "";
+  const inspectExamples: InspectFormExamples = {
+    batchNo: exampleText(line?.batch_no, "请输入验收批号"),
+    acceptedQty: exampleText(totalQty, "请输入通过数量"),
+    rejectedQty: "例如 0",
+    productionDate: exampleText(line?.production_date, "请选择生产日期"),
+    expiryDate: exampleText(line?.expiry_date, "请选择有效期"),
+    traceCodes: "例如 TC-M2-0001",
+    appearanceCheck: "例如 外观合格",
+    packageCheck: "例如 包装合格",
+    instructionCheck: "例如 说明书合格",
+    labelCheck: "例如 标签合格",
+    firstSignerId: `例如 ${firstSignerId}`,
+    secondSignerId: `例如 ${secondSignerId}`,
+    strategyNote: "例如 process=入库，node=验收，dual_scan",
+  };
   const currentProductTemperatureAttribute = productTemperatureAttribute(line?.product_code);
   const currentTemperatureControl = temperatureControlFromProductAttribute(currentProductTemperatureAttribute);
   const pending =
@@ -271,14 +290,8 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
     const firstLine = order.lines[0];
     setReceiveForm((value) => ({ ...value, actualQty: qty, shortageQty: "0", rejectedQty: "0" }));
     setRejectForm({ reason: "" });
-    setInspectForm((value) => ({
-      ...value,
-      batchNo: firstLine?.batch_no ?? "BATCH-202606",
-      acceptedQty: qty,
-      rejectedQty: "0",
-      productionDate: firstLine?.production_date ?? "2026-01-01",
-      expiryDate: firstLine?.expiry_date ?? "2028-01-01",
-    }));
+    setInspectForm(emptyInspectForm);
+    setSignForm(emptySignForm);
     setPutawayForm((value) => ({
       ...value,
       productCode: firstLine?.product_code ?? "",
@@ -300,6 +313,10 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
 
   function openRowDialog(id: string, dialog: InboundDialog) {
     setSelectedId(id);
+    if (dialog === "inspect") {
+      setInspectForm(emptyInspectForm);
+      setSignForm(emptySignForm);
+    }
     setActiveDialog(dialog);
   }
 
@@ -374,13 +391,13 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
     await inspectMutation.mutateAsync({
       id: order.id,
       request: {
-        batch_no: inspectForm.batchNo.trim() || line?.batch_no || "BATCH-202606",
+        batch_no: inspectForm.batchNo.trim(),
         accepted_qty: toInteger(inspectForm.acceptedQty),
         rejected_qty: toInteger(inspectForm.rejectedQty),
         production_date: inspectForm.productionDate,
         expiry_date: inspectForm.expiryDate,
         quality_status: inspectForm.qualityStatus.trim(),
-        trace_codes: splitCodes(inspectForm.traceCodes || "TC-M2-0001"),
+        trace_codes: splitCodes(inspectForm.traceCodes),
       },
     });
     await signMutation.mutateAsync({
@@ -508,6 +525,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
           receiveForm={receiveForm}
           rejectForm={rejectForm}
           inspectForm={inspectForm}
+          inspectExamples={inspectExamples}
           signForm={signForm}
           putawayForm={putawayForm}
           setActiveDialog={setActiveDialog}
@@ -581,4 +599,8 @@ function queryRange(value: QueryPanelValue[string], fallback?: QueryPanelRangeVa
 
 function queryValueFromUnknown(value: unknown): QueryPanelValue {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as QueryPanelValue) : {};
+}
+
+function exampleText(value: string | number | null | undefined, fallback: string) {
+  return value ? `例如 ${value}` : fallback;
 }
