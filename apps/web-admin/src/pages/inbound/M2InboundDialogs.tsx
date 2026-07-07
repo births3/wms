@@ -92,6 +92,22 @@ export interface SignFormState {
   note: string;
 }
 
+export interface InspectFormExamples {
+  batchNo: string;
+  acceptedQty: string;
+  rejectedQty: string;
+  productionDate: string;
+  expiryDate: string;
+  traceCodes: string;
+  appearanceCheck: string;
+  packageCheck: string;
+  instructionCheck: string;
+  labelCheck: string;
+  firstSignerId: string;
+  secondSignerId: string;
+  strategyNote: string;
+}
+
 export interface PutawayFormState {
   lpn: string;
   productCode: string;
@@ -117,6 +133,7 @@ interface M2InboundDialogsProps {
   receiveForm: ReceiveFormState;
   rejectForm: RejectFormState;
   inspectForm: InspectFormState;
+  inspectExamples: InspectFormExamples;
   signForm: SignFormState;
   putawayForm: PutawayFormState;
   setActiveDialog: (dialog: InboundDialog | null) => void;
@@ -145,6 +162,7 @@ export function M2InboundDialogs({
   receiveForm,
   rejectForm,
   inspectForm,
+  inspectExamples,
   signForm,
   putawayForm,
   setActiveDialog,
@@ -300,22 +318,22 @@ export function M2InboundDialogs({
               <DialogTitle>验收</DialogTitle>
               <DialogDescription>{orderReceiptNo ?? "未选择入库单"}</DialogDescription>
             </DialogHeader>
-            <TextField label="验收批号" value={inspectForm.batchNo} onChange={(batchNo) => setInspectForm((value) => ({ ...value, batchNo }))} />
-            <TextField label="通过数量" type="number" value={inspectForm.acceptedQty} onChange={(acceptedQty) => setInspectForm((value) => ({ ...value, acceptedQty }))} />
-            <TextField label="拒收数量" type="number" value={inspectForm.rejectedQty} onChange={(rejectedQty) => setInspectForm((value) => ({ ...value, rejectedQty }))} />
-            <TextField label="生产日期" type="date" value={inspectForm.productionDate} onChange={(productionDate) => setInspectForm((value) => ({ ...value, productionDate }))} />
-            <TextField label="有效期至" type="date" value={inspectForm.expiryDate} onChange={(expiryDate) => setInspectForm((value) => ({ ...value, expiryDate }))} />
-            <TextField label="追溯码" value={inspectForm.traceCodes} onChange={(traceCodes) => setInspectForm((value) => ({ ...value, traceCodes }))} />
-            <SelectField label="质量状态" value={inspectForm.qualityStatus} onChange={(qualityStatus) => setInspectForm((value) => ({ ...value, qualityStatus }))} options={[["qualified", "合格"], ["unqualified", "不合格"], ["quarantine", "待复验 / 隔离"]]} />
-            <TextField label="外观核对" value={inspectForm.appearanceCheck} onChange={(appearanceCheck) => setInspectForm((value) => ({ ...value, appearanceCheck }))} />
-            <TextField label="包装核对" value={inspectForm.packageCheck} onChange={(packageCheck) => setInspectForm((value) => ({ ...value, packageCheck }))} />
-            <TextField label="说明书核对" value={inspectForm.instructionCheck} onChange={(instructionCheck) => setInspectForm((value) => ({ ...value, instructionCheck }))} />
-            <TextField label="标签核对" value={inspectForm.labelCheck} onChange={(labelCheck) => setInspectForm((value) => ({ ...value, labelCheck }))} />
+            <TextField label="验收批号" required placeholder={inspectExamples.batchNo} value={inspectForm.batchNo} onChange={(batchNo) => setInspectForm((value) => ({ ...value, batchNo }))} />
+            <TextField label="通过数量" type="number" required placeholder={inspectExamples.acceptedQty} value={inspectForm.acceptedQty} onChange={(acceptedQty) => setInspectForm((value) => ({ ...value, acceptedQty }))} />
+            <TextField label="拒收数量" type="number" required placeholder={inspectExamples.rejectedQty} value={inspectForm.rejectedQty} onChange={(rejectedQty) => setInspectForm((value) => ({ ...value, rejectedQty }))} />
+            <TextField label="生产日期" type="date" required placeholder={inspectExamples.productionDate} value={inspectForm.productionDate} onChange={(productionDate) => setInspectForm((value) => ({ ...value, productionDate }))} />
+            <TextField label="有效期至" type="date" required placeholder={inspectExamples.expiryDate} value={inspectForm.expiryDate} onChange={(expiryDate) => setInspectForm((value) => ({ ...value, expiryDate }))} />
+            <TextField label="追溯码" required placeholder={inspectExamples.traceCodes} value={inspectForm.traceCodes} onChange={(traceCodes) => setInspectForm((value) => ({ ...value, traceCodes }))} />
+            <SelectField label="质量状态" required placeholder="请选择质量状态" value={inspectForm.qualityStatus} onChange={(qualityStatus) => setInspectForm((value) => ({ ...value, qualityStatus }))} options={[["qualified", "合格"], ["unqualified", "不合格"], ["quarantine", "待复验 / 隔离"]]} />
+            <TextField label="外观核对" required placeholder={inspectExamples.appearanceCheck} value={inspectForm.appearanceCheck} onChange={(appearanceCheck) => setInspectForm((value) => ({ ...value, appearanceCheck }))} />
+            <TextField label="包装核对" required placeholder={inspectExamples.packageCheck} value={inspectForm.packageCheck} onChange={(packageCheck) => setInspectForm((value) => ({ ...value, packageCheck }))} />
+            <TextField label="说明书核对" required placeholder={inspectExamples.instructionCheck} value={inspectForm.instructionCheck} onChange={(instructionCheck) => setInspectForm((value) => ({ ...value, instructionCheck }))} />
+            <TextField label="标签核对" required placeholder={inspectExamples.labelCheck} value={inspectForm.labelCheck} onChange={(labelCheck) => setInspectForm((value) => ({ ...value, labelCheck }))} />
             <section className="grid gap-3 rounded-md border bg-muted/20 p-3 md:col-span-2 md:grid-cols-2">
               <div className="text-xs font-medium text-muted-foreground md:col-span-2">验收复核</div>
-              <TextField label="第一签字人" value={signForm.firstSignerId} onChange={(firstSignerId) => setSignForm((value) => ({ ...value, firstSignerId }))} />
-              <TextField label="第二签字人" value={signForm.secondSignerId} onChange={(secondSignerId) => setSignForm((value) => ({ ...value, secondSignerId }))} />
-              <TextField label="策略命中说明" value={signForm.strategyNote} onChange={(strategyNote) => setSignForm((value) => ({ ...value, strategyNote }))} />
+              <TextField label="第一签字人" required placeholder={inspectExamples.firstSignerId} value={signForm.firstSignerId} onChange={(firstSignerId) => setSignForm((value) => ({ ...value, firstSignerId }))} />
+              <TextField label="第二签字人" required={signForm.dualRequired} placeholder={inspectExamples.secondSignerId} value={signForm.secondSignerId} onChange={(secondSignerId) => setSignForm((value) => ({ ...value, secondSignerId }))} />
+              <TextField label="策略命中说明" placeholder={inspectExamples.strategyNote} value={signForm.strategyNote} onChange={(strategyNote) => setSignForm((value) => ({ ...value, strategyNote }))} />
               <TextField label="签字备注" value={signForm.note} onChange={(note) => setSignForm((value) => ({ ...value, note }))} />
               <label className="flex items-center gap-2 text-sm text-muted-foreground md:col-span-2">
                 <input type="checkbox" checked={signForm.dualRequired} onChange={(event) => setSignForm((value) => ({ ...value, dualRequired: event.target.checked }))} />
@@ -419,16 +437,21 @@ function SelectField({
   value,
   onChange,
   options,
+  placeholder,
+  required = false,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   options: Array<[string, string]>;
+  placeholder?: string;
+  required?: boolean;
 }) {
   return (
     <label className="grid gap-1 text-xs text-muted-foreground">
       {label}
-      <select className="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground" value={value} onChange={(event) => onChange(event.target.value)}>
+      <select required={required} className="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground" value={value} onChange={(event) => onChange(event.target.value)}>
+        {placeholder && <option value="" disabled>{placeholder}</option>}
         {options.map(([optionValue, optionLabel]) => <option key={optionValue} value={optionValue}>{optionLabel}</option>)}
       </select>
     </label>
