@@ -9,94 +9,107 @@ import {
   cn,
   type DataGridColumn,
   type DataGridRefreshAction,
+  type DataGridToolbarAction,
   type QueryPanelField,
   type QueryPanelValue,
   type TreeCatalogNode,
 } from "@wms/ui";
+import { Eye } from "lucide-react";
 
 import {
   usePrintFieldLibrariesQuery,
+  usePrintTemplatesQuery,
   usePrintTemplateTypesQuery,
+  usePreviewPrintTemplateMutation,
+  useRecordPrintTemplateMutation,
+  useSavePrintTemplateMutation,
   type PrintFieldLibraryRow,
+  type PrintTemplatePreviewResponse,
+  type PrintTemplateRow,
   type PrintTemplateTypeRow,
+  type SavePrintTemplateRequest,
 } from "@/features/print-template/print-template-queries";
+
+import { H9TemplateDesignerDialog } from "./H9TemplateDesignerDialog";
+import { H9TemplatePreviewDialog } from "./H9TemplatePreviewDialog";
 
 const h9PrintTemplateQueryFields: QueryPanelField[] = [
   {
     key: "keyword",
     label: "关键字",
     type: "text",
-    placeholder: "搜索字段库编码、名称或发布人",
-    ariaLabel: "搜索打印字段库",
+    placeholder: "搜索模板编码、名称或状态",
+    ariaLabel: "搜索打印模板",
   },
   {
-    key: "sourceSchema",
-    label: "来源模型",
+    key: "templateType",
+    label: "模板类型",
     type: "text",
-    placeholder: "例如 ReceivingOrder",
-    ariaLabel: "搜索来源模型",
+    placeholder: "例如 m2_asn",
+    ariaLabel: "搜索模板类型",
   },
 ];
-const h9PrintTemplateCoreQueryFieldKeys = ["keyword", "sourceSchema"];
+const h9PrintTemplateCoreQueryFieldKeys = ["keyword", "templateType"];
 
-const columns: DataGridColumn<PrintFieldLibraryRow>[] = [
+const columns: DataGridColumn<PrintTemplateRow>[] = [
   {
-    key: "libraryCode",
-    header: "字段库编码",
+    key: "templateCode",
+    header: "模板编码",
     width: 220,
     minWidth: 160,
     mono: true,
     sortable: true,
-    sortValue: (row) => row.libraryCode,
-    filterValue: (row) => row.libraryCode,
-    copyValue: (row) => row.libraryCode,
+    sortValue: (row) => row.templateCode,
+    filterValue: (row) => row.templateCode,
+    copyValue: (row) => row.templateCode,
     filter: { type: "text" },
   },
   {
-    key: "libraryName",
-    header: "字段库名称",
+    key: "templateName",
+    header: "模板名称",
     width: 220,
     minWidth: 160,
     sortable: true,
-    sortValue: (row) => row.libraryName,
-    filterValue: (row) => row.libraryName,
-    copyValue: (row) => row.libraryName,
+    sortValue: (row) => row.templateName,
+    filterValue: (row) => row.templateName,
+    copyValue: (row) => row.templateName,
     filter: { type: "text" },
   },
   {
-    key: "sourceSchema",
-    header: "来源模型",
+    key: "templateTypeCode",
+    header: "模板类型",
     width: 180,
     minWidth: 140,
     mono: true,
     sortable: true,
-    sortValue: (row) => row.sourceSchema,
-    filterValue: (row) => row.sourceSchema,
-    copyValue: (row) => row.sourceSchema,
+    sortValue: (row) => row.templateTypeCode,
+    filterValue: (row) => row.templateTypeCode,
+    copyValue: (row) => row.templateTypeCode,
     filter: { type: "text" },
   },
   {
-    key: "versionNo",
+    key: "latestVersionNo",
     header: "最新版本",
     width: 120,
     minWidth: 100,
     sortable: true,
-    sortValue: (row) => row.versionNo,
-    filterValue: (row) => row.versionNo,
-    copyValue: (row) => `v${row.versionNo}`,
+    sortValue: (row) => row.latestVersionNo,
+    filterValue: (row) => row.latestVersionNo,
+    copyValue: (row) => `v${row.latestVersionNo}`,
     filter: { type: "numberRange" },
-    render: (row) => `v${row.versionNo}`,
+    render: (row) => `v${row.latestVersionNo}`,
   },
   {
-    key: "fieldCount",
-    header: "字段数",
-    width: 110,
-    minWidth: 90,
+    key: "scope",
+    header: "作用域",
+    width: 120,
+    minWidth: 100,
     sortable: true,
-    sortValue: (row) => row.fieldCount,
-    filterValue: (row) => row.fieldCount,
-    copyValue: (row) => String(row.fieldCount),
-    filter: { type: "numberRange" },
+    sortValue: (row) => row.scopeLabel,
+    filterValue: (row) => row.scope,
+    copyValue: (row) => row.scopeLabel,
+    filter: { type: "multiSelect", options: [{ label: "全局", value: "global" }, { label: "货主", value: "owner" }] },
+    render: (row) => row.scopeLabel,
   },
   {
     key: "status",
@@ -105,10 +118,33 @@ const columns: DataGridColumn<PrintFieldLibraryRow>[] = [
     minWidth: 100,
     sortable: true,
     sortValue: (row) => row.statusLabel,
-    filterValue: (row) => row.status,
+    filterValue: (row) => row.enabled ? "enabled" : "disabled",
     copyValue: (row) => row.statusLabel,
-    filter: { type: "multiSelect", options: [{ label: "已发布", value: "published" }] },
-    render: (row) => <StatusBadge status="completed" label={row.statusLabel} size="sm" />,
+    filter: { type: "multiSelect", options: [{ label: "启用", value: "enabled" }, { label: "停用", value: "disabled" }] },
+    render: (row) => <StatusBadge status={row.enabled ? "completed" : "isolated"} label={row.statusLabel} size="sm" />,
+  },
+  {
+    key: "isDefault",
+    header: "默认",
+    width: 100,
+    minWidth: 80,
+    sortable: true,
+    sortValue: (row) => row.isDefault ? 1 : 0,
+    filterValue: (row) => row.isDefault ? "yes" : "no",
+    copyValue: (row) => row.isDefault ? "是" : "否",
+    filter: { type: "multiSelect", options: [{ label: "是", value: "yes" }, { label: "否", value: "no" }] },
+    render: (row) => row.isDefault ? "是" : "否",
+  },
+  {
+    key: "designerVersion",
+    header: "设计器",
+    width: 160,
+    minWidth: 120,
+    sortable: true,
+    sortValue: (row) => row.designerVersion,
+    filterValue: (row) => row.designerVersion,
+    copyValue: (row) => row.designerVersion,
+    filter: { type: "text" },
   },
   {
     key: "createdAt",
@@ -123,28 +159,28 @@ const columns: DataGridColumn<PrintFieldLibraryRow>[] = [
     render: (row) => formatDateTime(row.createdAt),
   },
   {
+    key: "updatedAt",
+    header: "更新时间",
+    width: 180,
+    minWidth: 140,
+    sortable: true,
+    sortValue: (row) => row.updatedAt,
+    filterValue: (row) => row.updatedAt,
+    copyValue: (row) => formatDateTime(row.updatedAt),
+    filter: { type: "text" },
+    render: (row) => formatDateTime(row.updatedAt),
+  },
+  {
     key: "publishedAt",
     header: "发布时间",
     width: 180,
     minWidth: 140,
     sortable: true,
-    sortValue: (row) => row.publishedAt,
-    filterValue: (row) => row.publishedAt,
-    copyValue: (row) => formatDateTime(row.publishedAt),
+    sortValue: (row) => row.publishedAt ?? "",
+    filterValue: (row) => row.publishedAt ?? "",
+    copyValue: (row) => row.publishedAt ? formatDateTime(row.publishedAt) : "",
     filter: { type: "text" },
-    render: (row) => formatDateTime(row.publishedAt),
-  },
-  {
-    key: "publishedBy",
-    header: "发布人",
-    width: 260,
-    minWidth: 180,
-    mono: true,
-    sortable: true,
-    sortValue: (row) => row.publishedBy,
-    filterValue: (row) => row.publishedBy,
-    copyValue: (row) => row.publishedBy,
-    filter: { type: "text" },
+    render: (row) => row.publishedAt ? formatDateTime(row.publishedAt) : "-",
   },
 ];
 
@@ -152,18 +188,26 @@ type Notice = { type: "success" | "error"; text: string } | null;
 
 export function H9PrintTemplatePage() {
   const librariesQuery = usePrintFieldLibrariesQuery();
+  const templatesQuery = usePrintTemplatesQuery();
   const templateTypesQuery = usePrintTemplateTypesQuery();
+  const saveMutation = useSavePrintTemplateMutation();
+  const previewMutation = usePreviewPrintTemplateMutation();
+  const printMutation = useRecordPrintTemplateMutation();
   const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(() => defaultH9QueryValue());
   const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(() => defaultH9QueryValue());
+  const [selectedRowKeys, setSelectedRowKeys] = React.useState<string[]>([]);
   const [selectedTreeNodeId, setSelectedTreeNodeId] = React.useState("");
+  const [designerOpen, setDesignerOpen] = React.useState(false);
+  const [previewOpen, setPreviewOpen] = React.useState(false);
+  const [preview, setPreview] = React.useState<PrintTemplatePreviewResponse | null>(null);
   const [notice, setNotice] = React.useState<Notice>(null);
   const treeNodes = React.useMemo(
     () => buildH9TreeNodes(templateTypesQuery.data ?? [], librariesQuery.data ?? []),
     [librariesQuery.data, templateTypesQuery.data],
   );
   const treeScopedRows = React.useMemo(
-    () => filterRowsByTree(librariesQuery.data ?? [], templateTypesQuery.data ?? [], selectedTreeNodeId),
-    [librariesQuery.data, selectedTreeNodeId, templateTypesQuery.data],
+    () => filterRowsByTree(templatesQuery.data ?? [], templateTypesQuery.data ?? [], selectedTreeNodeId),
+    [selectedTreeNodeId, templateTypesQuery.data, templatesQuery.data],
   );
   const rows = React.useMemo(
     () => filterRows(treeScopedRows, appliedQuery),
@@ -173,26 +217,44 @@ export function H9PrintTemplatePage() {
     () => buildQueryPanelSummaryItems(h9PrintTemplateQueryFields, appliedQuery),
     [appliedQuery],
   );
+  const templateById = React.useMemo(() => new Map((templatesQuery.data ?? []).map((row) => [row.id, row])), [templatesQuery.data]);
   const refreshAction: DataGridRefreshAction = {
     label: "刷新",
-    description: "刷新打印模板树和字段库列表",
-    disabled: librariesQuery.isFetching || templateTypesQuery.isFetching,
+    description: "刷新打印模板树和模板列表",
+    disabled: librariesQuery.isFetching || templateTypesQuery.isFetching || templatesQuery.isFetching,
     onClick: () => {
       void refreshLibraries();
     },
   };
+  const createAction = {
+    label: "新增",
+    description: "打开 hiprint 打印模板设计器",
+    disabled: librariesQuery.isPending || templateTypesQuery.isPending,
+    onClick: () => setDesignerOpen(true),
+  };
+  const toolbarActions: DataGridToolbarAction[] = [
+    {
+      key: "preview-template",
+      label: "预览",
+      description: "按选中模板生成浏览器预览",
+      icon: <Eye className="size-4" aria-hidden />,
+      disabled: (context) => context.selectedRowKeys.length !== 1,
+      onClick: (context) => void previewTemplate(context.selectedRowKeys[0]),
+    },
+  ];
 
   async function refreshLibraries() {
     setNotice(null);
-    const [typesResult, librariesResult] = await Promise.all([
+    const [typesResult, librariesResult, templatesResult] = await Promise.all([
       templateTypesQuery.refetch(),
       librariesQuery.refetch(),
+      templatesQuery.refetch(),
     ]);
-    const error = typesResult.error ?? librariesResult.error;
+    const error = typesResult.error ?? librariesResult.error ?? templatesResult.error;
     setNotice(
       error
         ? { type: "error", text: error.message }
-        : { type: "success", text: "打印模板树已刷新" },
+        : { type: "success", text: "打印模板已刷新" },
     );
   }
 
@@ -200,6 +262,43 @@ export function H9PrintTemplatePage() {
     const defaults = defaultH9QueryValue();
     setDraftQuery(defaults);
     setAppliedQuery(defaults);
+  }
+
+  async function saveTemplate(request: SavePrintTemplateRequest) {
+    const saved = await saveMutation.mutateAsync(request);
+    setNotice({ type: "success", text: `${saved.template_code} 已保存` });
+  }
+
+  async function previewTemplate(rowId: string) {
+    const row = templateById.get(rowId);
+    if (!row) return;
+    try {
+      const next = await previewMutation.mutateAsync({
+        template_code: row.templateCode,
+        template_type_code: row.templateTypeCode,
+        business_document_id: "H9-SAMPLE",
+        data: samplePrintData(),
+      });
+      setPreview(next);
+      setPreviewOpen(true);
+    } catch (errorValue) {
+      setNotice({ type: "error", text: errorValue instanceof Error ? errorValue.message : "预览失败" });
+    }
+  }
+
+  async function recordPrint() {
+    if (!preview) return;
+    await printMutation.mutateAsync({
+      template_code: preview.template_code,
+      template_type_code: preview.template_type_code,
+      business_module: preview.template_type_code.split("_")[0]?.toUpperCase() || "H9",
+      business_document_type: preview.template_type_code,
+      business_document_id: "H9-SAMPLE",
+      data: preview.data,
+      status: "printed",
+      failure_reason: null,
+    });
+    setNotice({ type: "success", text: "打印记录已写入" });
   }
 
   return (
@@ -220,9 +319,9 @@ export function H9PrintTemplatePage() {
         resetLabel="重置"
       />
 
-      {(librariesQuery.error || templateTypesQuery.error) && (
+      {(librariesQuery.error || templateTypesQuery.error || templatesQuery.error) && (
         <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {templateTypesQuery.error?.message ?? librariesQuery.error?.message}
+          {templateTypesQuery.error?.message ?? librariesQuery.error?.message ?? templatesQuery.error?.message}
         </div>
       )}
 
@@ -243,19 +342,30 @@ export function H9PrintTemplatePage() {
         />
         <div className="min-w-0">
           <DataGrid
-            storageKey="h9.print-template.field-libraries"
+            storageKey="h9.print-template.templates"
             columns={columns}
             data={rows}
             rowKey={(row) => row.id}
-            caption={librariesQuery.isPending || templateTypesQuery.isPending ? "加载打印模板..." : undefined}
-            emptyTitle={librariesQuery.isError ? "读取打印字段库失败" : "暂无匹配字段库"}
+            selectable
+            selectedRowKeys={selectedRowKeys}
+            onSelectedRowKeysChange={setSelectedRowKeys}
+            caption={librariesQuery.isPending || templateTypesQuery.isPending || templatesQuery.isPending ? "加载打印模板..." : undefined}
+            emptyTitle={templatesQuery.isError ? "读取打印模板失败" : "暂无匹配模板"}
             emptyDescription={
-              librariesQuery.isError
+              templatesQuery.isError
                 ? "请检查后端 H9 接口和账号权限"
-                : "请检查左侧模板类型绑定的字段库编码，或调整查询条件。"
+                : "点击新增打开 hiprint 设计器，或调整查询条件。"
             }
-            exportFileBaseName="H9 打印模板字段库"
+            exportFileBaseName="H9 打印模板"
             refreshAction={refreshAction}
+            createAction={createAction}
+            printAction={{
+              label: "打印",
+              description: "预览并打印选中模板",
+              disabled: (context) => context.selectedRowKeys.length !== 1,
+              onClick: (context) => void previewTemplate(context.selectedRowKeys[0]),
+            }}
+            toolbarActions={toolbarActions}
             queryState={appliedQuery}
             querySummaryItems={querySummaryItems}
             onApplyQueryState={(queryState) => {
@@ -267,6 +377,19 @@ export function H9PrintTemplatePage() {
           />
         </div>
       </div>
+      <H9TemplateDesignerDialog
+        open={designerOpen}
+        templateTypes={templateTypesQuery.data ?? []}
+        libraries={librariesQuery.data ?? []}
+        onOpenChange={setDesignerOpen}
+        onSave={saveTemplate}
+      />
+      <H9TemplatePreviewDialog
+        open={previewOpen}
+        preview={preview}
+        onOpenChange={setPreviewOpen}
+        onPrint={recordPrint}
+      />
     </section>
   );
 }
@@ -274,22 +397,22 @@ export function H9PrintTemplatePage() {
 function defaultH9QueryValue(): QueryPanelValue {
   return {
     keyword: "",
-    sourceSchema: "",
+    templateType: "",
   };
 }
 
 function normalizeH9QueryValue(value: QueryPanelValue): QueryPanelValue {
   return {
     keyword: queryString(value.keyword),
-    sourceSchema: queryString(value.sourceSchema),
+    templateType: queryString(value.templateType),
   };
 }
 
-function filterRows(rows: PrintFieldLibraryRow[], query: QueryPanelValue) {
+function filterRows(rows: PrintTemplateRow[], query: QueryPanelValue) {
   const keyword = queryString(query.keyword).trim().toLowerCase();
-  const sourceSchema = queryString(query.sourceSchema).trim().toLowerCase();
+  const templateType = queryString(query.templateType).trim().toLowerCase();
   return rows.filter((row) => {
-    const sourceMatches = !sourceSchema || row.sourceSchema.toLowerCase().includes(sourceSchema);
+    const sourceMatches = !templateType || row.templateTypeCode.toLowerCase().includes(templateType);
     const keywordMatches = !keyword || row.searchText.includes(keyword);
     return sourceMatches && keywordMatches;
   });
@@ -336,23 +459,26 @@ function buildH9TreeNodes(
 }
 
 function filterRowsByTree(
-  rows: PrintFieldLibraryRow[],
+  rows: PrintTemplateRow[],
   templateTypes: PrintTemplateTypeRow[],
   selectedNodeId: string,
 ) {
   if (!selectedNodeId) return rows;
   if (selectedNodeId.startsWith("type:")) {
     const typeCode = selectedNodeId.slice("type:".length);
-    const templateType = templateTypes.find((type) => type.code === typeCode);
-    return templateType ? rows.filter((row) => row.libraryCode === templateType.fieldLibraryCode) : rows;
+    return rows.filter((row) => row.templateTypeCode === typeCode);
   }
   if (selectedNodeId.startsWith("library:")) {
     const libraryCode = selectedNodeId.slice("library:".length);
-    return rows.filter((row) => row.libraryCode === libraryCode);
+    const typeCodes = templateTypes.filter((type) => type.fieldLibraryCode === libraryCode).map((type) => type.code);
+    return rows.filter((row) => typeCodes.includes(row.templateTypeCode));
   }
   if (selectedNodeId.startsWith("version:")) {
     const versionId = selectedNodeId.slice("version:".length);
-    return rows.filter((row) => row.latestVersionId === versionId);
+    const typeCodes = templateTypes
+      .filter((type) => rows.some((row) => row.fieldLibraryVersionId === versionId && row.templateTypeCode === type.code))
+      .map((type) => type.code);
+    return rows.filter((row) => row.fieldLibraryVersionId === versionId || typeCodes.includes(row.templateTypeCode));
   }
   return rows;
 }
@@ -405,4 +531,15 @@ function NoticePanel({ notice }: { notice: Notice }) {
       {notice.text}
     </div>
   );
+}
+
+function samplePrintData() {
+  return {
+    asn: { code: "ASN-202607070001" },
+    inspection: { code: "INS-202607070001" },
+    outbound: { delivery_no: "DN-202607070001" },
+    location: { code: "A01-01-02-03" },
+    lpn: { code: "LPN-202607070001" },
+    product: { code: "P-M1-001", name: "冷藏胰岛素注射液" },
+  };
 }
