@@ -116,6 +116,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/audit/archive/partitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_audit_archive_partitions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/audit/archive/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["run_audit_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/audit/events": {
         parameters: {
             query?: never;
@@ -254,6 +286,38 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["confirm_billing_statement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/business-retention/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["plan_business_retention_archive_job"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/business-retention/policies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_business_retention_policies"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -510,6 +574,54 @@ export interface paths {
         get: operations["list_driver_today_tasks"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/event-bus/deliveries/pending": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_pending_event_deliveries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/event-bus/deliveries/{delivery_id}/ack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ack_event_delivery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/event-bus/deliveries/{delivery_id}/nack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["nack_event_delivery"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1516,6 +1628,38 @@ export interface components {
              */
             owner_id: string;
         };
+        /** @description 审计归档分区状态。 */
+        AuditArchivePartitionState: {
+            /** Format: date */
+            partition_end: string;
+            partition_name: string;
+            /** Format: date */
+            partition_start: string;
+            storage_tier: string;
+            target_tier: string;
+        };
+        AuditArchivePartitionStateListResponse: {
+            data: components["schemas"]["AuditArchivePartitionState"][];
+            page: components["schemas"]["PageMeta"];
+        };
+        AuditArchiveRunRequest: {
+            /** Format: date */
+            reference_date?: string | null;
+        };
+        AuditArchiveRunResponse: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: int32 */
+            partitions_archived: number;
+            /** Format: int32 */
+            partitions_seen: number;
+            /** Format: date */
+            reference_date: string;
+        };
         /** @description 审计事件。 */
         AuditEvent: {
             /** @description 事件动作。 */
@@ -1662,6 +1806,37 @@ export interface components {
             total_amount_cents: number;
             /** Format: date-time */
             updated_at: string;
+        };
+        BusinessArchiveJob: {
+            /** Format: date */
+            cutoff_date?: string | null;
+            delete_allowed: boolean;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            policy_code: string;
+            status: string;
+            table_name: string;
+            target_layer: string;
+        };
+        /** @description H2 业务数据留存策略。 */
+        BusinessRetentionPolicy: {
+            /** Format: uuid */
+            id: string;
+            /** Format: int32 */
+            online_retention_months: number;
+            /** Format: uuid */
+            owner_id: string;
+            permanent: boolean;
+            policy_code: string;
+            /** Format: int32 */
+            retention_years?: number | null;
+            special_drug: boolean;
+        };
+        BusinessRetentionPolicyListResponse: {
+            data: components["schemas"]["BusinessRetentionPolicy"][];
+            page: components["schemas"]["PageMeta"];
         };
         CalculateBillingChargesRequest: {
             charge_item: string;
@@ -2085,6 +2260,23 @@ export interface components {
             severity: string;
             /** @description 链路追踪 ID。 */
             trace_id: string;
+        };
+        /** @description H2 事件投递记录。 */
+        EventDelivery: {
+            /** Format: int32 */
+            attempt_count: number;
+            /** Format: uuid */
+            event_id: string;
+            /** Format: uuid */
+            id: string;
+            status: string;
+        };
+        EventDeliveryListResponse: {
+            data: components["schemas"]["EventDelivery"][];
+            page: components["schemas"]["PageMeta"];
+        };
+        EventDeliveryNackRequest: {
+            error: string;
         };
         ExecuteMappingRequest: {
             /** @description 自由结构 JSON 对象。 */
@@ -2521,6 +2713,12 @@ export interface components {
             count: number;
             /** @description 下一页游标；为空表示无更多数据。 */
             next_cursor?: string | null;
+        };
+        PlanBusinessArchiveJobRequest: {
+            policy_code: string;
+            /** Format: date */
+            reference_date?: string | null;
+            table_name: string;
         };
         PrintFieldDefinition: {
             display_name: string;
@@ -3760,6 +3958,107 @@ export interface operations {
             };
         };
     };
+    list_audit_archive_partitions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 审计归档分区状态 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditArchivePartitionStateListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    run_audit_archive: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuditArchiveRunRequest"];
+            };
+        };
+        responses: {
+            /** @description 执行审计归档周期 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditArchiveRunResponse"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 归档参数非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     list_audit_events: {
         parameters: {
             query?: {
@@ -4146,6 +4445,116 @@ export interface operations {
             };
             /** @description 账单状态不可确认 */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    plan_business_retention_archive_job: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanBusinessArchiveJobRequest"];
+            };
+        };
+        responses: {
+            /** @description 生成业务数据归档计划 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BusinessArchiveJob"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 留存策略不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 归档计划参数非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_business_retention_policies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 业务数据留存策略列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BusinessRetentionPolicyListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4800,6 +5209,151 @@ export interface operations {
             };
             /** @description 未登录 */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_pending_event_deliveries: {
+        parameters: {
+            query?: {
+                /** @description 最多返回条数 */
+                limit?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 待投递事件列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventDeliveryListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    ack_event_delivery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 事件投递 ID */
+                delivery_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 确认事件投递成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventDelivery"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 事件投递不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    nack_event_delivery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 事件投递 ID */
+                delivery_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventDeliveryNackRequest"];
+            };
+        };
+        responses: {
+            /** @description 记录事件投递失败 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventDelivery"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 事件投递不存在 */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

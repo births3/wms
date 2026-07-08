@@ -497,6 +497,127 @@
         }
       }
     },
+    "/api/v1/audit/archive/partitions": {
+      "get": {
+        "tags": [
+          "audit"
+        ],
+        "operationId": "list_audit_archive_partitions",
+        "responses": {
+          "200": {
+            "description": "审计归档分区状态",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditArchivePartitionStateListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/audit/archive/runs": {
+      "post": {
+        "tags": [
+          "audit"
+        ],
+        "operationId": "run_audit_archive",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuditArchiveRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "执行审计归档周期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditArchiveRunResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "归档参数非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/audit/events": {
       "get": {
         "tags": [
@@ -1032,6 +1153,137 @@
           },
           "422": {
             "description": "账单状态不可确认",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/business-retention/jobs": {
+      "post": {
+        "tags": [
+          "business-retention"
+        ],
+        "operationId": "plan_business_retention_archive_job",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanBusinessArchiveJobRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "生成业务数据归档计划",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessArchiveJob"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "留存策略不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "归档计划参数非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/business-retention/policies": {
+      "get": {
+        "tags": [
+          "business-retention"
+        ],
+        "operationId": "list_business_retention_policies",
+        "responses": {
+          "200": {
+            "description": "业务数据留存策略列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessRetentionPolicyListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
             "content": {
               "application/json": {
                 "schema": {
@@ -1897,6 +2149,193 @@
           },
           "401": {
             "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/event-bus/deliveries/pending": {
+      "get": {
+        "tags": [
+          "event-bus"
+        ],
+        "operationId": "list_pending_event_deliveries",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "最多返回条数",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "待投递事件列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventDeliveryListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/event-bus/deliveries/{delivery_id}/ack": {
+      "post": {
+        "tags": [
+          "event-bus"
+        ],
+        "operationId": "ack_event_delivery",
+        "parameters": [
+          {
+            "name": "delivery_id",
+            "in": "path",
+            "description": "事件投递 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "确认事件投递成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventDelivery"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "事件投递不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/event-bus/deliveries/{delivery_id}/nack": {
+      "post": {
+        "tags": [
+          "event-bus"
+        ],
+        "operationId": "nack_event_delivery",
+        "parameters": [
+          {
+            "name": "delivery_id",
+            "in": "path",
+            "description": "事件投递 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventDeliveryNackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "记录事件投递失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventDelivery"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "事件投递不存在",
             "content": {
               "application/json": {
                 "schema": {
@@ -6388,6 +6827,101 @@
           }
         }
       },
+      "AuditArchivePartitionState": {
+        "type": "object",
+        "description": "审计归档分区状态。",
+        "required": [
+          "partition_name",
+          "partition_start",
+          "partition_end",
+          "storage_tier",
+          "target_tier"
+        ],
+        "properties": {
+          "partition_end": {
+            "type": "string",
+            "format": "date"
+          },
+          "partition_name": {
+            "type": "string"
+          },
+          "partition_start": {
+            "type": "string",
+            "format": "date"
+          },
+          "storage_tier": {
+            "type": "string"
+          },
+          "target_tier": {
+            "type": "string"
+          }
+        }
+      },
+      "AuditArchivePartitionStateListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditArchivePartitionState"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "AuditArchiveRunRequest": {
+        "type": "object",
+        "properties": {
+          "reference_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          }
+        }
+      },
+      "AuditArchiveRunResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "reference_date",
+          "partitions_seen",
+          "partitions_archived",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "partitions_archived": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "partitions_seen": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reference_date": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
       "AuditEvent": {
         "type": "object",
         "description": "审计事件。",
@@ -6797,6 +7331,106 @@
           "updated_at": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "BusinessArchiveJob": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "policy_code",
+          "table_name",
+          "target_layer",
+          "status",
+          "delete_allowed"
+        ],
+        "properties": {
+          "cutoff_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "delete_allowed": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "policy_code": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "table_name": {
+            "type": "string"
+          },
+          "target_layer": {
+            "type": "string"
+          }
+        }
+      },
+      "BusinessRetentionPolicy": {
+        "type": "object",
+        "description": "H2 业务数据留存策略。",
+        "required": [
+          "id",
+          "owner_id",
+          "policy_code",
+          "online_retention_months",
+          "permanent",
+          "special_drug"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "online_retention_months": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "permanent": {
+            "type": "boolean"
+          },
+          "policy_code": {
+            "type": "string"
+          },
+          "retention_years": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "special_drug": {
+            "type": "boolean"
+          }
+        }
+      },
+      "BusinessRetentionPolicyListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BusinessRetentionPolicy"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
           }
         }
       },
@@ -8127,6 +8761,62 @@
           }
         }
       },
+      "EventDelivery": {
+        "type": "object",
+        "description": "H2 事件投递记录。",
+        "required": [
+          "id",
+          "event_id",
+          "status",
+          "attempt_count"
+        ],
+        "properties": {
+          "attempt_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "event_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "EventDeliveryListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventDelivery"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "EventDeliveryNackRequest": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        }
+      },
       "ExecuteMappingRequest": {
         "type": "object",
         "required": [
@@ -9454,6 +10144,26 @@
             "type": "string",
             "description": "下一页游标；为空表示无更多数据。",
             "nullable": true
+          }
+        }
+      },
+      "PlanBusinessArchiveJobRequest": {
+        "type": "object",
+        "required": [
+          "policy_code",
+          "table_name"
+        ],
+        "properties": {
+          "policy_code": {
+            "type": "string"
+          },
+          "reference_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "table_name": {
+            "type": "string"
           }
         }
       },
@@ -12080,6 +12790,14 @@
     {
       "name": "audit",
       "description": "审计追踪"
+    },
+    {
+      "name": "event-bus",
+      "description": "H2 事件总线运行接口"
+    },
+    {
+      "name": "business-retention",
+      "description": "H2 业务数据生命周期归档"
     },
     {
       "name": "master-data",

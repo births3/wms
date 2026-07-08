@@ -277,13 +277,16 @@ module = "H2"
 story_file = "docs/domain/user-stories-h2-audit-trail.md"
 types = ["write", "audit_compliance"]
 frontend_pages = []
-api_paths = []
+api_paths = [
+  "GET /api/v1/audit/archive/partitions",
+  "POST /api/v1/audit/archive/runs",
+]
 
 [stories.dimensions]
 requirement = "verified"
 fields = "verified"
 frontend = "not_applicable"
-api = "not_applicable"
+api = "verified"
 backend = "verified"
 database = "verified"
 security = "verified"
@@ -295,7 +298,6 @@ governance = "verified"
 
 [stories.not_applicable_reasons]
 frontend = "审计归档运行是后端横向作业切片，不新增独立管理端页面。"
-api = "当前切片提供后端归档运行服务、状态表和审计记录，不暴露公开 HTTP API。"
 
 [stories.tests]
 required_layers = ["L1", "L2", "L3", "L4", "L5", "L8", "L10", "L11"]
@@ -308,13 +310,17 @@ module = "H2"
 story_file = "docs/domain/user-stories-h2-audit-trail.md"
 types = ["write", "integration", "audit_compliance"]
 frontend_pages = []
-api_paths = []
+api_paths = [
+  "GET /api/v1/event-bus/deliveries/pending",
+  "POST /api/v1/event-bus/deliveries/{delivery_id}/ack",
+  "POST /api/v1/event-bus/deliveries/{delivery_id}/nack",
+]
 
 [stories.dimensions]
 requirement = "verified"
 fields = "verified"
 frontend = "not_applicable"
-api = "not_applicable"
+api = "verified"
 backend = "verified"
 database = "verified"
 security = "verified"
@@ -326,7 +332,6 @@ governance = "verified"
 
 [stories.not_applicable_reasons]
 frontend = "事件总线为后端横向 outbox 能力，不新增独立管理端页面。"
-api = "当前切片提供后端发布、订阅、投递、重试和死信表能力，不暴露公开 HTTP API。"
 
 [stories.tests]
 required_layers = ["L1", "L2", "L3", "L4", "L5", "L8", "L9", "L10", "L11"]
@@ -339,13 +344,16 @@ module = "H2"
 story_file = "docs/domain/user-stories-h2-audit-trail.md"
 types = ["write", "config_rule", "audit_compliance"]
 frontend_pages = []
-api_paths = []
+api_paths = [
+  "GET /api/v1/business-retention/policies",
+  "POST /api/v1/business-retention/jobs",
+]
 
 [stories.dimensions]
 requirement = "verified"
 fields = "verified"
 frontend = "not_applicable"
-api = "not_applicable"
+api = "verified"
 backend = "verified"
 database = "verified"
 security = "verified"
@@ -357,7 +365,6 @@ governance = "verified"
 
 [stories.not_applicable_reasons]
 frontend = "当前切片实现后端归档策略和计划作业；PC 查询入口后续由配置/审计管理页面承接。"
-api = "当前切片提供后端策略种子、归档计划和审计记录，不暴露公开 HTTP API。"
 
 [stories.tests]
 required_layers = ["L1", "L2", "L3", "L4", "L5", "L8", "L9", "L10", "L11"]
