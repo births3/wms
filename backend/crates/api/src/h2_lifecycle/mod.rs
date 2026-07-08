@@ -6,9 +6,13 @@ mod retention;
 mod support;
 mod types;
 
-pub use archive::{audit_target_tier, run_audit_archive_cycle, sync_audit_partition_states};
+pub use archive::{
+    audit_target_tier, list_audit_partition_states, run_audit_archive_cycle,
+    sync_audit_partition_states,
+};
 pub use event_bus::{
-    pending_event_deliveries, publish_event, record_delivery_failure, upsert_event_subscription,
+    acknowledge_event_delivery, pending_event_deliveries, publish_event, record_delivery_failure,
+    replay_events, upsert_event_subscription,
 };
 pub use retention::{
     list_business_retention_policies, plan_business_archive_job,
@@ -16,7 +20,8 @@ pub use retention::{
 };
 pub use types::{
     AuditArchiveRun, AuditPartitionState, BusinessArchiveJob, BusinessRetentionPolicy,
-    DeliveryStatus, EventDelivery, EventEnvelope, EventSubscription, H2LifecycleError, StorageTier,
+    DeliveryStatus, EventDelivery, EventEnvelope, EventReplayResult, EventSubscription,
+    H2LifecycleError, StorageTier,
 };
 
 pub const DEFAULT_ONLINE_QUARTERS: i32 = 4;

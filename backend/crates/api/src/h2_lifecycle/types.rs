@@ -18,7 +18,7 @@ pub enum StorageTier {
 }
 
 impl StorageTier {
-    pub(super) fn as_str(&self) -> &'static str {
+    pub fn as_str(&self) -> &'static str {
         match self {
             Self::Online => "online",
             Self::Archive => "archive",
@@ -46,6 +46,14 @@ pub enum DeliveryStatus {
 }
 
 impl DeliveryStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Pending => "pending",
+            Self::Delivered => "delivered",
+            Self::DeadLetter => "dead_letter",
+        }
+    }
+
     pub(super) fn from_str(value: &str) -> Result<Self, H2LifecycleError> {
         match value {
             "pending" => Ok(Self::Pending),
@@ -100,6 +108,13 @@ pub struct EventDelivery {
     pub event_id: Uuid,
     pub status: DeliveryStatus,
     pub attempt_count: i32,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EventReplayResult {
+    pub matched_events: i64,
+    pub deliveries_created: i64,
+    pub deliveries_requeued: i64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

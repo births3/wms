@@ -5,8 +5,8 @@ use uuid::Uuid;
 
 use super::support::{append_system_audit_in_tx, db_error, matches_event_pattern};
 use super::types::{
-    EventDelivery, EventDeliveryRow, EventEnvelope, EventSubscription, EventSubscriptionRow,
-    H2LifecycleError,
+    EventDelivery, EventDeliveryRow, EventEnvelope, EventReplayResult, EventSubscription,
+    EventSubscriptionRow, H2LifecycleError,
 };
 use super::DEFAULT_EVENT_MAX_ATTEMPTS;
 
@@ -182,6 +182,34 @@ pub async fn pending_event_deliveries(
     rows.into_iter().map(EventDelivery::try_from).collect()
 }
 
+pub async fn acknowledge_event_delivery(
+    pool: &PgPool,
+    owner_id: Uuid,
+    delivery_id: Uuid,
+    now: DateTime<Utc>,
+) -> Result<EventDelivery, H2LifecycleError> {
+    let row = sqlx::query_as::<_, EventDeliveryRow>(
+        r#"
+        UPDATE event_bus_delivery
+           SET status = 'delivered',
+               last_error = NULL,
+               updated_at = $3,
+               next_attempt_at = NULL
+         WHERE owner_id = $1 AND id = $2
+        RETURNING id, event_id, status, attempt_count
+        "#,
+    )
+    .bind(owner_id)
+    .bind(delivery_id)
+    .bind(now)
+    .fetch_optional(pool)
+    .await
+    .map_err(db_error)?
+    .ok_or(H2LifecycleError::NotFound)?;
+
+    EventDelivery::try_from(row)
+}
+
 pub async fn record_delivery_failure(
     pool: &PgPool,
     owner_id: Uuid,
@@ -236,6 +264,134 @@ pub async fn record_delivery_failure(
 
     tx.commit().await.map_err(db_error)?;
     EventDelivery::try_from(row)
+}
+
+pub async fn replay_events(
+    pool: &PgPool,
+    owner_id: Uuid,
+    event_type: Option<&str>,
+    from: Option<DateTime<Utc>>,
+    to: Option<DateTime<Utc>>,
+    now: DateTime<Utc>,
+) -> Result<EventReplayResult, H2LifecycleError> {
+    if let (Some(from), Some(to)) = (from, to) {
+        if from > to {
+            return Err(H2LifecycleError::InvalidInput(
+                "from must be before or equal to to".to_string(),
+            ));
+        }
+    }
+
+    let mut tx = pool.begin().await.map_err(db_error)?;
+    let events: Vec<(Uuid, String)> = sqlx::query_as(
+        r#"
+        SELECT id, event_type
+          FROM event_bus_event
+         WHERE owner_id = $1
+           AND ($2::TEXT IS NULL OR event_type = $2)
+           AND ($3::TIMESTAMPTZ IS NULL OR created_at >= $3)
+           AND ($4::TIMESTAMPTZ IS NULL OR created_at <= $4)
+         ORDER BY created_at ASC
+         LIMIT 10000
+        "#,
+    )
+    .bind(owner_id)
+    .bind(event_type)
+    .bind(from)
+    .bind(to)
+    .fetch_all(&mut *tx)
+    .await
+    .map_err(db_error)?;
+
+    let subscriptions: Vec<EventSubscriptionRow> = sqlx::query_as(
+        r#"
+        SELECT id, owner_id, subscriber_key, event_pattern, active
+          FROM event_bus_subscription
+         WHERE owner_id = $1 AND active = TRUE
+        "#,
+    )
+    .bind(owner_id)
+    .fetch_all(&mut *tx)
+    .await
+    .map_err(db_error)?;
+
+    let mut deliveries_created = 0_i64;
+    let mut deliveries_requeued = 0_i64;
+    for (event_id, current_event_type) in &events {
+        for subscription in &subscriptions {
+            if !matches_event_pattern(&subscription.event_pattern, current_event_type) {
+                continue;
+            }
+
+            deliveries_requeued += sqlx::query(
+                r#"
+                UPDATE event_bus_delivery
+                   SET status = 'pending',
+                       last_error = NULL,
+                       updated_at = $4,
+                       next_attempt_at = $4
+                 WHERE owner_id = $1
+                   AND event_id = $2
+                   AND subscription_id = $3
+                   AND status <> 'pending'
+                "#,
+            )
+            .bind(owner_id)
+            .bind(event_id)
+            .bind(subscription.id)
+            .bind(now)
+            .execute(&mut *tx)
+            .await
+            .map_err(db_error)?
+            .rows_affected() as i64;
+
+            deliveries_created += sqlx::query(
+                r#"
+                INSERT INTO event_bus_delivery (
+                    id, owner_id, event_id, subscription_id, status, attempt_count, next_attempt_at
+                )
+                VALUES ($1, $2, $3, $4, 'pending', 0, $5)
+                ON CONFLICT (event_id, subscription_id) DO NOTHING
+                "#,
+            )
+            .bind(Uuid::new_v4())
+            .bind(owner_id)
+            .bind(event_id)
+            .bind(subscription.id)
+            .bind(now)
+            .execute(&mut *tx)
+            .await
+            .map_err(db_error)?
+            .rows_affected() as i64;
+        }
+    }
+
+    append_system_audit_in_tx(
+        &mut tx,
+        owner_id,
+        "event_bus.replay",
+        "event_bus_event",
+        event_type.unwrap_or("*"),
+        serde_json::json!({
+            "event_type": event_type,
+            "from": from,
+            "to": to,
+            "matched_events": events.len(),
+            "deliveries_created": deliveries_created,
+            "deliveries_requeued": deliveries_requeued,
+        }),
+        now,
+        "system-event-bus",
+    )
+    .await?;
+
+    tx.commit().await.map_err(db_error)?;
+
+    Ok(EventReplayResult {
+        matched_events: events.len() as i64,
+        deliveries_created,
+        deliveries_requeued,
+    })
 }
 
 async fn load_event_by_idempotency(

@@ -4,8 +4,9 @@ use uuid::Uuid;
 use wms_api::{
     audit::{append_event, AuditWriteRequest},
     h2_lifecycle::{
-        pending_event_deliveries, plan_business_archive_job, publish_event,
-        record_delivery_failure, run_audit_archive_cycle, seed_default_business_retention_policies,
+        acknowledge_event_delivery, list_audit_partition_states, pending_event_deliveries,
+        plan_business_archive_job, publish_event, record_delivery_failure, replay_events,
+        run_audit_archive_cycle, seed_default_business_retention_policies,
         upsert_event_subscription, DeliveryStatus,
     },
 };
@@ -27,6 +28,13 @@ async fn audit_archive_cycle_is_idempotent_and_audited(pool: PgPool) {
             .await
             .expect("partition should create");
     }
+    assert!(
+        list_audit_partition_states(&pool)
+            .await
+            .expect("partition state read should query")
+            .is_empty(),
+        "read API helper must not sync partition state as a side effect"
+    );
 
     let first = run_audit_archive_cycle(&pool, owner_id, now.date_naive(), now, "archive-cycle-1")
         .await
@@ -117,6 +125,73 @@ async fn event_bus_delivers_by_pattern_and_dead_letters_after_retries(pool: PgPo
 
     assert_eq!(delivery.status, DeliveryStatus::DeadLetter);
     assert_eq!(delivery.attempt_count, 3);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn event_bus_acknowledges_and_replays_deliveries(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let now = Utc
+        .with_ymd_and_hms(2026, 7, 1, 2, 30, 0)
+        .single()
+        .expect("fixed UTC event timestamp should be valid");
+    upsert_event_subscription(
+        &pool,
+        owner_id,
+        "audit-exporter",
+        "audit.receiving_order.*",
+        true,
+        now,
+    )
+    .await
+    .expect("subscription should upsert");
+
+    let event = publish_event(
+        &pool,
+        owner_id,
+        "event-replay-1",
+        "audit.receiving_order.receive",
+        "H2",
+        "receiving_order",
+        "ASN-1",
+        serde_json::json!({"status": "received"}),
+        now,
+    )
+    .await
+    .expect("event should publish");
+    let delivery = pending_event_deliveries(&pool, owner_id, 10)
+        .await
+        .expect("pending deliveries should list")
+        .into_iter()
+        .find(|delivery| delivery.event_id == event.id)
+        .expect("delivery should exist");
+
+    let acknowledged = acknowledge_event_delivery(&pool, owner_id, delivery.id, now)
+        .await
+        .expect("delivery should acknowledge");
+    assert_eq!(acknowledged.status, DeliveryStatus::Delivered);
+
+    let replay = replay_events(
+        &pool,
+        owner_id,
+        Some("audit.receiving_order.receive"),
+        None,
+        None,
+        now,
+    )
+    .await
+    .expect("event replay should requeue delivered delivery");
+
+    assert_eq!(replay.matched_events, 1);
+    assert_eq!(replay.deliveries_created, 0);
+    assert_eq!(replay.deliveries_requeued, 1);
+
+    let replayed_delivery = pending_event_deliveries(&pool, owner_id, 10)
+        .await
+        .expect("pending deliveries should list after replay")
+        .into_iter()
+        .find(|delivery| delivery.id == acknowledged.id)
+        .expect("acknowledged delivery should be pending again");
+    assert_eq!(replayed_delivery.status, DeliveryStatus::Pending);
 }
 
 #[sqlx::test(migrations = "../../migrations")]

@@ -78,6 +78,12 @@ pub async fn sync_audit_partition_states(
     load_audit_partition_states(pool).await
 }
 
+pub async fn list_audit_partition_states(
+    pool: &PgPool,
+) -> Result<Vec<AuditPartitionState>, H2LifecycleError> {
+    load_audit_partition_states(pool).await
+}
+
 pub async fn run_audit_archive_cycle(
     pool: &PgPool,
     owner_id: Uuid,
