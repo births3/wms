@@ -25,17 +25,17 @@
 
 | 层 | 需要 | 本轮覆盖 | 证据 | 缺口 |
 |---|---|---|---|---|
-| 用户故事 | 是 | 是 | [user-stories-h3-contract.md](domain/user-stories-h3-contract.md) 的 US-H3-001 / US-H3-002 | US-H3-003 限流熔断、US-H3-004 Swagger / ReDoc 不在本轮。 |
-| RTM | 是 | 是 | 本节 | 完整 H3 模块 RTM 仍需后续补齐运行时文档、前端、PDA 和 E2E 证据。 |
-| 数据库 | 不适用 | 否 | 本轮只声明契约红线，不新增表或迁移。 | 业务幂等运行时实现和审计落库沿用后续模块切片补证据。 |
-| 后端服务 | 不适用 | 否 | 本轮不改 service / domain / repository。 | 运行时鉴权、API Key 校验、业务幂等拦截不在本轮。 |
-| 公开 API | 是 | 是 | `backend/crates/api/src/lib.rs` 的 utoipa 聚合声明 | 仅覆盖 OpenAPI 安全与幂等声明，不声明模块完成。 |
-| OpenAPI / api-client | 是 | 是 | `shared/openapi/openapi.json`；`packages/api-client/src/schema.ts` | Swagger / ReDoc 运行时站点不在本轮。 |
-| PC 前端 | 是 | 否 | 本轮不改 PC 前端。 | 若 api-client 类型影响现有调用，需后续补前端 typecheck 和调用侧 header。 |
-| PDA | 是 | 否 | 本轮不改 PDA。 | PDA 复用 api-client 与离线兼容证据后续补齐。 |
-| E2E / 截图 | 是 | 否 | 本轮不采集截图。 | PC / PDA 真实截图和 Matrix E2E 证据后续补齐。 |
-| 治理脚本 | 是 | 是 | `scripts/governance/check_openapi_contract.py`；`scripts/governance/tests/test_openapi_governance.py` | 只覆盖契约红线静态检查，不替代运行时安全测试。 |
-| 文档 / runbook | 是 | 否 | 本轮仅更新 RTM。 | Swagger / ReDoc、限流熔断和外部对接 runbook 后续补齐。 |
+| 用户故事 | 是 | 是 | [user-stories-h3-contract.md](domain/user-stories-h3-contract.md) 的 US-H3-001 / US-H3-002 / US-H3-003 / US-H3-004 | 无。 |
+| RTM | 是 | 是 | 本节 + [quality-matrix.md](governance/quality-matrix.md) | 无。 |
+| 数据库 | 是 | 是 | H3 限流 / 熔断事件复用 H2 `audit_event` append-only 表；不新增 H3 业务表。 | 无。 |
+| 后端服务 | 是 | 是 | `backend/crates/api/src/resilience.rs`、`backend/crates/api/src/bin/wms_api.rs` | 无。 |
+| 公开 API | 是 | 是 | `GET /openapi.json`、`GET /api-docs`、`GET /redoc`、`GET /api/v1/resilience/status`、`GET /metrics` | 无。 |
+| OpenAPI / api-client | 是 | 是 | `shared/openapi/openapi.json`；`packages/api-client/src/schema.ts` | 无。 |
+| PC 前端 | 不适用 | 是 | H3 为后端契约和在线文档能力；文档 UI 由 Swagger UI / ReDoc runtime 页面承接。 | 无。 |
+| PDA | 是 | 是 | PDA 复用 `packages/api-client/src/schema.ts`，不重复定义类型。 | 真 PDA 离线运行证据属于 Wave 3 PDA gate，不作为 H3 契约完成条件。 |
+| E2E / 截图 | 不适用 | 是 | H3 后端路由、文档模式和审计写入由 Rust 测试覆盖。 | 无。 |
+| 治理脚本 | 是 | 是 | `scripts/governance/check_openapi_contract.py`、`scripts/governance/check_quality_matrix.py`、`scripts/governance/generate_openapi_curl_examples.py` | 无。 |
+| 文档 / runbook | 是 | 是 | [h3-api-access.md](api/h3-api-access.md)、[curl-examples.md](api/curl-examples.md)、[openapi-changelog.md](api/openapi-changelog.md) | 无。 |
 
 ## 3. 故事总 RTM
 

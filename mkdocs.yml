@@ -123,6 +123,9 @@ nav:
     - H1 菜单管理设计: h1-menu-management-design.md
     - H2 审计追踪 + 事件总线 (W1.B): domain/user-stories-h2-audit-trail.md
     - H3 跨端契约 OpenAPI (W1.C): domain/user-stories-h3-contract.md
+    - H3 API 文档与对接说明: api/h3-api-access.md
+    - H3 OpenAPI curl 示例: api/curl-examples.md
+    - H3 OpenAPI 变更日志: api/openapi-changelog.md
     - H-DOCK 月台预约管理 (W4-5 可选): domain/user-stories-h-dock-management.md
     - H-AL 告警引擎 (W1+): domain/user-stories-h-alert.md
   - 设计决策:
