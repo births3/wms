@@ -465,6 +465,11 @@ checks = ["check_component_doc_header", "check_component_no_inline_style", "chec
 tier = "T1"
 
 [[rules]]
+match = "packages/ui/src/ui/**"
+checks = ["check_dialog_overlay_pointer_events"]
+tier = "T1"
+
+[[rules]]
 match = "packages/ui/src/business/QueryPanel/**"
 checks = ["check_admin_page_query_panel"]
 tier = "T1"
