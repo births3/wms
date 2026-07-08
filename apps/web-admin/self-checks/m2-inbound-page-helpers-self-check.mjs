@@ -49,7 +49,7 @@ try {
   assert.match(pageSource, /function openCreateDialog\(\) \{[\s\S]*setCreateForm\(emptyCreateForm\);[\s\S]*setActiveDialog\("create"\);[\s\S]*\}/, "点击新建 ASN 必须重置为空表单");
   assert.match(pageSource, /onClick: openCreateDialog/, "新建 ASN 按钮必须走重置入口");
   assert.match(dialogSource, /<TextField label="ASN 号" required placeholder="例如 ASN-M2-PC-0002"/, "ASN 样例只允许作为 placeholder");
-  assert.match(dialogSource, /<TextField label="ASN 商品编码" required placeholder="例如 P-M2-002"/, "商品编码样例只允许作为 placeholder");
+  assert.match(dialogSource, /<ProductLookupField[\s\S]*placeholder="例如 P-M2-002"[\s\S]*required/, "商品编码样例只允许作为 ProductLookupField placeholder");
   assert.match(dialogSource, /<TextField label="预报数量" type="number" required placeholder="例如 60"/, "预报数量样例只允许作为 placeholder");
   assert.ok(inspectFormBlock, "M2 验收表单必须使用可复位的空初始值");
   for (const field of ["batchNo", "acceptedQty", "rejectedQty", "productionDate", "expiryDate", "qualityStatus", "traceCodes", "appearanceCheck", "packageCheck", "instructionCheck", "labelCheck", "note"]) {

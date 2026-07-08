@@ -158,10 +158,11 @@ const systemDictionaryOptionsQueryKey = [
   "options",
 ] as const;
 
-export function useMasterDataRowsQuery(viewId: MasterDataViewId) {
+export function useMasterDataRowsQuery(viewId: MasterDataViewId, enabled = true) {
   return useQuery<MasterDataRow[], ApiError>({
     queryKey: [...masterDataQueryKey, viewId],
     queryFn: () => listMasterDataRows(viewId),
+    enabled,
   });
 }
 

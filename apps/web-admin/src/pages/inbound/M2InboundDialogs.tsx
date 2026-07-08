@@ -24,7 +24,9 @@ import {
 } from "@wms/ui";
 import { Ban, CheckCircle2, ClipboardCheck, PackageCheck, Plus } from "lucide-react";
 
+import { useMasterDataRowsQuery, type MasterDataRow } from "@/features/master-data/master-data-queries";
 import type { InboundDocumentType } from "./m2-inbound-document-type";
+import { ProductLookupDialog, ProductLookupField } from "./M2InboundProductLookup";
 
 export type InboundDialog = "create" | "receive" | "reject" | "inspect" | "putaway";
 
@@ -178,8 +180,21 @@ export function M2InboundDialogs({
   submitInspect,
   submitPutaway,
 }: M2InboundDialogsProps) {
+  const productsQuery = useMasterDataRowsQuery("m1-products", activeDialog === "create");
+  const [productLookupOpen, setProductLookupOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    if (activeDialog !== "create") setProductLookupOpen(false);
+  }, [activeDialog]);
+
   if (!activeDialog) return null;
   const coldChainReceiving = isColdChainTemperatureControl(derivedTemperatureControl);
+  const productRows = productsQuery.data ?? [];
+
+  function selectCreateProduct(product: MasterDataRow) {
+    setCreateForm((value) => ({ ...value, productCode: product.code }));
+    setProductLookupOpen(false);
+  }
 
   return (
     <Dialog open onOpenChange={(open) => !open && setActiveDialog(null)}>
@@ -219,7 +234,18 @@ export function M2InboundDialogs({
             <TextField label="供应商 ID" placeholder="例如 00000000-0000-0000-0000-000000005001" value={createForm.supplierId} onChange={(supplierId) => setCreateForm((value) => ({ ...value, supplierId }))} />
             <TextField label="仓库 ID" required placeholder="例如 00000000-0000-0000-0000-000000003001" value={createForm.warehouseId} onChange={(warehouseId) => setCreateForm((value) => ({ ...value, warehouseId }))} />
             <TextField label="预计到货" type="date" placeholder="例如 2026-06-27" value={createForm.expectedArrivalDate} onChange={(expectedArrivalDate) => setCreateForm((value) => ({ ...value, expectedArrivalDate }))} />
-            <TextField label="ASN 商品编码" required placeholder="例如 P-M2-002" value={createForm.productCode} onChange={(productCode) => setCreateForm((value) => ({ ...value, productCode }))} />
+            <ProductLookupField
+              batchNo={createForm.batchNo}
+              errorMessage={productsQuery.error?.message}
+              loading={productsQuery.isFetching}
+              placeholder="例如 P-M2-002"
+              products={productRows}
+              required
+              value={createForm.productCode}
+              onChange={(productCode) => setCreateForm((value) => ({ ...value, productCode }))}
+              onOpenLookup={() => setProductLookupOpen(true)}
+              onSelect={selectCreateProduct}
+            />
             {createForm.documentType === "sales_return" && (
               <TextField label="ASN 批号" placeholder="例如 BATCH-202606" value={createForm.batchNo} onChange={(batchNo) => setCreateForm((value) => ({ ...value, batchNo }))} />
             )}
@@ -367,6 +393,16 @@ export function M2InboundDialogs({
               <SubmitButton icon={<PackageCheck className="size-4" />} label="确认上架" disabled={!hasOrder || pending} />
             </DialogFooter>
           </form>
+        )}
+        {activeDialog === "create" && (
+          <ProductLookupDialog
+            batchNo={createForm.batchNo}
+            open={productLookupOpen}
+            products={productRows}
+            query={createForm.productCode}
+            onOpenChange={setProductLookupOpen}
+            onSelect={selectCreateProduct}
+          />
         )}
       </DialogContent>
     </Dialog>
