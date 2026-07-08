@@ -42,8 +42,10 @@ interface M2InboundOrderTableProps {
   orders: ReceivingOrder[];
   exportFileBaseName: string;
   selectedId: string | null;
+  selectedRowKeys: string[];
   isPending: boolean;
   onSelectOrder: (id: string | null) => void;
+  onSelectOrderKeys: (keys: string[]) => void;
   onOpenDetail: (id: string) => void;
   onOpenDialog: (id: string, dialog: InboundDialog) => void;
   refreshAction?: DataGridRefreshAction;
@@ -60,8 +62,10 @@ export function M2InboundOrderTable({
   orders,
   exportFileBaseName,
   selectedId,
+  selectedRowKeys,
   isPending,
   onSelectOrder,
+  onSelectOrderKeys,
   onOpenDetail,
   onOpenDialog,
   refreshAction,
@@ -212,8 +216,8 @@ export function M2InboundOrderTable({
       rowKey={(row) => row.id}
       selectedKey={selectedId ?? undefined}
       onRowClick={(row) => onSelectOrder(row.id)}
-      selectedRowKeys={selectedId ? [selectedId] : []}
-      onSelectedRowKeysChange={(keys) => onSelectOrder(keys.at(-1) ?? null)}
+      selectedRowKeys={selectedRowKeys}
+      onSelectedRowKeysChange={onSelectOrderKeys}
       caption={isPending ? "加载入库单..." : undefined}
       emptyTitle="暂无入库单"
       storageKey="m2-inbound-datagrid"

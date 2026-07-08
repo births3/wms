@@ -99,6 +99,7 @@ no_proxy=localhost,127.0.0.1,::1,192.168.0.0/16
 - prompt 要求 Codex 禁止推送远端、禁止创建 Gitea PR、禁止推 main、禁止强推。
 - prompt 要求 Codex 禁止自行合并到主工作区；本地分支交付后必须写清本地合并前置条件和 codex exec 日志位置。
 - prompt 要求 Codex 先执行 proposal 中的相似 / 共性问题判断；共性成立时必须一起修共享组件、字段矩阵、规范或治理脚本，不能只修当前页面。
+- issue 提到“勾选 / 选中 / 全选 / 第一个”时，prompt 要求 Codex 先追踪共享控件事件与页面状态所有者（如 `selectedRowKeys`、`selectedId`、自动首选 effect），不能只按“按钮”做泛 grep。
 - issue-agent 本地分支只有一个合并 owner：主代理。watcher 只启动执行和回写状态，不做本地合并。
 - 主代理合并 closed issue 分支前，必须先处理主工作区脏区：已有脏区按主题 review、验证、提交；主工作区干净后再合入 issue 分支。禁止把 issue diff 混入已有脏区提交。
 - 本地分支交付不等于 issue 完成。issue 评论只能写“已交付本地分支 / 等待主代理本地 review 合并 / 阻塞”，禁止在主工作区未验证和未收口前写“已完成”。

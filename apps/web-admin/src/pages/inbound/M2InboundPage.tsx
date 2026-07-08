@@ -43,6 +43,7 @@ import {
   detailStageFromMode,
   filterOrders,
   inboundPageMeta,
+  nextM2InboundSelectedId,
   productTemperatureAttribute,
   splitCodes,
   temperatureControlFromProductAttribute,
@@ -150,6 +151,8 @@ const m2InboundCoreQueryFieldKeys = ["keyword", "ownerKeyword", "statusFilter"];
 export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
   const ordersQuery = useReceivingOrdersQuery();
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  const [selectedRowKeys, setSelectedRowKeys] = React.useState<string[]>([]);
+  const [selectionClearedByUser, setSelectionClearedByUser] = React.useState(false);
   const defaultQuery = React.useMemo(
     () => defaultM2InboundQueryValue(mode, currentOwner),
     [mode, currentOwner.ownerCode, currentOwner.ownerId],
@@ -234,15 +237,24 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
   );
 
   React.useEffect(() => {
-    if (selectedId && orders.some((order) => order.id === selectedId)) return;
-    setSelectedId(orders[0]?.id ?? null);
-  }, [orders, selectedId]);
+    const orderIds = orders.map((order) => order.id);
+    const nextSelectedId = nextM2InboundSelectedId(selectedId, orderIds, selectionClearedByUser);
+    if (nextSelectedId !== selectedId) setSelectedId(nextSelectedId);
+    setSelectedRowKeys((current) => {
+      if (selectionClearedByUser) return current.length === 0 ? current : [];
+      const validKeys = current.filter((key) => orderIds.includes(key));
+      if (validKeys.length > 0) return sameStringArray(validKeys, current) ? current : validKeys;
+      const nextKeys = nextSelectedId ? [nextSelectedId] : [];
+      return sameStringArray(nextKeys, current) ? current : nextKeys;
+    });
+  }, [orders, selectedId, selectionClearedByUser]);
 
   React.useEffect(() => {
     const next = defaultM2InboundQueryValue(mode, currentOwner);
     setDraftQuery(next);
     setAppliedQuery(next);
     setLastEvent(null);
+    setSelectionClearedByUser(false);
   }, [mode, currentOwner.ownerCode, currentOwner.ownerId]);
 
   const selectedFromList = ordersQuery.data?.find((order) => order.id === selectedId) ?? null;
@@ -306,17 +318,31 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
   }
 
   function openRowDetail(id: string) {
-    setSelectedId(id);
+    selectOrder(id);
     setDetailOpen(true);
   }
 
   function openRowDialog(id: string, dialog: InboundDialog) {
-    setSelectedId(id);
+    selectOrder(id);
     if (dialog === "inspect") {
       setInspectForm(emptyInspectForm);
       setSignForm(emptySignForm);
     }
     setActiveDialog(dialog);
+  }
+
+  function selectOrder(id: string | null) {
+    setSelectionClearedByUser(id === null);
+    setSelectedId(id);
+    setSelectedRowKeys(id ? [id] : []);
+  }
+
+  function selectOrderKeys(keys: string[]) {
+    const visibleOrderIds = new Set(orders.map((order) => order.id));
+    const clearedVisibleSelection = keys.length === 0 && selectedRowKeys.some((key) => visibleOrderIds.has(key));
+    setSelectionClearedByUser(clearedVisibleSelection);
+    setSelectedRowKeys(keys);
+    setSelectedId(keys.at(-1) ?? null);
   }
 
   function openCreateDialog() {
@@ -348,7 +374,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
       ],
     };
     const created = await createMutation.mutateAsync(request);
-    setSelectedId(created.id);
+    selectOrder(created.id);
     setActiveDialog(null);
     setLastEvent(`${created.receipt_no} 已创建`);
   }
@@ -468,12 +494,15 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
           onValueChange={(next) => setDraftQuery(normalizeM2InboundQueryValue(next, defaultQuery))}
           onQuery={() => {
             setAppliedQuery(normalizeM2InboundQueryValue(draftQuery, defaultQuery));
+            setSelectionClearedByUser(false);
             void refreshInbound("入库列表已查询");
           }}
           onReset={() => {
             const next = defaultM2InboundQueryValue(mode, currentOwner);
             setDraftQuery(next);
             setAppliedQuery(next);
+            setSelectionClearedByUser(false);
+            setSelectedRowKeys([]);
             setSelectedId(null);
           }}
         />
@@ -490,8 +519,10 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
           orders={orders}
           exportFileBaseName={pageMeta.title}
           selectedId={selectedId}
+          selectedRowKeys={selectedRowKeys}
           isPending={ordersQuery.isPending}
-          onSelectOrder={setSelectedId}
+          onSelectOrder={selectOrder}
+          onSelectOrderKeys={selectOrderKeys}
           onOpenDetail={openRowDetail}
           onOpenDialog={openRowDialog}
           refreshAction={tableRefreshAction}
@@ -502,12 +533,16 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
             const next = normalizeM2InboundQueryValue(queryValueFromUnknown(queryState), defaultQuery);
             setDraftQuery(next);
             setAppliedQuery(next);
+            setSelectionClearedByUser(false);
+            setSelectedRowKeys([]);
             setSelectedId(null);
           }}
           onClearQueryState={() => {
             const next = defaultM2InboundQueryValue(mode, currentOwner);
             setDraftQuery(next);
             setAppliedQuery(next);
+            setSelectionClearedByUser(false);
+            setSelectedRowKeys([]);
             setSelectedId(null);
           }}
         />
@@ -549,6 +584,10 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
         />
     </section>
   );
+}
+
+function sameStringArray(left: string[], right: string[]) {
+  return left.length === right.length && left.every((item, index) => item === right[index]);
 }
 
 function defaultM2InboundQueryValue(

@@ -11,7 +11,7 @@ const server = await createServer({
 });
 
 try {
-  const { filterOrders, ownerLabel } = await server.ssrLoadModule("/src/pages/inbound/m2-inbound-page-helpers.ts");
+  const { filterOrders, nextM2InboundSelectedId, ownerLabel } = await server.ssrLoadModule("/src/pages/inbound/m2-inbound-page-helpers.ts");
   const { createAsnBatchNo } = await server.ssrLoadModule("/src/pages/inbound/m2-inbound-document-type.ts");
 
   const ownerA = "00000000-0000-0000-0000-000000000001";
@@ -34,8 +34,13 @@ try {
   );
   assert.equal(createAsnBatchNo("purchase_inbound", "BATCH-001"), null);
   assert.equal(createAsnBatchNo("sales_return", "BATCH-001"), "BATCH-001");
+  assert.equal(nextM2InboundSelectedId(null, ["a", "b"], false), "a");
+  assert.equal(nextM2InboundSelectedId(null, ["a", "b"], true), null);
+  assert.equal(nextM2InboundSelectedId("b", ["a", "b"], true), "b");
+  assert.equal(nextM2InboundSelectedId("missing", ["a"], false), "a");
 
   const pageSource = readFileSync(fileURLToPath(new URL("../src/pages/inbound/M2InboundPage.tsx", import.meta.url)), "utf8");
+  const orderTableSource = readFileSync(fileURLToPath(new URL("../src/pages/inbound/M2InboundOrderTable.tsx", import.meta.url)), "utf8");
   const dialogSource = readFileSync(fileURLToPath(new URL("../src/pages/inbound/M2InboundDialogs.tsx", import.meta.url)), "utf8");
   const createFormBlock = /const emptyCreateForm: CreateFormState = \{([\s\S]*?)\};/.exec(pageSource)?.[1] ?? "";
   const inspectFormBlock = /const emptyInspectForm: InspectFormState = \{([\s\S]*?)\};/.exec(pageSource)?.[1] ?? "";
@@ -48,6 +53,8 @@ try {
   assert.doesNotMatch(createFormBlock, /ASN-M2-PC-0002|P-M2-002|2026-02-01|2028-02-01|"60"/, "新建 ASN 样例值不能作为表单 value");
   assert.match(pageSource, /function openCreateDialog\(\) \{[\s\S]*setCreateForm\(emptyCreateForm\);[\s\S]*setActiveDialog\("create"\);[\s\S]*\}/, "点击新建 ASN 必须重置为空表单");
   assert.match(pageSource, /onClick: openCreateDialog/, "新建 ASN 按钮必须走重置入口");
+  assert.match(pageSource, /const \[selectedRowKeys, setSelectedRowKeys\] = React\.useState<string\[\]>\(\[\]\);/, "M2 DataGrid 必须保留多选 keys，表头全选再取消才能清空");
+  assert.doesNotMatch(orderTableSource, /onSelectedRowKeysChange=\{\(keys\) => onSelectOrder\(keys\.at\(-1\) \?\? null\)\}/, "M2 表格不能把全选结果压成最后一条");
   assert.match(dialogSource, /<TextField label="ASN 号" required placeholder="例如 ASN-M2-PC-0002"/, "ASN 样例只允许作为 placeholder");
   assert.match(dialogSource, /<ProductLookupField[\s\S]*placeholder="例如 P-M2-002"[\s\S]*required/, "商品编码样例只允许作为 ProductLookupField placeholder");
   assert.match(dialogSource, /<TextField label="预报数量" type="number" required placeholder="例如 60"/, "预报数量样例只允许作为 placeholder");

@@ -96,6 +96,16 @@ export function detailStageFromMode(mode: M2InboundMode): InboundDetailStage {
   return map[mode];
 }
 
+export function nextM2InboundSelectedId(
+  selectedId: string | null,
+  orderIds: readonly string[],
+  userClearedSelection: boolean,
+) {
+  if (selectedId && orderIds.includes(selectedId)) return selectedId;
+  if (userClearedSelection) return null;
+  return orderIds[0] ?? null;
+}
+
 export function inboundPageMeta(mode: M2InboundMode) {
   const meta: Record<M2InboundMode, { title: string; subtitle: string }> = {
     receiving: {
