@@ -12,6 +12,9 @@ const server = await createServer({
 try {
   const { productSourceLabel, masterDataActionLabels, productTableClassName, masterDataColumns } =
     await server.ssrLoadModule("/src/pages/master-data/m1-product-page-model.ts");
+  const { baseMasterDataColumns } = await server.ssrLoadModule(
+    "/src/pages/master-data/M1MasterDataColumns.tsx",
+  );
   const { productColumns } = await server.ssrLoadModule("/src/pages/master-data/ProductEditTable.tsx");
   const { productRow, supplierRow, customerRow } = await server.ssrLoadModule(
     "/src/features/master-data/master-data-queries.ts",
@@ -73,6 +76,15 @@ try {
   assert.equal(row.productFields.unitVolumeCm3, "360");
   assert.match(row.searchText, /10 件\/中包/);
   assert.match(row.searchText, /180/);
+
+  const productBaseColumns = masterDataColumns("m1-products", baseMasterDataColumns, []);
+  assert.equal(productBaseColumns.find((column) => column.key === "primary")?.header, "规格");
+  assert.equal(productBaseColumns.find((column) => column.key === "secondary")?.header, "批准文号");
+  assert.equal(productBaseColumns.find((column) => column.key === "extra")?.header, "储存条件");
+  const businessPartnerBaseColumns = masterDataColumns("m1-business-partners", baseMasterDataColumns, []);
+  assert.equal(businessPartnerBaseColumns.find((column) => column.key === "primary")?.header, "关键字段");
+  assert.equal(businessPartnerBaseColumns.find((column) => column.key === "secondary")?.header, "扩展字段");
+  assert.equal(businessPartnerBaseColumns.find((column) => column.key === "extra")?.header, "运行字段");
 
   const sourceColumn = masterDataColumns("m1-products", [], []).find(
     (column) => column.key === "source",

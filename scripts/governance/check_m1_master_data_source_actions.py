@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""check_m1_master_data_source_actions.py — M1 档案来源列与客商新建/导入入口检查
+"""check_m1_master_data_source_actions.py — M1 档案来源列、商品字段列头与客商入口检查
 
 类别：6. 前端治理
 Tier：T1（< 10s，纯静态扫描）
 输入：apps/web-admin M1 基础档案页面、列模型、查询层、dev mock
 输出：人类可读 + --json
 退出码：
-  0  商品、客商来源列与供应商/客户新建导入入口存在
+  0  商品字段列头、商品/客商来源列与供应商/客户新建导入入口存在
   1  存在缺口
   2  脚本自身错误
 """
@@ -59,6 +59,10 @@ TOKEN_SPECS = (
     TokenSpec(MODEL_TS, "新建客户", "客户档案缺少新建入口标签"),
     TokenSpec(MODEL_TS, "导入供应商", "供应商档案缺少导入入口标签"),
     TokenSpec(MODEL_TS, "导入客户", "客户档案缺少导入入口标签"),
+    TokenSpec(MODEL_TS, "productCoreColumns", "商品档案 DataGrid 缺少商品字段列头覆盖"),
+    TokenSpec(MODEL_TS, 'header: "规格"', "商品档案关键字段列头未显示为规格"),
+    TokenSpec(MODEL_TS, 'header: "批准文号"', "商品档案扩展字段列头未显示为批准文号"),
+    TokenSpec(MODEL_TS, 'header: "储存条件"', "商品档案运行字段列头未显示为储存条件"),
     TokenSpec(APP_TSX, '"m1-business-partners"', "左侧菜单缺少 M1 客商档案入口"),
     TokenSpec(APP_TSX, "M1 客商档案", "左侧菜单缺少客商档案标题"),
     TokenSpec(QUERY_TS, "middlePackage", "商品行模型缺少中包装映射"),
@@ -171,11 +175,11 @@ def main(argv: list[str] | None = None) -> int:
         for file_name in payload["files"]:
             print(f"  · 检查文件: {file_name}")
         if issues:
-            print(f"  ✘ {len(issues)} 处 M1 来源入口缺口:")
+            print(f"  ✘ {len(issues)} 处 M1 商品字段 / 来源入口缺口:")
             for issue in issues:
                 print(f"    - {issue.file}: {issue.message}")
         else:
-            print("  ✓ M1 商品、客商来源列与供应商/客户新建导入入口已登记")
+            print("  ✓ M1 商品字段列头、商品/客商来源列与供应商/客户新建导入入口已登记")
 
     return 0 if not issues else 1
 
