@@ -437,9 +437,9 @@ id = "US-H3-003"
 title = "API 限流与熔断"
 module = "H3"
 story_file = "docs/domain/user-stories-h3-contract.md"
-types = ["api_change"]
+types = ["api_change", "runtime_guard", "config_rule", "audit_compliance"]
 frontend_pages = []
-api_paths = ["GET /api/v1/resilience/status"]
+api_paths = ["GET /api/v1/resilience/status", "GET /metrics"]
 
 [stories.dimensions]
 requirement = "verified"
@@ -457,20 +457,20 @@ governance = "verified"
 
 [stories.not_applicable_reasons]
 frontend = "H3 限流与熔断是后端运行时平台能力，不新增 PC 管理页面。"
-database = "当前切片使用进程内令牌桶、熔断状态和计数器，不新增业务表。"
+database = "H3 不新增业务表；限流/熔断审计复用 H2 audit_event append-only 表。"
 
 [stories.tests]
-required_layers = ["L2", "L9"]
-covered_layers = ["L2", "L9"]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
 
 [[stories]]
 id = "US-H3-004"
 title = "API 文档可访问性"
 module = "H3"
 story_file = "docs/domain/user-stories-h3-contract.md"
-types = ["api_change"]
+types = ["read_only", "api_change", "config_rule"]
 frontend_pages = []
-api_paths = ["GET /openapi.json", "GET /api-docs"]
+api_paths = ["GET /openapi.json", "GET /api-docs", "GET /redoc"]
 
 [stories.dimensions]
 requirement = "verified"
@@ -488,11 +488,11 @@ governance = "verified"
 
 [stories.not_applicable_reasons]
 database = "API 文档访问不新增业务表。"
-audit = "API 文档访问由网关或 Web 服务器访问日志记录，不写业务审计表。"
+audit = "Spec 变更通过 Git 与 OpenAPI changelog 追踪；文档访问日志由 Web 服务器或网关记录，不写业务审计表。"
 
 [stories.tests]
-required_layers = ["L2", "L9"]
-covered_layers = ["L2", "L9"]
+required_layers = ["L1", "L2", "L3", "L4", "L8", "L9"]
+covered_layers = ["L1", "L2", "L3", "L4", "L8", "L9"]
 
 [[stories]]
 id = "US-H9-001"

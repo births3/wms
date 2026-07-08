@@ -22,6 +22,23 @@ def test_quality_matrix_derives_test_layers_from_story_types():
     ]
 
 
+def test_quality_matrix_runtime_guard_requires_resilience_layers():
+    """运行时保护故事不能降级成只有 L2/L9 的 API 契约检查。"""
+    from check_quality_matrix import derive_required_layers
+
+    assert derive_required_layers(["api_change", "runtime_guard", "audit_compliance"]) == [
+        "L1",
+        "L2",
+        "L4",
+        "L5",
+        "L7",
+        "L8",
+        "L9",
+        "L10",
+        "L11",
+    ]
+
+
 def test_quality_matrix_rejects_non_strict_dimension_status():
     """矩阵维度状态只能是 verified 或 not_applicable。"""
     from check_quality_matrix import check_story, Issue

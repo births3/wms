@@ -72,6 +72,7 @@ STORY_TYPE_LAYERS = {
     "config_rule": {"L1", "L2", "L3", "L4", "L8", "L9"},
     "audit_compliance": {"L5", "L8", "L10", "L11"},
     "integration": {"L2", "L3", "L4", "L9", "L10"},
+    "runtime_guard": {"L1", "L2", "L4", "L5", "L7", "L8", "L9", "L10", "L11"},
 }
 
 
