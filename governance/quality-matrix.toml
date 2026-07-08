@@ -402,6 +402,99 @@ required_layers = ["L2", "L9"]
 covered_layers = ["L2", "L9"]
 
 [[stories]]
+id = "US-H3-002"
+title = "前端 TS 类型生成"
+module = "H3"
+story_file = "docs/domain/user-stories-h3-contract.md"
+types = ["api_change"]
+frontend_pages = []
+api_paths = []
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "not_applicable"
+security = "verified"
+audit = "not_applicable"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.not_applicable_reasons]
+database = "TS 类型生成只刷新 shared/openapi/openapi.json 与 packages/api-client/src/schema.ts，不新增业务表。"
+audit = "类型生成是构建期产物，通过 Git diff 和 openapi-check 追踪，不写业务审计表。"
+
+[stories.tests]
+required_layers = ["L2", "L9"]
+covered_layers = ["L2", "L9"]
+
+[[stories]]
+id = "US-H3-003"
+title = "API 限流与熔断"
+module = "H3"
+story_file = "docs/domain/user-stories-h3-contract.md"
+types = ["api_change"]
+frontend_pages = []
+api_paths = ["GET /api/v1/resilience/status"]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "not_applicable"
+api = "verified"
+backend = "verified"
+database = "not_applicable"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.not_applicable_reasons]
+frontend = "H3 限流与熔断是后端运行时平台能力，不新增 PC 管理页面。"
+database = "当前切片使用进程内令牌桶、熔断状态和计数器，不新增业务表。"
+
+[stories.tests]
+required_layers = ["L2", "L9"]
+covered_layers = ["L2", "L9"]
+
+[[stories]]
+id = "US-H3-004"
+title = "API 文档可访问性"
+module = "H3"
+story_file = "docs/domain/user-stories-h3-contract.md"
+types = ["api_change"]
+frontend_pages = []
+api_paths = ["GET /openapi.json", "GET /api-docs"]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "not_applicable"
+security = "verified"
+audit = "not_applicable"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.not_applicable_reasons]
+database = "API 文档访问不新增业务表。"
+audit = "API 文档访问由网关或 Web 服务器访问日志记录，不写业务审计表。"
+
+[stories.tests]
+required_layers = ["L2", "L9"]
+covered_layers = ["L2", "L9"]
+
+[[stories]]
 id = "US-H9-001"
 title = "打印模板类型字典"
 module = "H9"
