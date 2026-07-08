@@ -2,11 +2,11 @@ use std::{env, error::Error, io, net::SocketAddr, path::PathBuf, sync::Arc};
 
 use axum::{
     extract::{Query, State},
-    http::StatusCode,
+    http::{header, HeaderMap, StatusCode},
     middleware::from_fn_with_state,
     response::{Html, IntoResponse, Response},
     routing::get,
-    Json, Router,
+    Extension, Json, Router,
 };
 use chrono::{DateTime, TimeZone, Utc};
 use serde::Deserialize;
@@ -49,6 +49,7 @@ const FEATURE_FLAGS_FILE_ENV: &str = "WMS_FEATURE_FLAGS_FILE";
 const DEFAULT_BIND_ADDR: &str = "0.0.0.0:8080";
 const DEFAULT_DB_MAX_CONNECTIONS: u32 = 32;
 const DEFAULT_FEATURE_FLAGS_FILE: &str = "deploy/feature_flags.toml";
+const API_DOCS_MODE_ENV: &str = "WMS_API_DOCS_MODE";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -188,6 +189,30 @@ struct AuditQueryState {
     pool: PgPool,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ApiDocsMode {
+    Development,
+    Production,
+}
+
+impl ApiDocsMode {
+    fn from_env() -> Self {
+        match env::var(API_DOCS_MODE_ENV)
+            .unwrap_or_else(|_| "development".to_string())
+            .trim()
+            .to_ascii_lowercase()
+            .as_str()
+        {
+            "production" => Self::Production,
+            _ => Self::Development,
+        }
+    }
+
+    fn requires_internal_ip(self) -> bool {
+        matches!(self, Self::Production)
+    }
+}
+
 fn app(
     config_center_state: ConfigCenterAppState,
     auth_state: AuthAppState,
@@ -203,7 +228,8 @@ fn app(
     let print_template_state = PrintTemplateAppState::with_postgres(audit_query_state.pool.clone());
     let admin_menu_state = AdminMenuAppState::with_postgres(audit_query_state.pool.clone());
     let h2_lifecycle_state = H2LifecycleAppState::with_postgres(audit_query_state.pool.clone());
-    let resilience_state = ResilienceState::from_env();
+    let resilience_state =
+        ResilienceState::from_env().with_audit_pool(audit_query_state.pool.clone());
 
     Router::new()
         .route("/healthz", get(healthz))
@@ -211,9 +237,11 @@ fn app(
         .route("/api/v1/healthz", get(healthz))
         .route("/openapi.json", get(openapi_json))
         .route("/api-docs", get(api_docs))
+        .route("/redoc", get(redoc_docs))
         .merge(
             Router::new()
                 .route("/api/v1/resilience/status", get(resilience_status))
+                .route("/metrics", get(metrics))
                 .with_state(resilience_state.clone()),
         )
         .merge(auth_router(auth_state))
@@ -228,6 +256,7 @@ fn app(
         .merge(wave3_router(wave3_state))
         .merge(wave4_router(wave4_state))
         .merge(wave5_router(wave5_state))
+        .layer(Extension(ApiDocsMode::from_env()))
         .layer(from_fn_with_state(resilience_state, resilience_middleware))
 }
 
@@ -243,7 +272,13 @@ async fn openapi_json() -> Json<utoipa::openapi::OpenApi> {
     Json(ApiDoc::openapi())
 }
 
-async fn api_docs() -> Html<&'static str> {
+async fn api_docs(Extension(mode): Extension<ApiDocsMode>, headers: HeaderMap) -> Response {
+    if mode == ApiDocsMode::Production {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    if !docs_internal_access_allowed(&headers, mode) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
     Html(
         r##"<!doctype html>
 <html lang="zh-CN">
@@ -259,6 +294,79 @@ async fn api_docs() -> Html<&'static str> {
 </body>
 </html>"##,
     )
+    .into_response()
+}
+
+async fn redoc_docs(Extension(mode): Extension<ApiDocsMode>, headers: HeaderMap) -> Response {
+    if !docs_internal_access_allowed(&headers, mode) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    Html(
+        r##"<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>WMS API ReDoc</title>
+</head>
+<body>
+  <redoc spec-url="/openapi.json"></redoc>
+  <script src="https://cdn.jsdelivr.net/npm/redoc@next/bundles/redoc.standalone.js"></script>
+</body>
+</html>"##,
+    )
+    .into_response()
+}
+
+async fn metrics(
+    Extension(mode): Extension<ApiDocsMode>,
+    State(state): State<ResilienceState>,
+    headers: HeaderMap,
+) -> Response {
+    if !docs_internal_access_allowed(&headers, mode) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    (
+        StatusCode::OK,
+        [(header::CONTENT_TYPE, "text/plain; version=0.0.4")],
+        state.metrics_text(),
+    )
+        .into_response()
+}
+
+fn docs_internal_access_allowed(headers: &HeaderMap, mode: ApiDocsMode) -> bool {
+    let Some(ip) = docs_request_ip(headers) else {
+        return !mode.requires_internal_ip();
+    };
+    ip_is_internal(&ip)
+}
+
+fn docs_request_ip(headers: &HeaderMap) -> Option<String> {
+    headers
+        .get("x-forwarded-for")
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.split(',').next())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .or_else(|| {
+            headers
+                .get("x-real-ip")
+                .and_then(|value| value.to_str().ok())
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+        })
+        .map(str::to_string)
+}
+
+fn ip_is_internal(ip: &str) -> bool {
+    ip.starts_with("10.")
+        || ip.starts_with("192.168.")
+        || ip.starts_with("127.")
+        || ip == "::1"
+        || ip
+            .strip_prefix("172.")
+            .and_then(|rest| rest.split('.').next())
+            .and_then(|octet| octet.parse::<u8>().ok())
+            .is_some_and(|octet| (16..=31).contains(&octet))
 }
 
 fn audit_query_router(state: AuditQueryState) -> Router {
@@ -400,10 +508,10 @@ fn format_audit_cursor(cursor: AuditEventQueryCursor) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use std::sync::{Arc, Mutex, OnceLock};
 
     use axum::{
-        body::Body,
+        body::{to_bytes, Body},
         http::{Request, StatusCode},
     };
     use tower::ServiceExt;
@@ -419,6 +527,8 @@ mod tests {
     use wms_domain::{AuditEventListResponse, CurrentUser, LoginRequest, LoginResponse};
 
     use super::*;
+
+    static ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
     struct AllowAllRevocationStore;
 
@@ -478,6 +588,14 @@ mod tests {
             Utc::now(),
         );
         encode_access_token(&claims, "test-secret").expect("token should encode")
+    }
+
+    fn with_env_lock<T>(f: impl FnOnce() -> T) -> T {
+        let _guard = ENV_LOCK
+            .get_or_init(|| Mutex::new(()))
+            .lock()
+            .expect("env lock should not be poisoned");
+        f()
     }
 
     async fn seed_auth_user(
@@ -714,16 +832,19 @@ mod tests {
     async fn h3_docs_routes_are_public() {
         let pool = sqlx::PgPool::connect_lazy("postgres://localhost/wms")
             .expect("lazy pool should not connect during docs route test");
-        let app = app(
-            config_center_state(),
-            AuthAppState::new(pool.clone()),
-            Wave3AppState::default(),
-            Wave4AppState::with_postgres(pool.clone()),
-            Wave5AppState::with_postgres(pool.clone()),
-            AuditQueryState { pool: pool.clone() },
-            MasterDataAppState::default(),
-            SystemDictionaryAppState::with_postgres(pool),
-        );
+        let app = with_env_lock(|| {
+            std::env::remove_var("WMS_API_DOCS_MODE");
+            app(
+                config_center_state(),
+                AuthAppState::new(pool.clone()),
+                Wave3AppState::default(),
+                Wave4AppState::with_postgres(pool.clone()),
+                Wave5AppState::with_postgres(pool.clone()),
+                AuditQueryState { pool: pool.clone() },
+                MasterDataAppState::default(),
+                SystemDictionaryAppState::with_postgres(pool),
+            )
+        });
 
         for uri in ["/openapi.json", "/api-docs", "/api/v1/resilience/status"] {
             let response = app
@@ -823,6 +944,548 @@ mod tests {
                 .and_then(|v| v.to_str().ok()),
             Some("open")
         );
+    }
+
+    #[tokio::test]
+    async fn h3_resilience_half_open_closes_after_recovery() {
+        async fn failing() -> StatusCode {
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+
+        let state = wms_api::resilience::ResilienceState::new_for_test(100, 100, 1, 0);
+        let failing_app =
+            Router::new()
+                .route("/dependency", get(failing))
+                .layer(from_fn_with_state(
+                    state.clone(),
+                    wms_api::resilience::resilience_middleware,
+                ));
+        let failed = failing_app
+            .oneshot(
+                Request::builder()
+                    .uri("/dependency")
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+        assert_eq!(failed.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(state.status().circuit_state, "half_open");
+
+        let recovered_app =
+            Router::new()
+                .route("/dependency", get(healthz))
+                .layer(from_fn_with_state(
+                    state.clone(),
+                    wms_api::resilience::resilience_middleware,
+                ));
+        let recovered = recovered_app
+            .oneshot(
+                Request::builder()
+                    .uri("/dependency")
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+        assert_eq!(recovered.status(), StatusCode::OK);
+        assert_eq!(state.status().circuit_state, "closed");
+    }
+
+    #[tokio::test]
+    async fn h3_resilience_limits_user_and_api_key_independently() {
+        let state =
+            wms_api::resilience::ResilienceState::new(wms_api::resilience::ResilienceConfig {
+                global_qps: 100,
+                global_burst: 100,
+                user_qps: 1,
+                user_burst: 1,
+                api_key_qps: 1,
+                api_key_burst: 1,
+                retry_after_seconds: 1,
+                circuit_failures: 10,
+                circuit_open_seconds: 30,
+            });
+        let app = Router::new()
+            .route("/limited", get(healthz))
+            .layer(from_fn_with_state(
+                state,
+                wms_api::resilience::resilience_middleware,
+            ));
+        let owner_id = Uuid::new_v4();
+        let user_one = bearer_token(owner_id);
+        let user_two = bearer_token(owner_id);
+
+        let first_user_one = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/limited")
+                    .header("authorization", format!("Bearer {user_one}"))
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+        assert_eq!(first_user_one.status(), StatusCode::OK);
+
+        let second_user_one = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/limited")
+                    .header("authorization", format!("Bearer {user_one}"))
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+        assert_eq!(second_user_one.status(), StatusCode::TOO_MANY_REQUESTS);
+
+        let first_user_two = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/limited")
+                    .header("authorization", format!("Bearer {user_two}"))
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+        assert_eq!(first_user_two.status(), StatusCode::OK);
+
+        let first_api_key = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/limited")
+                    .header("x-wms-api-key", "external-key-a")
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+        assert_eq!(first_api_key.status(), StatusCode::OK);
+
+        let second_api_key = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/limited")
+                    .header("x-wms-api-key", "external-key-a")
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+        assert_eq!(second_api_key.status(), StatusCode::TOO_MANY_REQUESTS);
+
+        let other_api_key = app
+            .oneshot(
+                Request::builder()
+                    .uri("/limited")
+                    .header("x-wms-api-key", "external-key-b")
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+        assert_eq!(other_api_key.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn h3_resilience_metrics_expose_rate_limit_and_degraded_counters() {
+        async fn failing() -> StatusCode {
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+
+        let state =
+            wms_api::resilience::ResilienceState::new(wms_api::resilience::ResilienceConfig {
+                global_qps: 1,
+                global_burst: 1,
+                user_qps: 100,
+                user_burst: 100,
+                api_key_qps: 100,
+                api_key_burst: 100,
+                retry_after_seconds: 1,
+                circuit_failures: 1,
+                circuit_open_seconds: 30,
+            });
+        let app = Router::new()
+            .route("/limited", get(healthz))
+            .route("/dependency", get(failing))
+            .route("/metrics", get(wms_api::resilience::resilience_metrics))
+            .with_state(state.clone())
+            .layer(from_fn_with_state(
+                state.clone(),
+                wms_api::resilience::resilience_middleware,
+            ));
+
+        let _ = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/limited")
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+        let limited = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/limited")
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+        assert_eq!(limited.status(), StatusCode::TOO_MANY_REQUESTS);
+
+        state.reset_rate_limit_for_test();
+        let failed = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/dependency")
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+        assert_eq!(failed.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+        let degraded = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/dependency")
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+        assert_eq!(degraded.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(
+            degraded
+                .headers()
+                .get("x-wms-degraded-response")
+                .and_then(|value| value.to_str().ok()),
+            Some("true")
+        );
+
+        let metrics = app
+            .oneshot(
+                Request::builder()
+                    .uri("/metrics")
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+        assert_eq!(metrics.status(), StatusCode::OK);
+        let body = to_bytes(metrics.into_body(), usize::MAX)
+            .await
+            .expect("metrics body should read");
+        let body = String::from_utf8(body.to_vec()).expect("metrics should be utf8");
+        assert!(body.contains("wms_h3_rate_limit_rejected_total 1"));
+        assert!(body.contains("wms_h3_circuit_opened_total 1"));
+        assert!(body.contains("wms_h3_degraded_responses_total 1"));
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn h3_resilience_rejections_write_h2_audit_for_bearer_actor(pool: PgPool) {
+        let state =
+            wms_api::resilience::ResilienceState::new(wms_api::resilience::ResilienceConfig {
+                global_qps: 1,
+                global_burst: 1,
+                user_qps: 100,
+                user_burst: 100,
+                api_key_qps: 100,
+                api_key_burst: 100,
+                retry_after_seconds: 1,
+                circuit_failures: 10,
+                circuit_open_seconds: 30,
+            })
+            .with_audit_pool(pool.clone());
+        let app = Router::new()
+            .route("/limited", get(healthz))
+            .layer(from_fn_with_state(
+                state,
+                wms_api::resilience::resilience_middleware,
+            ));
+        let owner_id = Uuid::new_v4();
+        let token = bearer_token(owner_id);
+
+        for expected in [StatusCode::OK, StatusCode::TOO_MANY_REQUESTS] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .uri("/limited")
+                        .header("authorization", format!("Bearer {token}"))
+                        .body(Body::empty())
+                        .expect("request should build"),
+                )
+                .await
+                .expect("router should respond");
+            assert_eq!(response.status(), expected);
+        }
+
+        let row: (i64, Option<String>, Option<String>) = sqlx::query_as(
+            r#"
+            SELECT COUNT(*), MIN(action), MIN(actor_name)
+              FROM audit_event
+             WHERE owner_id = $1
+               AND module = 'H3'
+               AND resource_type = 'api_resilience'
+            "#,
+        )
+        .bind(owner_id)
+        .fetch_one(&pool)
+        .await
+        .expect("audit row should query");
+        assert_eq!(row.0, 1);
+        assert_eq!(row.1.as_deref(), Some("h3.rate_limited"));
+        assert_eq!(row.2.as_deref(), Some("audit-reader"));
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn h3_resilience_rejections_write_h2_audit_for_api_key(pool: PgPool) {
+        let owner_id = Uuid::new_v4();
+        let state =
+            wms_api::resilience::ResilienceState::new(wms_api::resilience::ResilienceConfig {
+                global_qps: 100,
+                global_burst: 100,
+                user_qps: 100,
+                user_burst: 100,
+                api_key_qps: 1,
+                api_key_burst: 1,
+                retry_after_seconds: 1,
+                circuit_failures: 10,
+                circuit_open_seconds: 30,
+            })
+            .with_api_key_audit_owner_id(owner_id)
+            .with_audit_pool(pool.clone());
+        let app = Router::new()
+            .route("/limited", get(healthz))
+            .layer(from_fn_with_state(
+                state,
+                wms_api::resilience::resilience_middleware,
+            ));
+
+        for expected in [StatusCode::OK, StatusCode::TOO_MANY_REQUESTS] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .uri("/limited")
+                        .header("x-wms-api-key", "external-key-a")
+                        .body(Body::empty())
+                        .expect("request should build"),
+                )
+                .await
+                .expect("router should respond");
+            assert_eq!(response.status(), expected);
+        }
+
+        let row: (i64, Option<String>, Option<String>) = sqlx::query_as(
+            r#"
+            SELECT COUNT(*), MIN(action), MIN(actor_name)
+              FROM audit_event
+             WHERE owner_id = $1
+               AND module = 'H3'
+               AND resource_type = 'api_resilience'
+            "#,
+        )
+        .bind(owner_id)
+        .fetch_one(&pool)
+        .await
+        .expect("audit row should query");
+        assert_eq!(row.0, 1);
+        assert_eq!(row.1.as_deref(), Some("h3.rate_limited"));
+        assert!(row
+            .2
+            .as_deref()
+            .is_some_and(|actor_name| actor_name.starts_with("api-key:")));
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn h3_resilience_circuit_events_write_h2_audit(pool: PgPool) {
+        async fn failing() -> StatusCode {
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+
+        let state =
+            wms_api::resilience::ResilienceState::new(wms_api::resilience::ResilienceConfig {
+                global_qps: 100,
+                global_burst: 100,
+                user_qps: 100,
+                user_burst: 100,
+                api_key_qps: 100,
+                api_key_burst: 100,
+                retry_after_seconds: 1,
+                circuit_failures: 1,
+                circuit_open_seconds: 30,
+            })
+            .with_audit_pool(pool.clone());
+        let app = Router::new()
+            .route("/dependency", get(failing))
+            .layer(from_fn_with_state(
+                state,
+                wms_api::resilience::resilience_middleware,
+            ));
+        let owner_id = Uuid::new_v4();
+        let token = bearer_token(owner_id);
+
+        let failed = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/dependency")
+                    .header("authorization", format!("Bearer {token}"))
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+        assert_eq!(failed.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+        let degraded = app
+            .oneshot(
+                Request::builder()
+                    .uri("/dependency")
+                    .header("authorization", format!("Bearer {token}"))
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+        assert_eq!(degraded.status(), StatusCode::SERVICE_UNAVAILABLE);
+
+        let actions: Vec<String> = sqlx::query_scalar(
+            r#"
+            SELECT action
+              FROM audit_event
+             WHERE owner_id = $1
+               AND module = 'H3'
+               AND resource_type = 'api_resilience'
+             ORDER BY action
+            "#,
+        )
+        .bind(owner_id)
+        .fetch_all(&pool)
+        .await
+        .expect("audit actions should query");
+        assert_eq!(
+            actions,
+            vec![
+                "h3.circuit_degraded".to_string(),
+                "h3.circuit_opened".to_string()
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn h3_docs_routes_follow_environment_mode() {
+        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/wms")
+            .expect("lazy pool should not connect during docs mode test");
+        let app = with_env_lock(|| {
+            std::env::set_var("WMS_API_DOCS_MODE", "production");
+            let app = app(
+                config_center_state(),
+                AuthAppState::new(pool.clone()),
+                Wave3AppState::default(),
+                Wave4AppState::with_postgres(pool.clone()),
+                Wave5AppState::with_postgres(pool.clone()),
+                AuditQueryState { pool: pool.clone() },
+                MasterDataAppState::default(),
+                SystemDictionaryAppState::with_postgres(pool),
+            );
+            std::env::remove_var("WMS_API_DOCS_MODE");
+            app
+        });
+
+        let swagger = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/api-docs")
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+        assert_eq!(swagger.status(), StatusCode::NOT_FOUND);
+
+        let blocked_redoc = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/redoc")
+                    .header("x-forwarded-for", "8.8.8.8")
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+        assert_eq!(blocked_redoc.status(), StatusCode::FORBIDDEN);
+
+        let redoc_without_forwarded_ip = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/redoc")
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+        assert_eq!(redoc_without_forwarded_ip.status(), StatusCode::FORBIDDEN);
+
+        let metrics_without_forwarded_ip = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/metrics")
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+        assert_eq!(metrics_without_forwarded_ip.status(), StatusCode::FORBIDDEN);
+
+        let redoc = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/redoc")
+                    .header("x-forwarded-for", "10.0.0.8")
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+        assert_eq!(redoc.status(), StatusCode::OK);
+        let body = to_bytes(redoc.into_body(), usize::MAX)
+            .await
+            .expect("redoc body should read");
+        let body = String::from_utf8(body.to_vec()).expect("redoc should be utf8");
+        assert!(body.contains("redoc"));
+
+        let metrics = app
+            .oneshot(
+                Request::builder()
+                    .uri("/metrics")
+                    .header("x-forwarded-for", "10.0.0.8")
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+        assert_eq!(metrics.status(), StatusCode::OK);
     }
 
     #[test]
