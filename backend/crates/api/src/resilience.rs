@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     env,
     sync::{Arc, Mutex},
     time::{Duration, Instant},
@@ -11,18 +12,39 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
+use chrono::Utc;
+use sha2::{Digest, Sha256};
+use sqlx::PgPool;
+use uuid::Uuid;
 use wms_domain::{ErrorResponse, ResilienceStatus};
+
+use crate::{
+    audit::{append_event, AuditDiff, AuditWriteRequest},
+    auth::{decode_auth_context, JWT_SECRET_ENV},
+};
 
 const DEFAULT_GLOBAL_QPS: u32 = 1000;
 const DEFAULT_GLOBAL_BURST: u32 = 1000;
+const DEFAULT_USER_QPS: u32 = 100;
+const DEFAULT_USER_BURST: u32 = 100;
+const DEFAULT_API_KEY_QPS: u32 = 100;
+const DEFAULT_API_KEY_BURST: u32 = 100;
 const DEFAULT_RETRY_AFTER_SECONDS: u64 = 1;
 const DEFAULT_CIRCUIT_FAILURES: u32 = 5;
 const DEFAULT_CIRCUIT_OPEN_SECONDS: u64 = 30;
+const API_KEY_HEADER: &str = "x-wms-api-key";
+const INTERNAL_SERVICE_HEADER: &str = "x-wms-internal-service";
+const API_KEY_AUDIT_OWNER_ID_ENV: &str = "WMS_H3_API_KEY_AUDIT_OWNER_ID";
+const COLD_CHAIN_OWNER_ID_ENV: &str = "WMS_M5_COLD_CHAIN_OWNER_ID";
 
 #[derive(Clone, Debug)]
 pub struct ResilienceConfig {
     pub global_qps: u32,
     pub global_burst: u32,
+    pub user_qps: u32,
+    pub user_burst: u32,
+    pub api_key_qps: u32,
+    pub api_key_burst: u32,
     pub retry_after_seconds: u64,
     pub circuit_failures: u32,
     pub circuit_open_seconds: u64,
@@ -32,16 +54,42 @@ pub struct ResilienceConfig {
 pub struct ResilienceState {
     config: ResilienceConfig,
     inner: Arc<Mutex<ResilienceInner>>,
+    audit_pool: Option<PgPool>,
+    api_key_audit_owner_id: Option<Uuid>,
 }
 
 #[derive(Debug)]
 struct ResilienceInner {
+    global: TokenBucket,
+    users: HashMap<String, TokenBucket>,
+    api_keys: HashMap<String, TokenBucket>,
+    rate_limit_rejected_total: u64,
+    circuit_open_until: Option<Instant>,
+    circuit_half_open: bool,
+    circuit_opened_total: u64,
+    degraded_responses_total: u64,
+    consecutive_failures: u32,
+}
+
+#[derive(Debug)]
+struct TokenBucket {
     tokens: f64,
     last_refill: Instant,
-    rejected_total: u64,
-    circuit_open_until: Option<Instant>,
-    circuit_opened_total: u64,
-    consecutive_failures: u32,
+}
+
+#[derive(Clone, Debug)]
+enum CallerIdentity {
+    User {
+        user_id: Uuid,
+        owner_id: Uuid,
+        actor_name: String,
+        jti: String,
+    },
+    ApiKey {
+        key_hash: String,
+    },
+    Internal,
+    Anonymous,
 }
 
 enum ResilienceRejection {
@@ -49,11 +97,27 @@ enum ResilienceRejection {
     CircuitOpen(u64),
 }
 
+enum ResilienceAuditKind {
+    RateLimited,
+    CircuitOpened,
+    CircuitDegraded,
+}
+
+struct MetricsSnapshot {
+    rate_limit_rejected_total: u64,
+    circuit_opened_total: u64,
+    degraded_responses_total: u64,
+}
+
 impl ResilienceState {
     pub fn from_env() -> Self {
         Self::new(ResilienceConfig {
             global_qps: env_u32("WMS_API_GLOBAL_QPS", DEFAULT_GLOBAL_QPS),
             global_burst: env_u32("WMS_API_GLOBAL_BURST", DEFAULT_GLOBAL_BURST),
+            user_qps: env_u32("WMS_API_USER_QPS", DEFAULT_USER_QPS),
+            user_burst: env_u32("WMS_API_USER_BURST", DEFAULT_USER_BURST),
+            api_key_qps: env_u32("WMS_API_KEY_QPS", DEFAULT_API_KEY_QPS),
+            api_key_burst: env_u32("WMS_API_KEY_BURST", DEFAULT_API_KEY_BURST),
             retry_after_seconds: u64::from(env_u32(
                 "WMS_API_RETRY_AFTER_SECONDS",
                 DEFAULT_RETRY_AFTER_SECONDS as u32,
@@ -64,6 +128,7 @@ impl ResilienceState {
                 DEFAULT_CIRCUIT_OPEN_SECONDS as u32,
             )),
         })
+        .with_optional_api_key_audit_owner_id(api_key_audit_owner_id_from_env())
     }
 
     pub fn new_for_test(
@@ -75,6 +140,10 @@ impl ResilienceState {
         Self::new(ResilienceConfig {
             global_qps,
             global_burst,
+            user_qps: DEFAULT_USER_QPS,
+            user_burst: DEFAULT_USER_BURST,
+            api_key_qps: DEFAULT_API_KEY_QPS,
+            api_key_burst: DEFAULT_API_KEY_BURST,
             retry_after_seconds: DEFAULT_RETRY_AFTER_SECONDS,
             circuit_failures,
             circuit_open_seconds,
@@ -82,80 +151,195 @@ impl ResilienceState {
     }
 
     pub fn new(config: ResilienceConfig) -> Self {
-        let burst = config.global_burst.max(1);
+        let now = Instant::now();
         Self {
-            config,
+            config: config.clone(),
             inner: Arc::new(Mutex::new(ResilienceInner {
-                tokens: f64::from(burst),
-                last_refill: Instant::now(),
-                rejected_total: 0,
+                global: TokenBucket::new(config.global_burst, now),
+                users: HashMap::new(),
+                api_keys: HashMap::new(),
+                rate_limit_rejected_total: 0,
                 circuit_open_until: None,
+                circuit_half_open: false,
                 circuit_opened_total: 0,
+                degraded_responses_total: 0,
                 consecutive_failures: 0,
             })),
+            audit_pool: None,
+            api_key_audit_owner_id: None,
         }
+    }
+
+    pub fn with_audit_pool(mut self, pool: PgPool) -> Self {
+        self.audit_pool = Some(pool);
+        self
+    }
+
+    pub fn with_api_key_audit_owner_id(mut self, owner_id: Uuid) -> Self {
+        self.api_key_audit_owner_id = Some(owner_id);
+        self
+    }
+
+    fn with_optional_api_key_audit_owner_id(mut self, owner_id: Option<Uuid>) -> Self {
+        self.api_key_audit_owner_id = owner_id;
+        self
     }
 
     pub fn status(&self) -> ResilienceStatus {
         let now = Instant::now();
         let mut inner = self.lock_inner();
-        refill(&self.config, &mut inner, now);
+        inner
+            .global
+            .refill(self.config.global_qps, self.config.global_burst, now);
+        if inner.circuit_open_until.is_some_and(|until| until <= now) {
+            inner.circuit_open_until = None;
+            inner.circuit_half_open = true;
+        }
         let open_remaining = inner
             .circuit_open_until
             .and_then(|until| until.checked_duration_since(now))
             .map(|duration| duration.as_secs())
             .unwrap_or(0);
+        let circuit_state = if open_remaining > 0 {
+            "open"
+        } else if inner.circuit_half_open {
+            "half_open"
+        } else {
+            "closed"
+        };
         ResilienceStatus {
             rate_limit_capacity: self.config.global_burst,
-            rate_limit_available: inner.tokens.floor() as u32,
-            rate_limit_rejected_total: inner.rejected_total,
-            circuit_state: if open_remaining > 0 { "open" } else { "closed" }.to_string(),
+            rate_limit_available: inner.global.tokens.floor() as u32,
+            rate_limit_rejected_total: inner.rate_limit_rejected_total,
+            circuit_state: circuit_state.to_string(),
             circuit_open_remaining_seconds: open_remaining,
             circuit_opened_total: inner.circuit_opened_total,
             consecutive_failures: inner.consecutive_failures,
         }
     }
 
-    fn check_request(&self) -> Result<(), ResilienceRejection> {
+    pub fn metrics_text(&self) -> String {
+        let metrics = self.metrics_snapshot();
+        format!(
+            "# TYPE wms_h3_rate_limit_rejected_total counter\n\
+             wms_h3_rate_limit_rejected_total {}\n\
+             # TYPE wms_h3_circuit_opened_total counter\n\
+             wms_h3_circuit_opened_total {}\n\
+             # TYPE wms_h3_degraded_responses_total counter\n\
+             wms_h3_degraded_responses_total {}\n",
+            metrics.rate_limit_rejected_total,
+            metrics.circuit_opened_total,
+            metrics.degraded_responses_total
+        )
+    }
+
+    pub fn reset_rate_limit_for_test(&self) {
         let now = Instant::now();
         let mut inner = self.lock_inner();
-        refill(&self.config, &mut inner, now);
+        inner.global = TokenBucket::new(self.config.global_burst, now);
+        inner.users.clear();
+        inner.api_keys.clear();
+    }
+
+    fn metrics_snapshot(&self) -> MetricsSnapshot {
+        let inner = self.lock_inner();
+        MetricsSnapshot {
+            rate_limit_rejected_total: inner.rate_limit_rejected_total,
+            circuit_opened_total: inner.circuit_opened_total,
+            degraded_responses_total: inner.degraded_responses_total,
+        }
+    }
+
+    fn check_request(&self, caller: &CallerIdentity) -> Result<(), ResilienceRejection> {
+        let now = Instant::now();
+        let mut inner = self.lock_inner();
 
         if let Some(until) = inner.circuit_open_until {
             if let Some(remaining) = until.checked_duration_since(now) {
-                inner.rejected_total += 1;
+                inner.degraded_responses_total += 1;
                 return Err(ResilienceRejection::CircuitOpen(remaining.as_secs().max(1)));
             }
             inner.circuit_open_until = None;
-            inner.consecutive_failures = 0;
+            inner.circuit_half_open = true;
         }
 
-        if inner.tokens >= 1.0 {
-            inner.tokens -= 1.0;
-            return Ok(());
+        if !inner
+            .global
+            .consume(self.config.global_qps, self.config.global_burst, now)
+        {
+            inner.rate_limit_rejected_total += 1;
+            return Err(ResilienceRejection::RateLimited(
+                self.config.retry_after_seconds.max(1),
+            ));
         }
 
-        inner.rejected_total += 1;
-        Err(ResilienceRejection::RateLimited(
-            self.config.retry_after_seconds.max(1),
-        ))
+        match caller {
+            CallerIdentity::User { user_id, .. } => {
+                let bucket = inner
+                    .users
+                    .entry(user_id.to_string())
+                    .or_insert_with(|| TokenBucket::new(self.config.user_burst, now));
+                let allowed = bucket.consume(self.config.user_qps, self.config.user_burst, now);
+                if !allowed {
+                    inner.global.refund(self.config.global_burst);
+                    inner.rate_limit_rejected_total += 1;
+                    return Err(ResilienceRejection::RateLimited(
+                        self.config.retry_after_seconds.max(1),
+                    ));
+                }
+            }
+            CallerIdentity::ApiKey { key_hash } => {
+                let bucket = inner
+                    .api_keys
+                    .entry(key_hash.clone())
+                    .or_insert_with(|| TokenBucket::new(self.config.api_key_burst, now));
+                let allowed =
+                    bucket.consume(self.config.api_key_qps, self.config.api_key_burst, now);
+                if !allowed {
+                    inner.global.refund(self.config.global_burst);
+                    inner.rate_limit_rejected_total += 1;
+                    return Err(ResilienceRejection::RateLimited(
+                        self.config.retry_after_seconds.max(1),
+                    ));
+                }
+            }
+            CallerIdentity::Internal | CallerIdentity::Anonymous => {}
+        }
+
+        Ok(())
     }
 
-    fn record_response(&self, status: StatusCode) {
+    fn record_response(&self, status: StatusCode) -> Option<ResilienceAuditKind> {
         let mut inner = self.lock_inner();
         if status.is_server_error() {
             inner.consecutive_failures += 1;
-            if inner.consecutive_failures >= self.config.circuit_failures.max(1) {
+            if inner.circuit_half_open
+                || inner.consecutive_failures >= self.config.circuit_failures.max(1)
+            {
                 inner.circuit_open_until =
                     Some(Instant::now() + Duration::from_secs(self.config.circuit_open_seconds));
+                inner.circuit_half_open = false;
                 inner.circuit_opened_total += 1;
                 inner.consecutive_failures = 0;
+                return Some(ResilienceAuditKind::CircuitOpened);
             }
-            return;
+            return None;
         }
         if status.is_success() {
             inner.consecutive_failures = 0;
+            inner.circuit_half_open = false;
         }
+        None
+    }
+
+    async fn write_audit(&self, caller: &CallerIdentity, path: &str, kind: ResilienceAuditKind) {
+        let Some(pool) = &self.audit_pool else {
+            return;
+        };
+        let Some(req) = audit_request(caller, path, kind, self.api_key_audit_owner_id) else {
+            return;
+        };
+        let _ = append_event(pool, &req).await;
     }
 
     fn lock_inner(&self) -> std::sync::MutexGuard<'_, ResilienceInner> {
@@ -163,6 +347,39 @@ impl ResilienceState {
             Ok(guard) => guard,
             Err(poisoned) => poisoned.into_inner(),
         }
+    }
+}
+
+impl TokenBucket {
+    fn new(burst: u32, now: Instant) -> Self {
+        Self {
+            tokens: f64::from(burst.max(1)),
+            last_refill: now,
+        }
+    }
+
+    fn consume(&mut self, qps: u32, burst: u32, now: Instant) -> bool {
+        self.refill(qps, burst, now);
+        if self.tokens >= 1.0 {
+            self.tokens -= 1.0;
+            return true;
+        }
+        false
+    }
+
+    fn refund(&mut self, burst: u32) {
+        let capacity = f64::from(burst.max(1));
+        self.tokens = (self.tokens + 1.0).min(capacity);
+    }
+
+    fn refill(&mut self, qps: u32, burst: u32, now: Instant) {
+        let elapsed = now.duration_since(self.last_refill).as_secs_f64();
+        if elapsed <= 0.0 {
+            return;
+        }
+        let capacity = f64::from(burst.max(1));
+        self.tokens = (self.tokens + elapsed * f64::from(qps.max(1))).min(capacity);
+        self.last_refill = now;
     }
 }
 
@@ -175,12 +392,22 @@ pub async fn resilience_middleware(
         return next.run(request).await;
     }
 
-    if let Err(rejection) = state.check_request() {
-        return rejection_response(rejection);
+    let path = request.uri().path().to_string();
+    let caller = caller_identity(&request);
+    if let Err(rejection) = state.check_request(&caller) {
+        let kind = match rejection {
+            ResilienceRejection::RateLimited(_) => ResilienceAuditKind::RateLimited,
+            ResilienceRejection::CircuitOpen(_) => ResilienceAuditKind::CircuitDegraded,
+        };
+        let response = rejection_response(rejection);
+        state.write_audit(&caller, &path, kind).await;
+        return response;
     }
 
     let response = next.run(request).await;
-    state.record_response(response.status());
+    if let Some(kind) = state.record_response(response.status()) {
+        state.write_audit(&caller, &path, kind).await;
+    }
     response
 }
 
@@ -188,31 +415,136 @@ pub async fn resilience_status(State(state): State<ResilienceState>) -> Json<Res
     Json(state.status())
 }
 
-fn refill(config: &ResilienceConfig, inner: &mut ResilienceInner, now: Instant) {
-    let elapsed = now.duration_since(inner.last_refill).as_secs_f64();
-    if elapsed <= 0.0 {
-        return;
+pub async fn resilience_metrics(State(state): State<ResilienceState>) -> Response {
+    (
+        StatusCode::OK,
+        [(header::CONTENT_TYPE, "text/plain; version=0.0.4")],
+        state.metrics_text(),
+    )
+        .into_response()
+}
+
+fn caller_identity(request: &Request) -> CallerIdentity {
+    let headers = request.headers();
+    if headers
+        .get(INTERNAL_SERVICE_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| matches!(value, "1" | "true" | "TRUE"))
+    {
+        return CallerIdentity::Internal;
     }
-    let capacity = f64::from(config.global_burst.max(1));
-    inner.tokens = (inner.tokens + elapsed * f64::from(config.global_qps.max(1))).min(capacity);
-    inner.last_refill = now;
+
+    if let Some(value) = headers
+        .get(API_KEY_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        return CallerIdentity::ApiKey {
+            key_hash: short_sha256(value),
+        };
+    }
+
+    let Some(token) = headers
+        .get(header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))
+    else {
+        return CallerIdentity::Anonymous;
+    };
+    let Ok(secret) = env::var(JWT_SECRET_ENV) else {
+        return CallerIdentity::Anonymous;
+    };
+    match decode_auth_context(token, &secret) {
+        Ok(ctx) => CallerIdentity::User {
+            user_id: ctx.user_id,
+            owner_id: ctx.owner_id,
+            actor_name: ctx.actor_name,
+            jti: ctx.jti,
+        },
+        Err(_) => CallerIdentity::Anonymous,
+    }
+}
+
+fn audit_request(
+    caller: &CallerIdentity,
+    path: &str,
+    kind: ResilienceAuditKind,
+    api_key_audit_owner_id: Option<Uuid>,
+) -> Option<AuditWriteRequest> {
+    let (actor_id, actor_name, owner_id, jti) = match caller {
+        CallerIdentity::User {
+            user_id,
+            owner_id,
+            actor_name,
+            jti,
+        } => (*user_id, actor_name.clone(), *owner_id, jti.clone()),
+        CallerIdentity::ApiKey { key_hash } => (
+            Uuid::nil(),
+            format!("api-key:{key_hash}"),
+            api_key_audit_owner_id?,
+            format!("api-key:{key_hash}"),
+        ),
+        CallerIdentity::Internal | CallerIdentity::Anonymous => return None,
+    };
+    let (action, event) = match kind {
+        ResilienceAuditKind::RateLimited => ("h3.rate_limited", "rate_limited"),
+        ResilienceAuditKind::CircuitOpened => ("h3.circuit_opened", "circuit_opened"),
+        ResilienceAuditKind::CircuitDegraded => ("h3.circuit_degraded", "circuit_degraded"),
+    };
+    Some(AuditWriteRequest {
+        occurred_at: Utc::now(),
+        actor_id,
+        actor_name,
+        owner_id,
+        jti,
+        action: action.to_string(),
+        module: "H3".to_string(),
+        resource_type: "api_resilience".to_string(),
+        resource_id: path.to_string(),
+        diff: Some(AuditDiff::compute(
+            serde_json::json!({}),
+            serde_json::json!({
+                "event": event,
+                "path": path,
+            }),
+        )),
+        request_id: None,
+        ip: None,
+        user_agent: None,
+    })
+}
+
+fn api_key_audit_owner_id_from_env() -> Option<Uuid> {
+    env::var(API_KEY_AUDIT_OWNER_ID_ENV)
+        .or_else(|_| env::var(COLD_CHAIN_OWNER_ID_ENV))
+        .ok()
+        .and_then(|value| value.parse().ok())
+}
+
+fn short_sha256(value: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(value.as_bytes());
+    hex::encode(hasher.finalize()).chars().take(16).collect()
 }
 
 fn rejection_response(rejection: ResilienceRejection) -> Response {
-    let (status, code, message, retry_after, circuit_state) = match rejection {
+    let (status, code, message, retry_after, circuit_state, degraded) = match rejection {
         ResilienceRejection::RateLimited(seconds) => (
             StatusCode::TOO_MANY_REQUESTS,
             "H3_RATE_LIMITED",
             "API 请求超过限流阈值",
             Some(seconds),
             None,
+            false,
         ),
         ResilienceRejection::CircuitOpen(seconds) => (
             StatusCode::SERVICE_UNAVAILABLE,
             "H3_CIRCUIT_OPEN",
-            "API 熔断保护已打开",
+            "API 熔断保护已打开，返回降级响应",
             Some(seconds),
             Some("open"),
+            true,
         ),
     };
     let mut response = (
@@ -221,7 +553,10 @@ fn rejection_response(rejection: ResilienceRejection) -> Response {
             code: code.to_string(),
             message: message.to_string(),
             severity: "error".to_string(),
-            details: serde_json::json!({}),
+            details: serde_json::json!({
+                "degraded": degraded,
+                "data_may_be_stale": degraded,
+            }),
             trace_id: "unavailable".to_string(),
             retry_hint: retry_after.map(|seconds| format!("{seconds}s 后重试")),
         }),
@@ -237,6 +572,11 @@ fn rejection_response(rejection: ResilienceRejection) -> Response {
             .headers_mut()
             .insert("x-wms-circuit-state", HeaderValue::from_static(state));
     }
+    if degraded {
+        response
+            .headers_mut()
+            .insert("x-wms-degraded-response", HeaderValue::from_static("true"));
+    }
     response
 }
 
@@ -248,6 +588,8 @@ fn is_exempt_path(path: &str) -> bool {
             | "/api/v1/healthz"
             | "/openapi.json"
             | "/api-docs"
+            | "/redoc"
+            | "/metrics"
             | "/api/v1/resilience/status"
     )
 }
