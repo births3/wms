@@ -38,6 +38,9 @@ try {
   const pageSource = readFileSync(fileURLToPath(new URL("../src/pages/inbound/M2InboundPage.tsx", import.meta.url)), "utf8");
   const dialogSource = readFileSync(fileURLToPath(new URL("../src/pages/inbound/M2InboundDialogs.tsx", import.meta.url)), "utf8");
   const createFormBlock = /const emptyCreateForm: CreateFormState = \{([\s\S]*?)\};/.exec(pageSource)?.[1] ?? "";
+  const inspectFormBlock = /const emptyInspectForm: InspectFormState = \{([\s\S]*?)\};/.exec(pageSource)?.[1] ?? "";
+  const signFormBlock = /const emptySignForm: SignFormState = \{([\s\S]*?)\};/.exec(pageSource)?.[1] ?? "";
+  const submitInspectBlock = /async function submitInspect\([\s\S]*?\n  \}/.exec(pageSource)?.[0] ?? "";
   assert.ok(createFormBlock, "M2 新建 ASN 表单必须使用可复位的空初始值");
   for (const field of ["receiptNo", "documentType", "supplierId", "warehouseId", "expectedArrivalDate", "productCode", "batchNo", "expectedQty", "productionDate", "expiryDate"]) {
     assert.match(createFormBlock, new RegExp(`${field}: ""`), `新建 ASN 默认值必须为空: ${field}`);
@@ -48,6 +51,17 @@ try {
   assert.match(dialogSource, /<TextField label="ASN 号" required placeholder="例如 ASN-M2-PC-0002"/, "ASN 样例只允许作为 placeholder");
   assert.match(dialogSource, /<TextField label="ASN 商品编码" required placeholder="例如 P-M2-002"/, "商品编码样例只允许作为 placeholder");
   assert.match(dialogSource, /<TextField label="预报数量" type="number" required placeholder="例如 60"/, "预报数量样例只允许作为 placeholder");
+  assert.ok(inspectFormBlock, "M2 验收表单必须使用可复位的空初始值");
+  for (const field of ["batchNo", "acceptedQty", "rejectedQty", "productionDate", "expiryDate", "qualityStatus", "traceCodes", "appearanceCheck", "packageCheck", "instructionCheck", "labelCheck", "note"]) {
+    assert.match(inspectFormBlock, new RegExp(`${field}: ""`), `验收默认值必须为空: ${field}`);
+  }
+  assert.ok(signFormBlock, "M2 验收签字表单必须使用可复位的空初始值");
+  for (const field of ["firstSignerId", "secondSignerId", "strategyNote", "note"]) {
+    assert.match(signFormBlock, new RegExp(`${field}: ""`), `验收签字默认值必须为空: ${field}`);
+  }
+  assert.match(dialogSource, /<TextField label="验收批号" required placeholder=\{inspectExamples\.batchNo\}/, "验收批号背景值只允许作为 placeholder");
+  assert.match(dialogSource, /<TextField label="通过数量" type="number" required placeholder=\{inspectExamples\.acceptedQty\}/, "通过数量背景值只允许作为 placeholder");
+  assert.doesNotMatch(submitInspectBlock, /line\?\.batch_no \|\| "BATCH-202606"|inspectForm\.traceCodes \|\| "TC-M2-0001"/, "验收提交不能用背景值或样例值兜底");
 } finally {
   await server.close();
 }
