@@ -19,6 +19,7 @@ pub mod document_numbering_handlers;
 mod document_numbering_repository;
 pub mod feature_flags;
 pub mod h2_lifecycle;
+pub mod h2_lifecycle_handlers;
 pub mod inbound;
 pub mod inventory;
 pub mod master_data;
@@ -59,36 +60,40 @@ use crate::print_template::{
 use utoipa::OpenApi;
 use wms_domain::{
     AdminMenuButtonPermission, AdminMenuNode, AdminMenuTreeResponse, AdminMenuVersion, AuditActor,
-    AuditEvent, AuditEventListResponse, BatchCreateLocationsRequest, BatchEnableAdminMenuRequest,
-    BillingAccount, BillingChargeCalculation, BillingContract, BillingRule, BillingStatement,
-    CalculateBillingChargesRequest, ChangeInventoryStatusRequest, ColdChainDevice,
-    CompletePickTaskRequest, ConfigEntry, ConfirmBillingStatementRequest,
-    ConfirmContainerRecoveryRequest, ContainerRecovery, CreateAdminMenuNodeRequest,
-    CreateBillingAccountRequest, CreateBillingContractRequest, CreateBillingRuleRequest,
-    CreateColdChainDeviceRequest, CreateCrossdockPlanRequest, CreateCustomerRequest,
-    CreateLocationRequest, CreateOutboundOrderLineRequest, CreateOutboundOrderRequest,
-    CreateOutboundWaveRequest, CreatePackJobRequest, CreatePackingStationRequest,
-    CreateProductRequest, CreateReceivingOrderRequest, CreateRetailReplenishmentSuggestionRequest,
-    CreateSpecialDrugCategoryRequest, CreateSupplierRequest, CreateWarehouseRequest, CrossdockPlan,
-    CurrentUser, Customer, CustomerListResponse, DisableSystemDictionaryItemRequest,
-    DisposeTemperatureExcursionRequest, DocumentNumberAllocation,
-    DocumentNumberAllocationListResponse, DriverTask, DriverTaskListResponse, ErrorResponse,
-    ExecuteMappingRequest, ExecuteMappingResponse, FeatureFlagArchiveRequest,
-    FeatureFlagArchiveResult, FeatureFlagBatchImportRequest, FeatureFlagBatchImportResult,
-    FeatureFlagConfig, FeatureFlagExportResponse, FeatureFlagMigrationResult,
-    FeatureFlagReconcileReport, FeatureFlagSourceSwitchRequest, FeatureFlagSourceSwitchResponse,
-    GenerateBillingStatementRequest, GspLedgerReport, GspLedgerRow, HealthzResponse,
-    IngestTemperatureExcursionRequest, IngestTemperatureReadingRequest,
-    IngestTransitTemperatureRequest, InspectReceivingOrderRequest, InspectionSignatureRecord,
-    InventoryBatch, InventoryBatchListResponse, InventoryMovement, Location, LocationListResponse,
-    LoginRequest, LoginResponse, MappingDictionary, MappingQueueItem, MappingRule,
-    MappingTraceResponse, OutboundOrder, OutboundOrderLine, OutboundOrderListResponse,
-    OutboundWave, PackJob, PackingStation, PageMeta, PrintWaybillRequest, Product,
-    ProductListResponse, PublishAdminMenuRequest, PutawayInventoryRequest, PutawayRecord,
-    PutawayRequest, ReceiveReceivingOrderRequest, ReceiveTmsDispatchRequest,
-    ReceivingInspectionRecord, ReceivingOrder, ReceivingOrderLine, ReceivingOrderListResponse,
-    ReceivingOrderReceipt, RejectReceivingOrderRequest, ReportQueryRequest, ReportQueryResponse,
-    ReportRow, RetailReplenishmentSuggestion, ReviewOutboundOrderRequest, RollbackAdminMenuRequest,
+    AuditArchivePartitionState, AuditArchivePartitionStateListResponse, AuditArchiveRunRequest,
+    AuditArchiveRunResponse, AuditEvent, AuditEventListResponse, BatchCreateLocationsRequest,
+    BatchEnableAdminMenuRequest, BillingAccount, BillingChargeCalculation, BillingContract,
+    BillingRule, BillingStatement, BusinessArchiveJob, BusinessRetentionPolicy,
+    BusinessRetentionPolicyListResponse, CalculateBillingChargesRequest,
+    ChangeInventoryStatusRequest, ColdChainDevice, CompletePickTaskRequest, ConfigEntry,
+    ConfirmBillingStatementRequest, ConfirmContainerRecoveryRequest, ContainerRecovery,
+    CreateAdminMenuNodeRequest, CreateBillingAccountRequest, CreateBillingContractRequest,
+    CreateBillingRuleRequest, CreateColdChainDeviceRequest, CreateCrossdockPlanRequest,
+    CreateCustomerRequest, CreateLocationRequest, CreateOutboundOrderLineRequest,
+    CreateOutboundOrderRequest, CreateOutboundWaveRequest, CreatePackJobRequest,
+    CreatePackingStationRequest, CreateProductRequest, CreateReceivingOrderRequest,
+    CreateRetailReplenishmentSuggestionRequest, CreateSpecialDrugCategoryRequest,
+    CreateSupplierRequest, CreateWarehouseRequest, CrossdockPlan, CurrentUser, Customer,
+    CustomerListResponse, DisableSystemDictionaryItemRequest, DisposeTemperatureExcursionRequest,
+    DocumentNumberAllocation, DocumentNumberAllocationListResponse, DriverTask,
+    DriverTaskListResponse, ErrorResponse, EventDelivery, EventDeliveryListResponse,
+    EventDeliveryNackRequest, ExecuteMappingRequest, ExecuteMappingResponse,
+    FeatureFlagArchiveRequest, FeatureFlagArchiveResult, FeatureFlagBatchImportRequest,
+    FeatureFlagBatchImportResult, FeatureFlagConfig, FeatureFlagExportResponse,
+    FeatureFlagMigrationResult, FeatureFlagReconcileReport, FeatureFlagSourceSwitchRequest,
+    FeatureFlagSourceSwitchResponse, GenerateBillingStatementRequest, GspLedgerReport,
+    GspLedgerRow, HealthzResponse, IngestTemperatureExcursionRequest,
+    IngestTemperatureReadingRequest, IngestTransitTemperatureRequest, InspectReceivingOrderRequest,
+    InspectionSignatureRecord, InventoryBatch, InventoryBatchListResponse, InventoryMovement,
+    Location, LocationListResponse, LoginRequest, LoginResponse, MappingDictionary,
+    MappingQueueItem, MappingRule, MappingTraceResponse, OutboundOrder, OutboundOrderLine,
+    OutboundOrderListResponse, OutboundWave, PackJob, PackingStation, PageMeta,
+    PlanBusinessArchiveJobRequest, PrintWaybillRequest, Product, ProductListResponse,
+    PublishAdminMenuRequest, PutawayInventoryRequest, PutawayRecord, PutawayRequest,
+    ReceiveReceivingOrderRequest, ReceiveTmsDispatchRequest, ReceivingInspectionRecord,
+    ReceivingOrder, ReceivingOrderLine, ReceivingOrderListResponse, ReceivingOrderReceipt,
+    RejectReceivingOrderRequest, ReportQueryRequest, ReportQueryResponse, ReportRow,
+    RetailReplenishmentSuggestion, ReviewOutboundOrderRequest, RollbackAdminMenuRequest,
     ShipOutboundOrderRequest, SignInspectionRequest, SpecialDrugCategory,
     SpecialDrugCategoryListResponse, StoreDashboardResponse, Supplier, SupplierListResponse,
     SystemDictionaryCategory, SystemDictionaryImpactPreview, SystemDictionaryImpactReference,
@@ -186,6 +191,112 @@ fn rollback_admin_menu() {}
 )]
 #[allow(dead_code)]
 fn list_audit_events() {}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/audit/archive/partitions",
+    tag = "audit",
+    responses(
+        (status = 200, description = "审计归档分区状态", body = AuditArchivePartitionStateListResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+fn list_audit_archive_partitions() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/audit/archive/runs",
+    tag = "audit",
+    params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")),
+    request_body = AuditArchiveRunRequest,
+    responses(
+        (status = 200, description = "执行审计归档周期", body = AuditArchiveRunResponse),
+        (status = 400, description = "缺少幂等键", body = ErrorResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+        (status = 422, description = "归档参数非法", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+fn run_audit_archive() {}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/event-bus/deliveries/pending",
+    tag = "event-bus",
+    params(("limit" = Option<i64>, Query, description = "最多返回条数")),
+    responses(
+        (status = 200, description = "待投递事件列表", body = EventDeliveryListResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+fn list_pending_event_deliveries() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/event-bus/deliveries/{delivery_id}/ack",
+    tag = "event-bus",
+    params(("delivery_id" = uuid::Uuid, Path, description = "事件投递 ID")),
+    responses(
+        (status = 200, description = "确认事件投递成功", body = EventDelivery),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+        (status = 404, description = "事件投递不存在", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+fn ack_event_delivery() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/event-bus/deliveries/{delivery_id}/nack",
+    tag = "event-bus",
+    params(("delivery_id" = uuid::Uuid, Path, description = "事件投递 ID")),
+    request_body = EventDeliveryNackRequest,
+    responses(
+        (status = 200, description = "记录事件投递失败", body = EventDelivery),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+        (status = 404, description = "事件投递不存在", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+fn nack_event_delivery() {}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/business-retention/policies",
+    tag = "business-retention",
+    responses(
+        (status = 200, description = "业务数据留存策略列表", body = BusinessRetentionPolicyListResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+fn list_business_retention_policies() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/business-retention/jobs",
+    tag = "business-retention",
+    params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")),
+    request_body = PlanBusinessArchiveJobRequest,
+    responses(
+        (status = 200, description = "生成业务数据归档计划", body = BusinessArchiveJob),
+        (status = 400, description = "缺少幂等键", body = ErrorResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+        (status = 404, description = "留存策略不存在", body = ErrorResponse),
+        (status = 422, description = "归档计划参数非法", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+fn plan_business_retention_archive_job() {}
 
 #[utoipa::path(
     get,
@@ -880,6 +991,13 @@ fn confirm_container_recovery() {}
         publish_admin_menu,
         rollback_admin_menu,
         list_audit_events,
+        list_audit_archive_partitions,
+        run_audit_archive,
+        list_pending_event_deliveries,
+        ack_event_delivery,
+        nack_event_delivery,
+        list_business_retention_policies,
+        plan_business_retention_archive_job,
         list_products,
         create_product,
         get_product,
@@ -984,6 +1102,10 @@ fn confirm_container_recovery() {}
         AdminMenuTreeResponse,
         AdminMenuVersion,
         AuditActor,
+        AuditArchivePartitionState,
+        AuditArchivePartitionStateListResponse,
+        AuditArchiveRunRequest,
+        AuditArchiveRunResponse,
         AuditEvent,
         AuditEventListResponse,
         BatchCreateLocationsRequest,
@@ -993,6 +1115,9 @@ fn confirm_container_recovery() {}
         BillingContract,
         BillingRule,
         BillingStatement,
+        BusinessArchiveJob,
+        BusinessRetentionPolicy,
+        BusinessRetentionPolicyListResponse,
         CalculateBillingChargesRequest,
         ChangeInventoryStatusRequest,
         ColdChainDevice,
@@ -1032,6 +1157,9 @@ fn confirm_container_recovery() {}
         DocumentNumberAllocationListResponse,
         DisposeTemperatureExcursionRequest,
         ErrorResponse,
+        EventDelivery,
+        EventDeliveryListResponse,
+        EventDeliveryNackRequest,
         ExecuteMappingRequest,
         ExecuteMappingResponse,
         FeatureFlagArchiveRequest,
@@ -1071,6 +1199,7 @@ fn confirm_container_recovery() {}
         PackJob,
         PackingStation,
         PageMeta,
+        PlanBusinessArchiveJobRequest,
         PrintWaybillRequest,
         PrintFieldDefinition,
         PrintFieldDefinitionListResponse,
@@ -1152,6 +1281,8 @@ fn confirm_container_recovery() {}
         (name = "auth", description = "鉴权与会话"),
         (name = "admin-menu", description = "H1 管理端三层菜单"),
         (name = "audit", description = "审计追踪"),
+        (name = "event-bus", description = "H2 事件总线运行接口"),
+        (name = "business-retention", description = "H2 业务数据生命周期归档"),
         (name = "master-data", description = "M1 基础档案"),
         (name = "system-dictionary", description = "US-M1-011 系统字典中心"),
         (name = "code-generator", description = "M-CG 单据号生成"),
@@ -1201,6 +1332,13 @@ mod tests {
             "/api/v1/admin/menus/publish",
             "/api/v1/admin/menus/rollback",
             "/api/v1/audit/events",
+            "/api/v1/audit/archive/partitions",
+            "/api/v1/audit/archive/runs",
+            "/api/v1/event-bus/deliveries/pending",
+            "/api/v1/event-bus/deliveries/{delivery_id}/ack",
+            "/api/v1/event-bus/deliveries/{delivery_id}/nack",
+            "/api/v1/business-retention/policies",
+            "/api/v1/business-retention/jobs",
             "/api/v1/master-data/products",
             "/api/v1/master-data/products/{id}",
             "/api/v1/master-data/suppliers",
@@ -1286,6 +1424,17 @@ mod tests {
             "\"LoginResponse\"",
             "\"CurrentUser\"",
             "\"AuditEvent\"",
+            "\"AuditArchivePartitionState\"",
+            "\"AuditArchivePartitionStateListResponse\"",
+            "\"AuditArchiveRunRequest\"",
+            "\"AuditArchiveRunResponse\"",
+            "\"EventDelivery\"",
+            "\"EventDeliveryListResponse\"",
+            "\"EventDeliveryNackRequest\"",
+            "\"BusinessRetentionPolicy\"",
+            "\"BusinessRetentionPolicyListResponse\"",
+            "\"PlanBusinessArchiveJobRequest\"",
+            "\"BusinessArchiveJob\"",
             "\"BatchCreateLocationsRequest\"",
             "\"Product\"",
             "\"Supplier\"",

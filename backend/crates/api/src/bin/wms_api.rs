@@ -26,6 +26,7 @@ use wms_api::{
     config_center::{config_center_router, ConfigCenterAppState},
     document_numbering_handlers::{document_numbering_router, DocumentNumberingAppState},
     feature_flags::FeatureFlagRegistry,
+    h2_lifecycle_handlers::{h2_lifecycle_router, H2LifecycleAppState},
     master_data_handlers::{master_data_router, MasterDataAppState},
     print_template_handlers::{print_template_router, PrintTemplateAppState},
     system_dictionary_handlers::{system_dictionary_router, SystemDictionaryAppState},
@@ -197,6 +198,7 @@ fn app(
         DocumentNumberingAppState::with_postgres(audit_query_state.pool.clone());
     let print_template_state = PrintTemplateAppState::with_postgres(audit_query_state.pool.clone());
     let admin_menu_state = AdminMenuAppState::with_postgres(audit_query_state.pool.clone());
+    let h2_lifecycle_state = H2LifecycleAppState::with_postgres(audit_query_state.pool.clone());
 
     Router::new()
         .route("/healthz", get(healthz))
@@ -204,6 +206,7 @@ fn app(
         .route("/api/v1/healthz", get(healthz))
         .merge(auth_router(auth_state))
         .merge(audit_query_router(audit_query_state))
+        .merge(h2_lifecycle_router(h2_lifecycle_state))
         .merge(config_center_router(config_center_state))
         .merge(master_data_router(master_data_state))
         .merge(admin_menu_router(admin_menu_state))
@@ -557,6 +560,44 @@ mod tests {
             .expect("router should respond");
 
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn h2_lifecycle_routes_require_auth_context() {
+        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/wms")
+            .expect("lazy pool should not connect during auth rejection test");
+        let app = app(
+            config_center_state(),
+            AuthAppState::new(pool.clone()),
+            Wave3AppState::default(),
+            Wave4AppState::with_postgres(pool.clone()),
+            Wave5AppState::with_postgres(pool.clone()),
+            AuditQueryState { pool: pool.clone() },
+            MasterDataAppState::default(),
+            SystemDictionaryAppState::with_postgres(pool),
+        )
+        .layer(auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(
+            AllowAllRevocationStore,
+        ))));
+
+        for uri in [
+            "/api/v1/audit/archive/partitions",
+            "/api/v1/event-bus/deliveries/pending",
+            "/api/v1/business-retention/policies",
+        ] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .uri(uri)
+                        .body(Body::empty())
+                        .expect("request should build"),
+                )
+                .await
+                .expect("router should respond");
+
+            assert_eq!(response.status(), StatusCode::UNAUTHORIZED, "{uri}");
+        }
     }
 
     #[tokio::test]
