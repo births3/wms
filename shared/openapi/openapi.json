@@ -9,6 +9,21 @@
     "version": "0.0.5-wave-5-value-added"
   },
   "paths": {
+    "/api-docs": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "operationId": "api_docs",
+        "responses": {
+          "200": {
+            "description": "API 文档浏览页"
+          }
+        },
+        "security": [],
+        "x-auth-exempt-reason": "API 文档浏览页只读取公开契约；生产访问边界由网关或内网 ACL 控制。"
+      }
+    },
     "/api/v1/admin/menus/draft": {
       "get": {
         "tags": [
@@ -5752,6 +5767,28 @@
         "x-idempotency-exempt-reason": "报表查询为只读语义，使用 POST 承载复杂查询条件，不要求 Idempotency-Key。"
       }
     },
+    "/api/v1/resilience/status": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "operationId": "get_resilience_status",
+        "responses": {
+          "200": {
+            "description": "H3 API 韧性保护状态",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResilienceStatus"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "x-auth-exempt-reason": "H3 韧性状态供运行时探测；生产访问边界由网关或内网 ACL 控制。"
+      }
+    },
     "/api/v1/retail/crossdock-plans": {
       "post": {
         "tags": [
@@ -6628,6 +6665,21 @@
           }
         },
         "x-idempotency-exempt-reason": "追溯码上报首批契约未接入 L11 幂等，本轮仅声明豁免并保留后续补齐路径。"
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "operationId": "openapi_json",
+        "responses": {
+          "200": {
+            "description": "OpenAPI JSON 文档"
+          }
+        },
+        "security": [],
+        "x-auth-exempt-reason": "OpenAPI JSON 是公开契约产物；生产访问边界由网关或内网 ACL 控制。"
       }
     }
   },
@@ -11325,6 +11377,61 @@
             "type": "object",
             "description": "自由结构 JSON 对象。",
             "additionalProperties": true
+          }
+        }
+      },
+      "ResilienceStatus": {
+        "type": "object",
+        "description": "H3 API 韧性保护状态。",
+        "required": [
+          "rate_limit_capacity",
+          "rate_limit_available",
+          "rate_limit_rejected_total",
+          "circuit_state",
+          "circuit_open_remaining_seconds",
+          "circuit_opened_total",
+          "consecutive_failures"
+        ],
+        "properties": {
+          "circuit_open_remaining_seconds": {
+            "type": "integer",
+            "format": "int64",
+            "description": "熔断剩余秒数。",
+            "minimum": 0
+          },
+          "circuit_opened_total": {
+            "type": "integer",
+            "format": "int64",
+            "description": "熔断打开总次数。",
+            "minimum": 0
+          },
+          "circuit_state": {
+            "type": "string",
+            "description": "熔断状态：closed / open。"
+          },
+          "consecutive_failures": {
+            "type": "integer",
+            "format": "int32",
+            "description": "当前连续失败次数。",
+            "minimum": 0
+          },
+          "rate_limit_available": {
+            "type": "integer",
+            "format": "int32",
+            "description": "当前可用令牌数。",
+            "minimum": 0
+          },
+          "rate_limit_capacity": {
+            "type": "integer",
+            "format": "int32",
+            "description": "全局令牌桶容量。",
+            "minimum": 0
+          },
+          "rate_limit_rejected_total": {
+            "type": "integer",
+            "format": "int64",
+            "description": "限流或熔断拒绝总次数。",
+            "minimum": 0
           }
         }
       },

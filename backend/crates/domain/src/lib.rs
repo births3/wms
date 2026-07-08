@@ -49,6 +49,25 @@ pub struct HealthzResponse {
     pub generated_at: DateTime<Utc>,
 }
 
+/// H3 API 韧性保护状态。
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ResilienceStatus {
+    /// 全局令牌桶容量。
+    pub rate_limit_capacity: u32,
+    /// 当前可用令牌数。
+    pub rate_limit_available: u32,
+    /// 限流或熔断拒绝总次数。
+    pub rate_limit_rejected_total: u64,
+    /// 熔断状态：closed / open。
+    pub circuit_state: String,
+    /// 熔断剩余秒数。
+    pub circuit_open_remaining_seconds: u64,
+    /// 熔断打开总次数。
+    pub circuit_opened_total: u64,
+    /// 当前连续失败次数。
+    pub consecutive_failures: u32,
+}
+
 /// 登录请求。
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct LoginRequest {

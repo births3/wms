@@ -3,7 +3,8 @@ use std::{env, error::Error, io, net::SocketAddr, path::PathBuf, sync::Arc};
 use axum::{
     extract::{Query, State},
     http::StatusCode,
-    response::{IntoResponse, Response},
+    middleware::from_fn_with_state,
+    response::{Html, IntoResponse, Response},
     routing::get,
     Json, Router,
 };
@@ -11,7 +12,9 @@ use chrono::{DateTime, TimeZone, Utc};
 use serde::Deserialize;
 use sqlx::{postgres::PgPoolOptions, PgPool};
 use tokio::net::TcpListener;
+use utoipa::OpenApi;
 use uuid::Uuid;
+use wms_api::ApiDoc;
 use wms_api::{
     admin_menu_handlers::{admin_menu_router, AdminMenuAppState},
     audit::{
@@ -29,6 +32,7 @@ use wms_api::{
     h2_lifecycle_handlers::{h2_lifecycle_router, H2LifecycleAppState},
     master_data_handlers::{master_data_router, MasterDataAppState},
     print_template_handlers::{print_template_router, PrintTemplateAppState},
+    resilience::{resilience_middleware, resilience_status, ResilienceState},
     system_dictionary_handlers::{system_dictionary_router, SystemDictionaryAppState},
     wave3_handlers::{wave3_router, Wave3AppState},
     wave4_handlers::{wave4_router, Wave4AppState},
@@ -199,11 +203,19 @@ fn app(
     let print_template_state = PrintTemplateAppState::with_postgres(audit_query_state.pool.clone());
     let admin_menu_state = AdminMenuAppState::with_postgres(audit_query_state.pool.clone());
     let h2_lifecycle_state = H2LifecycleAppState::with_postgres(audit_query_state.pool.clone());
+    let resilience_state = ResilienceState::from_env();
 
     Router::new()
         .route("/healthz", get(healthz))
         .route("/readyz", get(healthz))
         .route("/api/v1/healthz", get(healthz))
+        .route("/openapi.json", get(openapi_json))
+        .route("/api-docs", get(api_docs))
+        .merge(
+            Router::new()
+                .route("/api/v1/resilience/status", get(resilience_status))
+                .with_state(resilience_state.clone()),
+        )
         .merge(auth_router(auth_state))
         .merge(audit_query_router(audit_query_state))
         .merge(h2_lifecycle_router(h2_lifecycle_state))
@@ -216,6 +228,7 @@ fn app(
         .merge(wave3_router(wave3_state))
         .merge(wave4_router(wave4_state))
         .merge(wave5_router(wave5_state))
+        .layer(from_fn_with_state(resilience_state, resilience_middleware))
 }
 
 async fn healthz() -> Json<HealthzResponse> {
@@ -224,6 +237,28 @@ async fn healthz() -> Json<HealthzResponse> {
         version: env!("CARGO_PKG_VERSION").to_string(),
         generated_at: Utc::now(),
     })
+}
+
+async fn openapi_json() -> Json<utoipa::openapi::OpenApi> {
+    Json(ApiDoc::openapi())
+}
+
+async fn api_docs() -> Html<&'static str> {
+    Html(
+        r##"<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>WMS API Docs</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>window.ui = SwaggerUIBundle({ url: "/openapi.json", dom_id: "#swagger-ui" });</script>
+</body>
+</html>"##,
+    )
 }
 
 fn audit_query_router(state: AuditQueryState) -> Router {
@@ -673,6 +708,121 @@ mod tests {
             .expect("router should respond");
 
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn h3_docs_routes_are_public() {
+        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/wms")
+            .expect("lazy pool should not connect during docs route test");
+        let app = app(
+            config_center_state(),
+            AuthAppState::new(pool.clone()),
+            Wave3AppState::default(),
+            Wave4AppState::with_postgres(pool.clone()),
+            Wave5AppState::with_postgres(pool.clone()),
+            AuditQueryState { pool: pool.clone() },
+            MasterDataAppState::default(),
+            SystemDictionaryAppState::with_postgres(pool),
+        );
+
+        for uri in ["/openapi.json", "/api-docs", "/api/v1/resilience/status"] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .uri(uri)
+                        .body(Body::empty())
+                        .expect("request should build"),
+                )
+                .await
+                .expect("router should respond");
+
+            assert_eq!(response.status(), StatusCode::OK, "{uri}");
+        }
+    }
+
+    #[tokio::test]
+    async fn h3_resilience_layer_rate_limits_with_retry_after() {
+        let app = Router::new()
+            .route("/limited", get(healthz))
+            .layer(from_fn_with_state(
+                wms_api::resilience::ResilienceState::new_for_test(1, 1, 10, 30),
+                wms_api::resilience::resilience_middleware,
+            ));
+
+        let first = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/limited")
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+        assert_eq!(first.status(), StatusCode::OK);
+
+        let second = app
+            .oneshot(
+                Request::builder()
+                    .uri("/limited")
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+        assert_eq!(second.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(
+            second
+                .headers()
+                .get("retry-after")
+                .and_then(|v| v.to_str().ok()),
+            Some("1")
+        );
+    }
+
+    #[tokio::test]
+    async fn h3_resilience_layer_opens_circuit_after_failures() {
+        async fn failing() -> StatusCode {
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+
+        let app = Router::new()
+            .route("/dependency", get(failing))
+            .layer(from_fn_with_state(
+                wms_api::resilience::ResilienceState::new_for_test(100, 100, 1, 30),
+                wms_api::resilience::resilience_middleware,
+            ));
+
+        let first = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/dependency")
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+        assert_eq!(first.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+        let second = app
+            .oneshot(
+                Request::builder()
+                    .uri("/dependency")
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+        assert_eq!(second.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(
+            second
+                .headers()
+                .get("x-wms-circuit-state")
+                .and_then(|v| v.to_str().ok()),
+            Some("open")
+        );
     }
 
     #[test]

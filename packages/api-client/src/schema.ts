@@ -4,6 +4,22 @@
  */
 
 export interface paths {
+    "/api-docs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["api_docs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/menus/draft": {
         parameters: {
             query?: never;
@@ -1380,6 +1396,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/resilience/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_resilience_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/retail/crossdock-plans": {
         parameters: {
             query?: never;
@@ -1550,6 +1582,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["create_traceability_outbound_report"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/openapi.json": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["openapi_json"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3106,6 +3154,41 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** @description H3 API 韧性保护状态。 */
+        ResilienceStatus: {
+            /**
+             * Format: int64
+             * @description 熔断剩余秒数。
+             */
+            circuit_open_remaining_seconds: number;
+            /**
+             * Format: int64
+             * @description 熔断打开总次数。
+             */
+            circuit_opened_total: number;
+            /** @description 熔断状态：closed / open。 */
+            circuit_state: string;
+            /**
+             * Format: int32
+             * @description 当前连续失败次数。
+             */
+            consecutive_failures: number;
+            /**
+             * Format: int32
+             * @description 当前可用令牌数。
+             */
+            rate_limit_available: number;
+            /**
+             * Format: int32
+             * @description 全局令牌桶容量。
+             */
+            rate_limit_capacity: number;
+            /**
+             * Format: int64
+             * @description 限流或熔断拒绝总次数。
+             */
+            rate_limit_rejected_total: number;
+        };
         ResolvePrintTemplateRequest: {
             template_code?: string | null;
             template_type_code: string;
@@ -3573,6 +3656,24 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    api_docs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description API 文档浏览页 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     list_draft_admin_menu: {
         parameters: {
             query?: never;
@@ -8000,6 +8101,26 @@ export interface operations {
             };
         };
     };
+    get_resilience_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description H3 API 韧性保护状态 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResilienceStatus"];
+                };
+            };
+        };
+    };
     create_retail_crossdock_plan: {
         parameters: {
             query?: never;
@@ -8656,6 +8777,24 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
+            };
+        };
+    };
+    openapi_json: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OpenAPI JSON 文档 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

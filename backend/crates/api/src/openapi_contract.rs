@@ -169,6 +169,24 @@ impl Modify for ContractSecurityAddon {
         );
         mark_public_operation(
             openapi,
+            "/openapi.json",
+            PathItemType::Get,
+            "OpenAPI JSON 是公开契约产物；生产访问边界由网关或内网 ACL 控制。",
+        );
+        mark_public_operation(
+            openapi,
+            "/api-docs",
+            PathItemType::Get,
+            "API 文档浏览页只读取公开契约；生产访问边界由网关或内网 ACL 控制。",
+        );
+        mark_public_operation(
+            openapi,
+            "/api/v1/resilience/status",
+            PathItemType::Get,
+            "H3 韧性状态供运行时探测；生产访问边界由网关或内网 ACL 控制。",
+        );
+        mark_public_operation(
+            openapi,
             "/api/v1/auth/login",
             PathItemType::Post,
             "登录接口用于签发 JWT，调用前尚无 Bearer token。",

@@ -32,6 +32,7 @@ pub mod parameter_mapping;
 pub mod print_template;
 pub mod print_template_handlers;
 pub mod reports;
+pub mod resilience;
 pub mod retail_chain;
 pub mod system_dictionary;
 pub mod system_dictionary_handlers;
@@ -93,8 +94,8 @@ use wms_domain::{
     ReceiveReceivingOrderRequest, ReceiveTmsDispatchRequest, ReceivingInspectionRecord,
     ReceivingOrder, ReceivingOrderLine, ReceivingOrderListResponse, ReceivingOrderReceipt,
     RejectReceivingOrderRequest, ReportQueryRequest, ReportQueryResponse, ReportRow,
-    RetailReplenishmentSuggestion, ReviewOutboundOrderRequest, RollbackAdminMenuRequest,
-    ShipOutboundOrderRequest, SignInspectionRequest, SpecialDrugCategory,
+    ResilienceStatus, RetailReplenishmentSuggestion, ReviewOutboundOrderRequest,
+    RollbackAdminMenuRequest, ShipOutboundOrderRequest, SignInspectionRequest, SpecialDrugCategory,
     SpecialDrugCategoryListResponse, StoreDashboardResponse, Supplier, SupplierListResponse,
     SystemDictionaryCategory, SystemDictionaryImpactPreview, SystemDictionaryImpactReference,
     SystemDictionaryItem, SystemDictionaryItemListResponse,
@@ -118,6 +119,39 @@ use wms_domain::{
 )]
 #[allow(dead_code)]
 fn healthz() {}
+
+#[utoipa::path(
+    get,
+    path = "/openapi.json",
+    tag = "system",
+    responses(
+        (status = 200, description = "OpenAPI JSON 文档"),
+    ),
+)]
+#[allow(dead_code)]
+fn openapi_json() {}
+
+#[utoipa::path(
+    get,
+    path = "/api-docs",
+    tag = "system",
+    responses(
+        (status = 200, description = "API 文档浏览页"),
+    ),
+)]
+#[allow(dead_code)]
+fn api_docs() {}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/resilience/status",
+    tag = "system",
+    responses(
+        (status = 200, description = "H3 API 韧性保护状态", body = ResilienceStatus),
+    ),
+)]
+#[allow(dead_code)]
+fn get_resilience_status() {}
 
 #[utoipa::path(
     post,
@@ -981,6 +1015,9 @@ fn confirm_container_recovery() {}
     ),
     paths(
         healthz,
+        openapi_json,
+        api_docs,
+        get_resilience_status,
         login,
         me,
         list_published_admin_menu,
@@ -1235,6 +1272,7 @@ fn confirm_container_recovery() {}
         ReportQueryRequest,
         ReportQueryResponse,
         ReportRow,
+        ResilienceStatus,
         RetailReplenishmentSuggestion,
         ReviewOutboundOrderRequest,
         RollbackAdminMenuRequest,
@@ -1322,6 +1360,9 @@ mod tests {
 
         for required_path in [
             "/api/v1/healthz",
+            "/openapi.json",
+            "/api-docs",
+            "/api/v1/resilience/status",
             "/api/v1/auth/login",
             "/api/v1/auth/me",
             "/api/v1/admin/menus/published",
@@ -1420,6 +1461,7 @@ mod tests {
 
         for required_schema in [
             "\"ErrorResponse\"",
+            "\"ResilienceStatus\"",
             "\"LoginRequest\"",
             "\"LoginResponse\"",
             "\"CurrentUser\"",
