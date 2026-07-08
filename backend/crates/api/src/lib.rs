@@ -144,6 +144,18 @@ fn api_docs() {}
 
 #[utoipa::path(
     get,
+    path = "/redoc",
+    tag = "system",
+    responses(
+        (status = 200, description = "生产只读 API 文档 ReDoc"),
+        (status = 403, description = "非内网访问被拒绝", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+fn redoc_docs() {}
+
+#[utoipa::path(
+    get,
     path = "/api/v1/resilience/status",
     tag = "system",
     responses(
@@ -152,6 +164,17 @@ fn api_docs() {}
 )]
 #[allow(dead_code)]
 fn get_resilience_status() {}
+
+#[utoipa::path(
+    get,
+    path = "/metrics",
+    tag = "system",
+    responses(
+        (status = 200, description = "Prometheus 文本指标"),
+    ),
+)]
+#[allow(dead_code)]
+fn metrics() {}
 
 #[utoipa::path(
     post,
@@ -1017,7 +1040,9 @@ fn confirm_container_recovery() {}
         healthz,
         openapi_json,
         api_docs,
+        redoc_docs,
         get_resilience_status,
+        metrics,
         login,
         me,
         list_published_admin_menu,

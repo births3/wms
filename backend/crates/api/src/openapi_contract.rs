@@ -181,9 +181,21 @@ impl Modify for ContractSecurityAddon {
         );
         mark_public_operation(
             openapi,
+            "/redoc",
+            PathItemType::Get,
+            "生产只读 API 文档浏览页；访问边界由网关或内网 ACL 控制。",
+        );
+        mark_public_operation(
+            openapi,
             "/api/v1/resilience/status",
             PathItemType::Get,
             "H3 韧性状态供运行时探测；生产访问边界由网关或内网 ACL 控制。",
+        );
+        mark_public_operation(
+            openapi,
+            "/metrics",
+            PathItemType::Get,
+            "Prometheus 指标由内网抓取；生产访问边界由网关或内网 ACL 控制。",
         );
         mark_public_operation(
             openapi,

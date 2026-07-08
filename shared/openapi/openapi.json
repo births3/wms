@@ -6667,6 +6667,21 @@
         "x-idempotency-exempt-reason": "追溯码上报首批契约未接入 L11 幂等，本轮仅声明豁免并保留后续补齐路径。"
       }
     },
+    "/metrics": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "operationId": "metrics",
+        "responses": {
+          "200": {
+            "description": "Prometheus 文本指标"
+          }
+        },
+        "security": [],
+        "x-auth-exempt-reason": "Prometheus 指标由内网抓取；生产访问边界由网关或内网 ACL 控制。"
+      }
+    },
     "/openapi.json": {
       "get": {
         "tags": [
@@ -6680,6 +6695,31 @@
         },
         "security": [],
         "x-auth-exempt-reason": "OpenAPI JSON 是公开契约产物；生产访问边界由网关或内网 ACL 控制。"
+      }
+    },
+    "/redoc": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "operationId": "redoc_docs",
+        "responses": {
+          "200": {
+            "description": "生产只读 API 文档 ReDoc"
+          },
+          "403": {
+            "description": "非内网访问被拒绝",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "x-auth-exempt-reason": "生产只读 API 文档浏览页；访问边界由网关或内网 ACL 控制。"
       }
     }
   },
