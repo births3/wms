@@ -24,6 +24,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 APP_TSX = REPO_ROOT / "apps" / "web-admin" / "src" / "App.tsx"
 CONFIG = REPO_ROOT / "apps" / "web-admin" / "src" / "pages" / "page-query-core-fields.json"
 QUERY_PANEL = REPO_ROOT / "packages" / "ui" / "src" / "business" / "QueryPanel" / "QueryPanel.tsx"
+M2_INBOUND_TABLE = REPO_ROOT / "apps" / "web-admin" / "src" / "pages" / "inbound" / "M2InboundOrderTable.tsx"
 
 
 @dataclass(frozen=True)
@@ -195,6 +196,16 @@ def field_keys(text: str, const_name: str) -> set[str]:
     return set(re.findall(r'key:\s*["\']([^"\']+)["\']', block))
 
 
+def m2_status_scope_issues(page_text: str, table_text: str) -> list[str]:
+    """M2 三个作业页的状态筛选必须按环节分区，避免验收页暴露上架中。"""
+    issues: list[str] = []
+    if "statusFilterOptions(mode)" not in page_text:
+        issues.append("M2 QueryPanel 状态筛选必须按 mode 使用 statusFilterOptions(mode)")
+    if "statusColumnFilterOptions(mode)" not in table_text:
+        issues.append("M2 DataGrid 状态列筛选必须按 mode 使用 statusColumnFilterOptions(mode)")
+    return issues
+
+
 def scan() -> list[Issue]:
     issues: list[Issue] = []
     pages = load_config()
@@ -263,6 +274,11 @@ def scan() -> list[Issue]:
             issues.append(Issue(rel(page_path), page_id, f"QueryPanel 未使用 fields={{{field_constant}}}"))
         if f"defaultVisibleFieldKeys={{{core_constant}}}" not in text:
             issues.append(Issue(rel(page_path), page_id, f"QueryPanel 未使用 defaultVisibleFieldKeys={{{core_constant}}}"))
+
+        if page_id in {"m2-receiving", "m2-inspecting", "m2-putaway"} and M2_INBOUND_TABLE.exists():
+            table_text = M2_INBOUND_TABLE.read_text(encoding="utf-8")
+            for message in m2_status_scope_issues(text, table_text):
+                issues.append(Issue(rel(page_path), page_id, message))
 
     return issues
 

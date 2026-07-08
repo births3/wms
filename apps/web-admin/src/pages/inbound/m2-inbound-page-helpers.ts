@@ -12,6 +12,10 @@ import {
 export type M2InboundMode = "receiving" | "inspecting" | "putaway";
 export type StatusFilterValue = "receiving" | "inspecting" | "putaway" | "completed" | "closed_rejected";
 export type StatusFilter = StatusFilterValue[];
+interface StatusFilterOption {
+  value: StatusFilterValue;
+  label: string;
+}
 export interface OwnerContext {
   ownerId: string;
   ownerCode: string;
@@ -89,6 +93,37 @@ export function defaultCreatedDateRange() {
 
 export function defaultStatusFilter(mode: M2InboundMode): StatusFilter {
   return [mode];
+}
+
+export function statusFilterOptions(mode: M2InboundMode): StatusFilterOption[] {
+  const options: Record<M2InboundMode, StatusFilterOption[]> = {
+    receiving: [
+      { value: "receiving", label: "待收货/收货中" },
+      { value: "closed_rejected", label: "已关闭(拒收)" },
+    ],
+    inspecting: [{ value: "inspecting", label: "验收中" }],
+    putaway: [
+      { value: "putaway", label: "上架中" },
+      { value: "completed", label: "已完成" },
+    ],
+  };
+  return options[mode];
+}
+
+export function statusColumnFilterOptions(mode: M2InboundMode): Array<{ value: string; label: string }> {
+  const options: Record<M2InboundMode, Array<{ value: string; label: string }>> = {
+    receiving: [
+      { value: "released", label: "待收货" },
+      { value: "receiving", label: "收货中" },
+      { value: "closed_rejected", label: "已关闭(拒收)" },
+    ],
+    inspecting: [{ value: "inspecting", label: "验收中" }],
+    putaway: [
+      { value: "putaway", label: "上架中" },
+      { value: "completed", label: "已完成" },
+    ],
+  };
+  return options[mode];
 }
 
 export function detailStageFromMode(mode: M2InboundMode): InboundDetailStage {

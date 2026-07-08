@@ -11,7 +11,13 @@ const server = await createServer({
 });
 
 try {
-  const { filterOrders, nextM2InboundSelectedId, ownerLabel } = await server.ssrLoadModule("/src/pages/inbound/m2-inbound-page-helpers.ts");
+  const {
+    filterOrders,
+    nextM2InboundSelectedId,
+    ownerLabel,
+    statusColumnFilterOptions,
+    statusFilterOptions,
+  } = await server.ssrLoadModule("/src/pages/inbound/m2-inbound-page-helpers.ts");
   const { createAsnBatchNo } = await server.ssrLoadModule("/src/pages/inbound/m2-inbound-document-type.ts");
 
   const ownerA = "00000000-0000-0000-0000-000000000001";
@@ -38,6 +44,10 @@ try {
   assert.equal(nextM2InboundSelectedId(null, ["a", "b"], true), null);
   assert.equal(nextM2InboundSelectedId("b", ["a", "b"], true), "b");
   assert.equal(nextM2InboundSelectedId("missing", ["a"], false), "a");
+  assert.deepEqual(statusFilterOptions("inspecting").map((item) => item.value), ["inspecting"]);
+  assert.deepEqual(statusColumnFilterOptions("inspecting").map((item) => item.value), ["inspecting"]);
+  assert.deepEqual(statusFilterOptions("putaway").map((item) => item.value), ["putaway", "completed"]);
+  assert.ok(statusColumnFilterOptions("putaway").some((item) => item.value === "putaway"));
 
   const pageSource = readFileSync(fileURLToPath(new URL("../src/pages/inbound/M2InboundPage.tsx", import.meta.url)), "utf8");
   const orderTableSource = readFileSync(fileURLToPath(new URL("../src/pages/inbound/M2InboundOrderTable.tsx", import.meta.url)), "utf8");

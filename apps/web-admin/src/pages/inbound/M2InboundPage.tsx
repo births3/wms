@@ -46,6 +46,7 @@ import {
   nextM2InboundSelectedId,
   productTemperatureAttribute,
   splitCodes,
+  statusFilterOptions,
   temperatureControlFromProductAttribute,
   toInteger,
   totalExpectedQty,
@@ -101,54 +102,48 @@ const emptySignForm: SignFormState = {
   strategyNote: "",
   note: "",
 };
-const m2InboundQueryFields: QueryPanelField[] = [
-  {
-    key: "keyword",
-    label: "关键字",
-    type: "text",
-    placeholder: "ASN / 商品 / 批号 / 单据类型",
-  },
-  {
-    key: "ownerKeyword",
-    label: "货主",
-    type: "text",
-    placeholder: "货主编码 / ID",
-  },
-  {
-    key: "documentTypeFilter",
-    label: "单据类型",
-    type: "multiSelect",
-    options: [
-      { value: "purchase_inbound", label: "采购入库" },
-      { value: "sales_return", label: "销售退货" },
-    ],
-  },
-  {
-    key: "statusFilter",
-    label: "状态",
-    type: "multiSelect",
-    options: [
-      { value: "receiving", label: "待收货/收货中" },
-      { value: "inspecting", label: "验收中" },
-      { value: "putaway", label: "上架中" },
-      { value: "completed", label: "已完成" },
-      { value: "closed_rejected", label: "已关闭(拒收)" },
-    ],
-  },
-  {
-    key: "arrivalDate",
-    label: "预计到货",
-    type: "dateRange",
-  },
-  {
-    key: "createdAt",
-    label: "创建时间",
-    type: "dateRange",
-  },
-];
 const m2InboundCoreQueryFieldKeys = ["keyword", "ownerKeyword", "statusFilter"];
 
 export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
+  const m2InboundQueryFields: QueryPanelField[] = React.useMemo(() => [
+    {
+      key: "keyword",
+      label: "关键字",
+      type: "text",
+      placeholder: "ASN / 商品 / 批号 / 单据类型",
+    },
+    {
+      key: "ownerKeyword",
+      label: "货主",
+      type: "text",
+      placeholder: "货主编码 / ID",
+    },
+    {
+      key: "documentTypeFilter",
+      label: "单据类型",
+      type: "multiSelect",
+      options: [
+        { value: "purchase_inbound", label: "采购入库" },
+        { value: "sales_return", label: "销售退货" },
+      ],
+    },
+    {
+      key: "statusFilter",
+      label: "状态",
+      type: "multiSelect",
+      options: statusFilterOptions(mode),
+    },
+    {
+      key: "arrivalDate",
+      label: "预计到货",
+      type: "dateRange",
+    },
+    {
+      key: "createdAt",
+      label: "创建时间",
+      type: "dateRange",
+    },
+  ], [mode]);
   const ordersQuery = useReceivingOrdersQuery();
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [selectedRowKeys, setSelectedRowKeys] = React.useState<string[]>([]);
@@ -233,7 +228,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
   );
   const m2QuerySummaryItems = React.useMemo(
     () => buildQueryPanelSummaryItems(m2InboundQueryFields, appliedQuery),
-    [appliedQuery],
+    [appliedQuery, m2InboundQueryFields],
   );
 
   React.useEffect(() => {
@@ -491,9 +486,9 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
           fields={m2InboundQueryFields}
           defaultVisibleFieldKeys={m2InboundCoreQueryFieldKeys}
           value={draftQuery}
-          onValueChange={(next) => setDraftQuery(normalizeM2InboundQueryValue(next, defaultQuery))}
+          onValueChange={(next) => setDraftQuery(normalizeM2InboundQueryValue(next, defaultQuery, mode))}
           onQuery={() => {
-            setAppliedQuery(normalizeM2InboundQueryValue(draftQuery, defaultQuery));
+            setAppliedQuery(normalizeM2InboundQueryValue(draftQuery, defaultQuery, mode));
             setSelectionClearedByUser(false);
             void refreshInbound("入库列表已查询");
           }}
@@ -530,7 +525,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
           queryState={appliedQuery}
           querySummaryItems={m2QuerySummaryItems}
           onApplyQueryState={(queryState) => {
-            const next = normalizeM2InboundQueryValue(queryValueFromUnknown(queryState), defaultQuery);
+            const next = normalizeM2InboundQueryValue(queryValueFromUnknown(queryState), defaultQuery, mode);
             setDraftQuery(next);
             setAppliedQuery(next);
             setSelectionClearedByUser(false);
@@ -608,12 +603,17 @@ function defaultM2InboundQueryValue(
 function normalizeM2InboundQueryValue(
   value: QueryPanelValue,
   fallback: M2InboundQueryValue,
+  mode: M2InboundMode,
 ): M2InboundQueryValue {
+  const rawStatusFilter = queryStringArray(value.statusFilter);
+  const statusFilter = rawStatusFilter.filter((item): item is StatusFilter[number] =>
+    statusFilterOptions(mode).some((option) => option.value === item),
+  );
   return {
     keyword: queryString(value.keyword),
     ownerKeyword: queryString(value.ownerKeyword) || fallback.ownerKeyword,
     documentTypeFilter: queryStringArray(value.documentTypeFilter) as InboundDocumentTypeFilter,
-    statusFilter: queryStringArray(value.statusFilter) as StatusFilter,
+    statusFilter: rawStatusFilter.length > 0 && statusFilter.length === 0 ? fallback.statusFilter : statusFilter,
     arrivalDate: queryRange(value.arrivalDate),
     createdAt: queryRange(value.createdAt, fallback.createdAt),
   };
