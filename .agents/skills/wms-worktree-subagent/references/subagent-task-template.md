@@ -23,6 +23,7 @@
 - AGENTS.md
 - 相关 */AGENTS.override.md
 - docs/requirements-traceability-matrix.md
+- docs/frontend-coding-standards.md
 - .agents/skills/wms-worktree-subagent/references/module-slice-boundary.md
 - 任务相关用户故事、设计文档、ADR 或 runbook
 - 任务相关 PlantUML 图文；PlantUML 只作为设计辅助输入，事实源仍以用户故事、ADR、RTM、OpenAPI、数据库文档和代码为准
@@ -39,14 +40,16 @@
 9. 重编译、截图或大验证前先跑 `df -h . /tmp`；可用空间不足 2GiB 时停止重型命令。
 10. 真实 PostgreSQL / `sqlx::test` 相关 Rust 测试缺本 worktree `.env` 时，统一用 `set -a; source /home/test1/workspace/wms/.env; set +a; <命令>` 包裹；禁止打印连接串。
 11. 真实前端任务必须明确截图路径、视口、是否上传 Gitea 附件；子代理不得占用 9002。
-12. 非平凡逻辑留下最小测试。
-13. 实现与 PlantUML/docu 不一致时，能确定图文过期才同步；否则停止确认。
-14. `pnpm`、OpenAPI 生成器、数据库连接、`.env`、网络或外部服务类必需验证失败时，最多做一次明确修复/重试；第二次仍失败写“不可合并”，停止执行，禁止临时包装命令绕过、手写生成物或继续压 diff。
-15. 运行 `git diff --check`、`just gov-t1` 和任务相关测试；任一失败时写“不可合并”。
-16. 使用 wms-review-fix-commit 做 review→修复→review，但子代理默认不 `git add` / `git commit`；验证通过后保留 worktree diff 给主代理审查、合入和分组提交。仍然禁止推送或合并主分支。
-17. 提交 scope 必须使用当前治理白名单允许值；模块名不在白名单时按变更层选择既有 scope，例如后端 API / OpenAPI 用 `接口`，管理端页面用 `管理端`，治理脚本用 `治理`。
-18. 不推送，不创建远端 PR，不运行 `git clean -f`、`git reset --hard` 或删除分支。
-19. 最终报告只贴摘要、状态、验证和 `git diff --stat`；禁止粘贴大段 patch/diff。需要审查 diff 时交给主代理运行 `git diff`。
+12. 管理端页面任务必须先输出页面设计契约：页面类型、主信息载体、标准动作入口、私有动作入口、详情展示方式和禁止常驻区域；列表型页面不得常驻轨迹、审计、明细、当前处理对象、节点状态或动作表单。
+13. 管理端页面任务必须运行 `python3 scripts/governance/check_admin_page_design_contract.py --json`；失败时先修页面或写“不可合并”，不得只登记矩阵。
+14. 非平凡逻辑留下最小测试。
+15. 实现与 PlantUML/docu 不一致时，能确定图文过期才同步；否则停止确认。
+16. `pnpm`、OpenAPI 生成器、数据库连接、`.env`、网络或外部服务类必需验证失败时，最多做一次明确修复/重试；第二次仍失败写“不可合并”，停止执行，禁止临时包装命令绕过、手写生成物或继续压 diff。
+17. 运行 `git diff --check`、`just gov-t1` 和任务相关测试；任一失败时写“不可合并”。
+18. 使用 wms-review-fix-commit 做 review→修复→review，但子代理默认不 `git add` / `git commit`；验证通过后保留 worktree diff 给主代理审查、合入和分组提交。仍然禁止推送或合并主分支。
+19. 提交 scope 必须使用当前治理白名单允许值；模块名不在白名单时按变更层选择既有 scope，例如后端 API / OpenAPI 用 `接口`，管理端页面用 `管理端`，治理脚本用 `治理`。
+20. 不推送，不创建远端 PR，不运行 `git clean -f`、`git reset --hard` 或删除分支。
+21. 最终报告只贴摘要、状态、验证和 `git diff --stat`；禁止粘贴大段 patch/diff。需要审查 diff 时交给主代理运行 `git diff`。
 
 最终输出：
 - 子 worktree 路径
