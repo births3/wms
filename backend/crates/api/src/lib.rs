@@ -155,6 +155,7 @@ fn healthz() {}
     responses(
         (status = 200, description = "OpenAPI JSON 文档"),
         (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "非内网访问被拒绝", body = ErrorResponse),
     ),
 )]
 #[allow(dead_code)]

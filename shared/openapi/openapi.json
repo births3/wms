@@ -8006,6 +8006,16 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "非内网访问被拒绝",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [],

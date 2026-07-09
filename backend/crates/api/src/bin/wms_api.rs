@@ -276,8 +276,11 @@ async fn healthz() -> Json<HealthzResponse> {
     })
 }
 
-async fn openapi_json() -> Json<utoipa::openapi::OpenApi> {
-    Json(ApiDoc::openapi())
+async fn openapi_json(Extension(mode): Extension<ApiDocsMode>, headers: HeaderMap) -> Response {
+    if !docs_internal_access_allowed(&headers, mode) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    Json(ApiDoc::openapi()).into_response()
 }
 
 async fn api_docs(Extension(mode): Extension<ApiDocsMode>, headers: HeaderMap) -> Response {
@@ -1470,6 +1473,18 @@ mod tests {
             .await
             .expect("router should respond");
         assert_eq!(metrics_without_forwarded_ip.status(), StatusCode::FORBIDDEN);
+
+        let openapi_without_forwarded_ip = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/openapi.json")
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+        assert_eq!(openapi_without_forwarded_ip.status(), StatusCode::FORBIDDEN);
 
         let redoc = app
             .clone()
