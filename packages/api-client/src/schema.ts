@@ -4194,6 +4194,15 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     list_draft_admin_menu: {
@@ -8993,6 +9002,15 @@ export interface operations {
                     "application/json": components["schemas"]["ResilienceStatus"];
                 };
             };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     create_retail_crossdock_plan: {
@@ -10252,6 +10270,15 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     openapi_json: {
@@ -10270,6 +10297,15 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     redoc_docs: {
@@ -10287,6 +10323,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
             };
             /** @description 非内网访问被拒绝 */
             403: {

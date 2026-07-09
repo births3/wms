@@ -152,6 +152,11 @@ COLD_CHAIN_API_KEY_HEADER = "X-WMS-API-Key"
 AUTH_EXEMPT_OPERATIONS = {
     ("/api/v1/healthz", "get"): "健康探针不依赖登录态，用于负载均衡和运行时就绪检查。",
     ("/api/v1/auth/login", "post"): "登录接口用于签发 JWT，调用前尚无 Bearer token。",
+    ("/openapi.json", "get"): "OpenAPI JSON 是公开契约产物；生产访问边界由网关或内网 ACL 控制。",
+    ("/api-docs", "get"): "API 文档浏览页只读取公开契约；生产访问边界由网关或内网 ACL 控制。",
+    ("/redoc", "get"): "生产只读 API 文档浏览页；访问边界由网关或内网 ACL 控制。",
+    ("/api/v1/resilience/status", "get"): "H3 韧性状态供运行时探测；生产访问边界由网关或内网 ACL 控制。",
+    ("/metrics", "get"): "Prometheus 指标由内网抓取；生产访问边界由网关或内网 ACL 控制。",
 }
 COLD_CHAIN_API_KEY_OPERATIONS = {
     ("/api/v1/cold-chain/readings", "post"),

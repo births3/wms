@@ -177,6 +177,32 @@ def test_check_openapi_contract_rejects_unexpected_public_operation():
     assert any(issue.kind == "unexpected_auth_exempt_security" for issue in issues)
 
 
+def test_check_openapi_contract_allows_documentation_and_metrics_public_operations():
+    """文档、指标和韧性探测接口由内网边界保护，可显式免 Bearer。"""
+    from check_openapi_contract import AUTH_EXEMPT_REASON, check_openapi_contract
+
+    issues, _ = check_openapi_contract(_secured_contract(
+        **{
+            path: {
+                "get": {
+                    "responses": _responses_with_401(),
+                    "security": [],
+                    AUTH_EXEMPT_REASON: "内网访问边界保护。",
+                }
+            }
+            for path in [
+                "/openapi.json",
+                "/api-docs",
+                "/redoc",
+                "/api/v1/resilience/status",
+                "/metrics",
+            ]
+        }
+    ))
+
+    assert not any(issue.kind == "unexpected_auth_exempt_security" for issue in issues)
+
+
 def test_check_openapi_contract_requires_cold_chain_api_key_security():
     """外部冷链写入接口必须使用 API Key security scheme。"""
     from check_openapi_contract import check_openapi_contract

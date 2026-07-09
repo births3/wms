@@ -130,6 +130,27 @@ const IDEMPOTENCY_EXEMPTION_GROUPS: &[IdempotencyExemptionGroup] = &[
         operations: &[("/api/v1/traceability/outbound-reports", PathItemType::Post)],
         reason: "追溯码上报首批契约未接入 L11 幂等，本轮仅声明豁免并保留后续补齐路径。",
     },
+    IdempotencyExemptionGroup {
+        operations: &[
+            (
+                "/api/v1/event-bus/deliveries/{delivery_id}/ack",
+                PathItemType::Post,
+            ),
+            (
+                "/api/v1/event-bus/deliveries/{delivery_id}/nack",
+                PathItemType::Post,
+            ),
+        ],
+        reason: "事件投递确认以 delivery_id 标识单次投递状态，本轮不扩大调用侧 header 面。",
+    },
+    IdempotencyExemptionGroup {
+        operations: &[
+            ("/api/v1/print-templates/resolve", PathItemType::Post),
+            ("/api/v1/print-templates/preview", PathItemType::Post),
+        ],
+        reason:
+            "打印模板解析和预览为只读语义，使用 POST 承载复杂模板数据，不要求 Idempotency-Key。",
+    },
 ];
 
 pub(crate) struct ContractSecurityAddon;

@@ -154,6 +154,7 @@ fn healthz() {}
     tag = "system",
     responses(
         (status = 200, description = "OpenAPI JSON 文档"),
+        (status = 401, description = "未登录", body = ErrorResponse),
     ),
 )]
 #[allow(dead_code)]
@@ -165,6 +166,7 @@ fn openapi_json() {}
     tag = "system",
     responses(
         (status = 200, description = "API 文档浏览页"),
+        (status = 401, description = "未登录", body = ErrorResponse),
     ),
 )]
 #[allow(dead_code)]
@@ -176,6 +178,7 @@ fn api_docs() {}
     tag = "system",
     responses(
         (status = 200, description = "生产只读 API 文档 ReDoc"),
+        (status = 401, description = "未登录", body = ErrorResponse),
         (status = 403, description = "非内网访问被拒绝", body = ErrorResponse),
     ),
 )]
@@ -188,6 +191,7 @@ fn redoc_docs() {}
     tag = "system",
     responses(
         (status = 200, description = "H3 API 韧性保护状态", body = ResilienceStatus),
+        (status = 401, description = "未登录", body = ErrorResponse),
     ),
 )]
 #[allow(dead_code)]
@@ -199,6 +203,7 @@ fn get_resilience_status() {}
     tag = "system",
     responses(
         (status = 200, description = "Prometheus 文本指标"),
+        (status = 401, description = "未登录", body = ErrorResponse),
     ),
 )]
 #[allow(dead_code)]
@@ -1520,7 +1525,9 @@ mod tests {
             "/api/v1/healthz",
             "/openapi.json",
             "/api-docs",
+            "/redoc",
             "/api/v1/resilience/status",
+            "/metrics",
             "/api/v1/auth/login",
             "/api/v1/auth/me",
             "/api/v1/admin/menus/published",
@@ -1605,7 +1612,20 @@ mod tests {
             "/api/v1/express/carriers",
             "/api/v1/express/routing-rules",
             "/api/v1/express/waybills",
+            "/api/v1/express/waybills/{waybill_no}/cancel",
             "/api/v1/express/waybills/{waybill_no}/tracking",
+            "/api/v1/wechat-notify/configs",
+            "/api/v1/wechat-notify/settings",
+            "/api/v1/wechat-notify/send",
+            "/api/v1/wechat-notify/records",
+            "/api/v1/wechat-notify/records/{record_id}/resend",
+            "/api/v1/print-templates/field-libraries",
+            "/api/v1/print-templates/field-libraries/{version_id}/fields",
+            "/api/v1/print-templates/templates",
+            "/api/v1/print-templates/templates/{template_id}/versions",
+            "/api/v1/print-templates/resolve",
+            "/api/v1/print-templates/preview",
+            "/api/v1/print-templates/print",
             "/api/v1/retail/replenishment-suggestions",
             "/api/v1/retail/crossdock-plans",
             "/api/v1/billing/charges/calculate",

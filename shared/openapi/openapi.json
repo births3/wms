@@ -18,6 +18,16 @@
         "responses": {
           "200": {
             "description": "API 文档浏览页"
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [],
@@ -2287,7 +2297,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "事件投递确认以 delivery_id 标识单次投递状态，本轮不扩大调用侧 header 面。"
       }
     },
     "/api/v1/event-bus/deliveries/{delivery_id}/nack": {
@@ -2359,7 +2370,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "事件投递确认以 delivery_id 标识单次投递状态，本轮不扩大调用侧 header 面。"
       }
     },
     "/api/v1/express/carriers": {
@@ -5756,7 +5768,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "打印模板解析和预览为只读语义，使用 POST 承载复杂模板数据，不要求 Idempotency-Key。"
       }
     },
     "/api/v1/print-templates/print": {
@@ -5917,7 +5930,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "打印模板解析和预览为只读语义，使用 POST 承载复杂模板数据，不要求 Idempotency-Key。"
       }
     },
     "/api/v1/print-templates/templates": {
@@ -6278,6 +6292,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ResilienceStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7947,6 +7971,16 @@
         "responses": {
           "200": {
             "description": "Prometheus 文本指标"
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [],
@@ -7962,6 +7996,16 @@
         "responses": {
           "200": {
             "description": "OpenAPI JSON 文档"
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [],
@@ -7977,6 +8021,16 @@
         "responses": {
           "200": {
             "description": "生产只读 API 文档 ReDoc"
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           },
           "403": {
             "description": "非内网访问被拒绝",
