@@ -31,6 +31,9 @@ DEV_WEB_LOG := "/tmp/wms-web-admin-9002.log"
 ISSUE_AGENT_LOG := MAIN_ROOT / ".codex/issue-agent/watch.log"
 ISSUE_AGENT_PID := MAIN_ROOT / ".codex/issue-agent/watch.pid"
 ISSUE_AGENT_CRON_TAG := "wms-issue-agent-watchdog"
+SESSION_CLOSEOUT_LOG := MAIN_ROOT / ".codex/session-closeout/watch.log"
+SESSION_CLOSEOUT_PID := MAIN_ROOT / ".codex/session-closeout/watch.pid"
+SESSION_CLOSEOUT_CRON_TAG := "wms-session-closeout-watchdog"
 
 # 默认显示帮助
 default:
@@ -208,14 +211,14 @@ dev-web-restart:
     tmux kill-session -t "{{DEV_WEB_SESSION}}" 2>/dev/null || true
     for pid in $(pgrep -f 'vite .*--port[[:space:]]+{{DEV_WEB_PORT}}' || true); do
       cwd=$(readlink "/proc/$pid/cwd" 2>/dev/null || true)
-      if [[ "$cwd" != "{{DEV_WEB_CWD}}" ]]; then
+      if [[ "$cwd" == "{{DEV_WEB_CWD}}" || "$cwd" == *"/wms-agent-"* ]]; then
         kill "$pid" 2>/dev/null || true
       fi
     done
     if [[ "${WMS_WEB_ADMIN_DEV_MOCK:-1}" == "1" ]]; then
       dev_env='WMS_WEB_ADMIN_DEV_MOCK=1'
     else
-      dev_env="WMS_WEB_ADMIN_DEV_MOCK=0 VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://192.168.124.10:18080}"
+      dev_env="WMS_WEB_ADMIN_DEV_MOCK=0 VITE_API_BASE_URL= WMS_WEB_ADMIN_E2E_API_URL=${WMS_WEB_ADMIN_E2E_API_URL:-http://192.168.124.10:18080}"
     fi
     tmux new-session -d -s "{{DEV_WEB_SESSION}}" -c "{{MAIN_ROOT}}" \
       "$dev_env pnpm -C apps/web-admin dev 2>&1 | tee {{DEV_WEB_LOG}}"
@@ -276,7 +279,7 @@ dev-web-worktree-restart path port="9003":
     if [[ "${WMS_WEB_ADMIN_DEV_MOCK:-1}" == "1" ]]; then
       dev_env='WMS_WEB_ADMIN_DEV_MOCK=1'
     else
-      dev_env="WMS_WEB_ADMIN_DEV_MOCK=0 VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://192.168.124.10:18080}"
+      dev_env="WMS_WEB_ADMIN_DEV_MOCK=0 VITE_API_BASE_URL= WMS_WEB_ADMIN_E2E_API_URL=${WMS_WEB_ADMIN_E2E_API_URL:-http://192.168.124.10:18080}"
     fi
     tmux new-session -d -s "$session" -c "$worktree" \
       "$dev_env pnpm -C apps/web-admin exec vite --host 0.0.0.0 --port $port --strictPort 2>&1 | tee $log"
@@ -338,7 +341,7 @@ dev-api-worktree-restart path port="18081":
       fi
     done
     tmux new-session -d -s "$session" -c "$worktree" \
-      "WMS_BIND_ADDR=0.0.0.0:$port JWT_SECRET=\${JWT_SECRET:-dev-jwt-secret-change-me} WMS_REDIS_URL=\${WMS_REDIS_URL:-redis://127.0.0.1:6379} cargo run --manifest-path backend/Cargo.toml -p wms-api --bin wms-api 2>&1 | tee $log"
+      "WMS_BIND_ADDR=0.0.0.0:$port WMS_JWT_SECRET=\${WMS_JWT_SECRET:-dev-jwt-secret-change-me} WMS_REDIS_URL=\${WMS_REDIS_URL:-redis://127.0.0.1:6379} cargo run --manifest-path backend/Cargo.toml -p wms-api --bin wms-api 2>&1 | tee $log"
     just dev-api-worktree-verify "$worktree" "$port"
 
 # 校验指定 worktree 的后端 API 端口、/healthz 和 LAN 地址
@@ -406,6 +409,10 @@ issue-agent-once *args:
 # Gitea issue agent：循环扫描；默认 dry-run，传 --apply 才评论或运行 codex exec
 issue-agent-watch *args:
     @python3 -u scripts/agents/issue_runner.py watch {{args}}
+
+# Gitea issue agent：扫描 closed issue 的本地分支合并队列；默认 dry-run，传 --apply 才本地合并
+issue-agent-local-merge *args:
+    @python3 -u scripts/agents/issue_runner.py local-merge-closed {{args}}
 
 # Gitea issue agent：验证后台环境能否真正启动 codex exec
 issue-agent-codex-smoke *args:
@@ -479,7 +486,7 @@ issue-agent-restart:
     done
     rm -f "$pid_file"
     cd "{{MAIN_ROOT}}"
-    nohup setsid python3 -u scripts/agents/issue_runner.py watch --interval "${WMS_ISSUE_AGENT_INTERVAL:-60}" --apply >> "{{ISSUE_AGENT_LOG}}" 2>&1 < /dev/null &
+    nohup setsid python3 -u scripts/agents/issue_runner.py watch --interval "${WMS_ISSUE_AGENT_INTERVAL:-60}" --apply --local-merge-closed >> "{{ISSUE_AGENT_LOG}}" 2>&1 < /dev/null &
     echo "$!" > "$pid_file"
     sleep 2
     "$just_bin" issue-agent-verify
@@ -512,6 +519,118 @@ issue-agent-uninstall-watchdog:
     #!/usr/bin/env bash
     set -euo pipefail
     { crontab -l 2>/dev/null || true; } | { grep -v -F "{{ISSUE_AGENT_CRON_TAG}}" || true; } | crontab -
+
+# 会话收口：执行一轮空闲检查；默认 dry-run，传 --apply 才运行 codex exec
+session-closeout-once *args:
+    @python3 -u scripts/agents/session_closeout_runner.py once {{args}}
+
+# 会话收口：循环空闲检查；默认 dry-run，传 --apply 才运行 codex exec
+session-closeout-watch *args:
+    @python3 -u scripts/agents/session_closeout_runner.py watch {{args}}
+
+# 会话收口：查看最近触发状态和 watcher 状态
+session-closeout-status:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    pid_file="{{SESSION_CLOSEOUT_PID}}"
+    echo "state:"
+    python3 -u scripts/agents/session_closeout_runner.py status || true
+    echo "pid:"
+    if [[ -f "$pid_file" ]]; then
+      pid="$(cat "$pid_file" 2>/dev/null || true)"
+      echo "${pid:-empty}"
+      if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+        ps -fp "$pid" || true
+      else
+        echo "not-running"
+      fi
+    else
+      echo "no pid file"
+    fi
+    echo "process:"
+    pgrep -af 'scripts/agents/session_closeout_runner.py watch' || true
+    echo "watchdog:"
+    crontab -l 2>/dev/null | grep -F "{{SESSION_CLOSEOUT_CRON_TAG}}" || true
+    echo "recent-log:"
+    tail -20 "{{SESSION_CLOSEOUT_LOG}}" 2>/dev/null || true
+
+# 会话收口：校验长期 watcher 真的在跑
+session-closeout-verify:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    pid_file="{{SESSION_CLOSEOUT_PID}}"
+    [[ -f "$pid_file" ]] || { echo "session-closeout pid 文件不存在：$pid_file" >&2; exit 1; }
+    pid="$(cat "$pid_file" 2>/dev/null || true)"
+    [[ "$pid" =~ ^[0-9]+$ ]] || { echo "session-closeout pid 无效：${pid:-empty}" >&2; exit 1; }
+    kill -0 "$pid" 2>/dev/null || { echo "session-closeout 进程不存在：$pid" >&2; exit 1; }
+    cmd="$(ps -p "$pid" -o args= 2>/dev/null || true)"
+    grep -F 'scripts/agents/session_closeout_runner.py watch' <<<"$cmd" >/dev/null || {
+      echo "session-closeout pid 不是 watcher：$cmd" >&2
+      exit 1
+    }
+
+# 会话收口：重启长期 watcher
+session-closeout-restart:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mkdir -p "$(dirname "{{SESSION_CLOSEOUT_LOG}}")"
+    just_bin="${JUST_BIN:-$(command -v just)}"
+    pid_file="{{SESSION_CLOSEOUT_PID}}"
+    stop_pid() {
+      local pid="$1"
+      [[ "$pid" =~ ^[0-9]+$ ]] || return 0
+      [[ "$pid" != "$$" && "$pid" != "$BASHPID" ]] || return 0
+      kill -0 "$pid" 2>/dev/null || return 0
+      kill "$pid" 2>/dev/null || true
+      for _ in {1..20}; do
+        kill -0 "$pid" 2>/dev/null || return 0
+        sleep 0.2
+      done
+      kill -KILL "$pid" 2>/dev/null || true
+    }
+    if [[ -f "$pid_file" ]]; then
+      pid="$(cat "$pid_file" 2>/dev/null || true)"
+      stop_pid "$pid"
+    fi
+    mapfile -t legacy_pids < <(ps -eo pid=,args= | awk '/[p]ython3 -u scripts\/agents\/session_closeout_runner\.py watch/ {print $1}')
+    for pid in "${legacy_pids[@]}"; do
+      stop_pid "$pid"
+    done
+    rm -f "$pid_file"
+    cd "{{MAIN_ROOT}}"
+    nohup setsid python3 -u scripts/agents/session_closeout_runner.py watch --interval "${WMS_SESSION_CLOSEOUT_INTERVAL:-60}" --idle-seconds "${WMS_SESSION_CLOSEOUT_IDLE_SECONDS:-1800}" --apply >> "{{SESSION_CLOSEOUT_LOG}}" 2>&1 < /dev/null &
+    echo "$!" > "$pid_file"
+    sleep 2
+    "$just_bin" session-closeout-verify
+
+# 会话收口：保活检查；进程不在则重启
+session-closeout-ensure:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    just_bin="${JUST_BIN:-$(command -v just)}"
+    if "$just_bin" session-closeout-verify >/dev/null 2>&1; then
+      echo "session-closeout running"
+      exit 0
+    fi
+    echo "session-closeout not running; restarting"
+    "$just_bin" session-closeout-restart
+
+# 会话收口：安装 cron watchdog，每分钟保活检查
+session-closeout-install-watchdog:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mkdir -p "$(dirname "{{SESSION_CLOSEOUT_LOG}}")"
+    just_bin="$(command -v just)"
+    path_value="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    line="* * * * * cd {{MAIN_ROOT}} && PATH=$path_value JUST_BIN=$just_bin $just_bin session-closeout-ensure >> {{SESSION_CLOSEOUT_LOG}} 2>&1 # {{SESSION_CLOSEOUT_CRON_TAG}}"
+    (crontab -l 2>/dev/null | grep -v -F "{{SESSION_CLOSEOUT_CRON_TAG}}" || true; echo "$line") | crontab -
+    "$just_bin" session-closeout-ensure
+
+# 会话收口：卸载 cron watchdog；不停止当前 watcher
+session-closeout-uninstall-watchdog:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    { crontab -l 2>/dev/null || true; } | { grep -v -F "{{SESSION_CLOSEOUT_CRON_TAG}}" || true; } | crontab -
 
 # 报告 Wave 1 完成度（默认不阻塞；出口检查用 --strict）
 wave-1-status:

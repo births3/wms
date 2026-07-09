@@ -19,7 +19,7 @@
 7. `codex exec` 空闲超时、失败或收到 `SIGTERM` / `SIGKILL` 等外部终止信号时，只评论失败状态，不自动重发方案，不复用旧确认；需要重跑时由人工补充新评论，再进入下一轮 proposal。
 8. 当前暂停 Gitea PR：Codex exec 只在本地 worktree / 本地分支修复、验证和回写 issue；禁止推送远端、禁止创建 Gitea PR。
 9. Codex 把本地 worktree、分支、提交或 diff 状态、验证结果、截图附件、本地测试环境重启结果、版本校验证据、本地合并前置条件和剩余风险评论回 issue。
-10. 主代理把 issue-agent 本地分支纳入本地收口队列：先收口主工作区已有脏区，再复审 issue 分支、补证据、修冲突、合并到主工作区、再决定是否关闭 issue。
+10. 关闭 issue 后，本地合并队列扫描 delivery 中的本地分支：先要求主工作区干净，再检查验证、截图或附件、重启或 `healthz` 证据；通过后用 `git merge --no-ff --no-commit` 预合并，跑 `git diff --check`、`git diff --cached --check`、`just gov-t1`，验证通过才提交本地合并提交并回写 `wms-issue-agent:merge:v1`。
 11. 已回写本地交付、等待主代理本地合并、阻塞或状态更正属于状态评论，不是新需求评论；watcher 不能因此再次生成“请回复确认方案”的判断评论。
 12. 用户验收反馈不对时，必须生成 `wms-issue-agent:revision-proposal:v1` 修正方案，等待新的 `确认方案` 后再执行；禁止复用旧确认自动继续跑。
 
@@ -54,7 +54,14 @@ just issue-agent-once --issue 1 --apply
 just issue-agent-watch --interval 60 --apply
 ```
 
-当前暂停 Gitea PR，不启用 `--merge-closed`；历史 `merge-closed` 子命令仅保留为旧流程排查工具，默认 watcher 不调用。暂停期间发现 open PR 时，先评论“暂停 PR、转本地合并”的原因，再关闭 PR；对应分支进入主代理本地 review / 合并队列。
+本地合并队列：
+
+```bash
+just issue-agent-local-merge
+just issue-agent-local-merge --issue 23 --apply
+```
+
+当前暂停 Gitea PR，不启用 `--merge-closed`；历史 `merge-closed` 子命令仅保留为旧流程排查工具，默认 watcher 不调用。长期 watcher 由 `just issue-agent-restart` 启动时会带 `--local-merge-closed`，只处理已关闭 issue 的本地 delivery 分支，不推送远端、不创建或合并 Gitea PR。暂停期间发现 open PR 时，先评论“暂停 PR、转本地合并”的原因，再关闭 PR；对应分支进入本地合并队列。
 
 长期运行 watcher（pid 文件后台进程 + cron watchdog，不使用 tmux）：
 
@@ -100,10 +107,10 @@ no_proxy=localhost,127.0.0.1,::1,192.168.0.0/16
 - prompt 要求 Codex 禁止自行合并到主工作区；本地分支交付后必须写清本地合并前置条件和 codex exec 日志位置。
 - prompt 要求 Codex 先执行 proposal 中的相似 / 共性问题判断；共性成立时必须一起修共享组件、字段矩阵、规范或治理脚本，不能只修当前页面。
 - issue 提到“勾选 / 选中 / 全选 / 第一个”时，prompt 要求 Codex 先追踪共享控件事件与页面状态所有者（如 `selectedRowKeys`、`selectedId`、自动首选 effect），不能只按“按钮”做泛 grep。
-- issue-agent 本地分支只有一个合并 owner：主代理。watcher 只启动执行和回写状态，不做本地合并。
+- issue-agent 本地分支只有一个合并 owner：主工作区本地合并队列。watcher 只有带 `--local-merge-closed` 时才扫描 closed issue 并执行本地 no-commit 预合并、验证、提交；不推送远端、不合并 PR。
 - 主代理合并 closed issue 分支前，必须先处理主工作区脏区：已有脏区按主题 review、验证、提交；主工作区干净后再合入 issue 分支。禁止把 issue diff 混入已有脏区提交。
 - 本地分支交付不等于 issue 完成。issue 评论只能写“已交付本地分支 / 等待主代理本地 review 合并 / 阻塞”，禁止在主工作区未验证和未收口前写“已完成”。
-- 自动 PR 合并暂停：长期 watcher 不带 `--merge-closed`，不得因为 issue 关闭就合并远端 PR。
+- 自动 PR 合并暂停：长期 watcher 不带 `--merge-closed`，不得因为 issue 关闭就合并远端 PR；关闭 issue 只允许进入本地合并队列。
 - 暂停 PR 期间不得保留 open PR 作为合并入口；关闭前必须写明原因，关闭后把 head 分支、worktree、提交哈希或 diff 状态登记为本地待合并对象。
 - issue 评论包含截图 / 附件时，prompt 必须列出附件下载 URL；Codex 必须先打开或下载附件辅助定位。
 - 前端或用户可见行为修复必须重启本地测试前后端，并把端口、URL、`/healthz` 或等价健康检查结果写回 issue。
@@ -137,7 +144,8 @@ no_proxy=localhost,127.0.0.1,::1,192.168.0.0/16
 | WMS 执行 | Codex 使用 WMS skills，完成验证；前端截图和 9002 重启证据由主代理在主工作区校验后补齐，且不自行合并主工作区 |
 | 证据回写 | issue 包含本地 worktree / 分支 / 提交或 diff 状态、真实截图附件、本地测试环境重启结果、重启后版本校验、codex exec 日志位置、本地合并前置条件和剩余风险 |
 | 状态评论 | 已交付本地分支、等待主代理合并、阻塞、状态更正等评论不能触发新一轮判断；只有后续人工补充真实新需求时才重新判断 |
-| 合并 owner | issue-agent 本地分支只由主代理 review 后本地合并；watcher 不合并 |
+| 本地合并队列 | closed issue 的 delivery 分支必须证据齐全；主工作区干净后，先 no-commit 预合并，再跑 `git diff --check`、`git diff --cached --check`、`just gov-t1`，通过后才提交本地合并 |
+| 合并 owner | issue-agent 本地分支只由主工作区本地合并队列收口；不推送远端、不合并 PR |
 | 合并顺序 | 主工作区脏区先按主题提交，closed issue 分支后合入；两者不得混成一个提交 |
 | 验收反馈 | 用户说不对、还缺或截图不符时，必须重新发修正方案并等待新确认，不得复用旧确认自动继续跑 |
 
