@@ -59,7 +59,6 @@ export function H9TemplateDesignerDialog({
   const [customPaperWidth, setCustomPaperWidth] = React.useState("100");
   const [customPaperHeight, setCustomPaperHeight] = React.useState("150");
   const [jsonText, setJsonText] = React.useState(() => JSON.stringify(defaultTemplateJson("asn.code", defaultPaper()), null, 2));
-  const [templateSettingsOpen, setTemplateSettingsOpen] = React.useState(true);
   const [jsonOpen, setJsonOpen] = React.useState(false);
   const [boundFields, setBoundFields] = React.useState<string[]>(["asn.code"]);
   const [error, setError] = React.useState<string | null>(null);
@@ -97,7 +96,6 @@ export function H9TemplateDesignerDialog({
   React.useEffect(() => {
     if (!open) return;
     setError(null);
-    setTemplateSettingsOpen(true);
     setJsonOpen(false);
     if (!initialTemplate) {
       const paper = defaultPaper();
@@ -198,6 +196,88 @@ export function H9TemplateDesignerDialog({
       </div>
     </>
   );
+  const templateSettingsPanel = (
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(9rem,12rem))] items-end gap-3 p-3">
+      <Field label="模板编码">
+        <Input className="h-8" value={templateCode} readOnly={mode === "edit"} onChange={(event) => setTemplateCode(event.target.value)} />
+      </Field>
+      <Field label="模板名称">
+        <Input className="h-8" value={templateName} onChange={(event) => setTemplateName(event.target.value)} />
+      </Field>
+      <Field label="模板类型">
+        <select className="h-8 w-full rounded-md border bg-background px-2 text-sm" value={templateTypeCode} disabled={mode === "edit"} onChange={(event) => setTemplateTypeCode(event.target.value)}>
+          {templateTypes.map((type) => (
+            <option key={type.code} value={type.code}>
+              {type.name}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <Field label="作用域">
+        <select className="h-8 w-full rounded-md border bg-background px-2 text-sm" value={scope} onChange={(event) => setScope(event.target.value as "global" | "owner")}>
+          <option value="global">全局默认</option>
+          <option value="owner">货主覆盖</option>
+        </select>
+      </Field>
+      <Field label="纸张大小">
+        <select
+          className="h-8 w-full rounded-md border bg-background px-2 text-sm"
+          value={paperPreset}
+          onChange={(event) => {
+            const next = event.target.value as PaperPreset;
+            setPaperPreset(next);
+            syncPaper({ paperPreset: next });
+          }}
+        >
+          <option value="A4">A4</option>
+          <option value="A5">A5</option>
+          <option value="custom">自定义</option>
+        </select>
+      </Field>
+      <Field label="纸张方向">
+        <select
+          className="h-8 w-full rounded-md border bg-background px-2 text-sm"
+          value={paperDirection}
+          onChange={(event) => {
+            const next = event.target.value as PaperDirection;
+            setPaperDirection(next);
+            syncPaper({ paperDirection: next });
+          }}
+        >
+          <option value="portrait">竖向</option>
+          <option value="landscape">横向</option>
+        </select>
+      </Field>
+      {paperPreset === "custom" && (
+        <>
+          <Field label="自定义宽(mm)">
+            <Input
+              className="h-8"
+              type="number"
+              min="20"
+              value={customPaperWidth}
+              onChange={(event) => {
+                setCustomPaperWidth(event.target.value);
+                syncPaper({ customPaperWidth: event.target.value });
+              }}
+            />
+          </Field>
+          <Field label="自定义高(mm)">
+            <Input
+              className="h-8"
+              type="number"
+              min="20"
+              value={customPaperHeight}
+              onChange={(event) => {
+                setCustomPaperHeight(event.target.value);
+                syncPaper({ customPaperHeight: event.target.value });
+              }}
+            />
+          </Field>
+        </>
+      )}
+    </div>
+  );
   const dialogTitle = mode === "edit" ? "修改打印模板" : mode === "copy" ? "复制打印模板" : "新增打印模板";
   const saveLabel = mode === "edit" ? "保存版本" : "保存";
 
@@ -210,102 +290,9 @@ export function H9TemplateDesignerDialog({
             <DialogDescription>使用 hiprint 设计模板，保存模板主数据、字段绑定和版本。</DialogDescription>
           </DialogHeader>
 
-          <div className="rounded-md border bg-muted/10">
-            <button
-              type="button"
-              className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium"
-              aria-expanded={templateSettingsOpen}
-              onClick={() => setTemplateSettingsOpen((current) => !current)}
-            >
-              <span>模板与纸张设置</span>
-              <span className="text-xs text-muted-foreground">{templateSettingsOpen ? "隐藏" : "展开"}</span>
-            </button>
-            {templateSettingsOpen && (
-              <div className="grid grid-cols-[repeat(auto-fit,minmax(9rem,12rem))] items-end gap-3 border-t p-3">
-                <Field label="模板编码">
-                  <Input className="h-8" value={templateCode} readOnly={mode === "edit"} onChange={(event) => setTemplateCode(event.target.value)} />
-                </Field>
-                <Field label="模板名称">
-                  <Input className="h-8" value={templateName} onChange={(event) => setTemplateName(event.target.value)} />
-                </Field>
-                <Field label="模板类型">
-                  <select className="h-8 w-full rounded-md border bg-background px-2 text-sm" value={templateTypeCode} disabled={mode === "edit"} onChange={(event) => setTemplateTypeCode(event.target.value)}>
-                    {templateTypes.map((type) => (
-                      <option key={type.code} value={type.code}>
-                        {type.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="作用域">
-                  <select className="h-8 w-full rounded-md border bg-background px-2 text-sm" value={scope} onChange={(event) => setScope(event.target.value as "global" | "owner")}>
-                    <option value="global">全局默认</option>
-                    <option value="owner">货主覆盖</option>
-                  </select>
-                </Field>
-                <Field label="纸张大小">
-                  <select
-                    className="h-8 w-full rounded-md border bg-background px-2 text-sm"
-                    value={paperPreset}
-                    onChange={(event) => {
-                      const next = event.target.value as PaperPreset;
-                      setPaperPreset(next);
-                      syncPaper({ paperPreset: next });
-                    }}
-                  >
-                    <option value="A4">A4</option>
-                    <option value="A5">A5</option>
-                    <option value="custom">自定义</option>
-                  </select>
-                </Field>
-                <Field label="纸张方向">
-                  <select
-                    className="h-8 w-full rounded-md border bg-background px-2 text-sm"
-                    value={paperDirection}
-                    onChange={(event) => {
-                      const next = event.target.value as PaperDirection;
-                      setPaperDirection(next);
-                      syncPaper({ paperDirection: next });
-                    }}
-                  >
-                    <option value="portrait">竖向</option>
-                    <option value="landscape">横向</option>
-                  </select>
-                </Field>
-                {paperPreset === "custom" && (
-                  <>
-                    <Field label="自定义宽(mm)">
-                      <Input
-                        className="h-8"
-                        type="number"
-                        min="20"
-                        value={customPaperWidth}
-                        onChange={(event) => {
-                          setCustomPaperWidth(event.target.value);
-                          syncPaper({ customPaperWidth: event.target.value });
-                        }}
-                      />
-                    </Field>
-                    <Field label="自定义高(mm)">
-                      <Input
-                        className="h-8"
-                        type="number"
-                        min="20"
-                        value={customPaperHeight}
-                        onChange={(event) => {
-                          setCustomPaperHeight(event.target.value);
-                          syncPaper({ customPaperHeight: event.target.value });
-                        }}
-                      />
-                    </Field>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-
           <H9HiprintDesigner
             ref={designerRef}
+            templateSettingsPanel={templateSettingsPanel}
             fieldBindingPanel={fieldBindingPanel}
             fields={fields.map((field) => ({ fieldPath: field.fieldPath, displayName: field.displayName }))}
             templateJson={parseJsonOrDefault(jsonText)}

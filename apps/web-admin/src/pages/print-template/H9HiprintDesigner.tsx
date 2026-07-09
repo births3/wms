@@ -1,11 +1,12 @@
 import * as React from "react";
 import { Button, cn } from "@wms/ui";
-import { RefreshCw } from "lucide-react";
+import { Maximize2, Minimize2, RefreshCw } from "lucide-react";
 
 import "hiprint/dist/print-lock.css";
 
 interface H9HiprintDesignerProps {
   templateJson: unknown;
+  templateSettingsPanel: React.ReactNode;
   fieldBindingPanel: React.ReactNode;
   fields: Array<{ fieldPath: string; displayName: string }>;
   onJsonChange: (value: unknown) => void;
@@ -17,17 +18,19 @@ export interface H9HiprintDesignerHandle {
 }
 
 export const H9HiprintDesigner = React.forwardRef<H9HiprintDesignerHandle, H9HiprintDesignerProps>(
-  function H9HiprintDesigner({ templateJson, fieldBindingPanel, fields, onJsonChange }, ref) {
+  function H9HiprintDesigner({ templateJson, templateSettingsPanel, fieldBindingPanel, fields, onJsonChange }, ref) {
     const id = React.useId().replace(/:/g, "");
     const paletteId = `h9-hiprint-palette-${id}`;
     const canvasId = `h9-hiprint-canvas-${id}`;
     const settingId = `h9-hiprint-setting-${id}`;
     const paginationId = `h9-hiprint-pagination-${id}`;
+    const designerRootRef = React.useRef<HTMLDivElement | null>(null);
     const templateRef = React.useRef<HiprintTemplate | null>(null);
     const [status, setStatus] = React.useState("hiprint 设计器初始化中");
     const [error, setError] = React.useState<string | null>(null);
     const [fieldPanelOpen, setFieldPanelOpen] = React.useState(true);
     const [fieldPanelTab, setFieldPanelTab] = React.useState<"binding" | "components">("binding");
+    const [designerFullscreen, setDesignerFullscreen] = React.useState(false);
 
     React.useImperativeHandle(ref, () => ({
       getJson: () => {
@@ -81,17 +84,42 @@ export const H9HiprintDesigner = React.forwardRef<H9HiprintDesignerHandle, H9Hip
       };
     }, [canvasId, paletteId, paginationId, settingId, templateJson]);
 
+    React.useEffect(() => {
+      function syncFullscreenState() {
+        setDesignerFullscreen(document.fullscreenElement === designerRootRef.current);
+      }
+
+      document.addEventListener("fullscreenchange", syncFullscreenState);
+      return () => document.removeEventListener("fullscreenchange", syncFullscreenState);
+    }, []);
+
     function syncJson() {
       const json = templateRef.current?.getJson() ?? templateJson;
       onJsonChange(json);
       setStatus("hiprint JSON 已同步");
     }
 
+    async function toggleDesignerFullscreen() {
+      if (designerFullscreen) {
+        if (document.fullscreenElement) {
+          await document.exitFullscreen().catch(() => undefined);
+        }
+        setDesignerFullscreen(false);
+        return;
+      }
+
+      setDesignerFullscreen(true);
+      await designerRootRef.current?.requestFullscreen?.().catch(() => undefined);
+    }
+
     return (
       <div
+        ref={designerRootRef}
+        data-h9-hiprint-designer="true"
         className={cn(
           "grid min-h-[34rem] gap-3",
           fieldPanelOpen ? "lg:grid-cols-[18rem_minmax(0,1fr)_18rem]" : "lg:grid-cols-[4rem_minmax(0,1fr)_18rem]",
+          designerFullscreen && "fixed inset-0 z-[70] h-screen bg-background p-3 shadow-2xl",
         )}
       >
         <aside className={cn("rounded-md border bg-muted/20 p-3", !fieldPanelOpen && "flex items-start justify-center p-2")}>
@@ -150,19 +178,33 @@ export const H9HiprintDesigner = React.forwardRef<H9HiprintDesignerHandle, H9Hip
         <main className="min-w-0 rounded-md border bg-background">
           <div className="flex items-center justify-between border-b px-3 py-2">
             <span className={cn("text-sm", error ? "text-destructive" : "text-muted-foreground")}>{status}</span>
-            <Button type="button" variant="outline" size="sm" onClick={syncJson}>
-              <RefreshCw className="size-4" aria-hidden />
-              同步
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={syncJson}>
+                <RefreshCw className="size-4" aria-hidden />
+                同步
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                title={designerFullscreen ? "退出全屏" : "全屏设计"}
+                aria-pressed={designerFullscreen}
+                onClick={() => void toggleDesignerFullscreen()}
+              >
+                {designerFullscreen ? <Minimize2 className="size-4" aria-hidden /> : <Maximize2 className="size-4" aria-hidden />}
+                {designerFullscreen ? "退出" : "全屏"}
+              </Button>
+            </div>
           </div>
+          <div className="border-b bg-muted/10">{templateSettingsPanel}</div>
           {error && <div className="border-b bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}
           <div id={paginationId} className="border-b px-3 py-2 text-sm text-muted-foreground" />
-          <div id={canvasId} className="h-[30rem] overflow-auto bg-muted/30 p-4" />
+          <div id={canvasId} className={cn("h-[30rem] overflow-auto bg-muted/30 p-4", designerFullscreen && "h-[calc(100vh-9rem)]")} />
         </main>
 
         <aside className="rounded-md border bg-muted/20 p-3">
           <div className="text-sm font-medium text-foreground">参数</div>
-          <div id={settingId} className="mt-3 max-h-[30rem] overflow-auto text-sm" />
+          <div id={settingId} className={cn("mt-3 max-h-[30rem] overflow-auto text-sm", designerFullscreen && "max-h-[calc(100vh-8rem)]")} />
         </aside>
       </div>
     );
