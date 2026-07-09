@@ -769,8 +769,8 @@
           }
         },
         "security": [],
-        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。",
-        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。"
+        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。",
+        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。"
       }
     },
     "/api/v1/auth/me": {
@@ -2351,6 +2351,504 @@
           },
           "404": {
             "description": "事件投递不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/express/carriers": {
+      "get": {
+        "tags": [
+          "express"
+        ],
+        "operationId": "list_express_carriers",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "快递商编码或名称",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "enabled",
+            "in": "query",
+            "description": "启停状态",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "nullable": true
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "返回条数",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "快递商配置列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpressCarrierListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "express"
+        ],
+        "operationId": "upsert_express_carrier",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertExpressCarrierRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "新增或更新快递商配置",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpressCarrier"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "快递商配置非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/express/routing-rules": {
+      "get": {
+        "tags": [
+          "express"
+        ],
+        "operationId": "list_express_routing_rules",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "规则编码或名称",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "delivery_provider_type",
+            "in": "query",
+            "description": "配送方式",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "enabled",
+            "in": "query",
+            "description": "启停状态",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "nullable": true
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "返回条数",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "快递选择规则列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpressRoutingRuleListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "express"
+        ],
+        "operationId": "upsert_express_routing_rule",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertExpressRoutingRuleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "新增或更新快递选择规则",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpressRoutingRule"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "快递规则非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/express/waybills": {
+      "post": {
+        "tags": [
+          "express"
+        ],
+        "operationId": "create_express_waybill",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateExpressWaybillRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "快递下单并生成运单",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpressWaybill"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "快递商不存在或未启用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "快递下单字段非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/express/waybills/{waybill_no}/cancel": {
+      "post": {
+        "tags": [
+          "express"
+        ],
+        "operationId": "cancel_express_waybill",
+        "parameters": [
+          {
+            "name": "waybill_no",
+            "in": "path",
+            "description": "快递运单号",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelExpressWaybillRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "取消快递运单",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpressWaybill"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "运单不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "运单状态不可取消",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/express/waybills/{waybill_no}/tracking": {
+      "get": {
+        "tags": [
+          "express"
+        ],
+        "operationId": "get_express_tracking",
+        "parameters": [
+          {
+            "name": "waybill_no",
+            "in": "path",
+            "description": "快递运单号",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "快递轨迹缓存",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpressTrackingResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "运单不存在",
             "content": {
               "application/json": {
                 "schema": {
@@ -6667,6 +7165,779 @@
         "x-idempotency-exempt-reason": "追溯码上报首批契约未接入 L11 幂等，本轮仅声明豁免并保留后续补齐路径。"
       }
     },
+    "/api/v1/wechat-notify/approvals": {
+      "post": {
+        "tags": [
+          "wechat-notify"
+        ],
+        "operationId": "create_h4_approval",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateH4ApprovalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "创建企业微信审批记录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H4ApprovalRecord"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "审批请求非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/wechat-notify/approvals/{approval_id}/callback": {
+      "post": {
+        "tags": [
+          "wechat-notify"
+        ],
+        "operationId": "callback_h4_approval",
+        "parameters": [
+          {
+            "name": "approval_id",
+            "in": "path",
+            "description": "审批记录 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/H4ApprovalCallbackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "回写企业微信审批结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H4ApprovalRecord"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "审批记录不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "审批结论非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/wechat-notify/configs": {
+      "get": {
+        "tags": [
+          "wechat-notify"
+        ],
+        "operationId": "list_h4_notification_configs",
+        "parameters": [
+          {
+            "name": "event_type",
+            "in": "query",
+            "description": "按通知事件过滤",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "H4 通知配置列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H4NotificationConfigListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "wechat-notify"
+        ],
+        "operationId": "upsert_h4_notification_config",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertH4NotificationConfigRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "创建或更新 H4 通知配置",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H4NotificationConfig"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "配置非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/wechat-notify/records": {
+      "get": {
+        "tags": [
+          "wechat-notify"
+        ],
+        "operationId": "list_h4_notification_records",
+        "parameters": [
+          {
+            "name": "event_type",
+            "in": "query",
+            "description": "按事件过滤",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "recipient",
+            "in": "query",
+            "description": "按接收人模糊过滤",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "按发送状态过滤",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "创建时间起点",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "nullable": true
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "创建时间终点",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "nullable": true
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "返回条数，默认 50，最大 100",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "H4 通知发送记录列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H4NotificationRecordListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/wechat-notify/records/{record_id}/resend": {
+      "post": {
+        "tags": [
+          "wechat-notify"
+        ],
+        "operationId": "resend_h4_notification_record",
+        "parameters": [
+          {
+            "name": "record_id",
+            "in": "path",
+            "description": "通知记录 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "重发 H4 通知记录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H4NotificationRecord"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "通知记录不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/wechat-notify/send": {
+      "post": {
+        "tags": [
+          "wechat-notify"
+        ],
+        "operationId": "send_h4_notification",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendH4NotificationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "发送企业微信通知",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/H4NotificationRecord"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "事件未配置",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "模板或接收人非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/wechat-notify/settings": {
+      "get": {
+        "tags": [
+          "wechat-notify"
+        ],
+        "operationId": "get_h4_wechat_settings",
+        "responses": {
+          "200": {
+            "description": "H4 企业微信通道参数",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H4WechatSettingsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "wechat-notify"
+        ],
+        "operationId": "upsert_h4_wechat_settings",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertH4WechatSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "创建或更新 H4 企业微信通道参数",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H4WechatSettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "参数非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/metrics": {
       "get": {
         "tags": [
@@ -7562,6 +8833,15 @@
           }
         }
       },
+      "CancelExpressWaybillRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
       "ChangeInventoryStatusRequest": {
         "type": "object",
         "required": [
@@ -7995,6 +9275,104 @@
           "source": {
             "type": "string",
             "nullable": true
+          }
+        }
+      },
+      "CreateExpressWaybillRequest": {
+        "type": "object",
+        "required": [
+          "package_no",
+          "carrier_code",
+          "sender_name",
+          "sender_mobile",
+          "sender_address",
+          "receiver_name",
+          "receiver_mobile",
+          "receiver_address",
+          "weight_grams",
+          "volume_cm3",
+          "package_count"
+        ],
+        "properties": {
+          "carrier_code": {
+            "type": "string"
+          },
+          "outbound_order_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "package_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "package_no": {
+            "type": "string"
+          },
+          "receiver_address": {
+            "type": "string"
+          },
+          "receiver_mobile": {
+            "type": "string"
+          },
+          "receiver_name": {
+            "type": "string"
+          },
+          "requested_waybill_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "sender_address": {
+            "type": "string"
+          },
+          "sender_mobile": {
+            "type": "string"
+          },
+          "sender_name": {
+            "type": "string"
+          },
+          "volume_cm3": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "weight_grams": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "CreateH4ApprovalRequest": {
+        "type": "object",
+        "required": [
+          "scenario",
+          "business_ref",
+          "dedupe_key",
+          "approver_user",
+          "process_id",
+          "callback_path",
+          "summary"
+        ],
+        "properties": {
+          "approver_user": {
+            "type": "string"
+          },
+          "business_ref": {
+            "type": "string"
+          },
+          "callback_path": {
+            "type": "string"
+          },
+          "dedupe_key": {
+            "type": "string"
+          },
+          "process_id": {
+            "type": "string"
+          },
+          "scenario": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
           }
         }
       },
@@ -8956,6 +10334,328 @@
           }
         }
       },
+      "ExpressCarrier": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "carrier_code",
+          "carrier_name",
+          "api_url",
+          "enabled",
+          "priority",
+          "conditions",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "account_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "api_key_alias": {
+            "type": "string",
+            "nullable": true
+          },
+          "api_secret_alias": {
+            "type": "string",
+            "nullable": true
+          },
+          "api_url": {
+            "type": "string"
+          },
+          "carrier_code": {
+            "type": "string"
+          },
+          "carrier_name": {
+            "type": "string"
+          },
+          "conditions": {},
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "priority": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ExpressCarrierListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpressCarrier"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "ExpressRoutingRule": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "rule_code",
+          "rule_name",
+          "delivery_provider_type",
+          "priority",
+          "conditions",
+          "enabled",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "carrier_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "conditions": {},
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "delivery_provider_type": {
+            "type": "string"
+          },
+          "effective_from": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "effective_to": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "fallback_strategy": {
+            "type": "string",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "priority": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rule_code": {
+            "type": "string"
+          },
+          "rule_name": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ExpressRoutingRuleListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpressRoutingRule"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "ExpressTrackingEvent": {
+        "type": "object",
+        "required": [
+          "id",
+          "waybill_no",
+          "event_time",
+          "status",
+          "description",
+          "source",
+          "cached_at"
+        ],
+        "properties": {
+          "cached_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "description": {
+            "type": "string"
+          },
+          "event_time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "location": {
+            "type": "string",
+            "nullable": true
+          },
+          "source": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "waybill_no": {
+            "type": "string"
+          }
+        }
+      },
+      "ExpressTrackingResponse": {
+        "type": "object",
+        "required": [
+          "waybill",
+          "events"
+        ],
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpressTrackingEvent"
+            }
+          },
+          "waybill": {
+            "$ref": "#/components/schemas/ExpressWaybill"
+          }
+        }
+      },
+      "ExpressWaybill": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "package_no",
+          "carrier_code",
+          "waybill_no",
+          "status",
+          "sender_name",
+          "sender_mobile",
+          "sender_address",
+          "receiver_name",
+          "receiver_mobile",
+          "receiver_address",
+          "weight_grams",
+          "volume_cm3",
+          "package_count",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "carrier_code": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "eta_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "outbound_order_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "package_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "package_no": {
+            "type": "string"
+          },
+          "receiver_address": {
+            "type": "string"
+          },
+          "receiver_mobile": {
+            "type": "string"
+          },
+          "receiver_name": {
+            "type": "string"
+          },
+          "sender_address": {
+            "type": "string"
+          },
+          "sender_mobile": {
+            "type": "string"
+          },
+          "sender_name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "volume_cm3": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "waybill_no": {
+            "type": "string"
+          },
+          "weight_grams": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "FeatureFlagArchiveRequest": {
         "type": "object",
         "required": [
@@ -9250,6 +10950,359 @@
             "type": "object",
             "description": "自由结构 JSON 对象。",
             "additionalProperties": true
+          }
+        }
+      },
+      "H4ApprovalCallbackRequest": {
+        "type": "object",
+        "required": [
+          "conclusion",
+          "approved_by"
+        ],
+        "properties": {
+          "approved_by": {
+            "type": "string"
+          },
+          "conclusion": {
+            "type": "string"
+          },
+          "external_approval_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "opinion": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "H4ApprovalRecord": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "scenario",
+          "business_ref",
+          "dedupe_key",
+          "approver_user",
+          "process_id",
+          "callback_path",
+          "summary",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "approved_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "approved_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "approver_user": {
+            "type": "string"
+          },
+          "business_ref": {
+            "type": "string"
+          },
+          "callback_path": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "dedupe_key": {
+            "type": "string"
+          },
+          "external_approval_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "failure_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "opinion": {
+            "type": "string",
+            "nullable": true
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "process_id": {
+            "type": "string"
+          },
+          "scenario": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "H4NotificationConfig": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "event_type",
+          "enabled",
+          "template",
+          "recipient_rule",
+          "channels",
+          "created_at",
+          "updated_at",
+          "version"
+        ],
+        "properties": {
+          "channels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "event_type": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "recipient_rule": {
+            "type": "object",
+            "description": "自由结构 JSON 对象。",
+            "additionalProperties": true
+          },
+          "template": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "H4NotificationConfigListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/H4NotificationConfig"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "H4NotificationRecord": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "event_type",
+          "dedupe_key",
+          "recipient",
+          "channel",
+          "content_summary",
+          "status",
+          "retry_count",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "channel": {
+            "type": "string"
+          },
+          "config_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "content_summary": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "dedupe_key": {
+            "type": "string"
+          },
+          "event_type": {
+            "type": "string"
+          },
+          "failure_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "recipient": {
+            "type": "string"
+          },
+          "retry_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sent_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "H4NotificationRecordListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/H4NotificationRecord"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "H4WechatSettings": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "corp_id",
+          "agent_id",
+          "secret_alias",
+          "callback_token_alias",
+          "aes_key_alias",
+          "callback_url",
+          "approval_callback_path",
+          "enabled",
+          "retry_max_attempts",
+          "retry_interval_seconds",
+          "created_at",
+          "updated_at",
+          "version"
+        ],
+        "properties": {
+          "aes_key_alias": {
+            "type": "string"
+          },
+          "agent_id": {
+            "type": "string"
+          },
+          "approval_callback_path": {
+            "type": "string"
+          },
+          "callback_token_alias": {
+            "type": "string"
+          },
+          "callback_url": {
+            "type": "string"
+          },
+          "corp_id": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "retry_interval_seconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "retry_max_attempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "secret_alias": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "H4WechatSettingsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/H4WechatSettings"
+              }
+            ],
+            "nullable": true
           }
         }
       },
@@ -11664,6 +13717,34 @@
           }
         }
       },
+      "SendH4NotificationRequest": {
+        "type": "object",
+        "required": [
+          "event_type",
+          "dedupe_key",
+          "recipients",
+          "payload"
+        ],
+        "properties": {
+          "dedupe_key": {
+            "type": "string"
+          },
+          "event_type": {
+            "type": "string"
+          },
+          "payload": {
+            "type": "object",
+            "description": "自由结构 JSON 对象。",
+            "additionalProperties": true
+          },
+          "recipients": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "SetDocumentNumberRuleEnabledRequest": {
         "type": "object",
         "required": [
@@ -12781,6 +14862,177 @@
           }
         }
       },
+      "UpsertExpressCarrierRequest": {
+        "type": "object",
+        "required": [
+          "carrier_code",
+          "carrier_name",
+          "api_url",
+          "enabled",
+          "priority",
+          "conditions"
+        ],
+        "properties": {
+          "account_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "api_key_alias": {
+            "type": "string",
+            "nullable": true
+          },
+          "api_secret_alias": {
+            "type": "string",
+            "nullable": true
+          },
+          "api_url": {
+            "type": "string"
+          },
+          "carrier_code": {
+            "type": "string"
+          },
+          "carrier_name": {
+            "type": "string"
+          },
+          "conditions": {},
+          "enabled": {
+            "type": "boolean"
+          },
+          "priority": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "UpsertExpressRoutingRuleRequest": {
+        "type": "object",
+        "required": [
+          "rule_code",
+          "rule_name",
+          "delivery_provider_type",
+          "priority",
+          "conditions",
+          "enabled"
+        ],
+        "properties": {
+          "carrier_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "conditions": {},
+          "delivery_provider_type": {
+            "type": "string"
+          },
+          "effective_from": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "effective_to": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "fallback_strategy": {
+            "type": "string",
+            "nullable": true
+          },
+          "priority": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rule_code": {
+            "type": "string"
+          },
+          "rule_name": {
+            "type": "string"
+          }
+        }
+      },
+      "UpsertH4NotificationConfigRequest": {
+        "type": "object",
+        "required": [
+          "event_type",
+          "enabled",
+          "template",
+          "recipient_rule",
+          "channels"
+        ],
+        "properties": {
+          "channels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "event_type": {
+            "type": "string"
+          },
+          "recipient_rule": {
+            "type": "object",
+            "description": "自由结构 JSON 对象。",
+            "additionalProperties": true
+          },
+          "template": {
+            "type": "string"
+          }
+        }
+      },
+      "UpsertH4WechatSettingsRequest": {
+        "type": "object",
+        "required": [
+          "corp_id",
+          "agent_id",
+          "secret_alias",
+          "callback_token_alias",
+          "aes_key_alias",
+          "callback_url",
+          "approval_callback_path",
+          "enabled",
+          "retry_max_attempts",
+          "retry_interval_seconds"
+        ],
+        "properties": {
+          "aes_key_alias": {
+            "type": "string"
+          },
+          "agent_id": {
+            "type": "string"
+          },
+          "approval_callback_path": {
+            "type": "string"
+          },
+          "callback_token_alias": {
+            "type": "string"
+          },
+          "callback_url": {
+            "type": "string"
+          },
+          "corp_id": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "retry_interval_seconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "retry_max_attempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "secret_alias": {
+            "type": "string"
+          }
+        }
+      },
       "UpsertSystemDictionaryItemRequest": {
         "type": "object",
         "required": [
@@ -12959,6 +15211,10 @@
       "description": "M-CG 单据号生成"
     },
     {
+      "name": "wechat-notify",
+      "description": "H4 企业微信通知与审批"
+    },
+    {
       "name": "print-template",
       "description": "H9 打印模板引擎"
     },
@@ -13009,6 +15265,10 @@
     {
       "name": "packing",
       "description": "M-PK 包装站"
+    },
+    {
+      "name": "express",
+      "description": "H5 快递对接"
     },
     {
       "name": "retail",

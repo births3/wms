@@ -33,6 +33,10 @@ assert.match(appShell, /<WorkspaceTabs\b[\s\S]*tabs=\{openTabs\.map/, "Workspace
 assert.match(appShell, /<Warehouse className="size-5"/, "顶部导航栏左侧应显示系统 Logo");
 assert.match(appShell, /currentUser\.display_name/, "顶部导航栏右侧应显示用户信息");
 assert.match(appShell, /menuKeysForActiveView/, "菜单切换页面时应自动展开当前路径");
+assert.doesNotMatch(appShell, /label:\s*"平台能力"/, "基础能力下不能回退为单一平台能力分组");
+for (const hGroup of ["H1 权限租户", "H2 审计能力", "H3 契约能力", "H4 企业微信", "H5 快递能力", "H9 打印能力"]) {
+  assert.match(appShell, new RegExp(`label:\\s*"${hGroup}"`), `基础能力应按 ${hGroup} 独立成二级菜单`);
+}
 assert.doesNotMatch(adminSidebarMenu, /\|\|\s*hasActive/, "当前页面所在菜单不能用 hasActive 强制展开，否则用户无法折叠");
 
 assert.ok(existsSync(workspaceTabsPath), "必须新增公共 WorkspaceTabs 组件");

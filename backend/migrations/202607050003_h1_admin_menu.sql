@@ -91,7 +91,9 @@ INSERT INTO auth_permissions (id, permission_code, permission_name)
 VALUES
     ('00000000-0000-0000-0000-000000001901', 'h1.menu.read', 'H1 菜单读取'),
     ('00000000-0000-0000-0000-000000001902', 'h1.menu.write', 'H1 菜单维护'),
-    ('00000000-0000-0000-0000-000000001903', 'h1.menu.publish', 'H1 菜单发布')
+    ('00000000-0000-0000-0000-000000001903', 'h1.menu.publish', 'H1 菜单发布'),
+    ('00000000-0000-0000-0000-000000002201', 'audit.read', '审计查询'),
+    ('00000000-0000-0000-0000-000000002301', 'h3.contract.read', 'H3 契约读取')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO admin_menu_draft_nodes (
@@ -111,7 +113,12 @@ VALUES
     ('00000000-0000-0000-0000-000000120005', '00000000-0000-0000-0000-000000110003', 2, 'inbound.operation', 'inbound/operation', '入库作业', NULL, 'CheckCircle2', 'menu.inbound.operation', 10, TRUE),
     ('00000000-0000-0000-0000-000000120006', '00000000-0000-0000-0000-000000110004', 2, 'outbound.operation', 'outbound/operation', '出库作业', NULL, 'ClipboardList', 'menu.outbound.operation', 10, TRUE),
     ('00000000-0000-0000-0000-000000120007', '00000000-0000-0000-0000-000000110005', 2, 'inventory.management', 'inventory/management', '库存管理', NULL, 'Layers', 'menu.inventory.management', 10, TRUE),
-    ('00000000-0000-0000-0000-000000120008', '00000000-0000-0000-0000-000000110006', 2, 'platform.capability', 'platform/capability', '平台能力', NULL, 'ShieldCheck', 'menu.platform.capability', 10, TRUE),
+    ('00000000-0000-0000-0000-000000120008', '00000000-0000-0000-0000-000000110006', 2, 'platform.h1', 'platform/h1', 'H1 权限租户', NULL, 'ShieldCheck', 'menu.platform.h1', 10, TRUE),
+    ('00000000-0000-0000-0000-000000120009', '00000000-0000-0000-0000-000000110006', 2, 'platform.h2', 'platform/h2', 'H2 审计能力', NULL, 'ClipboardList', 'menu.platform.h2', 20, TRUE),
+    ('00000000-0000-0000-0000-000000120010', '00000000-0000-0000-0000-000000110006', 2, 'platform.h3', 'platform/h3', 'H3 契约能力', NULL, 'KeyRound', 'menu.platform.h3', 30, TRUE),
+    ('00000000-0000-0000-0000-000000120011', '00000000-0000-0000-0000-000000110006', 2, 'platform.h4', 'platform/h4', 'H4 企业微信', NULL, 'Bell', 'menu.platform.h4', 40, TRUE),
+    ('00000000-0000-0000-0000-000000120012', '00000000-0000-0000-0000-000000110006', 2, 'platform.h5', 'platform/h5', 'H5 快递能力', NULL, 'Truck', 'menu.platform.h5', 50, TRUE),
+    ('00000000-0000-0000-0000-000000120013', '00000000-0000-0000-0000-000000110006', 2, 'platform.h9', 'platform/h9', 'H9 打印能力', NULL, 'Printer', 'menu.platform.h9', 90, TRUE),
     ('00000000-0000-0000-0000-000000130001', '00000000-0000-0000-0000-000000120001', 3, 'workspace.dashboard', 'workspace/overview/dashboard', '运营总览', 'dashboard', 'Activity', 'h1.auth.me', 10, TRUE),
     ('00000000-0000-0000-0000-000000130002', '00000000-0000-0000-0000-000000120002', 3, 'master_data.products', 'master_data/main/products', 'M1 商品档案', 'm1-products', 'PackageCheck', 'm1.master_data.read', 10, TRUE),
     ('00000000-0000-0000-0000-000000130003', '00000000-0000-0000-0000-000000120002', 3, 'master_data.business_partners', 'master_data/main/business_partners', 'M1 客商档案', 'm1-business-partners', 'Users', 'm1.master_data.read', 20, TRUE),
@@ -128,8 +135,10 @@ VALUES
     ('00000000-0000-0000-0000-000000130014', '00000000-0000-0000-0000-000000120006', 3, 'outbound.review', 'outbound/operation/review', 'M4 复核发货', 'm4-review', 'CheckCircle2', 'm4.read', 30, TRUE),
     ('00000000-0000-0000-0000-000000130015', '00000000-0000-0000-0000-000000120006', 3, 'outbound.purchase_returns', 'outbound/operation/purchase_returns', 'M4 采购退货出库', 'm4-returns', 'ClipboardList', 'm4.read', 40, TRUE),
     ('00000000-0000-0000-0000-000000130016', '00000000-0000-0000-0000-000000120007', 3, 'inventory.batches', 'inventory/management/batches', 'M3 批号管理', 'm3-batches', 'Layers', 'm3.read', 10, TRUE),
-    ('00000000-0000-0000-0000-000000130017', '00000000-0000-0000-0000-000000120008', 3, 'platform.menu_management', 'platform/capability/menu_management', 'H1 菜单管理', 'h1-menu-management', 'PanelLeftOpen', 'h1.menu.read', 10, TRUE),
-    ('00000000-0000-0000-0000-000000130018', '00000000-0000-0000-0000-000000120008', 3, 'platform.print_templates', 'platform/capability/print_templates', 'H9 打印模板', 'h9-print-templates', 'Printer', 'h9.print_template.read', 20, TRUE)
+    ('00000000-0000-0000-0000-000000130017', '00000000-0000-0000-0000-000000120008', 3, 'platform.h1.menu_management', 'platform/h1/menu_management', 'H1 菜单管理', 'h1-menu-management', 'PanelLeftOpen', 'h1.menu.read', 10, TRUE),
+    ('00000000-0000-0000-0000-000000130018', '00000000-0000-0000-0000-000000120013', 3, 'platform.h9.print_templates', 'platform/h9/print_templates', 'H9 打印模板', 'h9-print-templates', 'Printer', 'h9.print_template.read', 10, TRUE),
+    ('00000000-0000-0000-0000-000000130022', '00000000-0000-0000-0000-000000120009', 3, 'platform.h2.audit_trail', 'platform/h2/audit_trail', 'H2 审计追踪', 'h2-audit-trail', 'ClipboardList', 'audit.read', 10, TRUE),
+    ('00000000-0000-0000-0000-000000130023', '00000000-0000-0000-0000-000000120010', 3, 'platform.h3.api_contract', 'platform/h3/api_contract', 'H3 OpenAPI', 'h3-api-contract', 'KeyRound', 'h3.contract.read', 10, TRUE)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO admin_menu_draft_button_permissions (

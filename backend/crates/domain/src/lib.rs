@@ -2,6 +2,7 @@
 
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use utoipa::{
     openapi::schema::{AdditionalProperties, Object, ObjectBuilder},
     ToSchema,
@@ -1502,6 +1503,144 @@ pub struct PrintWaybillRequest {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ExpressCarrier {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub carrier_code: String,
+    pub carrier_name: String,
+    pub api_url: String,
+    pub api_key_alias: Option<String>,
+    pub api_secret_alias: Option<String>,
+    pub account_no: Option<String>,
+    pub enabled: bool,
+    pub priority: i32,
+    pub conditions: Value,
+    pub status: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ExpressCarrierListResponse {
+    pub data: Vec<ExpressCarrier>,
+    pub page: PageMeta,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct UpsertExpressCarrierRequest {
+    pub carrier_code: String,
+    pub carrier_name: String,
+    pub api_url: String,
+    pub api_key_alias: Option<String>,
+    pub api_secret_alias: Option<String>,
+    pub account_no: Option<String>,
+    pub enabled: bool,
+    pub priority: i32,
+    pub conditions: Value,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ExpressRoutingRule {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub rule_code: String,
+    pub rule_name: String,
+    pub delivery_provider_type: String,
+    pub carrier_code: Option<String>,
+    pub priority: i32,
+    pub conditions: Value,
+    pub fallback_strategy: Option<String>,
+    pub enabled: bool,
+    pub effective_from: Option<DateTime<Utc>>,
+    pub effective_to: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ExpressRoutingRuleListResponse {
+    pub data: Vec<ExpressRoutingRule>,
+    pub page: PageMeta,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct UpsertExpressRoutingRuleRequest {
+    pub rule_code: String,
+    pub rule_name: String,
+    pub delivery_provider_type: String,
+    pub carrier_code: Option<String>,
+    pub priority: i32,
+    pub conditions: Value,
+    pub fallback_strategy: Option<String>,
+    pub enabled: bool,
+    pub effective_from: Option<DateTime<Utc>>,
+    pub effective_to: Option<DateTime<Utc>>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ExpressWaybill {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub outbound_order_id: Option<Uuid>,
+    pub package_no: String,
+    pub carrier_code: String,
+    pub waybill_no: String,
+    pub status: String,
+    pub sender_name: String,
+    pub sender_mobile: String,
+    pub sender_address: String,
+    pub receiver_name: String,
+    pub receiver_mobile: String,
+    pub receiver_address: String,
+    pub weight_grams: i64,
+    pub volume_cm3: i64,
+    pub package_count: i32,
+    pub eta_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CreateExpressWaybillRequest {
+    pub outbound_order_id: Option<Uuid>,
+    pub package_no: String,
+    pub carrier_code: String,
+    pub requested_waybill_no: Option<String>,
+    pub sender_name: String,
+    pub sender_mobile: String,
+    pub sender_address: String,
+    pub receiver_name: String,
+    pub receiver_mobile: String,
+    pub receiver_address: String,
+    pub weight_grams: i64,
+    pub volume_cm3: i64,
+    pub package_count: i32,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CancelExpressWaybillRequest {
+    pub reason: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ExpressTrackingEvent {
+    pub id: Uuid,
+    pub waybill_no: String,
+    pub event_time: DateTime<Utc>,
+    pub status: String,
+    pub location: Option<String>,
+    pub description: String,
+    pub source: String,
+    pub cached_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ExpressTrackingResponse {
+    pub waybill: ExpressWaybill,
+    pub events: Vec<ExpressTrackingEvent>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct RetailReplenishmentSuggestion {
     pub id: Uuid,
     pub owner_id: Uuid,
@@ -1686,4 +1825,146 @@ pub struct ConfirmContainerRecoveryRequest {
     pub customer_id: Uuid,
     pub delivery_provider_type: String,
     pub shipped_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct H4NotificationConfig {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub event_type: String,
+    pub enabled: bool,
+    pub template: String,
+    #[schema(schema_with = free_form_json_schema)]
+    pub recipient_rule: serde_json::Value,
+    pub channels: Vec<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub version: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct UpsertH4NotificationConfigRequest {
+    pub event_type: String,
+    pub enabled: bool,
+    pub template: String,
+    #[schema(schema_with = free_form_json_schema)]
+    pub recipient_rule: serde_json::Value,
+    pub channels: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct H4NotificationConfigListResponse {
+    pub data: Vec<H4NotificationConfig>,
+    pub page: PageMeta,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct H4WechatSettings {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub corp_id: String,
+    pub agent_id: String,
+    pub secret_alias: String,
+    pub callback_token_alias: String,
+    pub aes_key_alias: String,
+    pub callback_url: String,
+    pub approval_callback_path: String,
+    pub enabled: bool,
+    pub retry_max_attempts: i32,
+    pub retry_interval_seconds: i32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub version: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct UpsertH4WechatSettingsRequest {
+    pub corp_id: String,
+    pub agent_id: String,
+    pub secret_alias: String,
+    pub callback_token_alias: String,
+    pub aes_key_alias: String,
+    pub callback_url: String,
+    pub approval_callback_path: String,
+    pub enabled: bool,
+    pub retry_max_attempts: i32,
+    pub retry_interval_seconds: i32,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct H4WechatSettingsResponse {
+    pub data: Option<H4WechatSettings>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct SendH4NotificationRequest {
+    pub event_type: String,
+    pub dedupe_key: String,
+    pub recipients: Vec<String>,
+    #[schema(schema_with = free_form_json_schema)]
+    pub payload: serde_json::Value,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct H4NotificationRecord {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub config_id: Option<Uuid>,
+    pub event_type: String,
+    pub dedupe_key: String,
+    pub recipient: String,
+    pub channel: String,
+    pub content_summary: String,
+    pub status: String,
+    pub retry_count: i32,
+    pub failure_reason: Option<String>,
+    pub sent_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct H4NotificationRecordListResponse {
+    pub data: Vec<H4NotificationRecord>,
+    pub page: PageMeta,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CreateH4ApprovalRequest {
+    pub scenario: String,
+    pub business_ref: String,
+    pub dedupe_key: String,
+    pub approver_user: String,
+    pub process_id: String,
+    pub callback_path: String,
+    pub summary: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct H4ApprovalCallbackRequest {
+    pub conclusion: String,
+    pub opinion: Option<String>,
+    pub approved_by: String,
+    pub external_approval_id: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct H4ApprovalRecord {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub scenario: String,
+    pub business_ref: String,
+    pub dedupe_key: String,
+    pub approver_user: String,
+    pub process_id: String,
+    pub callback_path: String,
+    pub summary: String,
+    pub status: String,
+    pub opinion: Option<String>,
+    pub external_approval_id: Option<String>,
+    pub approved_by: Option<String>,
+    pub approved_at: Option<DateTime<Utc>>,
+    pub failure_reason: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }

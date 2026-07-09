@@ -17,6 +17,7 @@ pub mod deploy_audit;
 pub mod document_numbering;
 pub mod document_numbering_handlers;
 mod document_numbering_repository;
+pub mod express;
 pub mod feature_flags;
 pub mod h2_lifecycle;
 pub mod h2_lifecycle_handlers;
@@ -44,6 +45,9 @@ pub mod wave4_handlers;
 pub mod wave4_repository;
 pub mod wave5_handlers;
 pub mod wave5_repository;
+pub mod wechat_notify;
+mod wechat_notify_idempotency;
+pub mod wechat_notify_service;
 
 use crate::document_numbering::{
     DocumentNumberRule, DocumentNumberRuleListResponse, SetDocumentNumberRuleEnabledRequest,
@@ -66,24 +70,29 @@ use wms_domain::{
     BatchEnableAdminMenuRequest, BillingAccount, BillingChargeCalculation, BillingContract,
     BillingRule, BillingStatement, BusinessArchiveJob, BusinessRetentionPolicy,
     BusinessRetentionPolicyListResponse, CalculateBillingChargesRequest,
-    ChangeInventoryStatusRequest, ColdChainDevice, CompletePickTaskRequest, ConfigEntry,
-    ConfirmBillingStatementRequest, ConfirmContainerRecoveryRequest, ContainerRecovery,
-    CreateAdminMenuNodeRequest, CreateBillingAccountRequest, CreateBillingContractRequest,
-    CreateBillingRuleRequest, CreateColdChainDeviceRequest, CreateCrossdockPlanRequest,
-    CreateCustomerRequest, CreateLocationRequest, CreateOutboundOrderLineRequest,
-    CreateOutboundOrderRequest, CreateOutboundWaveRequest, CreatePackJobRequest,
-    CreatePackingStationRequest, CreateProductRequest, CreateReceivingOrderRequest,
-    CreateRetailReplenishmentSuggestionRequest, CreateSpecialDrugCategoryRequest,
-    CreateSupplierRequest, CreateWarehouseRequest, CrossdockPlan, CurrentUser, Customer,
-    CustomerListResponse, DisableSystemDictionaryItemRequest, DisposeTemperatureExcursionRequest,
-    DocumentNumberAllocation, DocumentNumberAllocationListResponse, DriverTask,
-    DriverTaskListResponse, ErrorResponse, EventDelivery, EventDeliveryListResponse,
-    EventDeliveryNackRequest, ExecuteMappingRequest, ExecuteMappingResponse,
+    CancelExpressWaybillRequest, ChangeInventoryStatusRequest, ColdChainDevice,
+    CompletePickTaskRequest, ConfigEntry, ConfirmBillingStatementRequest,
+    ConfirmContainerRecoveryRequest, ContainerRecovery, CreateAdminMenuNodeRequest,
+    CreateBillingAccountRequest, CreateBillingContractRequest, CreateBillingRuleRequest,
+    CreateColdChainDeviceRequest, CreateCrossdockPlanRequest, CreateCustomerRequest,
+    CreateExpressWaybillRequest, CreateH4ApprovalRequest, CreateLocationRequest,
+    CreateOutboundOrderLineRequest, CreateOutboundOrderRequest, CreateOutboundWaveRequest,
+    CreatePackJobRequest, CreatePackingStationRequest, CreateProductRequest,
+    CreateReceivingOrderRequest, CreateRetailReplenishmentSuggestionRequest,
+    CreateSpecialDrugCategoryRequest, CreateSupplierRequest, CreateWarehouseRequest, CrossdockPlan,
+    CurrentUser, Customer, CustomerListResponse, DisableSystemDictionaryItemRequest,
+    DisposeTemperatureExcursionRequest, DocumentNumberAllocation,
+    DocumentNumberAllocationListResponse, DriverTask, DriverTaskListResponse, ErrorResponse,
+    EventDelivery, EventDeliveryListResponse, EventDeliveryNackRequest, ExecuteMappingRequest,
+    ExecuteMappingResponse, ExpressCarrier, ExpressCarrierListResponse, ExpressRoutingRule,
+    ExpressRoutingRuleListResponse, ExpressTrackingEvent, ExpressTrackingResponse, ExpressWaybill,
     FeatureFlagArchiveRequest, FeatureFlagArchiveResult, FeatureFlagBatchImportRequest,
     FeatureFlagBatchImportResult, FeatureFlagConfig, FeatureFlagExportResponse,
     FeatureFlagMigrationResult, FeatureFlagReconcileReport, FeatureFlagSourceSwitchRequest,
     FeatureFlagSourceSwitchResponse, GenerateBillingStatementRequest, GspLedgerReport,
-    GspLedgerRow, HealthzResponse, IngestTemperatureExcursionRequest,
+    GspLedgerRow, H4ApprovalCallbackRequest, H4ApprovalRecord, H4NotificationConfig,
+    H4NotificationConfigListResponse, H4NotificationRecord, H4NotificationRecordListResponse,
+    H4WechatSettings, H4WechatSettingsResponse, HealthzResponse, IngestTemperatureExcursionRequest,
     IngestTemperatureReadingRequest, IngestTransitTemperatureRequest, InspectReceivingOrderRequest,
     InspectionSignatureRecord, InventoryBatch, InventoryBatchListResponse, InventoryMovement,
     Location, LocationListResponse, LoginRequest, LoginResponse, MappingDictionary,
@@ -95,19 +104,38 @@ use wms_domain::{
     ReceivingOrder, ReceivingOrderLine, ReceivingOrderListResponse, ReceivingOrderReceipt,
     RejectReceivingOrderRequest, ReportQueryRequest, ReportQueryResponse, ReportRow,
     ResilienceStatus, RetailReplenishmentSuggestion, ReviewOutboundOrderRequest,
-    RollbackAdminMenuRequest, ShipOutboundOrderRequest, SignInspectionRequest, SpecialDrugCategory,
-    SpecialDrugCategoryListResponse, StoreDashboardResponse, Supplier, SupplierListResponse,
-    SystemDictionaryCategory, SystemDictionaryImpactPreview, SystemDictionaryImpactReference,
-    SystemDictionaryItem, SystemDictionaryItemListResponse,
-    TemperatureExcursionDispositionResponse, TemperatureExcursionEvent,
-    TemperatureExcursionEventListResponse, TemperatureReading, TmsDispatch,
-    TraceabilityOutboundReport, TraceabilityOutboundReportRequest, TraceabilityStatusChangeEvent,
-    TransitTemperatureReading, UpdateAdminMenuNodeRequest, UpdateCustomerRequest,
-    UpdateLocationRequest, UpdateProductRequest, UpdateReceivingOrderRequest,
-    UpdateSpecialDrugCategoryRequest, UpdateSupplierRequest, UpdateWarehouseRequest,
-    UpsertAdminMenuButtonPermissionRequest, UpsertSystemDictionaryItemRequest, Warehouse,
+    RollbackAdminMenuRequest, SendH4NotificationRequest, ShipOutboundOrderRequest,
+    SignInspectionRequest, SpecialDrugCategory, SpecialDrugCategoryListResponse,
+    StoreDashboardResponse, Supplier, SupplierListResponse, SystemDictionaryCategory,
+    SystemDictionaryImpactPreview, SystemDictionaryImpactReference, SystemDictionaryItem,
+    SystemDictionaryItemListResponse, TemperatureExcursionDispositionResponse,
+    TemperatureExcursionEvent, TemperatureExcursionEventListResponse, TemperatureReading,
+    TmsDispatch, TraceabilityOutboundReport, TraceabilityOutboundReportRequest,
+    TraceabilityStatusChangeEvent, TransitTemperatureReading, UpdateAdminMenuNodeRequest,
+    UpdateCustomerRequest, UpdateLocationRequest, UpdateProductRequest,
+    UpdateReceivingOrderRequest, UpdateSpecialDrugCategoryRequest, UpdateSupplierRequest,
+    UpdateWarehouseRequest, UpsertAdminMenuButtonPermissionRequest, UpsertExpressCarrierRequest,
+    UpsertExpressRoutingRuleRequest, UpsertH4NotificationConfigRequest,
+    UpsertH4WechatSettingsRequest, UpsertSystemDictionaryItemRequest, Warehouse,
     WarehouseListResponse, WeighPackJobRequest,
 };
+
+#[allow(dead_code)]
+fn _h4_openapi_type_use(
+    _create_approval: Option<CreateH4ApprovalRequest>,
+    _approval_callback: Option<H4ApprovalCallbackRequest>,
+    _approval: Option<H4ApprovalRecord>,
+    _config: Option<H4NotificationConfig>,
+    _config_list: Option<H4NotificationConfigListResponse>,
+    _wechat_settings: Option<H4WechatSettings>,
+    _wechat_settings_response: Option<H4WechatSettingsResponse>,
+    _record: Option<H4NotificationRecord>,
+    _record_list: Option<H4NotificationRecordListResponse>,
+    _send: Option<SendH4NotificationRequest>,
+    _upsert_config: Option<UpsertH4NotificationConfigRequest>,
+    _upsert_wechat_settings: Option<UpsertH4WechatSettingsRequest>,
+) {
+}
 
 #[utoipa::path(
     get,
@@ -663,6 +691,42 @@ fn set_document_number_rule_enabled() {}
 #[allow(dead_code)]
 fn list_document_number_allocations() {}
 
+#[utoipa::path(get, path = "/api/v1/wechat-notify/configs", tag = "wechat-notify", params(("event_type" = Option<String>, Query, description = "按通知事件过滤")), responses((status = 200, description = "H4 通知配置列表", body = H4NotificationConfigListResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "权限不足", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn list_h4_notification_configs() {}
+
+#[utoipa::path(post, path = "/api/v1/wechat-notify/configs", tag = "wechat-notify", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = UpsertH4NotificationConfigRequest, responses((status = 200, description = "创建或更新 H4 通知配置", body = H4NotificationConfig), (status = 400, description = "缺少幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "权限不足", body = ErrorResponse), (status = 409, description = "幂等冲突", body = ErrorResponse), (status = 422, description = "配置非法", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn upsert_h4_notification_config() {}
+
+#[utoipa::path(get, path = "/api/v1/wechat-notify/settings", tag = "wechat-notify", responses((status = 200, description = "H4 企业微信通道参数", body = H4WechatSettingsResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "权限不足", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn get_h4_wechat_settings() {}
+
+#[utoipa::path(post, path = "/api/v1/wechat-notify/settings", tag = "wechat-notify", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = UpsertH4WechatSettingsRequest, responses((status = 200, description = "创建或更新 H4 企业微信通道参数", body = H4WechatSettings), (status = 400, description = "缺少幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "权限不足", body = ErrorResponse), (status = 409, description = "幂等冲突", body = ErrorResponse), (status = 422, description = "参数非法", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn upsert_h4_wechat_settings() {}
+
+#[utoipa::path(post, path = "/api/v1/wechat-notify/send", tag = "wechat-notify", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = SendH4NotificationRequest, responses((status = 200, description = "发送企业微信通知", body = [H4NotificationRecord]), (status = 400, description = "缺少幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "权限不足", body = ErrorResponse), (status = 404, description = "事件未配置", body = ErrorResponse), (status = 409, description = "幂等冲突", body = ErrorResponse), (status = 422, description = "模板或接收人非法", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn send_h4_notification() {}
+
+#[utoipa::path(post, path = "/api/v1/wechat-notify/approvals", tag = "wechat-notify", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = CreateH4ApprovalRequest, responses((status = 200, description = "创建企业微信审批记录", body = H4ApprovalRecord), (status = 400, description = "缺少幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "权限不足", body = ErrorResponse), (status = 409, description = "幂等冲突", body = ErrorResponse), (status = 422, description = "审批请求非法", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn create_h4_approval() {}
+
+#[utoipa::path(post, path = "/api/v1/wechat-notify/approvals/{approval_id}/callback", tag = "wechat-notify", params(("approval_id" = uuid::Uuid, Path, description = "审批记录 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = H4ApprovalCallbackRequest, responses((status = 200, description = "回写企业微信审批结果", body = H4ApprovalRecord), (status = 400, description = "缺少幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "权限不足", body = ErrorResponse), (status = 404, description = "审批记录不存在", body = ErrorResponse), (status = 409, description = "幂等冲突", body = ErrorResponse), (status = 422, description = "审批结论非法", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn callback_h4_approval() {}
+
+#[utoipa::path(get, path = "/api/v1/wechat-notify/records", tag = "wechat-notify", params(("event_type" = Option<String>, Query, description = "按事件过滤"), ("recipient" = Option<String>, Query, description = "按接收人模糊过滤"), ("status" = Option<String>, Query, description = "按发送状态过滤"), ("from" = Option<chrono::DateTime<chrono::Utc>>, Query, description = "创建时间起点"), ("to" = Option<chrono::DateTime<chrono::Utc>>, Query, description = "创建时间终点"), ("limit" = Option<u32>, Query, description = "返回条数，默认 50，最大 100")), responses((status = 200, description = "H4 通知发送记录列表", body = H4NotificationRecordListResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "权限不足", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn list_h4_notification_records() {}
+
+#[utoipa::path(post, path = "/api/v1/wechat-notify/records/{record_id}/resend", tag = "wechat-notify", params(("record_id" = uuid::Uuid, Path, description = "通知记录 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), responses((status = 200, description = "重发 H4 通知记录", body = H4NotificationRecord), (status = 400, description = "缺少幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "权限不足", body = ErrorResponse), (status = 404, description = "通知记录不存在", body = ErrorResponse), (status = 409, description = "幂等冲突", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn resend_h4_notification_record() {}
+
 #[utoipa::path(
     get,
     path = "/api/v1/print-templates/field-libraries",
@@ -996,6 +1060,34 @@ fn weigh_pack_job() {}
 #[allow(dead_code)]
 fn print_pack_job_waybill() {}
 
+#[utoipa::path(get, path = "/api/v1/express/carriers", tag = "express", params(("q" = Option<String>, Query, description = "快递商编码或名称"), ("enabled" = Option<bool>, Query, description = "启停状态"), ("limit" = Option<u32>, Query, description = "返回条数")), responses((status = 200, description = "快递商配置列表", body = ExpressCarrierListResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn list_express_carriers() {}
+
+#[utoipa::path(post, path = "/api/v1/express/carriers", tag = "express", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = UpsertExpressCarrierRequest, responses((status = 200, description = "新增或更新快递商配置", body = ExpressCarrier), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 422, description = "快递商配置非法", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn upsert_express_carrier() {}
+
+#[utoipa::path(get, path = "/api/v1/express/routing-rules", tag = "express", params(("q" = Option<String>, Query, description = "规则编码或名称"), ("delivery_provider_type" = Option<String>, Query, description = "配送方式"), ("enabled" = Option<bool>, Query, description = "启停状态"), ("limit" = Option<u32>, Query, description = "返回条数")), responses((status = 200, description = "快递选择规则列表", body = ExpressRoutingRuleListResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn list_express_routing_rules() {}
+
+#[utoipa::path(post, path = "/api/v1/express/routing-rules", tag = "express", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = UpsertExpressRoutingRuleRequest, responses((status = 200, description = "新增或更新快递选择规则", body = ExpressRoutingRule), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 422, description = "快递规则非法", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn upsert_express_routing_rule() {}
+
+#[utoipa::path(post, path = "/api/v1/express/waybills", tag = "express", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = CreateExpressWaybillRequest, responses((status = 200, description = "快递下单并生成运单", body = ExpressWaybill), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 404, description = "快递商不存在或未启用", body = ErrorResponse), (status = 422, description = "快递下单字段非法", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn create_express_waybill() {}
+
+#[utoipa::path(post, path = "/api/v1/express/waybills/{waybill_no}/cancel", tag = "express", params(("waybill_no" = String, Path, description = "快递运单号"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = CancelExpressWaybillRequest, responses((status = 200, description = "取消快递运单", body = ExpressWaybill), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 404, description = "运单不存在", body = ErrorResponse), (status = 422, description = "运单状态不可取消", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn cancel_express_waybill() {}
+
+#[utoipa::path(get, path = "/api/v1/express/waybills/{waybill_no}/tracking", tag = "express", params(("waybill_no" = String, Path, description = "快递运单号")), responses((status = 200, description = "快递轨迹缓存", body = ExpressTrackingResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 404, description = "运单不存在", body = ErrorResponse)))]
+#[allow(dead_code)]
+fn get_express_tracking() {}
+
 #[utoipa::path(post, path = "/api/v1/retail/replenishment-suggestions", tag = "retail", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = CreateRetailReplenishmentSuggestionRequest, responses((status = 200, description = "生成门店补货建议", body = RetailReplenishmentSuggestion), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 409, description = "建议或幂等冲突", body = ErrorResponse), (status = 422, description = "补货水位非法", body = ErrorResponse)))]
 #[allow(dead_code)]
 fn create_retail_replenishment_suggestion() {}
@@ -1094,6 +1186,15 @@ fn confirm_container_recovery() {}
         upsert_document_number_rule,
         set_document_number_rule_enabled,
         list_document_number_allocations,
+        list_h4_notification_configs,
+        upsert_h4_notification_config,
+        get_h4_wechat_settings,
+        upsert_h4_wechat_settings,
+        send_h4_notification,
+        create_h4_approval,
+        callback_h4_approval,
+        list_h4_notification_records,
+        resend_h4_notification_record,
         list_print_field_libraries,
         list_print_field_definitions,
         list_print_templates,
@@ -1149,6 +1250,13 @@ fn confirm_container_recovery() {}
         create_pack_job,
         weigh_pack_job,
         print_pack_job_waybill,
+        list_express_carriers,
+        upsert_express_carrier,
+        list_express_routing_rules,
+        upsert_express_routing_rule,
+        create_express_waybill,
+        cancel_express_waybill,
+        get_express_tracking,
         create_retail_replenishment_suggestion,
         create_retail_crossdock_plan,
         calculate_billing_charges,
@@ -1178,6 +1286,7 @@ fn confirm_container_recovery() {}
         BillingRule,
         BillingStatement,
         BusinessArchiveJob,
+        CancelExpressWaybillRequest,
         BusinessRetentionPolicy,
         BusinessRetentionPolicyListResponse,
         CalculateBillingChargesRequest,
@@ -1195,6 +1304,8 @@ fn confirm_container_recovery() {}
         CreateColdChainDeviceRequest,
         CreateCrossdockPlanRequest,
         CreateCustomerRequest,
+        CreateExpressWaybillRequest,
+        CreateH4ApprovalRequest,
         CreateLocationRequest,
         CreateOutboundOrderLineRequest,
         CreateOutboundOrderRequest,
@@ -1224,6 +1335,13 @@ fn confirm_container_recovery() {}
         EventDeliveryNackRequest,
         ExecuteMappingRequest,
         ExecuteMappingResponse,
+        ExpressCarrier,
+        ExpressCarrierListResponse,
+        ExpressRoutingRule,
+        ExpressRoutingRuleListResponse,
+        ExpressTrackingEvent,
+        ExpressTrackingResponse,
+        ExpressWaybill,
         FeatureFlagArchiveRequest,
         FeatureFlagArchiveResult,
         FeatureFlagBatchImportRequest,
@@ -1237,6 +1355,14 @@ fn confirm_container_recovery() {}
         GenerateBillingStatementRequest,
         GspLedgerReport,
         GspLedgerRow,
+        H4ApprovalCallbackRequest,
+        H4ApprovalRecord,
+        H4NotificationConfig,
+        H4NotificationConfigListResponse,
+        H4NotificationRecord,
+        H4NotificationRecordListResponse,
+        H4WechatSettings,
+        H4WechatSettingsResponse,
         HealthzResponse,
         IngestTemperatureExcursionRequest,
         IngestTemperatureReadingRequest,
@@ -1301,6 +1427,7 @@ fn confirm_container_recovery() {}
         RetailReplenishmentSuggestion,
         ReviewOutboundOrderRequest,
         RollbackAdminMenuRequest,
+        SendH4NotificationRequest,
         ShipOutboundOrderRequest,
         SignInspectionRequest,
         SpecialDrugCategory,
@@ -1332,6 +1459,10 @@ fn confirm_container_recovery() {}
         UpdateWarehouseRequest,
         SetDocumentNumberRuleEnabledRequest,
         UpsertAdminMenuButtonPermissionRequest,
+        UpsertExpressCarrierRequest,
+        UpsertExpressRoutingRuleRequest,
+        UpsertH4NotificationConfigRequest,
+        UpsertH4WechatSettingsRequest,
         UpsertSystemDictionaryItemRequest,
         UpsertDocumentNumberRuleRequest,
         WeighPackJobRequest,
@@ -1349,6 +1480,7 @@ fn confirm_container_recovery() {}
         (name = "master-data", description = "M1 基础档案"),
         (name = "system-dictionary", description = "US-M1-011 系统字典中心"),
         (name = "code-generator", description = "M-CG 单据号生成"),
+        (name = "wechat-notify", description = "H4 企业微信通知与审批"),
         (name = "print-template", description = "H9 打印模板引擎"),
         (name = "inbound", description = "M2 入库业务规则"),
         (name = "inventory", description = "M3 库存批次与状态"),
@@ -1362,6 +1494,7 @@ fn confirm_container_recovery() {}
         (name = "cold-chain", description = "M5 外部冷链数据接入"),
         (name = "billing", description = "M9 计费账户、规则与月结"),
         (name = "packing", description = "M-PK 包装站"),
+        (name = "express", description = "H5 快递对接"),
         (name = "retail", description = "M8 连锁门店"),
         (name = "tms", description = "M10 TMS+"),
     ),
@@ -1469,6 +1602,10 @@ mod tests {
             "/api/v1/packing/jobs",
             "/api/v1/packing/jobs/{id}/weigh",
             "/api/v1/packing/jobs/{id}/waybill",
+            "/api/v1/express/carriers",
+            "/api/v1/express/routing-rules",
+            "/api/v1/express/waybills",
+            "/api/v1/express/waybills/{waybill_no}/tracking",
             "/api/v1/retail/replenishment-suggestions",
             "/api/v1/retail/crossdock-plans",
             "/api/v1/billing/charges/calculate",
@@ -1514,6 +1651,12 @@ mod tests {
             "\"FeatureFlagBatchImportRequest\"",
             "\"FeatureFlagReconcileReport\"",
             "\"FeatureFlagArchiveResult\"",
+            "\"ExpressCarrier\"",
+            "\"ExpressCarrierListResponse\"",
+            "\"ExpressRoutingRule\"",
+            "\"ExpressRoutingRuleListResponse\"",
+            "\"ExpressWaybill\"",
+            "\"ExpressTrackingResponse\"",
             "\"CreateOutboundOrderRequest\"",
             "\"OutboundOrder\"",
             "\"CreateOutboundWaveRequest\"",

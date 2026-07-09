@@ -5,9 +5,12 @@ import react from "@vitejs/plugin-react";
 import path from "node:path";
 
 import { handleAdminMenuDevMock } from "./dev-mocks/admin-menu-dev-mock";
+import { handleH5ExpressDevMock } from "./dev-mocks/express-dev-mock";
+import { handleH4WechatNotifyDevMock } from "./dev-mocks/wechat-notify-dev-mock";
 
 const devMockEnabled = process.env.WMS_WEB_ADMIN_DEV_MOCK === "1";
 const e2eApiUrl = process.env.WMS_WEB_ADMIN_E2E_API_URL?.trim();
+const devApiProxyUrl = e2eApiUrl || process.env.VITE_API_BASE_URL?.trim();
 const devOwnerId = "00000000-0000-0000-0000-000000000001";
 const devUserId = "00000000-0000-0000-0000-000000000101";
 const devWarehouseId = "00000000-0000-0000-0000-000000003001";
@@ -213,6 +216,12 @@ const devUser = {
     "h1.menu.read",
     "h1.menu.write",
     "h1.menu.publish",
+    "h4.notify.read",
+    "h4.notify.write",
+    "h4.notify.send",
+    "h4.approval.write",
+    "h5.express.read",
+    "h5.express.write",
     "h9.print_template.read",
     "h9.print_template.write",
     "h9.print_template.publish",
@@ -742,6 +751,16 @@ async function handleDevMockRequest(
   if (req.method === "POST" && pathname === "/api/v1/print-templates/print") {
     const body = await readJsonBody(req);
     sendJson(res, 200, devPrintRecordResponse(body));
+    return true;
+  }
+
+  if (pathname.startsWith("/api/v1/wechat-notify")) {
+    await handleH4WechatNotifyDevMock(req, res, pathname);
+    return true;
+  }
+
+  if (pathname.startsWith("/api/v1/express")) {
+    await handleH5ExpressDevMock(req, res, pathname);
     return true;
   }
 
@@ -1876,10 +1895,22 @@ export default defineConfig(({ command }) => {
       host: "0.0.0.0",
       port: 9002,
       strictPort: true,
-      proxy: e2eApiUrl
+      proxy: devApiProxyUrl
         ? {
             "/api": {
-              target: e2eApiUrl,
+              target: devApiProxyUrl,
+              changeOrigin: true,
+            },
+            "/api-docs": {
+              target: devApiProxyUrl,
+              changeOrigin: true,
+            },
+            "/openapi.json": {
+              target: devApiProxyUrl,
+              changeOrigin: true,
+            },
+            "/redoc": {
+              target: devApiProxyUrl,
               changeOrigin: true,
             },
           }

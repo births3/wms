@@ -76,6 +76,54 @@
       "reason": "菜单管理是三层树和配置编辑页，不使用页面上方 QueryPanel"
     },
     {
+      "id": "h2-audit-trail",
+      "title": "H2 审计追踪",
+      "required": false,
+      "reason": "横向能力入口页只展示审计能力与接口证据，不承担列表查询"
+    },
+    {
+      "id": "h3-api-contract",
+      "title": "H3 OpenAPI",
+      "required": false,
+      "reason": "横向能力入口页只展示契约与文档入口，不承担列表查询"
+    },
+    {
+      "id": "h4-wechat-settings",
+      "title": "H4 参数设置",
+      "required": false,
+      "reason": "企业微信通道参数是单配置域，不使用页面上方 QueryPanel"
+    },
+    {
+      "id": "h4-notify-configs",
+      "title": "H4 通知配置",
+      "required": true,
+      "source": "apps/web-admin/src/pages/wechat-notify/H4WechatNotifyPage.tsx",
+      "fieldConstant": "h4NotificationConfigQueryFields",
+      "coreConstant": "h4NotificationConfigCoreQueryFieldKeys",
+      "core": ["eventType", "enabled"],
+      "more": []
+    },
+    {
+      "id": "h4-notify-records",
+      "title": "H4 发送记录",
+      "required": true,
+      "source": "apps/web-admin/src/pages/wechat-notify/H4WechatNotifyPage.tsx",
+      "fieldConstant": "h4NotificationRecordQueryFields",
+      "coreConstant": "h4NotificationRecordCoreQueryFieldKeys",
+      "core": ["eventType", "recipient", "status"],
+      "more": ["createdAt"]
+    },
+    {
+      "id": "h5-express",
+      "title": "H5 快递对接",
+      "required": true,
+      "source": "apps/web-admin/src/pages/express/H5ExpressPage.tsx",
+      "fieldConstant": "queryFields",
+      "coreConstant": "h5ExpressCoreQueryFieldKeys",
+      "core": ["q", "enabled"],
+      "more": []
+    },
+    {
       "id": "h9-print-templates",
       "title": "H9 打印模板",
       "required": true,

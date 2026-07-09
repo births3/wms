@@ -28,6 +28,7 @@ use wms_api::{
     auth_handlers::{auth_router, AuthAppState},
     config_center::{config_center_router, ConfigCenterAppState},
     document_numbering_handlers::{document_numbering_router, DocumentNumberingAppState},
+    express::{express_router, ExpressAppState},
     feature_flags::FeatureFlagRegistry,
     h2_lifecycle_handlers::{h2_lifecycle_router, H2LifecycleAppState},
     master_data_handlers::{master_data_router, MasterDataAppState},
@@ -37,6 +38,7 @@ use wms_api::{
     wave3_handlers::{wave3_router, Wave3AppState},
     wave4_handlers::{wave4_router, Wave4AppState},
     wave5_handlers::{wave5_router, Wave5AppState},
+    wechat_notify::{wechat_notify_router, WechatNotifyAppState},
 };
 use wms_domain::{AuditActor, AuditEvent, AuditEventListResponse, ErrorResponse, HealthzResponse};
 
@@ -121,12 +123,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
         Wave3AppState::with_postgres(pool.clone()).with_config_center(config_center_state.clone());
     let wave4_state = Wave4AppState::with_postgres(pool.clone());
     let wave5_state = Wave5AppState::with_postgres(pool.clone());
+    let express_state = ExpressAppState::with_postgres(pool.clone());
     let app = app(
         config_center_state,
         auth_state,
         wave3_state,
         wave4_state,
         wave5_state,
+        express_state,
         audit_query_state,
         master_data_state,
         system_dictionary_state,
@@ -219,6 +223,7 @@ fn app(
     wave3_state: Wave3AppState,
     wave4_state: Wave4AppState,
     wave5_state: Wave5AppState,
+    express_state: ExpressAppState,
     audit_query_state: AuditQueryState,
     master_data_state: MasterDataAppState,
     system_dictionary_state: SystemDictionaryAppState,
@@ -228,6 +233,7 @@ fn app(
     let print_template_state = PrintTemplateAppState::with_postgres(audit_query_state.pool.clone());
     let admin_menu_state = AdminMenuAppState::with_postgres(audit_query_state.pool.clone());
     let h2_lifecycle_state = H2LifecycleAppState::with_postgres(audit_query_state.pool.clone());
+    let wechat_notify_state = WechatNotifyAppState::with_postgres(audit_query_state.pool.clone());
     let resilience_state =
         ResilienceState::from_env().with_audit_pool(audit_query_state.pool.clone());
 
@@ -253,6 +259,8 @@ fn app(
         .merge(system_dictionary_router(system_dictionary_state))
         .merge(document_numbering_router(document_numbering_state))
         .merge(print_template_router(print_template_state))
+        .merge(wechat_notify_router(wechat_notify_state))
+        .merge(express_router(express_state))
         .merge(wave3_router(wave3_state))
         .merge(wave4_router(wave4_state))
         .merge(wave5_router(wave5_state))
@@ -694,6 +702,7 @@ mod tests {
             Wave3AppState::default(),
             Wave4AppState::with_postgres(pool.clone()),
             Wave5AppState::with_postgres(pool.clone()),
+            ExpressAppState::with_postgres(pool.clone()),
             AuditQueryState { pool: pool.clone() },
             MasterDataAppState::default(),
             SystemDictionaryAppState::with_postgres(pool),
@@ -725,6 +734,7 @@ mod tests {
             Wave3AppState::default(),
             Wave4AppState::with_postgres(pool.clone()),
             Wave5AppState::with_postgres(pool.clone()),
+            ExpressAppState::with_postgres(pool.clone()),
             AuditQueryState { pool: pool.clone() },
             MasterDataAppState::default(),
             SystemDictionaryAppState::with_postgres(pool),
@@ -763,6 +773,7 @@ mod tests {
             Wave3AppState::default(),
             Wave4AppState::with_postgres(pool.clone()),
             Wave5AppState::with_postgres(pool.clone()),
+            ExpressAppState::with_postgres(pool.clone()),
             AuditQueryState { pool: pool.clone() },
             MasterDataAppState::default(),
             SystemDictionaryAppState::with_postgres(pool),
@@ -794,6 +805,7 @@ mod tests {
             Wave3AppState::default(),
             Wave4AppState::with_postgres(pool.clone()),
             Wave5AppState::with_postgres(pool.clone()),
+            ExpressAppState::with_postgres(pool.clone()),
             AuditQueryState { pool: pool.clone() },
             MasterDataAppState::default(),
             SystemDictionaryAppState::with_postgres(pool),
@@ -840,6 +852,7 @@ mod tests {
                 Wave3AppState::default(),
                 Wave4AppState::with_postgres(pool.clone()),
                 Wave5AppState::with_postgres(pool.clone()),
+                ExpressAppState::with_postgres(pool.clone()),
                 AuditQueryState { pool: pool.clone() },
                 MasterDataAppState::default(),
                 SystemDictionaryAppState::with_postgres(pool),
@@ -1400,6 +1413,7 @@ mod tests {
                 Wave3AppState::default(),
                 Wave4AppState::with_postgres(pool.clone()),
                 Wave5AppState::with_postgres(pool.clone()),
+                ExpressAppState::with_postgres(pool.clone()),
                 AuditQueryState { pool: pool.clone() },
                 MasterDataAppState::default(),
                 SystemDictionaryAppState::with_postgres(pool),
@@ -1583,6 +1597,7 @@ mod tests {
             Wave3AppState::default(),
             Wave4AppState::with_postgres(pool.clone()),
             Wave5AppState::with_postgres(pool.clone()),
+            ExpressAppState::with_postgres(pool.clone()),
             AuditQueryState { pool: pool.clone() },
             MasterDataAppState::default(),
             SystemDictionaryAppState::with_postgres(pool.clone()),
@@ -1685,6 +1700,7 @@ mod tests {
             Wave3AppState::default(),
             Wave4AppState::with_postgres(pool.clone()),
             Wave5AppState::with_postgres(pool.clone()),
+            ExpressAppState::with_postgres(pool.clone()),
             AuditQueryState { pool: pool.clone() },
             MasterDataAppState::default(),
             SystemDictionaryAppState::with_postgres(pool),

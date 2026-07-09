@@ -2,9 +2,11 @@ import * as React from "react";
 import { Button, Card, CardContent, Input, PageHeader, StatusBadge, WorkspaceTabs, cn } from "@wms/ui";
 import {
   Activity,
+  Bell,
   BookOpen,
   CheckCircle2,
   ClipboardList,
+  History,
   KeyRound,
   Layers,
   LogOut,
@@ -16,6 +18,7 @@ import {
   RefreshCw,
   Search,
   ShieldCheck,
+  Truck,
   Users,
   Warehouse,
   type LucideIcon,
@@ -37,10 +40,13 @@ import { clearAuthSession, hasActiveAuthSession } from "@/lib/auth-session";
 import { H1AdminMenuPage } from "@/pages/admin-menu/H1AdminMenuPage";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { FeatureFlagConfigCenterPage } from "@/pages/config-center/FeatureFlagConfigCenterPage";
+import { H4WechatNotifyPage, type H4WechatNotifyMode } from "@/pages/wechat-notify/H4WechatNotifyPage";
 import { M2InboundPage, type M2InboundMode } from "@/pages/inbound/M2InboundPage";
 import { M3BatchManagementPage } from "@/pages/inventory/M3BatchManagementPage";
 import { M1MasterDataPage, type MasterDataViewId } from "@/pages/master-data/M1MasterDataPage";
 import { M4OutboundPage, type M4OutboundMode } from "@/pages/outbound/M4OutboundPage";
+import { H2AuditTrailPage, H3ApiContractPage } from "@/pages/platform/HorizontalCapabilityPages";
+import { H5ExpressPage } from "@/pages/express/H5ExpressPage";
 import { H9PrintTemplatePage } from "@/pages/print-template/H9PrintTemplatePage";
 
 type AdminView =
@@ -56,6 +62,12 @@ type AdminView =
   | "m4-review"
   | "m4-returns"
   | "h1-menu-management"
+  | "h2-audit-trail"
+  | "h3-api-contract"
+  | "h4-wechat-settings"
+  | "h4-notify-configs"
+  | "h4-notify-records"
+  | "h5-express"
   | "h9-print-templates";
 
 const foundations = [
@@ -129,10 +141,13 @@ const menuSections: Array<{ label: string; items: SidebarMenuItem<AdminView>[] }
   {
     label: "基础能力",
     items: [
-      { title: "H1 权限租户", subtitle: "已接入接口", icon: ShieldCheck, disabled: true },
-      { title: "H2 审计追踪", subtitle: "已接入接口", icon: ClipboardList, disabled: true },
-      { title: "H3 OpenAPI", subtitle: "契约同步", icon: KeyRound, disabled: true },
       { id: "h1-menu-management", title: "H1 菜单管理", subtitle: "三层菜单 / 权限点", icon: ShieldCheck },
+      { id: "h2-audit-trail", title: "H2 审计追踪", subtitle: "审计 / 归档 / 事件", icon: ClipboardList },
+      { id: "h3-api-contract", title: "H3 OpenAPI", subtitle: "契约 / 文档 / 类型", icon: KeyRound },
+      { id: "h4-wechat-settings", title: "H4 参数设置", subtitle: "企业微信 / 回调 / 重试", icon: KeyRound },
+      { id: "h4-notify-configs", title: "H4 通知配置", subtitle: "事件 / 模板 / 接收人", icon: Bell },
+      { id: "h4-notify-records", title: "H4 发送记录", subtitle: "通知 / 重发 / 排查", icon: History },
+      { id: "h5-express", title: "H5 快递对接", subtitle: "快递商 / 规则 / 面单", icon: Truck },
       { id: "h9-print-templates", title: "H9 打印模板", subtitle: "字段库 / 模板类型", icon: Printer },
     ],
   },
@@ -165,15 +180,24 @@ const defaultMenuTree: SidebarMenuTreeSection<AdminView>[] = [
   { label: "库内业务", groups: [{ label: "库存管理", items: [menuItem("m3-batches")] }] },
   {
     label: "基础能力",
-    groups: [{ label: "平台能力", items: [menuItem("h1-menu-management"), menuItem("h9-print-templates")] }],
+    groups: [
+      { label: "H1 权限租户", items: [menuItem("h1-menu-management")] },
+      { label: "H2 审计能力", items: [menuItem("h2-audit-trail")] },
+      { label: "H3 契约能力", items: [menuItem("h3-api-contract")] },
+      { label: "H4 企业微信", items: [menuItem("h4-wechat-settings"), menuItem("h4-notify-configs"), menuItem("h4-notify-records")] },
+      { label: "H5 快递能力", items: [menuItem("h5-express")] },
+      { label: "H9 打印能力", items: [menuItem("h9-print-templates")] },
+    ],
   },
 ];
 
 const adminMenuIconByKey: Record<string, LucideIcon> = {
   Activity,
+  Bell,
   BookOpen,
   CheckCircle2,
   ClipboardList,
+  History,
   KeyRound,
   Layers,
   MapPinned,
@@ -181,6 +205,7 @@ const adminMenuIconByKey: Record<string, LucideIcon> = {
   PanelLeftOpen,
   Printer,
   ShieldCheck,
+  Truck,
   Users,
   Warehouse,
 };
@@ -351,6 +376,7 @@ function renderAdminView(
 ) {
   const inboundMode = inboundViewToMode(view);
   const outboundMode = outboundViewToMode(view);
+  const wechatNotifyMode = wechatNotifyViewToMode(view);
   const masterDataViewId = masterDataViewToId(view);
 
   if (view === "m1-feature-flags") {
@@ -376,6 +402,18 @@ function renderAdminView(
   }
   if (view === "h1-menu-management") {
     return <H1AdminMenuPage />;
+  }
+  if (view === "h2-audit-trail") {
+    return <H2AuditTrailPage />;
+  }
+  if (view === "h3-api-contract") {
+    return <H3ApiContractPage />;
+  }
+  if (wechatNotifyMode) {
+    return <H4WechatNotifyPage mode={wechatNotifyMode} />;
+  }
+  if (view === "h5-express") {
+    return <H5ExpressPage />;
   }
   if (view === "h9-print-templates") {
     return <H9PrintTemplatePage />;
@@ -415,6 +453,13 @@ function outboundViewToMode(view: AdminView): M4OutboundMode | null {
   if (view === "m4-waves") return "waves";
   if (view === "m4-review") return "review";
   if (view === "m4-returns") return "returns";
+  return null;
+}
+
+function wechatNotifyViewToMode(view: AdminView): H4WechatNotifyMode | null {
+  if (view === "h4-wechat-settings") return "settings";
+  if (view === "h4-notify-configs") return "configs";
+  if (view === "h4-notify-records") return "records";
   return null;
 }
 

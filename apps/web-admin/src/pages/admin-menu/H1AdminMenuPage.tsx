@@ -29,9 +29,11 @@ import {
 
 const iconOptions = [
   "Activity",
+  "Bell",
   "BookOpen",
   "CheckCircle2",
   "ClipboardList",
+  "History",
   "KeyRound",
   "Layers",
   "MapPinned",
@@ -39,6 +41,7 @@ const iconOptions = [
   "PanelLeftOpen",
   "Printer",
   "ShieldCheck",
+  "Truck",
   "Users",
   "Warehouse",
 ];
@@ -61,6 +64,12 @@ const viewIdOptions = [
   "m4-review",
   "m4-returns",
   "h1-menu-management",
+  "h2-audit-trail",
+  "h3-api-contract",
+  "h4-wechat-settings",
+  "h4-notify-configs",
+  "h4-notify-records",
+  "h5-express",
   "h9-print-templates",
 ];
 

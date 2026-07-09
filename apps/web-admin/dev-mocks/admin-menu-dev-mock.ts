@@ -230,10 +230,16 @@ function devAdminMenuSeed(): DevAdminMenuNode[] {
       group(parent, "inventory-work", "库存管理", "Layers", 10, [["m3-batches", "M3 批号管理", "Layers"]]),
     ]),
     section("platform", "基础能力", "ShieldCheck", 60, (parent) => [
-      group(parent, "platform-work", "平台能力", "ShieldCheck", 10, [
-        ["h1-menu-management", "H1 菜单管理", "ShieldCheck"],
-        ["h9-print-templates", "H9 打印模板", "Printer"],
+      group(parent, "h1-auth", "H1 权限租户", "ShieldCheck", 10, [["h1-menu-management", "H1 菜单管理", "ShieldCheck"]]),
+      group(parent, "h2-audit", "H2 审计能力", "ClipboardList", 20, [["h2-audit-trail", "H2 审计追踪", "ClipboardList"]]),
+      group(parent, "h3-contract", "H3 契约能力", "KeyRound", 30, [["h3-api-contract", "H3 OpenAPI", "KeyRound"]]),
+      group(parent, "h4-wechat", "H4 企业微信", "Bell", 40, [
+        ["h4-wechat-settings", "H4 参数设置", "KeyRound"],
+        ["h4-notify-configs", "H4 通知配置", "Bell"],
+        ["h4-notify-records", "H4 发送记录", "History"],
       ]),
+      group(parent, "h5-express", "H5 快递能力", "Truck", 50, [["h5-express", "H5 快递对接", "Truck"]]),
+      group(parent, "h9-print", "H9 打印能力", "Printer", 90, [["h9-print-templates", "H9 打印模板", "Printer"]]),
     ]),
   ];
 }
@@ -308,6 +314,12 @@ function devViewPermissionKey(viewId: string) {
     "m4-review": "m4.read",
     "m4-returns": "m4.read",
     "h1-menu-management": "h1.menu.read",
+    "h2-audit-trail": "audit.read",
+    "h3-api-contract": "h3.contract.read",
+    "h4-wechat-settings": "h4.notify.read",
+    "h4-notify-configs": "h4.notify.read",
+    "h4-notify-records": "h4.notify.read",
+    "h5-express": "h5.express.read",
     "h9-print-templates": "h9.print_template.read",
   };
   return permissions[viewId] ?? `menu.${viewId.replace(/-/g, ".")}`;
@@ -322,6 +334,9 @@ function devActionLabel(actionKey: string) {
     refresh: "刷新",
     export: "导出",
     print: "打印",
+    waybill: "下单",
+    tracking: "轨迹",
+    cancel: "取消",
   };
   return labels[actionKey] ?? actionKey;
 }

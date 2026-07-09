@@ -84,14 +84,42 @@ async fn admin_menu_draft_publish_is_versioned_idempotent_and_validates_register
         .expect("published menu should list");
     assert_eq!(version_no, Some(1));
     assert!(published.iter().any(|node| node.title == "基础能力"));
-    assert!(published.iter().any(|node| {
-        node.children.iter().any(|group| {
-            group
-                .children
-                .iter()
-                .any(|page| page.view_id.as_deref() == Some("h1-menu-management"))
-        })
-    }));
+    assert!(has_page_in_group(
+        &published,
+        "基础能力",
+        "H1 权限租户",
+        "h1-menu-management"
+    ));
+    assert!(has_page_in_group(
+        &published,
+        "基础能力",
+        "H2 审计能力",
+        "h2-audit-trail"
+    ));
+    assert!(has_page_in_group(
+        &published,
+        "基础能力",
+        "H3 契约能力",
+        "h3-api-contract"
+    ));
+    assert!(has_page_in_group(
+        &published,
+        "基础能力",
+        "H4 企业微信",
+        "h4-notify-configs"
+    ));
+    assert!(has_page_in_group(
+        &published,
+        "基础能力",
+        "H5 快递能力",
+        "h5-express"
+    ));
+    assert!(has_page_in_group(
+        &published,
+        "基础能力",
+        "H9 打印能力",
+        "h9-print-templates"
+    ));
     let inbound_user = ctx_with_permissions(owner_id, &["m2.write"]);
     let (inbound_menu, _) = service
         .list_published_tree(&pool, &inbound_user)
@@ -174,4 +202,22 @@ async fn admin_menu_draft_publish_is_versioned_idempotent_and_validates_register
         .await
         .expect_err("unknown view_id should fail");
     assert_eq!(invalid, AdminMenuError::UnknownView);
+}
+
+fn has_page_in_group(
+    nodes: &[wms_domain::AdminMenuNode],
+    section_title: &str,
+    group_title: &str,
+    view_id: &str,
+) -> bool {
+    nodes.iter().any(|section| {
+        section.title == section_title
+            && section.children.iter().any(|group| {
+                group.title == group_title
+                    && group
+                        .children
+                        .iter()
+                        .any(|page| page.view_id.as_deref() == Some(view_id))
+            })
+    })
 }

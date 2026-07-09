@@ -644,6 +644,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/express/carriers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_express_carriers"];
+        put?: never;
+        post: operations["upsert_express_carrier"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/express/routing-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_express_routing_rules"];
+        put?: never;
+        post: operations["upsert_express_routing_rule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/express/waybills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create_express_waybill"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/express/waybills/{waybill_no}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["cancel_express_waybill"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/express/waybills/{waybill_no}/tracking": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_express_tracking"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/healthz": {
         parameters: {
             query?: never;
@@ -1588,6 +1668,118 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/wechat-notify/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create_h4_approval"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/wechat-notify/approvals/{approval_id}/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["callback_h4_approval"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/wechat-notify/configs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_h4_notification_configs"];
+        put?: never;
+        post: operations["upsert_h4_notification_config"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/wechat-notify/records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_h4_notification_records"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/wechat-notify/records/{record_id}/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["resend_h4_notification_record"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/wechat-notify/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["send_h4_notification"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/wechat-notify/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_h4_wechat_settings"];
+        put?: never;
+        post: operations["upsert_h4_wechat_settings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/metrics": {
         parameters: {
             query?: never;
@@ -1928,6 +2120,9 @@ export interface components {
             quantity: number;
             source_refs: string[];
         };
+        CancelExpressWaybillRequest: {
+            reason?: string | null;
+        };
         ChangeInventoryStatusRequest: {
             approval_id: string;
             approval_source: string;
@@ -2067,6 +2262,34 @@ export interface components {
             customer_name: string;
             license_no?: string | null;
             source?: string | null;
+        };
+        CreateExpressWaybillRequest: {
+            carrier_code: string;
+            /** Format: uuid */
+            outbound_order_id?: string | null;
+            /** Format: int32 */
+            package_count: number;
+            package_no: string;
+            receiver_address: string;
+            receiver_mobile: string;
+            receiver_name: string;
+            requested_waybill_no?: string | null;
+            sender_address: string;
+            sender_mobile: string;
+            sender_name: string;
+            /** Format: int64 */
+            volume_cm3: number;
+            /** Format: int64 */
+            weight_grams: number;
+        };
+        CreateH4ApprovalRequest: {
+            approver_user: string;
+            business_ref: string;
+            callback_path: string;
+            dedupe_key: string;
+            process_id: string;
+            scenario: string;
+            summary: string;
         };
         CreateLocationRequest: {
             /** Format: uuid */
@@ -2376,6 +2599,105 @@ export interface components {
             queue_item_id?: string | null;
             unresolved_fields: string[];
         };
+        ExpressCarrier: {
+            account_no?: string | null;
+            api_key_alias?: string | null;
+            api_secret_alias?: string | null;
+            api_url: string;
+            carrier_code: string;
+            carrier_name: string;
+            conditions: unknown;
+            /** Format: date-time */
+            created_at: string;
+            enabled: boolean;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: int32 */
+            priority: number;
+            status: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        ExpressCarrierListResponse: {
+            data: components["schemas"]["ExpressCarrier"][];
+            page: components["schemas"]["PageMeta"];
+        };
+        ExpressRoutingRule: {
+            carrier_code?: string | null;
+            conditions: unknown;
+            /** Format: date-time */
+            created_at: string;
+            delivery_provider_type: string;
+            /** Format: date-time */
+            effective_from?: string | null;
+            /** Format: date-time */
+            effective_to?: string | null;
+            enabled: boolean;
+            fallback_strategy?: string | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: int32 */
+            priority: number;
+            rule_code: string;
+            rule_name: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        ExpressRoutingRuleListResponse: {
+            data: components["schemas"]["ExpressRoutingRule"][];
+            page: components["schemas"]["PageMeta"];
+        };
+        ExpressTrackingEvent: {
+            /** Format: date-time */
+            cached_at: string;
+            description: string;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: uuid */
+            id: string;
+            location?: string | null;
+            source: string;
+            status: string;
+            waybill_no: string;
+        };
+        ExpressTrackingResponse: {
+            events: components["schemas"]["ExpressTrackingEvent"][];
+            waybill: components["schemas"]["ExpressWaybill"];
+        };
+        ExpressWaybill: {
+            carrier_code: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            eta_at?: string | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            outbound_order_id?: string | null;
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: int32 */
+            package_count: number;
+            package_no: string;
+            receiver_address: string;
+            receiver_mobile: string;
+            receiver_name: string;
+            sender_address: string;
+            sender_mobile: string;
+            sender_name: string;
+            status: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: int64 */
+            volume_cm3: number;
+            waybill_no: string;
+            /** Format: int64 */
+            weight_grams: number;
+        };
         FeatureFlagArchiveRequest: {
             archive_ref: string;
         };
@@ -2457,6 +2779,114 @@ export interface components {
             values: {
                 [key: string]: unknown;
             };
+        };
+        H4ApprovalCallbackRequest: {
+            approved_by: string;
+            conclusion: string;
+            external_approval_id?: string | null;
+            opinion?: string | null;
+        };
+        H4ApprovalRecord: {
+            /** Format: date-time */
+            approved_at?: string | null;
+            approved_by?: string | null;
+            approver_user: string;
+            business_ref: string;
+            callback_path: string;
+            /** Format: date-time */
+            created_at: string;
+            dedupe_key: string;
+            external_approval_id?: string | null;
+            failure_reason?: string | null;
+            /** Format: uuid */
+            id: string;
+            opinion?: string | null;
+            /** Format: uuid */
+            owner_id: string;
+            process_id: string;
+            scenario: string;
+            status: string;
+            summary: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        H4NotificationConfig: {
+            channels: string[];
+            /** Format: date-time */
+            created_at: string;
+            enabled: boolean;
+            event_type: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            /** @description 自由结构 JSON 对象。 */
+            recipient_rule: {
+                [key: string]: unknown;
+            };
+            template: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: int64 */
+            version: number;
+        };
+        H4NotificationConfigListResponse: {
+            data: components["schemas"]["H4NotificationConfig"][];
+            page: components["schemas"]["PageMeta"];
+        };
+        H4NotificationRecord: {
+            channel: string;
+            /** Format: uuid */
+            config_id?: string | null;
+            content_summary: string;
+            /** Format: date-time */
+            created_at: string;
+            dedupe_key: string;
+            event_type: string;
+            failure_reason?: string | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            recipient: string;
+            /** Format: int32 */
+            retry_count: number;
+            /** Format: date-time */
+            sent_at?: string | null;
+            status: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        H4NotificationRecordListResponse: {
+            data: components["schemas"]["H4NotificationRecord"][];
+            page: components["schemas"]["PageMeta"];
+        };
+        H4WechatSettings: {
+            aes_key_alias: string;
+            agent_id: string;
+            approval_callback_path: string;
+            callback_token_alias: string;
+            callback_url: string;
+            corp_id: string;
+            /** Format: date-time */
+            created_at: string;
+            enabled: boolean;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: int32 */
+            retry_interval_seconds: number;
+            /** Format: int32 */
+            retry_max_attempts: number;
+            secret_alias: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: int64 */
+            version: number;
+        };
+        H4WechatSettingsResponse: {
+            data?: components["schemas"]["H4WechatSettings"] | null;
         };
         /** @description 健康检查响应。 */
         HealthzResponse: {
@@ -3281,6 +3711,15 @@ export interface components {
             template_name: string;
             template_type_code: string;
         };
+        SendH4NotificationRequest: {
+            dedupe_key: string;
+            event_type: string;
+            /** @description 自由结构 JSON 对象。 */
+            payload: {
+                [key: string]: unknown;
+            };
+            recipients: string[];
+        };
         SetDocumentNumberRuleEnabledRequest: {
             enabled: boolean;
         };
@@ -3637,6 +4076,57 @@ export interface components {
             /** Format: int32 */
             sequence_width: number;
             template: string;
+        };
+        UpsertExpressCarrierRequest: {
+            account_no?: string | null;
+            api_key_alias?: string | null;
+            api_secret_alias?: string | null;
+            api_url: string;
+            carrier_code: string;
+            carrier_name: string;
+            conditions: unknown;
+            enabled: boolean;
+            /** Format: int32 */
+            priority: number;
+        };
+        UpsertExpressRoutingRuleRequest: {
+            carrier_code?: string | null;
+            conditions: unknown;
+            delivery_provider_type: string;
+            /** Format: date-time */
+            effective_from?: string | null;
+            /** Format: date-time */
+            effective_to?: string | null;
+            enabled: boolean;
+            fallback_strategy?: string | null;
+            /** Format: int32 */
+            priority: number;
+            rule_code: string;
+            rule_name: string;
+        };
+        UpsertH4NotificationConfigRequest: {
+            channels: string[];
+            enabled: boolean;
+            event_type: string;
+            /** @description 自由结构 JSON 对象。 */
+            recipient_rule: {
+                [key: string]: unknown;
+            };
+            template: string;
+        };
+        UpsertH4WechatSettingsRequest: {
+            aes_key_alias: string;
+            agent_id: string;
+            approval_callback_path: string;
+            callback_token_alias: string;
+            callback_url: string;
+            corp_id: string;
+            enabled: boolean;
+            /** Format: int32 */
+            retry_interval_seconds: number;
+            /** Format: int32 */
+            retry_max_attempts: number;
+            secret_alias: string;
         };
         UpsertSystemDictionaryItemRequest: {
             /** Format: date-time */
@@ -5486,6 +5976,358 @@ export interface operations {
                 };
             };
             /** @description 事件投递不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_express_carriers: {
+        parameters: {
+            query?: {
+                /** @description 快递商编码或名称 */
+                q?: string | null;
+                /** @description 启停状态 */
+                enabled?: boolean | null;
+                /** @description 返回条数 */
+                limit?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 快递商配置列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpressCarrierListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    upsert_express_carrier: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertExpressCarrierRequest"];
+            };
+        };
+        responses: {
+            /** @description 新增或更新快递商配置 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpressCarrier"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 快递商配置非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_express_routing_rules: {
+        parameters: {
+            query?: {
+                /** @description 规则编码或名称 */
+                q?: string | null;
+                /** @description 配送方式 */
+                delivery_provider_type?: string | null;
+                /** @description 启停状态 */
+                enabled?: boolean | null;
+                /** @description 返回条数 */
+                limit?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 快递选择规则列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpressRoutingRuleListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    upsert_express_routing_rule: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertExpressRoutingRuleRequest"];
+            };
+        };
+        responses: {
+            /** @description 新增或更新快递选择规则 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpressRoutingRule"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 快递规则非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_express_waybill: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateExpressWaybillRequest"];
+            };
+        };
+        responses: {
+            /** @description 快递下单并生成运单 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpressWaybill"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 快递商不存在或未启用 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 快递下单字段非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    cancel_express_waybill: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 快递运单号 */
+                waybill_no: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelExpressWaybillRequest"];
+            };
+        };
+        responses: {
+            /** @description 取消快递运单 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpressWaybill"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 运单不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 运单状态不可取消 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_express_tracking: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 快递运单号 */
+                waybill_no: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 快递轨迹缓存 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpressTrackingResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 运单不存在 */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -8802,6 +9644,588 @@ export interface operations {
                 };
             };
             /** @description 追溯码状态变更三元组不完整 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_h4_approval: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateH4ApprovalRequest"];
+            };
+        };
+        responses: {
+            /** @description 创建企业微信审批记录 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H4ApprovalRecord"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 审批请求非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    callback_h4_approval: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 审批记录 ID */
+                approval_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["H4ApprovalCallbackRequest"];
+            };
+        };
+        responses: {
+            /** @description 回写企业微信审批结果 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H4ApprovalRecord"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 审批记录不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 审批结论非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_h4_notification_configs: {
+        parameters: {
+            query?: {
+                /** @description 按通知事件过滤 */
+                event_type?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description H4 通知配置列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H4NotificationConfigListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    upsert_h4_notification_config: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertH4NotificationConfigRequest"];
+            };
+        };
+        responses: {
+            /** @description 创建或更新 H4 通知配置 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H4NotificationConfig"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 配置非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_h4_notification_records: {
+        parameters: {
+            query?: {
+                /** @description 按事件过滤 */
+                event_type?: string | null;
+                /** @description 按接收人模糊过滤 */
+                recipient?: string | null;
+                /** @description 按发送状态过滤 */
+                status?: string | null;
+                /** @description 创建时间起点 */
+                from?: string | null;
+                /** @description 创建时间终点 */
+                to?: string | null;
+                /** @description 返回条数，默认 50，最大 100 */
+                limit?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description H4 通知发送记录列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H4NotificationRecordListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    resend_h4_notification_record: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 通知记录 ID */
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 重发 H4 通知记录 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H4NotificationRecord"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 通知记录不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    send_h4_notification: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendH4NotificationRequest"];
+            };
+        };
+        responses: {
+            /** @description 发送企业微信通知 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H4NotificationRecord"][];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 事件未配置 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 模板或接收人非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_h4_wechat_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description H4 企业微信通道参数 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H4WechatSettingsResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    upsert_h4_wechat_settings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertH4WechatSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description 创建或更新 H4 企业微信通道参数 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H4WechatSettings"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 参数非法 */
             422: {
                 headers: {
                     [name: string]: unknown;
