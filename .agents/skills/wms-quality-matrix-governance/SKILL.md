@@ -74,6 +74,12 @@ description: WMS 全链路质量矩阵治理技能。用户要求建立或维护
 
 发现型缺口不能在最终汇报中消失；“补齐/闭环/验收/所有模块”任务必须升级为严格模式，并按功能闭环处理。
 
+前端页面闭环的最小证据：
+
+- `frontend_pages` 声明的页面必须同时出现在 `apps/web-admin/src/App.tsx` 的 `menuSections`、`defaultMenuTree`、`renderAdminView` 可达路由和 `apps/web-admin/dev-mocks/admin-menu-dev-mock.ts` 已发布菜单种子中。
+- 带 `frontend_interaction` 且声明了 `frontend_pages` 的故事，必须在质量矩阵写 `e2e_checks`，内容可以是 Playwright E2E 命令，也可以是页面级 self-check 命令；模块严格闭环时缺失即失败。
+- 页面级 self-check 至少覆盖菜单入口、默认菜单树、已发布菜单 dev mock、路由渲染、公共查询 / 表格组件、真实后端或 dev mock 数据入口，防止“菜单有了但页面不可达 / Dev mock route not found / 没有可运行证据”。
+
 ## 运行反馈迭代
 
 出现三页以上同类遗漏、前端有页面但后端/API/权限未跟上、issue/review 暴露脚本漏检、新业务概念影响多模块时，先补矩阵或脚本，再批量修实现。顺序：定义目标 → 补事实源 → 补脚本 → 跑失败 → 修实现 → 生成展示页 → 复跑治理 → 记录漏检规则。

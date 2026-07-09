@@ -16,7 +16,7 @@ import argparse
 import json
 import re
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -29,9 +29,13 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 STORY_DIR = REPO_ROOT / "docs" / "domain"
 MATRIX = REPO_ROOT / "governance" / "quality-matrix.toml"
 APP_TSX = REPO_ROOT / "apps" / "web-admin" / "src" / "App.tsx"
+ADMIN_MENU_DEV_MOCK_TS = REPO_ROOT / "apps" / "web-admin" / "dev-mocks" / "admin-menu-dev-mock.ts"
 
 STORY_HEADING_RE = re.compile(r"^##\s+(US-[A-Z0-9]+-\d{3})[：:]\s*(.+?)\s*$", re.MULTILINE)
 MENU_ITEM_RE = re.compile(r'\{\s*id:\s*"([^"]+)"\s*,\s*title:\s*"([^"]+)"')
+MENU_TREE_ITEM_RE = re.compile(r'menuItem\("([^"]+)"\)')
+VIEW_LITERAL_RE = re.compile(r'"(dashboard|[a-z][a-z0-9]+-[a-z0-9-]+)"')
+DEV_MOCK_MENU_PAGE_RE = re.compile(r'\["([^"]+)",\s*"[^"]+",\s*"[^"]+"\]')
 
 
 @dataclass(frozen=True)
@@ -50,6 +54,14 @@ class ScopeGap:
     story_id: str
     file: str
     message: str
+
+
+@dataclass(frozen=True)
+class AdminNavigation:
+    menu_sections: dict[str, str]
+    default_menu_tree: set[str]
+    routed_views: set[str]
+    dev_mock_published_views: set[str] = field(default_factory=set)
 
 
 @dataclass(frozen=True)
@@ -101,15 +113,46 @@ def deferred_stories(data: dict[str, Any]) -> list[dict[str, Any]]:
     return [story for story in stories if isinstance(story, dict)]
 
 
-def read_admin_pages() -> dict[str, str]:
+def read_admin_navigation() -> AdminNavigation:
     text = APP_TSX.read_text(encoding="utf-8")
     start = text.index("const menuSections")
     end = text.index("const MENU_EXPANDED_STORAGE_KEY", start)
-    return {page_id: title for page_id, title in MENU_ITEM_RE.findall(text[start:end])}
+    menu_sections = {page_id: title for page_id, title in MENU_ITEM_RE.findall(text[start:end])}
+
+    tree_start = text.index("const defaultMenuTree")
+    tree_end = text.index("const adminMenuIconByKey", tree_start)
+    default_menu_tree = set(MENU_TREE_ITEM_RE.findall(text[tree_start:tree_end]))
+
+    route_start = text.index("function renderAdminView")
+    route_end = text.index("function LoadingShell", route_start)
+    routed_views = set(VIEW_LITERAL_RE.findall(text[route_start:route_end]))
+
+    return AdminNavigation(
+        menu_sections=menu_sections,
+        default_menu_tree=default_menu_tree,
+        routed_views=routed_views,
+        dev_mock_published_views=read_dev_mock_published_views(),
+    )
+
+
+def read_admin_pages() -> dict[str, str]:
+    return read_admin_navigation().menu_sections
+
+
+def read_dev_mock_published_views() -> set[str]:
+    if not ADMIN_MENU_DEV_MOCK_TS.exists():
+        return set()
+    text = ADMIN_MENU_DEV_MOCK_TS.read_text(encoding="utf-8")
+    return {page_id for page_id in DEV_MOCK_MENU_PAGE_RE.findall(text) if page_id == "dashboard" or "-" in page_id}
 
 
 def page_module(page_id: str) -> str:
     return page_id.split("-", 1)[0].upper()
+
+
+def has_frontend_e2e_checks(story: dict[str, Any]) -> bool:
+    checks = story.get("e2e_checks")
+    return isinstance(checks, list) and any(isinstance(item, str) and item.strip() for item in checks)
 
 
 def scan_scope_gaps(
@@ -118,6 +161,7 @@ def scan_scope_gaps(
     matrix_stories: list[dict[str, Any]],
     deferred_stories: list[dict[str, Any]] | None = None,
     admin_pages: dict[str, str],
+    admin_navigation: AdminNavigation | None = None,
     modules: set[str] | None = None,
 ) -> ScopeScanResult:
     story_headings = parse_story_headings(story_docs)
@@ -149,6 +193,12 @@ def scan_scope_gaps(
         for page_id in story.get("frontend_pages", [])
         if isinstance(page_id, str)
     }
+    if admin_navigation is None:
+        admin_navigation = AdminNavigation(
+            menu_sections=admin_pages,
+            default_menu_tree=set(admin_pages),
+            routed_views=set(admin_pages),
+        )
 
     for story in deferred_stories or []:
         story_id = str(story.get("id", ""))
@@ -218,10 +268,11 @@ def scan_scope_gaps(
                     message="质量矩阵登记了故事，但用户故事文档没有对应二级标题",
                 )
             )
-        for page_id in story.get("frontend_pages", []):
+        frontend_pages = [page_id for page_id in story.get("frontend_pages", []) if isinstance(page_id, str) and page_id]
+        for page_id in frontend_pages:
             if not isinstance(page_id, str) or not page_id:
                 continue
-            if page_id not in admin_pages:
+            if page_id not in admin_navigation.menu_sections:
                 gaps.append(
                     ScopeGap(
                         severity="block",
@@ -232,6 +283,56 @@ def scan_scope_gaps(
                         message=f"质量矩阵声明前端页 {page_id}，但 App 菜单没有该页面",
                     )
                 )
+            if page_id not in admin_navigation.default_menu_tree:
+                gaps.append(
+                    ScopeGap(
+                        severity="block",
+                        kind="frontend_page_not_in_default_menu_tree",
+                        module=module,
+                        story_id=story_id,
+                        file=rel(APP_TSX),
+                        message=f"质量矩阵声明前端页 {page_id}，但默认三层菜单树没有该页面",
+                    )
+                )
+            if page_id not in admin_navigation.routed_views:
+                gaps.append(
+                    ScopeGap(
+                        severity="block",
+                        kind="frontend_page_not_routed",
+                        module=module,
+                        story_id=story_id,
+                        file=rel(APP_TSX),
+                        message=f"质量矩阵声明前端页 {page_id}，但 renderAdminView 没有可达路由",
+                    )
+                )
+            if admin_navigation.dev_mock_published_views and page_id not in admin_navigation.dev_mock_published_views:
+                gaps.append(
+                    ScopeGap(
+                        severity="block",
+                        kind="frontend_page_not_in_dev_mock_published_menu",
+                        module=module,
+                        story_id=story_id,
+                        file=rel(ADMIN_MENU_DEV_MOCK_TS),
+                        message=f"质量矩阵声明前端页 {page_id}，但 dev mock 已发布菜单没有该页面",
+                    )
+                )
+        story_types = story.get("types", [])
+        if (
+            frontend_pages
+            and isinstance(story_types, list)
+            and "frontend_interaction" in story_types
+            and not has_frontend_e2e_checks(story)
+        ):
+            gaps.append(
+                ScopeGap(
+                    severity="discover",
+                    kind="frontend_story_missing_e2e_check",
+                    module=module,
+                    story_id=story_id,
+                    file=rel(MATRIX),
+                    message="前端交互故事已声明页面，但质量矩阵缺少 e2e_checks；需登记 Playwright 或页面级自检命令",
+                )
+            )
 
     for story in story_headings:
         if story.module not in active_modules:
@@ -251,7 +352,7 @@ def scan_scope_gaps(
             )
         )
 
-    for page_id, title in sorted(admin_pages.items()):
+    for page_id, title in sorted(admin_navigation.menu_sections.items()):
         module = page_module(page_id)
         if module not in active_modules:
             continue
@@ -288,11 +389,13 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     matrix = read_matrix()
+    admin_navigation = read_admin_navigation()
     result = scan_scope_gaps(
         story_docs=read_story_docs(),
         matrix_stories=matrix_stories(matrix),
         deferred_stories=deferred_stories(matrix),
-        admin_pages=read_admin_pages(),
+        admin_pages=admin_navigation.menu_sections,
+        admin_navigation=admin_navigation,
         modules={module.upper() for module in args.module} if args.module else None,
     )
     effective_ok = result.strict_ok if args.strict else result.ok

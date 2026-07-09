@@ -54,3 +54,6 @@
 - 新增用户故事、管理端菜单页、页面文件或质量矩阵条目时，必须让该脚本能解释“已覆盖、待登记、或明确不在本轮范围”。
 - 明确不在本轮范围的故事写入 `governance/quality-matrix.toml` 的 `[[deferred_stories]]`，必须有原因；这只关闭范围缺口，不表示功能已完成。
 - issue、review 或验收反馈发现“页面已有但按钮/弹窗/流程没做”时，先定位对应用户故事是否已进入矩阵；没有进入矩阵则先补矩阵或登记待办，再补实现。
+- 管理端页面进入 `frontend_pages` 后，必须同时检查 `menuSections`、`defaultMenuTree`、`renderAdminView` 路由可达和 `apps/web-admin/dev-mocks/admin-menu-dev-mock.ts` 已发布菜单种子，避免只登记菜单标题但默认三层菜单、运行时已发布菜单或页面渲染漏接。
+- 带 `frontend_interaction` 且声明管理端页面的故事，必须登记 `e2e_checks`。该字段可以写 Playwright E2E 命令，也可以写页面级 self-check 命令；严格模式下缺失视为闭环缺口。
+- 页面级 self-check 至少覆盖菜单入口、默认菜单树、已发布菜单 dev mock、路由渲染、公共 `QueryPanel` / `DataGrid` 使用、真实后端或 dev mock 数据入口。

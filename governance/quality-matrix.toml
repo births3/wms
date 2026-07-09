@@ -157,6 +157,10 @@ api_paths = [
   "GET /api/v1/admin/menus/published",
   "POST /api/v1/admin/menus/rollback",
 ]
+e2e_checks = [
+  "pnpm --dir apps/web-admin run test:e2e:shell-dev",
+  "node apps/web-admin/self-checks/app-shell-layout-self-check.mjs",
+]
 
 [stories.dimensions]
 requirement = "verified"
@@ -212,16 +216,19 @@ id = "US-H2-002"
 title = "审计追踪查询（后端分页查询切片）"
 module = "H2"
 story_file = "docs/domain/user-stories-h2-audit-trail.md"
-types = ["read_only", "api_change"]
-frontend_pages = []
+types = ["read_only", "api_change", "frontend_interaction"]
+frontend_pages = ["h2-audit-trail"]
 api_paths = [
   "GET /api/v1/audit/events",
+]
+e2e_checks = [
+  "pnpm --dir apps/web-admin run test:e2e:shell-dev",
 ]
 
 [stories.dimensions]
 requirement = "verified"
 fields = "verified"
-frontend = "not_applicable"
+frontend = "verified"
 api = "verified"
 backend = "verified"
 database = "verified"
@@ -232,12 +239,9 @@ evidence = "verified"
 docs = "verified"
 governance = "verified"
 
-[stories.not_applicable_reasons]
-frontend = "本切片只登记审计追踪后端查询接口；M6 审计报表页面承接查询界面。"
-
 [stories.tests]
-required_layers = ["L1", "L2", "L3", "L8", "L9"]
-covered_layers = ["L1", "L2", "L3", "L8", "L9"]
+required_layers = ["L1", "L2", "L3", "L7", "L8", "L9"]
+covered_layers = ["L1", "L2", "L3", "L7", "L8", "L9"]
 
 [[stories]]
 id = "US-H2-003"
@@ -468,9 +472,12 @@ id = "US-H3-004"
 title = "API 文档可访问性"
 module = "H3"
 story_file = "docs/domain/user-stories-h3-contract.md"
-types = ["read_only", "api_change", "config_rule"]
-frontend_pages = []
+types = ["read_only", "api_change", "config_rule", "frontend_interaction"]
+frontend_pages = ["h3-api-contract"]
 api_paths = ["GET /openapi.json", "GET /api-docs", "GET /redoc"]
+e2e_checks = [
+  "pnpm --dir apps/web-admin run test:e2e:shell-dev",
+]
 
 [stories.dimensions]
 requirement = "verified"
@@ -491,8 +498,312 @@ database = "API 文档访问不新增业务表。"
 audit = "Spec 变更通过 Git 与 OpenAPI changelog 追踪；文档访问日志由 Web 服务器或网关记录，不写业务审计表。"
 
 [stories.tests]
-required_layers = ["L1", "L2", "L3", "L4", "L8", "L9"]
-covered_layers = ["L1", "L2", "L3", "L4", "L8", "L9"]
+required_layers = ["L1", "L2", "L3", "L4", "L7", "L8", "L9"]
+covered_layers = ["L1", "L2", "L3", "L4", "L7", "L8", "L9"]
+
+[[stories]]
+id = "US-H4-001"
+title = "通知配置"
+module = "H4"
+story_file = "docs/domain/user-stories-h4-wechat-notify.md"
+types = ["write", "config_rule", "frontend_interaction", "audit_compliance"]
+frontend_pages = ["h4-notify-configs"]
+api_paths = [
+  "GET /api/v1/wechat-notify/configs",
+  "POST /api/v1/wechat-notify/configs",
+]
+e2e_checks = [
+  "pnpm --dir apps/web-admin run test:e2e:h4-dev",
+  "node apps/web-admin/self-checks/h4-wechat-notify-slice-self-check.mjs",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+
+[[stories]]
+id = "US-H4-002"
+title = "企业微信消息发送"
+module = "H4"
+story_file = "docs/domain/user-stories-h4-wechat-notify.md"
+types = ["write", "integration", "runtime_guard", "audit_compliance", "frontend_interaction"]
+frontend_pages = ["h4-wechat-settings", "h4-notify-configs", "h4-notify-records"]
+api_paths = [
+  "GET /api/v1/wechat-notify/settings",
+  "POST /api/v1/wechat-notify/settings",
+  "POST /api/v1/wechat-notify/send",
+  "GET /api/v1/wechat-notify/records",
+]
+e2e_checks = [
+  "pnpm --dir apps/web-admin run test:e2e:h4-dev",
+  "node apps/web-admin/self-checks/h4-wechat-notify-slice-self-check.mjs",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+
+[[stories]]
+id = "US-H4-003"
+title = "企业微信审批流对接"
+module = "H4"
+story_file = "docs/domain/user-stories-h4-wechat-notify.md"
+types = ["write", "integration", "runtime_guard", "audit_compliance", "api_change"]
+frontend_pages = []
+api_paths = [
+  "POST /api/v1/wechat-notify/approvals",
+  "POST /api/v1/wechat-notify/approvals/{approval_id}/callback",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "not_applicable"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.not_applicable_reasons]
+frontend = "H4 审批流由业务单据触发和企业微信回调驱动，本切片不新增独立管理端审批页面。"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+
+[[stories]]
+id = "US-H4-004"
+title = "通知发送记录查询"
+module = "H4"
+story_file = "docs/domain/user-stories-h4-wechat-notify.md"
+types = ["read_only", "write", "api_change", "frontend_interaction", "audit_compliance"]
+frontend_pages = ["h4-notify-records"]
+api_paths = [
+  "GET /api/v1/wechat-notify/records",
+  "POST /api/v1/wechat-notify/records/{record_id}/resend",
+]
+e2e_checks = [
+  "pnpm --dir apps/web-admin run test:e2e:h4-dev",
+  "node apps/web-admin/self-checks/h4-wechat-notify-slice-self-check.mjs",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+
+[[stories]]
+id = "US-H5-001"
+title = "快递商配置"
+module = "H5"
+story_file = "docs/domain/user-stories-h5-express.md"
+types = ["write", "config_rule", "frontend_interaction", "audit_compliance"]
+frontend_pages = ["h5-express"]
+api_paths = [
+  "GET /api/v1/express/carriers",
+  "POST /api/v1/express/carriers",
+]
+e2e_checks = [
+  "pnpm --dir apps/web-admin run test:e2e:shell-dev",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+
+[[stories]]
+id = "US-H5-002"
+title = "快递选择规则配置"
+module = "H5"
+story_file = "docs/domain/user-stories-h5-express.md"
+types = ["write", "config_rule", "frontend_interaction", "audit_compliance"]
+frontend_pages = ["h5-express"]
+api_paths = [
+  "GET /api/v1/express/routing-rules",
+  "POST /api/v1/express/routing-rules",
+]
+e2e_checks = [
+  "pnpm --dir apps/web-admin run test:e2e:shell-dev",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+
+[[stories]]
+id = "US-H5-003"
+title = "快递单打印"
+module = "H5"
+story_file = "docs/domain/user-stories-h5-express.md"
+types = ["write", "frontend_interaction", "api_change", "audit_compliance"]
+frontend_pages = ["h5-express", "h9-print-templates"]
+api_paths = [
+  "POST /api/v1/packing/jobs/{id}/waybill",
+  "POST /api/v1/express/waybills",
+]
+e2e_checks = [
+  "pnpm --dir apps/web-admin run test:e2e:shell-dev",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+
+[[stories]]
+id = "US-H5-004"
+title = "快递推送下单"
+module = "H5"
+story_file = "docs/domain/user-stories-h5-express.md"
+types = ["write", "integration", "runtime_guard", "frontend_interaction", "audit_compliance"]
+frontend_pages = ["h5-express"]
+api_paths = [
+  "POST /api/v1/express/waybills",
+  "POST /api/v1/express/waybills/{waybill_no}/cancel",
+]
+e2e_checks = [
+  "pnpm --dir apps/web-admin run test:e2e:shell-dev",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+
+[[stories]]
+id = "US-H5-005"
+title = "快递轨迹查询"
+module = "H5"
+story_file = "docs/domain/user-stories-h5-express.md"
+types = ["read_only", "integration", "frontend_interaction", "api_change"]
+frontend_pages = ["h5-express"]
+api_paths = [
+  "GET /api/v1/express/waybills/{waybill_no}/tracking",
+]
+e2e_checks = [
+  "pnpm --dir apps/web-admin run test:e2e:shell-dev",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "not_applicable"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.not_applicable_reasons]
+audit = "H5 轨迹查询为只读缓存读取；快递下单和配置写入分别在 US-H5-001、US-H5-002、US-H5-004 写入 H2 审计。"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L7", "L8", "L9", "L10"]
+covered_layers = ["L1", "L2", "L3", "L4", "L7", "L8", "L9", "L10"]
 
 [[stories]]
 id = "US-H9-001"
@@ -505,6 +816,10 @@ api_paths = [
   "GET /api/v1/system-dictionaries/{dict_code}/items",
   "PUT /api/v1/system-dictionaries/{dict_code}/items/{item_code}",
   "PATCH /api/v1/system-dictionaries/{dict_code}/items/{item_code}/disable",
+]
+e2e_checks = [
+  "node apps/web-admin/self-checks/h9-print-template-tree-self-check.mjs",
+  "pnpm --dir apps/web-admin run test:e2e:h9-dev",
 ]
 
 [stories.dimensions]
@@ -534,6 +849,10 @@ types = ["read_only", "api_change", "frontend_interaction"]
 frontend_pages = ["h9-print-templates"]
 api_paths = [
   "GET /api/v1/print-templates/field-libraries",
+]
+e2e_checks = [
+  "node apps/web-admin/self-checks/h9-print-template-tree-self-check.mjs",
+  "pnpm --dir apps/web-admin run test:e2e:h9-dev",
 ]
 
 [stories.dimensions]
@@ -569,6 +888,10 @@ api_paths = [
   "POST /api/v1/print-templates/templates",
   "GET /api/v1/print-templates/field-libraries/{version_id}/fields",
 ]
+e2e_checks = [
+  "node apps/web-admin/self-checks/h9-print-template-tree-self-check.mjs",
+  "pnpm --dir apps/web-admin run test:e2e:h9-dev",
+]
 
 [stories.dimensions]
 requirement = "verified"
@@ -599,6 +922,10 @@ api_paths = [
   "POST /api/v1/print-templates/preview",
   "POST /api/v1/print-templates/print",
 ]
+e2e_checks = [
+  "node apps/web-admin/self-checks/h9-print-template-tree-self-check.mjs",
+  "pnpm --dir apps/web-admin run test:e2e:h9-dev",
+]
 
 [stories.dimensions]
 requirement = "verified"
@@ -627,6 +954,10 @@ types = ["read_only", "frontend_interaction", "api_change"]
 frontend_pages = ["h9-print-templates"]
 api_paths = [
   "POST /api/v1/print-templates/resolve",
+]
+e2e_checks = [
+  "node apps/web-admin/self-checks/h9-print-template-tree-self-check.mjs",
+  "pnpm --dir apps/web-admin run test:e2e:h9-dev",
 ]
 
 [stories.dimensions]

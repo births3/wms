@@ -56,6 +56,110 @@ def test_scope_gap_blocks_matrix_frontend_page_that_is_not_in_menu():
     assert result.gaps[0].severity == "block"
 
 
+def test_scope_gap_blocks_matrix_frontend_page_that_is_not_in_default_tree_or_route():
+    from check_scope_gap_discovery import AdminNavigation, scan_scope_gaps
+
+    result = scan_scope_gaps(
+        story_docs={"docs/domain/user-stories-m2-inbound.md": "## US-M2-002：收货管理"},
+        matrix_stories=[
+            {
+                "id": "US-M2-002",
+                "module": "M2",
+                "frontend_pages": ["m2-receiving"],
+                "api_paths": [],
+            }
+        ],
+        admin_pages={"m2-receiving": "M2 收货管理"},
+        admin_navigation=AdminNavigation(
+            menu_sections={"m2-receiving": "M2 收货管理"},
+            default_menu_tree=set(),
+            routed_views=set(),
+        ),
+    )
+
+    assert not result.ok
+    assert [gap.kind for gap in result.gaps] == [
+        "frontend_page_not_in_default_menu_tree",
+        "frontend_page_not_routed",
+    ]
+
+
+def test_scope_gap_blocks_matrix_frontend_page_that_is_not_in_dev_mock_published_menu():
+    from check_scope_gap_discovery import AdminNavigation, scan_scope_gaps
+
+    result = scan_scope_gaps(
+        story_docs={"docs/domain/user-stories-h4-wechat-notify.md": "## US-H4-001：通知配置"},
+        matrix_stories=[
+            {
+                "id": "US-H4-001",
+                "module": "H4",
+                "frontend_pages": ["h4-notify-configs"],
+                "api_paths": [],
+            }
+        ],
+        admin_pages={"h4-notify-configs": "H4 通知配置"},
+        admin_navigation=AdminNavigation(
+            menu_sections={"h4-notify-configs": "H4 通知配置"},
+            default_menu_tree={"h4-notify-configs"},
+            routed_views={"h4-notify-configs"},
+            dev_mock_published_views={"h1-menu-management"},
+        ),
+    )
+
+    assert not result.ok
+    assert [gap.kind for gap in result.gaps] == ["frontend_page_not_in_dev_mock_published_menu"]
+    assert result.gaps[0].severity == "block"
+
+
+def test_scope_gap_discovers_frontend_story_without_e2e_checks():
+    from check_scope_gap_discovery import AdminNavigation, scan_scope_gaps
+
+    navigation = AdminNavigation(
+        menu_sections={"m2-receiving": "M2 收货管理"},
+        default_menu_tree={"m2-receiving"},
+        routed_views={"m2-receiving"},
+    )
+    result = scan_scope_gaps(
+        story_docs={"docs/domain/user-stories-m2-inbound.md": "## US-M2-002：收货管理"},
+        matrix_stories=[
+            {
+                "id": "US-M2-002",
+                "module": "M2",
+                "types": ["frontend_interaction"],
+                "frontend_pages": ["m2-receiving"],
+                "api_paths": [],
+            }
+        ],
+        admin_pages=navigation.menu_sections,
+        admin_navigation=navigation,
+    )
+
+    assert result.ok
+    assert not result.strict_ok
+    assert [gap.kind for gap in result.gaps] == ["frontend_story_missing_e2e_check"]
+    assert result.gaps[0].severity == "discover"
+
+    with_e2e = scan_scope_gaps(
+        story_docs={"docs/domain/user-stories-m2-inbound.md": "## US-M2-002：收货管理"},
+        matrix_stories=[
+            {
+                "id": "US-M2-002",
+                "module": "M2",
+                "types": ["frontend_interaction"],
+                "frontend_pages": ["m2-receiving"],
+                "api_paths": [],
+                "e2e_checks": ["pnpm --dir apps/web-admin run test:self-checks"],
+            }
+        ],
+        admin_pages=navigation.menu_sections,
+        admin_navigation=navigation,
+    )
+
+    assert with_e2e.ok
+    assert with_e2e.strict_ok
+    assert with_e2e.gaps == []
+
+
 def test_scope_gap_module_filter_keeps_requested_module_without_other_gaps():
     from check_scope_gap_discovery import scan_scope_gaps
 
