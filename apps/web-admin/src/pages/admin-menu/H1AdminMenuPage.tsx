@@ -1,5 +1,19 @@
 import * as React from "react";
-import { Button, Card, CardContent, Checkbox, Input, PageHeader, StatusBadge, cn } from "@wms/ui";
+import {
+  Button,
+  Card,
+  CardContent,
+  Checkbox,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  PageHeader,
+  StatusBadge,
+  cn,
+} from "@wms/ui";
 import { GitBranch, RefreshCw, RotateCcw, Save, Send, ToggleLeft } from "lucide-react";
 
 import {
@@ -62,6 +76,11 @@ interface NodeForm {
   buttons: AdminMenuButtonPermission[];
 }
 
+interface CreateChildForm {
+  title: string;
+  viewId: string;
+}
+
 export function H1AdminMenuPage() {
   const draftQuery = useDraftAdminMenuQuery();
   const createMutation = useCreateAdminMenuNodeMutation();
@@ -79,6 +98,8 @@ export function H1AdminMenuPage() {
   const [form, setForm] = React.useState<NodeForm>(() => formFromNode(null));
   const [newActionKey, setNewActionKey] = React.useState("");
   const [newActionLabel, setNewActionLabel] = React.useState("");
+  const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
+  const [createForm, setCreateForm] = React.useState<CreateChildForm>({ title: "", viewId: "" });
   const busy = createMutation.isPending || updateMutation.isPending || batchEnableMutation.isPending || publishMutation.isPending || rollbackMutation.isPending;
 
   React.useEffect(() => {
@@ -89,18 +110,21 @@ export function H1AdminMenuPage() {
     setForm(formFromNode(selectedNode));
   }, [selectedNode?.id]);
 
-  async function run<T>(task: Promise<T>, success: string, fallback: string) {
+  async function run<T>(task: Promise<T>, success: string, fallback: string): Promise<boolean> {
     setNotice(null);
     try {
       await task;
       setNotice({ type: "success", text: success });
+      return true;
     } catch (error) {
       setNotice({ type: "error", text: error instanceof Error ? error.message : fallback });
+      return false;
     }
   }
 
   async function saveSelected() {
     if (!selectedNode) return;
+    if (!window.confirm(`确认保存菜单节点「${selectedNode.title}」？`)) return;
     await run(
       updateMutation.mutateAsync({
         id: selectedNode.id,
@@ -119,19 +143,25 @@ export function H1AdminMenuPage() {
     );
   }
 
-  async function createChild() {
+  function openCreateChildDialog() {
     if (!selectedNode || selectedNode.level >= 3) return;
-    const title = window.prompt("菜单名称", selectedNode.level === 1 ? "新能力组" : "新页面");
-    if (!title?.trim()) return;
-    const viewId = selectedNode.level === 2 ? window.prompt("绑定 view_id", "")?.trim() : undefined;
-    await run(
+    setCreateForm({ title: selectedNode.level === 1 ? "新能力组" : "新页面", viewId: "" });
+    setCreateDialogOpen(true);
+  }
+
+  async function createChildFromDialog() {
+    if (!selectedNode || selectedNode.level >= 3) return;
+    const title = createForm.title.trim();
+    if (!title) return;
+    const stamp = Date.now();
+    const ok = await run(
       createMutation.mutateAsync({
         parent_id: selectedNode.id,
-        code: `custom.${Date.now()}`,
-        title: title.trim(),
-        view_id: viewId || undefined,
+        code: `custom.${stamp}`,
+        title,
+        view_id: selectedNode.level === 2 ? createForm.viewId.trim() || undefined : undefined,
         icon_key: "ShieldCheck",
-        permission_key: `menu.custom.${Date.now()}`,
+        permission_key: `menu.custom.${stamp}`,
         sort_order: selectedNode.children.length * 10 + 10,
         enabled: true,
         button_permissions: [],
@@ -139,6 +169,23 @@ export function H1AdminMenuPage() {
       "菜单节点已新增",
       "新增菜单节点失败",
     );
+    if (ok) setCreateDialogOpen(false);
+  }
+
+  async function batchDisableSelected() {
+    if (!checkedIds.length) return;
+    if (!window.confirm(`确认停用选中的 ${checkedIds.length} 个菜单节点？`)) return;
+    await run(batchEnableMutation.mutateAsync({ ids: checkedIds, enabled: false }), "已批量停用", "批量停用失败");
+  }
+
+  async function rollbackMenu() {
+    if (!window.confirm("确认回滚当前菜单草稿？")) return;
+    await run(rollbackMutation.mutateAsync({ target_version_no: null }), "菜单已回滚", "回滚菜单失败");
+  }
+
+  async function publishMenu() {
+    if (!window.confirm("确认发布 PC 菜单管理配置？")) return;
+    await run(publishMutation.mutateAsync({ note: "PC 菜单管理发布" }), "菜单已发布", "发布菜单失败");
   }
 
   async function dropOn(target: AdminMenuNode) {
@@ -186,13 +233,13 @@ export function H1AdminMenuPage() {
           <Button type="button" variant="outline" size="sm" disabled={draftQuery.isFetching} onClick={() => void draftQuery.refetch()}>
             <RefreshCw className="size-4" aria-hidden />刷新
           </Button>
-          <Button type="button" variant="outline" size="sm" disabled={busy || checkedIds.length === 0} onClick={() => void run(batchEnableMutation.mutateAsync({ ids: checkedIds, enabled: false }), "已批量停用", "批量停用失败")}>
+          <Button type="button" variant="outline" size="sm" disabled={busy || checkedIds.length === 0} onClick={() => void batchDisableSelected()}>
             <ToggleLeft className="size-4" aria-hidden />停用
           </Button>
-          <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void run(rollbackMutation.mutateAsync({ target_version_no: null }), "菜单已回滚", "回滚菜单失败")}>
+          <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void rollbackMenu()}>
             <RotateCcw className="size-4" aria-hidden />回滚
           </Button>
-          <Button type="button" size="sm" disabled={busy} onClick={() => void run(publishMutation.mutateAsync({ note: "PC 菜单管理发布" }), "菜单已发布", "发布菜单失败")}>
+          <Button type="button" size="sm" disabled={busy} onClick={() => void publishMenu()}>
             <Send className="size-4" aria-hidden />发布
           </Button>
         </div>
@@ -205,7 +252,7 @@ export function H1AdminMenuPage() {
           <CardContent className="space-y-3 p-4">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-base font-semibold tracking-normal">菜单树</h2>
-              <Button type="button" variant="outline" size="sm" disabled={!selectedNode || selectedNode.level >= 3 || busy} onClick={() => void createChild()}>
+              <Button type="button" variant="outline" size="sm" disabled={!selectedNode || selectedNode.level >= 3 || busy} onClick={openCreateChildDialog}>
                 新增
               </Button>
             </div>
@@ -282,6 +329,30 @@ export function H1AdminMenuPage() {
           </CardContent>
         </Card>
       </div>
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>新增菜单节点</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <Field label="菜单名称">
+              <Input value={createForm.title} onChange={(event) => setCreateForm({ ...createForm, title: event.target.value })} />
+            </Field>
+            {selectedNode?.level === 2 ? (
+              <Field label="绑定 view_id">
+                <select className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={createForm.viewId} onChange={(event) => setCreateForm({ ...createForm, viewId: event.target.value })}>
+                  <option value="">不绑定</option>
+                  {viewIdOptions.map((viewId) => <option key={viewId} value={viewId}>{viewId}</option>)}
+                </select>
+              </Field>
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>取消</Button>
+            <Button type="button" disabled={busy || !createForm.title.trim()} onClick={() => void createChildFromDialog()}>新增</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

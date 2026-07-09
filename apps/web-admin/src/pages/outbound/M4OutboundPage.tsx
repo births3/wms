@@ -208,14 +208,10 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
   const gridPrintAction: DataGridPrintAction = {
     label: "打印",
     description: `打印${meta.title}`,
-    disabled: ({ selectedRowKeys }) => mode === "review" && selectedRowKeys.length !== 1,
+    disabled: ({ selectedRowKeys }) => selectedRowKeys.length !== 1,
     onClick: ({ selectedRowKeys }) => {
-      if (mode === "review") {
-        const targetId = selectedRowKeys[0];
-        if (targetId) openAction("print", targetId);
-        return;
-      }
-      if (typeof window !== "undefined") window.print();
+      const targetId = selectedRowKeys[0];
+      if (targetId) openAction("print", targetId);
     },
   };
   const gridExportAction: DataGridExportAction = {

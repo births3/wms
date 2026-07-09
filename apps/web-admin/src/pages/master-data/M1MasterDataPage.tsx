@@ -421,7 +421,7 @@ function M1MasterDataGridPage({ viewId }: Pick<M1MasterDataPageProps, "viewId">)
         },
         onClick: ({ selectedRowKeys: keys }) => {
           const row = selectedCrudRowFrom(keys);
-          if (row) void disableCrudRow(row);
+          if (row && window.confirm(`确认停用「${row.name}」？`)) void disableCrudRow(row);
         },
       }
     : undefined;

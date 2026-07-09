@@ -337,6 +337,7 @@ export function H9PrintTemplatePage() {
   async function toggleTemplateEnabled(rowId: string) {
     try {
       const latest = await latestTemplateVersion(rowId);
+      if (!window.confirm(`确认${latest.enabled ? "停用" : "启用"}模板「${latest.template_name}」？`)) return;
       const saved = await saveMutation.mutateAsync(saveRequestFromVersion(latest, { enabled: !latest.enabled }));
       setNotice({ type: "success", text: `${saved.template_code} 已${saved.enabled ? "启用" : "停用"}` });
     } catch (errorValue) {
@@ -368,6 +369,7 @@ export function H9PrintTemplatePage() {
   async function previewTemplate(rowId: string) {
     const row = templateById.get(rowId);
     if (!row) return;
+    if (!window.confirm(`确认生成模板「${row.templateName}」的打印预览？`)) return;
     try {
       const next = await previewMutation.mutateAsync({
         template_code: row.templateCode,
