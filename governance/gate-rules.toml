@@ -441,7 +441,7 @@ tier = "T1"
 
 [[rules]]
 match = "apps/web-admin/src/App.tsx"
-checks = ["check_admin_navigation", "check_admin_page_query_panel", "check_scope_gap_discovery"]
+checks = ["check_admin_navigation", "check_admin_page_query_panel", "check_admin_page_design_contract", "check_scope_gap_discovery"]
 tier = "T1"
 
 # ============================================================
@@ -486,7 +486,7 @@ tier = "T1"
 
 [[rules]]
 match = "apps/web-admin/src/pages/**"
-checks = ["check_page_size", "check_admin_page_query_panel", "check_scope_gap_discovery"]
+checks = ["check_page_size", "check_admin_page_query_panel", "check_admin_page_design_contract", "check_scope_gap_discovery"]
 tier = "T1"
 
 [[rules]]

@@ -130,6 +130,7 @@ def test_admin_navigation_sources_trigger_navigation_guard():
 
     assert "check_admin_navigation" in triggered
     assert "check_admin_page_query_panel" in triggered
+    assert "check_admin_page_design_contract" in triggered
 
 
 def test_admin_page_sources_trigger_query_panel_guard():
@@ -140,10 +141,17 @@ def test_admin_page_sources_trigger_query_panel_guard():
     for changed_file in [
         "apps/web-admin/src/pages/inbound/M2InboundPage.tsx",
         "apps/web-admin/src/pages/page-query-core-fields.json",
-        "packages/ui/src/business/QueryPanel/QueryPanel.tsx",
     ]:
         triggered = match_rules([changed_file], rules)
         assert "check_admin_page_query_panel" in triggered
+        assert "check_admin_page_design_contract" in triggered
+
+    triggered = match_rules(
+        ["packages/ui/src/business/QueryPanel/QueryPanel.tsx"],
+        rules,
+    )
+    assert "check_admin_page_query_panel" in triggered
+    assert "check_admin_page_design_contract" not in triggered
 
 
 def test_quality_matrix_sources_trigger_quality_matrix_guard():
