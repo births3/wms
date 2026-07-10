@@ -19,6 +19,11 @@
 # 故事文件拆分阈值（Tier 1 校验）
 # ============================================================
 
+[[rules]]
+match = "governance/source-size-baseline.toml"
+checks = ["check_page_size"]
+tier = "T1"
+
 [story_split_thresholds]
 max_file_kb = 20           # 单文件超过 20KB 触发 warning
 max_stories_per_file = 8   # 单文件超过 8 个故事触发 warning
@@ -407,6 +412,16 @@ match = "docs/error-codes.md"
 checks = ["check_error_codes"]
 tier = "T1"
 
+[[rules]]
+match = "scripts/governance/check_error_codes.py"
+checks = ["check_error_codes", "check_governance_coverage"]
+tier = "T1"
+
+[[rules]]
+match = "scripts/governance/tests/test_error_code_overview.py"
+checks = ["check_error_codes", "check_governance_coverage"]
+tier = "T1"
+
 # v3.1 限界上下文 / Context Map 治理
 [[rules]]
 match = "docs/domain/*/module-manifest.toml"
@@ -426,7 +441,7 @@ tier = "T1"
 
 [[rules]]
 match = "backend/**"
-checks = ["check_secrets"]
+checks = ["check_secrets", "check_page_size"]
 tier = "T1"
 
 [[rules]]
@@ -436,7 +451,17 @@ tier = "T1"
 
 [[rules]]
 match = "apps/**"
-checks = ["check_secrets"]
+checks = ["check_secrets", "check_page_size"]
+tier = "T1"
+
+[[rules]]
+match = "packages/**"
+checks = ["check_page_size"]
+tier = "T1"
+
+[[rules]]
+match = "scripts/**"
+checks = ["check_page_size"]
 tier = "T1"
 
 [[rules]]
@@ -455,7 +480,7 @@ tier = "T1"
 
 [[rules]]
 match = "prototypes/**"
-checks = ["check_prototype_index_consistency", "check_prototype_story_sync", "check_prototype_fidelity", "check_prototype_navigation"]
+checks = ["check_prototype_index_consistency", "check_prototype_story_sync", "check_prototype_fidelity", "check_prototype_navigation", "check_page_size"]
 tier = "T1"
 
 # Layer 2 业务复合组件 + 页面级文件触发组件治理
@@ -501,6 +526,11 @@ tier = "T1"
 
 [[rules]]
 match = "apps/web-admin/vite.config.ts"
+checks = ["check_m1_master_data_source_actions"]
+tier = "T1"
+
+[[rules]]
+match = "apps/web-admin/dev-mocks/**"
 checks = ["check_m1_master_data_source_actions"]
 tier = "T1"
 

@@ -54,6 +54,17 @@ def test_unsafe_and_unwrap_ignores_comments_and_test_shortcuts():
     assert issues == []
 
 
+def test_unsafe_and_unwrap_treats_cfg_test_module_file_as_test_code():
+    from check_unsafe_and_unwrap import find_unsafe_unwrap_issues
+
+    issues = find_unsafe_unwrap_issues(
+        'let value = result.expect("test fixture should exist");',
+        path="backend/crates/api/src/audit/tests.rs",
+    )
+
+    assert issues == []
+
+
 def test_unsafe_and_unwrap_detects_real_production_usage():
     """生产路径 unsafe / unwrap / expect / panic 必须报错。"""
     from check_unsafe_and_unwrap import find_unsafe_unwrap_issues

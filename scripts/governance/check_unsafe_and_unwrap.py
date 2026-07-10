@@ -134,7 +134,11 @@ def strip_rust_comments_and_strings(text: str) -> str:
 
 def _is_test_file(path: str) -> bool:
     normalized = path.replace("\\", "/")
-    return "/tests/" in normalized or normalized.startswith("tests/")
+    return (
+        "/tests/" in normalized
+        or normalized.startswith("tests/")
+        or normalized.endswith("/tests.rs")
+    )
 
 
 def test_code_lines(text: str, *, path: str) -> set[int]:

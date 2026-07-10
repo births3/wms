@@ -2,6 +2,21 @@
 
 本参考承接 `wms-worktree-subagent` 的 tmux、worktree、`agent/*` 分支和 issue-agent 本地分支收口细节。`SKILL.md` 只保留路由和停止条件；执行到收口阶段时读取本文件。
 
+`read-only-current-diff` 不创建 worktree 或分支。主代理等待同批进程全部退出，按任务 slug 汇总全部输出文件，去重相同根因并保留最高严重度，重新核对 `git status --short` 后即可恢复写入；不进入合并或分支清理矩阵。
+
+## `read-only-current-diff` 最终汇报
+
+该模式只汇报以下字段，并以此作为完整收口：
+
+- 模式和模型。
+- 可见快照、读写范围、依赖和审查范围。
+- 每个输出文件归属的任务 slug、进程退出码和是否全部结束。
+- 按严重度排序的发现；无发现时明确写“未发现问题”。
+- 运行前后 `git status --short` 是否一致。
+- 建议的最小修复与验证命令。
+
+该模式不创建可合并产物，因此不套用下文的分支、服务会话和 worktree 收口字段。
+
 ## 分支与 tmux 收口
 
 worktree 子代理默认不创建远端 PR，只交付本地 diff 或本地分支给主代理审查、接入和分组提交。当前 Gitea issue-agent 也暂停 PR，只在 issue 评论里回写本地 worktree、分支、提交或 diff 状态和截图附件。
@@ -27,6 +42,8 @@ tmux 收口规则：
 - 最终汇报必须写：本地分支状态、是否已合并、tmux 会话是否仍存在、清理动作或保留原因。
 
 ## 主代理强制收尾门禁
+
+`read-only-current-diff` 不适用本节；该模式只执行本文件前述最终汇报和主工作区 `git status --short` 一致性校验。
 
 每次子代理合并、放弃或审查结束后，主代理必须做 worktree 收尾；这一步是本技能的停止条件之一，不能省略。
 
@@ -114,7 +131,7 @@ printf '清理后残留 agent 分支：\n'
 git branch --list 'agent/*' --format='%(refname:short) %(objectname:short) %(subject)'
 ```
 
-## 最终汇报
+## Worktree 模式最终汇报
 
 最终汇报必须包含：
 

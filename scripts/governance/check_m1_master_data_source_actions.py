@@ -22,17 +22,31 @@ from pathlib import Path
 THIS = Path(__file__).resolve()
 REPO_ROOT = THIS.parent.parent.parent
 WEB_ADMIN = REPO_ROOT / "apps" / "web-admin"
-QUERY_TS = WEB_ADMIN / "src" / "features" / "master-data" / "master-data-queries.ts"
+QUERY_SOURCE = WEB_ADMIN / "src" / "features" / "master-data" / "master-data-queries"
+QUERY_API_TS = QUERY_SOURCE / "api.ts"
+QUERY_MAPPERS_TS = QUERY_SOURCE / "mappers.ts"
+QUERY_TYPES_TS = QUERY_SOURCE / "types.ts"
 PAGE_TSX = WEB_ADMIN / "src" / "pages" / "master-data" / "M1MasterDataPage.tsx"
 MODEL_TS = WEB_ADMIN / "src" / "pages" / "master-data" / "m1-product-page-model.ts"
 ACTIONS_TSX = WEB_ADMIN / "src" / "pages" / "master-data" / "MasterDataSourceActions.tsx"
 APP_TSX = WEB_ADMIN / "src" / "App.tsx"
-VITE_CONFIG = WEB_ADMIN / "vite.config.ts"
+DEV_MOCK_SOURCE = WEB_ADMIN / "dev-mocks"
+DEV_MOCK_CORE_TS = DEV_MOCK_SOURCE / "web-admin-dev-mock-core.ts"
+DEV_MOCK_MODEL_TS = DEV_MOCK_SOURCE / "web-admin-dev-mock-model.ts"
 SELF_CHECK = WEB_ADMIN / "self-checks" / "m1-product-source-actions-self-check.mjs"
 API_CLIENT_SCHEMA = REPO_ROOT / "packages" / "api-client" / "src" / "schema.ts"
-DOMAIN_RS = REPO_ROOT / "backend" / "crates" / "domain" / "src" / "lib.rs"
+DOMAIN_MASTER_DICTIONARY_RS = (
+    REPO_ROOT / "backend" / "crates" / "domain" / "src" / "master_dictionary.rs"
+)
 HANDLERS_RS = REPO_ROOT / "backend" / "crates" / "api" / "src" / "master_data_handlers.rs"
-POSTGRES_RS = REPO_ROOT / "backend" / "crates" / "api" / "src" / "master_data_postgres.rs"
+POSTGRES_RS = (
+    REPO_ROOT
+    / "backend"
+    / "crates"
+    / "api"
+    / "src"
+    / "master_data_postgres.rs"
+)
 MIGRATION_SQL = REPO_ROOT / "backend" / "migrations" / "202607020002_master_data_source.sql"
 
 
@@ -65,22 +79,22 @@ TOKEN_SPECS = (
     TokenSpec(MODEL_TS, 'header: "储存条件"', "商品档案运行字段列头未显示为储存条件"),
     TokenSpec(APP_TSX, '"m1-business-partners"', "左侧菜单缺少 M1 客商档案入口"),
     TokenSpec(APP_TSX, "M1 客商档案", "左侧菜单缺少客商档案标题"),
-    TokenSpec(QUERY_TS, "middlePackage", "商品行模型缺少中包装映射"),
-    TokenSpec(QUERY_TS, "largePackage", "商品行模型缺少大包装映射"),
-    TokenSpec(QUERY_TS, "unitLengthMm", "商品行模型缺少单位长映射"),
-    TokenSpec(QUERY_TS, "unitWidthMm", "商品行模型缺少单位宽映射"),
-    TokenSpec(QUERY_TS, "unitHeightMm", "商品行模型缺少单位高映射"),
-    TokenSpec(QUERY_TS, "unitWeightG", "商品行模型缺少单位重量映射"),
-    TokenSpec(QUERY_TS, "unitVolumeCm3", "商品行模型缺少单位体积映射"),
-    TokenSpec(QUERY_TS, "export type CreateSupplierRequest", "查询层未导出供应商创建契约"),
-    TokenSpec(QUERY_TS, "export type CreateCustomerRequest", "查询层未导出客户创建契约"),
-    TokenSpec(QUERY_TS, 'api.POST("/api/v1/master-data/suppliers"', "供应商新建未复用后端接口"),
-    TokenSpec(QUERY_TS, 'api.POST("/api/v1/master-data/customers"', "客户新建未复用后端接口"),
-    TokenSpec(QUERY_TS, "listBusinessPartners", "查询层缺少客商合并列表"),
-    TokenSpec(QUERY_TS, "partnerKind", "客商行模型缺少供应商/客户类型字段"),
-    TokenSpec(QUERY_TS, "partnerTypeLabel", "客商行模型缺少类型显示值"),
-    TokenSpec(QUERY_TS, "sourceValue: supplierSource(item)", "供应商行缺少来源值映射"),
-    TokenSpec(QUERY_TS, "sourceValue: customerSource(item)", "客户行缺少来源值映射"),
+    TokenSpec(QUERY_MAPPERS_TS, "middlePackage", "商品行模型缺少中包装映射"),
+    TokenSpec(QUERY_MAPPERS_TS, "largePackage", "商品行模型缺少大包装映射"),
+    TokenSpec(QUERY_MAPPERS_TS, "unitLengthMm", "商品行模型缺少单位长映射"),
+    TokenSpec(QUERY_MAPPERS_TS, "unitWidthMm", "商品行模型缺少单位宽映射"),
+    TokenSpec(QUERY_MAPPERS_TS, "unitHeightMm", "商品行模型缺少单位高映射"),
+    TokenSpec(QUERY_MAPPERS_TS, "unitWeightG", "商品行模型缺少单位重量映射"),
+    TokenSpec(QUERY_MAPPERS_TS, "unitVolumeCm3", "商品行模型缺少单位体积映射"),
+    TokenSpec(QUERY_TYPES_TS, "export type CreateSupplierRequest", "查询层未导出供应商创建契约"),
+    TokenSpec(QUERY_TYPES_TS, "export type CreateCustomerRequest", "查询层未导出客户创建契约"),
+    TokenSpec(QUERY_API_TS, 'api.POST("/api/v1/master-data/suppliers"', "供应商新建未复用后端接口"),
+    TokenSpec(QUERY_API_TS, 'api.POST("/api/v1/master-data/customers"', "客户新建未复用后端接口"),
+    TokenSpec(QUERY_API_TS, "listBusinessPartners", "查询层缺少客商合并列表"),
+    TokenSpec(QUERY_MAPPERS_TS, "partnerKind", "客商行模型缺少供应商/客户类型字段"),
+    TokenSpec(QUERY_MAPPERS_TS, "partnerTypeLabel", "客商行模型缺少类型显示值"),
+    TokenSpec(QUERY_MAPPERS_TS, "sourceValue: supplierSource(item)", "供应商行缺少来源值映射"),
+    TokenSpec(QUERY_MAPPERS_TS, "sourceValue: customerSource(item)", "客户行缺少来源值映射"),
     TokenSpec(PAGE_TSX, "MasterDataSourceActions", "M1 页面缺少供应商/客户来源动作组件"),
     TokenSpec(PAGE_TSX, '"m1-business-partners"', "M1 页面缺少客商视图元数据或动作入口"),
     TokenSpec(PAGE_TSX, "M1 客商档案", "M1 页面缺少客商视图标题"),
@@ -105,15 +119,15 @@ TOKEN_SPECS = (
     TokenSpec(ACTIONS_TSX, 'source: "batch_import"', "批量导入供应商/客户请求缺少批量导入来源"),
     TokenSpec(ACTIONS_TSX, "supplier_code,supplier_name,license_no,contact_name", "供应商导入模板缺失"),
     TokenSpec(ACTIONS_TSX, "customer_code,customer_name,license_no", "客户导入模板缺失"),
-    TokenSpec(VITE_CONFIG, 'pathname === "/api/v1/master-data/suppliers"', "dev mock 缺少供应商 API"),
-    TokenSpec(VITE_CONFIG, 'pathname === "/api/v1/master-data/customers"', "dev mock 缺少客户 API"),
-    TokenSpec(VITE_CONFIG, "devSupplierFromCreateRequest", "dev mock 缺少供应商创建"),
-    TokenSpec(VITE_CONFIG, "devCustomerFromCreateRequest", "dev mock 缺少客户创建"),
-    TokenSpec(VITE_CONFIG, "middle_package", "dev mock 商品数据缺少中包装属性"),
-    TokenSpec(VITE_CONFIG, "large_package", "dev mock 商品数据缺少大包装属性"),
-    TokenSpec(VITE_CONFIG, "unit_weight_g", "dev mock 商品数据缺少单位重量属性"),
-    TokenSpec(DOMAIN_RS, "pub source: String", "后端供应商/客户响应契约缺少来源字段"),
-    TokenSpec(DOMAIN_RS, "pub source: Option<String>", "后端供应商/客户创建契约缺少来源输入"),
+    TokenSpec(DEV_MOCK_CORE_TS, 'pathname === "/api/v1/master-data/suppliers"', "dev mock 缺少供应商 API"),
+    TokenSpec(DEV_MOCK_CORE_TS, 'pathname === "/api/v1/master-data/customers"', "dev mock 缺少客户 API"),
+    TokenSpec(DEV_MOCK_CORE_TS, "devSupplierFromCreateRequest", "dev mock 缺少供应商创建"),
+    TokenSpec(DEV_MOCK_CORE_TS, "devCustomerFromCreateRequest", "dev mock 缺少客户创建"),
+    TokenSpec(DEV_MOCK_MODEL_TS, "middle_package", "dev mock 商品数据缺少中包装属性"),
+    TokenSpec(DEV_MOCK_MODEL_TS, "large_package", "dev mock 商品数据缺少大包装属性"),
+    TokenSpec(DEV_MOCK_MODEL_TS, "unit_weight_g", "dev mock 商品数据缺少单位重量属性"),
+    TokenSpec(DOMAIN_MASTER_DICTIONARY_RS, "pub source: String", "后端供应商/客户响应契约缺少来源字段"),
+    TokenSpec(DOMAIN_MASTER_DICTIONARY_RS, "pub source: Option<String>", "后端供应商/客户创建契约缺少来源输入"),
     TokenSpec(HANDLERS_RS, "state.create_product", "商品新建未接入真实后端写路径"),
     TokenSpec(HANDLERS_RS, "state.create_supplier", "供应商新建未接入真实后端写路径"),
     TokenSpec(HANDLERS_RS, "state.create_customer", "客户新建未接入真实后端写路径"),
@@ -140,6 +154,16 @@ def rel(path: Path) -> str:
     return path.relative_to(REPO_ROOT).as_posix()
 
 
+def read_source(path: Path) -> str:
+    if path.is_file():
+        return path.read_text(encoding="utf-8")
+    return "\n".join(
+        child.read_text(encoding="utf-8")
+        for child in sorted(path.rglob("*"))
+        if child.is_file() and child.suffix in {".ts", ".tsx"}
+    )
+
+
 def scan() -> list[Issue]:
     issues: list[Issue] = []
     cache: dict[Path, str] = {}
@@ -147,7 +171,7 @@ def scan() -> list[Issue]:
         if not spec.path.exists():
             issues.append(Issue(rel(spec.path), "必需文件不存在"))
             continue
-        text = cache.setdefault(spec.path, spec.path.read_text(encoding="utf-8"))
+        text = cache.setdefault(spec.path, read_source(spec.path))
         if spec.token not in text:
             issues.append(Issue(rel(spec.path), spec.message))
     return issues

@@ -1,19 +1,38 @@
 ---
 name: wms-worktree-subagent
-description: WMS 仓库用独立 worktree 和 codex exec 运行子代理、复盘输出、主代理合并、清理收尾并迭代子代理提示词的流程。用户要求建立 subagent、用 worktree 跑并行任务、codex exec 子任务、先跑一个再迭代 subagent、让主代理负责 review/merge、清理 worktree、检查遗留 agent worktree 时使用。
+description: 用户要求在 WMS 仓库使用 subagent、codex exec、worktree、并行拆分任务、只读审查当前未提交差异、指定子代理模型、由主代理 review/merge，或清理遗留 agent worktree 时使用。
 ---
 
 # WMS Worktree Subagent
 
-用于把 WMS 缺口拆给子代理：一个 worktree、一个任务、一个写入范围；主代理负责审查、接入和收口。
+用于把 WMS 缺口安全拆给子代理；主代理负责模式选择、并行调度、审查、接入和收口。
+
+## 启动前选择模式
+
+| 模式 | 使用场景 | 隔离要求 |
+|---|---|---|
+| `write-worktree` | 子代理需要修改文件 | 一个任务一个独立 worktree；写入范围不得与其他写任务重叠 |
+| `read-only-worktree` | 审查已提交的 `HEAD` | 使用可丢弃 worktree；不修改、不合并 |
+| `read-only-current-diff` | 审查主工作区未提交或未跟踪文件 | 直接在主工作区以 `read-only` 运行；不建分支、不建 worktree、不合并 |
+
+启动前必须记录模式、模型、可见快照、读写范围、依赖和输出文件。`read-only-current-diff` 运行期间主代理不得修改工作区；全部子代理退出后重新核对 `git status --short`。
+
+用户指定模型时使用 `-m <model>`；未指定时沿用本机 Codex 默认值。启动前用 `codex exec --help` 确认参数，模型不可用时停止并报告，禁止静默降级。
+
+## 并行规则
+
+- 默认最多 3 个子代理并行；任务存在依赖时按顺序运行。
+- 写任务必须使用互不重叠的授权路径；只读任务可以读取同一文件，但审查目标必须不同。
+- 每个子代理使用唯一 slug 和输出文件；主代理记录任务、模式、模型、范围、依赖、进程状态和退出码。
+- 主代理等待本批全部进程退出后再修改当前工作区、汇总结论或启动下一批。
 
 ## 子代理原则
 
-- 一个任务一个 worktree，不共享主工作区。
+- 写任务一个任务一个 worktree；只有 `read-only-current-diff` 可以读取主工作区。
 - 子代理只改授权范围；不推送、不改 main。
 - 子代理不创建远端 PR；只交付本地 diff、验证结果和清理建议。Gitea issue-agent 当前也走本地分支交付。
-- 默认用 `wms-loop-engineering` 和 `wms-review-fix-commit` 自审；子代理不 `git add` / `git commit`，由主代理提交。
-- 只读校准用 `read-only`，只输出下一轮切片、允许文件、停止条件、验证命令和技能缺口。
+- 写任务默认用 `wms-loop-engineering`，并按 `wms-review-fix-commit` 的 review → fix → review 检查项自审；子代理不 `git add` / `git commit`，由主代理提交。
+- `read-only-worktree` 输出下一轮切片、允许文件、停止条件、验证命令和技能缺口；`read-only-current-diff` 输出按严重度排序的发现、证据、最小修复和验证命令。
 - 外部设备、TMS、冷链平台、生产数据和凭据类 evidence 不能交给子代理伪造。
 - 构建缓存和大产物不得合并；污染必须在最终输出标记。
 - `pnpm`、OpenAPI 生成器、数据库、`.env`、网络或外部服务验证失败时最多重试一次；仍失败则不可合并。
@@ -28,7 +47,7 @@ description: WMS 仓库用独立 worktree 和 codex exec 运行子代理、复�
    - `git status --short --branch`
    - `git worktree list`
 2. 任务命名用短 slug，例如 `m2-inbound-pc`。
-3. 新 worktree 看不到未提交文件；依赖时先落最小文件或写入提示词。
+3. 新 worktree 看不到未提交文件；需要审查当前脏区时改用 `read-only-current-diff`，需要基于脏区写入时先由主代理审查并提交相关基线。
 4. 先写清任务边界；没有边界，不建 worktree：
    - 按 [references/module-slice-boundary.md](references/module-slice-boundary.md) 填覆盖矩阵。
    - 本轮切片覆盖哪些层，不覆盖哪些层。
@@ -42,7 +61,7 @@ git worktree add -b agent/<slug> ../wms-agent-<slug> HEAD
 6. 在子 worktree 跑：
 
 ```bash
-codex exec -C ../wms-agent-<slug> -s workspace-write -o ../wms-agent-<slug>.out.md "<任务提示词>"
+codex exec -C ../wms-agent-<slug> -s workspace-write --ephemeral -m <model> -o ../wms-agent-<slug>.out.md "<任务提示词>"
 ```
 
 加新 `codex exec` 参数前先用 `codex exec --help` 核对。未跟踪输入必须显式纳入。
@@ -50,8 +69,16 @@ codex exec -C ../wms-agent-<slug> -s workspace-write -o ../wms-agent-<slug>.out.
 只读校准命令：
 
 ```bash
-codex exec -C ../wms-agent-<slug> -s read-only -o ../wms-agent-<slug>.out.md "<只读校准提示词>"
+codex exec -C ../wms-agent-<slug> -s read-only --ephemeral -m <model> -o ../wms-agent-<slug>.out.md "<只读校准提示词>"
 ```
+
+审查当前未提交差异：
+
+```bash
+codex exec -C "$PWD" -s read-only --ephemeral -m <model> -o /tmp/wms-agent-<slug>.out.md "<只读审查提示词>"
+```
+
+没有指定模型时省略 `-m <model>`。
 
 ## 子代理任务提示词
 
@@ -59,9 +86,9 @@ codex exec -C ../wms-agent-<slug> -s read-only -o ../wms-agent-<slug>.out.md "<�
 
 ## 主代理复盘与合并
 
-子代理完成后，主代理按 [references/closeout.md](references/closeout.md) 检查 worktree、diff、忽略产物、tmux 和分支；当前不创建 Gitea PR。
+子代理完成后，主代理按 [references/closeout.md](references/closeout.md) 检查输出、worktree、diff、忽略产物、tmux 和分支；当前不创建 Gitea PR。`read-only-current-diff` 只汇总发现，不进入合并流程。
 
-主代理只在以下条件全部满足时考虑合并：
+主代理只在 `write-worktree` 以下条件全部满足时考虑合并：
 
 - 主工作区没有无关脏改动；否则先按 `wms-review-fix-commit` 把已有脏区 review、验证并按主题提交，再回到当前合并。
 - 子代理输出写明“本切片可合并”，且“是否可合并”为“是”。
@@ -108,4 +135,4 @@ codex exec -C ../wms-agent-<slug> -s read-only -o ../wms-agent-<slug>.out.md "<�
 - 子代理输出不可审查：收紧“最终输出”字段。
 - 留下未解释 worktree：收紧收尾门禁。
 
-迭代后运行 `git diff --check` 和 `just gov-t1`，再按 `wms-review-fix-commit` 提交。
+技能文件实际修改后运行 `git diff --check` 和 `just gov-t1`，再由主代理按 `wms-review-fix-commit` 提交；只读模式本身不触发提交。

@@ -67,6 +67,7 @@ TIER_SCRIPTS: dict[str, list[str]] = {
         "check_quality_matrix.py",
         "check_scope_gap_discovery.py",
         "check_m1_master_data_source_actions.py",
+        "check_error_codes.py",
         "check_baseline_health.py",
         "check_governance_consistency.py",
         "check_governance_coverage.py",

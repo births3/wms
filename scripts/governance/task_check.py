@@ -73,10 +73,36 @@ def run_one(check_name: str, json_mode: bool, *, strict_mode: bool = False) -> S
     if json_mode:
         cmd.append("--json")
     start = time.perf_counter()
-    p = subprocess.run(cmd, check=False)
+    p = subprocess.run(
+        cmd,
+        check=False,
+        capture_output=json_mode,
+        text=json_mode,
+    )
     dur = int((time.perf_counter() - start) * 1000)
     return ScriptResult(
         name=check_name, matched_files=0, exit_code=p.returncode, duration_ms=dur
+    )
+
+
+def run_t1_fallback(json_mode: bool) -> ScriptResult:
+    import time
+
+    cmd = [sys.executable, str(SCRIPTS_DIR / "governance_checks.py"), "--tier", "T1"]
+    if json_mode:
+        cmd.append("--json")
+    start = time.perf_counter()
+    result = subprocess.run(
+        cmd,
+        check=False,
+        capture_output=json_mode,
+        text=json_mode,
+    )
+    return ScriptResult(
+        name="governance_t1_fallback",
+        matched_files=0,
+        exit_code=result.returncode,
+        duration_ms=int((time.perf_counter() - start) * 1000),
     )
 
 
@@ -96,15 +122,63 @@ def main(argv: list[str] | None = None) -> int:
     # 按 Tier 过滤规则
     rules_for_tier = [r for r in rules if r.tier == args.tier or r.tier == "any"]
     triggered = match_rules(changed, rules_for_tier)
+    specific_rules = [rule for rule in rules_for_tier if rule.match != "**"]
+    specifically_matched = {
+        path for path in changed if any(rule.matches(path) for rule in specific_rules)
+    }
+    unknown_files = [path for path in changed if path not in specifically_matched]
+    machine_output = args.json or args.report_json
 
-    print(f"▶ task_check {args.tier} (base={args.base})")
-    print(f"  · changed files: {len(changed)}")
-    print(f"  · gate rules for {args.tier}: {len(rules_for_tier)}")
-    print(f"  · triggered checks: {len(triggered)}")
+    if not machine_output:
+        print(f"▶ task_check {args.tier} (base={args.base})")
+        print(f"  · changed files: {len(changed)}")
+        print(f"  · gate rules for {args.tier}: {len(rules_for_tier)}")
+        print(f"  · triggered checks: {len(triggered)}")
+
+    fallback_result: ScriptResult | None = None
+    if changed and unknown_files:
+        fallback_result = run_t1_fallback(machine_output)
+        fallback_result.matched_files = len(unknown_files)
+        if not specifically_matched:
+            fallback = fallback_result
+            payload = {
+                "tier": args.tier,
+                "base": args.base,
+                "changed": len(changed),
+                "triggered": [asdict(fallback)],
+                "note": "未匹配 diff 规则，已执行 T1 全量兜底",
+                "ok": fallback.exit_code == 0,
+            }
+            if machine_output:
+                print(json.dumps(payload, ensure_ascii=False, indent=2))
+            else:
+                print("  · 未匹配 diff 规则，执行 T1 全量兜底")
+                print(f"  {'✓' if fallback.exit_code == 0 else '✘'} governance_t1_fallback")
+            return 0 if fallback.exit_code == 0 else 1
+        if args.tier == "T1":
+            triggered = match_rules(changed, specific_rules)
 
     if not triggered:
-        msg = "no diff-triggered checks (Wave 0 骨架阶段属正常)"
-        if args.report_json:
+        if changed:
+            fallback = run_t1_fallback(machine_output)
+            fallback.matched_files = len(changed)
+            payload = {
+                "tier": args.tier,
+                "base": args.base,
+                "changed": len(changed),
+                "triggered": [asdict(fallback)],
+                "note": "未匹配 diff 规则，已执行 T1 全量兜底",
+                "ok": fallback.exit_code == 0,
+            }
+            if machine_output:
+                print(json.dumps(payload, ensure_ascii=False, indent=2))
+            else:
+                print("  · 未匹配 diff 规则，执行 T1 全量兜底")
+                print(f"  {'✓' if fallback.exit_code == 0 else '✘'} governance_t1_fallback")
+            return 0 if fallback.exit_code == 0 else 1
+
+        msg = "no changed files"
+        if machine_output:
             print(json.dumps({
                 "tier": args.tier,
                 "base": args.base,
@@ -117,24 +191,30 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  {msg}")
         return 0
 
-    results: list[ScriptResult] = []
+    results: list[ScriptResult] = [fallback_result] if fallback_result else []
+    if fallback_result and not machine_output:
+        print(f"  · {len(unknown_files)} 个未知路径，追加 T1 全量兜底")
+        print(f"  {'✓' if fallback_result.exit_code == 0 else '✘'} governance_t1_fallback")
     for check_name, files in triggered.items():
-        print(f"  · running {check_name}  (matched {len(files)} files)")
-        r = run_one(check_name, json_mode=args.json, strict_mode=args.strict)
+        if not machine_output:
+            print(f"  · running {check_name}  (matched {len(files)} files)")
+        r = run_one(check_name, json_mode=machine_output, strict_mode=args.strict)
         r.matched_files = len(files)
         if r.exit_code == -1:
             # 脚本未实现：根据 --strict 决定是阻塞还是降级
             if args.strict:
-                print(f"    ✘ script not implemented yet: {check_name} (--strict 模式下视为失败)")
+                if not machine_output:
+                    print(f"    ✘ script not implemented yet: {check_name} (--strict 模式下视为失败)")
                 r.exit_code = 2
             else:
-                print(f"    ⚠ script not implemented yet: {check_name} (placeholder, 加 --strict 视为失败)")
+                if not machine_output:
+                    print(f"    ⚠ script not implemented yet: {check_name} (placeholder, 加 --strict 视为失败)")
                 r.exit_code = 0  # 默认降级（不阻塞 Wave 演进）
         results.append(r)
 
     failed = [r for r in results if r.exit_code != 0]
 
-    if args.report_json:
+    if machine_output:
         print(json.dumps({
             "tier": args.tier,
             "base": args.base,

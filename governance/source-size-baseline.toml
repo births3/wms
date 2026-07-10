@@ -1,0 +1,22 @@
+# 历史超限源码基线。只允许删除条目或降低行数，不允许新增、放宽。
+[files]
+"backend/crates/api/src/bin/wms_api.rs" = 1668
+"backend/crates/api/src/bin/wms_audit_baseline_load.rs" = 1680
+"backend/crates/api/src/document_numbering_repository.rs" = 958
+"backend/crates/api/src/express.rs" = 1054
+"backend/crates/api/src/master_data_postgres.rs" = 918
+"backend/crates/api/src/print_template.rs" = 1454
+"backend/crates/api/src/wave3_handlers.rs" = 1790
+"backend/crates/api/src/wave3_repository.rs" = 1773
+"backend/crates/api/src/wave4_repository.rs" = 1556
+"backend/crates/api/src/wave5_repository.rs" = 1574
+"backend/crates/api/tests/master_data_postgres.rs" = 865
+"prototypes/src/prototype-kit/full-matrix-specs.ts" = 1703
+"prototypes/src/prototype-kit/prototype-model.ts" = 874
+"scripts/agents/issue_runner.py" = 1432
+"scripts/governance/check_wave3_pda_runtime_readiness.py" = 2555
+"scripts/governance/check_wave6_evidence_preflight.py" = 1400
+"scripts/governance/record_wave3_pda_runtime_evidence.py" = 1090
+"scripts/governance/report_wave6_pre_release.py" = 1072
+"scripts/governance/tests/test_wave3_pda_runtime_evidence.py" = 1107
+"scripts/governance/tests/test_wave3_pda_runtime_readiness.py" = 2585

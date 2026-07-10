@@ -1,7 +1,7 @@
 interface:
   display_name: WMS Worktree 子代理
-  short_description: 用独立 worktree 和 codex exec 拆分 WMS 子任务，并由主代理复盘、合并、验证、收口和迭代。
-  default_prompt: 请使用 WMS Worktree 子代理技能，把当前 WMS 缺口拆成有完整性边界、写入范围、验证命令和收口规则的独立子代理任务。
+  short_description: 用 codex exec 按写入 worktree、只读 worktree 或当前差异只读模式拆分 WMS 子任务。
+  default_prompt: 请使用 WMS Worktree 子代理技能，为当前任务选择模式和模型，并定义边界、范围、验证、并行与收口规则。
 compatibility:
   canonical_format: codex-skill
   adapter_targets:

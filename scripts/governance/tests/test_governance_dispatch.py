@@ -94,6 +94,25 @@ def test_governance_checks_t1_includes_scope_gap_discovery_guard():
     assert "check_scope_gap_discovery.py" in expand_tier_scripts("T1")
 
 
+def test_governance_checks_t1_includes_error_code_guard():
+    """T1 全量入口必须覆盖错误码字典和概览统计。"""
+    from governance_checks import expand_tier_scripts
+
+    assert "check_error_codes.py" in expand_tier_scripts("T1")
+
+
+def test_error_code_sources_trigger_error_code_guard():
+    from _diff import load_gate_rules, match_rules
+
+    rules = load_gate_rules()
+    for changed_file in [
+        "docs/error-codes.md",
+        "scripts/governance/check_error_codes.py",
+        "scripts/governance/tests/test_error_code_overview.py",
+    ]:
+        assert "check_error_codes" in match_rules([changed_file], rules)
+
+
 def test_governance_checks_t1_includes_dialog_overlay_guard():
     """T1 全量入口必须覆盖共享 Dialog 遮罩规则，避免弹窗内字段点击被遮罩关闭。"""
     from governance_checks import expand_tier_scripts

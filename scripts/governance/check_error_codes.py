@@ -31,6 +31,7 @@ import argparse
 import json
 import re
 import sys
+from collections import Counter
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -125,6 +126,64 @@ def parse_error_codes() -> tuple[list[ErrorEntry], list[str]]:
         entries.append(current)
 
     return entries, errors
+
+
+def check_overview_counts(entries: list[ErrorEntry], text: str) -> list[Issue]:
+    issues: list[Issue] = []
+    severity_section = re.search(r"## 3\..*?(?=\n---)", text, re.DOTALL)
+    module_section = re.search(r"## 4\..*?(?=\n---)", text, re.DOTALL)
+    if not severity_section or not module_section:
+        return [Issue("<overview>", "error", "overview_missing", "错误码概览章节缺失")]
+
+    declared_severity = {
+        match.group(1): int(match.group(2))
+        for match in re.finditer(
+            r"^\|\s*(info|warning|error|critical)\s*\|\s*(\d+)\s*\|",
+            severity_section.group(0),
+            re.MULTILINE,
+        )
+    }
+    total_match = re.search(
+        r"^\|\s*\*\*合计\*\*\s*\|\s*\*\*(\d+)\*\*\s*\|",
+        severity_section.group(0),
+        re.MULTILINE,
+    )
+    expected_severity = Counter(entry.severity for entry in entries)
+    for severity in sorted(VALID_SEVERITY):
+        if declared_severity.get(severity) != expected_severity.get(severity, 0):
+            issues.append(Issue(
+                "<overview>",
+                "error",
+                "severity_count_drift",
+                f"严重度 {severity} 概览={declared_severity.get(severity)}，字典={expected_severity.get(severity, 0)}",
+            ))
+    if not total_match or int(total_match.group(1)) != len(entries):
+        declared_total = total_match.group(1) if total_match else None
+        issues.append(Issue(
+            "<overview>",
+            "error",
+            "total_count_drift",
+            f"错误码合计概览={declared_total}，字典={len(entries)}",
+        ))
+
+    declared_modules = {
+        match.group(1): int(match.group(2))
+        for match in re.finditer(
+            r"^\|\s*([A-Z][A-Z0-9_]*)\s*\|\s*(\d+)\s*\|",
+            module_section.group(0),
+            re.MULTILINE,
+        )
+    }
+    expected_modules = Counter(entry.module for entry in entries)
+    for module in sorted(set(declared_modules) | set(expected_modules)):
+        if declared_modules.get(module) != expected_modules.get(module, 0):
+            issues.append(Issue(
+                "<overview>",
+                "error",
+                "module_count_drift",
+                f"模块 {module} 概览={declared_modules.get(module)}，字典={expected_modules.get(module, 0)}",
+            ))
+    return issues
 
 
 def load_field_canonicals() -> set[str]:
@@ -263,6 +322,7 @@ def main(argv: list[str] | None = None) -> int:
     module_prefixes = load_module_prefixes()
 
     issues = check_codes(entries, field_canonicals, story_ids, module_prefixes)
+    issues.extend(check_overview_counts(entries, DICT_PATH.read_text(encoding="utf-8")))
     errors = [i for i in issues if i.severity == "error"]
     warnings = [i for i in issues if i.severity == "warning"]
 
