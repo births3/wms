@@ -43,45 +43,30 @@ export type SettingsFormState = {
 
 export type Notice = { type: "success" | "warning" | "error"; text: string } | null;
 
-export function SettingsTestDialog(props: {
-  open: boolean;
-  testing: boolean;
-  onOpenChange: (open: boolean) => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>测试企业微信参数</DialogTitle>
-          <DialogDescription>校验当前已保存参数的完整性和启用状态，不发起外部网络请求。</DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => props.onOpenChange(false)}>取消</Button>
-          <Button type="button" disabled={props.testing} onClick={props.onConfirm}>确认测试</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 export function SettingsDialog(props: {
   open: boolean;
   form: SettingsFormState;
+  notice: Notice;
   saving: boolean;
+  testing: boolean;
   onFormChange: (form: SettingsFormState) => void;
   onOpenChange: (open: boolean) => void;
   onSave: () => void;
+  onTest: () => void;
 }) {
-  const { open, form, saving, onFormChange, onOpenChange, onSave } = props;
+  const { open, form, notice, saving, testing, onFormChange, onOpenChange, onSave, onTest } = props;
+  const busy = saving || testing;
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(nextOpen) => {
+      if (nextOpen || !busy) onOpenChange(nextOpen);
+    }}>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>企业微信参数设置</DialogTitle>
           <DialogDescription>维护企业微信应用、回调地址、密钥别名和重试参数；真实密钥不在 WMS 明文保存。</DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 md:grid-cols-2">
+        {notice?.type === "error" && <NoticePanel notice={notice} />}
+        <fieldset disabled={busy} className="grid gap-4 md:grid-cols-2">
           <Field label="企业 ID">
             <Input value={form.corpId} onChange={(event) => onFormChange({ ...form, corpId: event.target.value })} />
           </Field>
@@ -113,10 +98,11 @@ export function SettingsDialog(props: {
             <input type="checkbox" checked={form.enabled} onChange={(event) => onFormChange({ ...form, enabled: event.target.checked })} />
             启用企业微信通道
           </label>
-        </div>
+        </fieldset>
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>取消</Button>
-          <Button type="button" disabled={saving} onClick={onSave}>保存</Button>
+          <Button type="button" variant="outline" disabled={busy} onClick={() => onOpenChange(false)}>取消</Button>
+          <Button type="button" variant="outline" disabled={busy} onClick={onTest}>测试</Button>
+          <Button type="button" disabled={busy} onClick={onSave}>保存</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -256,7 +242,11 @@ export function NoticePanel({ notice }: { notice: Notice }) {
     : notice.type === "warning"
       ? "border-amber-300 bg-amber-50 text-amber-800"
       : "border-destructive/30 bg-destructive/10 text-destructive";
-  return <div className={`rounded-md border px-4 py-3 text-sm ${className}`} role="status">{notice.text}</div>;
+  return (
+    <div className={`rounded-md border px-4 py-3 text-sm ${className}`} role={notice.type === "error" ? "alert" : "status"}>
+      {notice.text}
+    </div>
+  );
 }
 
 export function ErrorPanel({ message }: { message: string }) {

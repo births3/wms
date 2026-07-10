@@ -11,7 +11,7 @@ import {
   type QueryPanelValue,
   type StatusKey,
 } from "@wms/ui";
-import { FlaskConical, RotateCw, Send } from "lucide-react";
+import { RotateCw, Send } from "lucide-react";
 
 import {
   useH4NotificationConfigsQuery,
@@ -34,7 +34,6 @@ import {
   RecordDetailDialog,
   SendDialog,
   SettingsDialog,
-  SettingsTestDialog,
   type ConfigFormState,
   type Notice,
   type SendFormState,
@@ -249,7 +248,6 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
   const [selectedRecordKeys, setSelectedRecordKeys] = React.useState<string[]>([]);
   const [selectedSettingsKeys, setSelectedSettingsKeys] = React.useState<string[]>([]);
   const [settingsDialogOpen, setSettingsDialogOpen] = React.useState(false);
-  const [settingsTestDialogOpen, setSettingsTestDialogOpen] = React.useState(false);
   const [configDialogOpen, setConfigDialogOpen] = React.useState(false);
   const [sendDialogOpen, setSendDialogOpen] = React.useState(false);
   const [detailRecord, setDetailRecord] = React.useState<H4NotificationRecord | null>(null);
@@ -296,7 +294,7 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
     return (
       <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
         <PageHeader title="H4 参数设置" subtitle="企业微信应用、回调、密钥别名和重试参数" />
-        <NoticePanel notice={notice} />
+        <NoticePanel notice={settingsDialogOpen ? null : notice} />
         {settingsQuery.error && <ErrorPanel message={settingsQuery.error.message} />}
         <DataGrid
           storageKey="h4.wechat-notify.settings"
@@ -328,30 +326,17 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
             disabled: () => selectedSettingsKeys.length !== 1,
             onClick: () => openSettingsDialog(selectedSettings),
           }}
-          toolbarActions={[
-            {
-              key: "test-settings",
-              label: "测试",
-              description: "校验已保存的企业微信参数",
-              icon: <FlaskConical className="size-4" aria-hidden />,
-              disabled: () => !settingsQuery.data || testSettingsMutation.isPending,
-              onClick: () => setSettingsTestDialogOpen(true),
-            },
-          ]}
         />
         <SettingsDialog
           open={settingsDialogOpen}
           form={settingsForm}
+          notice={notice}
           saving={upsertSettingsMutation.isPending}
+          testing={testSettingsMutation.isPending}
           onFormChange={setSettingsForm}
           onOpenChange={setSettingsDialogOpen}
           onSave={saveSettings}
-        />
-        <SettingsTestDialog
-          open={settingsTestDialogOpen}
-          testing={testSettingsMutation.isPending}
-          onOpenChange={setSettingsTestDialogOpen}
-          onConfirm={testSettings}
+          onTest={testSettings}
         />
       </section>
     );
@@ -531,6 +516,7 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
 
   function openSettingsDialog(settings: H4WechatSettings | null) {
     setSettingsForm(settings ? formFromSettings(settings) : emptySettingsForm());
+    setNotice(null);
     setSettingsDialogOpen(true);
   }
 
@@ -551,18 +537,7 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
 
   async function saveSettings() {
     try {
-      const saved = await upsertSettingsMutation.mutateAsync({
-        corp_id: settingsForm.corpId.trim(),
-        agent_id: settingsForm.agentId.trim(),
-        secret_alias: settingsForm.secretAlias.trim(),
-        callback_token_alias: settingsForm.callbackTokenAlias.trim(),
-        aes_key_alias: settingsForm.aesKeyAlias.trim(),
-        callback_url: settingsForm.callbackUrl.trim(),
-        approval_callback_path: settingsForm.approvalCallbackPath.trim(),
-        enabled: settingsForm.enabled,
-        retry_max_attempts: intFromText(settingsForm.retryMaxAttempts, 3),
-        retry_interval_seconds: intFromText(settingsForm.retryIntervalSeconds, 60),
-      });
+      const saved = await upsertSettingsMutation.mutateAsync(settingsRequest(settingsForm));
       setSettingsDialogOpen(false);
       setSelectedSettingsKeys([saved.id]);
       setNotice({ type: "success", text: `${saved.corp_id} 已保存` });
@@ -572,12 +547,21 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
   }
 
   async function testSettings() {
+    let saved: H4WechatSettings;
+    try {
+      saved = await upsertSettingsMutation.mutateAsync(settingsRequest(settingsForm));
+    } catch (errorValue) {
+      setNotice({ type: "error", text: errorText(errorValue, "保存企业微信参数失败") });
+      return;
+    }
+
+    setSelectedSettingsKeys([saved.id]);
     try {
       const result = await testSettingsMutation.mutateAsync();
-      setSettingsTestDialogOpen(false);
+      setSettingsDialogOpen(false);
       setNotice({ type: result.status === "success" ? "success" : "warning", text: result.message });
     } catch (errorValue) {
-      setSettingsTestDialogOpen(false);
+      setSettingsDialogOpen(false);
       setNotice({ type: "error", text: errorText(errorValue, "测试企业微信参数失败") });
     }
   }
@@ -694,6 +678,21 @@ function emptySettingsForm(): SettingsFormState {
     enabled: true,
     retryMaxAttempts: "3",
     retryIntervalSeconds: "60",
+  };
+}
+
+function settingsRequest(form: SettingsFormState) {
+  return {
+    corp_id: form.corpId.trim(),
+    agent_id: form.agentId.trim(),
+    secret_alias: form.secretAlias.trim(),
+    callback_token_alias: form.callbackTokenAlias.trim(),
+    aes_key_alias: form.aesKeyAlias.trim(),
+    callback_url: form.callbackUrl.trim(),
+    approval_callback_path: form.approvalCallbackPath.trim(),
+    enabled: form.enabled,
+    retry_max_attempts: intFromText(form.retryMaxAttempts, 3),
+    retry_interval_seconds: intFromText(form.retryIntervalSeconds, 60),
   };
 }
 

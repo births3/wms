@@ -28,7 +28,11 @@ assert.match(appShell, /<H4WechatNotifyPage mode=\{wechatNotifyMode\}/, "H4 菜�
 assert.match(pageSource, /<QueryPanel[\s\S]*fields=\{h4NotificationConfigQueryFields\}/, "H4 通知配置必须使用公共 QueryPanel");
 assert.match(pageSource, /<QueryPanel[\s\S]*fields=\{h4NotificationRecordQueryFields\}/, "H4 发送记录必须使用公共 QueryPanel");
 assert.match(pageSource, /mode === "settings"/, "H4 参数设置必须有独立页面模式");
-assert.match(pageSource, /<SettingsDialog[\s\S]*onSave=\{saveSettings\}/, "H4 参数设置必须有维护弹窗");
+assert.match(pageSource, /<SettingsDialog[\s\S]*onSave=\{saveSettings\}[\s\S]*onTest=\{testSettings\}/, "H4 参数测试必须由维护弹窗触发");
+assert.match(pageSource, /<SettingsDialog[\s\S]*notice=\{notice\}/, "H4 参数弹窗必须接收当前错误通知");
+assert.match(dialogsSource, /const busy = saving \|\| testing;[\s\S]*<fieldset disabled=\{busy\}/, "H4 参数保存或测试期间必须锁定表单输入");
+assert.match(dialogsSource, /notice\?\.type === "error"[\s\S]*<NoticePanel notice=\{notice\}/, "H4 参数保存错误必须显示在当前弹窗内");
+assert.match(dialogsSource, /role=\{notice\.type === "error" \? "alert" : "status"\}/, "H4 错误通知必须使用 alert 语义");
 assert.match(pageSource, /<DataGrid[\s\S]*storageKey="h4\.wechat-notify\.settings"/, "H4 参数设置必须使用公共 DataGrid");
 assert.match(pageSource, /<DataGrid[\s\S]*storageKey="h4\.wechat-notify\.configs"/, "H4 通知配置必须使用公共 DataGrid");
 assert.match(pageSource, /<DataGrid[\s\S]*storageKey="h4\.wechat-notify\.records"/, "H4 发送记录必须使用公共 DataGrid");
@@ -45,9 +49,10 @@ for (const route of [
 }
 
 assert.match(apiSource, /useTestH4WechatSettingsMutation/, "H4 api-client 必须提供参数测试 mutation");
-assert.match(pageSource, /key: "test-settings"/, "H4 参数设置必须提供测试动作");
-assert.match(pageSource, /<SettingsTestDialog[\s\S]*onConfirm=\{testSettings\}/, "H4 参数测试必须通过确认弹窗执行");
-assert.match(dialogsSource, /export function SettingsTestDialog/, "H4 参数测试必须提供确认弹窗");
+assert.doesNotMatch(pageSource, /key: "test-settings"/, "H4 参数测试不得出现在列表工具栏");
+assert.doesNotMatch(pageSource, /SettingsTestDialog/, "H4 参数测试不得使用独立确认弹窗");
+assert.doesNotMatch(dialogsSource, /export function SettingsTestDialog/, "H4 参数测试不得提供独立确认弹窗");
+assert.match(pageSource, /保存企业微信参数失败[\s\S]*return;[\s\S]*testSettingsMutation\.mutateAsync/, "H4 参数保存失败后不得继续测试或关闭弹窗");
 assert.match(devMockCore, /await handleH4WechatNotifyDevMock\(req, res, pathname\)/, "主 dev mock 必须实际调用 H4 通知路由处理器");
 assert.match(devMock, /pathname === "\/api\/v1\/wechat-notify\/configs"/, "dev mock 必须覆盖通知配置接口");
 assert.match(devMock, /pathname === "\/api\/v1\/wechat-notify\/settings"/, "dev mock 必须覆盖企业微信参数设置接口");

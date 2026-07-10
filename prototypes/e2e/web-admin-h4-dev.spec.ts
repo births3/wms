@@ -16,13 +16,43 @@ test("H4 管理端菜单能打开通知配置和发送记录", async ({ page }) 
   await page.getByRole("button", { name: /H4 参数设置/ }).click();
   await expect(page.getByRole("heading", { name: "H4 参数设置" })).toBeVisible();
   await expect(page.getByText("ww-demo-corp")).toBeVisible();
-  await page.getByRole("button", { name: "测试" }).click();
-  await expect(page.getByRole("dialog", { name: "测试企业微信参数" })).toBeVisible();
+  const settingsPage = page.locator("section").filter({ has: page.getByRole("heading", { name: "H4 参数设置" }) });
+  await settingsPage.getByRole("row").filter({ hasText: "ww-demo-corp" }).getByRole("checkbox").check();
+  await settingsPage.getByRole("button", { name: "修改" }).click();
+  const settingsDialog = page.getByRole("dialog", { name: "企业微信参数设置" });
+  await expect(settingsDialog).toBeVisible();
+  await settingsDialog.getByLabel("重试间隔秒").fill("75");
+  const requestOrder: string[] = [];
+  const trackSettingsRequests = (request: import("@playwright/test").Request) => {
+    if (request.method() !== "POST") return;
+    if (request.url().includes("/api/v1/wechat-notify/settings/test")) requestOrder.push("test-request");
+    else if (request.url().includes("/api/v1/wechat-notify/settings")) requestOrder.push("save-request");
+  };
+  const trackSettingsResponses = (response: import("@playwright/test").Response) => {
+    if (response.request().method() === "POST"
+      && response.url().includes("/api/v1/wechat-notify/settings")
+      && !response.url().includes("/test")) {
+      requestOrder.push("save-response");
+    }
+  };
+  page.on("request", trackSettingsRequests);
+  page.on("response", trackSettingsResponses);
+  const saveResponse = page.waitForResponse((response) =>
+    response.url().includes("/api/v1/wechat-notify/settings")
+      && !response.url().includes("/test")
+      && response.request().method() === "POST",
+  );
   const testResponse = page.waitForResponse((response) =>
     response.url().includes("/api/v1/wechat-notify/settings/test") && response.request().method() === "POST",
   );
-  await page.getByRole("button", { name: "确认测试" }).click();
+  await settingsDialog.getByRole("button", { name: "测试" }).click();
+  const savedResponse = await saveResponse;
+  expect(savedResponse.status()).toBe(200);
+  expect(savedResponse.request().postDataJSON()).toMatchObject({ retry_interval_seconds: 75 });
   const response = await testResponse;
+  page.off("request", trackSettingsRequests);
+  page.off("response", trackSettingsResponses);
+  expect(requestOrder).toEqual(["save-request", "save-response", "test-request"]);
   expect(response.status()).toBe(200);
   await expect(response.json()).resolves.toMatchObject({ status: "success" });
   await expect(page.getByText("企业微信参数校验通过")).toBeVisible();
@@ -232,11 +262,35 @@ test("H4 管理端菜单能打开通知配置和发送记录", async ({ page }) 
       }),
     });
   });
-  await page.getByRole("button", { name: "测试" }).click();
-  await page.getByRole("button", { name: "确认测试" }).click();
-  await expect(page.getByRole("dialog", { name: "测试企业微信参数" })).toBeHidden();
+  await settingsPage.getByRole("button", { name: "修改" }).click();
+  await settingsDialog.getByRole("button", { name: "测试" }).click();
+  await expect(settingsDialog).toBeHidden();
   await expect(page.getByText(/企业微信参数不完整/)).toBeVisible();
   await page.unroute("**/api/v1/wechat-notify/settings/test");
+
+  let testCalledAfterSaveFailure = false;
+  const trackBlockedTestRequest = (request: import("@playwright/test").Request) => {
+    if (request.method() === "POST" && request.url().includes("/api/v1/wechat-notify/settings/test")) {
+      testCalledAfterSaveFailure = true;
+    }
+  };
+  page.on("request", trackBlockedTestRequest);
+  await page.route("**/api/v1/wechat-notify/settings", async (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    await route.fulfill({
+      status: 422,
+      contentType: "application/json",
+      body: JSON.stringify({ code: "H4_REQUEST_INVALID", message: "保存参数失败", severity: "error", details: {}, trace_id: "e2e" }),
+    });
+  });
+  await settingsPage.getByRole("button", { name: "修改" }).click();
+  await settingsDialog.getByRole("button", { name: "测试" }).click();
+  await expect(settingsDialog).toBeVisible();
+  await expect(settingsDialog.getByRole("alert")).toHaveText("保存参数失败");
+  expect(testCalledAfterSaveFailure).toBe(false);
+  page.off("request", trackBlockedTestRequest);
+  await page.unroute("**/api/v1/wechat-notify/settings");
+  await settingsDialog.getByRole("button", { name: "取消" }).click();
   await page.screenshot({ path: path.join(artifactsDir, "wechat-settings.png"), fullPage: false });
 
   await page.getByRole("button", { name: /H4 通知配置/ }).click();
