@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 
 const dialogs = readFileSync(new URL("../src/pages/inbound/M2InboundDialogs.tsx", import.meta.url), "utf8");
 const lookup = readFileSync(new URL("../src/pages/inbound/M2InboundProductLookup.tsx", import.meta.url), "utf8");
-const queries = readFileSync(new URL("../src/features/master-data/master-data-queries.ts", import.meta.url), "utf8");
+const queries = readFileSync(new URL("../src/features/master-data/master-data-queries/queries.ts", import.meta.url), "utf8");
 
 assert.match(dialogs, /useMasterDataRowsQuery\("m1-products", activeDialog === "create"\)/);
 assert.match(dialogs, /<ProductLookupField/);

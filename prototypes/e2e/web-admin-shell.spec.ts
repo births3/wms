@@ -4,6 +4,296 @@ import path from "node:path";
 
 const artifactsDir = path.resolve("../apps/web-admin/.e2e-artifacts/shell-dev/screenshots");
 
+test("dev mock 保留主数据分页和入库动作状态", async ({ request }) => {
+  const productsResponse = await request.get("/api/v1/master-data/products");
+  expect(productsResponse.status()).toBe(200);
+  const products = await productsResponse.json() as { data: unknown[]; page: { count: number } };
+  expect(products.page.count).toBe(products.data.length);
+  expect(products.data.length).toBeGreaterThanOrEqual(3);
+  const productRows = products.data as Array<{
+    id: string;
+    product_code: string;
+    product_name: string;
+    spec: string | null;
+    dosage_form: string | null;
+    approval_no: string | null;
+    manufacturer: string | null;
+    special_drug_category_code: string | null;
+    attrs: Record<string, unknown>;
+    status: string;
+  }>;
+  const baseProduct = productRows.find((product) => product.product_code === "P-M1-001");
+  expect(baseProduct).toBeDefined();
+  const updatePayload = {
+    product_name: baseProduct?.product_name,
+    spec: baseProduct?.spec,
+    dosage_form: baseProduct?.dosage_form,
+    approval_no: baseProduct?.approval_no,
+    manufacturer: baseProduct?.manufacturer,
+    special_drug_category_code: "controlled",
+    attrs: { ...baseProduct?.attrs, storage_condition: "frozen" },
+    status: "inactive",
+  };
+  const updateResponse = await request.patch(`/api/v1/master-data/products/${baseProduct?.id}`, {
+    data: updatePayload,
+  });
+  expect(updateResponse.status()).toBe(200);
+  await expect.poll(async () => {
+    const productsAfterUpdate = await request.get("/api/v1/master-data/products");
+    const updatedRows = (await productsAfterUpdate.json() as { data: typeof productRows }).data;
+    return updatedRows.find((product) => product.product_code === "P-M1-001");
+  }).toMatchObject({
+    special_drug_category_code: "controlled",
+    attrs: { storage_condition: "frozen" },
+    status: "inactive",
+  });
+  await request.patch(`/api/v1/master-data/products/${baseProduct?.id}`, {
+    data: {
+      ...updatePayload,
+      special_drug_category_code: baseProduct?.special_drug_category_code,
+      attrs: baseProduct?.attrs,
+      status: baseProduct?.status,
+    },
+  });
+
+  const secondProduct = productRows.find((product) => product.product_code === "P-M1-002");
+  expect(secondProduct).toBeDefined();
+  const secondUpdateResponse = await request.patch(`/api/v1/master-data/products/${secondProduct?.id}`, {
+    data: { ...secondProduct, status: "inactive" },
+  });
+  expect(secondUpdateResponse.status()).toBe(200);
+  await expect.poll(async () => {
+    const response = await request.get("/api/v1/master-data/products");
+    const rows = (await response.json() as { data: typeof productRows }).data;
+    return rows.find((product) => product.product_code === "P-M1-002")?.status;
+  }).toBe("inactive");
+  await request.patch(`/api/v1/master-data/products/${secondProduct?.id}`, {
+    data: secondProduct,
+  });
+
+  const createdProductResponse = await request.post("/api/v1/master-data/products", {
+    data: { product_code: "P-M1-E2E", product_name: "默认值商品", attrs: {} },
+  });
+  await expect(createdProductResponse.json()).resolves.toMatchObject({
+    attrs: { source: "api_import", storage_condition: "normal" },
+    status: "active",
+  });
+  const createdSupplierResponse = await request.post("/api/v1/master-data/suppliers", {
+    data: { supplier_code: "S-M1-E2E", supplier_name: "默认值供应商" },
+  });
+  await expect(createdSupplierResponse.json()).resolves.toMatchObject({ source: "api_import", status: "active" });
+  const createdCustomerResponse = await request.post("/api/v1/master-data/customers", {
+    data: { customer_code: "C-M1-E2E", customer_name: "默认值客户" },
+  });
+  await expect(createdCustomerResponse.json()).resolves.toMatchObject({ source: "api_import", status: "active" });
+
+  const boundOwnerId = "00000000-0000-0000-0000-000000000001";
+  const createdLocationResponse = await request.post("/api/v1/master-data/locations", {
+    data: {
+      warehouse_id: "00000000-0000-0000-0000-000000003001",
+      zone_id: "00000000-0000-0000-0000-000000003101",
+      location_code: "A01-E2E-01-01",
+      row_no: 1,
+      column_no: 1,
+      layer_no: 1,
+      max_volume_cm3: 100000,
+      max_sku_count: 1,
+      location_type: "storage",
+      bound_owner_id: boundOwnerId,
+    },
+  });
+  const createdLocation = await createdLocationResponse.json() as { id: string };
+  const invalidLocationResponse = await request.post("/api/v1/master-data/locations", {
+    data: {
+      warehouse_id: "not-a-uuid",
+      zone_id: "00000000-0000-0000-0000-000000003101",
+      location_code: "A01-INVALID-01-01",
+      row_no: 1.5,
+      column_no: 1,
+      layer_no: 1,
+      max_volume_cm3: Number.MAX_SAFE_INTEGER + 1,
+      max_sku_count: 2_147_483_648,
+      location_type: "storage",
+    },
+  });
+  expect(invalidLocationResponse.status()).toBe(422);
+  const updatedLocationResponse = await request.patch(`/api/v1/master-data/locations/${createdLocation.id}`, {
+    data: { status: "disabled" },
+  });
+  await expect(updatedLocationResponse.json()).resolves.toMatchObject({ bound_owner_id: boundOwnerId });
+
+  const batchRequest = {
+      warehouse_id: "00000000-0000-0000-0000-000000003001",
+      zone_id: "00000000-0000-0000-0000-000000003101",
+      area_code: "E2E",
+      row_start: 2,
+      row_end: 2,
+      column_start: 1,
+      column_end: 2,
+      layer_start: 1,
+      layer_end: 1,
+      max_volume_cm3: 100000,
+      max_sku_count: 1,
+      location_type: "storage",
+  };
+  const missingBatchIdempotency = await request.post("/api/v1/master-data/locations/batch-create", {
+    data: { ...batchRequest, area_code: "MIS", row_start: 3, row_end: 3 },
+  });
+  expect(missingBatchIdempotency.status()).toBe(400);
+  await expect(missingBatchIdempotency.json()).resolves.toMatchObject({ code: "M1_LOCATION_IDEMPOTENCY_REQUIRED" });
+  const batchLocationResponse = await request.post("/api/v1/master-data/locations/batch-create", {
+    headers: { "Idempotency-Key": "m1-e2e-location-batch" },
+    data: batchRequest,
+  });
+  await expect(batchLocationResponse.json()).resolves.toMatchObject({
+    data: [
+      { location_code: "E2E-02-01-01" },
+      { location_code: "E2E-02-02-01" },
+    ],
+    page: { count: 2, next_cursor: null },
+  });
+  const replayBatchResponse = await request.post("/api/v1/master-data/locations/batch-create", {
+    headers: { "Idempotency-Key": "m1-e2e-location-batch" },
+    data: batchRequest,
+  });
+  expect(replayBatchResponse.status()).toBe(200);
+  await expect(replayBatchResponse.json()).resolves.toMatchObject(await batchLocationResponse.json());
+  const conflictingBatchResponse = await request.post("/api/v1/master-data/locations/batch-create", {
+    headers: { "Idempotency-Key": "m1-e2e-location-batch" },
+    data: { ...batchRequest, area_code: "CNF" },
+  });
+  expect(conflictingBatchResponse.status()).toBe(409);
+  await expect(conflictingBatchResponse.json()).resolves.toMatchObject({ code: "M1_LOCATION_IDEMPOTENCY_CONFLICT" });
+  const locationsAfterBatch = await request.get("/api/v1/master-data/locations");
+  const locationCodes = (await locationsAfterBatch.json() as { data: Array<{ location_code: string }> })
+    .data.map((location) => location.location_code);
+  expect(locationCodes).toEqual(expect.arrayContaining(["E2E-02-01-01", "E2E-02-02-01"]));
+
+  const duplicateBatchResponse = await request.post("/api/v1/master-data/locations/batch-create", {
+    headers: { "Idempotency-Key": "m1-e2e-location-batch-duplicate" },
+    data: batchRequest,
+  });
+  expect(duplicateBatchResponse.status()).toBe(409);
+  await expect(duplicateBatchResponse.json()).resolves.toMatchObject({ code: "M1_LOCATION_DUPLICATE" });
+
+  for (const invalidPayload of [
+    {
+      area_code: "MAX",
+      row_start: 1,
+      row_end: 99,
+      column_start: 1,
+      column_end: 6,
+      layer_start: 1,
+      layer_end: 1,
+      max_volume_cm3: 100000,
+      max_sku_count: 1,
+      location_type: "storage",
+    },
+    {
+      area_code: "CAP",
+      row_start: 1,
+      row_end: 1,
+      column_start: 1,
+      column_end: 1,
+      layer_start: 1,
+      layer_end: 1,
+      max_volume_cm3: -1,
+      max_sku_count: 0,
+      location_type: "unknown",
+    },
+    {
+      area_code: "DEC",
+      row_start: 1.5,
+      row_end: 2,
+      column_start: 1,
+      column_end: 1,
+      layer_start: 1,
+      layer_end: 1,
+      max_volume_cm3: 100000.5,
+      max_sku_count: 1.5,
+      location_type: "storage",
+    },
+    { ...batchRequest, area_code: "UID", warehouse_id: "not-a-uuid" },
+    { ...batchRequest, area_code: "ZON", zone_id: "00000000-0000-0000-0000-000000003199" },
+    { ...batchRequest, area_code: "OWN", bound_owner_id: "00000000-0000-0000-0000-000000000999" },
+    { ...batchRequest, area_code: "I32", max_sku_count: 2_147_483_648 },
+    { ...batchRequest, area_code: "I64", max_volume_cm3: Number.MAX_SAFE_INTEGER + 1 },
+  ]) {
+    const invalidBatchResponse = await request.post("/api/v1/master-data/locations/batch-create", {
+      headers: { "Idempotency-Key": `m1-e2e-invalid-${invalidPayload.area_code}` },
+      data: {
+        warehouse_id: "00000000-0000-0000-0000-000000003001",
+        zone_id: "00000000-0000-0000-0000-000000003101",
+        ...invalidPayload,
+      },
+    });
+    expect(invalidBatchResponse.status()).toBe(422);
+    await expect(invalidBatchResponse.json()).resolves.toMatchObject({ code: "M1_LOCATION_BATCH_INVALID" });
+  }
+
+  const missingDocumentTypeResponse = await request.post("/api/v1/inbound/receiving-orders", {
+    data: { receipt_no: "ASN-MISSING-DOCUMENT-TYPE", lines: [] },
+  });
+  expect(missingDocumentTypeResponse.status()).toBe(422);
+  await expect(missingDocumentTypeResponse.json()).resolves.toMatchObject({
+    code: "W3-422",
+    severity: "error",
+    details: {},
+    trace_id: "dev-mock",
+  });
+  const unknownRouteResponse = await request.get("/api/v1/dev-mock-contract-probe");
+  expect(unknownRouteResponse.status()).toBe(404);
+  await expect(unknownRouteResponse.json()).resolves.toMatchObject({
+    code: "DEV_MOCK_NOT_FOUND",
+    severity: "error",
+    details: {},
+    trace_id: "dev-mock",
+  });
+
+  const ordersResponse = await request.get("/api/v1/inbound/receiving-orders");
+  expect(ordersResponse.status()).toBe(200);
+  const orders = await ordersResponse.json() as {
+    data: Array<{ id: string; status: string }>;
+    page: { count: number };
+  };
+  expect(orders.page.count).toBe(100);
+  const released = orders.data.find((order) => order.status === "released");
+  expect(released).toBeDefined();
+
+  const receiveResponse = await request.post(`/api/v1/inbound/receiving-orders/${released?.id}/receive`, {
+    data: { actual_qty: 20, shortage_qty: 0, rejected_qty: 0 },
+  });
+  expect(receiveResponse.status()).toBe(200);
+  const receipt = await receiveResponse.json() as { id: string };
+  expect(receipt.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+  const inspectResponse = await request.post(`/api/v1/inbound/receiving-orders/${released?.id}/inspect`, {
+    data: { batch_no: "BATCH-E2E", accepted_qty: 20, rejected_qty: 0, quality_status: "qualified" },
+  });
+  expect(inspectResponse.status()).toBe(200);
+  const inspection = await inspectResponse.json() as { id: string };
+  expect(inspection.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+  const detailResponse = await request.get(`/api/v1/inbound/receiving-orders/${released?.id}`);
+  expect(detailResponse.status()).toBe(200);
+  await expect(detailResponse.json()).resolves.toMatchObject({ status: "inspecting" });
+});
+
+test("dev mock 保留 H9 字段库数量和 M2 ASN 字段", async ({ request }) => {
+  const librariesResponse = await request.get("/api/v1/print-templates/field-libraries");
+  expect(librariesResponse.status()).toBe(200);
+  const libraries = await librariesResponse.json() as {
+    data: Array<{ library_code: string; latest_version_id: string; field_count: number }>;
+  };
+  const asnLibrary = libraries.data.find((library) => library.library_code === "m2_asn");
+  expect(asnLibrary).toMatchObject({ field_count: 16 });
+
+  const fieldsResponse = await request.get(
+    `/api/v1/print-templates/field-libraries/${asnLibrary?.latest_version_id}/fields`,
+  );
+  expect(fieldsResponse.status()).toBe(200);
+  const fields = await fieldsResponse.json() as { data: Array<{ field_path: string }> };
+  expect(fields.data.map((field) => field.field_path)).toContain("product.code");
+});
+
 test("侧边栏筛选菜单支持 Escape 和点击页面内容关闭", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "登录" }).click();

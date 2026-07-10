@@ -7,6 +7,8 @@ import { api } from "@/lib/api";
 export type H4NotificationConfig = components["schemas"]["H4NotificationConfig"];
 export type H4NotificationRecord = components["schemas"]["H4NotificationRecord"];
 export type H4WechatSettings = components["schemas"]["H4WechatSettings"];
+export type H4WechatSettingsTestResponse =
+  components["schemas"]["H4WechatSettingsTestResponse"];
 export type UpsertH4NotificationConfigRequest = components["schemas"]["UpsertH4NotificationConfigRequest"];
 export type UpsertH4WechatSettingsRequest = components["schemas"]["UpsertH4WechatSettingsRequest"];
 export type SendH4NotificationRequest = components["schemas"]["SendH4NotificationRequest"];
@@ -62,6 +64,12 @@ export function useUpsertH4WechatSettingsMutation() {
   });
 }
 
+export function useTestH4WechatSettingsMutation() {
+  return useMutation<H4WechatSettingsTestResponse, ApiError>({
+    mutationFn: testH4WechatSettings,
+  });
+}
+
 export function useSendH4NotificationMutation() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -107,8 +115,8 @@ async function listH4NotificationRecords(params: H4RecordQueryParams): Promise<H
         event_type: params.eventType || undefined,
         recipient: params.recipient || undefined,
         status: params.status || undefined,
-        from: params.from || undefined,
-        to: params.to || undefined,
+        from: startOfDayUtc(params.from),
+        to: endOfDayUtc(params.to),
         limit: 100,
       },
     },
@@ -117,6 +125,25 @@ async function listH4NotificationRecords(params: H4RecordQueryParams): Promise<H
     throw new ApiError(result.error, "读取企业微信通知记录失败", result.response.status);
   }
   return result.data.data;
+}
+
+function startOfDayUtc(value?: string) {
+  return dateBoundaryUtc(value, false);
+}
+
+function endOfDayUtc(value?: string) {
+  return dateBoundaryUtc(value, true);
+}
+
+function dateBoundaryUtc(value: string | undefined, endOfDay: boolean) {
+  if (!value) return undefined;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return value;
+  const [, year, month, day] = match;
+  const date = endOfDay
+    ? new Date(Number(year), Number(month) - 1, Number(day), 23, 59, 59, 999)
+    : new Date(Number(year), Number(month) - 1, Number(day), 0, 0, 0, 0);
+  return date.toISOString();
 }
 
 async function upsertH4NotificationConfig(request: UpsertH4NotificationConfigRequest) {
@@ -137,6 +164,14 @@ async function upsertH4WechatSettings(request: UpsertH4WechatSettingsRequest) {
   });
   if (!result.data) {
     throw new ApiError(result.error, "保存企业微信参数设置失败", result.response.status);
+  }
+  return result.data;
+}
+
+async function testH4WechatSettings() {
+  const result = await api.POST("/api/v1/wechat-notify/settings/test");
+  if (!result.data) {
+    throw new ApiError(result.error, "测试企业微信参数失败", result.response.status);
   }
   return result.data;
 }

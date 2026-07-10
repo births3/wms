@@ -3,7 +3,8 @@ import { readFileSync } from "node:fs";
 
 const schema = readFileSync(new URL("../../../packages/api-client/src/schema.ts", import.meta.url), "utf8");
 const glossary = readFileSync(new URL("../../../docs/glossary.md", import.meta.url), "utf8");
-const queriesSource = readFileSync(new URL("../src/features/master-data/master-data-queries.ts", import.meta.url), "utf8");
+const queriesSource = readFileSync(new URL("../src/features/master-data/master-data-queries/queries.ts", import.meta.url), "utf8");
+const apiSource = readFileSync(new URL("../src/features/master-data/master-data-queries/api.ts", import.meta.url), "utf8");
 const crudDialogSource = readFileSync(new URL("../src/pages/master-data/MasterDataCrudDialog.tsx", import.meta.url), "utf8");
 const batchDialogSource = readFileSync(new URL("../src/pages/master-data/LocationBatchDialog.tsx", import.meta.url), "utf8");
 
@@ -26,3 +27,16 @@ assert.match(queriesSource, /useSystemDictionaryItemOptionsQuery/, "location UI 
 assert.doesNotMatch(queriesSource, /function locationTypeLabel/, "location list should not hard-code location type labels");
 assert.doesNotMatch(crudDialogSource, /const locationTypeOptions = \[/, "location CRUD should receive dictionary options");
 assert.doesNotMatch(batchDialogSource, /const locationTypeOptions/, "location batch dialog should receive dictionary options");
+const batchCreateSource = apiSource.slice(
+  apiSource.indexOf("export async function batchCreateLocations"),
+  apiSource.indexOf("export async function createProduct"),
+);
+assert.match(
+  batchCreateSource,
+  /await listSystemDictionaryItemOptions/,
+  "库位批量创建必须显式等待字典读取",
+);
+assert.ok(
+  batchCreateSource.indexOf("await listSystemDictionaryItemOptions") < batchCreateSource.indexOf('api.POST("/api/v1/master-data/locations/batch-create"'),
+  "库位批量创建必须先读取字典，再执行写入，避免写成功后因字典失败误报",
+);

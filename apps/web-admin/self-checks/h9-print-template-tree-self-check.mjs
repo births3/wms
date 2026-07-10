@@ -9,7 +9,11 @@ const querySource = read("src/features/print-template/print-template-queries.ts"
 const designerSource = read("src/pages/print-template/H9TemplateDesignerDialog.tsx");
 const hiprintSource = read("src/pages/print-template/H9HiprintDesigner.tsx");
 const previewSource = read("src/pages/print-template/H9TemplatePreviewDialog.tsx");
-const viteConfigSource = read("vite.config.ts");
+const devMockCoreSource = read("dev-mocks/web-admin-dev-mock-core.ts");
+const devMockSource = [
+  devMockCoreSource,
+  read("dev-mocks/web-admin-dev-mock-print-inventory.ts"),
+].join("\n");
 const businessIndexSource = read("../../packages/ui/src/business/index.ts");
 const componentRegistrySource = read("../../docs/prototypes/component-registry.md");
 
@@ -80,17 +84,17 @@ assert.match(previewSource, /template\.getHtml/);
 assert.match(previewSource, /纸张方向/);
 assert.match(previewSource, /applyPreviewPaperDirection/);
 assert.match(previewSource, /templateRef\.current\?\.print/);
-assert.match(viteConfigSource, /\/api\/v1\/print-templates\/field-libraries/);
-assert.match(viteConfigSource, /printFieldDefinitions/);
-assert.match(viteConfigSource, /\/api\/v1\/print-templates\/templates/);
-assert.match(viteConfigSource, /printTemplateVersions/);
-assert.match(viteConfigSource, /\/api\/v1\/print-templates\/resolve/);
-assert.match(viteConfigSource, /\/api\/v1\/print-templates\/preview/);
-assert.match(viteConfigSource, /\/api\/v1\/print-templates\/print/);
-assert.match(viteConfigSource, /devPrintFieldLibrariesResponse/);
-assert.match(viteConfigSource, /devPrintTemplatesResponse/);
-assert.match(viteConfigSource, /devPrintFieldDefinitionsResponse/);
-assert.match(viteConfigSource, /library_code/);
+assert.match(devMockSource, /\/api\/v1\/print-templates\/field-libraries/);
+assert.match(devMockSource, /fieldDefinitions/);
+assert.match(devMockSource, /\/api\/v1\/print-templates\/templates/);
+assert.match(devMockSource, /templateVersions/);
+assert.match(devMockSource, /\/api\/v1\/print-templates\/resolve/);
+assert.match(devMockSource, /\/api\/v1\/print-templates\/preview/);
+assert.match(devMockSource, /\/api\/v1\/print-templates\/print/);
+assert.match(devMockSource, /fieldLibraries/);
+assert.match(devMockSource, /templates/);
+assert.match(devMockSource, /library_code/);
+assert.match(devMockCoreSource, /await handlePrintInventoryDevMock\(req, res, pathname\)/);
 assert.match(businessIndexSource, /export \{ TreeCatalog \}/);
 assert.match(componentRegistrySource, /\*\*TreeCatalog\*\*/);
 

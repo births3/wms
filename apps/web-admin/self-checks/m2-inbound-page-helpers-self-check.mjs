@@ -52,6 +52,9 @@ try {
   const pageSource = readFileSync(fileURLToPath(new URL("../src/pages/inbound/M2InboundPage.tsx", import.meta.url)), "utf8");
   const orderTableSource = readFileSync(fileURLToPath(new URL("../src/pages/inbound/M2InboundOrderTable.tsx", import.meta.url)), "utf8");
   const dialogSource = readFileSync(fileURLToPath(new URL("../src/pages/inbound/M2InboundDialogs.tsx", import.meta.url)), "utf8");
+  const devMockCore = readFileSync(fileURLToPath(new URL("../dev-mocks/web-admin-dev-mock-core.ts", import.meta.url)), "utf8");
+  const devMockCommon = readFileSync(fileURLToPath(new URL("../dev-mocks/web-admin-dev-mock-core-common.ts", import.meta.url)), "utf8");
+  const devMockModel = readFileSync(fileURLToPath(new URL("../dev-mocks/web-admin-dev-mock-model.ts", import.meta.url)), "utf8");
   const createFormBlock = /const emptyCreateForm: CreateFormState = \{([\s\S]*?)\};/.exec(pageSource)?.[1] ?? "";
   const inspectFormBlock = /const emptyInspectForm: InspectFormState = \{([\s\S]*?)\};/.exec(pageSource)?.[1] ?? "";
   const signFormBlock = /const emptySignForm: SignFormState = \{([\s\S]*?)\};/.exec(pageSource)?.[1] ?? "";
@@ -79,6 +82,10 @@ try {
   assert.match(dialogSource, /<TextField label="验收批号" required placeholder=\{inspectExamples\.batchNo\}/, "验收批号背景值只允许作为 placeholder");
   assert.match(dialogSource, /<TextField label="通过数量" type="number" required placeholder=\{inspectExamples\.acceptedQty\}/, "通过数量背景值只允许作为 placeholder");
   assert.doesNotMatch(submitInspectBlock, /line\?\.batch_no \|\| "BATCH-202606"|inspectForm\.traceCodes \|\| "TC-M2-0001"/, "验收提交不能用背景值或样例值兜底");
+  assert.match(devMockModel, /devSeedOrderCount = 100/, "M2 dev mock 必须保留 100 条入库单");
+  assert.match(devMockCommon, /devSeedOrderStatusOverrides\.get\(id\)/, "种子入库单查询必须读取动作后的状态覆盖");
+  assert.match(devMockCommon, /devSeedOrderStatusOverrides\.set\(id, status\)/, "种子入库单动作必须持久化状态覆盖");
+  assert.match(devMockCore, /page: \{ count: data\.length, next_cursor: null \}/, "M2 dev mock 列表必须返回分页元数据");
 } finally {
   await server.close();
 }

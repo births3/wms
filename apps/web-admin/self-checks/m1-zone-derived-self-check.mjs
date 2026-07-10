@@ -6,7 +6,12 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(fileURLToPath(new URL("../../..", import.meta.url)));
 
 const appSource = read("apps/web-admin/src/App.tsx");
-const queriesSource = read("apps/web-admin/src/features/master-data/master-data-queries.ts");
+const queriesSource = [
+  read("apps/web-admin/src/features/master-data/master-data-queries/types.ts"),
+  read("apps/web-admin/src/features/master-data/master-data-queries/queries.ts"),
+  read("apps/web-admin/src/features/master-data/master-data-queries/api.ts"),
+  read("apps/web-admin/src/features/master-data/master-data-queries/mappers.ts"),
+].join("\n");
 const pageSource = read("apps/web-admin/src/pages/master-data/M1MasterDataPage.tsx");
 const navigationCheckSource = read("scripts/governance/check_admin_navigation.py");
 

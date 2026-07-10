@@ -1,0 +1,129 @@
+import type { components } from "@wms/api-client";
+
+export type MasterDataViewId =
+  | "m1-products"
+  | "m1-business-partners"
+  | "m1-warehouses"
+  | "m1-zones"
+  | "m1-locations"
+  | "m1-system-dictionary";
+
+export type Product = components["schemas"]["Product"];
+export type Supplier = components["schemas"]["Supplier"];
+export type Customer = components["schemas"]["Customer"];
+export type Warehouse = components["schemas"]["Warehouse"];
+export type Location = components["schemas"]["Location"];
+export type UpdateProductRequest = components["schemas"]["UpdateProductRequest"];
+export type CreateProductRequest = components["schemas"]["CreateProductRequest"];
+export type CreateSupplierRequest = components["schemas"]["CreateSupplierRequest"];
+export type UpdateSupplierRequest = components["schemas"]["UpdateSupplierRequest"];
+export type CreateCustomerRequest = components["schemas"]["CreateCustomerRequest"];
+export type UpdateCustomerRequest = components["schemas"]["UpdateCustomerRequest"];
+export type CreateWarehouseRequest = components["schemas"]["CreateWarehouseRequest"];
+export type UpdateWarehouseRequest = components["schemas"]["UpdateWarehouseRequest"];
+export type CreateLocationRequest = components["schemas"]["CreateLocationRequest"];
+export type UpdateLocationRequest = components["schemas"]["UpdateLocationRequest"];
+export type BatchCreateLocationsRequest = components["schemas"]["BatchCreateLocationsRequest"];
+export type SystemDictionaryItem = components["schemas"]["SystemDictionaryItem"];
+export type UpsertSystemDictionaryItemRequest =
+  components["schemas"]["UpsertSystemDictionaryItemRequest"];
+export type DisableSystemDictionaryItemRequest =
+  components["schemas"]["DisableSystemDictionaryItemRequest"];
+export type BusinessPartnerKind = "supplier" | "customer";
+
+export interface MasterDataRow {
+  id: string;
+  code: string;
+  name: string;
+  status: string;
+  statusLabel: string;
+  ownerId: string;
+  primaryLabel: string;
+  primaryValue: string;
+  secondaryLabel: string;
+  secondaryValue: string;
+  extraLabel: string;
+  extraValue: string;
+  createdAt: string;
+  sourceValue?: string;
+  updatedAt: string;
+  productFields?: ProductMasterDataFields;
+  zoneFields?: WarehouseZoneMasterDataFields;
+  locationFields?: LocationMasterDataFields;
+  partnerKind?: BusinessPartnerKind;
+  partnerTypeLabel?: string;
+  searchText: string;
+}
+
+export interface ProductMasterDataFields {
+  approvalNo?: string | null;
+  attrs: Record<string, unknown>;
+  dosageForm?: string | null;
+  manufacturer?: string | null;
+  specialDrugCategoryCode?: string | null;
+  spec?: string | null;
+  storageCondition?: string | null;
+  middlePackage: string;
+  largePackage: string;
+  unitLengthMm: string;
+  unitWidthMm: string;
+  unitHeightMm: string;
+  unitWeightG: string;
+  unitVolumeCm3: string;
+}
+
+export interface LocationMasterDataFields {
+  owner: string;
+  warehouse: string;
+  zone: string;
+  area: string;
+  rowNo: string;
+  columnNo: string;
+  layerNo: string;
+  locationType: string;
+  locationTypeCode: string;
+  volume: string;
+  maxVolumeCm3: string;
+  usedVolumeCm3: string;
+  maxSku: string;
+}
+
+export interface WarehouseZoneMasterDataFields {
+  owner: string;
+  warehouse: string;
+  zone: string;
+  locationCount: string;
+  availableLocationCount: string;
+}
+
+export interface SystemDictionaryPaneItem {
+  id: string;
+  code: string;
+  name: string;
+  source: string;
+  enabled: boolean;
+  ownerId?: string | null;
+  params: Record<string, unknown>;
+  effectiveFrom?: string | null;
+  effectiveTo?: string | null;
+  disabledReason?: string | null;
+  updatedAt: string;
+}
+
+export interface SystemDictionaryPaneGroup {
+  code: string;
+  name: string;
+  items: SystemDictionaryPaneItem[];
+}
+
+export interface SpecialDrugCategoryOption {
+  value: string;
+  label: string;
+  status: string;
+  requiresDualSign: boolean;
+}
+
+export type SystemDictionaryOption = readonly [string, string];
+
+export const masterDataQueryKey = ["master-data"] as const;
+export const specialDrugCategoryDictCode = "special_drug_category";

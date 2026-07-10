@@ -11,7 +11,7 @@ import {
   type QueryPanelValue,
   type StatusKey,
 } from "@wms/ui";
-import { RotateCw, Send } from "lucide-react";
+import { FlaskConical, RotateCw, Send } from "lucide-react";
 
 import {
   useH4NotificationConfigsQuery,
@@ -19,6 +19,7 @@ import {
   useH4WechatSettingsQuery,
   useResendH4NotificationRecordMutation,
   useSendH4NotificationMutation,
+  useTestH4WechatSettingsMutation,
   useUpsertH4NotificationConfigMutation,
   useUpsertH4WechatSettingsMutation,
   type H4NotificationConfig,
@@ -33,6 +34,7 @@ import {
   RecordDetailDialog,
   SendDialog,
   SettingsDialog,
+  SettingsTestDialog,
   type ConfigFormState,
   type Notice,
   type SendFormState,
@@ -247,6 +249,7 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
   const [selectedRecordKeys, setSelectedRecordKeys] = React.useState<string[]>([]);
   const [selectedSettingsKeys, setSelectedSettingsKeys] = React.useState<string[]>([]);
   const [settingsDialogOpen, setSettingsDialogOpen] = React.useState(false);
+  const [settingsTestDialogOpen, setSettingsTestDialogOpen] = React.useState(false);
   const [configDialogOpen, setConfigDialogOpen] = React.useState(false);
   const [sendDialogOpen, setSendDialogOpen] = React.useState(false);
   const [detailRecord, setDetailRecord] = React.useState<H4NotificationRecord | null>(null);
@@ -267,6 +270,7 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
     to: queryRange(recordParams.createdAt).to,
   });
   const upsertSettingsMutation = useUpsertH4WechatSettingsMutation();
+  const testSettingsMutation = useTestH4WechatSettingsMutation();
   const upsertMutation = useUpsertH4NotificationConfigMutation();
   const sendMutation = useSendH4NotificationMutation();
   const resendMutation = useResendH4NotificationRecordMutation();
@@ -324,6 +328,16 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
             disabled: () => selectedSettingsKeys.length !== 1,
             onClick: () => openSettingsDialog(selectedSettings),
           }}
+          toolbarActions={[
+            {
+              key: "test-settings",
+              label: "测试",
+              description: "校验已保存的企业微信参数",
+              icon: <FlaskConical className="size-4" aria-hidden />,
+              disabled: () => !settingsQuery.data || testSettingsMutation.isPending,
+              onClick: () => setSettingsTestDialogOpen(true),
+            },
+          ]}
         />
         <SettingsDialog
           open={settingsDialogOpen}
@@ -332,6 +346,12 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
           onFormChange={setSettingsForm}
           onOpenChange={setSettingsDialogOpen}
           onSave={saveSettings}
+        />
+        <SettingsTestDialog
+          open={settingsTestDialogOpen}
+          testing={testSettingsMutation.isPending}
+          onOpenChange={setSettingsTestDialogOpen}
+          onConfirm={testSettings}
         />
       </section>
     );
@@ -384,7 +404,7 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
               label: "重发",
               description: "重发失败或重试中的企业微信通知",
               icon: <RotateCw className="size-4" aria-hidden />,
-              disabled: () => !selectedRecord || selectedRecord.status === "success" || resendMutation.isPending,
+              disabled: () => !selectedRecord || !["failed", "retrying"].includes(selectedRecord.status) || resendMutation.isPending,
               onClick: () => selectedRecord && void resendRecord(selectedRecord.id),
             },
           ]}
@@ -551,6 +571,17 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
     }
   }
 
+  async function testSettings() {
+    try {
+      const result = await testSettingsMutation.mutateAsync();
+      setSettingsTestDialogOpen(false);
+      setNotice({ type: result.status === "success" ? "success" : "warning", text: result.message });
+    } catch (errorValue) {
+      setSettingsTestDialogOpen(false);
+      setNotice({ type: "error", text: errorText(errorValue, "测试企业微信参数失败") });
+    }
+  }
+
   async function saveConfig() {
     try {
       const request = {
@@ -590,7 +621,14 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
     if (!window.confirm("确认重发这条企业微信通知？")) return;
     try {
       const resent = await resendMutation.mutateAsync(recordId);
-      setNotice({ type: "success", text: `${resent.recipient} 已重发` });
+      if (resent.status === "success") {
+        setNotice({ type: "success", text: `${resent.recipient} 已重发` });
+      } else {
+        setNotice({
+          type: "warning",
+          text: `重发失败：${resent.failure_reason || "企业微信未返回成功状态"}`,
+        });
+      }
     } catch (errorValue) {
       setNotice({ type: "error", text: errorText(errorValue, "重发企业微信通知失败") });
     }
@@ -747,8 +785,15 @@ function queryValueFromUnknown(value: unknown): QueryPanelValue {
 }
 
 function dateInRange(value: string, range: QueryPanelRangeValue) {
-  const date = value.slice(0, 10);
+  const date = localDateKey(value);
   return (!range.from || date >= range.from) && (!range.to || date <= range.to);
+}
+
+function localDateKey(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.slice(0, 10);
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
 function formatDateTime(value: string) {

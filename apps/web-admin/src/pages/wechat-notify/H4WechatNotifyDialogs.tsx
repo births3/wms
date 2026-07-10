@@ -41,7 +41,29 @@ export type SettingsFormState = {
   retryIntervalSeconds: string;
 };
 
-export type Notice = { type: "success" | "error"; text: string } | null;
+export type Notice = { type: "success" | "warning" | "error"; text: string } | null;
+
+export function SettingsTestDialog(props: {
+  open: boolean;
+  testing: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Dialog open={props.open} onOpenChange={props.onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>测试企业微信参数</DialogTitle>
+          <DialogDescription>校验当前已保存参数的完整性和启用状态，不发起外部网络请求。</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => props.onOpenChange(false)}>取消</Button>
+          <Button type="button" disabled={props.testing} onClick={props.onConfirm}>确认测试</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export function SettingsDialog(props: {
   open: boolean;
@@ -231,7 +253,9 @@ export function NoticePanel({ notice }: { notice: Notice }) {
   if (!notice) return null;
   const className = notice.type === "success"
     ? "border-primary/20 bg-primary/5 text-primary"
-    : "border-destructive/30 bg-destructive/10 text-destructive";
+    : notice.type === "warning"
+      ? "border-amber-300 bg-amber-50 text-amber-800"
+      : "border-destructive/30 bg-destructive/10 text-destructive";
   return <div className={`rounded-md border px-4 py-3 text-sm ${className}`} role="status">{notice.text}</div>;
 }
 
