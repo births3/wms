@@ -77,9 +77,9 @@
 |---|---|---|
 | info | 1 | 状态变更通知 / 数据已存在等正常路径 |
 | warning | 28 | 业务规则拦截（库存不足 / 资质过期等）|
-| error | 23 | 业务异常（数据冲突 / 校验失败）|
+| error | 39 | 业务异常（数据冲突 / 校验失败）|
 | critical | 7 | 合规/安全异常（跨货主访问 / 篡改尝试）|
-| **合计** | **59** | — |
+| **合计** | **75** | — |
 
 ---
 
@@ -88,8 +88,9 @@
 | 前缀 | 错误码数 | 主要场景 |
 |---|---|---|
 | H1 | 12 | 鉴权 / 多租户隔离 |
-| H2 | 3 | 审计 / 事件总线 |
-| H4 | 2 | 通知发送 |
+| H2 | 5 | 审计 / 事件总线 |
+| H4 | 14 | 通知发送 / 审批 / 重发 |
+| H6 | 2 | 状态机查询与校验 |
 | H5 | 2 | 快递面单 |
 | H_DOCK | 3 | 月台预约 |
 | H_AL | 2 | 告警引擎 |
@@ -379,6 +380,175 @@ error_codes:
     message_en: 'Notification template not found'
     related_fields: []
     related_stories: [US-H4-001]
+    introduced_in: v3.1
+
+  - code: H4_IDEMPOTENCY_REQUIRED
+    module: H4
+    category: IDEMPOTENCY
+    detail: REQUIRED
+    http_status: 400
+    severity: error
+    message_zh: '缺少 Idempotency-Key'
+    message_en: 'Idempotency-Key is required'
+    related_fields: []
+    related_stories: [US-H4-001, US-H4-002, US-H4-003, US-H4-004]
+    introduced_in: v3.1
+
+  - code: H4_EVENT_NOT_FOUND
+    module: H4
+    category: EVENT
+    detail: NOT_FOUND
+    http_status: 404
+    severity: error
+    message_zh: '通知事件未配置或未启用'
+    message_en: 'Notification event is missing or disabled'
+    related_fields: []
+    related_stories: [US-H4-001, US-H4-002]
+    introduced_in: v3.1
+
+  - code: H4_WECHAT_SETTINGS_NOT_FOUND
+    module: H4
+    category: WECHAT
+    detail: SETTINGS_NOT_FOUND
+    http_status: 404
+    severity: error
+    message_zh: '企业微信参数未配置'
+    message_en: 'WeCom settings not found'
+    related_fields: []
+    related_stories: [US-H4-002]
+    introduced_in: v3.1
+
+  - code: H4_TEMPLATE_INVALID
+    module: H4
+    category: TEMPLATE
+    detail: INVALID
+    http_status: 422
+    severity: error
+    message_zh: '通知模板变量无法渲染'
+    message_en: 'Notification template variables cannot be rendered'
+    related_fields: []
+    related_stories: [US-H4-001, US-H4-002]
+    introduced_in: v3.1
+
+  - code: H4_NO_RECIPIENTS
+    module: H4
+    category: RECIPIENTS
+    detail: EMPTY
+    http_status: 422
+    severity: error
+    message_zh: '通知接收人为空'
+    message_en: 'Notification recipients are empty'
+    related_fields: []
+    related_stories: [US-H4-001, US-H4-002]
+    introduced_in: v3.1
+
+  - code: H4_APPROVAL_NOT_FOUND
+    module: H4
+    category: APPROVAL
+    detail: NOT_FOUND
+    http_status: 404
+    severity: error
+    message_zh: '审批记录不存在'
+    message_en: 'Approval record not found'
+    related_fields: []
+    related_stories: [US-H4-003]
+    introduced_in: v3.1
+
+  - code: H4_APPROVAL_STATUS_INVALID
+    module: H4
+    category: APPROVAL
+    detail: STATUS_INVALID
+    http_status: 422
+    severity: error
+    message_zh: '审批结论非法'
+    message_en: 'Approval status is invalid'
+    related_fields: []
+    related_stories: [US-H4-003]
+    introduced_in: v3.1
+
+  - code: H4_IDEMPOTENCY_CONFLICT
+    module: H4
+    category: IDEMPOTENCY
+    detail: CONFLICT
+    http_status: 409
+    severity: error
+    message_zh: '幂等键已被不同请求使用'
+    message_en: 'Idempotency-Key was used by a different request'
+    related_fields: []
+    related_stories: [US-H4-001, US-H4-002, US-H4-003, US-H4-004]
+    introduced_in: v3.1
+
+  - code: H4_REQUEST_INVALID
+    module: H4
+    category: REQUEST
+    detail: INVALID
+    http_status: 422
+    severity: error
+    message_zh: 'H4 请求非法'
+    message_en: 'H4 request is invalid'
+    related_fields: []
+    related_stories: [US-H4-001, US-H4-002, US-H4-003, US-H4-004]
+    introduced_in: v3.1
+
+  - code: H4_NOTIFY_INTERNAL
+    module: H4
+    category: NOTIFY
+    detail: INTERNAL
+    http_status: 500
+    severity: error
+    message_zh: 'H4 通知处理失败'
+    message_en: 'H4 notification processing failed'
+    related_fields: []
+    related_stories: [US-H4-001, US-H4-002, US-H4-003, US-H4-004]
+    introduced_in: v3.1
+
+  - code: H4_RECORD_NOT_FOUND
+    module: H4
+    category: RECORD
+    detail: NOT_FOUND
+    http_status: 404
+    severity: error
+    message_zh: '通知记录不存在'
+    message_en: 'Notification record not found'
+    related_fields: []
+    related_stories: [US-H4-004]
+    introduced_in: v3.1
+
+  - code: H4_RECORD_NOT_RESENDABLE
+    module: H4
+    category: RECORD
+    detail: NOT_RESENDABLE
+    http_status: 422
+    severity: error
+    message_zh: '仅失败或重试中的通知可以重发'
+    message_en: 'Only failed or retrying notifications can be resent'
+    related_fields: []
+    related_stories: [US-H4-004]
+    introduced_in: v3.1
+
+  # ========== H6 状态机 ==========
+  - code: H6_INVALID_TRANSITION_QUERY
+    module: H6
+    category: INVALID
+    detail: TRANSITION_QUERY
+    http_status: 400
+    severity: error
+    message_zh: '缺少或无法解析状态转换查询参数'
+    message_en: 'Transition query parameters are missing or invalid'
+    related_fields: []
+    related_stories: [US-H6-001]
+    introduced_in: v3.1
+
+  - code: H6_STATE_MACHINE_NOT_FOUND
+    module: H6
+    category: STATE_MACHINE
+    detail: NOT_FOUND
+    http_status: 404
+    severity: error
+    message_zh: '状态机定义不存在'
+    message_en: 'State machine definition not found'
+    related_fields: []
+    related_stories: [US-H6-001]
     introduced_in: v3.1
 
   # ========== H5 快递面单 ==========
@@ -914,3 +1084,4 @@ error_codes:
 |------|------|------|
 | 2026-05-18 | v1 | 初版：50 个错误码（H1×6 + H2×3 + H4×2 + H5×2 + H_DOCK×3 + H_AL×2 + M1×5 + M2×6 + M3×8 + M4×7 + M_VR×2 + M_QL×1 + M_TC×2 + M_PM×1）|
 | 2026-06-07 | v2 | W6.C 配置中心 Feature Flag smoke 新增 M1_CONFIG_FLAG_* 3 项；脚本统计当前合计 59 项 |
+| 2026-07-10 | v3 | 补齐当前 H4 handler 的 12 个业务错误码，并登记 H6 状态机查询与不存在错误码；脚本统计当前合计 75 项 |

@@ -50,6 +50,18 @@ title = "API Key 生命周期管理"
 module = "H1"
 reason = "当前没有 API Key 创建、轮换、吊销、作用域和审计接口；该能力应与 H-INT 外部系统接入切片一起设计和实现。"
 
+[[deferred_stories]]
+id = "US-H4-002"
+title = "企业微信消息发送"
+module = "H4"
+reason = "当前仅完成参数维护、本地完整性测试、模板渲染和发送记录持久化；未接外部 provider 时记录明确为失败，禁止伪报发送成功。企业微信真实 API 调用、失败重试、token 刷新和外部联调证据尚未完成。"
+
+[[deferred_stories]]
+id = "US-H4-003"
+title = "企业微信审批流对接"
+module = "H4"
+reason = "当前仅完成受 JWT 权限保护的内部审批记录和指定审批人回写模型；企业微信审批推送、外部回调签名校验、轮询兜底、业务单据原子回写和外部联调证据尚未完成。"
+
 [[stories]]
 id = "US-H1-001"
 title = "用户登录与 token 签发（PC 密码登录切片）"
@@ -536,75 +548,6 @@ required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
 covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
 
 [[stories]]
-id = "US-H4-002"
-title = "企业微信消息发送"
-module = "H4"
-story_file = "docs/domain/user-stories-h4-wechat-notify.md"
-types = ["write", "integration", "runtime_guard", "audit_compliance", "frontend_interaction"]
-frontend_pages = ["h4-wechat-settings", "h4-notify-configs", "h4-notify-records"]
-api_paths = [
-  "GET /api/v1/wechat-notify/settings",
-  "POST /api/v1/wechat-notify/settings",
-  "POST /api/v1/wechat-notify/send",
-  "GET /api/v1/wechat-notify/records",
-]
-e2e_checks = [
-  "pnpm --dir apps/web-admin run test:e2e:h4-dev",
-  "node apps/web-admin/self-checks/h4-wechat-notify-slice-self-check.mjs",
-]
-
-[stories.dimensions]
-requirement = "verified"
-fields = "verified"
-frontend = "verified"
-api = "verified"
-backend = "verified"
-database = "verified"
-security = "verified"
-audit = "verified"
-tests = "verified"
-evidence = "verified"
-docs = "verified"
-governance = "verified"
-
-[stories.tests]
-required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
-covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
-
-[[stories]]
-id = "US-H4-003"
-title = "企业微信审批流对接"
-module = "H4"
-story_file = "docs/domain/user-stories-h4-wechat-notify.md"
-types = ["write", "integration", "runtime_guard", "audit_compliance", "api_change"]
-frontend_pages = []
-api_paths = [
-  "POST /api/v1/wechat-notify/approvals",
-  "POST /api/v1/wechat-notify/approvals/{approval_id}/callback",
-]
-
-[stories.dimensions]
-requirement = "verified"
-fields = "verified"
-frontend = "not_applicable"
-api = "verified"
-backend = "verified"
-database = "verified"
-security = "verified"
-audit = "verified"
-tests = "verified"
-evidence = "verified"
-docs = "verified"
-governance = "verified"
-
-[stories.not_applicable_reasons]
-frontend = "H4 审批流由业务单据触发和企业微信回调驱动，本切片不新增独立管理端审批页面。"
-
-[stories.tests]
-required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
-covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
-
-[[stories]]
 id = "US-H4-004"
 title = "通知发送记录查询"
 module = "H4"
@@ -804,6 +747,41 @@ audit = "H5 轨迹查询为只读缓存读取；快递下单和配置写入分�
 [stories.tests]
 required_layers = ["L1", "L2", "L3", "L4", "L7", "L8", "L9", "L10"]
 covered_layers = ["L1", "L2", "L3", "L4", "L7", "L8", "L9", "L10"]
+
+[[stories]]
+id = "US-H6-001"
+title = "状态机定义注册与转换校验"
+module = "H6"
+story_file = "docs/domain/user-stories-h6-state-machine.md"
+types = ["read_only", "api_change", "config_rule"]
+frontend_pages = []
+api_paths = [
+  "GET /api/v1/state-machines",
+  "GET /api/v1/state-machines/{machine_code}",
+  "GET /api/v1/state-machines/{machine_code}/transition-validation",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "not_applicable"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "not_applicable"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.not_applicable_reasons]
+frontend = "H6 首批为后端状态机定义注册和转换校验能力，不新增独立管理端页面；业务模块接入时在对应页面展示状态。"
+audit = "本切片只读查询和转换校验，不执行状态变更；后续状态转换执行切片必须写入 H2 审计。"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L8", "L9"]
+covered_layers = ["L1", "L2", "L3", "L4", "L8", "L9"]
 
 [[stories]]
 id = "US-H9-001"

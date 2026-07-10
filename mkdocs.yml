@@ -116,6 +116,7 @@ nav:
   - 横向能力:
     - H4 企业微信: domain/user-stories-h4-wechat-notify.md
     - H5 快递: domain/user-stories-h5-express.md
+    - H6 状态机引擎: domain/user-stories-h6-state-machine.md
     - H9 打印模板引擎: domain/user-stories-h9-print-template.md
     - H-Driver 司机端 (W4.E): domain/user-stories-h-driver.md
     - H-Store 门店用户端 (W4.E): domain/user-stories-h-store.md

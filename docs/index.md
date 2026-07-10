@@ -39,6 +39,7 @@
 
 ### 看设计支撑
 
+- [H6 状态机引擎](domain/user-stories-h6-state-machine.md) — 状态机定义注册与转换校验
 - [模块依赖图](architecture-dependencies.md) — 当前模块清单 + 5 波次
 - [术语表](glossary.md) — 54 个术语 + 禁用词
 - [概念审计](concept-audit.md) — 8 视角扫描结果
