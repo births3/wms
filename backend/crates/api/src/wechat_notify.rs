@@ -13,8 +13,8 @@ use uuid::Uuid;
 use wms_domain::{
     CreateH4ApprovalRequest, H4ApprovalCallbackRequest, H4ApprovalRecord, H4NotificationConfig,
     H4NotificationConfigListResponse, H4NotificationRecord, H4NotificationRecordListResponse,
-    H4WechatSettings, H4WechatSettingsResponse, SendH4NotificationRequest,
-    UpsertH4NotificationConfigRequest, UpsertH4WechatSettingsRequest,
+    H4WechatSettings, H4WechatSettingsResponse, H4WechatSettingsTestResponse,
+    SendH4NotificationRequest, UpsertH4NotificationConfigRequest, UpsertH4WechatSettingsRequest,
 };
 
 use crate::{
@@ -77,6 +77,21 @@ impl IntoResponse for WechatNotifyHandlerError {
                 StatusCode::NOT_FOUND,
                 "H4_EVENT_NOT_FOUND",
                 "通知事件未配置或未启用",
+            ),
+            WechatNotifyHandlerError::Wechat(WechatNotifyError::RecordNotFound) => (
+                StatusCode::NOT_FOUND,
+                "H4_RECORD_NOT_FOUND",
+                "通知记录不存在",
+            ),
+            WechatNotifyHandlerError::Wechat(WechatNotifyError::RecordNotResendable) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "H4_RECORD_NOT_RESENDABLE",
+                "仅失败或重试中的通知可以重发",
+            ),
+            WechatNotifyHandlerError::Wechat(WechatNotifyError::WechatSettingsNotFound) => (
+                StatusCode::NOT_FOUND,
+                "H4_WECHAT_SETTINGS_NOT_FOUND",
+                "企业微信参数未配置",
             ),
             WechatNotifyHandlerError::Wechat(WechatNotifyError::TemplateInvalid) => (
                 StatusCode::UNPROCESSABLE_ENTITY,
@@ -143,6 +158,10 @@ pub fn wechat_notify_router(state: WechatNotifyAppState) -> Router {
         .route(
             "/api/v1/wechat-notify/settings",
             get(get_wechat_settings_handler).post(upsert_wechat_settings_handler),
+        )
+        .route(
+            "/api/v1/wechat-notify/settings/test",
+            post(test_wechat_settings_handler),
         )
         .route(
             "/api/v1/wechat-notify/send",
@@ -216,6 +235,19 @@ async fn upsert_wechat_settings_handler(
         .upsert_wechat_settings(&state.pool, &ctx, req, Utc::now(), &idempotency_key)
         .await?;
     Ok(Json(result.value))
+}
+
+async fn test_wechat_settings_handler(
+    ctx: AuthContext,
+    State(state): State<WechatNotifyAppState>,
+) -> Result<Json<H4WechatSettingsTestResponse>, WechatNotifyHandlerError> {
+    ctx.require_permission(H4_WRITE_PERMISSION)?;
+    Ok(Json(
+        state
+            .service
+            .test_wechat_settings(&state.pool, &ctx, Utc::now())
+            .await?,
+    ))
 }
 
 async fn send_notification_handler(

@@ -1,5 +1,5 @@
 use chrono::{NaiveDate, TimeZone, Utc};
-use sqlx::{postgres::PgPoolOptions, PgPool};
+use sqlx::PgPool;
 use uuid::Uuid;
 use wms_api::{
     auth::AuthContext,
@@ -12,8 +12,6 @@ use wms_domain::{
     GenerateBillingStatementRequest, IngestTransitTemperatureRequest, PrintWaybillRequest,
     ReceiveTmsDispatchRequest, WeighPackJobRequest,
 };
-
-static MIGRATION_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 struct SeededOutboundOrder {
     id: Uuid,
@@ -33,23 +31,6 @@ fn ctx(owner_id: Uuid) -> AuthContext {
         ],
         jti: Uuid::new_v4().to_string(),
     }
-}
-
-async fn migrated_pool() -> PgPool {
-    let database_url =
-        std::env::var("DATABASE_URL").expect("DATABASE_URL is required for wave5_postgres tests");
-    let pool = PgPoolOptions::new()
-        .max_connections(5)
-        .connect(&database_url)
-        .await
-        .expect("connect postgres");
-    let _guard = MIGRATION_LOCK.lock().await;
-    let migrations_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../migrations");
-    let migrator = sqlx::migrate::Migrator::new(migrations_path.as_path())
-        .await
-        .expect("load migrations");
-    migrator.run(&pool).await.expect("run migrations");
-    pool
 }
 
 async fn seed_outbound_order(
@@ -174,9 +155,8 @@ async fn audit_count(pool: &PgPool, owner_id: Uuid) -> i64 {
     .expect("count audit events")
 }
 
-#[tokio::test]
-async fn wave5_owner_isolation() {
-    let pool = migrated_pool().await;
+#[sqlx::test(migrations = "../../migrations")]
+async fn wave5_owner_isolation(pool: PgPool) {
     let repo = PgWave5Repository::new(pool.clone());
     let owner_a = Uuid::new_v4();
     let owner_b = Uuid::new_v4();
@@ -340,9 +320,8 @@ async fn wave5_owner_isolation() {
     assert_eq!(audit_count(&pool, owner_a).await, 5);
 }
 
-#[tokio::test]
-async fn chain_store_replenishment_to_packing_tms_and_billing() {
-    let pool = migrated_pool().await;
+#[sqlx::test(migrations = "../../migrations")]
+async fn chain_store_replenishment_to_packing_tms_and_billing(pool: PgPool) {
     let repo = PgWave5Repository::new(pool.clone());
     let owner_id = Uuid::new_v4();
     let ctx = ctx(owner_id);
@@ -614,9 +593,8 @@ async fn chain_store_replenishment_to_packing_tms_and_billing() {
     assert_eq!(audit_count(&pool, owner_id).await, 12);
 }
 
-#[tokio::test]
-async fn wave5_conflicts_and_billing_state_guards() {
-    let pool = migrated_pool().await;
+#[sqlx::test(migrations = "../../migrations")]
+async fn wave5_conflicts_and_billing_state_guards(pool: PgPool) {
     let repo = PgWave5Repository::new(pool.clone());
     let owner_id = Uuid::new_v4();
     let ctx = ctx(owner_id);

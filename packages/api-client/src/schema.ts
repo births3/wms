@@ -1524,6 +1524,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/state-machines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_state_machines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/state-machines/{machine_code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_state_machine"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/state-machines/{machine_code}/transition-validation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["validate_state_transition"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/store/dashboard": {
         parameters: {
             query?: never;
@@ -1774,6 +1822,22 @@ export interface paths {
         get: operations["get_h4_wechat_settings"];
         put?: never;
         post: operations["upsert_h4_wechat_settings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/wechat-notify/settings/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["test_h4_wechat_settings"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2888,6 +2952,12 @@ export interface components {
         H4WechatSettingsResponse: {
             data?: components["schemas"]["H4WechatSettings"] | null;
         };
+        H4WechatSettingsTestResponse: {
+            /** Format: date-time */
+            checked_at: string;
+            message: string;
+            status: string;
+        };
         /** @description 健康检查响应。 */
         HealthzResponse: {
             /**
@@ -3756,6 +3826,38 @@ export interface components {
         SpecialDrugCategoryListResponse: {
             data: components["schemas"]["SpecialDrugCategory"][];
             page: components["schemas"]["PageMeta"];
+        };
+        StateMachineDefinition: {
+            business_module: string;
+            machine_code: string;
+            machine_name: string;
+            states: components["schemas"]["StateMachineState"][];
+            transitions: components["schemas"]["StateMachineTransition"][];
+            version: string;
+        };
+        StateMachineDefinitionListResponse: {
+            data: components["schemas"]["StateMachineDefinition"][];
+            page: components["schemas"]["PageMeta"];
+        };
+        StateMachineState: {
+            code: string;
+            is_initial: boolean;
+            is_terminal: boolean;
+            label: string;
+        };
+        StateMachineTransition: {
+            event_code: string;
+            from_state: string;
+            label: string;
+            to_state: string;
+        };
+        StateTransitionValidationResponse: {
+            allowed: boolean;
+            event_code?: string | null;
+            from_state: string;
+            machine_code: string;
+            reason?: string | null;
+            to_state: string;
         };
         StoreDashboardResponse: {
             /** Format: int32 */
@@ -9139,6 +9241,160 @@ export interface operations {
             };
         };
     };
+    list_state_machines: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description H6 状态机定义列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StateMachineDefinitionListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_state_machine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 状态机编码 */
+                machine_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description H6 状态机定义 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StateMachineDefinition"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 状态机不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    validate_state_transition: {
+        parameters: {
+            query: {
+                /** @description 当前状态 */
+                from_state: string;
+                /** @description 目标状态 */
+                to_state: string;
+                /** @description 可选触发事件 */
+                event_code?: string | null;
+            };
+            header?: never;
+            path: {
+                /** @description 状态机编码 */
+                machine_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description H6 状态迁移校验结果 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StateTransitionValidationResponse"];
+                };
+            };
+            /** @description 查询参数缺失或格式错误 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 状态机不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_store_dashboard: {
         parameters: {
             query?: never;
@@ -10061,6 +10317,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description 通知记录状态不可重发 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     send_h4_notification: {
@@ -10236,6 +10501,62 @@ export interface operations {
             };
             /** @description 幂等冲突 */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 参数非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    test_h4_wechat_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 测试 H4 企业微信通道参数 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H4WechatSettingsTestResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 企业微信参数未配置 */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

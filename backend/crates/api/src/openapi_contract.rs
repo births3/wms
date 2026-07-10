@@ -28,6 +28,10 @@ const IDEMPOTENCY_EXEMPTION_GROUPS: &[IdempotencyExemptionGroup] = &[
         reason: "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。",
     },
     IdempotencyExemptionGroup {
+        operations: &[("/api/v1/wechat-notify/settings/test", PathItemType::Post)],
+        reason: "企业微信参数测试只校验已保存配置，不写入业务数据；使用 POST 表达受控测试动作。",
+    },
+    IdempotencyExemptionGroup {
         operations: &[
             ("/api/v1/billing/accounts", PathItemType::Post),
             ("/api/v1/billing/contracts", PathItemType::Post),

@@ -34,6 +34,7 @@ use wms_api::{
     master_data_handlers::{master_data_router, MasterDataAppState},
     print_template_handlers::{print_template_router, PrintTemplateAppState},
     resilience::{resilience_middleware, resilience_status, ResilienceState},
+    state_machine::state_machine_router,
     system_dictionary_handlers::{system_dictionary_router, SystemDictionaryAppState},
     wave3_handlers::{wave3_router, Wave3AppState},
     wave4_handlers::{wave4_router, Wave4AppState},
@@ -257,6 +258,7 @@ fn app(
         .merge(master_data_router(master_data_state))
         .merge(admin_menu_router(admin_menu_state))
         .merge(system_dictionary_router(system_dictionary_state))
+        .merge(state_machine_router())
         .merge(document_numbering_router(document_numbering_state))
         .merge(print_template_router(print_template_state))
         .merge(wechat_notify_router(wechat_notify_state))
@@ -609,13 +611,7 @@ mod tests {
         f()
     }
 
-    async fn seed_auth_user(
-        pool: &PgPool,
-        owner_id: Uuid,
-        user_id: Uuid,
-        role_id: Uuid,
-        permission_id: Uuid,
-    ) {
+    async fn seed_auth_user(pool: &PgPool, owner_id: Uuid, user_id: Uuid, role_id: Uuid) {
         let password_hash = bcrypt::hash("CorrectHorse1!", 4).expect("password should hash");
         sqlx::query(
             r#"
@@ -652,7 +648,7 @@ mod tests {
         sqlx::query(
             r#"
             INSERT INTO auth_roles (id, owner_id, role_code, role_name)
-            VALUES ($1, $2, 'system_admin', '系统管理员')
+            VALUES ($1, $2, 'audit_reader', '审计查询员')
             "#,
         )
         .bind(role_id)
@@ -660,16 +656,6 @@ mod tests {
         .execute(pool)
         .await
         .expect("role should insert");
-        sqlx::query(
-            r#"
-            INSERT INTO auth_permissions (id, permission_code, permission_name)
-            VALUES ($1, 'audit.read', '审计查询')
-            "#,
-        )
-        .bind(permission_id)
-        .execute(pool)
-        .await
-        .expect("permission should insert");
         sqlx::query(
             r#"
             INSERT INTO auth_user_roles (user_id, owner_id, role_id)
@@ -685,11 +671,12 @@ mod tests {
         sqlx::query(
             r#"
             INSERT INTO auth_role_permissions (role_id, permission_id)
-            VALUES ($1, $2)
+            SELECT $1, id
+              FROM auth_permissions
+             WHERE lower(permission_code) = 'audit.read'
             "#,
         )
         .bind(role_id)
-        .bind(permission_id)
         .execute(pool)
         .await
         .expect("role permission should insert");
@@ -1706,8 +1693,7 @@ mod tests {
         let owner_id = Uuid::new_v4();
         let user_id = Uuid::new_v4();
         let role_id = Uuid::new_v4();
-        let permission_id = Uuid::new_v4();
-        seed_auth_user(&pool, owner_id, user_id, role_id, permission_id).await;
+        seed_auth_user(&pool, owner_id, user_id, role_id).await;
         std::env::set_var(JWT_SECRET_ENV, "test-secret");
         let app = app(
             config_center_state(),
@@ -1755,7 +1741,7 @@ mod tests {
         assert_eq!(login.user.owner_id, owner_id);
         assert_eq!(login.user.owner_code, "PY_OWNER");
         assert_eq!(login.user.username, "admin");
-        assert_eq!(login.user.roles, vec!["system_admin"]);
+        assert_eq!(login.user.roles, vec!["audit_reader"]);
         assert_eq!(login.user.permissions, vec!["audit.read"]);
 
         let me_response = app
@@ -1778,7 +1764,7 @@ mod tests {
         assert_eq!(current_user.user_id, user_id);
         assert_eq!(current_user.owner_id, owner_id);
         assert_eq!(current_user.owner_code, "PY_OWNER");
-        assert_eq!(current_user.roles, vec!["system_admin"]);
+        assert_eq!(current_user.roles, vec!["audit_reader"]);
         assert_eq!(current_user.permissions, vec!["audit.read"]);
     }
 }

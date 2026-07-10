@@ -6473,6 +6473,206 @@
         }
       }
     },
+    "/api/v1/state-machines": {
+      "get": {
+        "tags": [
+          "state-machine"
+        ],
+        "operationId": "list_state_machines",
+        "responses": {
+          "200": {
+            "description": "H6 状态机定义列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StateMachineDefinitionListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/state-machines/{machine_code}": {
+      "get": {
+        "tags": [
+          "state-machine"
+        ],
+        "operationId": "get_state_machine",
+        "parameters": [
+          {
+            "name": "machine_code",
+            "in": "path",
+            "description": "状态机编码",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "H6 状态机定义",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StateMachineDefinition"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "状态机不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/state-machines/{machine_code}/transition-validation": {
+      "get": {
+        "tags": [
+          "state-machine"
+        ],
+        "operationId": "validate_state_transition",
+        "parameters": [
+          {
+            "name": "machine_code",
+            "in": "path",
+            "description": "状态机编码",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from_state",
+            "in": "query",
+            "description": "当前状态",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to_state",
+            "in": "query",
+            "description": "目标状态",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "event_code",
+            "in": "query",
+            "description": "可选触发事件",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "H6 状态迁移校验结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StateTransitionValidationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数缺失或格式错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "状态机不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/store/dashboard": {
       "get": {
         "tags": [
@@ -7725,6 +7925,16 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "通知记录状态不可重发",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -7960,6 +8170,67 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/wechat-notify/settings/test": {
+      "post": {
+        "tags": [
+          "wechat-notify"
+        ],
+        "operationId": "test_h4_wechat_settings",
+        "responses": {
+          "200": {
+            "description": "测试 H4 企业微信通道参数",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H4WechatSettingsTestResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "企业微信参数未配置",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "参数非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-idempotency-exempt-reason": "企业微信参数测试只校验已保存配置，不写入业务数据；使用 POST 表达受控测试动作。"
       }
     },
     "/metrics": {
@@ -11370,6 +11641,26 @@
           }
         }
       },
+      "H4WechatSettingsTestResponse": {
+        "type": "object",
+        "required": [
+          "status",
+          "message",
+          "checked_at"
+        ],
+        "properties": {
+          "checked_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "message": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
       "HealthzResponse": {
         "type": "object",
         "description": "健康检查响应。",
@@ -13929,6 +14220,138 @@
           }
         }
       },
+      "StateMachineDefinition": {
+        "type": "object",
+        "required": [
+          "machine_code",
+          "machine_name",
+          "business_module",
+          "version",
+          "states",
+          "transitions"
+        ],
+        "properties": {
+          "business_module": {
+            "type": "string"
+          },
+          "machine_code": {
+            "type": "string"
+          },
+          "machine_name": {
+            "type": "string"
+          },
+          "states": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StateMachineState"
+            }
+          },
+          "transitions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StateMachineTransition"
+            }
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      },
+      "StateMachineDefinitionListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StateMachineDefinition"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "StateMachineState": {
+        "type": "object",
+        "required": [
+          "code",
+          "label",
+          "is_initial",
+          "is_terminal"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "is_initial": {
+            "type": "boolean"
+          },
+          "is_terminal": {
+            "type": "boolean"
+          },
+          "label": {
+            "type": "string"
+          }
+        }
+      },
+      "StateMachineTransition": {
+        "type": "object",
+        "required": [
+          "from_state",
+          "to_state",
+          "event_code",
+          "label"
+        ],
+        "properties": {
+          "event_code": {
+            "type": "string"
+          },
+          "from_state": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "to_state": {
+            "type": "string"
+          }
+        }
+      },
+      "StateTransitionValidationResponse": {
+        "type": "object",
+        "required": [
+          "machine_code",
+          "from_state",
+          "to_state",
+          "allowed"
+        ],
+        "properties": {
+          "allowed": {
+            "type": "boolean"
+          },
+          "event_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "from_state": {
+            "type": "string"
+          },
+          "machine_code": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "to_state": {
+            "type": "string"
+          }
+        }
+      },
       "StoreDashboardResponse": {
         "type": "object",
         "required": [
@@ -15273,6 +15696,10 @@
     {
       "name": "code-generator",
       "description": "M-CG 单据号生成"
+    },
+    {
+      "name": "state-machine",
+      "description": "H6 状态机引擎"
     },
     {
       "name": "wechat-notify",

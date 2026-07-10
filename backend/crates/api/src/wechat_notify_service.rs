@@ -1,15 +1,17 @@
 //! H4 企业微信通知与审批服务。
 
+mod models;
+mod validation;
+
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
-use serde_json::Value;
-use sqlx::{FromRow, PgPool, Postgres, Transaction};
+use sqlx::PgPool;
 use uuid::Uuid;
 use wms_domain::{
     CreateH4ApprovalRequest, H4ApprovalCallbackRequest, H4ApprovalRecord, H4NotificationConfig,
     H4NotificationConfigListResponse, H4NotificationRecord, H4NotificationRecordListResponse,
-    H4WechatSettings, H4WechatSettingsResponse, PageMeta, SendH4NotificationRequest,
-    UpsertH4NotificationConfigRequest, UpsertH4WechatSettingsRequest,
+    H4WechatSettings, H4WechatSettingsResponse, H4WechatSettingsTestResponse, PageMeta,
+    SendH4NotificationRequest, UpsertH4NotificationConfigRequest, UpsertH4WechatSettingsRequest,
 };
 
 use crate::{
@@ -19,8 +21,11 @@ use crate::{
     },
 };
 
+use self::models::{ApprovalRow, ConfigRow, RecordRow, WechatSettingsRow};
+
 pub const DEFAULT_H4_QUERY_LIMIT: u32 = 50;
 pub const MAX_H4_QUERY_LIMIT: u32 = 100;
+const PROVIDER_NOT_CONFIGURED_REASON: &str = "企业微信外部发送能力尚未启用";
 
 #[derive(Clone, Debug)]
 pub struct PgWechatNotifyService;
@@ -34,6 +39,9 @@ pub struct IdempotentMutation<T> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum WechatNotifyError {
     EventNotFound,
+    RecordNotFound,
+    RecordNotResendable,
+    WechatSettingsNotFound,
     TemplateInvalid,
     NoRecipients,
     ApprovalNotFound,
@@ -53,78 +61,6 @@ pub struct H4RecordQuery {
     pub from: Option<DateTime<Utc>>,
     pub to: Option<DateTime<Utc>>,
     pub limit: Option<u32>,
-}
-
-#[derive(Clone, Debug, FromRow)]
-struct ConfigRow {
-    id: Uuid,
-    owner_id: Uuid,
-    event_type: String,
-    enabled: bool,
-    template: String,
-    recipient_rule: Value,
-    channels: Vec<String>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
-    version: i64,
-}
-
-#[derive(Clone, Debug, FromRow)]
-struct WechatSettingsRow {
-    id: Uuid,
-    owner_id: Uuid,
-    corp_id: String,
-    agent_id: String,
-    secret_alias: String,
-    callback_token_alias: String,
-    aes_key_alias: String,
-    callback_url: String,
-    approval_callback_path: String,
-    enabled: bool,
-    retry_max_attempts: i32,
-    retry_interval_seconds: i32,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
-    version: i64,
-}
-
-#[derive(Clone, Debug, FromRow)]
-struct RecordRow {
-    id: Uuid,
-    owner_id: Uuid,
-    config_id: Option<Uuid>,
-    event_type: String,
-    dedupe_key: String,
-    recipient: String,
-    channel: String,
-    content_summary: String,
-    status: String,
-    retry_count: i32,
-    failure_reason: Option<String>,
-    sent_at: Option<DateTime<Utc>>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
-}
-
-#[derive(Clone, Debug, FromRow)]
-struct ApprovalRow {
-    id: Uuid,
-    owner_id: Uuid,
-    scenario: String,
-    business_ref: String,
-    dedupe_key: String,
-    approver_user: String,
-    process_id: String,
-    callback_path: String,
-    summary: String,
-    status: String,
-    opinion: Option<String>,
-    external_approval_id: Option<String>,
-    approved_by: Option<String>,
-    approved_at: Option<DateTime<Utc>>,
-    failure_reason: Option<String>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
 }
 
 impl PgWechatNotifyService {
@@ -170,7 +106,7 @@ impl PgWechatNotifyService {
         now: DateTime<Utc>,
         idempotency_key: &str,
     ) -> Result<IdempotentMutation<H4NotificationConfig>, WechatNotifyError> {
-        validate_config_request(&req)?;
+        validation::validate_config_request(&req)?;
         let request_hash = json_request_hash(&req)?;
         let mut tx = pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
@@ -208,7 +144,7 @@ impl PgWechatNotifyService {
         .bind(req.enabled)
         .bind(req.template.trim())
         .bind(req.recipient_rule)
-        .bind(normalize_channels(req.channels))
+        .bind(validation::normalize_channels(req.channels))
         .bind(ctx.user_id)
         .bind(now)
         .fetch_one(&mut *tx)
@@ -268,7 +204,7 @@ impl PgWechatNotifyService {
         now: DateTime<Utc>,
         idempotency_key: &str,
     ) -> Result<IdempotentMutation<H4WechatSettings>, WechatNotifyError> {
-        validate_wechat_settings_request(&req)?;
+        validation::validate_wechat_settings_request(&req)?;
         let request_hash = json_request_hash(&req)?;
         let mut tx = pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
@@ -349,6 +285,41 @@ impl PgWechatNotifyService {
         })
     }
 
+    pub async fn test_wechat_settings(
+        &self,
+        pool: &PgPool,
+        ctx: &AuthContext,
+        now: DateTime<Utc>,
+    ) -> Result<H4WechatSettingsTestResponse, WechatNotifyError> {
+        let settings = self
+            .get_wechat_settings(pool, ctx)
+            .await?
+            .data
+            .ok_or(WechatNotifyError::WechatSettingsNotFound)?;
+        validation::validate_wechat_settings_request(&UpsertH4WechatSettingsRequest {
+            corp_id: settings.corp_id.clone(),
+            agent_id: settings.agent_id.clone(),
+            secret_alias: settings.secret_alias.clone(),
+            callback_token_alias: settings.callback_token_alias.clone(),
+            aes_key_alias: settings.aes_key_alias.clone(),
+            callback_url: settings.callback_url.clone(),
+            approval_callback_path: settings.approval_callback_path.clone(),
+            enabled: settings.enabled,
+            retry_max_attempts: settings.retry_max_attempts,
+            retry_interval_seconds: settings.retry_interval_seconds,
+        })?;
+        let (status, message) = if settings.enabled {
+            ("success", "企业微信参数校验通过")
+        } else {
+            ("warning", "企业微信参数已保存但未启用")
+        };
+        Ok(H4WechatSettingsTestResponse {
+            status: status.to_string(),
+            message: message.to_string(),
+            checked_at: now,
+        })
+    }
+
     pub async fn send_notification(
         &self,
         pool: &PgPool,
@@ -357,7 +328,7 @@ impl PgWechatNotifyService {
         now: DateTime<Utc>,
         idempotency_key: &str,
     ) -> Result<IdempotentMutation<Vec<H4NotificationRecord>>, WechatNotifyError> {
-        validate_send_request(&req)?;
+        validation::validate_send_request(&req)?;
         let request_hash = json_request_hash(&req)?;
         let mut tx = pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
@@ -369,9 +340,10 @@ impl PgWechatNotifyService {
                 replayed: true,
             });
         }
-        let config = load_enabled_config(&mut tx, ctx.owner_id, &req.event_type).await?;
-        let content = render_template(&config.template, &req.payload)?;
-        let summary = summarize(&content);
+        let config =
+            validation::load_enabled_config(&mut tx, ctx.owner_id, &req.event_type).await?;
+        let content = validation::render_template(&config.template, &req.payload)?;
+        let summary = validation::summarize(&content);
         let mut records = Vec::new();
         for recipient in req
             .recipients
@@ -387,7 +359,7 @@ impl PgWechatNotifyService {
                     sent_at, created_at, updated_at
                 )
                 VALUES ($1, $2, $3, $4, $5, $6, 'wechat', $7, $8,
-                        'success', 0, NULL, $9, $9, $9)
+                        'failed', 0, $9, NULL, $10, $10)
                 ON CONFLICT (owner_id, event_type, recipient, dedupe_key)
                 DO UPDATE SET updated_at = h4_notification_records.updated_at
                 RETURNING id, owner_id, config_id, event_type, dedupe_key, recipient,
@@ -403,6 +375,7 @@ impl PgWechatNotifyService {
             .bind(recipient)
             .bind(&content)
             .bind(&summary)
+            .bind(PROVIDER_NOT_CONFIGURED_REASON)
             .bind(now)
             .fetch_one(&mut *tx)
             .await
@@ -419,7 +392,7 @@ impl PgWechatNotifyService {
             "h4_notification_record",
             req.dedupe_key.clone(),
             &records,
-            "h4.notify.sent",
+            "h4.notify.delivery_failed",
             now,
         )
         .await?;
@@ -434,11 +407,20 @@ impl PgWechatNotifyService {
         &self,
         pool: &PgPool,
         ctx: &AuthContext,
-        req: CreateH4ApprovalRequest,
+        mut req: CreateH4ApprovalRequest,
         now: DateTime<Utc>,
         idempotency_key: &str,
     ) -> Result<IdempotentMutation<H4ApprovalRecord>, WechatNotifyError> {
-        validate_approval_request(&req)?;
+        validation::validate_approval_request(&req)?;
+        req.scenario = req.scenario.trim().to_string();
+        req.business_ref = req.business_ref.trim().to_string();
+        req.dedupe_key = req.dedupe_key.trim().to_string();
+        req.approver_user = Uuid::parse_str(req.approver_user.trim())
+            .map_err(|_| WechatNotifyError::InvalidRequest)?
+            .to_string();
+        req.process_id = req.process_id.trim().to_string();
+        req.callback_path = req.callback_path.trim().to_string();
+        req.summary = req.summary.trim().to_string();
         let request_hash = json_request_hash(&req)?;
         let mut tx = pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
@@ -468,13 +450,13 @@ impl PgWechatNotifyService {
         )
         .bind(approval_id)
         .bind(ctx.owner_id)
-        .bind(req.scenario.trim())
-        .bind(req.business_ref.trim())
-        .bind(req.dedupe_key.trim())
-        .bind(req.approver_user.trim())
-        .bind(req.process_id.trim())
-        .bind(req.callback_path.trim())
-        .bind(req.summary.trim())
+        .bind(&req.scenario)
+        .bind(&req.business_ref)
+        .bind(&req.dedupe_key)
+        .bind(&req.approver_user)
+        .bind(&req.process_id)
+        .bind(&req.callback_path)
+        .bind(&req.summary)
         .bind(now)
         .fetch_one(&mut *tx)
         .await
@@ -506,7 +488,7 @@ impl PgWechatNotifyService {
         pool: &PgPool,
         ctx: &AuthContext,
         approval_id: Uuid,
-        req: H4ApprovalCallbackRequest,
+        mut req: H4ApprovalCallbackRequest,
         now: DateTime<Utc>,
         idempotency_key: &str,
     ) -> Result<IdempotentMutation<H4ApprovalRecord>, WechatNotifyError> {
@@ -515,6 +497,16 @@ impl PgWechatNotifyService {
             "rejected" | "拒绝" => "rejected",
             _ => return Err(WechatNotifyError::InvalidStatus),
         };
+        let approved_by_user_id = Uuid::parse_str(req.approved_by.trim())
+            .map_err(|_| WechatNotifyError::InvalidRequest)?;
+        if approved_by_user_id != ctx.user_id {
+            return Err(WechatNotifyError::InvalidRequest);
+        }
+        req.conclusion = status.to_string();
+        req.approved_by = approved_by_user_id.to_string();
+        req.external_approval_id = req
+            .external_approval_id
+            .map(|value| value.trim().to_string());
         let request_hash = json_request_hash(&serde_json::json!({
             "approval_id": approval_id,
             "request": &req,
@@ -529,16 +521,58 @@ impl PgWechatNotifyService {
                 replayed: true,
             });
         }
+        let current = sqlx::query_as::<_, ApprovalRow>(
+            r#"
+            SELECT id, owner_id, scenario, business_ref, dedupe_key, approver_user,
+                   process_id, callback_path, summary, status, opinion,
+                   external_approval_id, approved_by, approved_at, failure_reason,
+                   created_at, updated_at
+              FROM h4_approval_records
+             WHERE owner_id = $1 AND id = $2
+             FOR UPDATE
+            "#,
+        )
+        .bind(ctx.owner_id)
+        .bind(approval_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(map_db_error)?
+        .ok_or(WechatNotifyError::ApprovalNotFound)?;
+        let approved_by = req.approved_by.clone();
+        let external_approval_id = req
+            .external_approval_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or(WechatNotifyError::InvalidRequest)?;
+        if approved_by != current.approver_user {
+            return Err(WechatNotifyError::InvalidRequest);
+        }
+        if current.status != "pending" {
+            if current.status != status {
+                return Err(WechatNotifyError::IdempotencyConflict);
+            }
+            if current.approved_by.as_deref() != Some(approved_by.as_str())
+                || current.external_approval_id.as_deref() != Some(external_approval_id)
+            {
+                return Err(WechatNotifyError::InvalidRequest);
+            }
+            tx.commit().await.map_err(map_db_error)?;
+            return Ok(IdempotentMutation {
+                value: current.into(),
+                replayed: true,
+            });
+        }
         let row = sqlx::query_as::<_, ApprovalRow>(
             r#"
             UPDATE h4_approval_records
-               SET status = CASE WHEN status = 'pending' THEN $3 ELSE status END,
-                   opinion = CASE WHEN status = 'pending' THEN $4 ELSE opinion END,
-                   external_approval_id = COALESCE(external_approval_id, $5),
-                   approved_by = CASE WHEN status = 'pending' THEN $6 ELSE approved_by END,
-                   approved_at = CASE WHEN status = 'pending' THEN $7 ELSE approved_at END,
+               SET status = $3,
+                   opinion = $4,
+                   external_approval_id = $5,
+                   approved_by = $6,
+                   approved_at = $7,
                    updated_at = $7
-             WHERE owner_id = $1 AND id = $2
+             WHERE owner_id = $1 AND id = $2 AND status = 'pending'
              RETURNING id, owner_id, scenario, business_ref, dedupe_key, approver_user,
                        process_id, callback_path, summary, status, opinion,
                        external_approval_id, approved_by, approved_at, failure_reason,
@@ -549,8 +583,8 @@ impl PgWechatNotifyService {
         .bind(approval_id)
         .bind(status)
         .bind(req.opinion)
-        .bind(req.external_approval_id)
-        .bind(req.approved_by)
+        .bind(external_approval_id)
+        .bind(&approved_by)
         .bind(now)
         .fetch_optional(&mut *tx)
         .await
@@ -588,6 +622,8 @@ impl PgWechatNotifyService {
             .limit
             .unwrap_or(DEFAULT_H4_QUERY_LIMIT)
             .min(MAX_H4_QUERY_LIMIT);
+        let can_read_all = is_system_admin(pool, ctx).await?;
+        let user_id = ctx.user_id.to_string();
         let rows = sqlx::query_as::<_, RecordRow>(
             r#"
             SELECT id, owner_id, config_id, event_type, dedupe_key, recipient,
@@ -600,8 +636,9 @@ impl PgWechatNotifyService {
                AND ($4::TEXT IS NULL OR status = $4)
                AND ($5::TIMESTAMPTZ IS NULL OR created_at >= $5)
                AND ($6::TIMESTAMPTZ IS NULL OR created_at <= $6)
+               AND ($7::BOOLEAN OR recipient = $8 OR recipient = $9)
              ORDER BY created_at DESC, id DESC
-             LIMIT $7
+             LIMIT $10
             "#,
         )
         .bind(ctx.owner_id)
@@ -610,6 +647,9 @@ impl PgWechatNotifyService {
         .bind(query.status)
         .bind(query.from)
         .bind(query.to)
+        .bind(can_read_all)
+        .bind(&ctx.actor_name)
+        .bind(user_id)
         .bind(i64::from(limit))
         .fetch_all(pool)
         .await
@@ -642,14 +682,26 @@ impl PgWechatNotifyService {
                 replayed: true,
             });
         }
+        let status: String = sqlx::query_scalar(
+            "SELECT status FROM h4_notification_records WHERE owner_id = $1 AND id = $2 FOR UPDATE",
+        )
+        .bind(ctx.owner_id)
+        .bind(record_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(map_db_error)?
+        .ok_or(WechatNotifyError::RecordNotFound)?;
+        if !matches!(status.as_str(), "failed" | "retrying") {
+            return Err(WechatNotifyError::RecordNotResendable);
+        }
         let row = sqlx::query_as::<_, RecordRow>(
             r#"
             UPDATE h4_notification_records
-               SET status = 'success',
+               SET status = 'failed',
                    retry_count = retry_count + 1,
-                   failure_reason = NULL,
-                   sent_at = $3,
-                   updated_at = $3
+                   failure_reason = $3,
+                   sent_at = NULL,
+                   updated_at = $4
              WHERE owner_id = $1 AND id = $2
              RETURNING id, owner_id, config_id, event_type, dedupe_key, recipient,
                        channel, content_summary, status, retry_count, failure_reason,
@@ -658,11 +710,12 @@ impl PgWechatNotifyService {
         )
         .bind(ctx.owner_id)
         .bind(record_id)
+        .bind(PROVIDER_NOT_CONFIGURED_REASON)
         .bind(now)
         .fetch_optional(&mut *tx)
         .await
         .map_err(map_db_error)?
-        .ok_or(WechatNotifyError::EventNotFound)?;
+        .ok_or(WechatNotifyError::RecordNotFound)?;
         let value: H4NotificationRecord = row.into();
         finish_mutation(
             &mut tx,
@@ -686,218 +739,27 @@ impl PgWechatNotifyService {
     }
 }
 
-async fn load_enabled_config(
-    tx: &mut Transaction<'_, Postgres>,
-    owner_id: Uuid,
-    event_type: &str,
-) -> Result<ConfigRow, WechatNotifyError> {
-    sqlx::query_as::<_, ConfigRow>(
+async fn is_system_admin(pool: &PgPool, ctx: &AuthContext) -> Result<bool, WechatNotifyError> {
+    sqlx::query_scalar(
         r#"
-        SELECT id, owner_id, event_type, enabled, template, recipient_rule,
-               channels, created_at, updated_at, version
-          FROM h4_notification_configs
-         WHERE owner_id = $1 AND event_type = $2 AND enabled = TRUE
+        SELECT EXISTS (
+            SELECT 1
+              FROM auth_user_roles user_role
+              JOIN auth_roles role ON role.id = user_role.role_id
+             WHERE user_role.user_id = $1
+               AND user_role.owner_id = $2
+               AND role.owner_id = $2
+               AND lower(role.role_code) = 'system_admin'
+        )
         "#,
     )
-    .bind(owner_id)
-    .bind(event_type)
-    .fetch_optional(&mut **tx)
+    .bind(ctx.user_id)
+    .bind(ctx.owner_id)
+    .fetch_one(pool)
     .await
-    .map_err(map_db_error)?
-    .ok_or(WechatNotifyError::EventNotFound)
-}
-
-fn validate_config_request(
-    req: &UpsertH4NotificationConfigRequest,
-) -> Result<(), WechatNotifyError> {
-    if req.event_type.trim().is_empty() || req.template.trim().is_empty() {
-        return Err(WechatNotifyError::InvalidRequest);
-    }
-    if !req.recipient_rule.is_object()
-        || !normalize_channels(req.channels.clone())
-            .iter()
-            .any(|v| v == "wechat")
-    {
-        return Err(WechatNotifyError::NoRecipients);
-    }
-    Ok(())
-}
-
-fn validate_wechat_settings_request(
-    req: &UpsertH4WechatSettingsRequest,
-) -> Result<(), WechatNotifyError> {
-    if [
-        req.corp_id.as_str(),
-        req.agent_id.as_str(),
-        req.secret_alias.as_str(),
-        req.callback_token_alias.as_str(),
-        req.aes_key_alias.as_str(),
-        req.callback_url.as_str(),
-        req.approval_callback_path.as_str(),
-    ]
-    .iter()
-    .any(|value| value.trim().is_empty())
-    {
-        return Err(WechatNotifyError::InvalidRequest);
-    }
-    if req.retry_max_attempts < 0
-        || req.retry_max_attempts > 10
-        || req.retry_interval_seconds < 1
-        || req.retry_interval_seconds > 3600
-    {
-        return Err(WechatNotifyError::InvalidRequest);
-    }
-    Ok(())
-}
-
-fn validate_send_request(req: &SendH4NotificationRequest) -> Result<(), WechatNotifyError> {
-    if req.event_type.trim().is_empty() || req.dedupe_key.trim().is_empty() {
-        return Err(WechatNotifyError::InvalidRequest);
-    }
-    if req.recipients.iter().all(|value| value.trim().is_empty()) {
-        return Err(WechatNotifyError::NoRecipients);
-    }
-    Ok(())
-}
-
-fn validate_approval_request(req: &CreateH4ApprovalRequest) -> Result<(), WechatNotifyError> {
-    if [
-        req.scenario.as_str(),
-        req.business_ref.as_str(),
-        req.dedupe_key.as_str(),
-        req.approver_user.as_str(),
-        req.process_id.as_str(),
-        req.callback_path.as_str(),
-        req.summary.as_str(),
-    ]
-    .iter()
-    .any(|value| value.trim().is_empty())
-    {
-        return Err(WechatNotifyError::InvalidRequest);
-    }
-    Ok(())
-}
-
-fn render_template(template: &str, payload: &Value) -> Result<String, WechatNotifyError> {
-    let mut content = template.to_string();
-    let object = payload
-        .as_object()
-        .ok_or(WechatNotifyError::TemplateInvalid)?;
-    for (key, value) in object {
-        let rendered = value
-            .as_str()
-            .map(str::to_string)
-            .unwrap_or_else(|| value.to_string());
-        content = content.replace(&format!("{{{{{key}}}}}"), &rendered);
-    }
-    if content.contains("{{") || content.contains("}}") {
-        return Err(WechatNotifyError::TemplateInvalid);
-    }
-    Ok(content)
-}
-
-fn summarize(content: &str) -> String {
-    content.chars().take(80).collect()
-}
-
-fn normalize_channels(channels: Vec<String>) -> Vec<String> {
-    let mut normalized: Vec<String> = channels
-        .into_iter()
-        .map(|value| value.trim().to_ascii_lowercase())
-        .filter(|value| !value.is_empty())
-        .collect();
-    if !normalized.iter().any(|value| value == "wechat") {
-        normalized.push("wechat".to_string());
-    }
-    normalized.sort();
-    normalized.dedup();
-    normalized
+    .map_err(map_db_error)
 }
 
 fn map_db_error(error: sqlx::Error) -> WechatNotifyError {
     WechatNotifyError::Database(error.to_string())
-}
-
-impl From<ConfigRow> for H4NotificationConfig {
-    fn from(row: ConfigRow) -> Self {
-        Self {
-            id: row.id,
-            owner_id: row.owner_id,
-            event_type: row.event_type,
-            enabled: row.enabled,
-            template: row.template,
-            recipient_rule: row.recipient_rule,
-            channels: row.channels,
-            created_at: row.created_at,
-            updated_at: row.updated_at,
-            version: row.version,
-        }
-    }
-}
-
-impl From<WechatSettingsRow> for H4WechatSettings {
-    fn from(row: WechatSettingsRow) -> Self {
-        Self {
-            id: row.id,
-            owner_id: row.owner_id,
-            corp_id: row.corp_id,
-            agent_id: row.agent_id,
-            secret_alias: row.secret_alias,
-            callback_token_alias: row.callback_token_alias,
-            aes_key_alias: row.aes_key_alias,
-            callback_url: row.callback_url,
-            approval_callback_path: row.approval_callback_path,
-            enabled: row.enabled,
-            retry_max_attempts: row.retry_max_attempts,
-            retry_interval_seconds: row.retry_interval_seconds,
-            created_at: row.created_at,
-            updated_at: row.updated_at,
-            version: row.version,
-        }
-    }
-}
-
-impl From<RecordRow> for H4NotificationRecord {
-    fn from(row: RecordRow) -> Self {
-        Self {
-            id: row.id,
-            owner_id: row.owner_id,
-            config_id: row.config_id,
-            event_type: row.event_type,
-            dedupe_key: row.dedupe_key,
-            recipient: row.recipient,
-            channel: row.channel,
-            content_summary: row.content_summary,
-            status: row.status,
-            retry_count: row.retry_count,
-            failure_reason: row.failure_reason,
-            sent_at: row.sent_at,
-            created_at: row.created_at,
-            updated_at: row.updated_at,
-        }
-    }
-}
-
-impl From<ApprovalRow> for H4ApprovalRecord {
-    fn from(row: ApprovalRow) -> Self {
-        Self {
-            id: row.id,
-            owner_id: row.owner_id,
-            scenario: row.scenario,
-            business_ref: row.business_ref,
-            dedupe_key: row.dedupe_key,
-            approver_user: row.approver_user,
-            process_id: row.process_id,
-            callback_path: row.callback_path,
-            summary: row.summary,
-            status: row.status,
-            opinion: row.opinion,
-            external_approval_id: row.external_approval_id,
-            approved_by: row.approved_by,
-            approved_at: row.approved_at,
-            failure_reason: row.failure_reason,
-            created_at: row.created_at,
-            updated_at: row.updated_at,
-        }
-    }
 }
