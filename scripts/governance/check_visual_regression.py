@@ -237,7 +237,9 @@ def main():
         # 0) 截断检测（snapshot 底部是否非空白）
         is_trunc, trunc_ratio = _detect_truncation(snapshot)
         if is_trunc:
-            truncations.append(f"{tab}: 底部 30 行非白像素 {trunc_ratio*100:.1f}%（可能被截断，建议加大 viewport 高度）")
+            message = f"{tab}: 底部 30 行非白像素 {trunc_ratio*100:.1f}%（页面被截断，请加大 viewport 高度）"
+            truncations.append(message)
+            errors.append(message)
 
         # 1) MD5 短路
         md5_a = _md5(baseline)

@@ -349,20 +349,17 @@ async function main() {
     headless: true,
     args: ["--no-sandbox", "--disable-dev-shm-usage"],
   });
-  const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 });
-  const page = await context.newPage();
-  await login(page);
-
   const results = [];
-  page.setDefaultTimeout(8_000);
-  page.setDefaultNavigationTimeout(20_000);
 
   const scenes = ONLY.size ? SCENES.filter((s) => ONLY.has(s.id)) : SCENES;
   for (const scene of scenes) {
     const started = Date.now();
+    const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 });
+    const page = await context.newPage();
+    page.setDefaultTimeout(8_000);
+    page.setDefaultNavigationTimeout(20_000);
     try {
-      await closeDialog(page);
-      await clearFilter(page).catch(() => {});
+      await login(page);
       // per-scene hard timeout
       await Promise.race([
         scene.run(page),
@@ -374,16 +371,6 @@ async function main() {
       results.push({ id: scene.id, module: scene.module, file: scene.file, ok: true, path: out, ms: Date.now() - started, error: null });
       console.log(`OK  ${scene.module}/${scene.file} (${Date.now() - started}ms)`);
     } catch (err) {
-      await closeDialog(page).catch(() => {});
-      // recover stuck page
-      try {
-        await page.goto(BASE_URL + "/", { waitUntil: "domcontentloaded", timeout: 15_000 });
-        if ((await page.getByRole("button", { name: /退出/ }).count()) === 0) {
-          await login(page);
-        }
-      } catch {
-        await login(page).catch(() => {});
-      }
       results.push({
         id: scene.id,
         module: scene.module,
@@ -394,6 +381,8 @@ async function main() {
         error: String(err?.message || err),
       });
       console.error(`FAIL ${scene.module}/${scene.file}: ${err?.message || err}`);
+    } finally {
+      await context.close();
     }
   }
 

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -48,9 +49,30 @@ def _review_metadata_errors(changed_pngs: list[str], manifest_diff: str) -> list
     return errors
 
 
-def _pending_baseline_review_errors() -> list[str]:
-    for staged in (True, False):
-        base = ["git", "diff"] + (["--cached"] if staged else [])
+def _duplicate_baseline_errors(manifest_files: dict[str, str | None]) -> list[str]:
+    file_tabs: dict[str, list[str]] = {}
+    for tab, filename in manifest_files.items():
+        if filename:
+            file_tabs.setdefault(filename, []).append(tab)
+    return [
+        f"baseline PNG '{filename}' 被多个 tab 引用：{', '.join(sorted(tabs))}"
+        for filename, tabs in file_tabs.items()
+        if len(tabs) > 1
+    ]
+
+
+def _pending_baseline_review_errors(base_ref: str | None = None) -> list[str]:
+    diffs = [["git", "diff", "--cached"], ["git", "diff"]]
+    if base_ref:
+        verify = subprocess.run(
+            ["git", "rev-parse", "--verify", base_ref],
+            cwd=REPO_ROOT,
+            capture_output=True,
+        )
+        if verify.returncode == 0:
+            diffs.append(["git", "diff", f"{base_ref}...HEAD"])
+    errors: list[str] = []
+    for base in diffs:
         changed = subprocess.run(
             base + ["--name-only", "--diff-filter=ACMRT"],
             cwd=REPO_ROOT,
@@ -68,8 +90,8 @@ def _pending_baseline_review_errors() -> list[str]:
             capture_output=True,
             text=True,
         ).stdout
-        return _review_metadata_errors(pngs, diff)
-    return []
+        errors.extend(_review_metadata_errors(pngs, diff))
+    return list(dict.fromkeys(errors))
 
 
 def _load_toml(path: Path) -> dict:
@@ -100,10 +122,11 @@ def _extract_tab_values_from_full_matrix_specs(content: str) -> list[str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--base", default=os.environ.get("WMS_GIT_BASE", "main"))
     args = parser.parse_args()
 
     errors: list[str] = []
-    errors.extend(_pending_baseline_review_errors())
+    errors.extend(_pending_baseline_review_errors(args.base))
 
     # 1. 读 Tabs.tsx
     if not TABS_FILE.exists():
@@ -133,6 +156,7 @@ def main() -> int:
     manifest_snaps = manifest_data.get("snapshots", [])
     manifest_tabs = [s["tab"] for s in manifest_snaps]
     manifest_files = {s["tab"]: s.get("file") for s in manifest_snaps}
+    errors.extend(_duplicate_baseline_errors(manifest_files))
 
     # 3. 三者一致性校验
     set_tabs = set(tabs_tsx_values)
