@@ -185,7 +185,8 @@ export function statusKey(status: string | null | undefined): StatusKey {
   return "pending";
 }
 
-export function statusLabel(status: string) {
+export function statusLabel(status: string | null | undefined) {
+  if (!status) return "-";
   const labels: Record<string, string> = {
     pending: "待处理",
     released: "待收货",

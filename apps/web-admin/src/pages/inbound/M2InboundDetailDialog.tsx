@@ -35,7 +35,13 @@ import {
   type ProcessState,
 } from "./m2-inbound-detail-view-model";
 import { inboundDocumentTypeLabel, inboundDocumentTypeOf } from "./m2-inbound-document-type";
-import { formatDateTime, ownerLabel, totalExpectedQty, type OwnerContext } from "./m2-inbound-page-helpers";
+import {
+  formatDateTime,
+  ownerLabel,
+  statusLabel,
+  totalExpectedQty,
+  type OwnerContext,
+} from "./m2-inbound-page-helpers";
 
 interface M2InboundDetailDialogProps {
   order: ReceivingOrder | null;
@@ -62,7 +68,7 @@ export function M2InboundDetailDialog({ order, currentOwner, defaultStage, open,
   const currentStage = inboundDetailStageIndex(order.status ?? "");
   const selectedProcess = processDetail(selectedStage, expectedQty, currentStage);
   const orderRows: Array<[string, string]> = [
-    ["单据状态", statusLabel(order.status ?? "")],
+    ["单据状态", statusLabel(order.status)],
     ["单据类型", inboundDocumentTypeLabel(documentType)],
     ["货主", ownerLabel(order.owner_id, currentOwner)],
     ["供应商", shortId(order.supplier_id)],
@@ -253,19 +259,6 @@ function BatchInfoBlock({ order }: { order: ReceivingOrder }) {
       </div>
     </div>
   );
-}
-
-function statusLabel(status: string) {
-  const labels: Record<string, string> = {
-    pending: "待处理",
-    released: "待收货",
-    receiving: "收货中",
-    inspecting: "验收中",
-    putaway: "上架中",
-    completed: "已完成",
-    closed_rejected: "已关闭(拒收)",
-  };
-  return labels[status] ?? status;
 }
 
 function shortId(value: string | null | undefined) {
