@@ -1,6 +1,72 @@
 # WMS 全链路质量矩阵事实源。
 # 展示页由 scripts/governance/check_quality_matrix.py --write-doc 生成。
 
+[evidence_profiles.M1]
+backend_files = ["backend/crates/api/src/system_dictionary_handlers.rs"]
+database_objects = ["system_dictionary_groups", "system_dictionary_items"]
+test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test system_dictionary_postgres"]
+evidence_refs = ["backend/crates/api/tests/system_dictionary_postgres.rs"]
+
+[evidence_profiles.H1]
+backend_files = ["backend/crates/api/src/auth_handlers.rs", "backend/crates/api/src/admin_menu_handlers.rs"]
+database_objects = ["auth_users", "auth_roles", "auth_permissions", "admin_menu_nodes"]
+test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test admin_menu_postgres"]
+evidence_refs = ["backend/crates/api/tests/admin_menu_postgres.rs"]
+
+[evidence_profiles.H2]
+backend_files = ["backend/crates/api/src/audit.rs", "backend/crates/api/src/h2_lifecycle_handlers.rs"]
+database_objects = ["audit_event", "audit_archive_runs", "outbox_event"]
+test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test audit_postgres --test h2_lifecycle_postgres"]
+evidence_refs = ["backend/crates/api/tests/audit_postgres.rs", "backend/crates/api/tests/h2_lifecycle_postgres.rs"]
+
+[evidence_profiles.H3]
+backend_files = ["backend/crates/api/src/resilience.rs", "backend/crates/api/src/bin/wms_api.rs"]
+database_objects = ["audit_event"]
+test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --lib openapi"]
+evidence_refs = ["shared/openapi/openapi.json", "packages/api-client/src/schema.ts"]
+
+[evidence_profiles.H4]
+backend_files = ["backend/crates/api/src/wechat_notify.rs", "backend/crates/api/src/wechat_notify_service.rs"]
+database_objects = ["wechat_notify_configs", "wechat_notify_records"]
+test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test h4_wechat_notify_postgres"]
+evidence_refs = ["backend/crates/api/tests/h4_wechat_notify_postgres.rs"]
+
+[evidence_profiles.H5]
+backend_files = ["backend/crates/api/src/express_part1.rs"]
+database_objects = ["express_carriers", "express_routing_rules", "express_waybills"]
+test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test express_postgres"]
+evidence_refs = ["backend/crates/api/tests/express_postgres.rs"]
+
+[evidence_profiles.H6]
+backend_files = ["backend/crates/api/src/state_machine.rs"]
+database_objects = ["auth_permissions"]
+test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test h6_state_machine_postgres"]
+evidence_refs = ["backend/crates/api/tests/h6_state_machine_postgres.rs"]
+
+[evidence_profiles.H9]
+backend_files = ["backend/crates/api/src/print_template_handlers.rs"]
+database_objects = ["print_templates", "print_template_versions", "print_records"]
+test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test print_template_postgres"]
+evidence_refs = ["backend/crates/api/tests/print_template_postgres.rs"]
+
+[evidence_profiles.M2]
+backend_files = ["backend/crates/api/src/wave3_handlers.rs", "backend/crates/api/src/wave3_repository.rs"]
+database_objects = ["receiving_orders", "receiving_order_receipts", "receiving_inspections", "receiving_putaways"]
+test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave3_postgres --test wave3_evidence_postgres", "pnpm --dir apps/web-admin run test:e2e:m2-real"]
+evidence_refs = ["backend/crates/api/tests/wave3_postgres.rs", "prototypes/e2e/web-admin-m2-real.spec.ts"]
+
+[evidence_profiles.M3]
+backend_files = ["backend/crates/api/src/inventory.rs", "backend/crates/api/src/wave3_repository.rs"]
+database_objects = ["inventory_batches", "inventory_movements", "inventory_status_changes"]
+test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave3_postgres", "pnpm --dir apps/web-admin run test:e2e:m2-real"]
+evidence_refs = ["backend/crates/api/tests/wave3_postgres.rs", "prototypes/e2e/web-admin-m2-real.spec.ts"]
+
+[evidence_profiles.M4]
+backend_files = ["backend/crates/api/src/wave4_handlers.rs", "backend/crates/api/src/wave4_repository.rs"]
+database_objects = ["outbound_orders", "outbound_order_lines", "outbound_waves"]
+test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave4_postgres", "pnpm --dir apps/web-admin run test:e2e:shell-dev"]
+evidence_refs = ["backend/crates/api/tests/wave4_postgres.rs", "prototypes/e2e/web-admin-shell.spec.ts"]
+
 [[stories]]
 id = "US-M1-011"
 title = "系统字典中心"
@@ -9,6 +75,7 @@ story_file = "docs/domain/user-stories-m1-master-data-warehouse.md"
 types = ["write", "config_rule", "frontend_interaction"]
 frontend_pages = ["m1-system-dictionary"]
 navigation_checks = ["pnpm --dir apps/web-admin run test:e2e:shell-dev"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m1-real"]
 api_paths = [
   "GET /api/v1/system-dictionaries/{dict_code}/items",
   "PUT /api/v1/system-dictionaries/{dict_code}/items/{item_code}",
@@ -38,30 +105,40 @@ id = "US-H1-002"
 title = "角色与权限管理"
 module = "H1"
 reason = "当前只落地角色、权限、用户绑定底层表和登录态权限读取；角色权限维护 API / UI、批量授权和权限即时变更操作未进入本轮执行。"
+owner = "H1 权限与多租户模块负责人"
+resume_when = "角色权限维护 API、管理端授权矩阵和权限变更 E2E 进入实施波次。"
 
 [[deferred_stories]]
 id = "US-H1-005"
 title = "Token 失效与登出"
 module = "H1"
 reason = "当前只落地 Redis token 黑名单和 permissions_changed_at 运行策略；登出 API、多设备会话列表和管理员强制踢人未进入本轮执行。"
+owner = "H1 权限与多租户模块负责人"
+resume_when = "会话生命周期 API、管理端会话列表和多设备注销测试进入实施波次。"
 
 [[deferred_stories]]
 id = "US-H1-006"
 title = "API Key 生命周期管理"
 module = "H1"
 reason = "当前没有 API Key 创建、轮换、吊销、作用域和审计接口；该能力应与 H-INT 外部系统接入切片一起设计和实现。"
+owner = "H1 与 H-INT 模块负责人"
+resume_when = "首个外部系统接入需要受控 API Key 生命周期时启动实施。"
 
 [[deferred_stories]]
 id = "US-H4-002"
 title = "企业微信消息发送"
 module = "H4"
 reason = "当前仅完成参数维护、本地完整性测试、模板渲染和发送记录持久化；未接外部 provider 时记录明确为失败，禁止伪报发送成功。企业微信真实 API 调用、失败重试、token 刷新和外部联调证据尚未完成。"
+owner = "H4 企业微信通知模块负责人"
+resume_when = "取得企业微信测试凭据和可访问的 dev/staging 回调地址后恢复实施。"
 
 [[deferred_stories]]
 id = "US-H4-003"
 title = "企业微信审批流对接"
 module = "H4"
 reason = "当前仅完成受 JWT 权限保护的内部审批记录和指定审批人回写模型；企业微信审批推送、外部回调签名校验、轮询兜底、业务单据原子回写和外部联调证据尚未完成。"
+owner = "H4 企业微信通知模块负责人"
+resume_when = "企业微信审批应用、回调密钥和联调环境准备完成后恢复实施。"
 
 [[stories]]
 id = "US-H1-001"
@@ -520,7 +597,7 @@ title = "通知配置"
 module = "H4"
 story_file = "docs/domain/user-stories-h4-wechat-notify.md"
 types = ["write", "config_rule", "frontend_interaction", "audit_compliance"]
-frontend_pages = ["h4-notify-configs"]
+frontend_pages = ["h4-notify-configs", "h4-wechat-settings"]
 api_paths = [
   "GET /api/v1/wechat-notify/configs",
   "POST /api/v1/wechat-notify/configs",
@@ -968,6 +1045,7 @@ story_file = "docs/domain/user-stories-m2-inbound-asn.md"
 types = ["write", "inventory_change", "frontend_interaction", "critical_path"]
 frontend_pages = ["m2-receiving"]
 navigation_checks = ["pnpm --dir apps/web-admin run test:e2e:shell-dev"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
 api_paths = [
   "POST /api/v1/inbound/receiving-orders/{id}/receive",
 ]
@@ -998,6 +1076,7 @@ story_file = "docs/domain/user-stories-m3-inventory-query.md"
 types = ["read_only", "frontend_interaction"]
 frontend_pages = ["m3-batches"]
 navigation_checks = ["pnpm --dir apps/web-admin run test:e2e:shell-dev"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
 api_paths = [
   "GET /api/v1/inventory/batches",
 ]
@@ -1028,6 +1107,7 @@ story_file = "docs/domain/user-stories-m4-outbound-order.md"
 types = ["write", "frontend_interaction", "api_change"]
 frontend_pages = ["m4-orders"]
 navigation_checks = ["pnpm --dir apps/web-admin run test:e2e:shell-dev"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:shell-dev"]
 api_paths = [
   "GET /api/v1/outbound/orders",
   "POST /api/v1/outbound/orders",
@@ -1051,3 +1131,1151 @@ governance = "verified"
 [stories.tests]
 required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
 covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
+
+# 以下延期项由全量范围治理登记；恢复后必须移入 [[stories]] 并补齐全维度证据。
+
+[[deferred_stories]]
+id = "US-AL-001"
+title = "告警定义注册"
+module = "AL"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "AL 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-AL-002"
+title = "告警触发与生命周期"
+module = "AL"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "AL 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-AL-003"
+title = "告警升级机制"
+module = "AL"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "AL 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-AL-004"
+title = "告警看板与统计"
+module = "AL"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "AL 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-AL-005"
+title = "告警通道与静默配置"
+module = "AL"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "AL 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-DOCK-001"
+title = "月台档案管理"
+module = "DOCK"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "DOCK 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-DOCK-002"
+title = "预约创建"
+module = "DOCK"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "DOCK 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-DOCK-003"
+title = "预约时间窗冲突检测"
+module = "DOCK"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "DOCK 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-DOCK-004"
+title = "预约变更与取消"
+module = "DOCK"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "DOCK 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-DOCK-005"
+title = "实到对账"
+module = "DOCK"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "DOCK 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-DOCK-006"
+title = "月台占用看板"
+module = "DOCK"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "DOCK 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-DOCK-007"
+title = "预约统计与报表"
+module = "DOCK"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "DOCK 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-DR-001"
+title = "司机端登录与今日任务列表"
+module = "DR"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "DR 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-DR-002"
+title = "司机签收（自有车队交接确认）"
+module = "DR"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "DR 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-DR-003"
+title = "在途异常上报"
+module = "DR"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "DR 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-DR-004"
+title = "司机端到店签收（客户签字）"
+module = "DR"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "DR 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-DR-005"
+title = "司机端工作日志与绩效查询"
+module = "DR"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "DR 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-ST-001"
+title = "门店登录与首页"
+module = "ST"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "ST 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-ST-002"
+title = "门店订货与补货请求"
+module = "ST"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "ST 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-ST-003"
+title = "门店签收（电子签收）"
+module = "ST"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "ST 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-ST-004"
+title = "门店退货发起"
+module = "ST"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "ST 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-ST-005"
+title = "门店订单查询与历史"
+module = "ST"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "ST 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-ST-006"
+title = "门店冷链订单温控查询（GSP 合规专项）"
+module = "ST"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "ST 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M1-001"
+title = "商品档案管理"
+module = "M1"
+frontend_pages = ["m1-products"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m1-real"]
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M1 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M1-002"
+title = "供应商资质档案"
+module = "M1"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M1 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M1-003"
+title = "客户/门店档案"
+module = "M1"
+frontend_pages = ["m1-business-partners"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m1-real"]
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M1 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M1-004"
+title = "仓库与库位管理"
+module = "M1"
+frontend_pages = ["m1-warehouses", "m1-zones", "m1-locations"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m1-real"]
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M1 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M1-005"
+title = "客商开票信息"
+module = "M1"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M1 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M1-006"
+title = "用户与权限管理"
+module = "M1"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M1 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M1-007"
+title = "多货主架构"
+module = "M1"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M1 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M1-008"
+title = "系统配置中心"
+module = "M1"
+frontend_pages = ["m1-feature-flags"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m1-real"]
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M1 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M1-009"
+title = "多仓管理"
+module = "M1"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M1 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M1-010"
+title = "特殊药品分类字典管理"
+module = "M1"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M1 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M10-001"
+title = "接收 TMS 路径规划结果"
+module = "M10"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M10 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M10-002"
+title = "在途温控数据接入"
+module = "M10"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M10 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M10-003"
+title = "容器回收追踪"
+module = "M10"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M10 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M10-004"
+title = "出库订单与 TMS 协作"
+module = "M10"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M10 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M11-000"
+title = "占位（v7 移除）"
+module = "M11"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M11 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M2-001"
+title = "创建 ASN（采购入库通知）"
+module = "M2"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M2 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M2-003"
+title = "PDA/PC Web 验收"
+module = "M2"
+frontend_pages = ["m2-inspecting"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M2 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M2-004"
+title = "双人验收签字"
+module = "M2"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M2 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M2-005"
+title = "PDA/PC Web 智能上架"
+module = "M2"
+frontend_pages = ["m2-putaway"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M2 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M2-006"
+title = "收货异常处理"
+module = "M2"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M2 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M2-007"
+title = "收货单据打印"
+module = "M2"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M2 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M2-008"
+title = "收货进度看板"
+module = "M2"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M2 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M2-009"
+title = "打印模板设计模块（迁移引用）"
+module = "M2"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M2 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M2-010"
+title = "上架策略配置"
+module = "M2"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M2 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M3-004"
+title = "在库养护"
+module = "M3"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M3 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M3-005"
+title = "库存盘点"
+module = "M3"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M3 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M3-006"
+title = "库内移库"
+module = "M3"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M3 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M3-009"
+title = "库存预警"
+module = "M3"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M3 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M3-010"
+title = "ABC 分类管理"
+module = "M3"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M3 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M3-011"
+title = "库位历史追踪"
+module = "M3"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M3 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M3-001"
+title = "实时库存查询"
+module = "M3"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M3 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M3-003"
+title = "库存状态管理"
+module = "M3"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M3 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M4-002"
+title = "波次规划"
+module = "M4"
+frontend_pages = ["m4-waves"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:shell-dev"]
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M4 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M4-003"
+title = "PDA 拣选作业"
+module = "M4"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M4 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M4-004"
+title = "出库复核"
+module = "M4"
+frontend_pages = ["m4-review"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:shell-dev"]
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M4 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M4-005"
+title = "随货同行单打印"
+module = "M4"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M4 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M4-006"
+title = "发货与交接"
+module = "M4"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M4 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M4-007"
+title = "出库进度看板"
+module = "M4"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M4 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M4-008"
+title = "销售退货入库处理（历史编号，归口 M2）"
+module = "M4"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M4 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M4-009"
+title = "波次出库箱规则"
+module = "M4"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M4 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M4-010"
+title = "拣选路径策略"
+module = "M4"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M4 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M4-011"
+title = "合并发货与拆单"
+module = "M4"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M4 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M4-012"
+title = "采购退货出库"
+module = "M4"
+frontend_pages = ["m4-returns"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:shell-dev"]
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M4 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M5-001"
+title = "冷链设备台账"
+module = "M5"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M5 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M5-002"
+title = "温控数据接入与展示"
+module = "M5"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M5 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M5-003"
+title = "温度超标事件接入与联动"
+module = "M5"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M5 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M6-001"
+title = "GSP 法定台账自动生成"
+module = "M6"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M6 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M6-002"
+title = "审计追踪查询"
+module = "M6"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M6 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M6-003"
+title = "业务报表"
+module = "M6"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M6 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M6-004"
+title = "特殊管理药品专用台账"
+module = "M6"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M6 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M8-001"
+title = "自动补货算法（门店水位）"
+module = "M8"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M8 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M8-002"
+title = "越库作业（Cross-Docking）"
+module = "M8"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M8 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M9-001"
+title = "计费规则配置"
+module = "M9"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M9 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M9-002"
+title = "自动计费"
+module = "M9"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M9 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-M9-003"
+title = "账单管理"
+module = "M9"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "M9 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-BA-001"
+title = "创建批号调整单"
+module = "BA"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "BA 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-BA-002"
+title = "批号调整双人审批"
+module = "BA"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "BA 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-BA-003"
+title = "PDA 执行批号调整（实物核对 + 库存与追溯码联动）"
+module = "BA"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "BA 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-BA-004"
+title = "ERP 反馈批号调整结果"
+module = "BA"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "BA 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-CG-001"
+title = "编码规则配置"
+module = "CG"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "CG 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-CG-002"
+title = "编码生成服务"
+module = "CG"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "CG 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-DI-001"
+title = "药检单平台对接配置"
+module = "DI"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "DI 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-DI-002"
+title = "扫码批量查询药检单"
+module = "DI"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "DI 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-DI-003"
+title = "药检单存储与查看"
+module = "DI"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "DI 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-DI-004"
+title = "药检单有效性校验"
+module = "DI"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "DI 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-PK-001"
+title = "包装站工位管理"
+module = "PK"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "PK 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-PK-002"
+title = "装箱作业"
+module = "PK"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "PK 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-PK-003"
+title = "称重校验"
+module = "PK"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "PK 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-PK-004"
+title = "保温箱配置（冷链）"
+module = "PK"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "PK 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-PK-005"
+title = "追溯码出库核验"
+module = "PK"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "PK 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-PK-006"
+title = "快递面单打印"
+module = "PK"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "PK 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-MPM-001"
+title = "参数对照字典定义"
+module = "MPM"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "MPM 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-MPM-002"
+title = "映射规则配置"
+module = "MPM"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "MPM 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-MPM-003"
+title = "待映射队列与质量联系单触发"
+module = "MPM"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "MPM 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-MPM-004"
+title = "映射执行 API"
+module = "MPM"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "MPM 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-MPM-005"
+title = "反向追溯与映射溯源"
+module = "MPM"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "MPM 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-MPM-006"
+title = "交易类型字典管理（PIX 三码）"
+module = "MPM"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "MPM 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-QL-001"
+title = "质量联系单类型与审批模板配置"
+module = "QL"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "QL 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-QL-002"
+title = "创建质量联系单"
+module = "QL"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "QL 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-QL-003"
+title = "质量联系单审批"
+module = "QL"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "QL 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-QL-004"
+title = "质量联系单与业务流程联动"
+module = "QL"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "QL 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-QL-005"
+title = "质量联系单查询与统计"
+module = "QL"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "QL 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-RC-001"
+title = "定时对账任务"
+module = "RC"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "RC 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-RC-002"
+title = "差异处理"
+module = "RC"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "RC 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-RC-003"
+title = "手动触发对账"
+module = "RC"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "RC 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-RC-004"
+title = "对账报表"
+module = "RC"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "RC 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-RP-001"
+title = "补货阈值管理"
+module = "RP"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "RP 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-RP-002"
+title = "日常补货（阈值触发）"
+module = "RP"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "RP 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-RP-003"
+title = "波次补货（紧急触发）"
+module = "RP"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "RP 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-RP-004"
+title = "拣选补拣（兜底触发）"
+module = "RP"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "RP 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-RP-005"
+title = "补货记录与报表"
+module = "RP"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "RP 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-SA-001"
+title = "报损单管理"
+module = "SA"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "SA 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-SA-002"
+title = "报溢单管理"
+module = "SA"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "SA 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-SA-003"
+title = "报损报溢查询与统计"
+module = "SA"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "SA 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-TC-001"
+title = "追溯码分类管理"
+module = "TC"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "TC 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-TC-002"
+title = "码库管理（大中小码）"
+module = "TC"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "TC 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-TC-003"
+title = "追溯码与商品绑定"
+module = "TC"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "TC 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-TC-004"
+title = "PDA 追溯码对应关系维护"
+module = "TC"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "TC 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-TC-005"
+title = "追溯码录入环节配置"
+module = "TC"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "TC 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-TC-006"
+title = "出库追溯码核验"
+module = "TC"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "TC 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-TC-007"
+title = "\"码上放心\"平台上报"
+module = "TC"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "TC 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-TE-001"
+title = "任务类型配置"
+module = "TE"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "TE 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-TE-002"
+title = "任务组与人员资格"
+module = "TE"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "TE 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-TE-003"
+title = "任务创建（各模块触发）"
+module = "TE"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "TE 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-TE-004"
+title = "任务优先级规则"
+module = "TE"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "TE 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-TE-005"
+title = "任务分配"
+module = "TE"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "TE 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-TE-006"
+title = "任务释放控制"
+module = "TE"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "TE 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-TE-007"
+title = "任务合并"
+module = "TE"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "TE 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-TE-008"
+title = "任务执行（PDA）"
+module = "TE"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "TE 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-TE-009"
+title = "任务跟踪看板"
+module = "TE"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "TE 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-TE-010"
+title = "任务绩效统计"
+module = "TE"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "TE 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-TE-011"
+title = "设备接口抽象（RFID/AGV/输送线预留）"
+module = "TE"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "TE 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-VR-001"
+title = "校验规则配置"
+module = "VR"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "VR 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-VR-002"
+title = "校验规则执行"
+module = "VR"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "VR 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-VR-003"
+title = "校验异常人工处理"
+module = "VR"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "VR 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-VR-004"
+title = "校验规则模板"
+module = "VR"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "VR 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-VR-005"
+title = "校验规则测试"
+module = "VR"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "VR 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+
+[[deferred_stories]]
+id = "US-VR-006"
+title = "双人策略矩阵规则"
+module = "VR"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+owner = "VR 模块负责人"
+resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
