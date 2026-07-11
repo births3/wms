@@ -155,10 +155,11 @@ async function ensureMenuVisible(page, group, menu) {
 
 async function login(page) {
   await page.goto(BASE_URL + "/", { waitUntil: "networkidle" });
-  await page.getByLabel("货主编码").fill(LOGIN.owner);
-  await page.getByLabel("登录账号").fill(LOGIN.username);
-  await page.getByLabel("密码").fill(LOGIN.password);
-  await page.getByRole("button", { name: "登录" }).click();
+  await page.locator("#owner-code").fill(LOGIN.owner);
+  await page.locator("#username").fill(LOGIN.username);
+  // 避免 getByLabel('密码') 命中「显示密码」按钮
+  await page.locator("#password").fill(LOGIN.password);
+  await page.getByRole("button", { name: "登录", exact: true }).click();
   await page.getByRole("button", { name: /退出/ }).waitFor({ timeout: 15_000 });
 }
 
