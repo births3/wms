@@ -17,7 +17,7 @@ import {
   type DataGridRefreshAction,
   type DataGridToolbarAction,
 } from "@wms/ui";
-import { CheckCircle2, ClipboardCheck, PackageCheck } from "lucide-react";
+import { CheckCircle2, ClipboardCheck, PackageCheck, Send } from "lucide-react";
 
 import type { ReceivingOrder } from "@/features/inbound/inbound-queries";
 import type { InboundDialog } from "./M2InboundDialogs";
@@ -25,6 +25,7 @@ import { inboundDocumentTypeLabel, inboundDocumentTypeOf } from "./m2-inbound-do
 import {
   canInspect,
   canPutaway,
+  canRelease,
   canReceiveOrReject,
   formatDateTime,
   ownerLabel,
@@ -51,6 +52,7 @@ interface M2InboundOrderTableProps {
   onSelectOrderKeys: (keys: string[]) => void;
   onOpenDetail: (id: string) => void;
   onOpenDialog: (id: string, dialog: InboundDialog) => void;
+  onRelease: (id: string) => void;
   refreshAction?: DataGridRefreshAction;
   createAction?: DataGridCreateAction;
   queryState?: M2InboundQueryValue;
@@ -71,6 +73,7 @@ export function M2InboundOrderTable({
   onSelectOrderKeys,
   onOpenDetail,
   onOpenDialog,
+  onRelease,
   refreshAction,
   createAction,
   queryState,
@@ -86,7 +89,7 @@ export function M2InboundOrderTable({
       if (selectedOrder) onOpenDetail(selectedOrder.id);
     },
   };
-  const privateActions = inboundPrivateActions(mode, selectedOrder, onOpenDialog);
+  const privateActions = inboundPrivateActions(mode, selectedOrder, onOpenDialog, onRelease);
   const orderColumns: DataGridColumn<ReceivingOrder>[] = [
     {
       key: "receipt_no",
@@ -237,9 +240,20 @@ function inboundPrivateActions(
   mode: M2InboundMode,
   selectedOrder: ReceivingOrder | null,
   onOpenDialog: (id: string, dialog: InboundDialog) => void,
+  onRelease: (id: string) => void,
 ): DataGridToolbarAction[] {
   if (mode === "receiving") {
     return [
+      {
+        key: "release",
+        label: "放行",
+        description: "放行草稿 ASN",
+        icon: <Send className="size-4" aria-hidden />,
+        disabled: !selectedOrder || !canRelease(selectedOrder.status),
+        onClick: () => {
+          if (selectedOrder && canRelease(selectedOrder.status)) onRelease(selectedOrder.id);
+        },
+      },
       {
         key: "receive",
         label: "收货",

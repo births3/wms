@@ -97,9 +97,9 @@ export const masterDataViewMeta: Record<
   },
   "m1-zones": {
     title: "M1 库区管理",
-    subtitle: "基于真实库位 API 派生的库区上下文",
-    emptyTitle: "暂无库区上下文",
-    emptyDescription: "当前没有可派生的库区，请先维护库位或调整筛选。",
+    subtitle: "库区编码、温区、色标与启停状态",
+    emptyTitle: "暂无库区档案",
+    emptyDescription: "当前筛选条件下没有库区，请调整关键字或清空筛选。",
     storageKey: "m1-zones-datagrid",
   },
   "m1-locations": {
@@ -145,11 +145,15 @@ export function M1MasterDataPage({ viewId }: M1MasterDataPageProps) {
 function M1MasterDataGridPage({ viewId }: Pick<M1MasterDataPageProps, "viewId">) {
   const meta = masterDataViewMeta[viewId];
   const rowsQuery = useMasterDataRowsQuery(viewId);
+  const warehouseRowsQuery = useMasterDataRowsQuery("m1-warehouses", viewId === "m1-zones");
+  const zoneRowsQuery = useMasterDataRowsQuery("m1-zones", viewId === "m1-locations");
   const locationTypeOptionsQuery = useSystemDictionaryItemOptionsQuery(
     "location_type",
     viewId === "m1-locations",
   );
   const locationTypeOptions = locationTypeOptionsQuery.data ?? [];
+  const temperatureZoneOptions = useSystemDictionaryItemOptionsQuery("temperature_zone", viewId === "m1-zones").data ?? [];
+  const qualityColorOptions = useSystemDictionaryItemOptionsQuery("quality_color", viewId === "m1-zones").data ?? [];
   const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(() => defaultM1QueryValue());
   const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(() => defaultM1QueryValue());
   const [lastEvent, setLastEvent] = React.useState<string | null>(null);
@@ -200,22 +204,22 @@ function M1MasterDataGridPage({ viewId }: Pick<M1MasterDataPageProps, "viewId">)
   const locationBatchScopes = React.useMemo(() => {
     if (viewId !== "m1-locations") return [];
     const scopes = new Map<string, LocationScopeOption>();
-    for (const row of rowsQuery.data ?? []) {
-      const fields = row.locationFields;
+    for (const row of zoneRowsQuery.data ?? []) {
+      const fields = row.zoneFields;
       if (!fields || fields.warehouseId === "-" || fields.zoneId === "-") continue;
       const ownerId = fields.owner === "-" ? null : fields.owner;
       const key = `${fields.warehouseId}:${fields.zoneId}:${ownerId ?? "none"}`;
       if (scopes.has(key)) continue;
       scopes.set(key, {
         key,
-        label: `仓库 ${fields.warehouse} / 库区 ${fields.zone}`,
+        label: `仓库 ${fields.warehouse} / 库区 ${row.code} · ${row.name}`,
         warehouseId: fields.warehouseId,
         zoneId: fields.zoneId,
         ownerId,
       });
     }
     return Array.from(scopes.values());
-  }, [rowsQuery.data, viewId]);
+  }, [zoneRowsQuery.data, viewId]);
   const locationBatchScope =
     locationBatchScopes.find((scope) => scope.key === locationBatchScopeKey) ??
     locationBatchScopes[0] ??
@@ -399,6 +403,12 @@ function M1MasterDataGridPage({ viewId }: Pick<M1MasterDataPageProps, "viewId">)
             description: "新建仓库",
             onClick: () => setCrudTarget({ kind: "warehouse", mode: "create" }),
           }
+        : viewId === "m1-zones"
+          ? {
+              label: "新增",
+              description: "新建库区",
+              onClick: () => setCrudTarget({ kind: "zone", mode: "create" }),
+            }
         : viewId === "m1-locations"
           ? {
               label: "新增",
@@ -634,10 +644,13 @@ function M1MasterDataGridPage({ viewId }: Pick<M1MasterDataPageProps, "viewId">)
         />
       )}
 
-      <MasterDataCrudDialog
+        <MasterDataCrudDialog
         target={crudTarget}
         locationScopes={locationBatchScopes}
-        locationTypeOptions={locationTypeOptions}
+          locationTypeOptions={locationTypeOptions}
+          warehouseOptions={warehouseRowsQuery.data ?? []}
+          temperatureZoneOptions={temperatureZoneOptions}
+          qualityColorOptions={qualityColorOptions}
         onOpenChange={(open) => !open && setCrudTarget(null)}
         onSubmit={submitCrudForm}
       />

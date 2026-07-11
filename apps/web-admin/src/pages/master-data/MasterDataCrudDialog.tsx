@@ -15,24 +15,28 @@ import { Ban, Pencil } from "lucide-react";
 import {
   createLocation,
   createWarehouse,
+  createWarehouseZone,
   updateCustomer,
   updateLocation,
   updateSupplier,
   updateWarehouse,
+  updateWarehouseZone,
 } from "@/features/master-data/master-data-queries";
 import type {
   CreateLocationRequest,
   CreateWarehouseRequest,
+  CreateWarehouseZoneRequest,
   MasterDataRow,
   MasterDataViewId,
   UpdateCustomerRequest,
   UpdateLocationRequest,
   UpdateSupplierRequest,
   UpdateWarehouseRequest,
+  UpdateWarehouseZoneRequest,
   SystemDictionaryOption,
 } from "@/features/master-data/master-data-queries";
 
-export type MasterDataCrudViewId = "m1-business-partners" | "m1-warehouses" | "m1-locations";
+export type MasterDataCrudViewId = "m1-business-partners" | "m1-warehouses" | "m1-zones" | "m1-locations";
 
 export interface LocationScopeOption { key: string; label: string; warehouseId: string; zoneId: string; ownerId: string | null; }
 
@@ -41,6 +45,8 @@ export type MasterDataCrudTarget =
   | { kind: "customer"; mode: "edit"; row: MasterDataRow }
   | { kind: "warehouse"; mode: "create" }
   | { kind: "warehouse"; mode: "edit"; row: MasterDataRow }
+  | { kind: "zone"; mode: "create" }
+  | { kind: "zone"; mode: "edit"; row: MasterDataRow }
   | { kind: "location"; mode: "create" }
   | { kind: "location"; mode: "edit"; row: MasterDataRow };
 
@@ -49,10 +55,11 @@ export type SourceEditFormState =
   | { kind: "customer"; mode: "edit"; id: string; code: string; name: string; licenseNo: string; status: string };
 
 export interface WarehouseFormState { kind: "warehouse"; mode: "create" | "edit"; id?: string; code: string; name: string; status: string; }
+export interface ZoneFormState { kind: "zone"; mode: "create" | "edit"; id?: string; warehouseId: string; code: string; name: string; temperatureZone: string; qualityColor: string; status: string; }
 
 export interface LocationFormState { kind: "location"; mode: "create" | "edit"; id?: string; scopeKey: string; code: string; rowNo: number; columnNo: number; layerNo: number; maxVolumeCm3: number; usedVolumeCm3: number; maxSkuCount: number; locationType: string; status: string; }
 
-export type MasterDataCrudForm = SourceEditFormState | WarehouseFormState | LocationFormState;
+export type MasterDataCrudForm = SourceEditFormState | WarehouseFormState | ZoneFormState | LocationFormState;
 
 const activeOptions = [
   ["active", "启用"],
@@ -65,12 +72,13 @@ const locationStatusOptions = [
   ["disabled", "停用"],
 ] as const;
 export function isMasterDataCrudView(viewId: MasterDataViewId): viewId is MasterDataCrudViewId {
-  return ["m1-business-partners", "m1-warehouses", "m1-locations"].includes(viewId);
+  return ["m1-business-partners", "m1-warehouses", "m1-zones", "m1-locations"].includes(viewId);
 }
 
 export function crudTargetForRow(viewId: MasterDataCrudViewId, row: MasterDataRow): MasterDataCrudTarget {
   if (viewId === "m1-business-partners") return businessPartnerCrudTarget(row);
   if (viewId === "m1-warehouses") return { kind: "warehouse", mode: "edit", row };
+  if (viewId === "m1-zones") return { kind: "zone", mode: "edit", row };
   return { kind: "location", mode: "edit", row };
 }
 
@@ -115,12 +123,18 @@ export function MasterDataCrudDialog({
   target,
   locationScopes,
   locationTypeOptions,
+  warehouseOptions,
+  temperatureZoneOptions,
+  qualityColorOptions,
   onOpenChange,
   onSubmit,
 }: {
   target: MasterDataCrudTarget | null;
   locationScopes: LocationScopeOption[];
   locationTypeOptions: SystemDictionaryOption[];
+  warehouseOptions: MasterDataRow[];
+  temperatureZoneOptions: SystemDictionaryOption[];
+  qualityColorOptions: SystemDictionaryOption[];
   onOpenChange: (open: boolean) => void;
   onSubmit: (form: MasterDataCrudForm) => Promise<void>;
 }) {
@@ -129,9 +143,9 @@ export function MasterDataCrudDialog({
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    setForm(target ? formFromTarget(target, locationScopes[0] ?? null) : null);
+    setForm(target ? formFromTarget(target, locationScopes[0] ?? null, warehouseOptions[0] ?? null) : null);
     setError(null);
-  }, [target, locationScopes]);
+  }, [target, locationScopes, warehouseOptions]);
 
   if (!target || !form) return null;
   const patch = (value: Partial<MasterDataCrudForm>) => {
@@ -181,6 +195,16 @@ export function MasterDataCrudDialog({
               <>
                 <TextField label="仓库编码" value={form.code} required disabled={form.mode === "edit"} onChange={(code) => patch({ code })} />
                 <TextField label="仓库名称" value={form.name} required onChange={(name) => patch({ name })} />
+                {form.mode === "edit" && <SelectField label="状态" value={form.status} options={activeOptions} onChange={(status) => patch({ status })} />}
+              </>
+            )}
+            {form.kind === "zone" && (
+              <>
+                <SelectField label="仓库" value={form.warehouseId} options={warehouseOptions.map((row) => [row.id, `${row.code} · ${row.name}`] as const)} onChange={(warehouseId) => patch({ warehouseId })} />
+                <TextField label="库区编码" value={form.code} required disabled={form.mode === "edit"} onChange={(code) => patch({ code })} />
+                <TextField label="库区名称" value={form.name} required onChange={(name) => patch({ name })} />
+                <SelectField label="温区" value={form.temperatureZone} options={temperatureZoneOptions} onChange={(temperatureZone) => patch({ temperatureZone })} />
+                <SelectField label="色标" value={form.qualityColor} options={qualityColorOptions} onChange={(qualityColor) => patch({ qualityColor })} />
                 {form.mode === "edit" && <SelectField label="状态" value={form.status} options={activeOptions} onChange={(status) => patch({ status })} />}
               </>
             )}
@@ -239,6 +263,19 @@ export const warehouseEditRequestFromForm = (form: WarehouseFormState): UpdateWa
   status: form.status,
 });
 
+export const zoneCreateRequestFromForm = (form: ZoneFormState): CreateWarehouseZoneRequest => ({
+  warehouse_id: form.warehouseId,
+  zone_code: requiredText(form.code),
+  zone_name: requiredText(form.name),
+  temperature_zone: form.temperatureZone,
+  quality_color: form.qualityColor,
+});
+
+export const zoneEditRequestFromForm = (form: ZoneFormState): UpdateWarehouseZoneRequest => ({
+  zone_name: requiredText(form.name), temperature_zone: form.temperatureZone,
+  quality_color: form.qualityColor, status: form.status,
+});
+
 export function locationCreateRequestFromForm(form: LocationFormState, scopes: LocationScopeOption[]): CreateLocationRequest {
   const scope = scopes.find((option) => option.key === form.scopeKey);
   if (!scope) throw new Error("缺少仓库 / 库区上下文");
@@ -282,6 +319,7 @@ export async function disableMasterDataCrudRow(
   if (viewId === "m1-warehouses") {
     return updateWarehouse({ id: row.id, request: { status: "disabled" } });
   }
+  if (viewId === "m1-zones") return updateWarehouseZone({ id: row.id, request: { status: "disabled" } });
   return updateLocation({ id: row.id, request: { status: "disabled" } });
 }
 
@@ -301,17 +339,24 @@ export async function saveMasterDataCrudForm(
   if (form.kind === "warehouse") {
     return updateWarehouse({ id: requiredRecordId(form.id), request: warehouseEditRequestFromForm(form) });
   }
+  if (form.kind === "zone" && form.mode === "create") return createWarehouseZone(zoneCreateRequestFromForm(form));
+  if (form.kind === "zone") return updateWarehouseZone({ id: requiredRecordId(form.id), request: zoneEditRequestFromForm(form) });
   if (form.mode === "create") {
     return createLocation(locationCreateRequestFromForm(form, scopes));
   }
   return updateLocation({ id: requiredRecordId(form.id), request: locationEditRequestFromForm(form) });
 }
 
-function formFromTarget(target: MasterDataCrudTarget, firstScope: LocationScopeOption | null): MasterDataCrudForm {
+function formFromTarget(target: MasterDataCrudTarget, firstScope: LocationScopeOption | null, firstWarehouse: MasterDataRow | null): MasterDataCrudForm {
   if (target.kind === "supplier") return { kind: "supplier", mode: "edit", id: target.row.id, code: target.row.code, name: target.row.name, licenseNo: clean(target.row.primaryValue), contactName: clean(target.row.secondaryValue), status: target.row.status || "active" };
   if (target.kind === "customer") return { kind: "customer", mode: "edit", id: target.row.id, code: target.row.code, name: target.row.name, licenseNo: clean(target.row.primaryValue), status: target.row.status || "active" };
   if (target.kind === "warehouse" && target.mode === "edit") return { kind: "warehouse", mode: "edit", id: target.row.id, code: target.row.code, name: target.row.name, status: target.row.status || "active" };
   if (target.kind === "warehouse") return { kind: "warehouse", mode: "create", code: "", name: "", status: "active" };
+  if (target.kind === "zone" && target.mode === "edit") {
+    const fields = target.row.zoneFields;
+    return { kind: "zone", mode: "edit", id: target.row.id, warehouseId: fields?.warehouseId ?? "", code: target.row.code, name: target.row.name, temperatureZone: target.row.secondaryValue, qualityColor: target.row.extraValue, status: target.row.status || "active" };
+  }
+  if (target.kind === "zone") return { kind: "zone", mode: "create", warehouseId: firstWarehouse?.id ?? "", code: "", name: "", temperatureZone: "normal", qualityColor: "qualified_green", status: "active" };
   if (target.kind === "location" && target.mode === "edit") {
     const fields = target.row.locationFields;
     return {
@@ -345,6 +390,7 @@ function title(form: MasterDataCrudForm) {
   if (form.kind === "supplier") return "编辑供应商";
   if (form.kind === "customer") return "编辑客户";
   if (form.kind === "warehouse") return form.mode === "create" ? "新建仓库" : "编辑仓库";
+  if (form.kind === "zone") return form.mode === "create" ? "新建库区" : "编辑库区";
   return form.mode === "create" ? "新建库位" : "编辑库位";
 }
 
@@ -358,6 +404,7 @@ function canSubmit(
     const hasLocationType = locationTypeOptions.some(([value]) => value === form.locationType);
     return hasScope && hasLocationType && !!form.code.trim() && form.rowNo > 0 && form.columnNo > 0 && form.layerNo > 0 && form.maxVolumeCm3 > 0 && form.usedVolumeCm3 >= 0 && form.maxSkuCount > 0;
   }
+  if (form.kind === "zone") return !!form.warehouseId && !!form.code.trim() && !!form.name.trim() && !!form.temperatureZone && !!form.qualityColor;
   return !!form.name.trim() && (form.kind !== "warehouse" || !!form.code.trim());
 }
 

@@ -321,6 +321,9 @@ for (const target of [
   { section: "入库业务", group: "入库作业", id: "m2-receiving", heading: "M2 收货管理" },
   { section: "库内业务", group: "库存管理", id: "m3-batches", heading: "M3 批号管理" },
   { section: "出库业务", group: "出库作业", id: "m4-orders", heading: "M4 出库订单管理" },
+  { section: "出库业务", group: "出库作业", id: "m4-waves", heading: "M4 波次规划" },
+  { section: "出库业务", group: "出库作业", id: "m4-review", heading: "M4 复核发货" },
+  { section: "出库业务", group: "出库作业", id: "m4-returns", heading: "M4 采购退货出库" },
 ]) {
   test(`${target.heading} 能通过三层菜单打开`, async ({ page }) => {
     await page.goto("/");
@@ -337,6 +340,10 @@ for (const target of [
     await page.getByRole("button", { name: `${target.heading} ${target.id}`, exact: true }).click();
 
     await expect(page.getByRole("heading", { name: target.heading, exact: true })).toBeVisible();
+    if (target.id.startsWith("m4-")) {
+      fs.mkdirSync(artifactsDir, { recursive: true });
+      await page.screenshot({ path: path.join(artifactsDir, `${target.id}.png`), fullPage: false });
+    }
   });
 }
 

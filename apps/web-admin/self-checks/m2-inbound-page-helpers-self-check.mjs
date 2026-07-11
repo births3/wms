@@ -14,6 +14,7 @@ try {
   const {
     canInspect,
     canPutaway,
+    canRelease,
     canReceiveOrReject,
     filterOrders,
     INSPECTION_DUAL_SIGN_REQUIRED_BY_STRATEGY,
@@ -60,6 +61,8 @@ try {
   assert.equal(canReceiveOrReject("released"), true);
   assert.equal(canReceiveOrReject("receiving"), true);
   assert.equal(canReceiveOrReject("completed"), false);
+  assert.equal(canRelease("draft"), true);
+  assert.equal(canRelease("released"), false);
   assert.equal(canInspect("inspecting"), true);
   assert.equal(canInspect("receiving"), true);
   assert.equal(canInspect("completed"), false);
@@ -92,6 +95,8 @@ try {
   assert.match(orderTableSource, /row\.status[\s\S]*<StatusBadge[\s\S]*text-muted-foreground/, "空状态不得伪装成待处理徽标");
   assert.match(orderTableSource, /canInspect\(selectedOrder\.status\)/, "验收动作必须按状态裁剪");
   assert.match(orderTableSource, /canPutaway\(selectedOrder\.status\)/, "上架动作必须按状态裁剪");
+  assert.match(orderTableSource, /canRelease\(selectedOrder\.status\)/, "ASN 放行动作必须仅允许草稿状态");
+  assert.match(pageSource, /useReleaseReceivingOrderMutation/, "M2 页面必须接入真实 ASN 放行 API");
   assert.match(dialogSource, /<TextField label="ASN 号" required placeholder="例如 ASN-M2-PC-0002"/, "ASN 样例只允许作为 placeholder");
   assert.match(dialogSource, /<ProductLookupField[\s\S]*placeholder="例如 P-M2-002"[\s\S]*required/, "商品编码样例只允许作为 ProductLookupField placeholder");
   assert.match(dialogSource, /<TextField label="预报数量" type="number" required placeholder="例如 60"/, "预报数量样例只允许作为 placeholder");

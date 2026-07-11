@@ -8,83 +8,38 @@ import {
   type SystemDictionaryPaneItem,
   type Supplier,
   type Warehouse,
+  type WarehouseZone,
   type WarehouseRef,
 } from "./types";
 
-export function warehouseZoneRowsFromLocations(
-  locations: readonly MasterDataRow[],
-): MasterDataRow[] {
-  const zones = new Map<
-    string,
-    {
-      owner: string;
-      warehouseId: string;
-      warehouse: string;
-      zoneId: string;
-      zone: string;
-      areas: Set<string>;
-      locationCount: number;
-      availableLocationCount: number;
-      createdAt: string;
-      updatedAt: string;
-    }
-  >();
-
-  for (const location of locations) {
-    const fields = location.locationFields;
-    if (!fields || fields.warehouseId === "-" || fields.zoneId === "-") continue;
-    const owner = fields.owner === "-" ? location.ownerId : fields.owner;
-    const key = `${owner}:${fields.warehouseId}:${fields.zoneId}`;
-    const current = zones.get(key);
-    const areas = current?.areas ?? new Set<string>();
-    if (fields.area && fields.area !== "-") areas.add(fields.area);
-    zones.set(key, {
-      owner,
-      warehouseId: fields.warehouseId,
-      warehouse: fields.warehouse,
-      zoneId: fields.zoneId,
-      zone: fields.zone,
-      areas,
-      locationCount: (current?.locationCount ?? 0) + 1,
-      availableLocationCount:
-        (current?.availableLocationCount ?? 0) + (location.status === "available" ? 1 : 0),
-      createdAt: current ? minText(current.createdAt, location.createdAt) : location.createdAt,
-      updatedAt: current ? maxText(current.updatedAt, location.updatedAt) : location.updatedAt,
-    });
-  }
-
-  return Array.from(zones.values())
-    .sort((left, right) =>
-      `${left.warehouse}:${left.zone}`.localeCompare(`${right.warehouse}:${right.zone}`, "zh-CN"),
-    )
-    .map((zone) => {
-      const zoneCode = zoneDisplayCode(zone.areas, zone.zoneId, zone.zone);
-      return row({
-        id: `${zone.owner}:${zone.warehouseId}:${zone.zoneId}`,
-        code: zoneCode,
-        name: `库区 ${zoneCode}`,
-        status: "derived_readonly",
-        statusLabel: "只读派生",
-        ownerId: zone.owner,
-        primaryLabel: "仓库",
-        primaryValue: zone.warehouse,
-        secondaryLabel: "库区",
-        secondaryValue: zoneCode,
-        extraLabel: "库位数",
-        extraValue: `${zone.locationCount} 个 / 可用 ${zone.availableLocationCount} 个`,
-        createdAt: zone.createdAt,
-        updatedAt: zone.updatedAt,
-        zoneFields: {
-          owner: zone.owner,
-          warehouse: zone.warehouse,
-          warehouseId: zone.warehouseId,
-          zone: zoneCode,
-          zoneId: zone.zoneId,
-          locationCount: String(zone.locationCount),
-          availableLocationCount: String(zone.availableLocationCount),
-        },
-      });
-    });
+export function warehouseZoneRow(item: WarehouseZone, warehouses: ReadonlyMap<string, WarehouseRef>): MasterDataRow {
+  const warehouse = warehouses.get(item.warehouse_id);
+  const warehouseLabel = warehouse ? `${warehouse.code} · ${warehouse.name}` : shortId(item.warehouse_id);
+  return row({
+    id: item.id,
+    code: item.zone_code,
+    name: item.zone_name,
+    status: item.status,
+    statusLabel: activeStatusLabel(item.status),
+    ownerId: item.owner_id,
+    primaryLabel: "仓库",
+    primaryValue: warehouseLabel,
+    secondaryLabel: "温区",
+    secondaryValue: item.temperature_zone,
+    extraLabel: "色标",
+    extraValue: item.quality_color,
+    createdAt: item.created_at,
+    updatedAt: item.updated_at,
+    zoneFields: {
+      owner: item.owner_id,
+      warehouse: warehouseLabel,
+      warehouseId: item.warehouse_id,
+      zone: item.zone_name,
+      zoneId: item.id,
+      locationCount: "-",
+      availableLocationCount: "-",
+    },
+  });
 }
 
 export function productRow(item: Product): MasterDataRow {
@@ -425,14 +380,6 @@ function locationAreaCode(locationCode: string) {
 export function idempotencyKey(prefix: string) {
   const random = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
   return `${prefix}-${random}`;
-}
-
-function minText(left: string, right: string) {
-  return left <= right ? left : right;
-}
-
-function maxText(left: string, right: string) {
-  return left >= right ? left : right;
 }
 
 function shortId(value: string) {

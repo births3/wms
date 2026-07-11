@@ -99,7 +99,7 @@ export function defaultStatusFilter(mode: M2InboundMode): StatusFilter {
 export function statusFilterOptions(mode: M2InboundMode): StatusFilterOption[] {
   const options: Record<M2InboundMode, StatusFilterOption[]> = {
     receiving: [
-      { value: "receiving", label: "待收货/收货中" },
+      { value: "receiving", label: "草稿/待收货/收货中" },
       { value: "closed_rejected", label: "已关闭(拒收)" },
     ],
     inspecting: [{ value: "inspecting", label: "验收中" }],
@@ -114,6 +114,7 @@ export function statusFilterOptions(mode: M2InboundMode): StatusFilterOption[] {
 export function statusColumnFilterOptions(mode: M2InboundMode): Array<{ value: string; label: string }> {
   const options: Record<M2InboundMode, Array<{ value: string; label: string }>> = {
     receiving: [
+      { value: "draft", label: "草稿" },
       { value: "released", label: "待收货" },
       { value: "receiving", label: "收货中" },
       { value: "closed_rejected", label: "已关闭(拒收)" },
@@ -165,6 +166,10 @@ export const INSPECTION_DUAL_SIGN_REQUIRED_BY_STRATEGY = true;
 
 export function canReceiveOrReject(status: string) {
   return status === "released" || status === "receiving";
+}
+
+export function canRelease(status: string) {
+  return status === "draft";
 }
 
 /** 验收：仅收货中/已收/验收中等可作业状态；终态禁用。 */
@@ -258,7 +263,7 @@ export function formatDateTime(value: string | null | undefined) {
 function matchesStatusFilter(status: string | null | undefined, filter: StatusFilter | null | undefined) {
   if (!filter || filter.length === 0) return true;
   if (!status) return false;
-  return filter.some((item) => (item === "receiving" ? canReceiveOrReject(status) : status === item));
+  return filter.some((item) => (item === "receiving" ? canRelease(status) || canReceiveOrReject(status) : status === item));
 }
 
 function matchesOwnerFilter(ownerId: string | null | undefined, normalizedOwner: string, ownerContext?: OwnerContext) {

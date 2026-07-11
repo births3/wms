@@ -84,6 +84,14 @@ async function receiveReceivingOrder(input: {
   return result.data;
 }
 
+async function releaseReceivingOrder(id: string) {
+  const result = await api.POST("/api/v1/inbound/receiving-orders/{id}/release", {
+    params: { path: { id }, header: { "Idempotency-Key": idempotencyKey("web-m2-release") } },
+  });
+  if (!result.data) throw new ApiError(result.error, "放行 ASN 失败", result.response.status);
+  return result.data;
+}
+
 async function rejectReceivingOrder(input: {
   id: string;
   request: RejectReceivingOrderRequest;
@@ -184,6 +192,14 @@ export function useReceiveReceivingOrderMutation() {
   return useMutation({
     mutationFn: receiveReceivingOrder,
     onSuccess: (_data, input) => invalidate(input.id),
+  });
+}
+
+export function useReleaseReceivingOrderMutation() {
+  const invalidate = useInvalidateReceivingOrders();
+  return useMutation({
+    mutationFn: releaseReceivingOrder,
+    onSuccess: (_data, id) => invalidate(id),
   });
 }
 

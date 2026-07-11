@@ -9,6 +9,7 @@ import {
   type CreateProductRequest,
   type CreateSupplierRequest,
   type CreateWarehouseRequest,
+  type CreateWarehouseZoneRequest,
   type MasterDataRow,
   type MasterDataViewId,
   type SpecialDrugCategoryOption,
@@ -19,6 +20,7 @@ import {
   type UpdateProductRequest,
   type UpdateSupplierRequest,
   type UpdateWarehouseRequest,
+  type UpdateWarehouseZoneRequest,
     specialDrugCategoryDictCode,
   masterDataQueryKey,
 } from "./types";
@@ -29,6 +31,7 @@ import {
   createProduct,
   createSupplier,
   createWarehouse,
+  createWarehouseZone,
   disableSystemDictionaryItem,
   listBusinessPartners,
   listCustomers,
@@ -46,6 +49,7 @@ import {
   updateProduct,
   updateSupplier,
   updateWarehouse,
+  updateWarehouseZone,
 } from "./api";
 
 const systemDictionaryGroupsQueryKey = [
@@ -154,6 +158,7 @@ export {
   createProduct,
   createSupplier,
   createWarehouse,
+  createWarehouseZone,
   listProducts,
   listCustomers,
   listSystemDictionaryItemOptions,
@@ -169,6 +174,7 @@ export {
   updateProduct,
   updateSupplier,
   updateWarehouse,
+  updateWarehouseZone,
   upsertSystemDictionaryItem,
   disableSystemDictionaryItem,
 };
@@ -180,11 +186,13 @@ export type {
   CreateProductRequest,
   CreateSupplierRequest,
   CreateWarehouseRequest,
+  CreateWarehouseZoneRequest,
   UpdateCustomerRequest,
   UpdateLocationRequest,
   UpdateProductRequest,
   UpdateSupplierRequest,
   UpdateWarehouseRequest,
+  UpdateWarehouseZoneRequest,
 };
 
 

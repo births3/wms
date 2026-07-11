@@ -8,6 +8,7 @@ import {
   type CreateProductRequest,
   type CreateSupplierRequest,
   type CreateWarehouseRequest,
+  type CreateWarehouseZoneRequest,
   type DisableSystemDictionaryItemRequest,
   type MasterDataRow,
   type Product,
@@ -20,6 +21,7 @@ import {
   type UpdateProductRequest,
   type UpdateSupplierRequest,
   type UpdateWarehouseRequest,
+  type UpdateWarehouseZoneRequest,
   type UpsertSystemDictionaryItemRequest,
   type WarehouseRef,
   specialDrugCategoryDictCode,
@@ -35,7 +37,7 @@ import {
   systemDictionaryRow,
   warehouseRefFromWarehouse,
   warehouseRow,
-  warehouseZoneRowsFromLocations,
+  warehouseZoneRow,
 } from "./mappers";
 
 const systemDictionaryDefinitions = [
@@ -112,7 +114,33 @@ export async function listLocations(): Promise<MasterDataRow[]> {
 }
 
 export async function listWarehouseZones(): Promise<MasterDataRow[]> {
-  return warehouseZoneRowsFromLocations(await listLocations());
+  const [result, warehouses] = await Promise.all([
+    api.GET("/api/v1/master-data/warehouse-zones"),
+    listWarehouseRefs(),
+  ]);
+  if (!result.data) throw new ApiError(result.error, "读取库区档案失败", result.response.status);
+  return result.data.data.map((zone) => warehouseZoneRow(zone, warehouses));
+}
+
+export async function createWarehouseZone(request: CreateWarehouseZoneRequest): Promise<MasterDataRow> {
+  const result = await api.POST("/api/v1/master-data/warehouse-zones", {
+    body: request,
+    params: { header: { "Idempotency-Key": idempotencyKey("warehouse-zone-create") } },
+  });
+  if (!result.data) throw new ApiError(result.error, "新建库区失败", result.response.status);
+  return warehouseZoneRow(result.data, await listWarehouseRefs());
+}
+
+export async function updateWarehouseZone(input: { id: string; request: UpdateWarehouseZoneRequest }): Promise<MasterDataRow> {
+  const result = await api.PATCH("/api/v1/master-data/warehouse-zones/{id}", {
+    params: {
+      path: { id: input.id },
+      header: { "Idempotency-Key": idempotencyKey(`warehouse-zone-update-${input.id}`) },
+    },
+    body: input.request,
+  });
+  if (!result.data) throw new ApiError(result.error, "保存库区失败", result.response.status);
+  return warehouseZoneRow(result.data, await listWarehouseRefs());
 }
 
 export async function batchCreateLocations(

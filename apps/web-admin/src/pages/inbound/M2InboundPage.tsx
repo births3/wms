@@ -13,6 +13,7 @@ import {
   useCreateReceivingOrderMutation,
   useInspectReceivingOrderMutation,
   usePutawayReceivingOrderMutation,
+  useReleaseReceivingOrderMutation,
   useReceiveReceivingOrderMutation,
   useReceivingOrderQuery,
   useReceivingOrdersQuery,
@@ -211,6 +212,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
 
   const createMutation = useCreateReceivingOrderMutation();
   const receiveMutation = useReceiveReceivingOrderMutation();
+  const releaseMutation = useReleaseReceivingOrderMutation();
   const rejectMutation = useRejectReceivingOrderMutation();
   const inspectMutation = useInspectReceivingOrderMutation();
   const signMutation = useSignReceivingOrderMutation();
@@ -283,6 +285,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
   const currentTemperatureControl = temperatureControlFromProductAttribute(currentProductTemperatureAttribute);
   const pending =
     createMutation.isPending ||
+    releaseMutation.isPending ||
     receiveMutation.isPending ||
     rejectMutation.isPending ||
     inspectMutation.isPending ||
@@ -290,6 +293,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
     putawayMutation.isPending;
   const error =
     createMutation.error ??
+    releaseMutation.error ??
     receiveMutation.error ??
     rejectMutation.error ??
     inspectMutation.error ??
@@ -412,6 +416,11 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
     });
     setActiveDialog(null);
     setLastEvent(`${order.receipt_no} 收货已提交`);
+  }
+
+  async function releaseOrder(id: string) {
+    const released = await releaseMutation.mutateAsync(id);
+    setLastEvent(`${released.receipt_no} 已放行`);
   }
 
   async function submitReject(event?: React.FormEvent<HTMLFormElement>) {
@@ -558,6 +567,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
           onSelectOrderKeys={selectOrderKeys}
           onOpenDetail={openRowDetail}
           onOpenDialog={openRowDialog}
+          onRelease={(id) => void releaseOrder(id)}
           refreshAction={tableRefreshAction}
           createAction={tableCreateAction}
           queryState={appliedQuery}
