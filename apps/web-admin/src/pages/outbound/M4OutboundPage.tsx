@@ -1,3 +1,4 @@
+// @governance: skip-page-size: M4 出库四模式共用本地种子态、状态裁剪动作与动作弹窗，待接真实 API 后拆 feature hooks
 import * as React from "react";
 import {
   Button,
@@ -25,7 +26,7 @@ import {
   type QueryPanelValue,
   type StatusKey,
 } from "@wms/ui";
-import { CheckCircle2, ClipboardCheck, Truck } from "lucide-react";
+import { CheckCircle2, ClipboardCheck, Truck, XCircle } from "lucide-react";
 
 import {
   M4OutboundDetailDialog,
@@ -68,6 +69,7 @@ type ActionKind =
   | "ship"
   | "create-return"
   | "approve-return"
+  | "reject-return"
   | "pick-return"
   | "review-return"
   | "ship-return";
@@ -75,6 +77,14 @@ type ActionKind =
 interface ActionState {
   kind: ActionKind;
   targetId?: string;
+}
+
+interface ActionTargetContext {
+  id: string;
+  docNo: string;
+  status: string;
+  statusText: string;
+  kindLabel: string;
 }
 
 const ownerId = "00000000-0000-0000-0000-000000000001";
@@ -153,6 +163,7 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
   const [activeAction, setActiveAction] = React.useState<ActionState | null>(null);
   const [lastEvent, setLastEvent] = React.useState<string | null>(null);
   const [note, setNote] = React.useState("");
+  const [actionError, setActionError] = React.useState<string | null>(null);
   const [createForm, setCreateForm] = React.useState({
     wmsOrderNo: "SO-M4-PC-NEW",
     erpOrderNo: "ERP-SO-NEW",
@@ -311,13 +322,54 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
   function openAction(kind: ActionKind, targetId?: string) {
     setActiveAction({ kind, targetId });
     setNote("");
+    setActionError(null);
+  }
+
+  function resolveActionTarget(action: ActionState | null): ActionTargetContext | null {
+    if (!action?.targetId) return null;
+    const order = orders.find((item) => item.id === action.targetId);
+    if (order) {
+      return {
+        id: order.id,
+        docNo: order.wms_order_no,
+        status: order.status,
+        statusText: statusLabel(order.status),
+        kindLabel: "出库单",
+      };
+    }
+    const wave = waves.find((item) => item.id === action.targetId);
+    if (wave) {
+      return {
+        id: wave.id,
+        docNo: wave.wave_no,
+        status: wave.status,
+        statusText: statusLabel(wave.status),
+        kindLabel: "波次",
+      };
+    }
+    const returnOrder = returns.find((item) => item.id === action.targetId);
+    if (returnOrder) {
+      return {
+        id: returnOrder.id,
+        docNo: returnOrder.return_no,
+        status: returnOrder.status,
+        statusText: statusLabel(returnOrder.status),
+        kindLabel: "采购退货单",
+      };
+    }
+    return null;
   }
 
   function submitAction(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!activeAction) return;
+    if (activeAction.kind === "reject-return" && !note.trim()) {
+      setActionError("驳回备注必填");
+      return;
+    }
     applyAction(activeAction);
     setActiveAction(null);
+    setActionError(null);
   }
 
   function applyAction(action: ActionState) {
@@ -354,6 +406,7 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
     if (action.kind === "release-wave") updateWave(action.targetId, "inventory_locked", "波次已下发");
     if (action.kind === "cancel-wave") updateWave(action.targetId, "cancelled", "波次已取消");
     if (action.kind === "approve-return") updateReturn(action.targetId, "approved", "采购退货审批已通过");
+    if (action.kind === "reject-return") updateReturn(action.targetId, "cancelled", "采购退货审批已驳回");
     if (action.kind === "pick-return") updateReturn(action.targetId, "picking", "采购退货拣货已完成");
     if (action.kind === "review-return") updateReturn(action.targetId, "reviewed", "采购退货复核已完成");
     if (action.kind === "ship-return") updateReturn(action.targetId, "shipped", "采购退货出库交接已完成");
@@ -512,11 +565,19 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
 
       <ActionDialog
         action={activeAction}
+        target={resolveActionTarget(activeAction)}
         createForm={createForm}
         note={note}
+        actionError={actionError}
         setCreateForm={setCreateForm}
-        setNote={setNote}
-        onClose={() => setActiveAction(null)}
+        setNote={(value) => {
+          setNote(value);
+          if (actionError) setActionError(null);
+        }}
+        onClose={() => {
+          setActiveAction(null);
+          setActionError(null);
+        }}
         onSubmit={submitAction}
       />
       <M4OutboundDetailDialog target={detailTarget} open={detailOpen} onOpenChange={setDetailOpen} />
@@ -532,32 +593,91 @@ function outboundPrivateActions(
   onAction: (kind: ActionKind, id: string) => void,
 ): DataGridToolbarAction[] {
   if (mode === "orders") {
+    const status = selectedOrder?.status;
     return [
-      toolbarAction("validate", "校验", "重新校验", <CheckCircle2 className="size-4" aria-hidden />, selectedOrder?.id, onAction),
-      toolbarAction("void", "作废", "作废申请", <ClipboardCheck className="size-4" aria-hidden />, selectedOrder?.id, onAction),
+      toolbarAction("validate", "校验", "重新校验", <CheckCircle2 className="size-4" aria-hidden />, selectedOrder?.id, onAction, canValidateOrder(status)),
+      toolbarAction("void", "作废", "作废申请", <ClipboardCheck className="size-4" aria-hidden />, selectedOrder?.id, onAction, canVoidOrder(status)),
     ];
   }
 
   if (mode === "waves") {
+    const status = selectedWave?.status;
     return [
-      toolbarAction("release-wave", "下发", "下发波次", <CheckCircle2 className="size-4" aria-hidden />, selectedWave?.id, onAction),
-      toolbarAction("cancel-wave", "取消", "取消波次", <ClipboardCheck className="size-4" aria-hidden />, selectedWave?.id, onAction),
+      toolbarAction("release-wave", "下发", "下发波次", <CheckCircle2 className="size-4" aria-hidden />, selectedWave?.id, onAction, canReleaseWave(status)),
+      toolbarAction("cancel-wave", "取消", "取消波次", <ClipboardCheck className="size-4" aria-hidden />, selectedWave?.id, onAction, canCancelWave(status)),
     ];
   }
 
   if (mode === "review") {
+    const status = selectedOrder?.status;
     return [
-      toolbarAction("review", "复核", "出库复核", <ClipboardCheck className="size-4" aria-hidden />, selectedOrder?.id, onAction),
-      toolbarAction("ship", "交接", "发货交接", <Truck className="size-4" aria-hidden />, selectedOrder?.id, onAction),
+      toolbarAction("review", "复核", "出库复核", <ClipboardCheck className="size-4" aria-hidden />, selectedOrder?.id, onAction, canReviewOrder(status)),
+      toolbarAction("ship", "交接", "发货交接", <Truck className="size-4" aria-hidden />, selectedOrder?.id, onAction, canShipOrder(status)),
     ];
   }
 
+  const status = selectedReturn?.status;
   return [
-    toolbarAction("approve-return", "审批", "采购退货审批", <CheckCircle2 className="size-4" aria-hidden />, selectedReturn?.id, onAction),
-    toolbarAction("pick-return", "拣货", "采购退货拣货", <Truck className="size-4" aria-hidden />, selectedReturn?.id, onAction),
-    toolbarAction("review-return", "复核", "采购退货复核", <ClipboardCheck className="size-4" aria-hidden />, selectedReturn?.id, onAction),
-    toolbarAction("ship-return", "出库", "采购退货出库交接", <CheckCircle2 className="size-4" aria-hidden />, selectedReturn?.id, onAction),
+    toolbarAction("approve-return", "审批", "采购退货审批", <CheckCircle2 className="size-4" aria-hidden />, selectedReturn?.id, onAction, canApproveReturn(status)),
+    toolbarAction("reject-return", "驳回", "采购退货驳回", <XCircle className="size-4" aria-hidden />, selectedReturn?.id, onAction, canRejectReturn(status)),
+    toolbarAction("pick-return", "拣货", "采购退货拣货", <Truck className="size-4" aria-hidden />, selectedReturn?.id, onAction, canPickReturn(status)),
+    toolbarAction("review-return", "复核", "采购退货复核", <ClipboardCheck className="size-4" aria-hidden />, selectedReturn?.id, onAction, canReviewReturn(status)),
+    toolbarAction("ship-return", "出库", "采购退货出库交接", <CheckCircle2 className="size-4" aria-hidden />, selectedReturn?.id, onAction, canShipReturn(status)),
   ];
+}
+
+/** 待校验 / 校验异常 / 已确认可校验；已发货禁校验 */
+function canValidateOrder(status: string | undefined) {
+  return status === "pending_validation" || status === "validation_exception" || status === "confirmed";
+}
+
+/** 未进波次可作废；已复核 / 已发货禁用作废 */
+function canVoidOrder(status: string | undefined) {
+  return status === "pending_validation" || status === "validation_exception" || status === "confirmed";
+}
+
+/** 草稿 / 待下发可下发 */
+function canReleaseWave(status: string | undefined) {
+  return status === "draft";
+}
+
+/** 未完成拣选可取消（draft / released）；已取消禁用 */
+function canCancelWave(status: string | undefined) {
+  return status === "draft" || status === "released";
+}
+
+/** 库存锁定 / 已复核可复核；已发货禁用 */
+function canReviewOrder(status: string | undefined) {
+  return status === "inventory_locked" || status === "reviewed";
+}
+
+/** 已复核可交接；已发货禁用 */
+function canShipOrder(status: string | undefined) {
+  return status === "reviewed";
+}
+
+/** 待审批可审批 / 驳回 */
+function canApproveReturn(status: string | undefined) {
+  return status === "pending_approval";
+}
+
+function canRejectReturn(status: string | undefined) {
+  return status === "pending_approval";
+}
+
+/** 已审批可拣货；禁止待审批可拣货 */
+function canPickReturn(status: string | undefined) {
+  return status === "approved";
+}
+
+/** 拣货中可复核 */
+function canReviewReturn(status: string | undefined) {
+  return status === "picking";
+}
+
+/** 已复核可出库；禁止待审批可复核 / 交接 */
+function canShipReturn(status: string | undefined) {
+  return status === "reviewed";
 }
 
 function toolbarAction(
@@ -567,23 +687,26 @@ function toolbarAction(
   icon: React.ReactNode,
   targetId: string | undefined,
   onAction: (kind: ActionKind, id: string) => void,
+  enabledByStatus = true,
 ): DataGridToolbarAction {
   return {
     key: kind,
     label,
     description,
     icon,
-    disabled: !targetId,
+    disabled: !targetId || !enabledByStatus,
     onClick: () => {
-      if (targetId) onAction(kind, targetId);
+      if (targetId && enabledByStatus) onAction(kind, targetId);
     },
   };
 }
 
-function ActionDialog({ action, createForm, note, setCreateForm, setNote, onClose, onSubmit }: {
+function ActionDialog({ action, target, createForm, note, actionError, setCreateForm, setNote, onClose, onSubmit }: {
   action: ActionState | null;
+  target: ActionTargetContext | null;
   createForm: { wmsOrderNo: string; erpOrderNo: string; orderType: string; customerName: string; productCode: string; batchNo: string; plannedQty: string; requiredShipDate: string };
   note: string;
+  actionError: string | null;
   setCreateForm: React.Dispatch<React.SetStateAction<{ wmsOrderNo: string; erpOrderNo: string; orderType: string; customerName: string; productCode: string; batchNo: string; plannedQty: string; requiredShipDate: string }>>;
   setNote: (value: string) => void;
   onClose: () => void;
@@ -591,14 +714,28 @@ function ActionDialog({ action, createForm, note, setCreateForm, setNote, onClos
 }) {
   if (!action) return null;
   const meta = actionMeta(action.kind);
+  const isCreate = action.kind === "create-order" || action.kind === "create-wave" || action.kind === "create-return";
+  const noteRequired = action.kind === "reject-return";
+  const titleWithDocNo = !isCreate && target && (action.kind === "ship" || action.kind === "validate" || action.kind === "ship-return")
+    ? `${meta.title} · ${target.docNo}`
+    : meta.title;
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <form className="grid gap-3 md:grid-cols-2" onSubmit={onSubmit}>
           <DialogHeader className="md:col-span-2">
-            <DialogTitle>{meta.title}</DialogTitle>
-            <DialogDescription>{meta.description}</DialogDescription>
+            <DialogTitle>{titleWithDocNo}</DialogTitle>
+            <DialogDescription>
+              {meta.description}
+              {!isCreate && target ? ` 目标${target.kindLabel}：${target.docNo}（${target.statusText}）` : ""}
+            </DialogDescription>
           </DialogHeader>
+          {!isCreate && target && (
+            <div className="md:col-span-2 rounded-md border bg-muted/30 px-3 py-2 text-sm" data-testid="action-target-context">
+              <div className="font-medium">{target.kindLabel} {target.docNo}</div>
+              <div className="text-xs text-muted-foreground">当前状态：{target.statusText}</div>
+            </div>
+          )}
           {action.kind === "create-order" ? (
             <>
               <TextField label="WMS 单号" value={createForm.wmsOrderNo} onChange={(wmsOrderNo) => setCreateForm((value) => ({ ...value, wmsOrderNo }))} />
@@ -613,12 +750,21 @@ function ActionDialog({ action, createForm, note, setCreateForm, setNote, onClos
           ) : (
             <>
               <ActionExtraFields kind={action.kind} />
-              <TextField className="md:col-span-2" label="备注" value={note} onChange={setNote} />
+              <TextField
+                className="md:col-span-2"
+                label={noteRequired ? "驳回备注（必填）" : "备注"}
+                value={note}
+                onChange={setNote}
+                placeholder={noteRequired ? "请填写驳回原因" : action.kind === "approve-return" ? "可选填写审批意见" : undefined}
+              />
             </>
+          )}
+          {actionError && (
+            <p className="md:col-span-2 text-sm text-destructive" role="alert">{actionError}</p>
           )}
           <DialogFooter className="md:col-span-2">
             <DialogClose asChild><Button type="button" variant="outline">取消</Button></DialogClose>
-            <Button type="submit">{meta.submitLabel}</Button>
+            <Button type="submit" variant={action.kind === "reject-return" ? "destructive" : "default"}>{meta.submitLabel}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -648,7 +794,8 @@ function actionMeta(kind: ActionKind) {
     print: { title: "打印", description: "提交随货同行单或快递面单打印任务。", submitLabel: "提交打印" },
     ship: { title: "发货交接", description: "记录交接对象并确认发货。", submitLabel: "确认发货" },
     "create-return": { title: "新建采购退货单", description: "创建退供应商的出库申请。", submitLabel: "创建采购退货单" },
-    "approve-return": { title: "采购退货审批", description: "审批退供应商出库申请。", submitLabel: "审批通过" },
+    "approve-return": { title: "采购退货审批", description: "审批退供应商出库申请，备注可选。", submitLabel: "审批通过" },
+    "reject-return": { title: "采购退货驳回", description: "驳回退供应商出库申请，备注必填。", submitLabel: "确认驳回" },
     "pick-return": { title: "采购退货拣货", description: "记录退供应商出库拣货结果。", submitLabel: "确认拣货" },
     "review-return": { title: "采购退货复核", description: "复核退供应商商品和数量。", submitLabel: "提交复核" },
     "ship-return": { title: "采购退货出库交接", description: "确认退供应商出库交接。", submitLabel: "确认出库" },
@@ -658,7 +805,7 @@ function actionMeta(kind: ActionKind) {
 
 function statusOptions(mode: M4OutboundMode) {
   if (mode === "waves") return [["draft", "待下发"], ["released", "已下发"], ["inventory_locked", "库存锁定"], ["cancelled", "已取消"]];
-  if (mode === "returns") return [["pending_approval", "待审批"], ["approved", "已审批"], ["picking", "拣货中"], ["reviewed", "已复核"], ["shipped", "已发货"]];
+  if (mode === "returns") return [["pending_approval", "待审批"], ["approved", "已审批"], ["picking", "拣货中"], ["reviewed", "已复核"], ["shipped", "已发货"], ["cancelled", "已取消"]];
   return [["pending_validation", "待校验"], ["validation_exception", "校验异常"], ["confirmed", "已确认"], ["inventory_locked", "库存锁定"], ["reviewed", "已复核"], ["shipped", "已发货"]];
 }
 

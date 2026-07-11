@@ -122,30 +122,46 @@ export function purchaseReturnApprovalSourceLabel(value: PurchaseReturnOrder["ap
 }
 
 export function ActionExtraFields({ kind }: { kind: string }) {
-  return <>{extraActionFields(kind).map(([label, value]) => <StaticField key={label} label={label} defaultValue={value} />)}</>;
+  return (
+    <>
+      {extraActionFields(kind).map(([label, value, placeholder]) => (
+        <StaticField key={label} label={label} defaultValue={value} placeholder={placeholder} />
+      ))}
+    </>
+  );
 }
 
-function extraActionFields(kind: string): Array<[string, string]> {
+function extraActionFields(kind: string): Array<[string, string, string?]> {
   if (kind === "release-wave" || kind === "create-wave") return [["路径策略", "S 型最短路径"], ["温区", "常温"], ["容量上限", "100 单 / 10000 件"]];
   if (kind === "review") return [["工位码", "PK-STATION-01"], ["实际复核数量", "按扫码累计"], ["短拣标识", "否"], ["复核人", "当前用户"]];
-  if (kind === "ship") return [["配送方类型", "第三方快递"], ["包裹数量", "1"], ["车牌号", "沪A-12345"], ["装车温度", "冷链时必填"], ["签字", "交接双方签字"]];
-  if (kind.includes("return")) return [
-    ["单据类型", "采购退货出库"],
-    ["原采购入库单", "ASN-M2-PC-0001"],
-    ["供应商", "华东医药供应商"],
-    ["退货原因", "供应商召回"],
-    ["商品", "P-M4-001"],
-    ["数量", "3 件"],
-    ["审批来源", purchaseReturnApprovalSourceLabel("purchase_return_approval")],
-  ];
+  if (kind === "ship" || kind === "ship-return") {
+    return [
+      ["配送方类型", "第三方快递"],
+      ["包裹数量", "1"],
+      ["车牌号", "沪A-12345"],
+      ["装车温度", "", "冷链时必填"],
+      ["签字", "交接双方签字"],
+    ];
+  }
+  if (kind === "approve-return" || kind === "reject-return" || kind === "pick-return" || kind === "review-return" || kind === "create-return") {
+    return [
+      ["单据类型", "采购退货出库"],
+      ["原采购入库单", "ASN-M2-PC-0001"],
+      ["供应商", "华东医药供应商"],
+      ["退货原因", "供应商召回"],
+      ["商品", "P-M4-001"],
+      ["数量", "3 件"],
+      ["审批来源", purchaseReturnApprovalSourceLabel("purchase_return_approval")],
+    ];
+  }
   return [["校验结果", "指定批号库存充足"], ["审批来源", "企业微信"]];
 }
 
-function StaticField({ label, defaultValue }: { label: string; defaultValue: string }) {
+function StaticField({ label, defaultValue, placeholder }: { label: string; defaultValue: string; placeholder?: string }) {
   return (
     <label>
       <span className="mb-1 block text-xs text-muted-foreground">{label}</span>
-      <Input defaultValue={defaultValue} />
+      <Input defaultValue={defaultValue} placeholder={placeholder} />
     </label>
   );
 }

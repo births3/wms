@@ -97,7 +97,6 @@ function OrderDetail({ order }: { order: OutboundOrder }) {
           title="校验与配送"
           rows={[
             ["校验结果", order.status === "validation_exception" ? "校验异常" : "指定批号库存充足"],
-            ["作废审批入口", "未进波次订单可申请"],
             ["复核模式", "包装站复核"],
             ["配送方", "第三方快递"],
             ["包裹数量", "1"],
@@ -106,10 +105,10 @@ function OrderDetail({ order }: { order: OutboundOrder }) {
         <DetailBlock
           title="交接字段"
           rows={[
-            ["交接时间", "待提交"],
-            ["车牌号", "沪A-12345"],
-            ["装车温度", "冷链时必填"],
-            ["签字", "待提交"],
+            ["交接时间", order.status === "shipped" ? formatDateTime(order.updated_at) : "—"],
+            ["车牌号", order.status === "shipped" ? "沪A-12345" : "—"],
+            ["装车温度", "—"],
+            ["签字", order.status === "shipped" ? "已签字" : "—"],
           ]}
         />
       </div>
@@ -171,10 +170,10 @@ function ReturnDetail({ returnOrder }: { returnOrder: PurchaseReturnOrder }) {
         <DetailBlock
           title="出库执行"
           rows={[
-            ["审批记录", returnOrder.status === "pending_approval" ? "待审批" : "已审批"],
-            ["拣货记录", returnOrder.status === "picking" ? "拣货中" : "待提交"],
-            ["复核记录", returnOrder.status === "reviewed" ? "已复核" : "待提交"],
-            ["出库交接", returnOrder.status === "shipped" ? "已交接" : "待提交"],
+            ["审批记录", returnOrder.status === "pending_approval" ? "待审批" : returnOrder.status === "cancelled" ? "已驳回" : "已审批"],
+            ["拣货记录", returnOrder.status === "picking" || returnOrder.status === "reviewed" || returnOrder.status === "shipped" ? "已拣货" : "—"],
+            ["复核记录", returnOrder.status === "reviewed" || returnOrder.status === "shipped" ? "已复核" : "—"],
+            ["出库交接", returnOrder.status === "shipped" ? "已交接" : "—"],
           ]}
         />
       </div>
