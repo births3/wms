@@ -1,16 +1,138 @@
 //! Wave 2 M-PM parameter mapping runtime service.
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::Arc};
 
+use axum::{
+    extract::State,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    routing::post,
+    Json, Router,
+};
 use chrono::{DateTime, Utc};
 use serde_json::{Map, Value};
+use sqlx::PgPool;
+use tokio::sync::Mutex;
 use uuid::Uuid;
 use wms_domain::{
-    ExecuteMappingRequest, ExecuteMappingResponse, MappingDictionary, MappingQueueItem,
-    MappingRule, MappingTraceResponse,
+    ErrorResponse, ExecuteMappingRequest, ExecuteMappingResponse, MappingDictionary,
+    MappingQueueItem, MappingRule, MappingTraceResponse,
 };
 
-use crate::auth::AuthContext;
+use crate::{
+    audit::{append_event, AuditDiff, AuditError, AuditWriteRequest},
+    auth::{AuthContext, AuthError},
+};
+
+const EXECUTE_PERMISSION: &str = "mpm.execute";
+
+#[derive(Clone, Debug)]
+pub struct ParameterMappingAppState {
+    service: Arc<Mutex<ParameterMappingService>>,
+    pool: PgPool,
+}
+
+impl ParameterMappingAppState {
+    pub fn with_postgres(pool: PgPool) -> Self {
+        Self {
+            service: Arc::new(Mutex::new(ParameterMappingService::default())),
+            pool,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum ParameterMappingHandlerError {
+    Auth(AuthError),
+    Mapping(MappingError),
+    Audit(AuditError),
+}
+
+impl From<AuthError> for ParameterMappingHandlerError {
+    fn from(value: AuthError) -> Self {
+        Self::Auth(value)
+    }
+}
+
+impl IntoResponse for ParameterMappingHandlerError {
+    fn into_response(self) -> Response {
+        if let Self::Auth(error) = self {
+            return error.into_response();
+        }
+        let (status, code, message) = match self {
+            Self::Mapping(MappingError::RawPayloadMustBeObject) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "PM_RAW_PAYLOAD_INVALID",
+                "raw_payload must be an object".to_string(),
+            ),
+            Self::Mapping(MappingError::TraceNotFound) => (
+                StatusCode::NOT_FOUND,
+                "PM_TRACE_NOT_FOUND",
+                "mapping trace not found".to_string(),
+            ),
+            Self::Audit(error) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "PM_AUDIT_FAILED",
+                format!("failed to append mapping audit: {error:?}"),
+            ),
+            Self::Auth(_) => unreachable!(),
+        };
+        (
+            status,
+            Json(ErrorResponse {
+                code: code.to_string(),
+                message,
+                severity: "error".to_string(),
+                details: serde_json::json!({}),
+                trace_id: "unavailable".to_string(),
+                retry_hint: None,
+            }),
+        )
+            .into_response()
+    }
+}
+
+pub fn parameter_mapping_router(state: ParameterMappingAppState) -> Router {
+    Router::new()
+        .route(
+            "/api/v1/parameter-mapping/execute",
+            post(execute_mapping_handler),
+        )
+        .with_state(state)
+}
+
+async fn execute_mapping_handler(
+    ctx: AuthContext,
+    State(state): State<ParameterMappingAppState>,
+    Json(req): Json<ExecuteMappingRequest>,
+) -> Result<Json<ExecuteMappingResponse>, ParameterMappingHandlerError> {
+    ctx.require_permission(EXECUTE_PERMISSION)?;
+    let source_system = req.source_system.clone();
+    let mut service = state.service.lock().await;
+    let mut next = service.clone();
+    let result = next
+        .execute(&ctx, req, Utc::now())
+        .map_err(ParameterMappingHandlerError::Mapping)?;
+    let audit = AuditWriteRequest::from_auth_context(
+        &ctx,
+        "execute_mapping",
+        "M-PM",
+        "parameter_mapping_execution",
+        result.execution_id.to_string(),
+        Some(AuditDiff::compute(
+            serde_json::json!({"source_system": source_system}),
+            serde_json::json!({
+                "unresolved_fields": &result.unresolved_fields,
+                "queue_item_id": result.queue_item_id,
+            }),
+        )),
+    );
+    append_event(&state.pool, &audit)
+        .await
+        .map_err(ParameterMappingHandlerError::Audit)?;
+    *service = next;
+    Ok(Json(result))
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum MappingError {
