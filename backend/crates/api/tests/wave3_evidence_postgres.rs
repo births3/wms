@@ -13,7 +13,8 @@ use wms_domain::{
     CreateBillingAccountRequest, CreateBillingContractRequest, CreateBillingRuleRequest,
     CreateReceivingOrderRequest, GenerateBillingStatementRequest,
     IngestTemperatureExcursionRequest, IngestTemperatureReadingRequest,
-    InspectReceivingOrderRequest, ReceivingOrderLine, SignInspectionRequest,
+    InspectReceivingOrderRequest, PutawayRequest, ReceiveReceivingOrderRequest, ReceivingOrderLine,
+    SignInspectionRequest,
 };
 
 fn ctx(owner_id: Uuid) -> AuthContext {
@@ -295,8 +296,12 @@ async fn inspect_and_sign_receiving_order_replay_without_duplicate_audit(pool: P
         .with_ymd_and_hms(2026, 6, 4, 12, 0, 0)
         .single()
         .expect("valid time");
+    let mut request = receiving_order_req("ASN-PG-INSPECT-001");
+    request.lines[0].batch_no = None;
+    request.lines[0].production_date = None;
+    request.lines[0].expiry_date = None;
     let order = repo
-        .create_receiving_order(&ctx, receiving_order_req("ASN-PG-INSPECT-001"), now)
+        .create_receiving_order(&ctx, request, now)
         .await
         .expect("create receiving order");
     sqlx::query("UPDATE receiving_orders SET status = 'inspecting' WHERE id = $1")
@@ -340,6 +345,17 @@ async fn inspect_and_sign_receiving_order_replay_without_duplicate_audit(pool: P
         .expect("replay inspection");
     assert_eq!(first.value.id, replay.value.id);
     assert!(replay.replayed);
+    let inspected_line: (Option<String>, Option<NaiveDate>, Option<NaiveDate>) = sqlx::query_as(
+        "SELECT batch_no, production_date, expiry_date FROM receiving_order_lines WHERE receiving_order_id = $1 AND owner_id = $2",
+    )
+    .bind(order.id)
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("inspection should persist confirmed batch dates on the order line");
+    assert_eq!(inspected_line.0.as_deref(), Some("B202606"));
+    assert_eq!(inspected_line.1, NaiveDate::from_ymd_opt(2026, 1, 1));
+    assert_eq!(inspected_line.2, NaiveDate::from_ymd_opt(2028, 1, 1));
 
     let sign_req = SignInspectionRequest {
         first_signer_id: Uuid::new_v4(),
@@ -386,6 +402,117 @@ async fn inspect_and_sign_receiving_order_replay_without_duplicate_audit(pool: P
     .await
     .expect("inspection evidence counts");
     assert_eq!(counts, (1, 1, 1, 1, 1, 1));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn inbound_chain_persists_inventory_movement_and_audit_end_to_end(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let ctx = ctx(owner_id);
+    let repo = PgWave3Repository::new(pool.clone());
+    let now = Utc
+        .with_ymd_and_hms(2026, 7, 12, 9, 0, 0)
+        .single()
+        .expect("valid time");
+    let supplier_id = Uuid::new_v4();
+    let warehouse_id = Uuid::new_v4();
+    sqlx::query("INSERT INTO suppliers (id,owner_id,supplier_code,supplier_name,uscc,status) VALUES ($1,$2,'SUP-CHAIN','链路供应商','USCC-CHAIN','active')")
+        .bind(supplier_id).bind(owner_id).execute(&pool).await.expect("seed supplier");
+    sqlx::query("INSERT INTO warehouses (id,owner_id,warehouse_code,warehouse_name,warehouse_type,status) VALUES ($1,$2,'WH-CHAIN','链路仓','normal','active')")
+        .bind(warehouse_id).bind(owner_id).execute(&pool).await.expect("seed warehouse");
+    let mut request = receiving_order_req("ASN-CHAIN-001");
+    request.supplier_id = Some(supplier_id);
+    request.warehouse_id = warehouse_id;
+    request.lines[0].batch_no = None;
+    request.lines[0].production_date = None;
+    request.lines[0].expiry_date = None;
+    let order = repo
+        .create_receiving_order(&ctx, request, now)
+        .await
+        .expect("create ASN");
+    repo.release_receiving_order_with_audit(
+        &ctx,
+        order.id,
+        now,
+        Some("chain-release"),
+        Some(audit(&ctx, "release", "M2", "receiving_order")),
+    )
+    .await
+    .expect("release ASN");
+    repo.receive_receiving_order_with_audit(
+        &ctx,
+        order.id,
+        ReceiveReceivingOrderRequest {
+            actual_qty: 10,
+            shortage_qty: 0,
+            rejected_qty: 0,
+            arrival_temperature_celsius: Some(5.0),
+            exception_note: None,
+        },
+        now,
+        "chain-receive",
+        Some(audit(&ctx, "receive", "M2", "receiving_receipt")),
+    )
+    .await
+    .expect("receive ASN");
+    repo.inspect_receiving_order_with_audit(
+        &ctx,
+        order.id,
+        InspectReceivingOrderRequest {
+            batch_no: "B-CHAIN-001".into(),
+            accepted_qty: 10,
+            rejected_qty: 0,
+            production_date: "2026-01-01".into(),
+            expiry_date: "2028-01-01".into(),
+            quality_status: STATUS_QUALIFIED.into(),
+            trace_codes: vec!["TRACE-CHAIN-001".into()],
+        },
+        now.date_naive(),
+        now,
+        "chain-inspect",
+        Some(audit(&ctx, "inspect", "M2", "receiving_inspection")),
+    )
+    .await
+    .expect("inspect ASN");
+    repo.sign_receiving_order_with_audit(
+        &ctx,
+        order.id,
+        SignInspectionRequest {
+            first_signer_id: Uuid::new_v4(),
+            second_signer_id: Some(Uuid::new_v4()),
+            dual_required: true,
+        },
+        now,
+        "chain-sign",
+        Some(audit(&ctx, "sign", "M2", "receiving_inspection_signature")),
+    )
+    .await
+    .expect("dual sign ASN");
+    repo.putaway_receiving_order_and_inventory_with_audit(
+        &ctx,
+        order.id,
+        PutawayRequest {
+            batch_no: "B-CHAIN-001".into(),
+            product_code: "P-001".into(),
+            qty: 10,
+            location_id: Uuid::new_v4(),
+            location_code: "A01-01-01-01".into(),
+            quality_status: STATUS_QUALIFIED.into(),
+        },
+        now,
+        "chain-putaway",
+        Some(audit(&ctx, "putaway", "M2", "receiving_order")),
+    )
+    .await
+    .expect("putaway ASN");
+
+    let result: (String, i64, i64, i64, i64) = sqlx::query_as(r#"SELECT
+        (SELECT status FROM receiving_orders WHERE owner_id=$1 AND id=$2),
+        (SELECT COALESCE(SUM(qty_on_hand),0)::BIGINT FROM inventory_batches WHERE owner_id=$1 AND batch_no='B-CHAIN-001'),
+        (SELECT COUNT(*) FROM inventory_movements WHERE owner_id=$1 AND source_document_id=$2),
+        (SELECT COUNT(*) FROM audit_event WHERE owner_id=$1 AND action IN ('release','receive','inspect','sign','putaway')),
+        (SELECT COUNT(*) FROM idempotency_request WHERE owner_id=$1 AND idempotency_key LIKE 'chain-%')"#)
+        .bind(owner_id).bind(order.id).fetch_one(&pool).await.expect("query complete chain");
+    assert_eq!(result, ("completed".into(), 10, 1, 5, 5));
 }
 
 #[sqlx::test(migrations = "../../migrations")]

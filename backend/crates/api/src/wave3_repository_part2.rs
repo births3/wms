@@ -76,6 +76,30 @@ pub async fn inspect_receiving_order_with_audit(
         .await
         .map_err(map_db_error)?;
 
+        let updated_line = sqlx::query(
+            r#"
+            UPDATE receiving_order_lines
+               SET batch_no = $3, production_date = $4, expiry_date = $5
+             WHERE id = (
+                SELECT id FROM receiving_order_lines
+                 WHERE receiving_order_id = $1 AND owner_id = $2
+                 ORDER BY line_no
+                 LIMIT 1
+             )
+            "#,
+        )
+        .bind(id)
+        .bind(ctx.owner_id)
+        .bind(&req.batch_no)
+        .bind(production_date)
+        .bind(expiry_date)
+        .execute(&mut *tx)
+        .await
+        .map_err(map_db_error)?;
+        if updated_line.rows_affected() != 1 {
+            return Err(Wave3RepositoryError::NotFound);
+        }
+
         store_idempotency_success(
             &mut tx,
             ctx.owner_id,
