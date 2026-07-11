@@ -2,8 +2,7 @@
 """capture_visual_snapshots.py — chrome headless 自动 fullpage 截图
 
 用法：
-  cd prototypes && pnpm dev &     # 先起 vite
-  python3 scripts/governance/capture_visual_snapshots.py [--port 5173]
+  python3 scripts/governance/capture_visual_snapshots.py [--port 5173] [--start-server]
   → 输出到 prototypes/.visual-snapshots/<tab>.png
 
 机制：
@@ -18,11 +17,13 @@
 from __future__ import annotations
 
 import argparse
+import os
 import re
+import signal
 import shutil
 import subprocess
 import sys
-import tempfile
+import time
 from pathlib import Path
 
 _THIS = Path(__file__).resolve()
@@ -61,6 +62,35 @@ def _check_vite(port: int) -> bool:
         return False
 
 
+def _start_vite(port: int) -> subprocess.Popen:
+    process = subprocess.Popen(
+        ["pnpm", "exec", "vite", "--host", "127.0.0.1", "--port", str(port), "--strictPort"],
+        cwd=REPO_ROOT / "prototypes",
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    for _ in range(120):
+        if process.poll() is not None:
+            raise RuntimeError(f"vite 启动失败或端口 {port} 已被占用")
+        if _check_vite(port):
+            return process
+        time.sleep(0.25)
+    _stop_process(process)
+    raise RuntimeError(f"vite 在端口 {port} 启动超时")
+
+
+def _stop_process(process: subprocess.Popen) -> None:
+    if process.poll() is not None:
+        return
+    os.killpg(process.pid, signal.SIGTERM)
+    try:
+        process.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        os.killpg(process.pid, signal.SIGKILL)
+        process.wait(timeout=10)
+
+
 def _measure_page_height(chrome: str, url: str, width: int, fallback_height: int) -> int:
     """用 JS 查询页面真实高度。失败回退到 fallback_height。"""
     js_html = (
@@ -78,6 +108,7 @@ def _measure_page_height(chrome: str, url: str, width: int, fallback_height: int
 
 
 def _capture(chrome: str, url: str, width: int, height: int, out_file: Path) -> tuple[bool, str]:
+    out_file.unlink(missing_ok=True)
     cmd = [
         chrome,
         "--headless",
@@ -89,23 +120,22 @@ def _capture(chrome: str, url: str, width: int, height: int, out_file: Path) -> 
         f"--screenshot={out_file}",
         url,
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-    ok = out_file.exists() and out_file.stat().st_size > 0
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    except subprocess.TimeoutExpired:
+        return (False, "chrome 截图超时")
+    ok = result.returncode == 0 and out_file.exists() and out_file.stat().st_size > 0
     return (ok, result.stderr[:200] if not ok else "")
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=5173)
+    parser.add_argument("--start-server", action="store_true", help="自动启动并在结束时关闭原型 Vite")
     args = parser.parse_args()
 
     if not MANIFEST_TOML.exists():
         print(f"[ERROR] 缺少 {MANIFEST_TOML}", file=sys.stderr)
-        sys.exit(2)
-
-    if not _check_vite(args.port):
-        print(f"[ERROR] vite dev server 未运行（端口 {args.port}）", file=sys.stderr)
-        print(f"  请先在 prototypes/ 跑：pnpm dev", file=sys.stderr)
         sys.exit(2)
 
     chrome = _find_chrome()
@@ -117,37 +147,47 @@ def main():
         print("[ERROR] manifest.toml 无 [[snapshots]] 条目", file=sys.stderr)
         sys.exit(2)
 
-    print(f"▶ 截 {len(snapshots)} 个 tab（chrome: {chrome}）")
-    failed = 0
-    for snap in snapshots:
-        tab = snap["tab"]
-        url_hash = snap["url_hash"]
-        # 支持 viewport = "1500x1100" 或 "1500x1100~2000"（max-height）
-        viewport = snap["viewport"]
-        m = re.match(r"^(\d+)x(\d+)(?:~(\d+))?$", viewport)
-        if not m:
-            print(f"  ✘ {tab:20s} viewport 格式错误: {viewport}")
-            failed += 1
-            continue
-        w = int(m.group(1))
-        h = int(m.group(2))
+    vite_process = None
+    try:
+        vite_process = _start_vite(args.port) if args.start_server else None
+        if not _check_vite(args.port):
+            print(f"[ERROR] vite dev server 未运行（端口 {args.port}）", file=sys.stderr)
+            print("  请先在 prototypes/ 跑 pnpm dev，或使用 --start-server", file=sys.stderr)
+            sys.exit(2)
+        print(f"▶ 截 {len(snapshots)} 个 tab（chrome: {chrome}）")
+        failed = 0
+        for snap in snapshots:
+            tab = snap["tab"]
+            url_hash = snap["url_hash"]
+            viewport = snap["viewport"]
+            m = re.match(r"^(\d+)x(\d+)(?:~(\d+))?$", viewport)
+            if not m:
+                print(f"  ✘ {tab:20s} viewport 格式错误: {viewport}")
+                failed += 1
+                continue
+            w = int(m.group(1))
+            h = int(m.group(2))
+            out_file = OUTPUT_DIR / snap["file"]
+            url = f"http://localhost:{args.port}/{url_hash}"
+            ok, err = _capture(chrome, url, w, h, out_file)
+            if not ok:
+                print(f"  ✘ {tab:20s} 截图失败: {err}")
+                failed += 1
+            else:
+                size_kb = out_file.stat().st_size // 1024
+                print(f"  ✓ {tab:20s} {w}x{h:<5d}  {size_kb} KB")
 
-        out_file = OUTPUT_DIR / snap["file"]
-        url = f"http://localhost:{args.port}/{url_hash}"
+        print(f"\n输出目录: {OUTPUT_DIR}")
+        if failed:
+            print(f"✘ {failed} 个失败", file=sys.stderr)
+            sys.exit(1)
+        from check_visual_regression import SNAPSHOT_SOURCE_DIGEST, visual_source_digest
 
-        ok, err = _capture(chrome, url, w, h, out_file)
-        if not ok:
-            print(f"  ✘ {tab:20s} 截图失败: {err}")
-            failed += 1
-        else:
-            size_kb = out_file.stat().st_size // 1024
-            print(f"  ✓ {tab:20s} {w}x{h:<5d}  {size_kb} KB")
-
-    print(f"\n输出目录: {OUTPUT_DIR}")
-    if failed:
-        print(f"✘ {failed} 个失败", file=sys.stderr)
-        sys.exit(1)
-    print(f"✓ 全部 {len(snapshots)} 个 tab 截图完成")
+        SNAPSHOT_SOURCE_DIGEST.write_text(visual_source_digest() + "\n", encoding="utf-8")
+        print(f"✓ 全部 {len(snapshots)} 个 tab 截图完成")
+    finally:
+        if vite_process is not None:
+            _stop_process(vite_process)
 
 
 if __name__ == "__main__":

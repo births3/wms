@@ -33,6 +33,23 @@ MANIFEST_TOML = REPO_ROOT / "governance" / "visual-baselines" / "manifest.toml"
 BASELINE_DIR = REPO_ROOT / "governance" / "visual-baselines"
 SNAPSHOT_DIR = REPO_ROOT / "prototypes" / ".visual-snapshots"
 DIFF_DIR = REPO_ROOT / "prototypes" / ".visual-diffs"
+VISUAL_SOURCE_DIRS = [
+    REPO_ROOT / "prototypes" / "src",
+    REPO_ROOT / "prototypes" / "public",
+    REPO_ROOT / "packages" / "ui" / "src",
+]
+VISUAL_SOURCE_FILES = [
+    MANIFEST_TOML,
+    REPO_ROOT / "prototypes" / "package.json",
+    REPO_ROOT / "prototypes" / "index.html",
+    REPO_ROOT / "prototypes" / "postcss.config.js",
+    REPO_ROOT / "prototypes" / "tailwind.config.js",
+    REPO_ROOT / "prototypes" / "vite.config.ts",
+    REPO_ROOT / "packages" / "ui" / "package.json",
+    REPO_ROOT / "packages" / "ui" / "tailwind-preset.cjs",
+    REPO_ROOT / "pnpm-lock.yaml",
+]
+SNAPSHOT_SOURCE_DIGEST = SNAPSHOT_DIR / ".source.sha256"
 
 # 阈值
 MEAN_DIFF_WARN = 2.0
@@ -57,6 +74,45 @@ def _md5(path: Path) -> str:
         for chunk in iter(lambda: f.read(8192), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+def _source_digest(source_files: list[Path], *, root: Path = REPO_ROOT) -> str:
+    """按相对路径和内容计算确定性摘要，不受 mtime 影响。"""
+    digest = hashlib.sha256()
+    for path in sorted((path for path in source_files if path.is_file()), key=lambda item: str(item)):
+        try:
+            display = path.relative_to(root)
+        except ValueError:
+            display = path
+        digest.update(str(display).encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def visual_source_files() -> list[Path]:
+    return [
+        *VISUAL_SOURCE_FILES,
+        *[
+            path
+            for source_dir in VISUAL_SOURCE_DIRS
+            for path in source_dir.rglob("*")
+            if path.is_file()
+        ],
+    ]
+
+
+def visual_source_digest() -> str:
+    return _source_digest(visual_source_files())
+
+
+def _exit_error(message: str, *, json_mode: bool, exit_code: int) -> None:
+    if json_mode:
+        print(json.dumps({"status": "error", "errors": [message], "warnings": [], "truncations": [], "results": []}))
+    else:
+        print(f"[ERROR] {message}", file=sys.stderr)
+    sys.exit(exit_code)
 
 
 def _detect_truncation(snapshot: Path) -> tuple[bool, float]:
@@ -145,14 +201,21 @@ def main():
     args = parser.parse_args()
 
     if not MANIFEST_TOML.exists():
-        print(f"[ERROR] 缺少 {MANIFEST_TOML}", file=sys.stderr)
-        sys.exit(2)
+        _exit_error(f"缺少 {MANIFEST_TOML}", json_mode=args.json, exit_code=2)
     if not SNAPSHOT_DIR.exists() or not any(SNAPSHOT_DIR.iterdir()):
-        print(f"[ERROR] 无 snapshot：先跑 capture_visual_snapshots.py", file=sys.stderr)
-        sys.exit(2)
+        _exit_error("无 snapshot：先跑 capture_visual_snapshots.py", json_mode=args.json, exit_code=2)
 
     data = _load_toml(MANIFEST_TOML)
     snapshots = data.get("snapshots", [])
+    recorded_digest = SNAPSHOT_SOURCE_DIGEST.read_text(encoding="utf-8").strip() if SNAPSHOT_SOURCE_DIGEST.exists() else ""
+    current_digest = visual_source_digest()
+    if recorded_digest != current_digest:
+        message = "snapshot 源码摘要缺失或已变化；先运行 capture_visual_snapshots.py 生成本次构建截图"
+        if args.json:
+            print(json.dumps({"status": "fail", "errors": [message], "warnings": [], "truncations": [], "results": []}))
+        else:
+            print(f"[ERROR] {message}", file=sys.stderr)
+        sys.exit(1)
 
     results: list[dict] = []
     errors: list[str] = []
@@ -215,6 +278,7 @@ def main():
             "status": "fail" if errors else "pass",
             "errors": errors,
             "warnings": warnings,
+            "truncations": truncations,
             "results": results,
             "thresholds": {
                 "mean_diff_warn": MEAN_DIFF_WARN,
