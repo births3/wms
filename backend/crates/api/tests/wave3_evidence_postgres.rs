@@ -110,6 +110,99 @@ async fn seed_rate(
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn create_billing_account_with_audit_persists_audit_event(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let ctx = ctx(owner_id);
+    let repo = PgWave3Repository::new(pool.clone());
+    let now = Utc::now();
+
+    let account = repo
+        .create_billing_account_with_audit(
+            &ctx,
+            CreateBillingAccountRequest {
+                account_code: "BILL-AUDIT-001".to_string(),
+                account_name: "Billing audit account".to_string(),
+            },
+            now,
+            audit(&ctx, "create_account", "M9", "billing_account"),
+        )
+        .await
+        .expect("create billing account with audit");
+
+    let counts: (i64, i64) = sqlx::query_as(
+        "SELECT (SELECT COUNT(*) FROM billing_accounts WHERE id = $1), (SELECT COUNT(*) FROM audit_event WHERE owner_id = $2 AND action = 'create_account' AND resource_id = $3)",
+    )
+    .bind(account.id)
+    .bind(owner_id)
+    .bind(account.id.to_string())
+    .fetch_one(&pool)
+    .await
+    .expect("query billing account and audit evidence");
+    assert_eq!(counts, (1, 1));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn create_billing_rule_with_audit_persists_audit_event(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let ctx = ctx(owner_id);
+    let repo = PgWave3Repository::new(pool.clone());
+    let now = Utc::now();
+    let account = repo
+        .create_billing_account(
+            &ctx,
+            CreateBillingAccountRequest {
+                account_code: "BILL-AUDIT-002".to_string(),
+                account_name: "Billing rule audit account".to_string(),
+            },
+            now,
+        )
+        .await
+        .expect("create billing account");
+    let contract = repo
+        .create_billing_contract(
+            &ctx,
+            CreateBillingContractRequest {
+                account_id: account.id,
+                contract_no: "CONTRACT-AUDIT-002".to_string(),
+                valid_from: "2026-06-01".to_string(),
+                valid_to: "2026-06-30".to_string(),
+            },
+            now,
+        )
+        .await
+        .expect("create billing contract");
+
+    let rule = repo
+        .create_billing_rule_with_audit(
+            &ctx,
+            CreateBillingRuleRequest {
+                contract_id: contract.id,
+                charge_item: "storage".to_string(),
+                unit: "pallet_day".to_string(),
+                unit_price_cents: 125,
+                billing_cycle: "monthly".to_string(),
+                effective_from: "2026-06-01".to_string(),
+                effective_to: "2026-06-30".to_string(),
+            },
+            now,
+            audit(&ctx, "create_rule", "M9", "billing_rule"),
+        )
+        .await
+        .expect("create billing rule with audit");
+
+    let counts: (i64, i64) = sqlx::query_as(
+        "SELECT (SELECT COUNT(*) FROM billing_rules WHERE id = $1), (SELECT COUNT(*) FROM audit_event WHERE owner_id = $2 AND action = 'create_rule' AND resource_id = $3)",
+    )
+    .bind(rule.id)
+    .bind(owner_id)
+    .bind(rule.id.to_string())
+    .fetch_one(&pool)
+    .await
+    .expect("query billing rule and audit evidence");
+    assert_eq!(counts, (1, 1));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn expired_idempotency_key_is_not_replayed(pool: PgPool) {
     let owner_id = Uuid::new_v4();
     let ctx = ctx(owner_id);

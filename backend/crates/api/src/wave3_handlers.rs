@@ -737,6 +737,20 @@ async fn create_billing_account_handler(
 ) -> Result<Json<BillingAccount>, Wave3HandlerError> {
     ctx.require_permission("m9.write")?;
     let now = Utc::now();
+    if let Some(repository) = &state.wave3_repository {
+        let audit = AuditWriteRequest::from_auth_context(
+            &ctx,
+            "create_account",
+            "M9",
+            "billing_account",
+            "",
+            None,
+        );
+        let account = repository
+            .create_billing_account_with_audit(&ctx, req, now, audit)
+            .await?;
+        return Ok(Json(account));
+    }
     let account = {
         let mut store = state.billing_store.lock().await;
         store.create_account(&ctx, req, now)?
@@ -783,6 +797,20 @@ async fn create_billing_rule_handler(
 ) -> Result<Json<BillingRule>, Wave3HandlerError> {
     ctx.require_permission("m9.write")?;
     let now = Utc::now();
+    if let Some(repository) = &state.wave3_repository {
+        let audit = AuditWriteRequest::from_auth_context(
+            &ctx,
+            "create_rule",
+            "M9",
+            "billing_rule",
+            "",
+            None,
+        );
+        let rule = repository
+            .create_billing_rule_with_audit(&ctx, req, now, audit)
+            .await?;
+        return Ok(Json(rule));
+    }
     let rule = {
         let mut store = state.billing_store.lock().await;
         store.create_rule(&ctx, req, now)?
