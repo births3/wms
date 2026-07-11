@@ -134,7 +134,6 @@ function WaveDetail({ wave, orders }: { wave: OutboundWave; orders: OutboundOrde
           ["路径策略", "S 型最短路径"],
           ["温区", "常温"],
           ["容量上限", "100 单 / 10000 件"],
-          ["下发 / 取消入口", "列表操作按钮进入弹窗"],
           ["创建时间", formatDateTime(wave.created_at)],
         ]}
       />
@@ -158,7 +157,7 @@ function ReturnDetail({ returnOrder }: { returnOrder: PurchaseReturnOrder }) {
             ["原采购入库单", returnOrder.source_purchase_order_no],
             ["供应商", returnOrder.supplier_name],
             ["退货原因", returnOrder.reason],
-            ["审批来源", returnOrder.approval_source],
+            ["审批来源", purchaseReturnApprovalSourceLabel(returnOrder.approval_source)],
           ]}
         />
         <DetailBlock
@@ -315,6 +314,11 @@ export function statusLabel(status: string) {
 
 function purchaseReturnDocumentTypeLabel(value: PurchaseReturnOrder["document_type"]) {
   return value === "purchase_return_outbound" ? "采购退货出库" : value;
+}
+
+function purchaseReturnApprovalSourceLabel(value: PurchaseReturnOrder["approval_source"] | string) {
+  if (value === "purchase_return_approval") return "采购退货审批";
+  return value;
 }
 
 function totalPlannedQty(order: OutboundOrder) {

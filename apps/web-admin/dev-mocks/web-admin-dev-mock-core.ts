@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin } from "vite";
 
 import { handleAdminMenuDevMock } from "./admin-menu-dev-mock";
+import { handleAuditDevMock } from "./audit-dev-mock";
 import { handleH4WechatNotifyDevMock } from "./wechat-notify-dev-mock";
 import { handleH5ExpressDevMock } from "./express-dev-mock";
 import { handlePrintInventoryDevMock } from "./web-admin-dev-mock-print-inventory";
@@ -110,6 +111,9 @@ async function tryHandleDevMockRoute(
   if (pathname.startsWith("/api/v1/wechat-notify")) {
     await handleH4WechatNotifyDevMock(req, res, pathname);
     return true;
+  }
+  if (pathname.startsWith("/api/v1/audit")) {
+    if (await handleAuditDevMock(req, res, pathname)) return true;
   }
 
   if (req.method === "POST" && pathname === "/api/v1/auth/login") {
@@ -276,8 +280,19 @@ async function tryHandleDevMockRoute(
   if (await handlePrintInventoryDevMock(req, res, pathname)) return true;
 
   if (req.method === "GET" && pathname === "/api/v1/inbound/receiving-orders") {
+    // 列表始终 200；未知/空关键字查询由前端或此处按空结果处理，不暴露 DEV_MOCK_NOT_FOUND
     const data = allDevOrders();
     sendJson(res, 200, { data, page: { count: data.length, next_cursor: null } });
+    return true;
+  }
+
+  // 未单独实现的入库列表子路径：GET 返回空列表，避免「Dev mock route not found」
+  if (
+    req.method === "GET" &&
+    pathname.startsWith("/api/v1/inbound/") &&
+    !pathname.match(/^\/api\/v1\/inbound\/receiving-orders\/[^/]+$/)
+  ) {
+    sendJson(res, 200, { data: [], page: { count: 0, next_cursor: null } });
     return true;
   }
 

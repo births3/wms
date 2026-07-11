@@ -42,6 +42,7 @@ import {
   ReviewSummary,
   TextField,
   TwoLine,
+  purchaseReturnApprovalSourceLabel,
   purchaseReturnDocumentTypeLabel,
 } from "./M4OutboundPageParts";
 
@@ -687,7 +688,20 @@ function filterReturns(returns: PurchaseReturnOrder[], query: QueryPanelValue) {
   const keyword = queryString(query.keyword);
   const statuses = new Set(queryStringArray(query.statusFilter));
   const businessDate = queryRange(query.businessDate);
-  return returns.filter((item) => matches(`${item.return_no} ${item.document_type} ${item.source_purchase_order_no} ${item.supplier_name} ${item.reason} ${item.product_code} ${item.approval_source}`.toLowerCase(), keyword) && matchesStatus(item.status, statuses) && dateInRange(item.created_at, businessDate));
+  return returns.filter((item) => matches(
+    [
+      item.return_no,
+      item.document_type,
+      purchaseReturnDocumentTypeLabel(item.document_type),
+      item.source_purchase_order_no,
+      item.supplier_name,
+      item.reason,
+      item.product_code,
+      item.approval_source,
+      purchaseReturnApprovalSourceLabel(item.approval_source),
+    ].join(" ").toLowerCase(),
+    keyword,
+  ) && matchesStatus(item.status, statuses) && dateInRange(item.created_at, businessDate));
 }
 
 function matches(searchable: string, keyword: string) {

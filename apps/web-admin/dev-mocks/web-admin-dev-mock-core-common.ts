@@ -513,7 +513,9 @@ function seedDocumentType(index: number): DevOrder["document_type"] {
 }
 
 function seedOrderStatus(index: number) {
-  return index % 2 === 0 ? "released" : "receiving";
+  // 轮转状态，保证收货 / 验收 / 上架三页默认筛选下都有数据
+  const statuses = ["released", "receiving", "inspecting", "putaway", "completed", "closed_rejected"] as const;
+  return statuses[(index - 1) % statuses.length];
 }
 
 export async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {

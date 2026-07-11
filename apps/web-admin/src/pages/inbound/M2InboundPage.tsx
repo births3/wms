@@ -163,7 +163,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
   const [lastEvent, setLastEvent] = React.useState<string | null>(null);
   const [createForm, setCreateForm] = React.useState<CreateFormState>(emptyCreateForm);
   const [receiveForm, setReceiveForm] = React.useState<ReceiveFormState>({
-    actualQty: "0",
+    actualQty: "",
     shortageQty: "0",
     rejectedQty: "0",
     temperature: "",
@@ -180,8 +180,8 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
     contactIdNo: "310101199001010000",
     sealChecked: "已核对",
     filingChecked: "已核对",
-    deliveryQty: "0",
-    batchQty: "0",
+    deliveryQty: "",
+    batchQty: "",
     secondReceiverId: secondSignerId,
     note: "",
   });
@@ -294,14 +294,29 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
   React.useEffect(() => {
     if (!order) return;
     const qty = String(totalExpectedQty(order));
-    setReceiveForm((value) => ({ ...value, actualQty: qty, shortageQty: "0", rejectedQty: "0" }));
+    const firstLine = order.lines[0];
+    const batchNo = firstLine?.batch_no?.trim() ?? "";
+    setReceiveForm((value) => ({
+      ...value,
+      // 送货数量 / 实到数量默认带出订单预报数量，避免误导性 0
+      actualQty: qty,
+      deliveryQty: qty,
+      // 批号字段默认用批号+预报数量，无批号时留空由用户录入（不要默认 0）
+      batchQty: batchNo ? `${batchNo} × ${qty}` : "",
+      shortageQty: "0",
+      rejectedQty: "0",
+      temperature: "",
+      temperatureControl: temperatureControlFromProductAttribute(
+        productTemperatureAttribute(firstLine?.product_code),
+      ),
+    }));
     setRejectForm({ reason: "" });
     setInspectForm(emptyInspectForm);
     setSignForm(emptySignForm);
     setPutawayForm((value) => ({
       ...value,
-      productCode: order.lines[0]?.product_code ?? "",
-      batchNo: order.lines[0]?.batch_no ?? "BATCH-202606",
+      productCode: firstLine?.product_code ?? "",
+      batchNo: batchNo || "BATCH-202606",
       qty,
     }));
   }, [order?.id]);
@@ -504,7 +519,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
 
         {error && (
           <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            {error.message}
+            {inboundErrorMessage(error)}
           </div>
         )}
 
@@ -547,7 +562,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
           orderReceiptNo={order?.receipt_no ?? null}
           hasOrder={Boolean(order)}
           pending={pending}
-          errorMessage={error?.message}
+          errorMessage={error ? inboundErrorMessage(error) : undefined}
           productTemperatureAttribute={currentProductTemperatureAttribute}
           derivedTemperatureControl={currentTemperatureControl}
           createForm={createForm}
@@ -641,4 +656,15 @@ function queryValueFromUnknown(value: unknown): QueryPanelValue {
 
 function exampleText(value: string | number | null | undefined, fallback: string) {
   return value ? `例如 ${value}` : fallback;
+}
+
+function inboundErrorMessage(error: { code?: string; message: string }) {
+  if (
+    error.code === "DEV_MOCK_NOT_FOUND" ||
+    error.code === "INBOUND_ORDER_NOT_FOUND" ||
+    /Dev mock route not found|Receiving order not found/i.test(error.message)
+  ) {
+    return "未找到匹配的入库数据，请调整查询条件或刷新后重试";
+  }
+  return error.message;
 }

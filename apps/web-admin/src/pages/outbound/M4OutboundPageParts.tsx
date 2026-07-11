@@ -63,6 +63,11 @@ export function purchaseReturnDocumentTypeLabel(value: PurchaseReturnOrder["docu
   return value === "purchase_return_outbound" ? "采购退货出库" : value;
 }
 
+export function purchaseReturnApprovalSourceLabel(value: PurchaseReturnOrder["approval_source"] | string) {
+  if (value === "purchase_return_approval") return "采购退货审批";
+  return value;
+}
+
 export function ActionExtraFields({ kind }: { kind: string }) {
   return <>{extraActionFields(kind).map(([label, value]) => <StaticField key={label} label={label} defaultValue={value} />)}</>;
 }
@@ -78,7 +83,7 @@ function extraActionFields(kind: string): Array<[string, string]> {
     ["退货原因", "供应商召回"],
     ["商品", "P-M4-001"],
     ["数量", "3 件"],
-    ["审批来源", "purchase_return_approval"],
+    ["审批来源", purchaseReturnApprovalSourceLabel("purchase_return_approval")],
   ];
   return [["校验结果", "指定批号库存充足"], ["审批来源", "企业微信"]];
 }

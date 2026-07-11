@@ -268,20 +268,20 @@ export function M2InboundDialogs({
               <DialogTitle>收货</DialogTitle>
               <DialogDescription>{orderReceiptNo ?? "未选择入库单"}</DialogDescription>
             </DialogHeader>
-            <TextField label="送货数量" type="number" value={receiveForm.deliveryQty} onChange={(deliveryQty) => setReceiveForm((value) => ({ ...value, deliveryQty }))} />
+            <TextField label="送货数量" type="number" placeholder="默认订单预报数量" value={receiveForm.deliveryQty} onChange={(deliveryQty) => setReceiveForm((value) => ({ ...value, deliveryQty }))} />
             <TextField label="实际到货数量" type="number" value={receiveForm.actualQty} onChange={(actualQty) => setReceiveForm((value) => ({ ...value, actualQty }))} />
             <TextField label="缺货数量" type="number" value={receiveForm.shortageQty} onChange={(shortageQty) => setReceiveForm((value) => ({ ...value, shortageQty }))} />
             <TextField label="拒收数量" type="number" value={receiveForm.rejectedQty} onChange={(rejectedQty) => setReceiveForm((value) => ({ ...value, rejectedQty }))} />
-            <TextField label="批号 + 数量" value={receiveForm.batchQty} onChange={(batchQty) => setReceiveForm((value) => ({ ...value, batchQty }))} />
+            <TextField label="批号 + 数量" placeholder="例如 BATCH-202606 × 60" value={receiveForm.batchQty} onChange={(batchQty) => setReceiveForm((value) => ({ ...value, batchQty }))} />
             <ReadOnlyField label="商品温度属性" value={productTemperatureAttribute} />
             <ReadOnlyField label="温控方式" value={derivedTemperatureControl} />
             {coldChainReceiving && (
               <section className="grid gap-3 rounded-md border bg-muted/20 p-3 md:col-span-3 md:grid-cols-4">
                 <div className="text-xs font-medium text-muted-foreground md:col-span-4">冷链字段</div>
-                <TextField label="到货温度" type="number" required value={receiveForm.temperature} onChange={(temperature) => setReceiveForm((value) => ({ ...value, temperature }))} />
+                <TextField label="到货温度 (°C)" type="number" required placeholder="例如 5（单位 °C）" value={receiveForm.temperature} onChange={(temperature) => setReceiveForm((value) => ({ ...value, temperature }))} />
                 <TextField label="启运时间" type="datetime-local" required value={receiveForm.departureTime} onChange={(departureTime) => setReceiveForm((value) => ({ ...value, departureTime }))} />
                 <TextField label="到货时间" type="datetime-local" required value={receiveForm.arrivalTime} onChange={(arrivalTime) => setReceiveForm((value) => ({ ...value, arrivalTime }))} />
-                <TextField label="冷链运输方式" required value={receiveForm.transportMode} onChange={(transportMode) => setReceiveForm((value) => ({ ...value, transportMode }))} />
+                <TextField label="冷链运输方式" required placeholder="例如 冷藏车" value={receiveForm.transportMode} onChange={(transportMode) => setReceiveForm((value) => ({ ...value, transportMode }))} />
               </section>
             )}
             <TextField label="车牌号" value={receiveForm.vehicleNo} onChange={(vehicleNo) => setReceiveForm((value) => ({ ...value, vehicleNo }))} />

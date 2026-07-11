@@ -23,9 +23,20 @@ function idempotencyKey(prefix: string) {
   return `${prefix}-${random}`;
 }
 
+function isDevMockNotFound(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const code = "code" in error ? String(error.code ?? "") : "";
+  const message = "message" in error ? String(error.message ?? "") : "";
+  return code === "DEV_MOCK_NOT_FOUND" || /Dev mock route not found/i.test(message);
+}
+
 async function listReceivingOrders(): Promise<ReceivingOrder[]> {
   const result = await api.GET("/api/v1/inbound/receiving-orders");
   if (!result.data) {
+    // 空关键字 / 未实现查询路由时，dev mock 可能返回 DEV_MOCK_NOT_FOUND；业务上按空列表处理
+    if (isDevMockNotFound(result.error) || result.response.status === 404) {
+      return [];
+    }
     throw new ApiError(result.error, "读取入库单失败", result.response.status);
   }
   return result.data.data;
@@ -36,6 +47,13 @@ async function getReceivingOrder(id: string): Promise<ReceivingOrder> {
     params: { path: { id } },
   });
   if (!result.data) {
+    if (isDevMockNotFound(result.error) || result.response.status === 404) {
+      throw new ApiError(
+        { code: "INBOUND_ORDER_NOT_FOUND", message: "未找到对应入库单，请刷新列表后重试", severity: "error", details: {}, trace_id: "web-admin" },
+        "未找到对应入库单，请刷新列表后重试",
+        result.response.status,
+      );
+    }
     throw new ApiError(result.error, "读取入库单详情失败", result.response.status);
   }
   return result.data;
