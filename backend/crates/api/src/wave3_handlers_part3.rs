@@ -1,0 +1,480 @@
+use std::sync::Arc;
+
+use axum::{
+    extract::{Path, State},
+    http::{HeaderMap, StatusCode},
+    response::{IntoResponse, Response},
+    routing::{get, post},
+    Json, Router,
+};
+use chrono::Utc;
+use sha2::{Digest, Sha256};
+use sqlx::PgPool;
+use tokio::sync::Mutex;
+use uuid::Uuid;
+use wms_domain::{
+    BillingAccount, BillingContract, BillingRule, ChangeInventoryStatusRequest, ColdChainDevice,
+    CreateBillingAccountRequest, CreateBillingContractRequest, CreateBillingRuleRequest,
+    CreateColdChainDeviceRequest, CreateReceivingOrderRequest, ErrorResponse,
+    IngestTemperatureExcursionRequest, IngestTemperatureReadingRequest,
+    InspectReceivingOrderRequest, InspectionSignatureRecord, InventoryBatch,
+    InventoryBatchListResponse, PageMeta, PutawayInventoryRequest, PutawayRecord, PutawayRequest,
+    ReceiveReceivingOrderRequest, ReceivingInspectionRecord, ReceivingOrder,
+    ReceivingOrderListResponse, ReceivingOrderReceipt, RejectReceivingOrderRequest,
+    TemperatureExcursionEvent, TemperatureReading, UpdateReceivingOrderRequest,
+};
+
+use crate::{
+    audit::{AuditDiff, AuditLog, AuditWriteRequest},
+    auth::{AuthContext, AuthError},
+    billing::{BillingError, BillingStore},
+    cold_chain::{ColdChainError, ColdChainService},
+    config_center::{
+        ConfigCenterAppState, ConfigCenterError, CONFIG_FLAG_DISABLED_CODE,
+        CONFIG_FLAG_MISSING_CODE, CONFIG_FLAG_SOURCE_INVALID_CODE,
+    },
+    inbound::{ReceivingOrderError, ReceivingOrderStore},
+    inventory::{InventoryError, InventoryStore},
+    wave3_repository::{PgWave3Repository, Wave3RepositoryError},
+};
+
+#[path = "wave3_handlers/receiving_handlers.rs"]
+mod receiving_handlers;
+use receiving_handlers::apply_receiving_order_routes;
+#[cfg(test)]
+use receiving_handlers::{receive_receiving_order_handler, update_receiving_order_handler};
+
+const IDEMPOTENCY_KEY_HEADER: &str = "idempotency-key";
+const EXTERNAL_API_KEY_HEADER: &str = "x-wms-api-key";
+const COLD_CHAIN_API_KEY_SHA256_ENV: &str = "WMS_M5_COLD_CHAIN_API_KEY_SHA256";
+const COLD_CHAIN_OWNER_ID_ENV: &str = "WMS_M5_COLD_CHAIN_OWNER_ID";
+pub const INVENTORY_BATCHES_SMOKE_FLAG: &str = "m3_inventory_batches_config_center_smoke";
+
+#[derive(Clone, Debug)]
+pub struct ExternalApiKeyConfig {
+    pub key_sha256: String,
+    pub owner_id: Uuid,
+    pub actor_name: String,
+}
+
+impl ExternalApiKeyConfig {
+    pub fn from_env() -> Result<Self, Wave3HandlerError> {
+        let key_sha256 = std::env::var(COLD_CHAIN_API_KEY_SHA256_ENV)
+            .map_err(|_| Wave3HandlerError::ExternalAuthConfigMissing)?;
+        let owner_id = std::env::var(COLD_CHAIN_OWNER_ID_ENV)
+            .map_err(|_| Wave3HandlerError::ExternalAuthConfigMissing)?
+            .parse()
+            .map_err(|_| Wave3HandlerError::ExternalAuthConfigInvalid)?;
+        Ok(Self {
+            key_sha256,
+            owner_id,
+            actor_name: "external-cold-chain".to_string(),
+        })
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Wave3AppState {
+    pub inbound_store: Arc<Mutex<ReceivingOrderStore>>,
+    pub inventory_store: Arc<Mutex<InventoryStore>>,
+    pub cold_chain_service: Arc<Mutex<ColdChainService>>,
+    pub billing_store: Arc<Mutex<BillingStore>>,
+    pub audit_log: Arc<Mutex<AuditLog>>,
+    pub wave3_repository: Option<Arc<PgWave3Repository>>,
+    pub cold_chain_api_key: Option<ExternalApiKeyConfig>,
+    pub config_center_state: Option<ConfigCenterAppState>,
+}
+
+impl Default for Wave3AppState {
+    fn default() -> Self {
+        Self {
+            inbound_store: Arc::new(Mutex::new(ReceivingOrderStore::default())),
+            inventory_store: Arc::new(Mutex::new(InventoryStore::default())),
+            cold_chain_service: Arc::new(Mutex::new(ColdChainService::default())),
+            billing_store: Arc::new(Mutex::new(BillingStore::default())),
+            audit_log: Arc::new(Mutex::new(AuditLog::default())),
+            wave3_repository: None,
+            cold_chain_api_key: None,
+            config_center_state: None,
+        }
+    }
+}
+
+impl Wave3AppState {
+    pub fn with_postgres(pool: PgPool) -> Self {
+        Self {
+            wave3_repository: Some(Arc::new(PgWave3Repository::new(pool))),
+            cold_chain_api_key: ExternalApiKeyConfig::from_env().ok(),
+            ..Self::default()
+        }
+    }
+
+    pub fn with_config_center(mut self, config_center_state: ConfigCenterAppState) -> Self {
+        self.config_center_state = Some(config_center_state);
+        self
+    }
+
+    pub fn with_postgres_and_cold_chain_api_key(
+        pool: PgPool,
+        cold_chain_api_key: ExternalApiKeyConfig,
+    ) -> Self {
+        Self {
+            wave3_repository: Some(Arc::new(PgWave3Repository::new(pool))),
+            cold_chain_api_key: Some(cold_chain_api_key),
+            ..Self::default()
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Wave3HandlerError {
+    Auth(AuthError),
+    Receiving(ReceivingOrderError),
+    Inventory(InventoryError),
+    ColdChain(ColdChainError),
+    Billing(BillingError),
+    ConfigCenter(ConfigCenterError),
+    Repository(Wave3RepositoryError),
+    MissingIdempotencyKey,
+    ExternalAuthMissing,
+    ExternalAuthInvalid,
+    ExternalAuthConfigMissing,
+    ExternalAuthConfigInvalid,
+}
+
+impl From<AuthError> for Wave3HandlerError {
+    fn from(value: AuthError) -> Self {
+        Self::Auth(value)
+    }
+}
+
+impl From<ReceivingOrderError> for Wave3HandlerError {
+    fn from(value: ReceivingOrderError) -> Self {
+        Self::Receiving(value)
+    }
+}
+
+impl From<InventoryError> for Wave3HandlerError {
+    fn from(value: InventoryError) -> Self {
+        Self::Inventory(value)
+    }
+}
+
+impl From<ColdChainError> for Wave3HandlerError {
+    fn from(value: ColdChainError) -> Self {
+        Self::ColdChain(value)
+    }
+}
+
+impl From<BillingError> for Wave3HandlerError {
+    fn from(value: BillingError) -> Self {
+        Self::Billing(value)
+    }
+}
+
+impl From<ConfigCenterError> for Wave3HandlerError {
+    fn from(value: ConfigCenterError) -> Self {
+        Self::ConfigCenter(value)
+    }
+}
+
+impl From<Wave3RepositoryError> for Wave3HandlerError {
+    fn from(value: Wave3RepositoryError) -> Self {
+        Self::Repository(value)
+    }
+}
+
+impl IntoResponse for Wave3HandlerError {
+    fn into_response(self) -> Response {
+        if let Wave3HandlerError::Auth(error) = self {
+            return error.into_response();
+        }
+
+        let (status, code, message) = match self {
+            Wave3HandlerError::MissingIdempotencyKey => (
+                StatusCode::BAD_REQUEST,
+                "W3-IDEMPOTENCY-REQUIRED",
+                "缺少 Idempotency-Key",
+            ),
+            Wave3HandlerError::ExternalAuthMissing => (
+                StatusCode::UNAUTHORIZED,
+                "HINT-AUTH-MISSING",
+                "缺少外部系统 API Key",
+            ),
+            Wave3HandlerError::ExternalAuthInvalid => (
+                StatusCode::UNAUTHORIZED,
+                "HINT-AUTH-INVALID",
+                "外部系统 API Key 无效",
+            ),
+            Wave3HandlerError::ExternalAuthConfigMissing
+            | Wave3HandlerError::ExternalAuthConfigInvalid => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "HINT-AUTH-CONFIG",
+                "外部系统凭证配置不可用",
+            ),
+            Wave3HandlerError::Receiving(ReceivingOrderError::NotFound)
+            | Wave3HandlerError::Inventory(InventoryError::NotFound)
+            | Wave3HandlerError::ColdChain(ColdChainError::DeviceNotFound(_))
+            | Wave3HandlerError::Billing(BillingError::NotFound)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::NotFound) => {
+                (StatusCode::NOT_FOUND, "W3-404", "资源不存在")
+            }
+            Wave3HandlerError::ConfigCenter(ConfigCenterError::MissingFlag(_)) => (
+                StatusCode::NOT_FOUND,
+                CONFIG_FLAG_MISSING_CODE,
+                "Feature Flag 不存在",
+            ),
+            Wave3HandlerError::ConfigCenter(ConfigCenterError::DisabledFlag(_)) => (
+                StatusCode::NOT_FOUND,
+                CONFIG_FLAG_DISABLED_CODE,
+                "Feature Flag 未启用",
+            ),
+            Wave3HandlerError::Receiving(ReceivingOrderError::DuplicateReceiptNo(_))
+            | Wave3HandlerError::ColdChain(ColdChainError::DuplicateDevice(_))
+            | Wave3HandlerError::Billing(BillingError::DuplicateAccountCode(_))
+            | Wave3HandlerError::Billing(BillingError::DuplicateContractNo(_))
+            | Wave3HandlerError::Billing(BillingError::BillingRuleConflict)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::DuplicateReceipt)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::DuplicateCode)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::IdempotencyConflict)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::BillingRuleConflict) => {
+                (StatusCode::CONFLICT, "W3-409", "资源重复")
+            }
+            Wave3HandlerError::Receiving(ReceivingOrderError::EmptyLines)
+            | Wave3HandlerError::Receiving(ReceivingOrderError::InvalidStatus { .. })
+            | Wave3HandlerError::Receiving(ReceivingOrderError::QuantityClosureMismatch)
+            | Wave3HandlerError::Receiving(ReceivingOrderError::OverReceiptNotAllowed)
+            | Wave3HandlerError::Receiving(ReceivingOrderError::InvalidQuantity)
+            | Wave3HandlerError::Receiving(ReceivingOrderError::InvalidReason)
+            | Wave3HandlerError::Receiving(ReceivingOrderError::InvalidDocumentType)
+            | Wave3HandlerError::Receiving(ReceivingOrderError::BatchExpired)
+            | Wave3HandlerError::Receiving(ReceivingOrderError::SameSigner)
+            | Wave3HandlerError::Receiving(ReceivingOrderError::MissingSecondSigner)
+            | Wave3HandlerError::Inventory(InventoryError::InvalidQuantity)
+            | Wave3HandlerError::Inventory(InventoryError::ExpiredBatch)
+            | Wave3HandlerError::Inventory(InventoryError::MissingApprovalSource)
+            | Wave3HandlerError::Inventory(InventoryError::InvalidStateTransition { .. })
+            | Wave3HandlerError::ColdChain(ColdChainError::FutureTimestamp)
+            | Wave3HandlerError::Billing(BillingError::InvalidRate)
+            | Wave3HandlerError::Billing(BillingError::InvalidQuantity)
+            | Wave3HandlerError::Billing(BillingError::InvalidEffectiveWindow)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidStatus { .. })
+            | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidQuantity)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidDocumentType)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidDate(_))
+            | Wave3HandlerError::Repository(Wave3RepositoryError::BatchExpired)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::QuantityClosureMismatch)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::OverReceiptNotAllowed)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::MissingSecondSigner)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::SameSigner)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidReason)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::MissingApprovalSource)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidStateTransition {
+                ..
+            })
+            | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidEffectiveWindow)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidRate)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::FutureTimestamp) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "W3-422",
+                "业务规则校验失败",
+            ),
+            Wave3HandlerError::ConfigCenter(ConfigCenterError::InvalidFeatureFlagSource(_)) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                CONFIG_FLAG_SOURCE_INVALID_CODE,
+                "Feature Flag 读取源无效",
+            ),
+            Wave3HandlerError::Repository(Wave3RepositoryError::Audit(_))
+            | Wave3HandlerError::Repository(Wave3RepositoryError::Database(_))
+            | Wave3HandlerError::Repository(Wave3RepositoryError::Serialize(_)) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "W3-500",
+                "持久化或审计写入失败",
+            ),
+            Wave3HandlerError::Auth(_) => unreachable!("auth error returned above"),
+        };
+
+        (
+            status,
+            Json(ErrorResponse {
+                code: code.to_string(),
+                message: message.to_string(),
+                severity: "error".to_string(),
+                details: serde_json::json!({}),
+                trace_id: "unavailable".to_string(),
+                retry_hint: None,
+            }),
+        )
+            .into_response()
+    }
+}
+
+pub fn wave3_router(state: Wave3AppState) -> Router {
+    apply_receiving_order_routes()
+        .route(
+            "/api/v1/inventory/batches",
+            get(list_inventory_batches_handler),
+        )
+        .route(
+            "/api/v1/inventory/batches/putaway",
+            post(putaway_inventory_batch_handler),
+        )
+        .route(
+            "/api/v1/inventory/batches/status",
+            post(change_inventory_batch_status_handler),
+        )
+        .route(
+            "/api/v1/cold-chain/devices",
+            post(create_cold_chain_device_handler),
+        )
+        .route(
+            "/api/v1/cold-chain/readings",
+            post(ingest_temperature_reading_handler),
+        )
+        .route(
+            "/api/v1/cold-chain/excursions",
+            post(ingest_temperature_excursion_handler),
+        )
+        .route(
+            "/api/v1/billing/accounts",
+            post(create_billing_account_handler),
+        )
+        .route(
+            "/api/v1/billing/contracts",
+            post(create_billing_contract_handler),
+        )
+        .route("/api/v1/billing/rules", post(create_billing_rule_handler))
+        .with_state(state)
+}
+
+async fn list_receiving_orders_handler(
+    ctx: AuthContext,
+    State(state): State<Wave3AppState>,
+) -> Result<Json<ReceivingOrderListResponse>, Wave3HandlerError> {
+    let data = if let Some(repository) = &state.wave3_repository {
+        repository.list_receiving_orders(&ctx).await?
+    } else {
+        let store = state.inbound_store.lock().await;
+        store.list(&ctx)
+    };
+    Ok(Json(ReceivingOrderListResponse {
+        page: PageMeta {
+            count: data.len() as u32,
+            next_cursor: None,
+        },
+        data,
+    }))
+}
+
+async fn create_receiving_order_handler(
+    ctx: AuthContext,
+    State(state): State<Wave3AppState>,
+    Json(req): Json<CreateReceivingOrderRequest>,
+) -> Result<Json<ReceivingOrder>, Wave3HandlerError> {
+    ctx.require_permission("m2.write")?;
+    let now = Utc::now();
+    let order = if let Some(repository) = &state.wave3_repository {
+        repository.create_receiving_order(&ctx, req, now).await?
+    } else {
+        let mut store = state.inbound_store.lock().await;
+        store.create(&ctx, req, now)?
+    };
+    append_audit(
+        &state,
+        &ctx,
+        "create",
+        "M2",
+        "receiving_order",
+        order.id.to_string(),
+    )
+    .await;
+    Ok(Json(order))
+}
+
+async fn inspect_receiving_order_handler(
+    ctx: AuthContext,
+    State(state): State<Wave3AppState>,
+    Path(id): Path<Uuid>,
+    headers: HeaderMap,
+    Json(req): Json<InspectReceivingOrderRequest>,
+) -> Result<Json<ReceivingInspectionRecord>, Wave3HandlerError> {
+    ctx.require_permission("m2.write")?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
+    let now = Utc::now();
+    if let Some(repository) = &state.wave3_repository {
+        let audit = AuditWriteRequest::from_auth_context(
+            &ctx,
+            "inspect",
+            "M2",
+            "receiving_order",
+            id.to_string(),
+            None,
+        );
+        let outcome = repository
+            .inspect_receiving_order_with_audit(
+                &ctx,
+                id,
+                req,
+                now.date_naive(),
+                now,
+                &idempotency_key,
+                Some(audit),
+            )
+            .await?;
+        return Ok(Json(outcome.value));
+    }
+    let inspection = {
+        let mut store = state.inbound_store.lock().await;
+        store.inspect(&ctx, id, req, now.date_naive(), now)?
+    };
+    append_audit(
+        &state,
+        &ctx,
+        "inspect",
+        "M2",
+        "receiving_order",
+        id.to_string(),
+    )
+    .await;
+    Ok(Json(inspection))
+}
+
+async fn sign_receiving_order_handler(
+    ctx: AuthContext,
+    State(state): State<Wave3AppState>,
+    Path(id): Path<Uuid>,
+    headers: HeaderMap,
+    Json(req): Json<wms_domain::SignInspectionRequest>,
+) -> Result<Json<InspectionSignatureRecord>, Wave3HandlerError> {
+    ctx.require_permission("m2.write")?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
+    let now = Utc::now();
+    if let Some(repository) = &state.wave3_repository {
+        let audit = AuditWriteRequest::from_auth_context(
+            &ctx,
+            "sign",
+            "M2",
+            "receiving_order",
+            id.to_string(),
+            None,
+        );
+        let outcome = repository
+            .sign_receiving_order_with_audit(&ctx, id, req, now, &idempotency_key, Some(audit))
+            .await?;
+        return Ok(Json(outcome.value));
+    }
+    let signature = {
+        let mut store = state.inbound_store.lock().await;
+        store.sign_inspection(&ctx, id, req, now)?
+    };
+    append_audit(
+        &state,
+        &ctx,
+        "sign",
+        "M2",
+        "receiving_order",
+        id.to_string(),
+    )
+    .await;
+    Ok(Json(signature))
+}

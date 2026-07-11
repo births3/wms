@@ -482,14 +482,9 @@ mod tests {
             Err(ReceivingOrderError::NotFound)
         ));
 
-        let updated = store
-            .release(&ctx_a, created.id, now)
-            .expect("release receiving order");
-        assert_eq!(updated.status, "released");
-
         store
             .delete(&ctx_a, created.id)
-            .expect("delete receiving order");
+            .expect("delete draft receiving order");
         assert!(store.list(&ctx_a).is_empty());
     }
 

@@ -1,0 +1,422 @@
+fn location_drafts(
+    owner_id: Uuid,
+    req: &BatchCreateLocationsRequest,
+    now: DateTime<Utc>,
+) -> Result<Vec<Location>, MasterDataError> {
+    let area_code = req.area_code.trim().to_uppercase();
+    let valid_range = req.row_start >= 1
+        && req.row_start <= req.row_end
+        && req.row_end <= 99
+        && req.column_start >= 1
+        && req.column_start <= req.column_end
+        && req.column_end <= 99
+        && req.layer_start >= 1
+        && req.layer_start <= req.layer_end
+        && req.layer_end <= 99
+        && req.max_volume_cm3 >= 0
+        && req.max_sku_count > 0
+        && !req.location_type.trim().is_empty()
+        && area_code.len() == 3
+        && area_code.chars().all(|item| item.is_ascii_alphanumeric());
+    if !valid_range {
+        return Err(MasterDataError::InvalidLocationBatchRange);
+    }
+    let total_count = (req.row_end - req.row_start + 1)
+        * (req.column_end - req.column_start + 1)
+        * (req.layer_end - req.layer_start + 1);
+    if total_count > LOCATION_BATCH_MAX_COUNT {
+        return Err(MasterDataError::InvalidLocationBatchRange);
+    }
+
+    let mut locations = Vec::with_capacity(total_count as usize);
+    for row_no in req.row_start..=req.row_end {
+        for column_no in req.column_start..=req.column_end {
+            for layer_no in req.layer_start..=req.layer_end {
+                locations.push(Location {
+                    id: Uuid::new_v4(),
+                    owner_id,
+                    warehouse_id: req.warehouse_id,
+                    zone_id: req.zone_id,
+                    location_code: format!("{area_code}-{row_no:02}-{column_no:02}-{layer_no:02}"),
+                    row_no,
+                    column_no,
+                    layer_no,
+                    max_volume_cm3: req.max_volume_cm3,
+                    used_volume_cm3: 0,
+                    max_sku_count: req.max_sku_count,
+                    location_type: req.location_type.clone(),
+                    bound_owner_id: req.bound_owner_id,
+                    status: "available".to_string(),
+                    created_at: now,
+                    updated_at: now,
+                });
+            }
+        }
+    }
+    Ok(locations)
+}
+
+async fn ensure_enabled_dictionary_item(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    dict_code: &str,
+    item_code: &str,
+    now: DateTime<Utc>,
+) -> Result<(), MasterDataError> {
+    let exists: bool = sqlx::query_scalar(
+        r#"
+        WITH scoped_items AS (
+            SELECT
+                item.enabled,
+                ROW_NUMBER() OVER (
+                    PARTITION BY item.item_code
+                    ORDER BY
+                        CASE WHEN item.owner_id = $2 THEN 1 ELSE 0 END DESC,
+                        item.updated_at DESC
+                ) AS scope_rank
+              FROM system_dictionary_items item
+              JOIN system_dictionary_categories category
+                ON category.dict_code = item.dict_code
+               AND category.enabled = TRUE
+             WHERE item.dict_code = $1
+               AND item.item_code = $3
+               AND (item.owner_id IS NULL OR item.owner_id = $2)
+               AND (item.effective_from IS NULL OR item.effective_from <= $4)
+               AND (item.effective_to IS NULL OR item.effective_to > $4)
+        )
+        SELECT EXISTS (
+            SELECT 1
+              FROM scoped_items
+             WHERE scope_rank = 1
+               AND enabled = TRUE
+        )
+        "#,
+    )
+    .bind(dict_code)
+    .bind(owner_id)
+    .bind(item_code)
+    .bind(now)
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(map_db_error)?;
+    if exists {
+        Ok(())
+    } else {
+        Err(MasterDataError::InvalidLocationBatchRange)
+    }
+}
+
+async fn ensure_warehouse_zone_in_owner(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    warehouse_id: Uuid,
+    zone_id: Uuid,
+) -> Result<(), MasterDataError> {
+    let exists: bool = sqlx::query_scalar(
+        r#"
+        SELECT EXISTS (
+            SELECT 1
+              FROM warehouses warehouse
+              JOIN warehouse_zones zone
+                ON zone.owner_id = warehouse.owner_id
+               AND zone.warehouse_id = warehouse.id
+             WHERE warehouse.owner_id = $1
+               AND warehouse.id = $2
+               AND zone.id = $3
+        )
+        "#,
+    )
+    .bind(owner_id)
+    .bind(warehouse_id)
+    .bind(zone_id)
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(map_db_error)?;
+    if exists {
+        Ok(())
+    } else {
+        Err(MasterDataError::NotFound)
+    }
+}
+
+async fn existing_location_code(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    location_codes: &[String],
+) -> Result<Option<String>, MasterDataError> {
+    sqlx::query_scalar(
+        r#"
+        SELECT location_code
+          FROM warehouse_locations
+         WHERE owner_id = $1
+           AND location_code = ANY($2)
+         LIMIT 1
+        "#,
+    )
+    .bind(owner_id)
+    .bind(location_codes)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(map_db_error)
+}
+
+async fn replay_idempotency<T: DeserializeOwned>(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    idempotency_key: &str,
+    request_hash: &str,
+    now: DateTime<Utc>,
+) -> Result<Option<T>, MasterDataError> {
+    let row: Option<(String, Value, DateTime<Utc>)> = sqlx::query_as(
+        r#"
+        SELECT request_hash, response_body, expires_at
+          FROM idempotency_request
+         WHERE owner_id = $1 AND idempotency_key = $2
+         FOR UPDATE
+        "#,
+    )
+    .bind(owner_id)
+    .bind(idempotency_key)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(map_db_error)?;
+    let Some((stored_hash, response_body, expires_at)) = row else {
+        return Ok(None);
+    };
+    if expires_at <= now {
+        sqlx::query("DELETE FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = $2")
+            .bind(owner_id)
+            .bind(idempotency_key)
+            .execute(&mut **tx)
+            .await
+            .map_err(map_db_error)?;
+        return Ok(None);
+    }
+    if stored_hash != request_hash {
+        return Err(MasterDataError::IdempotencyConflict);
+    }
+    serde_json::from_value(response_body)
+        .map(Some)
+        .map_err(|error| MasterDataError::Serialize(error.to_string()))
+}
+
+async fn lock_idempotency_key(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    idempotency_key: &str,
+) -> Result<(), MasterDataError> {
+    sqlx::query("SELECT pg_advisory_xact_lock($1)")
+        .bind(idempotency_lock_id(owner_id, idempotency_key))
+        .fetch_one(&mut **tx)
+        .await
+        .map_err(map_db_error)?;
+    Ok(())
+}
+
+async fn store_idempotency_success<T: Serialize>(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    idempotency_key: &str,
+    request_hash: &str,
+    response: &T,
+    now: DateTime<Utc>,
+) -> Result<(), MasterDataError> {
+    let response_body = serde_json::to_value(response)
+        .map_err(|error| MasterDataError::Serialize(error.to_string()))?;
+    sqlx::query(
+        r#"
+        INSERT INTO idempotency_request (
+            id, owner_id, idempotency_key, request_hash, method, path,
+            status_code, response_body, resource_type, resource_id, expires_at, created_at
+        )
+        VALUES (
+            $1, $2, $3, $4, 'POST', '/api/v1/master-data/locations/batch-create',
+            200, $5, 'warehouse_location', 'batch-create', $6, $7
+        )
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(owner_id)
+    .bind(idempotency_key)
+    .bind(request_hash)
+    .bind(response_body)
+    .bind(now + Duration::hours(24))
+    .bind(now)
+    .execute(&mut **tx)
+    .await
+    .map_err(map_db_error)?;
+    Ok(())
+}
+
+async fn append_master_data_audit<T: Serialize>(
+    tx: &mut Transaction<'_, Postgres>,
+    ctx: &AuthContext,
+    action: &str,
+    resource_type: &str,
+    resource_id: Uuid,
+    response: &T,
+    now: DateTime<Utc>,
+) -> Result<(), MasterDataError> {
+    let response_body = serde_json::to_value(response)
+        .map_err(|error| MasterDataError::Serialize(error.to_string()))?;
+    let mut audit = AuditWriteRequest::from_auth_context(
+        ctx,
+        action,
+        "M1",
+        resource_type,
+        resource_id.to_string(),
+        Some(AuditDiff::compute(json!({}), response_body)),
+    );
+    audit.occurred_at = now;
+    append_event_in_tx(tx, &audit)
+        .await
+        .map(|_| ())
+        .map_err(|error| MasterDataError::Audit(format!("{error:?}")))
+}
+
+fn request_hash(value: &Value) -> Result<String, MasterDataError> {
+    let text = serde_json::to_string(value)
+        .map_err(|error| MasterDataError::Serialize(error.to_string()))?;
+    let mut hasher = Sha256::new();
+    hasher.update(text.as_bytes());
+    Ok(hex::encode(hasher.finalize()))
+}
+
+fn idempotency_lock_id(owner_id: Uuid, idempotency_key: &str) -> i64 {
+    let mut hasher = Sha256::new();
+    hasher.update(owner_id.as_bytes());
+    hasher.update([0]);
+    hasher.update(idempotency_key.as_bytes());
+    let digest = hasher.finalize();
+    let mut bytes = [0_u8; 8];
+    bytes.copy_from_slice(&digest[..8]);
+    i64::from_be_bytes(bytes)
+}
+
+impl From<ProductRow> for Product {
+    fn from(row: ProductRow) -> Self {
+        Self {
+            id: row.id,
+            owner_id: row.owner_id,
+            product_code: row.product_code,
+            product_name: row.product_name,
+            approval_no: row.approval_no,
+            spec: Some(row.specification),
+            dosage_form: row.dosage_form,
+            manufacturer: row.manufacturer,
+            special_drug_category_code: Some(row.special_drug_category),
+            status: row.status,
+            attrs: json!({ "storage_condition": row.storage_condition, "source": row.source }),
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        }
+    }
+}
+
+impl From<SupplierRow> for Supplier {
+    fn from(row: SupplierRow) -> Self {
+        Self {
+            id: row.id,
+            owner_id: row.owner_id,
+            supplier_code: row.supplier_code,
+            supplier_name: row.supplier_name,
+            license_no: Some(row.uscc),
+            contact_name: row.contact_name,
+            source: row.source,
+            status: row.status,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        }
+    }
+}
+
+impl From<CustomerRow> for Customer {
+    fn from(row: CustomerRow) -> Self {
+        Self {
+            id: row.id,
+            owner_id: row.owner_id,
+            customer_code: row.customer_code,
+            customer_name: row.customer_name,
+            license_no: None,
+            source: row.source,
+            status: row.status,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        }
+    }
+}
+
+impl From<WarehouseRow> for Warehouse {
+    fn from(row: WarehouseRow) -> Self {
+        Self {
+            id: row.id,
+            owner_id: row.owner_id,
+            warehouse_code: row.warehouse_code,
+            warehouse_name: row.warehouse_name,
+            status: row.status,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        }
+    }
+}
+
+impl From<LocationRow> for Location {
+    fn from(row: LocationRow) -> Self {
+        Self {
+            id: row.id,
+            owner_id: row.owner_id,
+            warehouse_id: row.warehouse_id,
+            zone_id: row.zone_id,
+            location_code: row.location_code,
+            row_no: row.row_no,
+            column_no: row.column_no,
+            layer_no: row.layer_no,
+            max_volume_cm3: row.max_volume_cm3,
+            used_volume_cm3: row.used_volume_cm3,
+            max_sku_count: row.max_sku_count,
+            location_type: row.location_type,
+            bound_owner_id: row.bound_owner_id,
+            status: row.status,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        }
+    }
+}
+
+fn map_db_error(error: sqlx::Error) -> MasterDataError {
+    MasterDataError::Database(error.to_string())
+}
+
+fn string_attr(attrs: &Value, key: &str) -> Option<String> {
+    attrs
+        .get(key)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+}
+
+fn non_empty_or(value: Option<String>, default_value: &str) -> String {
+    value
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| default_value.to_string())
+}
+
+fn map_location_write_error(error: sqlx::Error) -> MasterDataError {
+    if let sqlx::Error::Database(db_error) = &error {
+        if db_error.code().as_deref() == Some("23505") {
+            return MasterDataError::DuplicateLocationCode("warehouse_location".to_string());
+        }
+    }
+    map_db_error(error)
+}
+
+fn map_catalog_write_error(error: sqlx::Error, code: &str) -> MasterDataError {
+    if let sqlx::Error::Database(db_error) = &error {
+        if db_error.code().as_deref() == Some("23505") {
+            return MasterDataError::DuplicateCode(code.to_string());
+        }
+    }
+    map_db_error(error)
+}
