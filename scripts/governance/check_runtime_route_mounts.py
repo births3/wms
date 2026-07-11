@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -23,6 +24,8 @@ REPO_ROOT = _THIS.parent.parent.parent
 OPENAPI_JSON = REPO_ROOT / "shared" / "openapi" / "openapi.json"
 WMS_API_RS = REPO_ROOT / "backend" / "crates" / "api" / "src" / "bin" / "wms_api.rs"
 API_LIB_RS = REPO_ROOT / "backend" / "crates" / "api" / "src" / "lib.rs"
+API_SRC = REPO_ROOT / "backend" / "crates" / "api" / "src"
+HTTP_METHODS = {"get", "post", "put", "patch", "delete"}
 
 
 @dataclass(frozen=True)
@@ -54,6 +57,21 @@ ROUTE_MOUNT_SPECS = (
     ),
 )
 
+STRICT_ROUTE_MOUNT_SPECS = (
+    RouteMountSpec(
+        name="M6 报表",
+        openapi_path="/api/v1/reports/query",
+        tokens=("reports_router(", "ReportsAppState", "reports_handlers"),
+        files=(REPO_ROOT / "backend" / "crates" / "api" / "src" / "reports_handlers.rs",),
+    ),
+    RouteMountSpec(
+        name="M-PM 参数对照",
+        openapi_path="/api/v1/parameter-mapping/execute",
+        tokens=("parameter_mapping_router(", "ParameterMappingAppState", "parameter_mapping_handlers"),
+        files=(REPO_ROOT / "backend" / "crates" / "api" / "src" / "parameter_mapping_handlers.rs",),
+    ),
+)
+
 
 def rel(path: Path) -> str:
     return path.relative_to(REPO_ROOT).as_posix()
@@ -67,7 +85,79 @@ def load_openapi_paths() -> set[str]:
     return set(paths)
 
 
-def scan() -> list[Issue]:
+def load_openapi_operations() -> set[str]:
+    payload = json.loads(OPENAPI_JSON.read_text(encoding="utf-8"))
+    paths = payload.get("paths", {})
+    if not isinstance(paths, dict):
+        raise ValueError("shared/openapi/openapi.json 缺少 paths 对象")
+    return {
+        f"{method.upper()} {path}"
+        for path, item in paths.items()
+        if isinstance(item, dict)
+        for method in item
+        if method in HTTP_METHODS
+    }
+
+
+def _route_calls(source: str) -> list[str]:
+    calls: list[str] = []
+    cursor = 0
+    while (start := source.find(".route(", cursor)) >= 0:
+        index = start + len(".route(")
+        depth = 1
+        quoted = False
+        escaped = False
+        while index < len(source) and depth:
+            char = source[index]
+            if quoted:
+                if escaped:
+                    escaped = False
+                elif char == "\\":
+                    escaped = True
+                elif char == '"':
+                    quoted = False
+            elif char == '"':
+                quoted = True
+            elif char == "(":
+                depth += 1
+            elif char == ")":
+                depth -= 1
+            index += 1
+        if depth == 0:
+            calls.append(source[start + len(".route("):index - 1])
+        cursor = max(index, start + len(".route("))
+    return calls
+
+
+def operations_from_sources(sources: list[str]) -> set[str]:
+    operations: set[str] = set()
+    for source in sources:
+        for call in _route_calls(source):
+            path_match = re.match(r'\s*"([^"]+)"\s*,', call)
+            if not path_match:
+                continue
+            path = re.sub(r":([A-Za-z_][A-Za-z0-9_]*)", r"{\1}", path_match.group(1))
+            handler_expression = call[path_match.end():]
+            for method in HTTP_METHODS:
+                if re.search(rf"\b{method}\s*\(", handler_expression):
+                    operations.add(f"{method.upper()} {path}")
+    return operations
+
+
+def runtime_operations() -> set[str]:
+    entry = WMS_API_RS.read_text(encoding="utf-8").split("#[cfg(test)]", 1)[0]
+    mounted_routers = set(re.findall(r"\.merge\(\s*([a-zA-Z0-9_]+_router)\s*\(", entry))
+    sources = [entry]
+    for path in API_SRC.glob("*.rs"):
+        if path == WMS_API_RS:
+            continue
+        source = path.read_text(encoding="utf-8").split("#[cfg(test)]", 1)[0]
+        if any(re.search(rf"pub\s+fn\s+{re.escape(router)}\b", source) for router in mounted_routers):
+            sources.append(source)
+    return operations_from_sources(sources)
+
+
+def scan(*, strict: bool = False) -> list[Issue]:
     issues: list[Issue] = []
     for required in (OPENAPI_JSON, WMS_API_RS, API_LIB_RS):
         if not required.exists():
@@ -80,7 +170,8 @@ def scan() -> list[Issue]:
     lib_text = API_LIB_RS.read_text(encoding="utf-8")
     combined = f"{runtime_text}\n{lib_text}"
 
-    for spec in ROUTE_MOUNT_SPECS:
+    specs = (*ROUTE_MOUNT_SPECS, *STRICT_ROUTE_MOUNT_SPECS) if strict else ROUTE_MOUNT_SPECS
+    for spec in specs:
         if spec.openapi_path not in openapi_paths:
             continue
         for token in spec.tokens:
@@ -90,21 +181,30 @@ def scan() -> list[Issue]:
             if not path.exists():
                 issues.append(Issue(rel(path), f"{spec.name} OpenAPI 已声明但缺少运行时 handler 文件"))
 
+    if strict:
+        missing_operations = sorted(load_openapi_operations() - runtime_operations())
+        issues.extend(
+            Issue(rel(WMS_API_RS), f"OpenAPI operation 未挂载到已合并运行时 Router: {operation}")
+            for operation in missing_operations
+        )
+
     return issues
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--strict", action="store_true", help="逐 operation 检查全部正式 OpenAPI 路由")
     args = parser.parse_args(argv)
 
-    issues = scan()
+    issues = scan(strict=args.strict)
     payload = {
         "check": "check_runtime_route_mounts",
         "tier": "T1",
         "category": "接口契约治理",
         "openapi": rel(OPENAPI_JSON),
         "runtime_entry": rel(WMS_API_RS),
+        "strict": args.strict,
         "issues": [asdict(issue) for issue in issues],
         "ok": not issues,
     }
