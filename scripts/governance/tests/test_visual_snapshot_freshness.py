@@ -6,6 +6,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from check_visual_regression import _source_digest, visual_source_files
+from check_baseline_completeness import _review_metadata_errors
 from capture_visual_snapshots import _capture
 
 
@@ -48,3 +49,21 @@ def test_failed_capture_does_not_reuse_old_png(tmp_path):
 
     assert ok is False
     assert not output.exists()
+
+
+def test_changed_baseline_requires_review_metadata_in_same_manifest_hunk():
+    stale = '''@@ -1,3 +1,3 @@
+ file = "m2.png"
+ reviewed_by = "项目主人"
+ reviewed_at = "2026-06-27"
+'''
+    reviewed = '''@@ -1,3 +1,3 @@
+ file = "m2.png"
+-reviewed_by = "项目主人"
+-reviewed_at = "2026-06-27"
++reviewed_by = "zhouliang"
++reviewed_at = "2026-07-11"
+'''
+
+    assert _review_metadata_errors(["m2.png"], stale)
+    assert _review_metadata_errors(["m2.png"], reviewed) == []

@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -30,6 +31,45 @@ TABS_FILE = REPO_ROOT / "prototypes" / "src" / "Tabs.tsx"
 FULL_MATRIX_SPECS_FILE = REPO_ROOT / "prototypes" / "src" / "prototype-kit" / "full-matrix-specs.ts"
 MANIFEST_TOML = REPO_ROOT / "governance" / "visual-baselines" / "manifest.toml"
 BASELINE_DIR = REPO_ROOT / "governance" / "visual-baselines"
+
+
+def _review_metadata_errors(changed_pngs: list[str], manifest_diff: str) -> list[str]:
+    hunks = re.split(r"(?=^@@)", manifest_diff, flags=re.MULTILINE)
+    errors = []
+    for png in changed_pngs:
+        reviewed = any(
+            f'file = "{png}"' in hunk
+            and re.search(r'^\+reviewed_by\s*=\s*"[^"?\-]+"', hunk, re.MULTILINE)
+            and re.search(r'^\+reviewed_at\s*=\s*"\d{4}-\d{2}-\d{2}"', hunk, re.MULTILINE)
+            for hunk in hunks
+        )
+        if not reviewed:
+            errors.append(f"baseline PNG '{png}' 已修改，但对应 manifest 区块未同步更新审核人和审核日期")
+    return errors
+
+
+def _pending_baseline_review_errors() -> list[str]:
+    for staged in (True, False):
+        base = ["git", "diff"] + (["--cached"] if staged else [])
+        changed = subprocess.run(
+            base + ["--name-only", "--diff-filter=ACMRT"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.splitlines()
+        pngs = [Path(path).name for path in changed if path.startswith("governance/visual-baselines/") and path.endswith(".png")]
+        if not pngs:
+            continue
+        diff = subprocess.run(
+            base + ["--unified=5", "--", str(MANIFEST_TOML.relative_to(REPO_ROOT))],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+        return _review_metadata_errors(pngs, diff)
+    return []
 
 
 def _load_toml(path: Path) -> dict:
@@ -63,6 +103,7 @@ def main() -> int:
     args = parser.parse_args()
 
     errors: list[str] = []
+    errors.extend(_pending_baseline_review_errors())
 
     # 1. 读 Tabs.tsx
     if not TABS_FILE.exists():
