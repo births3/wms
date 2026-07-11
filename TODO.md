@@ -20,6 +20,8 @@
 
 ### 进行中 / 待做
 
+- [ ] 全项目治理真实缺口按 [2026-07-11 修复计划](docs/reviews/governance-remediation-plan-2026-07-11.md) 分批关闭；禁止批量标记已验证或自动接受视觉基线
+
 - [x] W6 scope：ADR-0035 已定义 Wave 6 为预发布证据收口波次，不新增业务功能
 - [x] W6 status / complete check：建立 Wave 6 证据收口报告与 `just wave-6-status` / `just wave-6-complete-check`
 - [x] W6 closeout runbook：建立 [Wave 6 Closeout Runbook](docs/runbooks/wave-6-closeout.md)，集中 8 个 evidence gate 的记录与验证顺序
