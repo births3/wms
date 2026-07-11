@@ -61,6 +61,10 @@ const dataGridSource = readFileSync(
   new URL("../src/business/DataGrid/DataGrid.tsx", import.meta.url),
   "utf8",
 );
+const dataGridToolbarSource = readFileSync(
+  new URL("../src/business/DataGrid/DataGridToolbar.tsx", import.meta.url),
+  "utf8",
+);
 const headerCellSource = readFileSync(
   new URL("../src/business/DataGrid/DataGridHeaderCell.tsx", import.meta.url),
   "utf8",
@@ -83,11 +87,11 @@ assert.match(toolbarSource, /createPortal\(/);
 assert.match(toolbarSource, /className="fixed z-50 w-80/);
 assert.doesNotMatch(toolbarSource, /className="absolute right-0 top-full/);
 assert.match(dataGridSource, /import \{ useDataGridPopoverDismiss \} from "\.\/data-grid-popover-dismiss";/);
-assert.match(dataGridSource, /useDataGridPopoverDismiss\(\{[\s\S]*open: fieldsOpen \|\| openFilterKey !== null,[\s\S]*setFieldsOpen\(false\);[\s\S]*setOpenFilterKey\(null\);[\s\S]*\}\);/);
-assert.match(dataGridSource, /namedViewsControl=\{\s*<DataGridNamedViewsToolbar/);
-assert.doesNotMatch(dataGridSource, /<div className="flex shrink-0 flex-wrap items-center justify-end gap-2 self-end md:ml-auto">\s*<DataGridNamedViewsToolbar/);
-assert.match(headerCellSource, /namedViewsControl\?: React\.ReactNode;/);
-assert.match(headerCellSource, /\{namedViewsControl\}[\s\S]*aria-label="字段设置"/);
+assert.match(dataGridSource, /useDataGridPopoverDismiss\(\{[\s\S]*open: fieldsOpen \|\| actionSettingsOpen \|\| openFilterKey !== null,[\s\S]*setFieldsOpen\(false\);[\s\S]*setActionSettingsOpen\(false\);[\s\S]*setOpenFilterKey\(null\);[\s\S]*\}\);/);
+assert.match(dataGridSource, /<DataGridToolbar/);
+assert.match(dataGridToolbarSource, /<DataGridNamedViewsToolbar/);
+assert.match(dataGridToolbarSource, /<DataGridNamedViewsToolbar[\s\S]*aria-label="字段显示"/);
+assert.doesNotMatch(headerCellSource, /namedViewsControl/);
 assert.match(headerCellSource, /import \{ createPortal \} from "react-dom";/);
 assert.match(headerCellSource, /className="fixed z-50 w-56/);
 assert.match(headerCellSource, /createPortal\(/);
