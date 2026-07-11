@@ -87,6 +87,8 @@ interface NodeForm {
 
 interface CreateChildForm {
   title: string;
+  code: string;
+  enabled: boolean;
   viewId: string;
 }
 
@@ -108,8 +110,17 @@ export function H1AdminMenuPage() {
   const [newActionKey, setNewActionKey] = React.useState("");
   const [newActionLabel, setNewActionLabel] = React.useState("");
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
-  const [createForm, setCreateForm] = React.useState<CreateChildForm>({ title: "", viewId: "" });
+  const [createParentSnapshot, setCreateParentSnapshot] = React.useState<AdminMenuNode | null>(null);
+  const [createForm, setCreateForm] = React.useState<CreateChildForm>({
+    title: "",
+    code: "",
+    enabled: true,
+    viewId: "",
+  });
   const busy = createMutation.isPending || updateMutation.isPending || batchEnableMutation.isPending || publishMutation.isPending || rollbackMutation.isPending;
+  const createParentNode = createDialogOpen ? createParentSnapshot : null;
+  const createChildLevel = createParentNode && createParentNode.level < 3 ? createParentNode.level + 1 : null;
+  const createFormValid = Boolean(createForm.title.trim() && createForm.code.trim());
 
   React.useEffect(() => {
     if (!selectedId && flatNodes[0]) setSelectedId(flatNodes[0].id);
@@ -154,31 +165,43 @@ export function H1AdminMenuPage() {
 
   function openCreateChildDialog() {
     if (!selectedNode || selectedNode.level >= 3) return;
-    setCreateForm({ title: selectedNode.level === 1 ? "新能力组" : "新页面", viewId: "" });
+    const stamp = Date.now();
+    setCreateParentSnapshot(selectedNode);
+    setCreateForm({
+      title: selectedNode.level === 1 ? "新能力组" : "新页面",
+      code: `custom.${stamp}`,
+      enabled: true,
+      viewId: "",
+    });
     setCreateDialogOpen(true);
   }
 
   async function createChildFromDialog() {
-    if (!selectedNode || selectedNode.level >= 3) return;
+    if (!createParentSnapshot || createParentSnapshot.level >= 3) return;
     const title = createForm.title.trim();
-    if (!title) return;
-    const stamp = Date.now();
+    const code = createForm.code.trim();
+    if (!title || !code) return;
+    // 优先用树中最新父节点取 children 排序；挂靠目标始终用打开弹窗时锁定的 parent_id
+    const parentLive = flatNodes.find((node) => node.id === createParentSnapshot.id) ?? createParentSnapshot;
     const ok = await run(
       createMutation.mutateAsync({
-        parent_id: selectedNode.id,
-        code: `custom.${stamp}`,
+        parent_id: createParentSnapshot.id,
+        code,
         title,
-        view_id: selectedNode.level === 2 ? createForm.viewId.trim() || undefined : undefined,
+        view_id: createParentSnapshot.level === 2 ? createForm.viewId.trim() || undefined : undefined,
         icon_key: "ShieldCheck",
-        permission_key: `menu.custom.${stamp}`,
-        sort_order: selectedNode.children.length * 10 + 10,
-        enabled: true,
+        permission_key: `menu.${code}`,
+        sort_order: parentLive.children.length * 10 + 10,
+        enabled: createForm.enabled,
         button_permissions: [],
       }),
       "菜单节点已新增",
       "新增菜单节点失败",
     );
-    if (ok) setCreateDialogOpen(false);
+    if (ok) {
+      setCreateDialogOpen(false);
+      setCreateParentSnapshot(null);
+    }
   }
 
   async function batchDisableSelected() {
@@ -338,18 +361,65 @@ export function H1AdminMenuPage() {
           </CardContent>
         </Card>
       </div>
-      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+      <Dialog
+        open={createDialogOpen}
+        onOpenChange={(open) => {
+          setCreateDialogOpen(open);
+          if (!open) setCreateParentSnapshot(null);
+        }}
+      >
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>新增菜单节点</DialogTitle>
           </DialogHeader>
           <div className="grid gap-3">
-            <Field label="菜单名称">
-              <Input value={createForm.title} onChange={(event) => setCreateForm({ ...createForm, title: event.target.value })} />
+            <Field label="父节点">
+              <Input
+                value={createParentNode ? `${createParentNode.title}（L${createParentNode.level}）` : ""}
+                readOnly
+                disabled
+                aria-label="父节点"
+              />
             </Field>
-            {selectedNode?.level === 2 ? (
+            <Field label="层级">
+              <Input
+                value={createChildLevel ? `L${createChildLevel}` : ""}
+                readOnly
+                disabled
+                aria-label="层级"
+              />
+            </Field>
+            <Field label="菜单名称">
+              <Input
+                value={createForm.title}
+                onChange={(event) => setCreateForm({ ...createForm, title: event.target.value })}
+                aria-label="菜单名称"
+              />
+            </Field>
+            <Field label="编码">
+              <Input
+                value={createForm.code}
+                onChange={(event) => setCreateForm({ ...createForm, code: event.target.value })}
+                aria-label="编码"
+                placeholder="custom.timestamp"
+              />
+            </Field>
+            <label className="flex items-center gap-2 text-sm text-foreground">
+              <Checkbox
+                checked={createForm.enabled}
+                onCheckedChange={(value) => setCreateForm({ ...createForm, enabled: value === true })}
+                aria-label="启用"
+              />
+              启用
+            </label>
+            {createParentNode?.level === 2 ? (
               <Field label="绑定 view_id">
-                <select className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={createForm.viewId} onChange={(event) => setCreateForm({ ...createForm, viewId: event.target.value })}>
+                <select
+                  className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                  value={createForm.viewId}
+                  onChange={(event) => setCreateForm({ ...createForm, viewId: event.target.value })}
+                  aria-label="绑定 view_id"
+                >
                   <option value="">不绑定</option>
                   {viewIdOptions.map((viewId) => <option key={viewId} value={viewId}>{viewId}</option>)}
                 </select>
@@ -357,8 +427,17 @@ export function H1AdminMenuPage() {
             ) : null}
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>取消</Button>
-            <Button type="button" disabled={busy || !createForm.title.trim()} onClick={() => void createChildFromDialog()}>新增</Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setCreateDialogOpen(false);
+                setCreateParentSnapshot(null);
+              }}
+            >
+              取消
+            </Button>
+            <Button type="button" disabled={busy || !createFormValid} onClick={() => void createChildFromDialog()}>新增</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
