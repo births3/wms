@@ -1,0 +1,57 @@
+{
+  "check": "check_idempotency_test",
+  "version": 1,
+  "generated_at": "2026-07-11T12:14:05Z",
+  "ignored": [
+    {
+      "id": "POST /api/v1/admin/menus/draft/batch-enable",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/admin/menus/rollback",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/cold-chain/excursions",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/cold-chain/readings",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/express/routing-rules",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/express/waybills/{waybill_no}/cancel",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/inbound/receiving-orders/{id}/inspect",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/inbound/receiving-orders/{id}/sign",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "PUT /api/v1/code-generator/document-number-rules/{rule_code}",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "PUT /api/v1/system-dictionaries/{dict_code}/items/{item_code}",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    }
+  ]
+}

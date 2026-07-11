@@ -1,0 +1,132 @@
+{
+  "check": "check_audit_trail_coverage",
+  "version": 1,
+  "generated_at": "2026-07-11T12:14:05Z",
+  "ignored": [
+    {
+      "id": "DELETE /api/v1/master-data/special-drug-categories/{id}",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "PATCH /api/v1/admin/menus/draft/nodes/{id}",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "PATCH /api/v1/master-data/special-drug-categories/{id}",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/admin/menus/draft/batch-enable",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/admin/menus/draft/nodes",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/admin/menus/publish",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/admin/menus/rollback",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/cold-chain/devices",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/cold-chain/excursions",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/cold-chain/readings",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/config-center/feature-flags/archive-file-source",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/config-center/feature-flags/import",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/config-center/feature-flags/migrate",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/config-center/feature-flags/source",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/event-bus/deliveries/{delivery_id}/nack",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/express/routing-rules",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/express/waybills/{waybill_no}/cancel",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/inbound/receiving-orders/{id}/inspect",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/inbound/receiving-orders/{id}/sign",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/parameter-mapping/execute",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/reports/gsp/inbound-ledger",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/reports/gsp/inventory-ledger",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/reports/gsp/outbound-ledger",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "PUT /api/v1/code-generator/document-number-rules/{rule_code}",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "PUT /api/v1/system-dictionaries/{dict_code}/items/{item_code}",
+      "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    }
+  ]
+}

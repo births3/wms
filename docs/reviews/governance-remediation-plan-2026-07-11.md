@@ -27,7 +27,7 @@ strict 检查仍应失败并暴露以下真实缺口，禁止挂载返回空台�
 | G0-B | M-PM OpenAPI 已声明，但现有服务没有持久化字典、规则、队列和五年追溯 | 完成数据库迁移、配置 API、缓存失效、权限授权、审计和多实例测试后再挂载 |
 | G0-C | 收货单 `DELETE` 是已发布契约但没有运行时实现，且业务故事要求作废而非物理删除 | 先确定兼容迁移，再实现带状态机、权限、幂等和审计的作废语义；不得物理删除历史单据 |
 | G0-D | 多数 OpenAPI operation 只有路径提及或未授权状态测试 | 每个 operation 至少覆盖成功路径、权限、业务错误和关键事务；route inventory 只能作为挂载检查 |
-| G0-E | T3 已接入 `check_audit_trail_coverage`、`check_idempotency_test`，但两个治理脚本尚未实现 | 先用真实写路径和测试证据定义规则，再实现脚本；`task_check.py --tier T3 --strict` 必须在此之前保持失败 |
+| G0-E | ~~T3 审计/幂等脚本未实现~~ **已关闭** | 已实现真实规则：`check_audit_trail_coverage`（OpenAPI 写路径 + HTTP 写成功测试 → audit_event 证据）与 `check_idempotency_test`（Idempotency-Key 写操作 → 测试幂等证据）；已知缺口入 `governance/baselines/`，禁止新增回退 |
 | G0-F | API 创建后的 ASN 停留在 `draft`，现有 `release_receiving_order` 没有运行时入口，且供应商资质有效期所需主数据和 M-VR 调用尚未落地 | 按故事实现“待校验 → 校验异常 / 待收货”动作，接入有效供应商及资质规则、权限、幂等和同事务审计；真实 API 创建后必须能继续收货 |
 
 退出命令：
