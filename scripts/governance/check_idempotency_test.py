@@ -5,8 +5,8 @@
 Tier：T3
 规则（真实契约 + 测试证据，禁止假绿）：
 1. 从 OpenAPI 收集声明 Idempotency-Key 的写操作（x-idempotency-exempt-reason 豁免）
-2. backend/crates/api/tests 中须有可识别该操作的测试文件，
-   且同文件含幂等证据（idempotency-key / idempotency_request / IdempotencyConflict 等）
+2. backend/crates/api/tests 中须有可识别该操作的测试函数，
+   且同函数含幂等记录、冲突或重放断言
 3. 支持 HTTP 路径与 repository 直测命名（如 receive_receiving_order）
 4. 违规 id 走 baseline：禁止新增缺口
 
@@ -34,10 +34,27 @@ DEFAULT_TEST_ROOT = REPO_ROOT / "backend" / "crates" / "api" / "tests"
 WRITE_METHODS = {"post", "put", "patch", "delete"}
 IDEMPOTENCY_HEADER = "Idempotency-Key"
 IDEMPOTENCY_EXEMPT_REASON = "x-idempotency-exempt-reason"
-IDEMPOTENCY_EVIDENCE_RE = re.compile(
-    r"idempotency[-_ ]?key|idempotency_request|IdempotencyConflict|idempotent",
-    re.IGNORECASE,
-)
+TEST_FN_RE = re.compile(r"(?:#\[[^\]]+\]\s*)*(?:async\s+)?fn\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(")
+ACTION_SEGMENTS = {
+    "ack",
+    "cancel",
+    "complete",
+    "confirm",
+    "disable",
+    "inspect",
+    "nack",
+    "publish",
+    "putaway",
+    "receive",
+    "reject",
+    "resend",
+    "review",
+    "rollback",
+    "ship",
+    "sign",
+    "test",
+}
+ACTION_ALIASES = {"receive": ("receive", "receiving")}
 
 
 def path_to_regex(path: str) -> re.Pattern[str]:
@@ -105,6 +122,29 @@ def _has_header_parameter(operation: dict, header_name: str) -> bool:
     return header_name.lower() in json.dumps(operation).lower()
 
 
+def _function_bodies(text: str) -> list[str]:
+    matches = list(TEST_FN_RE.finditer(text))
+    return [
+        text[match.start() : matches[index + 1].start() if index + 1 < len(matches) else len(text)]
+        for index, match in enumerate(matches)
+    ]
+
+
+def _has_idempotency_evidence(body: str, operation: dict) -> bool:
+    lower = body.lower()
+    action = operation["path"].rstrip("/").rsplit("/", 1)[-1].lower()
+    function_name = TEST_FN_RE.search(body)
+    action_names = ACTION_ALIASES.get(action, (action,))
+    if action in ACTION_SEGMENTS and (
+        function_name is None
+        or not any(name in function_name.group(1).lower() for name in action_names)
+    ):
+        return False
+    if "idempotency_request" in lower or "idempotencyconflict" in lower:
+        return True
+    return "replay" in lower and bool(re.search(r"assert_(?:eq|ne|matches)!|\.expect\(", body))
+
+
 def collect_idempotency_required_ops(openapi_path: Path = OPENAPI_JSON) -> list[dict]:
     if not openapi_path.is_file():
         return []
@@ -145,14 +185,19 @@ def find_missing_idempotency_tests(required_ops: list[dict], test_root: Path) ->
             }
             for op in required_ops
         ]
-    files = [(p, p.read_text(encoding="utf-8", errors="ignore")) for p in sorted(test_root.rglob("*.rs"))]
+    files = [
+        _function_bodies(p.read_text(encoding="utf-8", errors="ignore"))
+        for p in sorted(test_root.rglob("*.rs"))
+    ]
     missing: list[dict] = []
     for op in required_ops:
         evidence_hit = False
-        for _path, text in files:
-            if not file_covers_operation(text, op["path"], op["path_re"], op["operation_id"]):
-                continue
-            if IDEMPOTENCY_EVIDENCE_RE.search(text):
+        for bodies in files:
+            if any(
+                file_covers_operation(body, op["path"], op["path_re"], op["operation_id"])
+                and _has_idempotency_evidence(body, op)
+                for body in bodies
+            ):
                 evidence_hit = True
                 break
         if not evidence_hit:

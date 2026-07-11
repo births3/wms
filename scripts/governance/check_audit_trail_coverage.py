@@ -5,8 +5,8 @@
 Tier：T3
 规则（真实写路径 + 测试证据，禁止假绿关键字扫盘）：
 1. 从 OpenAPI 收集写操作（POST/PUT/PATCH/DELETE）
-2. 每个写操作在 backend/crates/api/tests 中须有“路径/动作可识别”的测试文件，
-   且同文件含 audit_event / append_event / AuditWriteRequest 等审计证据
+2. 每个写操作在 backend/crates/api/tests 中须有“路径/动作可识别”的测试函数，
+   且同函数查询 audit_event 持久化证据
 3. 另：HTTP 写成功测试（Request::builder + 2xx）的函数体必须含审计证据
 4. 违规 id 走 baseline：禁止新增缺口
 
@@ -49,10 +49,7 @@ SUCCESS_STATUS_RE_TEMPLATE = (
     r"StatusCode::(?:OK|CREATED|ACCEPTED|NO_CONTENT|PARTIAL_CONTENT)\s*\)"
 )
 TEST_FN_RE = re.compile(r"(?:#\[[^\]]+\]\s*)*(?:async\s+)?fn\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(")
-AUDIT_EVIDENCE_RE = re.compile(
-    r"audit_event|append_event(?:_in_tx)?|append_audit(?:_with_diff)?|AuditWriteRequest",
-    re.IGNORECASE,
-)
+AUDIT_EVIDENCE_RE = re.compile(r"audit_event", re.IGNORECASE)
 
 
 def path_to_regex(path: str) -> re.Pattern[str]:
@@ -158,23 +155,20 @@ def _enclosing_test_name(text: str, pos: int) -> str | None:
 
 
 def _test_function_span(text: str, fn_name: str) -> tuple[int, int] | None:
-    pattern = re.compile(
-        rf"(?:#\[[^\]]+\]\s*)*(?:async\s+)?fn\s+{re.escape(fn_name)}\s*\([^)]*\)\s*(?:->\s*[^{{]+)?\{{",
-    )
-    match = pattern.search(text)
-    if not match:
-        return None
-    start = match.start()
-    i = match.end() - 1
-    depth = 0
-    for j in range(i, len(text)):
-        if text[j] == "{":
-            depth += 1
-        elif text[j] == "}":
-            depth -= 1
-            if depth == 0:
-                return start, j + 1
-    return start, len(text)
+    matches = list(TEST_FN_RE.finditer(text))
+    for index, match in enumerate(matches):
+        if match.group(1) == fn_name:
+            end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+            return match.start(), end
+    return None
+
+
+def _function_bodies(text: str) -> list[str]:
+    matches = list(TEST_FN_RE.finditer(text))
+    return [
+        text[match.start() : matches[index + 1].start() if index + 1 < len(matches) else len(text)]
+        for index, match in enumerate(matches)
+    ]
 
 
 def collect_write_success_tests(test_root: Path) -> list[dict]:
@@ -240,14 +234,19 @@ def find_missing_openapi_audit_tests(ops: list[dict], test_root: Path) -> list[d
             }
             for op in ops
         ]
-    files = [(p, p.read_text(encoding="utf-8", errors="ignore")) for p in sorted(test_root.rglob("*.rs"))]
+    files = [
+        _function_bodies(p.read_text(encoding="utf-8", errors="ignore"))
+        for p in sorted(test_root.rglob("*.rs"))
+    ]
     missing: list[dict] = []
     for op in ops:
         covered = False
-        for _path, text in files:
-            if not file_covers_operation(text, op["path"], op["path_re"], op["operation_id"]):
-                continue
-            if AUDIT_EVIDENCE_RE.search(text):
+        for bodies in files:
+            if any(
+                file_covers_operation(body, op["path"], op["path_re"], op["operation_id"])
+                and AUDIT_EVIDENCE_RE.search(body)
+                for body in bodies
+            ):
                 covered = True
                 break
         if not covered:

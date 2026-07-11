@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "generated_at": "2026-07-11T12:22:29Z",
+  "max_counts": {
+    "check_audit_trail_coverage": 55,
+    "check_idempotency_test": 24,
+    "openapi-compat-v1": 0
+  },
+  "note": "由 check_baseline_health.py 维护；每个 check 的 baseline 数量上限。"
+}

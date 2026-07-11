@@ -4,6 +4,11 @@
   "generated_at": "2026-07-11T12:14:05Z",
   "ignored": [
     {
+      "id": "DELETE /api/v1/inbound/receiving-orders/{id}",
+      "reason": "G0-E review inventory correction 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
       "id": "DELETE /api/v1/master-data/special-drug-categories/{id}",
       "reason": "G0-E initial inventory 2026-07-11",
       "added_at": "2026-07-11"
@@ -16,6 +21,11 @@
     {
       "id": "PATCH /api/v1/master-data/special-drug-categories/{id}",
       "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "PATCH /api/v1/system-dictionaries/{dict_code}/items/{item_code}/disable",
+      "reason": "G0-E review inventory correction 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
@@ -36,6 +46,41 @@
     {
       "id": "POST /api/v1/admin/menus/rollback",
       "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/billing/accounts",
+      "reason": "G0-E review inventory correction 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/billing/charges/calculate",
+      "reason": "G0-E review inventory correction 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/billing/contracts",
+      "reason": "G0-E review inventory correction 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/billing/rules",
+      "reason": "G0-E review inventory correction 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/billing/statements",
+      "reason": "G0-E review inventory correction 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/billing/statements/{id}/confirm",
+      "reason": "G0-E review inventory correction 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/business-retention/jobs",
+      "reason": "G0-E review inventory correction 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
@@ -74,13 +119,28 @@
       "added_at": "2026-07-11"
     },
     {
+      "id": "POST /api/v1/event-bus/deliveries/{delivery_id}/ack",
+      "reason": "G0-E review inventory correction 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
       "id": "POST /api/v1/event-bus/deliveries/{delivery_id}/nack",
       "reason": "G0-E initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
+      "id": "POST /api/v1/express/carriers",
+      "reason": "G0-E review inventory correction 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
       "id": "POST /api/v1/express/routing-rules",
       "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/express/waybills",
+      "reason": "G0-E review inventory correction 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
@@ -94,8 +154,48 @@
       "added_at": "2026-07-11"
     },
     {
+      "id": "POST /api/v1/inbound/receiving-orders/{id}/putaway",
+      "reason": "G0-E review inventory correction 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/inbound/receiving-orders/{id}/receive",
+      "reason": "G0-E review inventory correction 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
       "id": "POST /api/v1/inbound/receiving-orders/{id}/sign",
       "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/inventory/batches/putaway",
+      "reason": "G0-E review inventory correction 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/master-data/special-drug-categories",
+      "reason": "G0-E review inventory correction 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/packing/jobs",
+      "reason": "G0-E review inventory correction 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/packing/jobs/{id}/waybill",
+      "reason": "G0-E review inventory correction 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/packing/jobs/{id}/weigh",
+      "reason": "G0-E review inventory correction 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/packing/stations",
+      "reason": "G0-E review inventory correction 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
@@ -116,6 +216,56 @@
     {
       "id": "POST /api/v1/reports/gsp/outbound-ledger",
       "reason": "G0-E initial inventory 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/retail/crossdock-plans",
+      "reason": "G0-E review inventory correction 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/retail/replenishment-suggestions",
+      "reason": "G0-E review inventory correction 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/tms/container-recoveries",
+      "reason": "G0-E review inventory correction 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/tms/dispatches",
+      "reason": "G0-E review inventory correction 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/tms/transit-temperature-readings",
+      "reason": "G0-E review inventory correction 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/wechat-notify/configs",
+      "reason": "G0-E review inventory correction 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/wechat-notify/records/{record_id}/resend",
+      "reason": "G0-E review inventory correction 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/wechat-notify/send",
+      "reason": "G0-E review inventory correction 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/wechat-notify/settings",
+      "reason": "G0-E review inventory correction 2026-07-11",
+      "added_at": "2026-07-11"
+    },
+    {
+      "id": "POST /api/v1/wechat-notify/settings/test",
+      "reason": "G0-E review inventory correction 2026-07-11",
       "added_at": "2026-07-11"
     },
     {

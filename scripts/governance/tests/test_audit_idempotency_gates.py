@@ -122,6 +122,44 @@ async fn receive_ok() {
     assert "POST /api/v1/tms/dispatches" in ids
 
 
+def test_openapi_audit_evidence_must_be_in_same_test_function(tmp_path: Path):
+    tests = tmp_path / "tests"
+    tests.mkdir()
+    (tests / "mixed.rs").write_text(
+        """
+async fn receive_without_audit() {
+    receive_receiving_order(...);
+}
+async fn unrelated_audit_test() {
+    SELECT COUNT(*) FROM audit_event;
+}
+""",
+        encoding="utf-8",
+    )
+    path = "/api/v1/inbound/receiving-orders/{id}/receive"
+    ops = [{"id": f"POST {path}", "method": "POST", "path": path, "operation_id": "", "path_re": path_to_regex(path)}]
+
+    assert find_missing_openapi_audit_tests(ops, tests)[0]["id"] == f"POST {path}"
+
+
+def test_audit_request_construction_is_not_persistence_evidence(tmp_path: Path):
+    tests = tmp_path / "tests"
+    tests.mkdir()
+    (tests / "request_only.rs").write_text(
+        """
+async fn receive_with_audit_input_only() {
+    let audit = AuditWriteRequest::new(...);
+    receive_receiving_order(..., audit);
+}
+""",
+        encoding="utf-8",
+    )
+    path = "/api/v1/inbound/receiving-orders/{id}/receive"
+    ops = [{"id": f"POST {path}", "method": "POST", "path": path, "operation_id": "", "path_re": path_to_regex(path)}]
+
+    assert find_missing_openapi_audit_tests(ops, tests)
+
+
 def test_idempotency_gate_matches_repo_tests_and_flags_uncovered(tmp_path: Path):
     openapi = {
         "paths": {
@@ -180,3 +218,61 @@ async fn receiving_order_reject_closes_order_and_replays_idempotently(pool: PgPo
     assert "POST /api/v1/inbound/receiving-orders/{id}/receive" not in ids
     assert "POST /api/v1/inbound/receiving-orders/{id}/reject" not in ids
     assert "POST /api/v1/tms/dispatches" in ids
+
+
+def test_idempotency_evidence_must_be_in_same_test_function(tmp_path: Path):
+    tests = tmp_path / "tests"
+    tests.mkdir()
+    (tests / "mixed.rs").write_text(
+        """
+async fn receive_without_replay_check() {
+    receive_receiving_order(...);
+}
+async fn unrelated_idempotency_test() {
+    SELECT COUNT(*) FROM idempotency_request;
+}
+""",
+        encoding="utf-8",
+    )
+    path = "/api/v1/inbound/receiving-orders/{id}/receive"
+    required = [{"id": f"POST {path}", "method": "POST", "path": path, "operation_id": "", "path_re": path_to_regex(path)}]
+
+    assert find_missing_idempotency_tests(required, tests)[0]["id"] == f"POST {path}"
+
+
+def test_single_idempotency_header_is_not_replay_evidence(tmp_path: Path):
+    tests = tmp_path / "tests"
+    tests.mkdir()
+    (tests / "single.rs").write_text(
+        """
+async fn receive_once() {
+    request.header("Idempotency-Key", "once-only");
+    receive_receiving_order(...);
+}
+""",
+        encoding="utf-8",
+    )
+    path = "/api/v1/inbound/receiving-orders/{id}/receive"
+    required = [{"id": f"POST {path}", "method": "POST", "path": path, "operation_id": "", "path_re": path_to_regex(path)}]
+
+    assert find_missing_idempotency_tests(required, tests)
+
+
+def test_other_action_replay_does_not_cover_resend(tmp_path: Path):
+    tests = tmp_path / "tests"
+    tests.mkdir()
+    (tests / "mixed_actions.rs").write_text(
+        """
+async fn h4_send_replays_multiple_actions() {
+    resend_record(..., "resend-1").await.expect("resend once");
+    send_notification(..., "send-1").await.expect("send first");
+    let replay = send_notification(..., "send-1").await.expect("send should replay");
+    assert!(replay.replayed);
+}
+""",
+        encoding="utf-8",
+    )
+    path = "/api/v1/wechat-notify/records/{record_id}/resend"
+    required = [{"id": f"POST {path}", "method": "POST", "path": path, "operation_id": "resend_h4_notification_record", "path_re": path_to_regex(path)}]
+
+    assert find_missing_idempotency_tests(required, tests)
