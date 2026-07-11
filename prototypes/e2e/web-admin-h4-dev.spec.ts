@@ -9,7 +9,7 @@ test("H4 管理端菜单能打开通知配置和发送记录", async ({ page }) 
 
   await page.goto("/");
   await page.getByRole("button", { name: "登录" }).click();
-  await expect(page.getByRole("heading", { name: "WMS Web Admin" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "运营总览" })).toBeVisible();
 
   await page.getByRole("button", { name: "基础能力" }).click();
   await page.getByRole("button", { name: "H4 企业微信" }).click();

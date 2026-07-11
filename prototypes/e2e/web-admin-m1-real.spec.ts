@@ -12,7 +12,7 @@ test("M1 管理端读取真实后端数据", async ({ page }) => {
   await page.getByLabel("登录账号").fill("admin");
   await page.getByLabel("密码").fill("CorrectHorse1!");
   await page.getByRole("button", { name: "登录" }).click();
-  await expect(page.getByRole("heading", { name: "WMS Web Admin" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "运营总览" })).toBeVisible();
 
   await page.getByRole("button", { name: "基础档案" }).click();
 

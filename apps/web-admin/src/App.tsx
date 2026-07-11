@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Button, Card, CardContent, Input, PageHeader, StatusBadge, WorkspaceTabs, cn } from "@wms/ui";
+import { Button, Card, CardContent, Input, PageHeader, WorkspaceTabs, cn } from "@wms/ui";
 import {
   Activity,
   Bell,
@@ -35,7 +35,6 @@ import {
 } from "@/app-shell/AdminSidebarMenu";
 import { usePublishedAdminMenuQuery } from "@/features/admin-menu/admin-menu-queries";
 import { useCurrentUserQuery, useLogout, type CurrentUser } from "@/features/auth/auth-queries";
-import { apiBaseUrl, wave1ContractPaths } from "@/lib/api";
 import { clearAuthSession, hasActiveAuthSession } from "@/lib/auth-session";
 import { H1AdminMenuPage } from "@/pages/admin-menu/H1AdminMenuPage";
 import { LoginPage } from "@/pages/auth/LoginPage";
@@ -70,40 +69,42 @@ type AdminView =
   | "h5-express"
   | "h9-print-templates";
 
-const foundations = [
+/** 作业 KPI 占位数据（后续可接真实待办接口） */
+const operationKpis = [
   {
-    id: "h1",
-    title: "H1 权限与多租户",
-    description: "JWT 登录、AuthContext、货主隔离和权限集合。",
-    status: "completed" as const,
-    label: "可登录",
-    meta: "login / me",
-    icon: ShieldCheck,
+    id: "pending-receiving",
+    label: "待收货",
+    value: 12,
+    hint: "入库单待收货",
+    icon: PackageCheck,
   },
   {
-    id: "h2",
-    title: "H2 审计追踪",
-    description: "登录和写操作进入 append-only 审计链路。",
-    status: "completed" as const,
-    label: "已接入",
-    meta: "audit events",
-    icon: ClipboardList,
+    id: "pending-inspecting",
+    label: "待验收",
+    value: 5,
+    hint: "收货后待验收",
+    icon: CheckCircle2,
   },
   {
-    id: "h3",
-    title: "H3 OpenAPI 契约",
-    description: "前端通过 @wms/api-client 消费后端契约。",
-    status: "completed" as const,
-    label: "已同步",
-    meta: `${wave1ContractPaths.length} 条基础路径`,
-    icon: KeyRound,
+    id: "pending-putaway",
+    label: "待上架",
+    value: 8,
+    hint: "验收后待上架",
+    icon: Layers,
   },
-];
+  {
+    id: "pending-review",
+    label: "待复核",
+    value: 3,
+    hint: "出库复核 / 审批",
+    icon: History,
+  },
+] as const;
 
 const menuSections: Array<{ label: string; items: SidebarMenuItem<AdminView>[] }> = [
   {
     label: "工作台",
-    items: [{ id: "dashboard", title: "运营总览", subtitle: "系统基础状态", icon: Activity }],
+    items: [{ id: "dashboard", title: "运营总览", subtitle: "今日待办与快捷入口", icon: Activity }],
   },
   {
     label: "基础档案",
@@ -287,7 +288,7 @@ function workspaceTabForView(view: AdminView): AdminWorkspaceTab {
   return {
     view,
     label: item?.title ?? "运营总览",
-    subtitle: item?.subtitle ?? "系统基础状态",
+    subtitle: item?.subtitle ?? "今日待办与快捷入口",
     closable: view !== "dashboard",
   };
 }
@@ -423,6 +424,8 @@ function renderAdminView(
       currentUser={currentUser}
       onOpenM2Inbound={() => navigateTo("m2-receiving")}
       onOpenM4Outbound={() => navigateTo("m4-orders")}
+      onOpenM3Batches={() => navigateTo("m3-batches")}
+      onOpenH2Audit={() => navigateTo("h2-audit-trail")}
     />
   );
 }
@@ -744,12 +747,23 @@ interface DashboardProps {
   currentUser: CurrentUser;
   onOpenM2Inbound: () => void;
   onOpenM4Outbound: () => void;
+  onOpenM3Batches: () => void;
+  onOpenH2Audit: () => void;
 }
 
-function Dashboard({ currentUser, onOpenM2Inbound, onOpenM4Outbound }: DashboardProps) {
+function Dashboard({
+  currentUser,
+  onOpenM2Inbound,
+  onOpenM4Outbound,
+  onOpenM3Batches,
+  onOpenH2Audit,
+}: DashboardProps) {
   return (
     <section className="flex w-full flex-col gap-6 px-4 py-8 lg:px-8">
-      <PageHeader title="WMS Web Admin" subtitle={`${currentUser.owner_code} / ${currentUser.display_name}`} />
+      <PageHeader
+        title="运营总览"
+        subtitle={`货主 ${currentUser.owner_code} · 关注待办作业与常用入口`}
+      />
 
       <div className="grid gap-4 lg:grid-cols-[18rem_1fr]">
         <Card className="rounded-lg shadow-sm">
@@ -767,22 +781,21 @@ function Dashboard({ currentUser, onOpenM2Inbound, onOpenM4Outbound }: Dashboard
           </CardContent>
         </Card>
 
-        <div className="grid gap-4 md:grid-cols-3">
-          {foundations.map((item) => {
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {operationKpis.map((item) => {
             const Icon = item.icon;
             return (
               <Card key={item.id} className="rounded-lg shadow-sm">
-                <CardContent className="flex h-full flex-col gap-4 p-5">
+                <CardContent className="flex h-full flex-col gap-3 p-5">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex size-10 items-center justify-center rounded-md bg-primary/10 text-primary">
                       <Icon className="size-5" aria-hidden />
                     </div>
-                    <StatusBadge status={item.status} label={item.label} size="sm" />
+                    <p className="text-xs font-medium text-muted-foreground">{item.hint}</p>
                   </div>
                   <div>
-                    <h2 className="text-lg font-semibold tracking-normal">{item.title}</h2>
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">{item.description}</p>
-                    <p className="mt-3 text-xs font-medium text-muted-foreground">{item.meta}</p>
+                    <p className="text-sm text-muted-foreground">{item.label}</p>
+                    <p className="mt-1 text-3xl font-semibold tracking-tight tabular-nums">{item.value}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -796,21 +809,31 @@ function Dashboard({ currentUser, onOpenM2Inbound, onOpenM4Outbound }: Dashboard
           <div className="flex size-10 items-center justify-center rounded-md bg-wms-success/10 text-wms-success">
             <Activity className="size-5" aria-hidden />
           </div>
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-4">
             <div>
-              <h2 className="text-lg font-semibold tracking-normal">运行入口</h2>
+              <h2 className="text-lg font-semibold tracking-normal">快捷入口</h2>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                API 基址：{apiBaseUrl || "当前域名"}
+                进入常用作业页面，处理收货、出库、批号与审计查询
               </p>
             </div>
-            <Button type="button" onClick={onOpenM2Inbound}>
-              <PackageCheck className="size-4" aria-hidden />
-              M2 收货管理
-            </Button>
-            <Button type="button" variant="outline" onClick={onOpenM4Outbound}>
-              <ClipboardList className="size-4" aria-hidden />
-              M4 出库订单管理
-            </Button>
+            <div className="flex flex-wrap gap-3">
+              <Button type="button" onClick={onOpenM2Inbound}>
+                <PackageCheck className="size-4" aria-hidden />
+                M2 收货管理
+              </Button>
+              <Button type="button" variant="outline" onClick={onOpenM4Outbound}>
+                <ClipboardList className="size-4" aria-hidden />
+                M4 出库订单
+              </Button>
+              <Button type="button" variant="outline" onClick={onOpenM3Batches}>
+                <Layers className="size-4" aria-hidden />
+                M3 批号管理
+              </Button>
+              <Button type="button" variant="outline" onClick={onOpenH2Audit}>
+                <History className="size-4" aria-hidden />
+                H2 审计追踪
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

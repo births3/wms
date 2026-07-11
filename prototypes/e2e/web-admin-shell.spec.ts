@@ -297,7 +297,7 @@ test("dev mock 保留 H9 字段库数量和 M2 ASN 字段", async ({ request }) 
 test("侧边栏筛选菜单支持 Escape 和点击页面内容关闭", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "登录" }).click();
-  const pageHeading = page.getByRole("heading", { name: "WMS Web Admin" });
+  const pageHeading = page.getByRole("heading", { name: "运营总览" });
   await expect(pageHeading).toBeVisible();
 
   await page.getByRole("button", { name: "筛选菜单" }).click();
@@ -328,7 +328,7 @@ for (const target of [
       page.waitForResponse((response) => response.url().includes("/api/v1/admin/menus/published")),
       page.getByRole("button", { name: "登录" }).click(),
     ]);
-    await expect(page.getByRole("heading", { name: "WMS Web Admin" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "运营总览" })).toBeVisible();
 
     const sectionButton = page.getByRole("button", { name: target.section });
     if (await sectionButton.getAttribute("aria-expanded") !== "true") await sectionButton.click();
@@ -345,7 +345,7 @@ test("H1 菜单管理能通过三层菜单打开", async ({ page }) => {
 
   await page.goto("/");
   await page.getByRole("button", { name: "登录" }).click();
-  await expect(page.getByRole("heading", { name: "WMS Web Admin" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "运营总览" })).toBeVisible();
 
   await page.getByRole("button", { name: "基础能力" }).click();
   await page.getByRole("button", { name: "H1 权限租户" }).click();
@@ -363,7 +363,7 @@ test("H2 H3 基础能力能通过三层菜单打开", async ({ page }) => {
 
   await page.goto("/");
   await page.getByRole("button", { name: "登录" }).click();
-  await expect(page.getByRole("heading", { name: "WMS Web Admin" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "运营总览" })).toBeVisible();
 
   await page.getByRole("button", { name: "基础能力" }).click();
   await page.getByRole("button", { name: "H2 审计能力" }).click();
@@ -385,7 +385,7 @@ test("H5 快递对接能通过三层菜单打开", async ({ page }) => {
 
   await page.goto("/");
   await page.getByRole("button", { name: "登录" }).click();
-  await expect(page.getByRole("heading", { name: "WMS Web Admin" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "运营总览" })).toBeVisible();
 
   await page.getByRole("button", { name: "基础能力" }).click();
   await page.getByRole("button", { name: "H5 快递能力" }).click();

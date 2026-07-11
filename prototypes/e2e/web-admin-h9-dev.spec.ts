@@ -9,7 +9,7 @@ test("H9 设计器使用浏览器真实全屏", async ({ page }) => {
 
   await page.goto("/");
   await page.getByRole("button", { name: "登录" }).click();
-  await expect(page.getByRole("heading", { name: "WMS Web Admin" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "运营总览" })).toBeVisible();
 
   await page.getByRole("button", { name: "基础能力" }).click();
   await page.getByRole("button", { name: "H9 打印能力" }).click();
