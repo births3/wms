@@ -40,4 +40,26 @@ assert.doesNotMatch(page, /key:\s*"actions"/, "M4 列定义不得保留行内操
 assert.doesNotMatch(page, /function (OrderActions|WaveActions|ReturnActions|ActionButtons)\b/, "M4 行内操作按钮组件应移除");
 assert.doesNotMatch(page, /table(Refresh|Create|Detail|Print|Export|Toolbar)Action/, "M4 页面不得保留旧 table* 动作命名");
 
+const parts = readFileSync(resolve(root, "src/pages/outbound/M4OutboundPageParts.tsx"), "utf8");
+const productSummary = sliceBetween(parts, "export function ProductSummary", "export function ReviewSummary");
+const reviewSummary = sliceBetween(parts, "export function ReviewSummary", "export function OrderNoSummary");
+assert.match(parts, /销售出库/, "OrderNoSummary 类型文案应完整展示「销售出库」");
+assert.match(productSummary, /件/, "ProductSummary 应主显件数");
+assert.doesNotMatch(productSummary, /校验结果|批号|行\s*\//, "ProductSummary 不得再堆叠校验结果/批号/行数");
+assert.match(parts, /function ValidationBadge\b/, "校验应拆为独立 StatusBadge 列组件");
+assert.match(parts, /function BatchNoCell\b/, "批号应拆为独立列组件");
+assert.match(parts, /function CustomerCell\b/, "客户列应优先可读客户名");
+assert.match(reviewSummary, /短拣/, "ReviewSummary 应保留短拣短文案");
+assert.doesNotMatch(reviewSummary, /复核模式|计划\s/, "ReviewSummary 不得堆「复核模式」或「计划 N 件 / 短拣」挤乱文案");
+assert.match(page, /minWidth:\s*2[24]0/, "采购退货单号或单号列应有足够 minWidth");
+assert.match(page, /BatchNoCell|ValidationBadge|CustomerCell/, "M4 列表应使用拆列/降噪单元格组件");
+
+function sliceBetween(source, startMarker, endMarker) {
+  const start = source.indexOf(startMarker);
+  assert.notEqual(start, -1, `应找到片段起点 ${startMarker}`);
+  const end = source.indexOf(endMarker, start + startMarker.length);
+  assert.notEqual(end, -1, `应找到片段终点 ${endMarker}`);
+  return source.slice(start, end);
+}
+
 console.log("m4 outbound DataGrid actions self-check passed");

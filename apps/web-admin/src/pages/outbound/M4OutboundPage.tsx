@@ -37,11 +37,14 @@ import {
 } from "./M4OutboundDetailDialog";
 import {
   ActionExtraFields,
+  BatchNoCell,
+  CustomerCell,
   OrderNoSummary,
   ProductSummary,
   ReviewSummary,
   TextField,
   TwoLine,
+  ValidationBadge,
   purchaseReturnApprovalSourceLabel,
   purchaseReturnDocumentTypeLabel,
 } from "./M4OutboundPageParts";
@@ -221,14 +224,30 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
   };
   const gridToolbarActions = outboundPrivateActions(mode, selectedOrder, selectedWave, selectedReturn, openAction);
 
-  const orderColumns: DataGridColumn<OutboundOrder>[] = [
-    { key: "wms_order_no", header: "单号 / 类型", mono: true, minWidth: 180, onDoubleClick: (row) => openOrderDetail(row.id), render: (row) => <OrderNoSummary order={row} /> },
-    { key: "product", header: mode === "review" ? "复核 / 数量" : "商品 / 数量", minWidth: 220, render: (row) => mode === "review" ? <ReviewSummary order={row} /> : <ProductSummary order={row} /> },
-    { key: "customer_id", header: mode === "review" ? "客户 / 配送" : "客户 / 门店", mono: true, minWidth: 170, render: (row) => mode === "review" ? <TwoLine top={`${shortId(row.customer_id)} / 门店A`} bottom="配送方 第三方快递" /> : `${shortId(row.customer_id)} / 门店A` },
-    { key: "required_ship_at", header: mode === "review" ? "包裹 / 车牌" : "要求发货", minWidth: 150, render: (row) => mode === "review" ? <TwoLine top="包裹数量 1" bottom="车牌号 沪A-12345" /> : formatDate(row.required_ship_at) },
-    { key: "created_at", header: "创建时间", minWidth: 150, filter: { type: "dateRange" }, render: (row) => formatDate(row.created_at) },
-    { key: "status", header: "状态", minWidth: 130, filter: { type: "multiSelect", options: statusOptions(mode).map(([value, label]) => ({ value, label })) }, render: (row) => <StatusBadge status={statusKey(row.status)} label={statusLabel(row.status)} size="sm" /> },
-  ];
+  const orderColumns: DataGridColumn<OutboundOrder>[] = mode === "review"
+    ? [
+        { key: "wms_order_no", header: "单号 / 类型", mono: true, minWidth: 220, width: 240, onDoubleClick: (row) => openOrderDetail(row.id), render: (row) => <OrderNoSummary order={row} /> },
+        { key: "product", header: "计划件数", minWidth: 120, render: (row) => <ReviewSummary order={row} /> },
+        { key: "customer_id", header: "客户 / 配送", minWidth: 160, render: (row) => (
+          <div className="text-sm">
+            <CustomerCell customerId={row.customer_id} />
+            <div className="mt-0.5 text-xs text-muted-foreground">配送 第三方快递</div>
+          </div>
+        ) },
+        { key: "required_ship_at", header: "包裹 / 车牌", minWidth: 150, render: () => <TwoLine top="包裹数量 1" bottom="车牌号 沪A-12345" /> },
+        { key: "created_at", header: "创建时间", minWidth: 150, filter: { type: "dateRange" }, render: (row) => formatDate(row.created_at) },
+        { key: "status", header: "状态", minWidth: 130, filter: { type: "multiSelect", options: statusOptions(mode).map(([value, label]) => ({ value, label })) }, render: (row) => <StatusBadge status={statusKey(row.status)} label={statusLabel(row.status)} size="sm" /> },
+      ]
+    : [
+        { key: "wms_order_no", header: "单号 / 类型", mono: true, minWidth: 220, width: 240, onDoubleClick: (row) => openOrderDetail(row.id), render: (row) => <OrderNoSummary order={row} /> },
+        { key: "product", header: "商品 / 数量", minWidth: 140, render: (row) => <ProductSummary order={row} /> },
+        { key: "batch_no", header: "批号", mono: true, minWidth: 150, render: (row) => <BatchNoCell order={row} /> },
+        { key: "validation", header: "校验", minWidth: 100, render: (row) => <ValidationBadge order={row} /> },
+        { key: "customer_id", header: "客户 / 门店", minWidth: 150, render: (row) => <CustomerCell customerId={row.customer_id} /> },
+        { key: "required_ship_at", header: "要求发货", minWidth: 150, render: (row) => formatDate(row.required_ship_at) },
+        { key: "created_at", header: "创建时间", minWidth: 150, filter: { type: "dateRange" }, render: (row) => formatDate(row.created_at) },
+        { key: "status", header: "状态", minWidth: 130, filter: { type: "multiSelect", options: statusOptions(mode).map(([value, label]) => ({ value, label })) }, render: (row) => <StatusBadge status={statusKey(row.status)} label={statusLabel(row.status)} size="sm" /> },
+      ];
 
   const waveColumns: DataGridColumn<OutboundWave>[] = [
     { key: "wave_no", header: "波次号", mono: true, minWidth: 180, onDoubleClick: (row) => openWaveDetail(row.id), render: (row) => <span className="text-primary">{row.wave_no}</span> },
@@ -240,7 +259,7 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
   ];
 
   const returnColumns: DataGridColumn<PurchaseReturnOrder>[] = [
-    { key: "return_no", header: "采购退货单 / 类型", mono: true, minWidth: 190, onDoubleClick: (row) => openReturnDetail(row.id), render: (row) => <TwoLine top={row.return_no} bottom={purchaseReturnDocumentTypeLabel(row.document_type)} /> },
+    { key: "return_no", header: "采购退货单 / 类型", mono: true, minWidth: 240, width: 260, onDoubleClick: (row) => openReturnDetail(row.id), render: (row) => <TwoLine top={row.return_no} bottom={purchaseReturnDocumentTypeLabel(row.document_type)} /> },
     { key: "source_purchase_order_no", header: "原采购入库单", mono: true, minWidth: 180 },
     { key: "supplier_name", header: "供应商 / 原因", minWidth: 200, render: (row) => <TwoLine top={row.supplier_name} bottom={row.reason} /> },
     { key: "product", header: "商品 / 数量", minWidth: 160, render: (row) => <TwoLine top={row.product_code} bottom={`${row.qty} 件`} /> },
@@ -788,10 +807,6 @@ function waveQty(wave: OutboundWave, orders: OutboundOrder[]) {
 
 function waveLineCount(wave: OutboundWave, orders: OutboundOrder[]) {
   return orders.filter((order) => wave.order_ids.includes(order.id)).reduce((sum, order) => sum + order.lines.length, 0);
-}
-
-function shortId(value: string) {
-  return value.slice(0, 8);
 }
 
 function formatDate(value: string | null | undefined) {

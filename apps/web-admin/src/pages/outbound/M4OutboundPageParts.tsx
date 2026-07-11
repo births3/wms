@@ -1,4 +1,4 @@
-import { Input } from "@wms/ui";
+import { Input, StatusBadge } from "@wms/ui";
 
 import type { OutboundOrder, PurchaseReturnOrder } from "./M4OutboundDetailDialog";
 
@@ -25,38 +25,91 @@ export function TextField({
   );
 }
 
+/** 主显：商品编码 + 件数；批号 / 行数 / 校验另列展示 */
 export function ProductSummary({ order }: { order: OutboundOrder }) {
   const first = order.lines[0];
   return (
     <div className="text-sm">
       <div className="font-medium">{first?.product_code ?? "-"}</div>
-      <div className="text-xs text-muted-foreground">
-        {order.lines.length} 行 / {first?.batch_no ?? "-"} / {lineTotalPlannedQty(order)} 件 / 校验结果 {validationResultLabel(order)}
+      <div className="text-xs text-muted-foreground">{lineTotalPlannedQty(order)} 件</div>
+    </div>
+  );
+}
+
+/** 复核列表降噪：计划件数 + 短拣短文案，不堆「复核模式」等次要信息 */
+export function ReviewSummary({ order }: { order: OutboundOrder }) {
+  return (
+    <div className="text-sm">
+      <div className="font-medium">{lineTotalPlannedQty(order)} 件</div>
+      <div className="text-xs text-muted-foreground">{order.short_pick ? "有短拣" : "无短拣"}</div>
+    </div>
+  );
+}
+
+/** 类型文案完整展示「销售出库」，避免列宽不足截成「销」 */
+export function OrderNoSummary({ order }: { order: OutboundOrder }) {
+  return (
+    <div className="text-sm">
+      <div className="whitespace-nowrap font-medium text-primary">{order.wms_order_no}</div>
+      <div className="whitespace-nowrap text-xs text-muted-foreground">
+        {order.erp_order_no ?? "-"} · 销售出库
       </div>
     </div>
   );
 }
 
-export function ReviewSummary({ order }: { order: OutboundOrder }) {
+export function BatchNoCell({ order }: { order: OutboundOrder }) {
+  const first = order.lines[0];
+  return <span className="font-mono text-sm">{first?.batch_no ?? "-"}</span>;
+}
+
+export function ValidationBadge({ order }: { order: OutboundOrder }) {
+  const failed = order.status === "validation_exception";
   return (
-    <TwoLine
-      top="复核模式 包装站复核"
-      bottom={`计划 ${lineTotalPlannedQty(order)} 件 / 短拣标识 ${order.short_pick ? "是" : "否"}`}
+    <StatusBadge
+      status={failed ? "unqualified" : "completed"}
+      label={failed ? "异常" : "通过"}
+      size="sm"
     />
   );
 }
 
-export function OrderNoSummary({ order }: { order: OutboundOrder }) {
-  return <TwoLine top={order.wms_order_no} bottom={`${order.erp_order_no ?? "-"} / 销售出库`} />;
+/** 优先可读客户名；仅有 id 时 shortId + 门店名 */
+export function CustomerCell({ customerId, storeName = "门店A" }: { customerId: string; storeName?: string }) {
+  const name = customerDisplayName(customerId);
+  if (name) {
+    return (
+      <div className="text-sm">
+        <div className="font-medium whitespace-nowrap">{name}</div>
+        <div className="text-xs text-muted-foreground whitespace-nowrap">{storeName}</div>
+      </div>
+    );
+  }
+  return (
+    <div className="text-sm">
+      <div className="font-mono whitespace-nowrap">{shortId(customerId)}</div>
+      <div className="text-xs text-muted-foreground whitespace-nowrap">{storeName}</div>
+    </div>
+  );
 }
 
 export function TwoLine({ top, bottom }: { top: string; bottom: string }) {
   return (
     <div className="text-sm">
-      <div className="font-medium text-primary">{top}</div>
-      <div className="text-xs text-muted-foreground">{bottom}</div>
+      <div className="whitespace-nowrap font-medium text-primary">{top}</div>
+      <div className="whitespace-nowrap text-xs text-muted-foreground">{bottom}</div>
     </div>
   );
+}
+
+function customerDisplayName(customerId: string) {
+  // 列表 seed / 新建默认客户：可读名优先于裸 UUID
+  if (customerId === "00000000-0000-0000-0000-000000004001") return "连锁门店 A";
+  return null;
+}
+
+function shortId(value: string) {
+  return value.slice(0, 8);
 }
 
 export function purchaseReturnDocumentTypeLabel(value: PurchaseReturnOrder["document_type"]) {
@@ -99,8 +152,4 @@ function StaticField({ label, defaultValue }: { label: string; defaultValue: str
 
 function lineTotalPlannedQty(order: OutboundOrder) {
   return order.lines.reduce((sum, line) => sum + line.planned_qty, 0);
-}
-
-function validationResultLabel(order: OutboundOrder) {
-  return order.status === "validation_exception" ? "异常" : "通过";
 }

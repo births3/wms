@@ -17,6 +17,11 @@ const devMock = readFileSync(
 assert.match(appShell, /id:\s*"m3-batches"/, "库内业务菜单应登记 M3 批号管理视图");
 assert.match(appShell, /<M3BatchManagementPage\b/, "App 应渲染 M3 批号管理页面");
 assert.match(page, /<DataGrid\b/, "M3 批号管理页应复用 DataGrid");
+assert.match(page, /detailAction=\{gridDetailAction\}/, "M3 批号管理应提供标准详情动作");
+assert.match(page, /onDoubleClick:\s*\(row\)\s*=>\s*onOpenDetail\(row\.id\)/, "M3 批号列应支持双击打开详情");
+assert.match(page, /function M3BatchDetailDialog\b/, "M3 应提供批号详情 Dialog");
+assert.match(page, /ExpiryDateCell|近效期|已过期/, "M3 有效期列应有近效期/过期视觉区分");
+assert.match(page, /emptyTitle="暂无库存批次"/, "M3 应保持 emptyTitle");
 assert.match(queries, /api\.GET\("\/api\/v1\/inventory\/batches"\)/, "批号列表应通过现有 inventory batches API 读取");
 assert.match(devMock, /pathname === "\/api\/v1\/inventory\/batches"/, "开发 mock 应覆盖 M3 批号列表路由");
 assert.match(devMock, /function inventoryBatches\(\)/, "开发 mock 应提供 M3 批号列表数据");
