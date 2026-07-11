@@ -102,12 +102,27 @@ impl ReceivingOrderStore {
         req: UpdateReceivingOrderRequest,
         now: DateTime<Utc>,
     ) -> Result<ReceivingOrder, ReceivingOrderError> {
+        if req.lines.as_ref().is_some_and(Vec::is_empty) {
+            return Err(ReceivingOrderError::EmptyLines);
+        }
         let order = self
             .orders
             .get_mut(&id)
             .ok_or(ReceivingOrderError::NotFound)?;
         if order.owner_id != ctx.owner_id {
             return Err(ReceivingOrderError::NotFound);
+        }
+        if req.status.is_some() {
+            return Err(ReceivingOrderError::InvalidStatus {
+                expected: "workflow action",
+                actual: order.status.clone(),
+            });
+        }
+        if order.status != "draft" {
+            return Err(ReceivingOrderError::InvalidStatus {
+                expected: "draft",
+                actual: order.status.clone(),
+            });
         }
         if let Some(value) = req.supplier_id {
             order.supplier_id = Some(value);
@@ -116,20 +131,38 @@ impl ReceivingOrderStore {
             order.warehouse_id = value;
         }
         if let Some(value) = req.external_ref {
-            order.external_ref = Some(value);
-        }
-        if let Some(value) = req.status {
-            order.status = value;
+            order.external_ref = value;
         }
         if let Some(value) = req.expected_arrival_at {
             order.expected_arrival_at = Some(value);
         }
         if let Some(lines) = req.lines {
-            if lines.is_empty() {
-                return Err(ReceivingOrderError::EmptyLines);
-            }
             order.lines = lines;
         }
+        order.updated_at = now;
+        Ok(order.clone())
+    }
+
+    pub fn release(
+        &mut self,
+        ctx: &AuthContext,
+        id: Uuid,
+        now: DateTime<Utc>,
+    ) -> Result<ReceivingOrder, ReceivingOrderError> {
+        let order = self
+            .orders
+            .get_mut(&id)
+            .ok_or(ReceivingOrderError::NotFound)?;
+        if order.owner_id != ctx.owner_id {
+            return Err(ReceivingOrderError::NotFound);
+        }
+        if order.status != "draft" {
+            return Err(ReceivingOrderError::InvalidStatus {
+                expected: "draft",
+                actual: order.status.clone(),
+            });
+        }
+        order.status = "released".to_string();
         order.updated_at = now;
         Ok(order.clone())
     }
@@ -446,20 +479,8 @@ mod tests {
         ));
 
         let updated = store
-            .update(
-                &ctx_a,
-                created.id,
-                UpdateReceivingOrderRequest {
-                    supplier_id: None,
-                    warehouse_id: None,
-                    external_ref: None,
-                    status: Some("released".to_string()),
-                    expected_arrival_at: None,
-                    lines: None,
-                },
-                now,
-            )
-            .expect("update receiving order");
+            .release(&ctx_a, created.id, now)
+            .expect("release receiving order");
         assert_eq!(updated.status, "released");
 
         store
@@ -492,6 +513,90 @@ mod tests {
         );
 
         assert!(matches!(result, Err(ReceivingOrderError::EmptyLines)));
+    }
+
+    #[test]
+    fn receiving_order_update_validation_is_atomic() {
+        let now = Utc::now();
+        let ctx = ctx(Uuid::new_v4());
+        let mut store = ReceivingOrderStore::default();
+        let created = store
+            .create(
+                &ctx,
+                CreateReceivingOrderRequest {
+                    receipt_no: "ASN-ATOMIC-001".to_string(),
+                    document_type: "purchase_inbound".to_string(),
+                    supplier_id: None,
+                    warehouse_id: Uuid::new_v4(),
+                    external_ref: None,
+                    expected_arrival_at: None,
+                    lines: vec![line()],
+                },
+                now,
+            )
+            .expect("create order");
+
+        let result = store.update(
+            &ctx,
+            created.id,
+            UpdateReceivingOrderRequest {
+                supplier_id: Some(Uuid::new_v4()),
+                warehouse_id: Some(Uuid::new_v4()),
+                external_ref: Some(Some("MUST-NOT-PERSIST".to_string())),
+                status: None,
+                expected_arrival_at: None,
+                lines: Some(Vec::new()),
+            },
+            now,
+        );
+
+        assert!(matches!(result, Err(ReceivingOrderError::EmptyLines)));
+        assert_eq!(
+            store.get(&ctx, created.id).expect("order").external_ref,
+            None
+        );
+    }
+
+    #[test]
+    fn receiving_order_update_can_clear_external_reference() {
+        let now = Utc::now();
+        let ctx = ctx(Uuid::new_v4());
+        let mut store = ReceivingOrderStore::default();
+        let created = store
+            .create(
+                &ctx,
+                CreateReceivingOrderRequest {
+                    receipt_no: "ASN-CLEAR-001".to_string(),
+                    document_type: "purchase_inbound".to_string(),
+                    supplier_id: Some(Uuid::new_v4()),
+                    warehouse_id: Uuid::new_v4(),
+                    external_ref: Some("ERP-CLEAR-001".to_string()),
+                    expected_arrival_at: Some(now),
+                    lines: vec![line()],
+                },
+                now,
+            )
+            .expect("create order");
+
+        let updated = store
+            .update(
+                &ctx,
+                created.id,
+                UpdateReceivingOrderRequest {
+                    supplier_id: None,
+                    warehouse_id: None,
+                    external_ref: Some(None),
+                    status: None,
+                    expected_arrival_at: None,
+                    lines: None,
+                },
+                now,
+            )
+            .expect("clear nullable fields");
+
+        assert_eq!(updated.supplier_id, created.supplier_id);
+        assert_eq!(updated.external_ref, None);
+        assert_eq!(updated.expected_arrival_at, created.expected_arrival_at);
     }
 
     #[test]
@@ -546,21 +651,7 @@ mod tests {
                 now,
             )
             .expect("create order");
-        store
-            .update(
-                &ctx,
-                created.id,
-                UpdateReceivingOrderRequest {
-                    supplier_id: None,
-                    warehouse_id: None,
-                    external_ref: None,
-                    status: Some("released".to_string()),
-                    expected_arrival_at: None,
-                    lines: None,
-                },
-                now,
-            )
-            .expect("release order");
+        store.release(&ctx, created.id, now).expect("release order");
 
         let mismatch = store.receive(
             &ctx,
@@ -684,21 +775,7 @@ mod tests {
                 now,
             )
             .expect("create order");
-        store
-            .update(
-                &ctx,
-                created.id,
-                UpdateReceivingOrderRequest {
-                    supplier_id: None,
-                    warehouse_id: None,
-                    external_ref: None,
-                    status: Some("receiving".to_string()),
-                    expected_arrival_at: None,
-                    lines: None,
-                },
-                now,
-            )
-            .expect("mark receiving");
+        store.release(&ctx, created.id, now).expect("release order");
 
         let receipt = store
             .reject(
@@ -741,21 +818,7 @@ mod tests {
                 now,
             )
             .expect("create order");
-        store
-            .update(
-                &ctx,
-                created.id,
-                UpdateReceivingOrderRequest {
-                    supplier_id: None,
-                    warehouse_id: None,
-                    external_ref: None,
-                    status: Some("released".to_string()),
-                    expected_arrival_at: None,
-                    lines: None,
-                },
-                now,
-            )
-            .expect("release order");
+        store.release(&ctx, created.id, now).expect("release order");
         store
             .receive(
                 &ctx,

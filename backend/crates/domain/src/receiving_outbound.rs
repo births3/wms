@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -52,10 +52,23 @@ pub struct CreateReceivingOrderRequest {
 pub struct UpdateReceivingOrderRequest {
     pub supplier_id: Option<Uuid>,
     pub warehouse_id: Option<Uuid>,
-    pub external_ref: Option<String>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_nullable_patch",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub external_ref: Option<Option<String>>,
     pub status: Option<String>,
     pub expected_arrival_at: Option<DateTime<Utc>>,
     pub lines: Option<Vec<ReceivingOrderLine>>,
+}
+
+fn deserialize_nullable_patch<'de, D, T>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::<T>::deserialize(deserializer).map(Some)
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -154,4 +167,26 @@ pub struct ShipOutboundOrderRequest {
     pub handover_to: String,
     pub package_count: u32,
     pub shipped_at: Option<DateTime<Utc>>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::UpdateReceivingOrderRequest;
+
+    #[test]
+    fn nullable_patch_distinguishes_missing_null_and_value() {
+        let missing: UpdateReceivingOrderRequest =
+            serde_json::from_str("{}").expect("missing fields should deserialize");
+        let clear: UpdateReceivingOrderRequest = serde_json::from_str(r#"{"external_ref":null}"#)
+            .expect("null field should deserialize");
+        let value: UpdateReceivingOrderRequest = serde_json::from_str(
+            r#"{"external_ref":"ERP-001","expected_arrival_at":"2026-07-11T00:00:00Z"}"#,
+        )
+        .expect("values should deserialize");
+
+        assert_eq!(missing.external_ref, None);
+        assert_eq!(clear.external_ref, Some(None));
+        assert_eq!(value.external_ref, Some(Some("ERP-001".to_string())));
+        assert!(value.expected_arrival_at.is_some());
+    }
 }

@@ -27,11 +27,11 @@ use wms_domain::{
     InventoryBatchListResponse, PageMeta, PutawayInventoryRequest, PutawayRecord, PutawayRequest,
     ReceiveReceivingOrderRequest, ReceivingInspectionRecord, ReceivingOrder,
     ReceivingOrderListResponse, ReceivingOrderReceipt, RejectReceivingOrderRequest,
-    TemperatureExcursionEvent, TemperatureReading,
+    TemperatureExcursionEvent, TemperatureReading, UpdateReceivingOrderRequest,
 };
 
 use crate::{
-    audit::{AuditLog, AuditWriteRequest},
+    audit::{AuditDiff, AuditLog, AuditWriteRequest},
     auth::{AuthContext, AuthError},
     billing::{BillingError, BillingStore},
     cold_chain::{ColdChainError, ColdChainService},
@@ -317,7 +317,7 @@ pub fn wave3_router(state: Wave3AppState) -> Router {
         )
         .route(
             "/api/v1/inbound/receiving-orders/:id",
-            get(get_receiving_order_handler),
+            get(get_receiving_order_handler).patch(update_receiving_order_handler),
         )
         .route(
             "/api/v1/inbound/receiving-orders/:id/receive",
@@ -430,6 +430,51 @@ async fn get_receiving_order_handler(
         let store = state.inbound_store.lock().await;
         store.get(&ctx, id)?
     };
+    Ok(Json(order))
+}
+
+async fn update_receiving_order_handler(
+    ctx: AuthContext,
+    State(state): State<Wave3AppState>,
+    Path(id): Path<Uuid>,
+    Json(req): Json<UpdateReceivingOrderRequest>,
+) -> Result<Json<ReceivingOrder>, Wave3HandlerError> {
+    ctx.require_permission("m2.write")?;
+    let now = Utc::now();
+    let (order, audit_diff) = if let Some(repository) = &state.wave3_repository {
+        let audit = AuditWriteRequest::from_auth_context(
+            &ctx,
+            "update",
+            "M2",
+            "receiving_order",
+            id.to_string(),
+            None,
+        );
+        (
+            repository
+                .update_receiving_order(&ctx, id, req, now, audit)
+                .await?,
+            None,
+        )
+    } else {
+        let mut store = state.inbound_store.lock().await;
+        let before = store.get(&ctx, id)?;
+        let after = store.update(&ctx, id, req, now)?;
+        let diff = AuditDiff::compute(serde_json::json!(before), serde_json::json!(after));
+        (after, Some(diff))
+    };
+    if let Some(diff) = audit_diff {
+        append_audit_with_diff(
+            &state,
+            &ctx,
+            "update",
+            "M2",
+            "receiving_order",
+            id.to_string(),
+            Some(diff),
+        )
+        .await;
+    }
     Ok(Json(order))
 }
 
@@ -1010,6 +1055,18 @@ async fn append_audit(
     resource_type: &'static str,
     resource_id: String,
 ) {
+    append_audit_with_diff(state, ctx, action, module, resource_type, resource_id, None).await;
+}
+
+async fn append_audit_with_diff(
+    state: &Wave3AppState,
+    ctx: &AuthContext,
+    action: &'static str,
+    module: &'static str,
+    resource_type: &'static str,
+    resource_id: String,
+    diff: Option<AuditDiff>,
+) {
     let mut audit_log = state.audit_log.lock().await;
     audit_log.append_event(AuditWriteRequest::from_auth_context(
         ctx,
@@ -1017,7 +1074,7 @@ async fn append_audit(
         module,
         resource_type,
         resource_id,
-        None,
+        diff,
     ));
 }
 
@@ -1046,9 +1103,9 @@ mod tests {
         ingest_temperature_reading_handler, inspect_receiving_order_handler,
         list_inventory_batches_handler, putaway_inventory_batch_handler,
         putaway_receiving_order_handler, receive_receiving_order_handler, sha256_hex,
-        sign_receiving_order_handler, wave3_router, ExternalApiKeyConfig, Wave3AppState,
-        Wave3HandlerError, EXTERNAL_API_KEY_HEADER, IDEMPOTENCY_KEY_HEADER,
-        INVENTORY_BATCHES_SMOKE_FLAG,
+        sign_receiving_order_handler, update_receiving_order_handler, wave3_router,
+        ExternalApiKeyConfig, Wave3AppState, Wave3HandlerError, EXTERNAL_API_KEY_HEADER,
+        IDEMPOTENCY_KEY_HEADER, INVENTORY_BATCHES_SMOKE_FLAG,
     };
     use crate::{
         auth::{AuthContext, AuthError},
@@ -1174,6 +1231,102 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn update_receiving_order_requires_permission_and_appends_audit() {
+        let owner_id = Uuid::new_v4();
+        let state = Wave3AppState::default();
+        let authorized = ctx(owner_id, &["m2.write"]);
+        let created = {
+            let mut store = state.inbound_store.lock().await;
+            store
+                .create(
+                    &authorized,
+                    CreateReceivingOrderRequest {
+                        receipt_no: "ASN-UPDATE-001".to_string(),
+                        document_type: "purchase_inbound".to_string(),
+                        supplier_id: None,
+                        warehouse_id: Uuid::new_v4(),
+                        external_ref: None,
+                        expected_arrival_at: None,
+                        lines: vec![receiving_line()],
+                    },
+                    Utc::now(),
+                )
+                .expect("receiving order should be created")
+        };
+
+        let denied = update_receiving_order_handler(
+            ctx(owner_id, &[]),
+            State(state.clone()),
+            Path(created.id),
+            Json(UpdateReceivingOrderRequest {
+                supplier_id: None,
+                warehouse_id: None,
+                external_ref: Some(Some("ERP-UPDATED".to_string())),
+                status: None,
+                expected_arrival_at: None,
+                lines: None,
+            }),
+        )
+        .await;
+        assert!(matches!(
+            denied,
+            Err(Wave3HandlerError::Auth(AuthError::PermissionDenied(permission)))
+                if permission == "m2.write"
+        ));
+
+        let updated = update_receiving_order_handler(
+            authorized,
+            State(state.clone()),
+            Path(created.id),
+            Json(UpdateReceivingOrderRequest {
+                supplier_id: None,
+                warehouse_id: None,
+                external_ref: Some(Some("ERP-UPDATED".to_string())),
+                status: None,
+                expected_arrival_at: None,
+                lines: None,
+            }),
+        )
+        .await
+        .expect("authorized update should succeed")
+        .0;
+
+        assert_eq!(updated.external_ref.as_deref(), Some("ERP-UPDATED"));
+        let audit = state.audit_log.lock().await;
+        assert_eq!(audit.events().len(), 1);
+        assert_eq!(audit.events()[0].action, "update");
+        let diff = audit.events()[0]
+            .diff
+            .as_ref()
+            .expect("update audit should record before and after values");
+        assert!(diff.changed_keys.contains(&"external_ref".to_string()));
+        assert_eq!(diff.before["external_ref"], serde_json::Value::Null);
+        assert_eq!(diff.after["external_ref"], "ERP-UPDATED");
+        drop(audit);
+
+        let status_bypass = update_receiving_order_handler(
+            ctx(owner_id, &["m2.write"]),
+            State(state),
+            Path(created.id),
+            Json(UpdateReceivingOrderRequest {
+                supplier_id: None,
+                warehouse_id: None,
+                external_ref: None,
+                status: Some("completed".to_string()),
+                expected_arrival_at: None,
+                lines: None,
+            }),
+        )
+        .await;
+        assert!(matches!(
+            status_bypass,
+            Err(Wave3HandlerError::Receiving(
+                crate::inbound::ReceivingOrderError::InvalidStatus { .. }
+            ))
+        ));
+    }
+
+    #[tokio::test]
     async fn inbound_receive_handler_requires_permission_and_appends_audit() {
         let owner_id = Uuid::new_v4();
         let authorized = ctx(owner_id, &["m2.write"]);
@@ -1201,19 +1354,7 @@ mod tests {
                 )
                 .expect("create order");
             store
-                .update(
-                    &authorized,
-                    created.id,
-                    UpdateReceivingOrderRequest {
-                        supplier_id: None,
-                        warehouse_id: None,
-                        external_ref: None,
-                        status: Some("released".to_string()),
-                        expected_arrival_at: None,
-                        lines: None,
-                    },
-                    now,
-                )
+                .release(&authorized, created.id, now)
                 .expect("release order")
         };
 

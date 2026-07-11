@@ -13,12 +13,12 @@ use wms_domain::{
     InventoryBatch, InventoryMovement, PutawayRecord, PutawayRequest, ReceiveReceivingOrderRequest,
     ReceivingInspectionRecord, ReceivingOrder, ReceivingOrderLine, ReceivingOrderReceipt,
     RejectReceivingOrderRequest, SignInspectionRequest, TemperatureExcursionEvent,
-    TemperatureReading, RECEIVING_DOCUMENT_TYPE_PURCHASE_INBOUND,
+    TemperatureReading, UpdateReceivingOrderRequest, RECEIVING_DOCUMENT_TYPE_PURCHASE_INBOUND,
     RECEIVING_DOCUMENT_TYPE_SALES_RETURN,
 };
 
 use crate::{
-    audit::{append_event_in_tx, AuditWriteRequest},
+    audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
     auth::AuthContext,
     inventory::{allowed_transition, STATUS_QUALIFIED},
 };
@@ -75,7 +75,7 @@ pub enum Wave3RepositoryError {
     Serialize(String),
 }
 
-#[derive(FromRow)]
+#[derive(Clone, FromRow)]
 struct ReceivingOrderRow {
     id: Uuid,
     owner_id: Uuid,
@@ -199,30 +199,7 @@ impl PgWave3Repository {
         .await
         .map_err(map_db_error)?;
 
-        for line in &req.lines {
-            sqlx::query(
-                r#"
-                INSERT INTO receiving_order_lines (
-                    id, receiving_order_id, owner_id, line_no, product_id,
-                    product_code, expected_qty, batch_no, production_date, expiry_date
-                )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-                "#,
-            )
-            .bind(Uuid::new_v4())
-            .bind(id)
-            .bind(ctx.owner_id)
-            .bind(i32::try_from(line.line_no).map_err(|_| Wave3RepositoryError::InvalidQuantity)?)
-            .bind(line.product_id)
-            .bind(&line.product_code)
-            .bind(line.expected_qty)
-            .bind(&line.batch_no)
-            .bind(parse_optional_date(line.production_date.as_deref())?)
-            .bind(parse_optional_date(line.expiry_date.as_deref())?)
-            .execute(&mut *tx)
-            .await
-            .map_err(map_db_error)?;
-        }
+        insert_receiving_order_lines(&mut tx, ctx.owner_id, id, &req.lines).await?;
 
         tx.commit().await.map_err(map_db_error)?;
         Ok(ReceivingOrder {
@@ -290,6 +267,104 @@ impl PgWave3Repository {
         .ok_or(Wave3RepositoryError::NotFound)?;
         let lines = self.load_receiving_order_lines(ctx.owner_id, id).await?;
         Ok(map_receiving_order(row, lines))
+    }
+
+    pub async fn update_receiving_order(
+        &self,
+        ctx: &AuthContext,
+        id: Uuid,
+        req: UpdateReceivingOrderRequest,
+        now: DateTime<Utc>,
+        audit: AuditWriteRequest,
+    ) -> Result<ReceivingOrder, Wave3RepositoryError> {
+        if req.lines.as_ref().is_some_and(Vec::is_empty) {
+            return Err(Wave3RepositoryError::InvalidQuantity);
+        }
+        if req.status.is_some() {
+            return Err(Wave3RepositoryError::InvalidStatus {
+                expected: "workflow action".to_string(),
+                actual: req.status.unwrap_or_default(),
+            });
+        }
+
+        let mut tx = self.begin().await?;
+        let locked = lock_receiving_order(&mut tx, ctx.owner_id, id).await?;
+        if locked.status != "draft" {
+            return Err(Wave3RepositoryError::InvalidStatus {
+                expected: "draft".to_string(),
+                actual: locked.status,
+            });
+        }
+        if let Some(supplier_id) = req.supplier_id {
+            ensure_owned_reference(&mut tx, "suppliers", ctx.owner_id, supplier_id).await?;
+        }
+        if let Some(warehouse_id) = req.warehouse_id {
+            ensure_owned_reference(&mut tx, "warehouses", ctx.owner_id, warehouse_id).await?;
+        }
+        for product_id in req
+            .lines
+            .iter()
+            .flatten()
+            .filter_map(|line| line.product_id)
+        {
+            ensure_owned_reference(&mut tx, "products", ctx.owner_id, product_id).await?;
+        }
+        let before_lines = load_receiving_order_lines_in_tx(&mut tx, ctx.owner_id, id).await?;
+        let before = map_receiving_order(locked, before_lines);
+        let external_ref_is_set = req.external_ref.is_some();
+        let external_ref = req.external_ref.flatten();
+        let row = sqlx::query_as::<_, ReceivingOrderRow>(
+            r#"
+            UPDATE receiving_orders
+               SET supplier_id = COALESCE($3, supplier_id),
+                   warehouse_id = COALESCE($4, warehouse_id),
+                   external_ref = CASE WHEN $5 THEN $6 ELSE external_ref END,
+                   expected_arrival_at = COALESCE($7, expected_arrival_at),
+                   updated_at = $8,
+                   version = version + 1
+             WHERE id = $1 AND owner_id = $2
+            RETURNING id, owner_id, receipt_no, document_type, supplier_id, warehouse_id,
+                      external_ref, status, expected_arrival_at, created_at, updated_at
+            "#,
+        )
+        .bind(id)
+        .bind(ctx.owner_id)
+        .bind(req.supplier_id)
+        .bind(req.warehouse_id)
+        .bind(external_ref_is_set)
+        .bind(external_ref)
+        .bind(req.expected_arrival_at)
+        .bind(now)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(map_db_error)?
+        .ok_or(Wave3RepositoryError::NotFound)?;
+
+        if let Some(lines) = &req.lines {
+            sqlx::query(
+                "DELETE FROM receiving_order_lines WHERE receiving_order_id = $1 AND owner_id = $2",
+            )
+            .bind(id)
+            .bind(ctx.owner_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(map_db_error)?;
+            insert_receiving_order_lines(&mut tx, ctx.owner_id, id, lines).await?;
+        }
+        let after_lines = load_receiving_order_lines_in_tx(&mut tx, ctx.owner_id, id).await?;
+        let after = map_receiving_order(row, after_lines);
+        let mut audit = audit;
+        audit.diff = Some(AuditDiff::compute(
+            serde_json::to_value(&before)
+                .map_err(|error| Wave3RepositoryError::Serialize(error.to_string()))?,
+            serde_json::to_value(&after)
+                .map_err(|error| Wave3RepositoryError::Serialize(error.to_string()))?,
+        ));
+        append_event_in_tx(&mut tx, &audit)
+            .await
+            .map_err(|error| Wave3RepositoryError::Audit(format!("{error:?}")))?;
+        tx.commit().await.map_err(map_db_error)?;
+        Ok(after)
     }
 
     pub async fn release_receiving_order(
@@ -1574,6 +1649,57 @@ async fn lock_receiving_order(
     .ok_or(Wave3RepositoryError::NotFound)
 }
 
+async fn load_receiving_order_lines_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    id: Uuid,
+) -> Result<Vec<ReceivingOrderLine>, Wave3RepositoryError> {
+    let rows = sqlx::query_as::<_, ReceivingOrderLineRow>(
+        r#"
+        SELECT line_no, product_id, product_code, expected_qty, batch_no,
+               production_date, expiry_date
+          FROM receiving_order_lines
+         WHERE receiving_order_id = $1 AND owner_id = $2
+         ORDER BY line_no
+        "#,
+    )
+    .bind(id)
+    .bind(owner_id)
+    .fetch_all(&mut **tx)
+    .await
+    .map_err(map_db_error)?;
+    Ok(rows.into_iter().map(map_receiving_order_line).collect())
+}
+
+async fn ensure_owned_reference(
+    tx: &mut Transaction<'_, Postgres>,
+    table: &'static str,
+    owner_id: Uuid,
+    id: Uuid,
+) -> Result<(), Wave3RepositoryError> {
+    let query = match table {
+        "suppliers" => "SELECT EXISTS(SELECT 1 FROM suppliers WHERE owner_id = $1 AND id = $2 AND status = 'active')",
+        "warehouses" => "SELECT EXISTS(SELECT 1 FROM warehouses WHERE owner_id = $1 AND id = $2 AND status = 'active')",
+        "products" => "SELECT EXISTS(SELECT 1 FROM products WHERE owner_id = $1 AND id = $2 AND status = 'active')",
+        _ => {
+            return Err(Wave3RepositoryError::Serialize(
+                "invalid reference table".to_string(),
+            ))
+        }
+    };
+    let exists: bool = sqlx::query_scalar(query)
+        .bind(owner_id)
+        .bind(id)
+        .fetch_one(&mut **tx)
+        .await
+        .map_err(map_db_error)?;
+    if exists {
+        Ok(())
+    } else {
+        Err(Wave3RepositoryError::NotFound)
+    }
+}
+
 async fn ensure_cold_chain_device_active(
     tx: &mut Transaction<'_, Postgres>,
     owner_id: Uuid,
@@ -1758,6 +1884,39 @@ fn idempotency_lock_id(owner_id: Uuid, idempotency_key: &str) -> i64 {
     let mut bytes = [0_u8; 8];
     bytes.copy_from_slice(&digest[..8]);
     i64::from_be_bytes(bytes)
+}
+
+async fn insert_receiving_order_lines(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    receiving_order_id: Uuid,
+    lines: &[ReceivingOrderLine],
+) -> Result<(), Wave3RepositoryError> {
+    for line in lines {
+        sqlx::query(
+            r#"
+            INSERT INTO receiving_order_lines (
+                id, receiving_order_id, owner_id, line_no, product_id,
+                product_code, expected_qty, batch_no, production_date, expiry_date
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(receiving_order_id)
+        .bind(owner_id)
+        .bind(i32::try_from(line.line_no).map_err(|_| Wave3RepositoryError::InvalidQuantity)?)
+        .bind(line.product_id)
+        .bind(&line.product_code)
+        .bind(line.expected_qty)
+        .bind(&line.batch_no)
+        .bind(parse_optional_date(line.production_date.as_deref())?)
+        .bind(parse_optional_date(line.expiry_date.as_deref())?)
+        .execute(&mut **tx)
+        .await
+        .map_err(map_db_error)?;
+    }
+    Ok(())
 }
 
 fn parse_optional_date(value: Option<&str>) -> Result<Option<NaiveDate>, Wave3RepositoryError> {
