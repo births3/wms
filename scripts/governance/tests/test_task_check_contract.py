@@ -102,6 +102,11 @@ def test_json_mode_emits_one_aggregate_document(monkeypatch, capsys):
         "run_one",
         lambda *_args, **_kwargs: task_check.ScriptResult("check_error_codes", 0, 0, 1),
     )
+    monkeypatch.setattr(
+        task_check,
+        "run_t1_fallback",
+        lambda _json_mode: task_check.ScriptResult("governance_t1_fallback", 0, 0, 1),
+    )
 
     assert task_check.main(["--tier", "T1", "--report-json", "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)

@@ -13,14 +13,14 @@ Tier：T1（< 5s）
   2 脚本自身错误
 
 校验项：
-  1. 24 个 BC 的 manifest 是否都已就位（Wave 0 末期允许部分缺失，仅 warning）
+  1. 24 个 BC 的 manifest 是否都已就位（普通模式报告，--strict 阻断）
   2. 每个 manifest 必有 [bounded_context] + [integrations] 段
   3. 集成模式在 8 种白名单内
   4. Shared Kernel 类型在 9 个白名单内
   5. 跨 BC 依赖图双向一致（A 声明依赖 B 时，B 也应承认 A）
 
 适用范围：所有 docs/domain/<bc-slug>/module-manifest.toml
-不强制：Wave 0 期间允许 manifest 不全（M-TC 是首个示例）
+普通模式用于日常盘点；T4 使用 --strict，缺失 manifest 会阻断。
 """
 from __future__ import annotations
 
@@ -135,11 +135,11 @@ def check(manifests: list[BCManifest]) -> list[Issue]:
     issues: list[Issue] = []
     found_bcs = {m.bc_code for m in manifests if Path(REPO_ROOT / m.file).exists()}
 
-    # 1. 缺失的 BC manifest（Wave 0 期间允许，仅 info）
+    # 1. 缺失的 BC manifest（普通模式盘点，strict 阻断）
     missing = BOUNDED_CONTEXTS - found_bcs
     for bc in sorted(missing):
         issues.append(Issue(bc, "info", "manifest_missing",
-                            f"BC '{bc}' 的 module-manifest.toml 未创建（Wave 0 期间允许；Wave 1 启动前必须补）"))
+                            f"BC '{bc}' 的 module-manifest.toml 未创建（T4 strict 出口前必须补）"))
 
     # 2-5. 已存在的 manifest 校验
     for m in manifests:
@@ -189,6 +189,7 @@ def check(manifests: list[BCManifest]) -> list[Issue]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--strict", action="store_true", help="缺失、警告或错误均阻断")
     args = parser.parse_args(argv)
 
     manifests = load_manifests()
@@ -209,7 +210,8 @@ def main(argv: list[str] | None = None) -> int:
             "errors": [asdict(i) for i in errors],
             "warnings": [asdict(i) for i in warnings],
             "infos": [asdict(i) for i in infos],
-            "ok": not errors,
+            "strict": args.strict,
+            "ok": not errors and not (args.strict and (warnings or infos)),
         }, ensure_ascii=False, indent=2))
     else:
         print(f"check_bounded_contexts (T1, 文档治理) — "
@@ -233,7 +235,7 @@ def main(argv: list[str] | None = None) -> int:
         if not (errors or warnings or infos):
             print("  ✓ 所有 BC manifest 合规")
 
-    return 0 if not errors else 1
+    return 1 if errors or (args.strict and (warnings or infos)) else 0
 
 
 if __name__ == "__main__":

@@ -15,8 +15,7 @@
 #   just preflight          Tier 3
 #   just verify             Tier 4
 #
-# 注意：第 0 周阶段，Rust / 前端工具链尚未引入，许多命令为占位
-#       带 [WAVE-N] 标记的命令将在对应波次启动时启用
+# 当前已进入 Wave 6；四级入口必须执行真实检查并 fail closed。
 
 set shell := ["bash", "-cu"]
 set dotenv-load := true
@@ -42,27 +41,22 @@ default:
 # ============================================================
 # Tier 1: quick-check（< 10 秒）
 # 写代码时随手跑、pre-commit 自动触发
-# 仅做：格式、lint、提交规范，不跑测试
+# 仅做：格式和快速治理，不跑测试
 # ============================================================
 
-# Tier 1 quick-check (< 10s): fmt + lint + commit convention
-quick-check: _t1-banner _t1-fmt _t1-lint _t1-commit-conv
+# Tier 1 quick-check (< 10s): fmt + fast governance
+quick-check: _t1-banner _t1-fmt _t1-governance
 
 _t1-banner:
     @echo "▶ Tier 1 quick-check (target < 10s)"
 
 _t1-fmt:
-    @echo "  · format check (placeholder, [WAVE-1])"
-    @# cargo fmt --all -- --check
-    @# pnpm -r exec prettier --check .
+    @echo "  · Rust format check"
+    @cargo fmt --manifest-path backend/Cargo.toml --all -- --check
 
-_t1-lint:
-    @echo "  · lint check (placeholder, [WAVE-1])"
-    @# cargo clippy --workspace --all-targets --no-deps -- -D warnings
-    @# pnpm -r run lint --quiet
-
-_t1-commit-conv:
-    @python3 scripts/governance/check_commit_convention.py --staged || true
+_t1-governance:
+    @echo "  · governance T1 checks"
+    @python3 scripts/governance/governance_checks.py --tier T1
 
 # ============================================================
 # Tier 2: task-check（< 120 秒）
@@ -71,7 +65,7 @@ _t1-commit-conv:
 # ============================================================
 
 # Tier 2 task-check (< 120s): T1 + diff-driven + L1/L2
-task-check: quick-check _t2-banner _t2-diff-checks _t2-unit-tests _t2-contract-static
+task-check: quick-check _t2-banner _t2-diff-checks _t2-lint _t2-unit-tests _t2-contract-static
 
 _t2-banner:
     @echo "▶ Tier 2 task-check (target < 120s)"
@@ -80,14 +74,24 @@ _t2-diff-checks:
     @echo "  · diff-driven governance checks"
     @python3 scripts/governance/task_check.py --tier T2 --strict
 
+_t2-lint:
+    @echo "  · Rust clippy"
+    @cargo clippy --manifest-path backend/Cargo.toml --workspace --all-targets --no-deps -- -D warnings -A clippy::too-many-arguments
+
 _t2-unit-tests:
-    @echo "  · L1 unit tests (placeholder, [WAVE-2])"
-    @# cargo test --workspace --lib
-    @# pnpm -r run test:unit
+    @echo "  · L1 unit tests"
+    @cargo test --manifest-path backend/Cargo.toml --workspace --lib
+    @pnpm --dir apps/web-admin run test:self-checks
+    @node packages/ui/tests/dialog-dismiss.test.ts
+    @node packages/ui/tests/data-grid-views.test.ts
 
 _t2-contract-static:
-    @echo "  · L2 API contract static (placeholder, [WAVE-2])"
-    @# python3 scripts/governance/validate_openapi_artifacts.py
+    @echo "  · L2 API contract static"
+    @pnpm --dir apps/web-admin exec tsc --noEmit
+    @pnpm --dir packages/api-client run typecheck
+    @python3 scripts/governance/check_openapi_in_sync.py --strict
+    @python3 scripts/governance/validate_openapi_artifacts.py
+    @python3 scripts/governance/check_openapi_contract.py
 
 # ============================================================
 # Tier 3: preflight（< 5 分钟）
@@ -102,14 +106,18 @@ _t3-banner:
     @echo "▶ Tier 3 preflight (target < 5min)"
 
 _t3-integration:
-    @echo "  · L3-L5/L8/L11 integration tests (placeholder, [WAVE-3])"
-    @# cargo test --workspace
-    @# pnpm -r run test
-    @# pnpm -r run test:integration
+    @echo "  · L3-L5/L8/L11 integration tests"
+    @cargo test --manifest-path backend/Cargo.toml --workspace
+    @python3 -m pytest scripts/governance/tests -q
+    @pnpm --dir apps/web-admin run test:e2e:shell-dev
+    @pnpm --dir apps/web-admin run test:e2e:h4-dev
+    @pnpm --dir apps/web-admin run test:e2e:h9-dev
 
 _t3-governance-l3:
     @echo "  · governance T3 checks"
-    @python3 scripts/governance/governance_checks.py --tier T3 || true
+    @python3 scripts/governance/task_check.py --tier T3 --strict
+    @python3 scripts/governance/capture_visual_snapshots.py --port 15173 --start-server
+    @python3 scripts/governance/check_visual_regression.py
 
 # ============================================================
 # Tier 4: verify（< 30 分钟）
@@ -124,25 +132,33 @@ _t4-banner:
     @echo "▶ Tier 4 verify (target < 30min)"
 
 _t4-full-tests:
-    @echo "  · full test suite incl. release mode (placeholder, [WAVE-4])"
-    @# cargo test --workspace --release
+    @echo "  · full test suite incl. release mode"
+    @cargo test --manifest-path backend/Cargo.toml --workspace --release
 
 _t4-e2e:
     @echo "  · Matrix E2E screenshots (full, [PROTOTYPE-C])"
     @just matrix-e2e-full
 
 _t4-perf-bench:
-    @echo "  · L7 performance baselines (placeholder, [WAVE-4])"
-    @# cargo bench --workspace
-    @# python3 scripts/governance/check_perf_baseline.py
+    @echo "  · L7 / runtime evidence release gate"
+    @python3 scripts/governance/validate_wave1_runtime_evidence.py --kind h2
+    @just wave-6-complete-check
 
 _t4-compat-check:
-    @echo "  · L9 OpenAPI compatibility (placeholder, [WAVE-3])"
-    @# python3 scripts/governance/check_api_compat.py
+    @echo "  · L9 OpenAPI compatibility"
+    @python3 scripts/governance/check_openapi_in_sync.py --strict
+    @python3 scripts/governance/validate_openapi_artifacts.py
+    @python3 scripts/governance/check_openapi_contract.py
+    @python3 scripts/governance/check_api_compat.py
 
 _t4-governance-l4:
-    @echo "  · governance T4 checks (full)"
-    @python3 scripts/governance/governance_checks.py --tier T4 || true
+    @echo "  · active-module scope completeness"
+    @python3 scripts/governance/check_runtime_route_mounts.py --strict
+    @python3 scripts/governance/check_handler_test_coverage.py --strict
+    @python3 scripts/governance/check_scope_gap_discovery.py --strict
+    @python3 scripts/governance/check_bounded_contexts.py --strict
+    @python3 scripts/governance/check_multi_end_consistency.py --strict
+    @python3 scripts/governance/check_observability.py --strict
 
 # ============================================================
 # 治理脚本独立入口

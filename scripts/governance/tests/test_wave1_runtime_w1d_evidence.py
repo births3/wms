@@ -124,6 +124,11 @@ def test_wave1_completion_report_w1d_signal_entry_without_runtime_record_is_pre_
     monkeypatch.setattr(report, "file_exists", fake_file_exists)
     monkeypatch.setattr(report, "file_contains", fake_file_contains)
     monkeypatch.setattr(report, "accepted_adr", lambda path: True)
+    monkeypatch.setattr(
+        report,
+        "valid_w1d_runtime_evidence",
+        lambda: (False, "缺少真实 dev/staging 自动回滚证据"),
+    )
 
     items = {item.item_id: item for item in report.evaluate_wave1()}
 

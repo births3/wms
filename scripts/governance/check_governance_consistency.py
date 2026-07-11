@@ -3,7 +3,7 @@
 
 类别：1. 文档治理
 Tier：T1（< 10s）
-输入：docs/governance.md §4.6 表格 + governance/gate-rules.toml
+输入：docs/governance.md §4.6 表格 + governance/gate-rules.toml + justfile
 输出：人类可读 + --json
 退出码：
   0  通过（§4.6 与 gate-rules.toml 中 Wave 计划脚本一致）
@@ -37,6 +37,7 @@ _THIS = Path(__file__).resolve()
 REPO_ROOT = _THIS.parent.parent.parent
 GOVERNANCE_MD = REPO_ROOT / "docs" / "governance.md"
 GATE_RULES = REPO_ROOT / "governance" / "gate-rules.toml"
+JUSTFILE = REPO_ROOT / "justfile"
 
 # §4.6 表格行模式：| Wave N | `script_a.py` / `script_b.py` | T2 | `path/**` |
 TABLE_ROW_RE = re.compile(
@@ -57,6 +58,64 @@ class Issue:
 class RuleSpec:
     tier: str
     patterns: set[str]
+
+
+TIER_ENTRYPOINT_RECIPES = {
+    "_t1-fmt",
+    "_t1-governance",
+    "_t2-diff-checks",
+    "_t2-lint",
+    "_t2-unit-tests",
+    "_t2-contract-static",
+    "_t3-integration",
+    "_t3-governance-l3",
+    "_t4-full-tests",
+    "_t4-e2e",
+    "_t4-perf-bench",
+    "_t4-compat-check",
+    "_t4-governance-l4",
+}
+
+FORCED_SUCCESS_RE = re.compile(r"(?:\|\||;\s*(?:true|exit\s+0)(?:\s|$)|\bset\s+\+e\b)")
+
+
+def tier_entrypoint_issues(just_text: str, *, required: set[str] | None = None) -> list[Issue]:
+    """检查主 Tier recipe 有真实命令且失败不会被吞掉。"""
+    required = required or TIER_ENTRYPOINT_RECIPES
+    lines = just_text.splitlines()
+    bodies: dict[str, list[str]] = {}
+    current: str | None = None
+    for line in lines:
+        if line and not line[0].isspace() and not line.startswith("#") and line.endswith(":"):
+            current = line[:-1]
+            bodies.setdefault(current, [])
+        elif current is not None and (not line or line[0].isspace() or line.startswith("#")):
+            bodies[current].append(line)
+        elif line:
+            current = None
+
+    issues: list[Issue] = []
+    for recipe in sorted(required):
+        body = "\n".join(bodies.get(recipe, []))
+        if recipe not in bodies:
+            issues.append(Issue("tier_recipe_missing", recipe, "justfile 缺少主 Tier recipe"))
+            continue
+        has_placeholder = "placeholder" in body.lower() or "占位" in body
+        if has_placeholder:
+            issues.append(Issue("tier_placeholder", recipe, "主 Tier recipe 仍包含占位实现"))
+        if FORCED_SUCCESS_RE.search(body):
+            issues.append(Issue("tier_failure_swallowed", recipe, "主 Tier recipe 强制返回成功并吞掉失败"))
+        commands = [
+            line.lstrip().lstrip("@").strip()
+            for line in bodies[recipe]
+            if line.strip() and not line.lstrip().startswith(("#", "@#", "@echo"))
+        ]
+        if not has_placeholder and not any(
+            command.startswith(("cargo ", "pnpm ", "python3 ", "node ", "just "))
+            for command in commands
+        ):
+            issues.append(Issue("tier_command_missing", recipe, "主 Tier recipe 没有可执行检查命令"))
+    return issues
 
 
 def _doc_section_text() -> str:
@@ -141,6 +200,7 @@ def main(argv: list[str] | None = None) -> int:
     gate_scripts = {script: spec.tier for script, spec in gate_specs.items()}
 
     issues: list[Issue] = []
+    issues.extend(tier_entrypoint_issues(JUSTFILE.read_text(encoding="utf-8")))
 
     # 1. doc 中提到但 gate-rules 中没有
     for script, tier in doc_scripts.items():

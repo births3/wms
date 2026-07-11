@@ -431,7 +431,7 @@ Wave 1 起，涉及一线操作或复杂业务流程的前端页面采用"前端
 | Wave 1 | `check_field_coding_standards.py`（字段命名/类型/加密/审计）| T1 | `docs/compliance/gsp-field-traceability.md` + `docs/domain/user-stories-*.md` |
 | Wave 1 | `check_business_rules_registry.py`（业务规则字段引用）| T1 | `docs/compliance/gsp-business-rules-registry.md` + `docs/domain/user-stories-*.md` |
 | Wave 1 | `check_openapi_in_sync.py` / `validate_openapi_artifacts.py` / `check_openapi_contract.py` | T2 | `shared/openapi/openapi.json` + `backend/crates/api/**` + `backend/crates/domain/**` + `packages/api-client/src/schema.ts` |
-| Wave 3 | `check_audit_trail_coverage.py` / `check_idempotency_test.py` | T3 | `backend/crates/domain/src/inventory/**` |
+| Wave 3 | `check_audit_trail_coverage.py` / `check_idempotency_test.py` | T3 | `backend/crates/api/src/**` |
 | Wave 3 | `check_cold_chain_data_freshness.py` | T3 | `backend/crates/domain/src/cold_chain/**` |
 | Wave 4 | `check_perf_baseline.py` / `check_api_compat.py` | T4 | （CI 全量，非 diff 触发）|
 | Wave 4 | `check_observability_signals.py`（L10 可观测）| T4 | （CI 全量，非 diff 触发）|

@@ -660,9 +660,9 @@ match = "packages/api-client/src/schema.ts"
 checks = ["check_openapi_in_sync", "validate_openapi_artifacts", "check_openapi_contract"]
 tier = "T2"
 
-# Wave 3 启用：审计追踪覆盖（库存变更必须经 audit 层）
+# Wave 3 启用：API 写路径的审计与幂等覆盖；脚本缺失时 strict 必须失败
 [[rules]]
-match = "backend/crates/domain/src/inventory/**"
+match = "backend/crates/api/src/**"
 checks = ["check_audit_trail_coverage", "check_idempotency_test"]
 tier = "T3"
 

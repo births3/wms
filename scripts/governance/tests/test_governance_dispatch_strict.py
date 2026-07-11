@@ -1,4 +1,5 @@
 """治理入口 strict 语义传递测试。"""
+import json
 import sys
 from pathlib import Path
 
@@ -93,3 +94,107 @@ def test_task_check_strict_script_args_are_explicitly_scoped():
         "check_openapi_in_sync": ["--strict"],
         "report_wave2_completion": ["--strict", "--require-runtime-evidence"],
     }
+
+
+def test_tier_entrypoints_reject_placeholders_and_swallowed_failures():
+    """主 Tier 入口不能继续保留占位命令或用 || true 吞掉失败。"""
+    from check_governance_consistency import tier_entrypoint_issues
+
+    issues = tier_entrypoint_issues(
+        """
+_t1-fmt:
+    @echo "format placeholder"
+_t3-governance-l3:
+    @python3 scripts/governance/governance_checks.py --tier T3 || :
+""",
+        required={"_t1-fmt", "_t3-governance-l3"},
+    )
+
+    assert {issue.kind for issue in issues} == {"tier_placeholder", "tier_failure_swallowed"}
+
+
+def test_preflight_runs_t3_diff_governance():
+    justfile = (Path(__file__).resolve().parents[3] / "justfile").read_text(encoding="utf-8")
+
+    assert "python3 scripts/governance/task_check.py --tier T3 --strict" in justfile
+
+
+def test_tier_entrypoints_reject_semicolon_true():
+    from check_governance_consistency import tier_entrypoint_issues
+
+    issues = tier_entrypoint_issues(
+        """
+_t1-fmt:
+    @cargo fmt --all -- --check; true
+""",
+        required={"_t1-fmt"},
+    )
+
+    assert [issue.kind for issue in issues] == ["tier_failure_swallowed"]
+
+
+def test_tier_entrypoints_reject_other_failure_swallowing_forms():
+    from check_governance_consistency import tier_entrypoint_issues
+
+    for command in ("cargo fmt || echo ignored", "cargo fmt; exit 0", "set +e\n    @cargo fmt"):
+        issues = tier_entrypoint_issues(
+            f"_t1-fmt:\n    @{command}\n",
+            required={"_t1-fmt"},
+        )
+        assert "tier_failure_swallowed" in {issue.kind for issue in issues}
+
+
+def test_t4_uses_existing_wave6_strict_recipe():
+    from check_governance_consistency import JUSTFILE
+
+    just_text = JUSTFILE.read_text(encoding="utf-8")
+
+    assert "@just wave-6-complete-check" in just_text
+    assert "@just wave-6-status --strict" not in just_text
+
+
+def test_tier_entrypoints_accept_real_fail_closed_commands():
+    from check_governance_consistency import tier_entrypoint_issues
+
+    issues = tier_entrypoint_issues(
+        """
+_t1-fmt:
+    @cargo fmt --manifest-path backend/Cargo.toml --all -- --check
+_t3-governance-l3:
+    @python3 scripts/governance/governance_checks.py --tier T3
+""",
+        required={"_t1-fmt", "_t3-governance-l3"},
+    )
+
+    assert issues == []
+
+
+def test_governance_dispatch_json_is_single_document(monkeypatch, capsys):
+    import governance_checks as checks
+
+    monkeypatch.setattr(checks, "expand_tier_scripts", lambda tier: ["check_doc_links.py"])
+    monkeypatch.setattr(
+        checks,
+        "run_script",
+        lambda name, *, json_mode: checks.ScriptResult(name=name, exit_code=0, duration_ms=1),
+    )
+
+    assert checks.main(["--tier", "T1", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["ok"] is True
+    assert payload["scripts"][0]["name"] == "check_doc_links.py"
+
+
+def test_governance_dispatch_preserves_script_error_exit_code(monkeypatch, capsys):
+    import governance_checks as checks
+
+    monkeypatch.setattr(checks, "expand_tier_scripts", lambda tier: ["check_doc_links.py"])
+    monkeypatch.setattr(
+        checks,
+        "run_script",
+        lambda name, *, json_mode: checks.ScriptResult(name=name, exit_code=2, duration_ms=1),
+    )
+
+    assert checks.main(["--tier", "T1", "--json"]) == 2
+    assert json.loads(capsys.readouterr().out)["ok"] is False

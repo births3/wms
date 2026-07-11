@@ -360,7 +360,7 @@ def main(argv: list[str] | None = None) -> int:
     blocking = [item for item in items if item.blocks_strict]
     pre_release = [item for item in items if not item.strict_blocking and not item.complete]
     runtime_blocking = pre_release if args.require_runtime_evidence else []
-    ok = not blocking and not runtime_blocking
+    ok = not ((args.strict and blocking) or runtime_blocking)
 
     if args.json:
         print(json.dumps({
@@ -390,9 +390,7 @@ def main(argv: list[str] | None = None) -> int:
         if runtime_blocking:
             print(f"runtime evidence 阻塞缺口: {len(runtime_blocking)}")
 
-    if args.require_runtime_evidence and runtime_blocking:
-        return 1
-    return 1 if args.strict and blocking else 0
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":

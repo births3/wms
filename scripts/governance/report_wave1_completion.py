@@ -329,7 +329,7 @@ def validate_h2_runtime_payload(
         contains_forbidden_h2_runtime_boundary(benchmark_log_ref, allow_example_refs=allow_example_refs)
         or not contains_environment_token(benchmark_log_ref, environment)
     ):
-        return False, "H2 runtime evidence benchmark_log_ref 必须指向非本机 dev 证据，不能包含 staging/local/prod/mock/fake 边界"
+        return False, "H2 runtime evidence benchmark_log_ref 必须指向非本机 dev 证据，不能包含 staging/local/prod/production/mock/fake 边界"
 
     seal_cron = payload.get("seal_cron")
     if not isinstance(seal_cron, dict):
@@ -355,7 +355,7 @@ def validate_h2_runtime_payload(
         contains_forbidden_h2_runtime_boundary(cron_log_ref, allow_example_refs=allow_example_refs)
         or not contains_environment_token(cron_log_ref, environment)
     ):
-        return False, "H2 runtime evidence cron_log_ref 必须指向非本机 dev 证据，不能包含 staging/local/prod/mock/fake 边界"
+        return False, "H2 runtime evidence cron_log_ref 必须指向非本机 dev 证据，不能包含 staging/local/prod/production/mock/fake 边界"
 
     return True, "H2 runtime evidence 内容有效"
 

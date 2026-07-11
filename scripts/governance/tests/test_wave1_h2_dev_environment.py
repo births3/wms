@@ -324,7 +324,7 @@ def test_wave1_h2_baseline_loader_and_seal_share_day_lock():
     loader = Path("backend/crates/api/src/bin/wms_audit_baseline_load.rs").read_text(
         encoding="utf-8",
     )
-    audit = Path("backend/crates/api/src/audit.rs").read_text(encoding="utf-8")
+    audit = Path("backend/crates/api/src/audit/db.rs").read_text(encoding="utf-8")
 
     assert "audit_event:{day}" in loader
     assert "audit_event:{}" in audit

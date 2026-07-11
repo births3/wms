@@ -141,3 +141,171 @@ def test_handler_test_coverage_requires_every_path(tmp_path):
     assert [issue.kind for issue in issues] == ["partial_path_coverage"]
     assert stats["covered_paths"] == ["/api/v1/auth/login"]
     assert stats["missing_paths"] == ["/api/v1/auth/me"]
+
+
+def test_handler_test_coverage_scans_split_openapi_path_modules(tmp_path):
+    """OpenAPI path 拆出 lib.rs 后仍必须被统计，禁止 path_count=0 假绿。"""
+    from check_handler_test_coverage import check_handler_test_coverage
+
+    api_crate, lib_rs = _write_api_lib(tmp_path, ["mod openapi_paths;"])
+    paths_dir = api_crate / "src" / "openapi_paths"
+    paths_dir.mkdir()
+    (paths_dir / "core.rs").write_text(
+        '#[utoipa::path(get, path = "/api/v1/healthz")]\nfn healthz() {}\n',
+        encoding="utf-8",
+    )
+    tests_dir = api_crate / "tests"
+    tests_dir.mkdir()
+    (tests_dir / "openapi.rs").write_text(
+        '#[test]\nfn covers_healthz() {\n'
+        '    let response = Request::builder().uri("/api/v1/healthz");\n'
+        '    assert_eq!(response.status(), StatusCode::OK);\n'
+        '}\n',
+        encoding="utf-8",
+    )
+
+    issues, stats = check_handler_test_coverage(lib_rs, api_crate, strict=True)
+
+    assert issues == []
+    assert stats["path_count"] == 1
+    assert stats["covered_paths"] == ["/api/v1/healthz"]
+
+
+def test_handler_test_coverage_strict_rejects_path_string_only(tmp_path):
+    from check_handler_test_coverage import check_handler_test_coverage
+
+    api_crate, lib_rs = _write_api_lib(tmp_path, [
+        '#[utoipa::path(get, path = "/api/v1/healthz")]\nfn healthz() {}',
+    ])
+    tests_dir = api_crate / "tests"
+    tests_dir.mkdir()
+    (tests_dir / "openapi.rs").write_text(
+        '#[test]\nfn mentions_only() { assert_eq!("/api/v1/healthz", "/api/v1/healthz"); }\n',
+        encoding="utf-8",
+    )
+
+    issues, stats = check_handler_test_coverage(lib_rs, api_crate, strict=True)
+
+    assert [issue.kind for issue in issues] == ["missing_http_exercise"]
+    assert stats["exercised_paths"] == []
+
+
+def test_handler_test_coverage_strict_distinguishes_http_methods(tmp_path):
+    from check_handler_test_coverage import check_handler_test_coverage
+
+    api_crate, lib_rs = _write_api_lib(tmp_path, [
+        '#[utoipa::path(get, path = "/api/v1/items")]\nfn list() {}\n'
+        '#[utoipa::path(post, path = "/api/v1/items")]\nfn create() {}',
+    ])
+    tests_dir = api_crate / "tests"
+    tests_dir.mkdir()
+    (tests_dir / "items.rs").write_text(
+        '#[test]\nfn lists() {\n'
+        '    let response = Request::builder().uri("/api/v1/items");\n'
+        '    assert_eq!(response.status(), StatusCode::OK);\n'
+        '}\n',
+        encoding="utf-8",
+    )
+
+    issues, stats = check_handler_test_coverage(lib_rs, api_crate, strict=True)
+
+    assert [issue.kind for issue in issues] == ["missing_http_exercise"]
+    assert stats["exercised_operations"] == ["GET /api/v1/items"]
+    assert stats["unexercised_operations"] == ["POST /api/v1/items"]
+
+
+def test_handler_test_coverage_strict_accepts_quoted_post_method(tmp_path):
+    from check_handler_test_coverage import check_handler_test_coverage
+
+    api_crate, lib_rs = _write_api_lib(tmp_path, [
+        '#[utoipa::path(post, path = "/api/v1/items")]\nfn create() {}',
+    ])
+    tests_dir = api_crate / "tests"
+    tests_dir.mkdir()
+    (tests_dir / "items.rs").write_text(
+        '#[test]\nfn creates() {\n'
+        '    let response = Request::builder().method("POST").uri("/api/v1/items");\n'
+        '    assert_eq!(response.status(), StatusCode::CREATED);\n'
+        '}\n',
+        encoding="utf-8",
+    )
+
+    issues, stats = check_handler_test_coverage(lib_rs, api_crate, strict=True)
+
+    assert issues == []
+    assert stats["exercised_operations"] == ["POST /api/v1/items"]
+
+
+def test_handler_test_coverage_strict_accepts_method_after_uri(tmp_path):
+    from check_handler_test_coverage import check_handler_test_coverage
+
+    api_crate, lib_rs = _write_api_lib(tmp_path, [
+        '#[utoipa::path(post, path = "/api/v1/items")]\nfn create() {}',
+    ])
+    tests_dir = api_crate / "tests"
+    tests_dir.mkdir()
+    (tests_dir / "items.rs").write_text(
+        '#[test]\nfn creates() {\n'
+        '    let response = Request::builder().uri("/api/v1/items").method("POST");\n'
+        '    assert_eq!(response.status(), StatusCode::OK);\n'
+        '}\n',
+        encoding="utf-8",
+    )
+
+    issues, stats = check_handler_test_coverage(lib_rs, api_crate, strict=True)
+
+    assert issues == []
+    assert stats["exercised_operations"] == ["POST /api/v1/items"]
+
+
+def test_handler_test_coverage_strict_rejects_unrelated_or_404_assertion(tmp_path):
+    from check_handler_test_coverage import check_handler_test_coverage
+
+    api_crate, lib_rs = _write_api_lib(tmp_path, [
+        '#[utoipa::path(get, path = "/api/v1/items")]\nfn list() {}',
+    ])
+    tests_dir = api_crate / "tests"
+    tests_dir.mkdir()
+    (tests_dir / "items.rs").write_text(
+        '#[test]\nfn missing_route() {\n'
+        '    let response = Request::builder().uri("/api/v1/items");\n'
+        '    assert_eq!(response.status(), StatusCode::NOT_FOUND);\n'
+        '    let other = fake_response();\n'
+        '    assert_eq!(other.status(), StatusCode::OK);\n'
+        '}\n',
+        encoding="utf-8",
+    )
+
+    issues, stats = check_handler_test_coverage(lib_rs, api_crate, strict=True)
+
+    assert {issue.kind for issue in issues} == {"missing_http_exercise"}
+    assert stats["exercised_operations"] == []
+
+
+def test_handler_test_coverage_rejects_route_inventory_as_behavior_coverage(tmp_path):
+    """只排除 404/405 的路由盘点不能替代逐接口行为测试。"""
+    from check_handler_test_coverage import check_handler_test_coverage
+
+    api_crate, lib_rs = _write_api_lib(tmp_path, [
+        '#[utoipa::path(get, path = "/api/v1/items")]\nfn list() {}\n'
+        '#[utoipa::path(post, path = "/api/v1/items")]\nfn create() {}',
+    ])
+    tests_dir = api_crate / "tests"
+    tests_dir.mkdir()
+    (tests_dir / "runtime_inventory.rs").write_text(
+        '#[test]\nfn every_openapi_operation_is_mounted_by_the_runtime_router() {\n'
+        '    let openapi = ApiDoc::openapi();\n'
+        '    let request = Request::builder();\n'
+        '    let rejected = StatusCode::NOT_FOUND | StatusCode::METHOD_NOT_ALLOWED;\n'
+        '    assert!(missing.is_empty());\n'
+        '}\n',
+        encoding="utf-8",
+    )
+
+    issues, stats = check_handler_test_coverage(lib_rs, api_crate, strict=True)
+
+    assert {issue.kind for issue in issues} == {
+        "missing_path_coverage",
+        "missing_http_exercise",
+    }
+    assert stats["exercised_operations"] == []

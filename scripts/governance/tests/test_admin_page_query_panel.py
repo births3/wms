@@ -61,7 +61,7 @@ def test_page_query_suggestion_for_h9_print_template_page():
 
     assert suggestion["required"] is True
     assert suggestion["source"] == "apps/web-admin/src/pages/print-template/H9PrintTemplatePage.tsx"
-    assert suggestion["core"] == ["keyword", "sourceSchema"]
+    assert suggestion["core"] == ["keyword", "templateType"]
     assert suggestion["more"] == []
 
 

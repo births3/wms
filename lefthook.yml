@@ -22,7 +22,7 @@
 pre-commit:
   parallel: true
   commands:
-    # 1. 格式 / lint / 提交规范（占位，等 Wave 1 工具链就位）
+    # 1. 格式 / T1 治理 / 提交规范
     quick-check:
       run: just quick-check
       stage_fixed: true

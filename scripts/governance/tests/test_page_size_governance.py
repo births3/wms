@@ -2,9 +2,47 @@
 import sys
 from pathlib import Path
 
+import pytest
+
 TEST_DIR = Path(__file__).resolve().parent
 SCRIPTS_DIR = TEST_DIR.parent
 sys.path.insert(0, str(SCRIPTS_DIR))
+
+
+@pytest.fixture(autouse=True)
+def isolated_page_size_probe_repo(tmp_path, monkeypatch):
+    """探针只能写 pytest 临时仓库，避免与并行治理扫描互相污染。"""
+    import check_page_size
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(check_page_size, "REPO_ROOT", tmp_path)
+    page_dirs = (
+        tmp_path / "prototypes/src/pages",
+        tmp_path / "prototypes/src/prototype-kit",
+        tmp_path / "apps/web-admin/src/pages",
+        tmp_path / "apps/pda-mobile/src/pages",
+        tmp_path / "packages/ui/src/business",
+    )
+    source_dirs = (
+        tmp_path / "backend/crates",
+        tmp_path / "apps",
+        tmp_path / "packages",
+        tmp_path / "prototypes",
+        tmp_path / "scripts",
+    )
+    probe_dirs = (
+        *page_dirs,
+        *source_dirs,
+        tmp_path / "backend/crates/api/src",
+        tmp_path / "apps/web-admin/self-checks",
+        tmp_path / "scripts/governance",
+    )
+    for directory in probe_dirs:
+        directory.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(check_page_size, "PAGE_DIRS", page_dirs)
+    monkeypatch.setattr(check_page_size, "SOURCE_DIRS", source_dirs)
+    monkeypatch.setattr(check_page_size, "BASELINE_PATH", tmp_path / "governance/source-size-baseline.toml")
+    monkeypatch.setattr(check_page_size, "LEGACY_OVERSIZED_SOURCE_BASELINE", {})
 
 
 def test_governance_test_files_stay_below_800_lines():

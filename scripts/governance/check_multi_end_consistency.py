@@ -16,7 +16,7 @@ Tier：T1（< 5s）
   2 脚本自身错误
 
 适用范围：写操作故事（核心模块）
-不强制：纯查询故事 / Wave 5 后期模块
+普通模式用于日常盘点；T4 使用 --strict，核心模块未分类会阻断。
 """
 from __future__ import annotations
 
@@ -142,6 +142,7 @@ def check(stats: list[StoryTagStats]) -> list[Issue]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--strict", action="store_true", help="核心模块分类缺口阻断")
     args = parser.parse_args(argv)
 
     stats = scan_stories()
@@ -166,7 +167,8 @@ def main(argv: list[str] | None = None) -> int:
             "errors": [asdict(i) for i in errors],
             "warnings": [asdict(i) for i in warnings],
             "infos": [asdict(i) for i in infos],
-            "ok": not errors,
+            "strict": args.strict,
+            "ok": not errors and not (args.strict and (warnings or infos)),
         }, ensure_ascii=False, indent=2))
     else:
         print(f"check_multi_end_consistency (T1, 文档治理) — "
@@ -184,7 +186,7 @@ def main(argv: list[str] | None = None) -> int:
                 loc = f"{i.file}/{i.story_id}" if i.story_id else i.file
                 print(f"    ⚠ [{loc}] {i.rule}: {i.message}")
         if infos:
-            print(f"\n  信息（{len(infos)} 项，Wave 1 启动前补全）：")
+            print(f"\n  信息（{len(infos)} 项，T4 strict 出口前补全）：")
             for i in infos[:10]:
                 loc = f"{i.file}/{i.story_id}" if i.story_id else i.file
                 print(f"    ℹ [{loc}] {i.rule}: {i.message}")
@@ -193,7 +195,7 @@ def main(argv: list[str] | None = None) -> int:
         if not (errors or warnings or infos):
             print("  ✓ 多端规则分类全部覆盖")
 
-    return 0 if not errors else 1
+    return 1 if errors or (args.strict and (warnings or infos)) else 0
 
 
 if __name__ == "__main__":

@@ -15,11 +15,7 @@ Tier：作为入口，按 --tier 参数调度对应 Tier 的脚本
   1  有一个或多个脚本返回 1（违规）
   2  调度器自身错误
 
-第 0 周仅含 4 个起步脚本：
-  T1: validate_environment, check_doc_links, validate_adr_index, check_commit_convention
-  T2: T1 + (placeholder for diff-driven checks via task_check.py)
-  T3: T2 + (placeholder for L3-L5/L8/L11 governance checks; 引入于 Wave 3+)
-  T4: T3 + (placeholder for L6/L7/L9/L10 governance checks; 引入于 Wave 4+)
+当前处于 Wave 6，各 Tier 调度真实检查；T4 的运行证据和完整 E2E 由 just verify 编排。
 """
 from __future__ import annotations
 
@@ -66,6 +62,9 @@ TIER_SCRIPTS: dict[str, list[str]] = {
         "check_admin_page_design_contract.py",
         "check_quality_matrix.py",
         "check_scope_gap_discovery.py",
+        "check_bounded_contexts.py",
+        "check_multi_end_consistency.py",
+        "check_observability.py",
         "check_m1_master_data_source_actions.py",
         "check_error_codes.py",
         "check_baseline_health.py",
@@ -86,7 +85,6 @@ TIER_SCRIPTS: dict[str, list[str]] = {
         "check_component_registry_consistency.py",
         "check_dialog_overlay_pointer_events.py",
         "check_datagrid_popover_portal.py",
-        "check_page_size.py",
         "check_prototype_fidelity.py",
         "check_prototype_navigation.py",
         "check_baseline_completeness.py",
@@ -99,6 +97,7 @@ TIER_SCRIPTS: dict[str, list[str]] = {
         "validate_openapi_artifacts.py",
         "check_openapi_contract.py",
         "check_prototype_review_signoff.py",
+        "check_page_size.py",
     ],
     "T3": [
         # Wave 3+ handler test coverage / idempotency / permission matrix
@@ -107,6 +106,7 @@ TIER_SCRIPTS: dict[str, list[str]] = {
     ],
     "T4": [
         # 完整矩阵 E2E 截图报告由 just verify 的 _t4-e2e 生成，这里只校验报告。
+        "check_api_compat.py",
         "check_matrix_e2e_report.py",
     ],
 }
@@ -137,7 +137,7 @@ def run_script(name: str, *, json_mode: bool) -> ScriptResult:
     if p.stdout and not json_mode:
         for line in p.stdout.splitlines():
             print(f"    {line}")
-    if p.stderr:
+    if p.stderr and not json_mode:
         for line in p.stderr.splitlines():
             print(f"    [err] {line}", file=sys.stderr)
     return ScriptResult(name=name, exit_code=p.returncode, duration_ms=dur)
@@ -166,35 +166,39 @@ def expand_tier_scripts(tier: str) -> list[str]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--tier", required=True, choices=["T1", "T2", "T3", "T4"])
-    parser.add_argument("--json", action="store_true", help="子脚本以 JSON 模式运行")
-    parser.add_argument("--report-json", action="store_true", help="本调度器输出 JSON 总结")
+    parser.add_argument("--json", action="store_true", help="仅输出本调度器 JSON 总结")
+    parser.add_argument("--report-json", action="store_true", help="兼容旧调用；等价于 --json")
     args = parser.parse_args(argv)
+    machine_output = args.json or args.report_json
 
     scripts = expand_tier_scripts(args.tier)
     if not scripts:
         msg = f"no scripts registered for {args.tier} (Wave 0 placeholder)"
-        if args.report_json:
+        if machine_output:
             print(json.dumps({"tier": args.tier, "scripts": [], "note": msg, "ok": True}))
         else:
             print(msg)
         return 0
 
-    print(f"▶ governance_checks {args.tier} ({len(scripts)} scripts)")
+    if not machine_output:
+        print(f"▶ governance_checks {args.tier} ({len(scripts)} scripts)")
 
     results: list[ScriptResult] = []
     for s in scripts:
         if not (SCRIPTS_DIR / s).exists():
-            print(f"  ! missing script: {s}", file=sys.stderr)
+            if not machine_output:
+                print(f"  ! missing script: {s}", file=sys.stderr)
             results.append(ScriptResult(name=s, exit_code=2, duration_ms=0))
             continue
-        print(f"  · running {s}")
-        r = run_script(s, json_mode=args.json)
+        if not machine_output:
+            print(f"  · running {s}")
+        r = run_script(s, json_mode=machine_output)
         results.append(r)
 
     failed = [r for r in results if r.exit_code != 0]
     total_ms = sum(r.duration_ms for r in results)
 
-    if args.report_json:
+    if machine_output:
         print(json.dumps({
             "tier": args.tier,
             "scripts": [asdict(r) for r in results],
@@ -207,6 +211,8 @@ def main(argv: list[str] | None = None) -> int:
             mark = "✓" if r.exit_code == 0 else "✘"
             print(f"  {mark} {r.name:<35} exit={r.exit_code} {r.duration_ms}ms")
 
+    if any(result.exit_code == 2 for result in failed):
+        return 2
     return 0 if not failed else 1
 
 
