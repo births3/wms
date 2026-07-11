@@ -65,9 +65,13 @@
     },
     {
       "id": "m1-feature-flags",
-      "title": "M1 Feature Flag",
-      "required": false,
-      "reason": "配置中心当前不是大列表查询页"
+      "title": "M1 功能开关",
+      "required": true,
+      "source": "apps/web-admin/src/pages/config-center/FeatureFlagConfigCenterPage.tsx",
+      "fieldConstant": "featureFlagQueryFields",
+      "coreConstant": "featureFlagCoreQueryFieldKeys",
+      "core": ["keyword", "status"],
+      "more": []
     },
     {
       "id": "h1-menu-management",

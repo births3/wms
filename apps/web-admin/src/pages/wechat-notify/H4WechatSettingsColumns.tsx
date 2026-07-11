@@ -77,7 +77,11 @@ export const settingsColumns: DataGridColumn<H4WechatSettings>[] = [
     filterValue: (row) => row.callback_url,
     copyValue: (row) => row.callback_url,
     filter: { type: "text" },
-    render: (row) => <span className="line-clamp-2">{row.callback_url}</span>,
+    render: (row) => (
+      <span className="block truncate" title={row.callback_url}>
+        {row.callback_url || "-"}
+      </span>
+    ),
   },
   {
     key: "approval_callback_path",
@@ -88,7 +92,11 @@ export const settingsColumns: DataGridColumn<H4WechatSettings>[] = [
     filterValue: (row) => row.approval_callback_path,
     copyValue: (row) => row.approval_callback_path,
     filter: { type: "text" },
-    render: (row) => <span className="line-clamp-2">{row.approval_callback_path}</span>,
+    render: (row) => (
+      <span className="block truncate" title={row.approval_callback_path}>
+        {row.approval_callback_path || "-"}
+      </span>
+    ),
   },
   {
     key: "retry",

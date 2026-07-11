@@ -101,6 +101,8 @@ export function H1AdminMenuPage() {
   const rollbackMutation = useRollbackAdminMenuMutation();
   const nodes = draftQuery.data?.data ?? [];
   const flatNodes = React.useMemo(() => flattenNodes(nodes), [nodes]);
+  const [treeSearch, setTreeSearch] = React.useState("");
+  const filteredNodes = React.useMemo(() => filterMenuTree(nodes, treeSearch), [nodes, treeSearch]);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [checkedIds, setCheckedIds] = React.useState<string[]>([]);
   const [dragId, setDragId] = React.useState<string | null>(null);
@@ -288,20 +290,32 @@ export function H1AdminMenuPage() {
                 新增
               </Button>
             </div>
+            <Input
+              value={treeSearch}
+              onChange={(event) => setTreeSearch(event.target.value)}
+              placeholder="搜索菜单标题或编码"
+              aria-label="搜索菜单标题或编码"
+            />
             {draftQuery.error ? <p className="text-sm text-destructive">{draftQuery.error.message}</p> : null}
             <div className="space-y-1">
-              {nodes.map((node) => (
-                <MenuTreeNode
-                  key={node.id}
-                  node={node}
-                  selectedId={selectedNode?.id ?? ""}
-                  checkedIds={checkedIds}
-                  onSelect={setSelectedId}
-                  onChecked={toggleChecked}
-                  onDragStart={setDragId}
-                  onDrop={(target) => void dropOn(target)}
-                />
-              ))}
+              {filteredNodes.length === 0 ? (
+                <p className="px-1 py-2 text-sm text-muted-foreground">
+                  {treeSearch.trim() ? "未找到匹配的菜单节点" : "暂无菜单节点"}
+                </p>
+              ) : (
+                filteredNodes.map((node) => (
+                  <MenuTreeNode
+                    key={node.id}
+                    node={node}
+                    selectedId={selectedNode?.id ?? ""}
+                    checkedIds={checkedIds}
+                    onSelect={setSelectedId}
+                    onChecked={toggleChecked}
+                    onDragStart={setDragId}
+                    onDrop={(target) => void dropOn(target)}
+                  />
+                ))
+              )}
             </div>
           </CardContent>
         </Card>
@@ -479,8 +493,8 @@ function MenuTreeNode({
       >
         <Checkbox checked={checkedIds.includes(node.id)} onCheckedChange={(value) => onChecked(node.id, value === true)} />
         <GitBranch className="size-4 shrink-0" aria-hidden />
-        <span className="min-w-0 flex-1 truncate">{node.title}</span>
-        <span className="text-xs text-muted-foreground">L{node.level}</span>
+        <span className="min-w-0 flex-1 truncate" title={`${node.title}（${node.code}）`}>{node.title}</span>
+        <span className="shrink-0 text-xs text-muted-foreground">L{node.level}</span>
       </div>
       {node.children.map((child) => (
         <MenuTreeNode key={child.id} node={child} selectedId={selectedId} checkedIds={checkedIds} onSelect={onSelect} onChecked={onChecked} onDragStart={onDragStart} onDrop={onDrop} />
@@ -512,6 +526,32 @@ function formFromNode(node: AdminMenuNode | null): NodeForm {
 
 function flattenNodes(nodes: AdminMenuNode[]): AdminMenuNode[] {
   return nodes.flatMap((node) => [node, ...flattenNodes(node.children)]);
+}
+
+/** 按标题/编码过滤菜单树：匹配节点保留完整子树，仅后代匹配时保留祖先路径。 */
+function filterMenuTree(nodes: AdminMenuNode[], keyword: string): AdminMenuNode[] {
+  const query = keyword.trim().toLowerCase();
+  if (!query) return nodes;
+
+  const nodeMatches = (node: AdminMenuNode) =>
+    node.title.toLowerCase().includes(query) || node.code.toLowerCase().includes(query);
+
+  const walk = (list: AdminMenuNode[]): AdminMenuNode[] => {
+    const result: AdminMenuNode[] = [];
+    for (const node of list) {
+      const selfMatch = nodeMatches(node);
+      const children = walk(node.children);
+      if (selfMatch || children.length > 0) {
+        result.push({
+          ...node,
+          children: selfMatch ? node.children : children,
+        });
+      }
+    }
+    return result;
+  };
+
+  return walk(nodes);
 }
 
 function menuLevelClass(level: number) {

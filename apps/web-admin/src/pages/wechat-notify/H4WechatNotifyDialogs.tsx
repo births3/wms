@@ -223,10 +223,23 @@ export function RecordDetailDialog({ record, onOpenChange }: { record: H4Notific
               ["去重键", record.dedupe_key],
             ]} />
             <Field label="内容摘要">
-              <div className="rounded-md border bg-muted/30 p-3 text-sm">{record.content_summary}</div>
+              <div className="rounded-md border bg-muted/30 p-3 text-sm whitespace-pre-wrap break-words">{record.content_summary || "-"}</div>
             </Field>
             <Field label="失败原因">
-              <div className="rounded-md border bg-muted/30 p-3 text-sm">{record.failure_reason || "-"}</div>
+              <div
+                className={`rounded-md border p-3 text-sm whitespace-pre-wrap break-words ${
+                  record.status === "failed" || record.status === "retrying"
+                    ? "border-destructive/30 bg-destructive/10 text-destructive"
+                    : "bg-muted/30"
+                }`}
+              >
+                {record.failure_reason?.trim()
+                  || (record.status === "failed"
+                    ? "未返回失败原因"
+                    : record.status === "retrying"
+                      ? "重试中，暂无失败原因"
+                      : "-")}
+              </div>
             </Field>
           </div>
         )}

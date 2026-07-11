@@ -13,11 +13,15 @@ import {
   DialogTitle,
   Input,
   PageHeader,
+  QueryPanel,
   StatusBadge,
+  buildQueryPanelSummaryItems,
   cn,
   type DataGridColumn,
   type DataGridRefreshAction,
   type DataGridToolbarAction,
+  type QueryPanelField,
+  type QueryPanelValue,
 } from "@wms/ui";
 import { Archive, Database, Download, Shuffle, Upload } from "lucide-react";
 
@@ -43,8 +47,28 @@ const sourceOptions = [
   ["environment", "环境变量"],
 ] as const;
 
+const featureFlagQueryFields: QueryPanelField[] = [
+  {
+    key: "keyword",
+    label: "关键字",
+    type: "text",
+    placeholder: "开关标识 / 负责人",
+    ariaLabel: "搜索功能开关",
+  },
+  {
+    key: "status",
+    label: "状态",
+    type: "multiSelect",
+    options: [
+      { label: "启用", value: "enabled" },
+      { label: "关闭", value: "disabled" },
+    ],
+  },
+];
+const featureFlagCoreQueryFieldKeys = ["keyword", "status"];
+
 const columns: DataGridColumn<FeatureFlagConfig>[] = [
-  textColumn("key", "Flag Key", 280),
+  textColumn("key", "开关标识", 280),
   {
     key: "enabled",
     header: "状态",
@@ -57,7 +81,7 @@ const columns: DataGridColumn<FeatureFlagConfig>[] = [
     render: (row) => <StatusBadge status={row.enabled ? "completed" : "offline_cached"} label={row.enabled ? "启用" : "关闭"} size="sm" />,
   },
   { ...textColumn("source", "来源", 140), render: (row) => sourceLabel(row.source), sortValue: (row) => sourceLabel(row.source) },
-  textColumn("owner", "Owner", 150),
+  textColumn("owner", "负责人", 150),
   {
     key: "created_at",
     header: "创建时间",
@@ -83,11 +107,18 @@ export function FeatureFlagConfigCenterPage({}: FeatureFlagConfigCenterPageProps
   const [archiveRef, setArchiveRef] = React.useState("deploy/feature_flags.toml");
   const [importOpen, setImportOpen] = React.useState(false);
   const [importText, setImportText] = React.useState("");
+  const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(() => defaultFeatureFlagQuery());
+  const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(() => defaultFeatureFlagQuery());
   const flags = flagsQuery.data?.flags ?? [];
+  const filteredFlags = React.useMemo(() => filterFeatureFlags(flags, appliedQuery), [flags, appliedQuery]);
+  const querySummaryItems = React.useMemo(
+    () => buildQueryPanelSummaryItems(featureFlagQueryFields, appliedQuery),
+    [appliedQuery],
+  );
   const busy = migrateMutation.isPending || importMutation.isPending || switchMutation.isPending || archiveMutation.isPending;
   const gridRefreshAction: DataGridRefreshAction = {
     label: "刷新",
-    description: "刷新 Feature Flag 列表",
+    description: "刷新功能开关列表",
     disabled: flagsQuery.isFetching,
     onClick: () => {
       void refreshFlags();
@@ -131,38 +162,51 @@ export function FeatureFlagConfigCenterPage({}: FeatureFlagConfigCenterPageProps
     const result = await flagsQuery.refetch();
     setNotice(
       result.error
-        ? { type: "error", text: errorMessage(result.error, "刷新 Feature Flag 失败") }
-        : { type: "success", text: "Feature Flag 列表已刷新" },
+        ? { type: "error", text: errorMessage(result.error, "刷新功能开关失败") }
+        : { type: "success", text: "功能开关列表已刷新" },
     );
   }
 
   async function submitImport(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    let flags: FeatureFlagConfig[];
+    let nextFlags: FeatureFlagConfig[];
     try {
-      flags = parseFeatureFlagImportJson(importText);
+      nextFlags = parseFeatureFlagImportJson(importText);
     } catch (error) {
-      setNotice({ type: "error", text: errorMessage(error, "导入 Feature Flag 失败") });
+      setNotice({ type: "error", text: errorMessage(error, "导入功能开关失败") });
       return;
     }
     await act(
-      importMutation.mutateAsync(flags),
+      importMutation.mutateAsync(nextFlags),
       (result) => {
         setImportOpen(false);
         setImportText("");
         return `已导入 ${result.imported_count} 条到 ${result.target}`;
       },
-      "导入 Feature Flag 失败",
+      "导入功能开关失败",
     );
   }
 
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
       <PageHeader
-        title="M1 配置中心 / Feature Flag"
-        subtitle={`读取源：${sourceLabel(flagsQuery.data?.source ?? "unknown")} · ${flags.length} 条`}
+        title="功能开关 / 配置中心"
+        subtitle={`Feature Flag · 读取源：${sourceLabel(flagsQuery.data?.source ?? "unknown")} · ${filteredFlags.length}/${flags.length} 条`}
       />
       <NoticePanel notice={notice} />
+
+      <QueryPanel
+        fields={featureFlagQueryFields}
+        defaultVisibleFieldKeys={featureFlagCoreQueryFieldKeys}
+        value={draftQuery}
+        onValueChange={(next) => setDraftQuery(normalizeFeatureFlagQuery(next))}
+        onQuery={() => setAppliedQuery(normalizeFeatureFlagQuery(draftQuery))}
+        onReset={() => {
+          const next = defaultFeatureFlagQuery();
+          setDraftQuery(next);
+          setAppliedQuery(next);
+        }}
+      />
 
       <div className="grid gap-4 lg:grid-cols-[1fr_22rem]">
         <Card className="rounded-lg shadow-sm">
@@ -170,14 +214,26 @@ export function FeatureFlagConfigCenterPage({}: FeatureFlagConfigCenterPageProps
             <DataGrid
               storageKey="m1.config-center.feature-flags"
               columns={columns}
-              data={flags}
+              data={filteredFlags}
               rowKey={(row) => row.key}
-              caption={flagsQuery.isPending ? "加载 Feature Flag..." : undefined}
-              emptyTitle={flagsQuery.isError ? "读取 Feature Flag 失败" : "暂无 Feature Flag"}
-              emptyDescription={flagsQuery.isError ? errorMessage(flagsQuery.error, "请检查后端接口") : "当前导出结果为空"}
-              exportFileBaseName="M1 配置中心 Feature Flag"
+              caption={flagsQuery.isPending ? "加载功能开关..." : undefined}
+              emptyTitle={flagsQuery.isError ? "读取功能开关失败" : "暂无功能开关"}
+              emptyDescription={flagsQuery.isError ? errorMessage(flagsQuery.error, "请检查后端接口") : "当前导出结果为空，或没有匹配查询条件"}
+              exportFileBaseName="功能开关配置中心"
               refreshAction={gridRefreshAction}
               toolbarActions={gridToolbarActions}
+              queryState={appliedQuery}
+              querySummaryItems={querySummaryItems}
+              onApplyQueryState={(queryState) => {
+                const next = normalizeFeatureFlagQuery(queryValueFromUnknown(queryState));
+                setDraftQuery(next);
+                setAppliedQuery(next);
+              }}
+              onClearQueryState={() => {
+                const next = defaultFeatureFlagQuery();
+                setDraftQuery(next);
+                setAppliedQuery(next);
+              }}
             />
           </CardContent>
         </Card>
@@ -186,7 +242,7 @@ export function FeatureFlagConfigCenterPage({}: FeatureFlagConfigCenterPageProps
           <Card className="rounded-lg shadow-sm">
             <CardContent className="space-y-4 p-5">
               <h2 className="text-base font-semibold tracking-normal">迁移与读取源</h2>
-              <Button type="button" className="w-full justify-start" disabled={busy} onClick={() => void act(migrateMutation.mutateAsync(), (r) => `迁移完成：${r.source} → ${r.target}，${r.migrated_count} 条`, "迁移 Feature Flag 失败")}>
+              <Button type="button" className="w-full justify-start" disabled={busy} onClick={() => void act(migrateMutation.mutateAsync(), (r) => `迁移完成：${r.source} → ${r.target}，${r.migrated_count} 条`, "迁移功能开关失败")}>
                 <Database className="size-4" aria-hidden />{migrateMutation.isPending ? "迁移中..." : "从文件源迁移"}
               </Button>
               <label className="grid gap-1 text-xs text-muted-foreground">
@@ -216,9 +272,9 @@ export function FeatureFlagConfigCenterPage({}: FeatureFlagConfigCenterPageProps
       <Dialog open={importOpen} onOpenChange={(open) => !importMutation.isPending && setImportOpen(open)}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <form className="grid gap-4" onSubmit={submitImport}>
-            <DialogHeader><DialogTitle>导入 Feature Flag JSON</DialogTitle><DialogDescription>支持数组，或包含 flags 数组的导出对象。</DialogDescription></DialogHeader>
+            <DialogHeader><DialogTitle>导入功能开关 JSON</DialogTitle><DialogDescription>支持数组，或包含 flags 数组的导出对象。</DialogDescription></DialogHeader>
             <NoticePanel notice={notice?.type === "error" ? notice : null} />
-            <textarea className="min-h-72 rounded-md border border-input bg-background px-3 py-2 font-mono text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" value={importText} onChange={(event) => setImportText(event.target.value)} aria-label="Feature Flag JSON" placeholder={importPlaceholder} />
+            <textarea className="min-h-72 rounded-md border border-input bg-background px-3 py-2 font-mono text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" value={importText} onChange={(event) => setImportText(event.target.value)} aria-label="功能开关 JSON" placeholder={importPlaceholder} />
             <DialogFooter>
               <DialogClose asChild><Button type="button" variant="outline" disabled={importMutation.isPending}>取消</Button></DialogClose>
               <Button type="submit" disabled={importMutation.isPending}><Upload className="size-4" aria-hidden />{importMutation.isPending ? "导入中..." : "确认导入"}</Button>
@@ -256,6 +312,33 @@ function downloadJson(payload: unknown) {
   anchor.download = "feature-flags.json";
   anchor.click();
   URL.revokeObjectURL(url);
+}
+
+function defaultFeatureFlagQuery(): QueryPanelValue {
+  return { keyword: "", status: [] };
+}
+
+function normalizeFeatureFlagQuery(value: QueryPanelValue): QueryPanelValue {
+  return {
+    keyword: typeof value.keyword === "string" ? value.keyword : "",
+    status: Array.isArray(value.status) ? value.status.filter((item): item is string => typeof item === "string") : [],
+  };
+}
+
+function filterFeatureFlags(flags: FeatureFlagConfig[], query: QueryPanelValue): FeatureFlagConfig[] {
+  const keyword = (typeof query.keyword === "string" ? query.keyword : "").trim().toLowerCase();
+  const statuses = new Set(
+    Array.isArray(query.status) ? query.status.filter((item): item is string => typeof item === "string") : [],
+  );
+  return flags.filter((flag) => {
+    const statusValue = flag.enabled ? "enabled" : "disabled";
+    const haystack = [flag.key, flag.owner, flag.source, sourceLabel(flag.source)].join(" ").toLowerCase();
+    return (!keyword || haystack.includes(keyword)) && (!statuses.size || statuses.has(statusValue));
+  });
+}
+
+function queryValueFromUnknown(value: unknown): QueryPanelValue {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as QueryPanelValue) : {};
 }
 
 const importPlaceholder = JSON.stringify({ flags: [{ key: "m4_outbound_v2_picker_stage1", owner: "platform", created_at: "2026-07-03", cleanup_by: "2026-10-01", enabled: false, source: "config_center" }] }, null, 2);

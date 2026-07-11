@@ -69,34 +69,34 @@ type AdminView =
   | "h5-express"
   | "h9-print-templates";
 
-/** 作业 KPI 占位数据（后续可接真实待办接口） */
+/** 作业 KPI 示例数据（尚未接入真实待办接口，勿当作生产统计） */
 const operationKpis = [
   {
     id: "pending-receiving",
     label: "待收货",
     value: 12,
-    hint: "入库单待收货",
+    hint: "示例 · 入库单待收货",
     icon: PackageCheck,
   },
   {
     id: "pending-inspecting",
     label: "待验收",
     value: 5,
-    hint: "收货后待验收",
+    hint: "示例 · 收货后待验收",
     icon: CheckCircle2,
   },
   {
     id: "pending-putaway",
     label: "待上架",
     value: 8,
-    hint: "验收后待上架",
+    hint: "示例 · 验收后待上架",
     icon: Layers,
   },
   {
     id: "pending-review",
     label: "待复核",
     value: 3,
-    hint: "出库复核 / 审批",
+    hint: "示例 · 出库复核 / 审批",
     icon: History,
   },
 ] as const;
@@ -115,7 +115,7 @@ const menuSections: Array<{ label: string; items: SidebarMenuItem<AdminView>[] }
       { id: "m1-zones", title: "M1 库区管理", subtitle: "库区 / 仓库", icon: MapPinned },
       { id: "m1-locations", title: "M1 库位管理", subtitle: "库位 / 容量", icon: MapPinned },
       { id: "m1-system-dictionary", title: "M1 系统字典", subtitle: "单据类型 / 特殊药品分类", icon: BookOpen },
-      { id: "m1-feature-flags", title: "M1 Feature Flag", subtitle: "配置中心 / 灰度", icon: KeyRound },
+      { id: "m1-feature-flags", title: "M1 功能开关", subtitle: "配置中心 / Feature Flag", icon: KeyRound },
     ],
   },
   {
@@ -762,7 +762,7 @@ function Dashboard({
     <section className="flex w-full flex-col gap-6 px-4 py-8 lg:px-8">
       <PageHeader
         title="运营总览"
-        subtitle={`货主 ${currentUser.owner_code} · 关注待办作业与常用入口`}
+        subtitle={`货主 ${currentUser.owner_code} · 下方 KPI 为示例数据，后续可接真实待办`}
       />
 
       <div className="grid gap-4 lg:grid-cols-[18rem_1fr]">
