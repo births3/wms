@@ -171,12 +171,7 @@ def scan_scope_gaps(
         for story in matrix_stories
         if isinstance(story.get("id"), str)
     }
-    all_active_modules = {
-        str(story.get("module", "")).upper()
-        for story in matrix_stories
-        if str(story.get("module", "")).strip()
-    }
-    all_active_modules |= {story_module(story_id) for story_id in matrix_story_ids}
+    all_active_modules = {story.module for story in story_headings}
     requested_modules = {module.upper() for module in modules} if modules is not None else None
     active_modules = requested_modules if requested_modules is not None else all_active_modules
 
@@ -189,7 +184,7 @@ def scan_scope_gaps(
     deferred_story_ids: set[str] = set()
     matrix_frontend_pages = {
         page_id
-        for story in matrix_stories
+        for story in [*matrix_stories, *(deferred_stories or [])]
         for page_id in story.get("frontend_pages", [])
         if isinstance(page_id, str)
     }
@@ -248,6 +243,40 @@ def scan_scope_gaps(
                     story_id=story_id or "-",
                     file=rel(MATRIX),
                     message="延期故事必须填写 reason，说明为什么不进入本轮质量矩阵",
+                )
+            )
+        if not str(story.get("owner", "")).strip():
+            gaps.append(
+                ScopeGap(
+                    severity="block",
+                    kind="deferred_story_missing_owner",
+                    module=module,
+                    story_id=story_id or "-",
+                    file=rel(MATRIX),
+                    message="延期故事必须填写 owner，明确负责收口的模块或角色",
+                )
+            )
+        if not str(story.get("resume_when", "")).strip():
+            gaps.append(
+                ScopeGap(
+                    severity="block",
+                    kind="deferred_story_missing_resume_when",
+                    module=module,
+                    story_id=story_id or "-",
+                    file=rel(MATRIX),
+                    message="延期故事必须填写 resume_when，明确恢复实施的可验证条件",
+                )
+            )
+        frontend_pages = [page for page in story.get("frontend_pages", []) if isinstance(page, str)]
+        if frontend_pages and not has_frontend_e2e_checks(story):
+            gaps.append(
+                ScopeGap(
+                    severity="discover",
+                    kind="deferred_frontend_story_missing_e2e_check",
+                    module=module,
+                    story_id=story_id,
+                    file=rel(MATRIX),
+                    message="延期故事已有管理端页面，仍必须登记当前已实现切片的 E2E 检查",
                 )
             )
         deferred_story_ids.add(story_id)

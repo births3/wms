@@ -219,6 +219,31 @@ def dimension_status(story: dict[str, Any], dimension: str) -> str | None:
     return None
 
 
+def check_evidence_profiles(
+    matrix: dict[str, Any], stories: list[dict[str, Any]], *, repo_root: Path = REPO_ROOT
+) -> list[Issue]:
+    issues: list[Issue] = []
+    profiles = matrix.get("evidence_profiles", {})
+    if not isinstance(profiles, dict):
+        return [Issue("<matrix>", "evidence", "evidence_profiles 必须是对象")]
+    for story in stories:
+        story_id = str(story.get("id", "<missing>"))
+        module = str(story.get("module", ""))
+        profile = profiles.get(module)
+        if not isinstance(profile, dict):
+            issues.append(Issue(story_id, "evidence", f"模块 {module} 缺少 evidence_profiles.{module}"))
+            continue
+        for field in ("backend_files", "database_objects", "test_checks", "evidence_refs"):
+            values = profile.get(field)
+            if not isinstance(values, list) or not values or not all(isinstance(value, str) and value.strip() for value in values):
+                issues.append(Issue(story_id, "evidence", f"evidence_profiles.{module}.{field} 必须是非空字符串数组"))
+        for field in ("backend_files", "evidence_refs"):
+            for value in profile.get(field, []) if isinstance(profile.get(field), list) else []:
+                if isinstance(value, str) and not (repo_root / value).exists():
+                    issues.append(Issue(story_id, "evidence", f"证据文件不存在: {value}"))
+    return issues
+
+
 def scan() -> list[Issue]:
     matrix = load_matrix()
     stories = matrix.get("stories")
@@ -237,6 +262,7 @@ def scan() -> list[Issue]:
             issues.append(Issue(story_id, "requirement", "故事 ID 重复"))
         seen.add(story_id)
         issues.extend(check_story(raw_story, story_files=known_story_files, openapi_paths=known_openapi_paths))
+    issues.extend(check_evidence_profiles(matrix, [story for story in stories if isinstance(story, dict)]))
 
     expected_doc = build_markdown(matrix)
     if DOC.exists() and DOC.read_text(encoding="utf-8") != expected_doc:

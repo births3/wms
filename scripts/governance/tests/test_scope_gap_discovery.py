@@ -34,6 +34,22 @@ def test_scope_gap_reports_unregistered_stories_in_active_module_without_default
     assert result.gaps[0].severity == "discover"
 
 
+def test_scope_gap_default_scan_includes_modules_not_yet_in_matrix():
+    from check_scope_gap_discovery import scan_scope_gaps
+
+    result = scan_scope_gaps(
+        story_docs={
+            "docs/domain/user-stories-m1.md": "## US-M1-001：商品档案",
+            "docs/domain/user-stories-m4.md": "## US-M4-001：出库订单",
+        },
+        matrix_stories=[{"id": "US-M1-001", "module": "M1", "frontend_pages": [], "api_paths": []}],
+        admin_pages={},
+    )
+
+    assert result.active_modules == ["M1", "M4"]
+    assert [gap.story_id for gap in result.gaps] == ["US-M4-001"]
+
+
 def test_scope_gap_blocks_matrix_frontend_page_that_is_not_in_menu():
     from check_scope_gap_discovery import scan_scope_gaps
 
@@ -228,6 +244,8 @@ def test_scope_gap_accepts_deferred_story_with_reason():
                 "module": "H9",
                 "story_file": "docs/domain/user-stories-h9-print-template.md",
                 "reason": "后续切片实现模板设计器。",
+                "owner": "H9 模块负责人",
+                "resume_when": "H9 模板设计器进入开发波次。",
             }
         ],
         admin_pages={"h9-print-templates": "H9 打印模板"},
@@ -238,6 +256,42 @@ def test_scope_gap_accepts_deferred_story_with_reason():
     assert result.strict_ok
     assert result.deferred_story_ids == ["US-H9-003"]
     assert result.gaps == []
+
+
+def test_scope_gap_deferred_story_can_cover_existing_menu_but_requires_e2e() -> None:
+    from check_scope_gap_discovery import AdminNavigation, scan_scope_gaps
+
+    navigation = AdminNavigation(
+        menu_sections={"m2-inspecting": "M2 验收管理"},
+        default_menu_tree={"m2-inspecting"},
+        routed_views={"m2-inspecting"},
+    )
+    deferred = {
+        "id": "US-M2-003",
+        "module": "M2",
+        "reason": "PDA 尚未实现。",
+        "owner": "M2 模块负责人",
+        "resume_when": "PDA 波次启动。",
+        "frontend_pages": ["m2-inspecting"],
+    }
+    missing = scan_scope_gaps(
+        story_docs={"docs/domain/user-stories-m2.md": "## US-M2-003：PDA/PC Web 验收"},
+        matrix_stories=[],
+        deferred_stories=[deferred],
+        admin_pages=navigation.menu_sections,
+        admin_navigation=navigation,
+    )
+    assert [gap.kind for gap in missing.gaps] == ["deferred_frontend_story_missing_e2e_check"]
+
+    deferred["e2e_checks"] = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
+    covered = scan_scope_gaps(
+        story_docs={"docs/domain/user-stories-m2.md": "## US-M2-003：PDA/PC Web 验收"},
+        matrix_stories=[],
+        deferred_stories=[deferred],
+        admin_pages=navigation.menu_sections,
+        admin_navigation=navigation,
+    )
+    assert covered.gaps == []
 
 
 def test_scope_gap_blocks_invalid_deferred_story():
@@ -269,6 +323,8 @@ def test_scope_gap_blocks_invalid_deferred_story():
     assert [gap.kind for gap in result.gaps] == [
         "deferred_story_missing_from_story_docs",
         "deferred_story_missing_reason",
+        "deferred_story_missing_owner",
+        "deferred_story_missing_resume_when",
     ]
 
 

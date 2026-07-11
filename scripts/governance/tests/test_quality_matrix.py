@@ -232,3 +232,26 @@ def test_quality_matrix_rejects_unregistered_navigation_command():
     issues = check_story(story, story_files=set(), openapi_paths=set())
 
     assert Issue("US-M2-002", "evidence", "未登记的导航检查命令: echo fake-e2e") in issues
+
+
+def test_verified_story_requires_module_evidence_profile(tmp_path):
+    from check_quality_matrix import check_evidence_profiles
+
+    source = tmp_path / "handler.rs"
+    source.write_text("handler", encoding="utf-8")
+    stories = [{"id": "US-M2-002", "module": "M2"}]
+
+    missing = check_evidence_profiles({}, stories, repo_root=tmp_path)
+    assert [issue.message for issue in missing] == ["模块 M2 缺少 evidence_profiles.M2"]
+
+    matrix = {
+        "evidence_profiles": {
+            "M2": {
+                "backend_files": ["handler.rs"],
+                "database_objects": ["receiving_orders"],
+                "test_checks": ["cargo test -p wms-api --test wave3_postgres"],
+                "evidence_refs": ["handler.rs"],
+            }
+        }
+    }
+    assert check_evidence_profiles(matrix, stories, repo_root=tmp_path) == []

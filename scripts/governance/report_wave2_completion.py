@@ -111,6 +111,11 @@ def file_contains(path: str, *needles: str) -> bool:
     return bool(text) and all(needle in text for needle in needles)
 
 
+def files_contain(paths: list[str], *needles: str) -> bool:
+    text = "\n".join(read_text(path) for path in paths)
+    return bool(text) and all(needle in text for needle in needles)
+
+
 def load_openapi() -> dict[str, Any]:
     path = REPO_ROOT / "shared/openapi/openapi.json"
     if not path.exists():
@@ -212,8 +217,8 @@ def collect_items() -> list[EvidenceItem]:
     items: list[EvidenceItem] = []
 
     m1_ok = (
-        file_contains(
-            "backend/crates/domain/src/lib.rs",
+        files_contain(
+            ["backend/crates/domain/src/lib.rs", "backend/crates/domain/src/master_dictionary.rs"],
             "pub struct Product",
             "pub struct Supplier",
             "pub struct Customer",
@@ -247,7 +252,11 @@ def collect_items() -> list[EvidenceItem]:
     ))
 
     m2_ok = (
-        file_contains("backend/crates/domain/src/lib.rs", "pub struct ReceivingOrder", "pub struct ReceivingOrderLine")
+        files_contain(
+            ["backend/crates/domain/src/lib.rs", "backend/crates/domain/src/receiving_outbound.rs"],
+            "pub struct ReceivingOrder",
+            "pub struct ReceivingOrderLine",
+        )
         and file_contains("backend/crates/api/src/inbound.rs", "pub struct ReceivingOrderStore", "receiving_order_crud_is_owner_scoped")
         and openapi_has(["/api/v1/inbound/receiving-orders"], ["ReceivingOrder", "CreateReceivingOrderRequest"])
     )

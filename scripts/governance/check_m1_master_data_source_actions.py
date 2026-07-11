@@ -156,7 +156,13 @@ def rel(path: Path) -> str:
 
 def read_source(path: Path) -> str:
     if path.is_file():
-        return path.read_text(encoding="utf-8")
+        family = [path]
+        if path.suffix:
+            family.extend(sorted(path.parent.glob(f"{path.stem}_part*{path.suffix}")))
+            split_dir = path.parent / path.stem
+            if split_dir.is_dir():
+                family.extend(sorted(split_dir.rglob(f"*{path.suffix}")))
+        return "\n".join(item.read_text(encoding="utf-8") for item in dict.fromkeys(family))
     return "\n".join(
         child.read_text(encoding="utf-8")
         for child in sorted(path.rglob("*"))

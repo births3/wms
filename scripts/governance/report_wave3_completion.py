@@ -60,7 +60,15 @@ class LayerEvidence:
 
 def read_text(path: str) -> str:
     target = REPO_ROOT / path
-    return target.read_text(encoding="utf-8") if target.exists() else ""
+    if not target.exists() or not target.is_file():
+        return ""
+    family = [target]
+    if target.suffix:
+        family.extend(sorted(target.parent.glob(f"{target.stem}_part*{target.suffix}")))
+        split_dir = target.parent / target.stem
+        if split_dir.is_dir():
+            family.extend(sorted(split_dir.rglob(f"*{target.suffix}")))
+    return "\n".join(item.read_text(encoding="utf-8") for item in dict.fromkeys(family))
 
 
 def file_exists(path: str) -> bool:
@@ -69,6 +77,11 @@ def file_exists(path: str) -> bool:
 
 def file_contains(path: str, *needles: str) -> bool:
     text = read_text(path)
+    return bool(text) and all(needle in text for needle in needles)
+
+
+def files_contain(paths: list[str], *needles: str) -> bool:
+    text = "\n".join(read_text(path) for path in paths)
     return bool(text) and all(needle in text for needle in needles)
 
 
@@ -261,8 +274,15 @@ def collect_key_path_layers() -> list[LayerEvidence]:
         [] if l2_ok else ["缺少 M2/M3 OpenAPI path/schema 或 api-client header 类型"],
     ))
 
-    l3_ok = file_contains(
+    handler_sources = [
         "backend/crates/api/src/wave3_handlers.rs",
+        "backend/crates/api/src/wave3_handlers_part1.rs",
+        "backend/crates/api/src/wave3_handlers_part2.rs",
+        "backend/crates/api/src/wave3_handlers_part3.rs",
+        "backend/crates/api/src/wave3_handlers_part4.rs",
+    ]
+    l3_ok = files_contain(
+        handler_sources,
         "postgres_receive_handler_writes_business_idempotency_and_audit",
         "postgres_putaway_handler_commits_inventory_and_audit",
         "postgres_inventory_query_and_status_change_are_scoped_idempotent_and_audited",
@@ -277,8 +297,8 @@ def collect_key_path_layers() -> list[LayerEvidence]:
 
     l4_ok = (
         file_contains("backend/crates/api/src/inbound.rs", "receiving_inspection_rejects_expired_batch")
-        and file_contains(
-            "backend/crates/api/src/wave3_handlers.rs",
+        and files_contain(
+            handler_sources,
             "MissingApprovalSource",
             "MissingIdempotencyKey",
         )
@@ -299,8 +319,8 @@ def collect_key_path_layers() -> list[LayerEvidence]:
             "inventory_batches",
             "inventory_movements",
         )
-        and file_contains(
-            "backend/crates/api/src/wave3_handlers.rs",
+        and files_contain(
+            handler_sources,
             "audit_event",
             "inventory_status_changes",
         )
@@ -335,8 +355,8 @@ def collect_key_path_layers() -> list[LayerEvidence]:
         strict_blocking=False,
     ))
 
-    l8_ok = file_contains(
-        "backend/crates/api/src/wave3_handlers.rs",
+    l8_ok = files_contain(
+        handler_sources,
         "inbound_receive_handler_requires_permission_and_appends_audit",
         "PermissionDenied",
         "postgres_inventory_query_and_status_change_are_scoped_idempotent_and_audited",
@@ -369,8 +389,8 @@ def collect_key_path_layers() -> list[LayerEvidence]:
         [] if l9_ok else ["缺少 OpenAPI 同步产物或契约检查"],
     ))
 
-    l10_ok = file_contains(
-        "backend/crates/api/src/wave3_handlers.rs",
+    l10_ok = files_contain(
+        handler_sources,
         "audit_event",
         "action = 'receive'",
         "action = 'putaway'",
@@ -386,14 +406,17 @@ def collect_key_path_layers() -> list[LayerEvidence]:
     ))
 
     l11_ok = (
-        file_contains(
-            "backend/crates/api/tests/wave3_postgres.rs",
+        files_contain(
+            [
+                "backend/crates/api/tests/wave3_postgres.rs",
+                "backend/crates/api/tests/wave3_evidence_postgres.rs",
+            ],
             "receiving_receipt_is_single_closure_and_idempotent",
             "expired_idempotency_key_is_not_replayed",
             "idempotency_request",
         )
-        and file_contains(
-            "backend/crates/api/src/wave3_handlers.rs",
+        and files_contain(
+            handler_sources,
             "same idempotency key should replay",
             "Idempotency-Key",
         )
@@ -412,17 +435,32 @@ def collect_key_path_layers() -> list[LayerEvidence]:
 def collect_items() -> list[EvidenceItem]:
     items: list[EvidenceItem] = []
 
+    repository_sources = [
+        "backend/crates/api/src/wave3_repository.rs",
+        "backend/crates/api/src/wave3_repository_part1.rs",
+        "backend/crates/api/src/wave3_repository_part2.rs",
+        "backend/crates/api/src/wave3_repository/receiving_read.rs",
+        "backend/crates/api/src/wave3_repository/receiving_update.rs",
+    ]
+    handler_sources = [
+        "backend/crates/api/src/wave3_handlers.rs",
+        "backend/crates/api/src/wave3_handlers_part1.rs",
+        "backend/crates/api/src/wave3_handlers_part2.rs",
+        "backend/crates/api/src/wave3_handlers_part3.rs",
+        "backend/crates/api/src/wave3_handlers_part4.rs",
+    ]
+
     m2_ok = (
         file_contains("backend/crates/api/src/inbound.rs", "ReceivingOrderStore", "ReceivingOrderError")
-        and file_contains(
-            "backend/crates/api/src/wave3_repository.rs",
+        and files_contain(
+            repository_sources,
             "receive_receiving_order_with_audit",
             "inspect_receiving_order_with_audit",
             "sign_receiving_order_with_audit",
             "putaway_receiving_order_and_inventory_with_audit",
         )
-        and file_contains(
-            "backend/crates/api/src/wave3_handlers.rs",
+        and files_contain(
+            handler_sources,
             "postgres_receive_handler_writes_business_idempotency_and_audit",
             "postgres_inspect_and_sign_handlers_write_idempotency_and_audit",
             "postgres_putaway_handler_commits_inventory_and_audit",
@@ -442,14 +480,14 @@ def collect_items() -> list[EvidenceItem]:
 
     m3_ok = (
         file_contains("backend/crates/api/src/inventory.rs", "InventoryStore", "allowed_transition")
-        and file_contains(
-            "backend/crates/api/src/wave3_repository.rs",
+        and files_contain(
+            repository_sources,
             "list_inventory_batches",
             "change_inventory_status_with_audit",
             "inventory_status_changes",
         )
-        and file_contains(
-            "backend/crates/api/src/wave3_handlers.rs",
+        and files_contain(
+            handler_sources,
             "postgres_inventory_query_and_status_change_are_scoped_idempotent_and_audited",
         )
     )
@@ -467,8 +505,8 @@ def collect_items() -> list[EvidenceItem]:
 
     m5_ok = (
         file_contains("backend/crates/api/src/cold_chain.rs", "ColdChainService", "IngestTemperatureReadingRequest")
-        and file_contains(
-            "backend/crates/api/src/wave3_handlers.rs",
+        and files_contain(
+            handler_sources,
             "ExternalApiKeyConfig",
             "EXTERNAL_API_KEY_HEADER",
             "external_auth_headers",

@@ -56,6 +56,23 @@ def test_m1_governance_recursively_reports_missing_split_source_token(tmp_path, 
     ]
 
 
+def test_m1_governance_reads_rust_source_family(tmp_path):
+    import check_m1_master_data_source_actions as check
+
+    source = tmp_path / "master_data_handlers.rs"
+    source.write_text('include!("master_data_handlers_part2.rs");', encoding="utf-8")
+    (tmp_path / "master_data_handlers_part2.rs").write_text(
+        "state.create_product state.create_supplier state.create_customer",
+        encoding="utf-8",
+    )
+
+    text = check.read_source(source)
+
+    assert "state.create_product" in text
+    assert "state.create_supplier" in text
+    assert "state.create_customer" in text
+
+
 def test_m1_dev_mock_changes_trigger_source_action_check():
     """拆分后的 dev mock 变更必须触发 M1 来源动作治理。"""
     from _diff import load_gate_rules, match_rules

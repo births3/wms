@@ -206,6 +206,10 @@ matrix-e2e-full *args:
 web-admin-m1-real-e2e:
     @pnpm --dir apps/web-admin run test:e2e:m1-real
 
+# M2 管理端真实后端完整入库链路 E2E；需要 DATABASE_URL 或 WMS_DB_URL 指向测试库
+web-admin-m2-real-e2e:
+    @pnpm --dir apps/web-admin run test:e2e:m2-real
+
 # 管理端 9002 当前占用状态
 dev-web-status:
     #!/usr/bin/env bash
