@@ -95,227 +95,70 @@ def run(cmd: list[str], *, input_text: str | None = None) -> str:
     return result.stdout
 
 
-def tea_api(endpoint: str, *, method: str = "GET", payload: dict[str, Any] | None = None) -> Any:
-    cmd = ["tea", "api", "-X", method, endpoint]
-    if payload is not None:
-        with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as f:
-            json.dump(payload, f, ensure_ascii=False)
-            payload_path = f.name
-        try:
-            cmd.extend(["-d", f"@{payload_path}"])
-            text = run(cmd)
-        finally:
-            Path(payload_path).unlink(missing_ok=True)
-    else:
-        text = run(cmd)
-    return json.loads(text or "null")
+from _issue_runner_comments import *  # noqa: F403
 
 
-def list_open_issues(limit: int) -> list[dict[str, Any]]:
-    items = tea_api(f"/repos/{{owner}}/{{repo}}/issues?state=open&limit={limit}")
-    return [item for item in items if not item.get("pull_request")]
 
 
-def list_closed_issues(limit: int) -> list[dict[str, Any]]:
-    items = tea_api(f"/repos/{{owner}}/{{repo}}/issues?state=closed&limit={limit}")
-    return [item for item in items if not item.get("pull_request")]
 
 
-def list_open_pulls(limit: int) -> list[dict[str, Any]]:
-    return tea_api(f"/repos/{{owner}}/{{repo}}/pulls?state=open&limit={limit}")
 
 
-def get_pull(index: int) -> dict[str, Any]:
-    return tea_api(f"/repos/{{owner}}/{{repo}}/pulls/{index}")
 
 
-def get_issue(index: int) -> dict[str, Any]:
-    return tea_api(f"/repos/{{owner}}/{{repo}}/issues/{index}")
 
 
-def get_comments(index: int) -> list[dict[str, Any]]:
-    return tea_api(f"/repos/{{owner}}/{{repo}}/issues/{index}/comments")
 
 
-def post_comment(index: int, body: str) -> None:
-    tea_api(f"/repos/{{owner}}/{{repo}}/issues/{index}/comments", method="POST", payload={"body": body})
 
 
-def parse_time(value: str) -> datetime:
-    return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
 
 
-def body_of(comment: dict[str, Any]) -> str:
-    return str(comment.get("body") or "")
 
 
-def latest_marker_time(comments: list[dict[str, Any]], marker: str) -> datetime | None:
-    times = [parse_time(str(c["created_at"])) for c in comments if marker in body_of(c)]
-    return max(times) if times else None
 
 
-def latest_marker_comment(comments: list[dict[str, Any]], markers: tuple[str, ...]) -> dict[str, Any] | None:
-    matches = [c for c in comments if any(marker in body_of(c) for marker in markers)]
-    if not matches:
-        return None
-    return max(matches, key=lambda c: parse_time(str(c["created_at"])))
 
 
-def has_command_after(comments: list[dict[str, Any]], since: datetime, command: str) -> bool:
-    for comment in comments:
-        created = parse_time(str(comment["created_at"]))
-        if created > since and not is_agent_comment(comment) and has_command(body_of(comment), command):
-            return True
-    return False
 
 
-def has_active_merge_marker(comments: list[dict[str, Any]]) -> bool:
-    merge_time = latest_marker_time(comments, MERGE_MARKER)
-    if merge_time is None:
-        return False
-    correction_time = latest_marker_time(comments, MERGE_CORRECTION_MARKER)
-    return correction_time is None or correction_time < merge_time
 
 
-def has_command(text: str, command: str) -> bool:
-    pattern = re.compile(rf"^\s*{re.escape(command)}(?:\s|$)")
-    return any(pattern.match(line) for line in text.splitlines())
 
 
-def has_confirm_after(comments: list[dict[str, Any]], since: datetime) -> bool:
-    return latest_confirm_after(comments, since) is not None
 
 
-def latest_confirm_after(comments: list[dict[str, Any]], since: datetime) -> dict[str, Any] | None:
-    matches: list[dict[str, Any]] = []
-    for comment in comments:
-        created = parse_time(str(comment["created_at"]))
-        if created <= since or is_agent_comment(comment):
-            continue
-        if is_confirm_comment(comment):
-            matches.append(comment)
-    if not matches:
-        return None
-    return max(matches, key=lambda c: parse_time(str(c["created_at"])))
 
 
-def confirm_key(comment: dict[str, Any]) -> str:
-    if comment.get("id") is not None:
-        return str(comment["id"])
-    return f"{comment.get('created_at', '')}:{body_of(comment).strip()}"
 
 
-def load_consumed_confirmations() -> dict[str, list[str]]:
-    try:
-        data = json.loads(CONSUMED_CONFIRMATIONS_FILE.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        return {}
-    if not isinstance(data, dict):
-        return {}
-    return {str(k): [str(item) for item in v] for k, v in data.items() if isinstance(v, list)}
 
 
-def confirmation_consumed(issue_number: int, key: str) -> bool:
-    return key in set(load_consumed_confirmations().get(str(issue_number), []))
 
 
-def mark_confirmation_consumed(issue_number: int, key: str) -> None:
-    data = load_consumed_confirmations()
-    values = data.setdefault(str(issue_number), [])
-    if key not in values:
-        values.append(key)
-    CONSUMED_CONFIRMATIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    tmp = CONSUMED_CONFIRMATIONS_FILE.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    tmp.replace(CONSUMED_CONFIRMATIONS_FILE)
 
 
-def has_reject_after(comments: list[dict[str, Any]], since: datetime) -> bool:
-    for comment in comments:
-        created = parse_time(str(comment["created_at"]))
-        if created > since and has_command(body_of(comment), "/reject"):
-            return True
-    return False
 
 
-def short(text: str, limit: int) -> str:
-    normalized = " ".join(str(text or "").split())
-    if len(normalized) <= limit:
-        return normalized
-    return normalized[: limit - 1] + "…"
 
 
-def is_agent_comment(comment: dict[str, Any]) -> bool:
-    return "wms-issue-agent:" in body_of(comment)
 
 
-def is_status_comment(comment: dict[str, Any]) -> bool:
-    text = body_of(comment)
-    return is_agent_comment(comment) or any(token in text for token in STATUS_COMMENT_TOKENS)
 
 
-def is_obsolete_control_comment(comment: dict[str, Any]) -> bool:
-    if is_agent_comment(comment):
-        return False
-    text = body_of(comment)
-    return (
-        has_command(text, "/confirm")
-        or has_command(text, "/codex run")
-        or any(line.strip() == "开始处理" for line in text.splitlines())
-    )
 
 
-def is_confirm_comment(comment: dict[str, Any]) -> bool:
-    return body_of(comment).strip() == CONFIRM_PHRASE
 
 
-def comment_summary(comments: list[dict[str, Any]], limit: int = 5) -> str:
-    human_comments = [c for c in comments if not is_agent_comment(c)]
-    if not human_comments:
-        return "暂无人工评论。"
-    lines: list[str] = []
-    for c in human_comments[-limit:]:
-        author = (c.get("user") or {}).get("login", "unknown")
-        lines.append(f"- {author}: {short(normalize_attachment_links(body_of(c)), 220)}")
-    return "\n".join(lines)
 
 
-def gitea_root() -> str:
-    remote = run(["git", "remote", "get-url", "origin"]).strip()
-    return remote.removesuffix(".git").rsplit("/", 2)[0]
 
 
-def normalize_attachment_links(text: str) -> str:
-    root = gitea_root()
-    return text.replace("](/attachments/", f"]({root}/attachments/").replace("(/attachments/", f"({root}/attachments/")
 
 
-def attachment_summary(
-    comments: list[dict[str, Any]],
-    *,
-    issue: dict[str, Any] | None = None,
-    limit: int = 10,
-) -> str:
-    lines: list[str] = []
-    if issue:
-        author = (issue.get("user") or {}).get("login", "issue")
-        for asset in issue.get("assets") or []:
-            url = asset.get("browser_download_url")
-            if url:
-                lines.append(f"- {author}: {asset.get('name', 'attachment')} {url}")
-    for c in comments[-limit:]:
-        if is_agent_comment(c):
-            continue
-        author = (c.get("user") or {}).get("login", "unknown")
-        for asset in c.get("assets") or []:
-            url = asset.get("browser_download_url")
-            if url:
-                lines.append(f"- {author}: {asset.get('name', 'attachment')} {url}")
-    return "\n".join(lines) if lines else "无"
 
 
-def text_blob(*parts: Any) -> str:
-    return "\n".join(str(part or "") for part in parts)
+
 
 
 CODE_CONTEXT_GLOBS = [
@@ -388,46 +231,10 @@ KEYWORD_ALIASES = {
 }
 
 
-def issue_keywords(text: str) -> list[str]:
-    keywords: list[str] = []
-    for word in DOMAIN_KEYWORDS:
-        if word in text:
-            keywords.extend(KEYWORD_ALIASES.get(word, []))
-            keywords.append(word)
-    for word in re.findall(r"[A-Za-z][A-Za-z0-9_-]{2,}|M\d+", text):
-        if word.lower() not in {"issue", "http", "https"}:
-            keywords.append(word)
-    seen: set[str] = set()
-    return [word for word in keywords if not (word in seen or seen.add(word))][:10]
+from _issue_runner_context import *  # noqa: F403
 
 
-def code_context_summary(issue: dict[str, Any], comments: list[dict[str, Any]]) -> str:
-    text = f"{issue.get('title', '')} {issue.get('body', '')} {comment_summary(comments, limit=10)}"
-    keywords = issue_keywords(text)
-    if not keywords:
-        return "未提取到可检索关键词；当前判断只能基于 issue 文本，执行前必须补充页面、接口、截图或复现步骤。"
 
-    lines: list[str] = []
-    for keyword in keywords:
-        matches: list[str] = []
-        for target in CODE_CONTEXT_GLOBS:
-            cmd = ["rg", "-n", "--with-filename", "--fixed-strings", keyword, target]
-            result = subprocess.run(cmd, capture_output=True, text=True, cwd=REPO_ROOT, check=False)
-            for line in result.stdout.splitlines():
-                if line.strip() and not line.startswith("scripts/agents/issue_runner.py:"):
-                    matches.append(line)
-                if len(matches) >= 3:
-                    break
-            if len(matches) >= 3:
-                break
-        if matches:
-            lines.append(f"- `{keyword}` 命中：")
-            lines.extend(f"  - `{short(match, 180)}`" for match in matches)
-        if len(lines) >= 9:
-            break
-    if not lines:
-        return "未在前端、后端、脚本或文档中命中 issue 关键词；执行前必须补充更具体的页面、接口、截图或复现步骤。"
-    return "\n".join(lines[:12])
 
 
 COMMONALITY_RULES = [
@@ -464,490 +271,62 @@ COMMONALITY_RULES = [
 ]
 
 
-def commonality_summary(issue: dict[str, Any], comments: list[dict[str, Any]]) -> str:
-    text = f"{issue.get('title', '')} {issue.get('body', '')} {comment_summary(comments, limit=10)}"
-    matched: list[tuple[str, str, str]] = []
-    for words, category, scope, action in COMMONALITY_RULES:
-        if any(word in text for word in words):
-            matched.append((category, scope, action))
-    if any(category == "DataGrid 选择状态一致性" for category, _, _ in matched):
-        matched = [item for item in matched if item[0] != "管理端动作入口一致性"]
-    if not matched:
-        return (
-            "- 初判：暂未证明是共性问题。\n"
-            "- 是否一起修改：先按当前 issue 定位；执行中若发现同类页面、组件、字段、流程或治理脚本也受影响，停止并升级为共性修复。\n"
-            "- 预防治理：若能脚本化，补 T1 检查；否则更新对应 skill、runbook 或规范文档。"
-        )
-    lines = ["- 初判：可能是共性问题，执行前必须先核查同类范围。"]
-    for category, scope, action in matched[:2]:
-        lines.append(f"- 共性类型：{category}")
-        lines.append(f"- 相似范围：{scope}")
-        lines.append(f"- 是否一起修改：{action}")
-    lines.append("- 预防治理：把可复发约束写入 prompt / skill / runbook；能静态检查的再补治理脚本。")
-    return "\n".join(lines)
-
-
-def has_selection_state_signal(text: str) -> bool:
-    return any(
-        word in text
-        for word in (
-            "全局勾选",
-            "取消勾选",
-            "自动勾选",
-            "勾选",
-            "全选",
-            "选中",
-            "第一个",
-            "selectedRowKeys",
-        )
-    )
-
-
-def pr_mentions_issue(pr: dict[str, Any], issue_number: int) -> bool:
-    text = text_blob(pr.get("title"), pr.get("body"))
-    return bool(re.search(rf"(?:issue|关联|关闭|close[sd]?)\s*#?{issue_number}\b", text, re.I))
-
-
-def has_merge_blocker(text: str) -> bool:
-    return any(word in text for word in ("/reject", "不要合并", "暂不合并", "合并阻塞", "blocked", "BLOCKED"))
-
-
-def has_merge_evidence(text: str) -> bool:
-    return "验证" in text and ("截图" in text or "附件" in text) and ("重启" in text or "healthz" in text)
-
-
-def is_auto_merge_branch(head_ref: str, issue_number: int) -> bool:
-    return head_ref.startswith("agent/") or head_ref.startswith(f"fix/issue-{issue_number}-")
-
-
-def current_branch() -> str:
-    return run(["git", "branch", "--show-current"]).strip()
-
-
-def pull_is_merged(pr: dict[str, Any]) -> bool:
-    return bool(pr.get("merged") or pr.get("merged_at") or pr.get("merge_commit_sha"))
-
-
-def merge_verification_error(pr: dict[str, Any]) -> str | None:
-    if pull_is_merged(pr):
-        return None
-    return (
-        f"state={pr.get('state')}, merged={pr.get('merged')}, "
-        f"mergeable={pr.get('mergeable')}, merged_at={pr.get('merged_at')}, "
-        f"merge_commit_sha={pr.get('merge_commit_sha')}"
-    )
-
-
-def merge_blockers(issue: dict[str, Any], comments: list[dict[str, Any]], pr: dict[str, Any]) -> list[str]:
-    human_comments = [body_of(c) for c in comments if "wms-issue-agent:" not in body_of(c)]
-    text = text_blob(issue.get("body"), pr.get("body"), *human_comments)
-    head_ref = str((pr.get("head") or {}).get("ref") or "")
-    base_ref = str((pr.get("base") or {}).get("ref") or "")
-    blockers: list[str] = []
-    if issue.get("state") != "closed":
-        blockers.append("issue 未关闭")
-    if base_ref and base_ref != current_branch():
-        blockers.append(f"PR base 不是当前工作分支：{base_ref}")
-    if has_active_merge_marker(comments):
-        if pull_is_merged(pr):
-            blockers.append("issue 已有合并 marker")
-        else:
-            blockers.append("issue 有未纠正的合并 marker 但 PR 未合并")
-    failure_time = latest_marker_time(comments, MERGE_FAILED_MARKER)
-    if failure_time and not has_command_after(comments, failure_time, MERGE_RETRY_COMMAND):
-        blockers.append(f"已有自动合并失败 marker，需人工评论 {MERGE_RETRY_COMMAND} 后重试")
-    if pr.get("state") != "open":
-        blockers.append("PR 不是 open")
-    if pull_is_merged(pr):
-        blockers.append("PR 已合并")
-    if not pr.get("mergeable"):
-        blockers.append("PR 不可自动合并")
-    if not is_auto_merge_branch(head_ref, int(issue["number"])):
-        blockers.append("PR 分支不是 agent/* 或 fix/issue-<编号>-*")
-    if has_merge_blocker(text):
-        blockers.append("存在阻塞或拒绝合并评论")
-    if not has_merge_evidence(text):
-        blockers.append("缺少验证、截图或重启证据")
-    return blockers
-
-
-def extract_local_merge_branches(text: str, issue_number: int) -> list[str]:
-    branches: list[str] = []
-    for match in LOCAL_BRANCH_PATTERN.finditer(text):
-        branch = match.group(0).strip("`'\"，。,.；;")
-        if branch in branches:
-            continue
-        if is_auto_merge_branch(branch, issue_number):
-            branches.append(branch)
-    return branches
-
-
-def latest_local_delivery_branches(issue_number: int, comments: list[dict[str, Any]]) -> list[str]:
-    deliveries = [comment for comment in comments if DELIVERY_MARKER in body_of(comment)]
-    for comment in sorted(deliveries, key=lambda c: parse_time(str(c["created_at"])), reverse=True):
-        branches = extract_local_merge_branches(body_of(comment), issue_number)
-        if branches:
-            return branches
-    return []
-
-
-def local_branch_exists(branch: str) -> bool:
-    result = subprocess.run(
-        ["git", "show-ref", "--verify", "--quiet", f"refs/heads/{branch}"],
-        cwd=REPO_ROOT,
-        check=False,
-    )
-    return result.returncode == 0
-
-
-def local_branch_merged(branch: str) -> bool:
-    result = subprocess.run(
-        ["git", "merge-base", "--is-ancestor", branch, "HEAD"],
-        cwd=REPO_ROOT,
-        check=False,
-    )
-    return result.returncode == 0
-
-
-def workspace_clean() -> bool:
-    return run(["git", "status", "--porcelain"]).strip() == ""
-
-
-def local_merge_blockers(
-    issue: dict[str, Any],
-    comments: list[dict[str, Any]],
-    branch: str,
-    *,
-    branch_exists: bool,
-    branch_merged: bool,
-    workspace_clean: bool,
-    current_ref: str | None = None,
-) -> list[str]:
-    issue_number = int(issue["number"])
-    latest_delivery = latest_marker_comment(comments, (DELIVERY_MARKER,))
-    human_comments = [body_of(c) for c in comments if not is_agent_comment(c)]
-    text = text_blob(issue.get("body"), body_of(latest_delivery or {}), *human_comments)
-    blockers: list[str] = []
-    if issue.get("state") != "closed":
-        blockers.append("issue 未关闭")
-    if not latest_delivery:
-        blockers.append("缺少本地交付 delivery")
-    if has_active_merge_marker(comments):
-        blockers.append("issue 已有合并 marker")
-    failure_time = latest_marker_time(comments, MERGE_FAILED_MARKER)
-    if failure_time and not has_command_after(comments, failure_time, MERGE_RETRY_COMMAND):
-        blockers.append(f"已有自动合并失败 marker，需人工评论 {MERGE_RETRY_COMMAND} 后重试")
-    if not is_auto_merge_branch(branch, issue_number):
-        blockers.append("本地分支不是 agent/* 或 fix/issue-<编号>-*")
-    if current_ref and current_ref == branch:
-        blockers.append("当前工作分支就是待合并分支")
-    if not branch_exists:
-        blockers.append(f"本地分支不存在：{branch}")
-    if has_merge_blocker(text):
-        blockers.append("存在阻塞或拒绝合并评论")
-    if not has_merge_evidence(text):
-        blockers.append("缺少验证、截图或重启证据")
-    if branch_exists and not branch_merged and not workspace_clean:
-        blockers.append("主工作区存在未提交改动")
-    return blockers
-
-
-def abort_local_merge() -> None:
-    subprocess.run(["git", "merge", "--abort"], cwd=REPO_ROOT, check=False, capture_output=True, text=True)
-
-
-def merge_local_branch_checked(issue_number: int, branch: str) -> str:
-    try:
-        run(["git", "merge", "--no-ff", "--no-commit", branch])
-    except Exception:
-        abort_local_merge()
-        raise
-    try:
-        for command in LOCAL_MERGE_VALIDATIONS:
-            run(list(command))
-        run(["git", "commit", "-m", f"杂项(issue)：合并 closed issue #{issue_number} 本地分支"])
-    except Exception:
-        abort_local_merge()
-        raise
-    return run(["git", "rev-parse", "--short", "HEAD"]).strip()
-
-
-def build_local_merge_comment(issue_number: int, branch: str, merge_commit: str, *, already_merged: bool = False) -> str:
-    state = "已在当前工作分支中" if already_merged else "已由本地合并队列合并到当前工作分支"
-    return (
-        f"{MERGE_MARKER}\n"
-        f"issue 已关闭，本地分支 `{branch}` {state}。\n"
-        f"- issue：#{issue_number}\n"
-        f"- 分支：`{branch}`\n"
-        f"- 合并提交：`{merge_commit}`\n"
-        f"- 触发：closed issue #{issue_number}\n"
-        "- 远端：未推送；Gitea PR 合并仍暂停。\n"
-    )
-
-
-def build_local_merge_failed_comment(issue_number: int, branch: str, error: str) -> str:
-    return (
-        f"{MERGE_FAILED_MARKER}\n"
-        "本地合并队列已停止：合并、验证或提交失败，因此没有写入合并 marker。\n"
-        f"- issue：#{issue_number}\n"
-        f"- 分支：`{branch}`\n"
-        f"- 失败原因：{short(error, 500)}\n"
-        f"- 处理方式：修复本地分支或主工作区后，人工评论 `{MERGE_RETRY_COMMAND}` 再允许 watcher 重试。\n"
-    )
-
-
-def run_local_merge_closed(args: argparse.Namespace) -> int:
-    issues = [get_issue(args.issue)] if args.issue else list_closed_issues(args.limit)
-    clean = workspace_clean()
-    current_ref = current_branch()
-    for issue in issues:
-        issue_number = int(issue["number"])
-        comments = get_comments(issue_number)
-        branches = latest_local_delivery_branches(issue_number, comments)
-        if not branches:
-            print(f"skip: issue #{issue_number} 未找到本地 delivery 分支", flush=True)
-            continue
-        for branch in branches:
-            exists = local_branch_exists(branch)
-            merged = exists and local_branch_merged(branch)
-            blockers = local_merge_blockers(
-                issue,
-                comments,
-                branch,
-                branch_exists=exists,
-                branch_merged=merged,
-                workspace_clean=clean,
-                current_ref=current_ref,
-            )
-            if blockers:
-                print(f"skip: issue #{issue_number} 分支 {branch}：{'; '.join(blockers)}", flush=True)
-                continue
-            if not args.apply:
-                print(f"dry-run: 将本地合并 issue #{issue_number} 分支 {branch}", flush=True)
-                return 0
-            if merged:
-                merge_commit = run(["git", "rev-parse", "--short", "HEAD"]).strip()
-                post_comment(issue_number, build_local_merge_comment(issue_number, branch, merge_commit, already_merged=True))
-                print(f"already-merged: issue #{issue_number} 分支 {branch}", flush=True)
-                return 0
-            try:
-                merge_commit = merge_local_branch_checked(issue_number, branch)
-            except Exception as exc:  # noqa: BLE001
-                post_comment(issue_number, build_local_merge_failed_comment(issue_number, branch, str(exc)))
-                print(f"local-merge-failed: issue #{issue_number} 分支 {branch}：{short(str(exc), 240)}", flush=True)
-                return 2
-            post_comment(issue_number, build_local_merge_comment(issue_number, branch, merge_commit))
-            print(f"local-merged: issue #{issue_number} 分支 {branch}", flush=True)
-            return 0
-    print("no-action: 没有可本地合并的 closed issue 分支", flush=True)
-    return 0
-
-
-def latest_human_time(comments: list[dict[str, Any]]) -> datetime | None:
-    times = [parse_time(str(c["created_at"])) for c in comments if not is_agent_comment(c)]
-    return max(times) if times else None
-
-
-def latest_actionable_human_time(comments: list[dict[str, Any]]) -> datetime | None:
-    times = [
-        parse_time(str(c["created_at"]))
-        for c in comments
-        if not is_status_comment(c) and not is_obsolete_control_comment(c) and not is_confirm_comment(c)
-    ]
-    return max(times) if times else None
-
-
-def latest_status_time(comments: list[dict[str, Any]]) -> datetime | None:
-    times = [parse_time(str(c["created_at"])) for c in comments if is_status_comment(c)]
-    return max(times) if times else None
-
-
-def build_proposal_comment(issue: dict[str, Any], comments: list[dict[str, Any]], *, revision: bool = False) -> str:
-    labels = ", ".join(label["name"] for label in issue.get("labels") or []) or "无"
-    scope = "待确认"
-    text = f"{issue.get('title', '')} {issue.get('body', '')} {comment_summary(comments, limit=10)}"
-    code_context = code_context_summary(issue, comments)
-    commonality = commonality_summary(issue, comments)
-    if "菜单" in text or "导航" in text:
-        scope = "可能是管理端左侧导航 / 菜单交互"
-    conclusion = "需要补充"
-    confidence = "中"
-    reason = "issue 描述较短，缺少截图、页面入口或期望效果，直接开发容易修错位置。"
-    action = "建议先补充截图或说明具体页面；如果确认是管理端菜单视觉问题，再按低风险 UI 修复执行。"
-    if has_selection_state_signal(text):
-        scope = "可能是管理端 DataGrid 勾选 / 全选状态交互"
-        conclusion = "建议执行"
-        confidence = "中高"
-        reason = (
-            "issue 已指向可复现的选择状态异常，应先核查 DataGrid 与页面 "
-            "selectedRowKeys / onSelectedRowKeysChange / 自动首选第一条逻辑。"
-        )
-        action = (
-            "回复裸一行 `确认方案` 后执行最小修复；执行前先定位选择状态所有者，"
-            "确认是否存在把多选数组压成单选或取消后自动回填第一条的问题。"
-        )
-    elif any(word in text for word in ("报错", "失败", "打不开", "不能", "无法")):
-        conclusion = "建议执行"
-        confidence = "中"
-        reason = "描述指向可复现故障，优先用日志、接口或页面复现定位。"
-        action = "回复裸一行 `确认方案` 后执行最小修复；如复现信息不足，执行时会先停止补问。"
-    elif any(word in text for word in ("截图", "图片", "红框", "圈", "页面")):
-        conclusion = "建议执行"
-        confidence = "中"
-        reason = "已有截图或页面位置补充，可以按当前范围做最小修复。"
-        action = "回复裸一行 `确认方案` 后执行最小修复；未确认前继续只评论判断。"
-    elif any(word in text for word in ("新增", "增加", "字段", "状态", "流程", "规则")):
-        conclusion = "需要人工决策"
-        confidence = "中"
-        reason = "可能引入字段、状态、流程或业务规则变化，不能直接由 agent 拍板。"
-        action = "先补业务边界和验收标准，再决定是否确认执行。"
-    marker = REVISION_PROPOSAL_MARKER if revision else PROPOSAL_MARKER
-    title = "修正方案" if revision else "方案提案"
-    feedback_note = "\n本轮是用户验收反馈后的修正方案；旧确认不得复用。\n" if revision else ""
-    return f"""{marker}
-## WMS Issue Agent {title}
-
-- Issue：#{issue["number"]} {issue["title"]}
-- 作者：{(issue.get("user") or {}).get("login", "unknown")}
-- 标签：{labels}
-- 当前状态：open
-- 可能影响范围：{scope}
-- 结论：{conclusion}
-- 置信度：{confidence}
-{feedback_note}
-
-### 问题复述
-
-{short(issue.get("body") or issue.get("title") or "", 800)}
-
-### 评论摘要
-
-{comment_summary(comments)}
-
-### 截图 / 附件
-
-{attachment_summary(comments, issue=issue)}
-
-### 根因文件和代码核查
-
-{code_context}
-
-### 相似 / 共性问题判断
-
-{commonality}
-
-### 改动计划
-
-- 前端：按根因文件定位；若是用户可见行为，补真实页面验证和截图。
-- 后端：暂未发现必须改动；如果执行中发现 API / 数据模型缺口，停止并重新提案。
-- 数据：暂未发现必须改动；新增字段、状态、角色、模块或业务默认值必须停止确认。
-- 文档：如共性成立，更新对应 prompt / runbook / skill / 规范；能脚本化的补治理脚本。
-- 测试：先补最小回归测试，再做实现。
-
-### 判断依据
-
-- {reason}
-- 上方代码核查是本轮判断的仓库证据；如果没有命中代码，执行前必须先补充复现信息。
-- 当前步骤只做判断和确认，不改代码、不提交、不推送。
-
-### 预计影响范围
-
-- 前端：{scope}
-- 后端：暂未发现必须改动
-- 文档 / 测试：按实际修复范围补最小验证
-
-### 建议动作
-
-{action}
-
-### 验证要求
-
-- 至少运行 `git diff --check` 和 `just gov-t1`。
-- 涉及前端或用户可见行为时，必须截图、重启本地测试前后端，并校验运行版本是本次修复提交。
-
-### 风险与停止条件
-
-- 如果需要新增字段、状态、角色、模块或业务默认值，必须停止并向用户确认。
-- 如果复现信息不足，必须先补信息，不能靠猜测开发。
-
-### 请确认
-
-- 同意按上述方案执行：回复裸一行 `确认方案`
-- 需要补充：直接继续评论需求细节或截图
-- 暂不执行：评论 `/reject`
-"""
-
-
-def build_fix_prompt(issue: dict[str, Any], comments: list[dict[str, Any]]) -> str:
-    proposal = latest_marker_comment(comments, (PROPOSAL_MARKER, REVISION_PROPOSAL_MARKER))
-    proposal_url = str(proposal.get("html_url") or "") if proposal else ""
-    commonality = commonality_summary(issue, comments)
-    return f"""请处理 Gitea issue #{issue["number"]}：{issue["title"]}
-
-来源：{issue.get("html_url", "")}
-确认对应方案：{proposal_url or "未提供"}
-
-用户已在最新方案后回复裸一行“确认方案”。请按 WMS 仓库规则处理：
-1. 使用 `wms-issue-codex-exec`、`wms-loop-engineering` 和 `wms-execution-retrospective` 执行；先按 proposal 的“相似 / 共性问题判断”核查同类页面、组件、字段、流程和治理脚本，若共性成立，必须同步补规则、脚本或矩阵，不能只修一个页面。
-2. 当前命令已由 issue-agent 在 issue 专属 worktree 中用 `codex exec` 直接启动；先运行 `pwd`、`git status --short --branch` 和 `git worktree list` 核对，禁止修改主工作区。
-3. 只修复 issue 指向的问题。新增字段、状态、角色、模块或业务默认值时停止并向用户确认。
-4. 完成后运行相关测试，至少 `git diff --check` 和 `just gov-t1`。
-5. 涉及前端或用户可见行为时，禁止在子 worktree 中启动或占用 9002；9002 只允许主工作区固定会话 `wms-web-admin-9002`。issue worktree 预览必须使用本 prompt 末尾分配的 `WMS_ISSUE_WEB_PORT`，执行 `just dev-web-worktree-restart <worktree> $WMS_ISSUE_WEB_PORT` 并用 `just dev-web-worktree-verify <worktree> $WMS_ISSUE_WEB_PORT` 校验进程 cwd 与 worktree 一致。纯前端修复默认共用主后端 `18080`；改后端 / API / 数据库时必须使用本 prompt 末尾分配的 `WMS_ISSUE_API_PORT`，执行 `just dev-api-worktree-restart <worktree> $WMS_ISSUE_API_PORT` 并用 `just dev-api-worktree-verify <worktree> $WMS_ISSUE_API_PORT` 校验 `/healthz`、LAN URL 和进程一致性。需要真实截图或重启证据时，合并到主工作区后由主代理运行 `just dev-web-restart` 和 `just dev-web-verify`，后端按仓库现有运行方式启动并检查 `/healthz`。重启后必须校验运行的是本次修复版本：记录当前提交哈希，并用 `just dev-web-verify` 输出、页面可见变更、接口响应版本字段或等价证据证明不是旧进程缓存；把端口、URL、提交哈希、进程一致性和版本校验结果写入 issue。
-6. 如果 issue 评论包含截图 / 附件，必须先打开或下载附件辅助定位，不能只按文字猜测。
-7. 涉及前端或用户可见行为时，必须采集真实前端截图；必须用 `POST /repos/{{owner}}/{{repo}}/issues/<编号>/assets` 把截图上传为 Gitea 附件，并用 Markdown 图片评论到 issue；不能只写本地路径。
-8. 当前可用截图 / 附件如下：
-{attachment_summary(comments, issue=issue, limit=10)}
-9. 读取 Gitea issue、评论或附件元数据必须使用 `tea api`，例如 `tea api /repos/{{owner}}/{{repo}}/issues/{issue["number"]}`；禁止裸 `curl` 访问 Gitea API。
-10. 当前暂停 Gitea PR：允许在 issue 专属 worktree 的本地分支上提交，禁止推送远端、禁止创建 Gitea PR、禁止自行合并到主工作区。
-11. 最后必须评论 `{DELIVERY_MARKER}` delivery 信息：本地 worktree、分支、提交哈希或 diff 状态、验证结果、截图证据、本地测试环境重启结果、codex exec 日志位置、本地合并前置条件和剩余风险，并明确下一步是“等待主代理本地 review 后合并”或“阻塞”。
-12. 如果用户验收反馈不对，不得继续复用本次确认；必须等待 issue-agent 重新生成修正方案并由用户再次回复“确认方案”。
-
-端口和进程一致性规则：
-- 主工作区固定：前端 9002，后端 18080。
-- issue worktree 前端：9003-9099，每个 worktree 独立端口。
-- issue worktree 后端：18081-18099；只有改后端 / API / 数据库时启动，纯前端修复共用 18080。
-- 端口验证必须证明端口对应进程来自本 issue worktree；不能只证明端口可访问。
-- delivery 必须写明本轮使用的前端端口、后端端口或共用后端、LAN URL、`/healthz` 结果和进程一致性校验结果。
-
-当前相似 / 共性问题判断：
-{commonality}
-
-Issue 正文：
-{issue.get("body") or ""}
-
-近期人工评论：
-{comment_summary(comments, limit=10)}
-"""
-
-
-def choose_action(
-    issue: dict[str, Any],
-    comments: list[dict[str, Any]],
-) -> Action | None:
-    human_time = latest_actionable_human_time(comments)
-    proposal = latest_marker_comment(comments, (PROPOSAL_MARKER, REVISION_PROPOSAL_MARKER))
-    proposal_time = parse_time(str(proposal["created_at"])) if proposal else None
-    exec_time = latest_marker_time(comments, EXEC_MARKER)
-    status_time = latest_status_time(comments)
-    confirm = latest_confirm_after(comments, proposal_time) if proposal_time else None
-    key = confirm_key(confirm) if confirm else None
-    confirmed = confirm is not None and not confirmation_consumed(int(issue["number"]), key or "")
-    if status_time and not confirmed and (human_time is None or human_time <= status_time):
-        return None
-    if proposal_time is None:
-        return Action(issue=issue, kind="proposal", body=build_proposal_comment(issue, comments))
-    if has_reject_after(comments, proposal_time):
-        return None
-    if human_time and human_time > proposal_time:
-        if exec_time and exec_time > proposal_time:
-            return Action(issue=issue, kind="revision-proposal", body=build_proposal_comment(issue, comments, revision=True))
-        return Action(issue=issue, kind="proposal", body=build_proposal_comment(issue, comments))
-    if confirmed:
-        if exec_time is None or exec_time < proposal_time:
-            return Action(issue=issue, kind="exec", body=build_fix_prompt(issue, comments), confirm_key=key)
-    if exec_time and exec_time > proposal_time:
-        return None
-    return None
+
+
+
+
+from _issue_runner_merge import *  # noqa: F403
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from _issue_runner_proposal import *  # noqa: F403
+
+
+
+
+
+
+
+
+
+
+
 
 
 def write_preview(out_dir: Path, issue_number: int, kind: str, body: str) -> Path:
@@ -1321,282 +700,8 @@ def run_watch(args: argparse.Namespace) -> int:
         time.sleep(args.interval)
 
 
-def self_test() -> int:
-    global CONSUMED_CONFIRMATIONS_FILE
-    CONSUMED_CONFIRMATIONS_FILE = Path(tempfile.mkdtemp(prefix="wms-issue-agent-test-")) / "consumed.json"
-    issue = {"number": 7, "title": "测试", "body": "正文", "labels": [], "user": {"login": "u"}}
-    assert display_path(REPO_ROOT / "justfile") == "justfile"
-    assert display_path(Path("/tmp/wms-issue-agent-preview.txt")) == "/tmp/wms-issue-agent-preview.txt"
-    worktree_path, branch = issue_worktree(7, "20260702010101")
-    assert worktree_path.name == "wms-agent-issue-7-20260702010101"
-    assert branch == "fix/issue-7-20260702010101"
-    tmp_env = Path(tempfile.mkdtemp(prefix="wms-issue-agent-env-")) / "env"
-    tmp_env.write_text(
-        "\n".join(
-            [
-                "# comment",
-                "export https_proxy=http://127.0.0.1:7894",
-                "http_proxy='http://127.0.0.1:7894'",
-                "IGNORED=value",
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    assert read_issue_agent_env(tmp_env) == {
-        "https_proxy": "http://127.0.0.1:7894",
-        "http_proxy": "http://127.0.0.1:7894",
-    }
-    command = build_codex_command(
-        worktree_path,
-        DEFAULT_OUT_DIR / "issue-7-exec.txt",
-        DEFAULT_OUT_DIR / "issue-7-exec.log",
-    )
-    assert f"-C {quote(str(worktree_path))}" in command
-    assert f"-C {quote(str(REPO_ROOT))} " not in command
-    t0 = "2026-07-01T00:00:00Z"
-    t1 = "2026-07-01T00:01:00Z"
-    comments = [{"created_at": t0, "body": build_proposal_comment(issue, [])}]
-    assert "### 根因文件和代码核查" in comments[0]["body"]
-    assert "### 相似 / 共性问题判断" in comments[0]["body"]
-    assert "暂未证明是共性问题" in comments[0]["body"]
-    assert "/confirm" not in comments[0]["body"]
-    assert "开始处理" not in comments[0]["body"]
-    popup_issue = {**issue, "title": "点击按钮弹出新窗口时点击外边区域不会关闭"}
-    popup_proposal = build_proposal_comment(popup_issue, [])
-    assert "弹层 / 弹窗关闭交互" in popup_proposal
-    assert "是否一起修改" in popup_proposal
-    assert "prompt / runbook / skill / 规范" in popup_proposal
-    assert "弹层 / 弹窗关闭交互" in build_fix_prompt(popup_issue, [])
-    selection_issue = {
-        **issue,
-        "title": "全局勾选按钮再点中已勾选按钮，取消勾选，不要自动勾选第一个",
-        "body": "全局勾选按钮再点中已勾选按钮，取消勾选，不要自动勾选第一个",
-    }
-    selection_proposal = build_proposal_comment(selection_issue, [])
-    assert "DataGrid 选择状态一致性" in selection_proposal
-    assert "selectedRowKeys" in selection_proposal
-    assert "可能是管理端 DataGrid 勾选 / 全选状态交互" in selection_proposal
-    assert "管理端动作入口一致性" not in selection_proposal
-    assert "管理端菜单视觉问题" not in selection_proposal
-    assert choose_action(issue, []).kind == "proposal"
-    assert choose_action(issue, comments) is None
-    confirmed = [*comments, {"created_at": t1, "body": "/confirm"}]
-    assert choose_action(issue, confirmed) is None
-    confirmed_zh = [*comments, {"created_at": t1, "body": "确认方案"}]
-    action = choose_action(issue, confirmed_zh)
-    assert action.kind == "exec"
-    assert action.confirm_key
-    mark_confirmation_consumed(7, action.confirm_key)
-    assert choose_action(issue, confirmed_zh) is None
-    later_confirmed_zh = [*comments, {"created_at": "2026-07-01T00:02:00Z", "body": "确认方案"}]
-    assert choose_action(issue, later_confirmed_zh).kind == "exec"
-    multiline_confirm = [*comments, {"created_at": t1, "body": "确认方案\n补充：需要截图"}]
-    assert choose_action(issue, multiline_confirm).kind == "proposal"
-    detail_then_confirm = [
-        *comments,
-        {"created_at": t1, "body": "补充：需要截图"},
-        {"created_at": "2026-07-01T00:02:00Z", "body": "确认方案"},
-    ]
-    assert choose_action(issue, detail_then_confirm).kind == "proposal"
-    start_zh = [*comments, {"created_at": t1, "body": "开始处理"}]
-    assert choose_action(issue, start_zh) is None
-    mentioned = [*comments, {"created_at": t1, "body": "不要 /confirm，先补截图"}]
-    assert choose_action(issue, mentioned).kind == "proposal"
-    mentioned_zh = [*comments, {"created_at": t1, "body": "不要确认方案，先补截图"}]
-    assert choose_action(issue, mentioned_zh).kind == "proposal"
-    refreshed = [*mentioned, {"created_at": "2026-07-01T00:02:00Z", "body": build_proposal_comment(issue, mentioned)}]
-    assert choose_action(issue, refreshed) is None
-    sent = [*confirmed_zh, {"created_at": "2026-07-01T00:02:00Z", "body": EXEC_MARKER}]
-    assert choose_action(issue, sent) is None
-    failed_exec = [
-        *sent,
-        {
-            "created_at": "2026-07-01T00:03:00Z",
-            "body": f"{STATUS_CORRECTION_MARKER}\n`codex exec` 执行超时，未形成完成闭环。",
-        },
-    ]
-    assert choose_action(issue, failed_exec) is None
-    failed_exec_with_feedback = [
-        *failed_exec,
-        {"created_at": "2026-07-01T00:04:00Z", "body": "重新执行，继续处理"},
-    ]
-    assert choose_action(issue, failed_exec_with_feedback).kind == "revision-proposal"
-    failed_exec_refreshed = [
-        *failed_exec_with_feedback,
-        {
-            "created_at": "2026-07-01T00:05:00Z",
-            "body": build_proposal_comment(issue, failed_exec_with_feedback, revision=True),
-        },
-    ]
-    assert choose_action(issue, failed_exec_refreshed) is None
-    delivered = [
-        *sent,
-        {
-            "created_at": "2026-07-01T00:03:00Z",
-            "body": "已按确认处理 issue #7，最终交付 PR 为 #9。PR 合并前置条件：等待用户确认合并。",
-        },
-    ]
-    assert choose_action(issue, delivered) is None
-    after_delivery = [*delivered, {"created_at": "2026-07-01T00:04:00Z", "body": "补充：按钮还缺一个"}]
-    assert choose_action(issue, after_delivery).kind == "revision-proposal"
-    after_exec = [*sent, {"created_at": "2026-07-01T00:03:00Z", "body": "不对，还缺下拉异常"}]
-    assert choose_action(issue, after_exec).kind == "revision-proposal"
-    after_exec_refreshed = [
-        *after_exec,
-        {"created_at": "2026-07-01T00:04:00Z", "body": build_proposal_comment(issue, after_exec)},
-    ]
-    assert choose_action(issue, after_exec_refreshed) is None
-    after_exec_confirmed = [*after_exec_refreshed, {"created_at": "2026-07-01T00:05:00Z", "body": "确认方案"}]
-    assert choose_action(issue, after_exec_confirmed).kind == "exec"
-    rejected = [*comments, {"created_at": t1, "body": "/reject 不执行 /confirm"}]
-    assert choose_action(issue, rejected) is None
-    with_asset = [
-        *comments,
-        {
-            "created_at": t1,
-            "body": "见截图",
-            "user": {"login": "u"},
-            "assets": [{"name": "image.png", "browser_download_url": "http://gitea/attachments/a"}],
-        },
-    ]
-    assert choose_action(issue, [*with_asset, {"created_at": "2026-07-01T00:02:00Z", "body": "确认方案"}]).kind == "proposal"
-    with_asset_refreshed = [
-        *with_asset,
-        {"created_at": "2026-07-01T00:02:00Z", "body": build_proposal_comment(issue, with_asset)},
-        {"created_at": "2026-07-01T00:03:00Z", "body": "确认方案"},
-    ]
-    prompt = choose_action(issue, with_asset_refreshed).body
-    assert "http://gitea/attachments/a" in prompt
-    assert "上传为 Gitea 附件" in prompt
-    assert "wms-execution-retrospective" in prompt
-    assert "共性问题" in prompt
-    assert DELIVERY_MARKER in prompt
-    assert "tea api" in prompt
-    assert "禁止裸 `curl`" in prompt
-    assert "WMS_ISSUE_WEB_PORT" in prompt
-    assert "WMS_ISSUE_API_PORT" in prompt
-    assert "进程一致性" in prompt
-    runtime_prompt = Path(tempfile.mkdtemp(prefix="wms-issue-agent-runtime-")) / "prompt.txt"
-    runtime_prompt.write_text("base", encoding="utf-8")
-    append_runtime_context(runtime_prompt, Path("/tmp/wms-agent-issue-7-demo"), 9003, 18081)
-    runtime_text = runtime_prompt.read_text(encoding="utf-8")
-    assert "WMS_ISSUE_WEB_PORT=9003" in runtime_text
-    assert "WMS_ISSUE_API_PORT=18081" in runtime_text
-    assert "dev-api-worktree-verify" in runtime_text
-    issue_asset = {
-        **issue,
-        "assets": [{"name": "issue.png", "browser_download_url": "http://gitea/attachments/issue"}],
-    }
-    assert "http://gitea/attachments/issue" in build_proposal_comment(issue_asset, [])
-    assert "http://gitea/attachments/issue" in build_fix_prompt(issue_asset, [])
-    closed_issue = {"number": 8, "state": "closed", "body": "已验收"}
-    pr = {
-        "number": 9,
-        "state": "open",
-        "merged": False,
-        "mergeable": True,
-        "title": "修复：issue #8",
-        "body": "关联 issue #8\n验证：通过\n截图证据：已上传附件\n后端重启：/healthz ok",
-        "head": {"ref": "agent/issue-8-demo"},
-    }
-    assert pr_mentions_issue(pr, 8)
-    assert not pr_mentions_issue({**pr, "title": "普通变更", "body": "普通 PR #8，不是 issue 关联"}, 8)
-    assert merge_blockers(closed_issue, [], pr) == []
-    assert merge_blockers(closed_issue, [], {**pr, "head": {"ref": "fix/issue-8-datagrid-views"}}) == []
-    assert "PR 分支不是 agent/* 或 fix/issue-<编号>-*" in merge_blockers(
-        closed_issue,
-        [],
-        {**pr, "head": {"ref": "fix/issue-9-other"}},
-    )
-    assert f"PR base 不是当前工作分支：other-branch" in merge_blockers(
-        closed_issue,
-        [],
-        {**pr, "base": {"ref": "other-branch"}},
-    )
-    assert pull_is_merged({**pr, "merged": True})
-    assert pull_is_merged({**pr, "merged_at": "2026-07-01T00:00:00Z"})
-    assert pull_is_merged({**pr, "merge_commit_sha": "abc"})
-    assert not pull_is_merged(pr)
-    assert merge_verification_error(pr) == (
-        "state=open, merged=False, mergeable=True, merged_at=None, merge_commit_sha=None"
-    )
-    false_merge_marker = [{"created_at": t1, "body": MERGE_MARKER}]
-    assert "issue 有未纠正的合并 marker 但 PR 未合并" in merge_blockers(closed_issue, false_merge_marker, pr)
-    corrected_marker = [
-        *false_merge_marker,
-        {"created_at": "2026-07-01T00:02:00Z", "body": MERGE_CORRECTION_MARKER},
-    ]
-    assert "issue 有未纠正的合并 marker 但 PR 未合并" not in merge_blockers(
-        closed_issue,
-        corrected_marker,
-        pr,
-    )
-    failed_marker = [
-        *corrected_marker,
-        {"created_at": "2026-07-01T00:03:00Z", "body": MERGE_FAILED_MARKER},
-    ]
-    assert f"已有自动合并失败 marker，需人工评论 {MERGE_RETRY_COMMAND} 后重试" in merge_blockers(
-        closed_issue,
-        failed_marker,
-        pr,
-    )
-    retried = [
-        *failed_marker,
-        {"created_at": "2026-07-01T00:04:00Z", "body": MERGE_RETRY_COMMAND},
-    ]
-    assert f"已有自动合并失败 marker，需人工评论 {MERGE_RETRY_COMMAND} 后重试" not in merge_blockers(
-        closed_issue,
-        retried,
-        pr,
-    )
-    assert "缺少验证、截图或重启证据" in merge_blockers(closed_issue, [], {**pr, "body": "关联 issue #8"})
-    assert merge_blockers(closed_issue, [{"created_at": t1, "body": f"{PROPOSAL_MARKER}\n评论 `/reject`"}], pr) == []
-    assert "存在阻塞或拒绝合并评论" in merge_blockers(
-        closed_issue,
-        [{"created_at": t1, "body": "不要合并"}],
-        pr,
-    )
-    delivery_comment = {
-        "created_at": t1,
-        "body": (
-            f"{DELIVERY_MARKER}\n"
-            "- 分支：`fix/issue-8-local-merge`\n"
-            "- 验证：`just gov-t1` 通过\n"
-            "- 截图证据：已上传附件\n"
-            "- 本地测试环境重启结果：`/healthz` ok\n"
-            "- 下一步：等待主代理本地 review 后合并\n"
-        ),
-    }
-    assert extract_local_merge_branches(body_of(delivery_comment), 8) == ["fix/issue-8-local-merge"]
-    assert latest_local_delivery_branches(8, [delivery_comment]) == ["fix/issue-8-local-merge"]
-    assert local_merge_blockers(
-        closed_issue,
-        [delivery_comment],
-        "fix/issue-8-local-merge",
-        branch_exists=True,
-        branch_merged=False,
-        workspace_clean=True,
-    ) == []
-    assert "主工作区存在未提交改动" in local_merge_blockers(
-        closed_issue,
-        [delivery_comment],
-        "fix/issue-8-local-merge",
-        branch_exists=True,
-        branch_merged=False,
-        workspace_clean=False,
-    )
-    assert "缺少验证、截图或重启证据" in local_merge_blockers(
-        closed_issue,
-        [{**delivery_comment, "body": f"{DELIVERY_MARKER}\n- 分支：`fix/issue-8-local-merge`"}],
-        "fix/issue-8-local-merge",
-        branch_exists=True,
-        branch_merged=False,
-        workspace_clean=True,
-    )
-    assert MERGE_MARKER in build_local_merge_comment(8, "fix/issue-8-local-merge", "abc123")
-    print("self-test: ok", flush=True)
-    return 0
+from _issue_runner_selftest import self_test
+
 
 
 def build_parser() -> argparse.ArgumentParser:
