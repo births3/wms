@@ -200,7 +200,9 @@ export function M2InboundOrderTable({
         type: "multiSelect",
         options: statusColumnFilterOptions(mode),
       },
-      render: (row) => <StatusBadge status={statusKey(row.status)} label={statusLabel(row.status)} size="sm" />,
+      render: (row) => row.status
+        ? <StatusBadge status={statusKey(row.status)} label={statusLabel(row.status)} size="sm" />
+        : <span className="text-muted-foreground">-</span>,
     },
   ];
 

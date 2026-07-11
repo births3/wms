@@ -19,6 +19,8 @@ try {
     INSPECTION_DUAL_SIGN_REQUIRED_BY_STRATEGY,
     nextM2InboundSelectedId,
     ownerLabel,
+    statusKey,
+    statusLabel,
     statusColumnFilterOptions,
     statusFilterOptions,
   } = await server.ssrLoadModule("/src/pages/inbound/m2-inbound-page-helpers.ts");
@@ -52,6 +54,8 @@ try {
   assert.deepEqual(statusColumnFilterOptions("inspecting").map((item) => item.value), ["inspecting"]);
   assert.deepEqual(statusFilterOptions("putaway").map((item) => item.value), ["putaway", "completed"]);
   assert.ok(statusColumnFilterOptions("putaway").some((item) => item.value === "putaway"));
+  assert.equal(statusLabel(null), "-");
+  assert.equal(statusKey(null), "pending");
 
   assert.equal(canReceiveOrReject("released"), true);
   assert.equal(canReceiveOrReject("receiving"), true);
@@ -85,6 +89,7 @@ try {
   assert.match(pageSource, /onClick: openCreateDialog/, "新建 ASN 按钮必须走重置入口");
   assert.match(pageSource, /const \[selectedRowKeys, setSelectedRowKeys\] = React\.useState<string\[\]>\(\[\]\);/, "M2 DataGrid 必须保留多选 keys，表头全选再取消才能清空");
   assert.doesNotMatch(orderTableSource, /onSelectedRowKeysChange=\{\(keys\) => onSelectOrder\(keys\.at\(-1\) \?\? null\)\}/, "M2 表格不能把全选结果压成最后一条");
+  assert.match(orderTableSource, /row\.status[\s\S]*<StatusBadge[\s\S]*text-muted-foreground/, "空状态不得伪装成待处理徽标");
   assert.match(orderTableSource, /canInspect\(selectedOrder\.status\)/, "验收动作必须按状态裁剪");
   assert.match(orderTableSource, /canPutaway\(selectedOrder\.status\)/, "上架动作必须按状态裁剪");
   assert.match(dialogSource, /<TextField label="ASN 号" required placeholder="例如 ASN-M2-PC-0002"/, "ASN 样例只允许作为 placeholder");
