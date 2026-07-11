@@ -27,6 +27,22 @@ const SUBGROUPS = [
   "H1 权限租户", "H2 审计能力", "H3 契约能力", "H4 企业微信", "H5 快递能力", "H9 打印能力",
 ];
 
+/** menu regex source → preferred subgroup to expand (avoid toggle thrash). */
+const MENU_SUBGROUP = [
+  [/M1 商品档案|M1 客商档案/, "主数据"],
+  [/M1 仓库管理|M1 库区管理|M1 库位管理/, "仓储资料"],
+  [/M1 系统字典|M1 Feature Flag/, "系统配置"],
+  [/M2 收货|M2 验收|M2 上架/, "入库作业"],
+  [/M4 出库订单|M4 波次|M4 复核|M4 采购退货/, "出库作业"],
+  [/M3 批号/, "库存管理"],
+  [/H1 菜单/, "H1 权限租户"],
+  [/H2 审计/, "H2 审计能力"],
+  [/H3 OpenAPI|H3 契约/, "H3 契约能力"],
+  [/H4 参数|H4 通知|H4 发送/, "H4 企业微信"],
+  [/H5 快递/, "H5 快递能力"],
+  [/H9 打印/, "H9 打印能力"],
+];
+
 function ensureDir(d) {
   fs.mkdirSync(d, { recursive: true });
 }
@@ -49,43 +65,79 @@ async function login(page) {
   await page.getByRole("button", { name: /退出/ }).waitFor({ timeout: 15_000 });
 }
 
+/** Only expand when aria-expanded="false"; never toggle-close open sections. */
+async function expandIfCollapsed(page, name) {
+  const btn = page.getByRole("button", { name, exact: true }).first();
+  if (!(await btn.count()) || !(await visible(btn))) return;
+  const exp = await btn.getAttribute("aria-expanded").catch(() => null);
+  if (exp === "true") return;
+  if (exp !== "false") return; // unknown: do not toggle
+  await btn.click({ timeout: 2_000 }).catch(() => {});
+  await page.waitForTimeout(120);
+}
+
+function preferredSubgroup(menu) {
+  const source = menu instanceof RegExp ? menu.source : String(menu);
+  for (const [re, sub] of MENU_SUBGROUP) {
+    if (re.test(source) || (typeof menu === "string" && re.test(menu))) return sub;
+  }
+  return null;
+}
+
+async function menuIfVisible(menuBtn) {
+  if (!(await menuBtn.count())) return false;
+  // Sidebar is scrollable — bring into view before visibility check
+  await menuBtn.scrollIntoViewIfNeeded().catch(() => {});
+  return visible(menuBtn);
+}
+
 async function ensureMenuVisible(page, group, menu) {
   const menuBtn = page.getByRole("button", { name: menu }).first();
-  if (await visible(menuBtn)) return menuBtn;
-  if (group) {
-    const g = page.getByRole("button", { name: group, exact: true }).first();
-    if ((await g.count()) && !(await visible(menuBtn))) {
-      await g.click().catch(() => {});
-      await page.waitForTimeout(150);
-    }
+  if (await menuIfVisible(menuBtn)) return menuBtn;
+
+  if (group) await expandIfCollapsed(page, group);
+  if (await menuIfVisible(menuBtn)) return menuBtn;
+
+  const preferred = preferredSubgroup(menu);
+  if (preferred) {
+    await expandIfCollapsed(page, preferred);
+    if (await menuIfVisible(menuBtn)) return menuBtn;
   }
+
   for (const sub of SUBGROUPS) {
-    if (await visible(menuBtn)) break;
+    if (await menuIfVisible(menuBtn)) break;
     const s = page.getByRole("button", { name: sub, exact: true }).first();
-    if (await s.count()) {
-      await s.click().catch(() => {});
-      await page.waitForTimeout(100);
-    }
+    if (!(await s.count()) || !(await visible(s))) continue;
+    const exp = await s.getAttribute("aria-expanded").catch(() => null);
+    if (exp === "true") continue;
+    await s.click({ timeout: 1_500 }).catch(() => {});
+    await page.waitForTimeout(80);
   }
-  if (!(await visible(menuBtn))) {
+
+  if (!(await menuIfVisible(menuBtn))) {
     for (const top of TOP_SECTIONS) {
-      if (await visible(menuBtn)) break;
-      await page.getByRole("button", { name: top, exact: true }).first().click().catch(() => {});
-      await page.waitForTimeout(80);
+      if (await menuIfVisible(menuBtn)) break;
+      await expandIfCollapsed(page, top);
       for (const sub of SUBGROUPS) {
-        if (await visible(menuBtn)) break;
-        await page.getByRole("button", { name: sub, exact: true }).first().click().catch(() => {});
+        if (await menuIfVisible(menuBtn)) break;
+        const s = page.getByRole("button", { name: sub, exact: true }).first();
+        if (!(await s.count()) || !(await visible(s))) continue;
+        const exp = await s.getAttribute("aria-expanded").catch(() => null);
+        if (exp === "true") continue;
+        await s.click({ timeout: 1_500 }).catch(() => {});
         await page.waitForTimeout(60);
       }
     }
   }
+
+  await menuBtn.scrollIntoViewIfNeeded().catch(() => {});
   await menuBtn.waitFor({ state: "visible", timeout: 10_000 });
   return menuBtn;
 }
 
 async function openPage(page, group, menu) {
   const btn = await ensureMenuVisible(page, group, menu);
-  await btn.click();
+  await btn.click({ timeout: 5_000 });
   await page.waitForTimeout(700);
 }
 
@@ -103,33 +155,99 @@ async function closeDialog(page) {
   }
 }
 
+async function firstVisible(locator) {
+  const n = await locator.count();
+  for (let i = 0; i < n; i++) {
+    const item = locator.nth(i);
+    if (await item.isVisible().catch(() => false)) return item;
+  }
+  return null;
+}
+
+/** Prefer enabled toolbar buttons in the main content area (x > sidebar). */
+async function firstContentButton(page, name, { exact = true } = {}) {
+  const buttons = page.getByRole("button", { name, exact });
+  let fallback = null;
+  for (let i = 0; i < (await buttons.count()); i++) {
+    const btn = buttons.nth(i);
+    if (!(await btn.isVisible().catch(() => false))) continue;
+    const box = await btn.boundingBox().catch(() => null);
+    if (box && box.x < 280) continue; // sidebar
+    if (!(await btn.isEnabled().catch(() => false))) {
+      fallback = fallback ?? btn;
+      continue;
+    }
+    return btn;
+  }
+  return fallback;
+}
+
+async function clickContentButton(page, name, { exact = true, waitEnabledMs = 8_000 } = {}) {
+  const deadline = Date.now() + waitEnabledMs;
+  let btn = null;
+  while (Date.now() < deadline) {
+    btn = await firstContentButton(page, name, { exact });
+    if (btn && (await btn.isEnabled().catch(() => false))) break;
+    await page.waitForTimeout(200);
+  }
+  if (!btn) throw new Error(`content button not found: ${name}`);
+  if (!(await btn.isEnabled().catch(() => false))) throw new Error(`content button disabled: ${name}`);
+  await btn.click({ timeout: 5_000 });
+  await page.waitForTimeout(400);
+}
+
+/** Prefer checkboxes inside the active main panel; skip hidden workspace tabs. */
 async function selectFirstDataRow(page) {
-  const boxes = page.getByRole("checkbox");
-  const n = await boxes.count();
-  if (n >= 2) {
-    const box = boxes.nth(1);
-    const state = await box.getAttribute("data-state").catch(() => null);
+  // Prefer tbody row checkboxes (skip header "select all")
+  const bodyBoxes = page.locator('tbody [role="checkbox"], tbody button[role="checkbox"]');
+  const body = await firstVisible(bodyBoxes);
+  if (body) {
+    const state = await body.getAttribute("data-state").catch(() => null);
     if (state !== "checked") {
-      await box.click({ force: true });
-      await page.waitForTimeout(200);
+      await body.click({ force: true, timeout: 5_000 });
+      await page.waitForTimeout(250);
     }
     return true;
   }
-  // fallback: click first data cell-ish text
-  const cell = page.locator("tbody tr").first();
-  if (await cell.count()) {
-    await cell.click();
-    await page.waitForTimeout(200);
+
+  const allBoxes = page.getByRole("checkbox");
+  const visible = [];
+  for (let i = 0; i < (await allBoxes.count()); i++) {
+    const box = allBoxes.nth(i);
+    if (await box.isVisible().catch(() => false)) visible.push(box);
+  }
+  // index 0 is usually header; pick first data checkbox
+  if (visible.length >= 2) {
+    const box = visible[1];
+    const state = await box.getAttribute("data-state").catch(() => null);
+    if (state !== "checked") {
+      await box.click({ force: true, timeout: 5_000 });
+      await page.waitForTimeout(250);
+    }
+    return true;
+  }
+
+  const cell = await firstVisible(page.locator("tbody tr"));
+  if (cell) {
+    await cell.click({ timeout: 5_000 });
+    await page.waitForTimeout(250);
     return true;
   }
   return false;
 }
 
 async function clickToolbar(page, name, { exact = true } = {}) {
-  const btn = page.getByRole("button", { name, exact }).first();
-  await btn.waitFor({ state: "visible", timeout: 5_000 });
-  // wait enable (max ~3s)
-  for (let i = 0; i < 12; i++) {
+  // Prefer enabled visible toolbar buttons (avoid status filter chips named similarly)
+  const buttons = page.getByRole("button", { name, exact });
+  let btn = null;
+  for (let i = 0; i < (await buttons.count()); i++) {
+    const candidate = buttons.nth(i);
+    if (!(await candidate.isVisible().catch(() => false))) continue;
+    btn = candidate;
+    if (await candidate.isEnabled()) break;
+  }
+  if (!btn) throw new Error(`button not found: ${name}`);
+  for (let i = 0; i < 20; i++) {
     if (await btn.isEnabled()) break;
     await page.waitForTimeout(150);
   }
@@ -149,30 +267,38 @@ async function shot(page, module, file) {
 }
 
 async function filterEmpty(page, keyword = "NO-SUCH-RECORD-XYZ") {
-  // QueryPanel may collapse core fields — expand first
-  const expand = page.getByRole("button", { name: /展开|更多/ }).first();
-  if ((await expand.count()) && (await expand.isVisible().catch(() => false))) {
-    await expand.click().catch(() => {});
-    await page.waitForTimeout(200);
+  // QueryPanel may collapse core fields — expand all visible expanders
+  const expands = page.getByRole("button", { name: /展开|更多/ });
+  for (let i = 0; i < (await expands.count()); i++) {
+    const expand = expands.nth(i);
+    if (await expand.isVisible().catch(() => false)) {
+      await expand.click({ timeout: 1_500 }).catch(() => {});
+      await page.waitForTimeout(150);
+    }
   }
 
+  // Prefer accessible name / placeholder APIs (QueryPanel uses aria-label = label)
   const candidates = [
-    page.getByLabel("关键字"),
-    page.getByPlaceholder(/单号|关键字|搜索|编码|名称|ASN|商品|批号/),
-    page.locator('input[aria-label="关键字"]'),
-    page.locator('main input[type="text"], section input[type="text"]').first(),
+    page.getByRole("textbox", { name: "关键字" }),
+    page.getByRole("textbox", { name: /关键字|批号|单号|搜索/ }),
+    page.getByPlaceholder(/批号|单号|关键字|搜索|编码|商品/),
+    page.locator(
+      'input[aria-label="关键字"], input[placeholder*="批号"], input[placeholder*="单号"], input[placeholder*="关键字"], input[placeholder*="搜索"], input[placeholder*="编码"], input[placeholder*="商品"]',
+    ),
   ];
   let filled = false;
   for (const loc of candidates) {
-    const target = loc.first();
-    if (!(await target.count())) continue;
-    if (!(await target.isVisible().catch(() => false))) continue;
+    const target = await firstVisible(loc);
+    if (!target) continue;
     await target.fill(keyword, { timeout: 3_000 });
     filled = true;
     break;
   }
   if (!filled) throw new Error("no visible keyword field");
-  await page.getByRole("button", { name: "查询" }).first().click({ timeout: 5_000 });
+
+  const queryBtn = await firstContentButton(page, "查询", { exact: true });
+  if (!queryBtn) throw new Error("no visible query button");
+  await queryBtn.click({ timeout: 5_000 });
   await page.waitForTimeout(600);
 }
 
@@ -230,16 +356,14 @@ const SCENES = [
     file: "m1-locations-batch-dialog-current.png",
     async run(page) {
       await openPage(page, "基础档案", /M1 库位管理/);
-      const batch = page.getByRole("button", { name: /批量新增|批量/ }).first();
-      if (!(await batch.count()) || !(await batch.isEnabled())) {
-        // fallback: 新增 single location dialog if batch not present
-        const add = page.getByRole("button", { name: "新增", exact: true }).first();
-        if (!(await add.count()) || !(await add.isEnabled())) throw new Error("no location create/batch");
-        await add.click({ timeout: 5_000 });
-      } else {
+      // 工具栏「批量」/「批量新增」
+      const batch = await firstVisible(page.getByRole("button", { name: /批量/ }));
+      if (batch && (await batch.isEnabled())) {
         await batch.click({ timeout: 5_000 });
+      } else {
+        await clickToolbar(page, "新增");
       }
-      await page.getByRole("dialog").waitFor({ timeout: 5_000 });
+      await page.getByRole("dialog").waitFor({ timeout: 8_000 });
     },
   },
   {
@@ -248,16 +372,9 @@ const SCENES = [
     file: "m1-system-dictionary-create-dialog-current.png",
     async run(page) {
       await openPage(page, "基础档案", /M1 系统字典/);
-      // dictionary may need type selected first
-      const treeItem = page.getByRole("button", { name: /单据类型|document_type|特殊药品/ }).first();
-      if (await treeItem.count()) {
-        await treeItem.click({ timeout: 3_000 }).catch(() => {});
-        await page.waitForTimeout(300);
-      }
-      const add = page.getByRole("button", { name: /新增/ }).first();
-      if (!(await add.count()) || !(await add.isEnabled())) throw new Error("dictionary add disabled");
-      await add.click({ timeout: 5_000 });
-      await page.getByRole("dialog").waitFor({ timeout: 5_000 });
+      // 默认已选 special_drug_category；直接点内容区「新增」
+      await clickContentButton(page, "新增");
+      await page.getByRole("dialog").waitFor({ timeout: 8_000 });
     },
   },
 
@@ -326,18 +443,9 @@ const SCENES = [
     async run(page) {
       await openPage(page, "入库业务", /M2 验收管理/);
       await selectFirstDataRow(page);
-      const candidates = ["验收", "详情", "修改"];
-      let opened = false;
-      for (const name of candidates) {
-        const btn = page.getByRole("button", { name, exact: true }).first();
-        if ((await btn.count()) && (await btn.isEnabled())) {
-          await btn.click({ timeout: 5_000 });
-          opened = true;
-          break;
-        }
-      }
-      if (!opened) throw new Error("no enabled inspect action");
-      await page.getByRole("dialog").waitFor({ timeout: 5_000 });
+      // 验收动作可能与状态筛选标签同名，优先点工具栏 enabled 的「验收」
+      await clickToolbar(page, "验收");
+      await page.getByRole("dialog").waitFor({ timeout: 8_000 });
     },
   },
   {
@@ -347,15 +455,11 @@ const SCENES = [
     async run(page) {
       await openPage(page, "入库业务", /M2 验收管理/);
       await selectFirstDataRow(page);
-      for (const name of ["双人签字", "签字", "验收"]) {
-        const btn = page.getByRole("button", { name: new RegExp(`^${name}$`) }).first();
-        if ((await btn.count()) && (await btn.isEnabled())) {
-          await btn.click({ timeout: 5_000 });
-          await page.waitForTimeout(400);
-          if ((await page.getByRole("dialog").count()) > 0) return;
-        }
-      }
-      throw new Error("no sign dialog entry");
+      await clickToolbar(page, "验收");
+      const dialog = page.getByRole("dialog");
+      await dialog.waitFor({ timeout: 8_000 });
+      // 签字字段已内嵌在验收弹窗；截到含双人签字区即可
+      await dialog.getByText(/第一签字人|第二人账号/).first().waitFor({ timeout: 5_000 });
     },
   },
   {
@@ -384,7 +488,15 @@ const SCENES = [
     async run(page) {
       await openPage(page, "出库业务", /M4 出库订单管理/);
       await selectFirstDataRow(page);
-      await clickToolbar(page, "详情");
+      // 双击单号或点详情
+      const orderLink = page.locator("tbody .text-primary, tbody td").filter({ hasText: /SO-/ }).first();
+      if (await orderLink.isVisible().catch(() => false)) {
+        await orderLink.dblclick({ timeout: 5_000 }).catch(async () => {
+          await clickToolbar(page, "详情");
+        });
+      } else {
+        await clickToolbar(page, "详情");
+      }
       await page.getByRole("dialog").waitFor({ timeout: 8_000 });
     },
   },
@@ -483,14 +595,12 @@ const SCENES = [
     async run(page) {
       await openPage(page, "基础能力", /H4 参数设置/);
       await selectFirstDataRow(page);
-      for (const name of ["修改", "新增", "详情"]) {
-        const btn = page.getByRole("button", { name, exact: true }).first();
-        if ((await btn.count()) && (await btn.isEnabled())) {
-          await btn.click({ timeout: 5_000 });
-          break;
-        }
+      try {
+        await clickToolbar(page, "修改");
+      } catch {
+        await clickToolbar(page, "新增");
       }
-      await page.getByRole("dialog").waitFor({ timeout: 5_000 });
+      await page.getByRole("dialog").waitFor({ timeout: 8_000 });
     },
   },
   {
@@ -499,15 +609,9 @@ const SCENES = [
     file: "h5-express-dialog-current.png",
     async run(page) {
       await openPage(page, "基础能力", /H5 快递对接/);
-      await selectFirstDataRow(page).catch(() => {});
-      for (const name of ["新增", "修改", "详情"]) {
-        const btn = page.getByRole("button", { name, exact: true }).first();
-        if ((await btn.count()) && (await btn.isEnabled())) {
-          await btn.click({ timeout: 5_000 });
-          break;
-        }
-      }
-      await page.getByRole("dialog").waitFor({ timeout: 5_000 });
+      // 快递商配置区「新增」（页面有承运商/规则两处新增，取内容区第一个）
+      await clickContentButton(page, "新增");
+      await page.getByRole("dialog").waitFor({ timeout: 8_000 });
     },
   },
   {
@@ -516,10 +620,9 @@ const SCENES = [
     file: "h9-print-template-create-dialog-current.png",
     async run(page) {
       await openPage(page, "基础能力", /H9 打印模板/);
-      const add = page.getByRole("button", { name: /新增/ }).first();
-      if (!(await add.count()) || !(await add.isEnabled())) throw new Error("h9 add disabled");
-      await add.click();
-      await page.getByRole("dialog").waitFor({ timeout: 8_000 });
+      // createAction 在 types/libraries pending 时 disabled — 等到可点
+      await clickContentButton(page, "新增", { waitEnabledMs: 15_000 });
+      await page.getByRole("dialog").waitFor({ timeout: 15_000 });
     },
   },
 ];
@@ -548,7 +651,7 @@ async function main() {
       // per-scene hard timeout
       await Promise.race([
         scene.run(page),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("scene timeout 45s")), 45_000)),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("scene timeout 60s")), 60_000)),
       ]);
       const out = await shot(page, scene.module, scene.file);
       await closeDialog(page);
