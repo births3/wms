@@ -25,9 +25,16 @@ for (const page of h4Pages) {
 }
 
 assert.match(appShell, /<H4WechatNotifyPage mode=\{wechatNotifyMode\}/, "H4 菜单页必须由 renderAdminView 渲染");
+assert.match(pageSource, /<QueryPanel[\s\S]*fields=\{h4WechatSettingsQueryFields\}/, "H4 参数设置必须使用公共 QueryPanel");
+assert.match(pageSource, /h4WechatSettingsCoreQueryFieldKeys/, "H4 参数设置必须登记核心查询字段常量");
+assert.match(pageSource, /filterSettings/, "H4 参数设置必须本地过滤 settingsRows");
 assert.match(pageSource, /<QueryPanel[\s\S]*fields=\{h4NotificationConfigQueryFields\}/, "H4 通知配置必须使用公共 QueryPanel");
 assert.match(pageSource, /<QueryPanel[\s\S]*fields=\{h4NotificationRecordQueryFields\}/, "H4 发送记录必须使用公共 QueryPanel");
 assert.match(pageSource, /mode === "settings"/, "H4 参数设置必须有独立页面模式");
+const settingsPageConfig = queryConfig.pages.find((item) => item.id === "h4-wechat-settings");
+assert.equal(settingsPageConfig?.required, true, "h4-wechat-settings 查询分类必须 required=true");
+assert.equal(settingsPageConfig?.fieldConstant, "h4WechatSettingsQueryFields", "h4-wechat-settings 必须登记 fieldConstant");
+assert.deepEqual(settingsPageConfig?.core, ["keyword", "enabled"], "h4-wechat-settings 核心字段必须为 keyword/enabled");
 assert.match(pageSource, /<SettingsDialog[\s\S]*onSave=\{saveSettings\}[\s\S]*onTest=\{testSettings\}/, "H4 参数测试必须由维护弹窗触发");
 assert.match(pageSource, /<SettingsDialog[\s\S]*notice=\{notice\}/, "H4 参数弹窗必须接收当前错误通知");
 assert.match(dialogsSource, /const busy = saving \|\| testing;[\s\S]*<fieldset disabled=\{busy\}/, "H4 参数保存或测试期间必须锁定表单输入");

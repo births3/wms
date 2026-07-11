@@ -47,6 +47,17 @@ interface H4WechatNotifyPageProps {
   mode: H4WechatNotifyMode;
 }
 
+const h4WechatSettingsQueryFields: QueryPanelField[] = [
+  { key: "keyword", label: "关键字", type: "text", placeholder: "企业 ID / Agent / 别名" },
+  {
+    key: "enabled",
+    label: "启停状态",
+    type: "multiSelect",
+    options: [{ label: "启用", value: "true" }, { label: "停用", value: "false" }],
+  },
+];
+const h4WechatSettingsCoreQueryFieldKeys = ["keyword", "enabled"];
+
 const h4NotificationConfigQueryFields: QueryPanelField[] = [
   { key: "eventType", label: "事件类型", type: "text", placeholder: "例如 asn_arrived" },
   {
@@ -240,6 +251,8 @@ const recordColumns: DataGridColumn<H4NotificationRecord>[] = [
 ];
 
 export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
+  const [settingsQuery, setSettingsQueryState] = React.useState<QueryPanelValue>(() => defaultSettingsQuery());
+  const [appliedSettingsQuery, setAppliedSettingsQuery] = React.useState<QueryPanelValue>(() => defaultSettingsQuery());
   const [configQuery, setConfigQuery] = React.useState<QueryPanelValue>(() => defaultConfigQuery());
   const [appliedConfigQuery, setAppliedConfigQuery] = React.useState<QueryPanelValue>(() => defaultConfigQuery());
   const [recordQuery, setRecordQuery] = React.useState<QueryPanelValue>(() => defaultRecordQuery());
@@ -256,9 +269,10 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
   const [sendForm, setSendForm] = React.useState<SendFormState>(() => emptySendForm());
   const [notice, setNotice] = React.useState<Notice>(null);
 
+  const settingsParams = normalizeSettingsQuery(appliedSettingsQuery);
   const configParams = normalizeConfigQuery(appliedConfigQuery);
   const recordParams = normalizeRecordQuery(appliedRecordQuery);
-  const settingsQuery = useH4WechatSettingsQuery();
+  const settingsQueryResult = useH4WechatSettingsQuery();
   const configsQuery = useH4NotificationConfigsQuery(queryString(configParams.eventType));
   const recordsQuery = useH4NotificationRecordsQuery({
     eventType: queryString(recordParams.eventType),
@@ -273,7 +287,10 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
   const sendMutation = useSendH4NotificationMutation();
   const resendMutation = useResendH4NotificationRecordMutation();
 
-  const settingsRows = React.useMemo(() => settingsQuery.data ? [settingsQuery.data] : [], [settingsQuery.data]);
+  const settingsRows = React.useMemo(
+    () => filterSettings(settingsQueryResult.data ? [settingsQueryResult.data] : [], settingsParams),
+    [settingsQueryResult.data, settingsParams],
+  );
   const configs = React.useMemo(
     () => filterConfigs(configsQuery.data ?? [], configParams),
     [configsQuery.data, configParams],
@@ -284,7 +301,10 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
   );
   const configById = React.useMemo(() => new Map((configsQuery.data ?? []).map((row) => [row.id, row])), [configsQuery.data]);
   const recordById = React.useMemo(() => new Map((recordsQuery.data ?? []).map((row) => [row.id, row])), [recordsQuery.data]);
-  const settingsById = React.useMemo(() => new Map(settingsRows.map((row) => [row.id, row])), [settingsRows]);
+  const settingsById = React.useMemo(
+    () => new Map((settingsQueryResult.data ? [settingsQueryResult.data] : []).map((row) => [row.id, row])),
+    [settingsQueryResult.data],
+  );
 
   const selectedSettings = selectedSettingsKeys.length === 1 ? settingsById.get(selectedSettingsKeys[0]) ?? null : null;
   const selectedConfig = selectedConfigKeys.length === 1 ? configById.get(selectedConfigKeys[0]) ?? null : null;
@@ -295,7 +315,19 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
       <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
         <PageHeader title="H4 参数设置" subtitle="企业微信应用、回调、密钥别名和重试参数" />
         <NoticePanel notice={settingsDialogOpen ? null : notice} />
-        {settingsQuery.error && <ErrorPanel message={settingsQuery.error.message} />}
+        <QueryPanel
+          fields={h4WechatSettingsQueryFields}
+          defaultVisibleFieldKeys={h4WechatSettingsCoreQueryFieldKeys}
+          value={settingsQuery}
+          onValueChange={(next) => setSettingsQueryState(normalizeSettingsQuery(next))}
+          onQuery={() => setAppliedSettingsQuery(normalizeSettingsQuery(settingsQuery))}
+          onReset={() => {
+            const next = defaultSettingsQuery();
+            setSettingsQueryState(next);
+            setAppliedSettingsQuery(next);
+          }}
+        />
+        {settingsQueryResult.error && <ErrorPanel message={settingsQueryResult.error.message} />}
         <DataGrid
           storageKey="h4.wechat-notify.settings"
           columns={settingsColumns}
@@ -304,20 +336,20 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
           selectable
           selectedRowKeys={selectedSettingsKeys}
           onSelectedRowKeysChange={setSelectedSettingsKeys}
-          caption={settingsQuery.isPending ? "加载企业微信参数..." : undefined}
+          caption={settingsQueryResult.isPending ? "加载企业微信参数..." : undefined}
           emptyTitle="暂无企业微信参数设置"
           exportFileBaseName="H4 参数设置"
           tableClassName="min-w-[2180px]"
           refreshAction={{
             label: "刷新",
             description: "刷新企业微信参数",
-            disabled: settingsQuery.isFetching,
+            disabled: settingsQueryResult.isFetching,
             onClick: () => void refreshSettings(),
           }}
           createAction={{
             label: "新增",
             description: "首次新增企业微信参数",
-            disabled: () => Boolean(settingsQuery.data),
+            disabled: () => Boolean(settingsQueryResult.data),
             onClick: () => openSettingsDialog(null),
           }}
           editAction={{
@@ -325,6 +357,18 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
             description: "修改选中的企业微信参数",
             disabled: () => selectedSettingsKeys.length !== 1,
             onClick: () => openSettingsDialog(selectedSettings),
+          }}
+          queryState={appliedSettingsQuery}
+          querySummaryItems={buildQueryPanelSummaryItems(h4WechatSettingsQueryFields, appliedSettingsQuery)}
+          onApplyQueryState={(queryState) => {
+            const next = normalizeSettingsQuery(queryValueFromUnknown(queryState));
+            setSettingsQueryState(next);
+            setAppliedSettingsQuery(next);
+          }}
+          onClearQueryState={() => {
+            const next = defaultSettingsQuery();
+            setSettingsQueryState(next);
+            setAppliedSettingsQuery(next);
           }}
         />
         <SettingsDialog
@@ -500,7 +544,7 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
   );
 
   async function refreshSettings() {
-    const result = await settingsQuery.refetch();
+    const result = await settingsQueryResult.refetch();
     setNotice(result.error ? { type: "error", text: result.error.message } : { type: "success", text: "企业微信参数已刷新" });
   }
 
@@ -619,12 +663,20 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
   }
 }
 
+function defaultSettingsQuery(): QueryPanelValue {
+  return { keyword: "", enabled: [] };
+}
+
 function defaultConfigQuery(): QueryPanelValue {
   return { eventType: "", enabled: [] };
 }
 
 function defaultRecordQuery(): QueryPanelValue {
   return { eventType: "", recipient: "", status: [], createdAt: { from: "", to: "" } };
+}
+
+function normalizeSettingsQuery(value: QueryPanelValue): QueryPanelValue {
+  return { keyword: queryString(value.keyword), enabled: queryStringArray(value.enabled) };
 }
 
 function normalizeConfigQuery(value: QueryPanelValue): QueryPanelValue {
@@ -638,6 +690,22 @@ function normalizeRecordQuery(value: QueryPanelValue): QueryPanelValue {
     status: queryStringArray(value.status),
     createdAt: queryRange(value.createdAt),
   };
+}
+
+function filterSettings(rows: H4WechatSettings[], query: QueryPanelValue) {
+  const keyword = queryString(query.keyword).trim().toLowerCase();
+  const enabled = new Set(queryStringArray(query.enabled));
+  return rows.filter((row) => {
+    const enabledValue = row.enabled ? "true" : "false";
+    const haystack = [
+      row.corp_id,
+      row.agent_id,
+      row.secret_alias,
+      row.callback_token_alias,
+      row.aes_key_alias,
+    ].join(" ").toLowerCase();
+    return (!keyword || haystack.includes(keyword)) && (!enabled.size || enabled.has(enabledValue));
+  });
 }
 
 function filterConfigs(rows: H4NotificationConfig[], query: QueryPanelValue) {

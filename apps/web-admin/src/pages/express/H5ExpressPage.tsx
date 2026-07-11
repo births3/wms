@@ -1,5 +1,6 @@
 import * as React from "react";
 import {
+  Button,
   Card,
   CardContent,
   DataGrid,
@@ -11,7 +12,7 @@ import {
   type QueryPanelField,
   type QueryPanelValue,
 } from "@wms/ui";
-import { Ban, PackageCheck, Route, Truck } from "lucide-react";
+import { Ban, PackageCheck, Printer, Route, Truck } from "lucide-react";
 
 import {
   useCancelExpressWaybillMutation,
@@ -269,9 +270,14 @@ export function H5ExpressPage() {
   const selectedCarrier = selectedCarrierKeys.length === 1 ? carrierById.get(selectedCarrierKeys[0]) ?? null : null;
   const selectedRule = selectedRuleKeys.length === 1 ? ruleById.get(selectedRuleKeys[0]) ?? null : null;
 
+  const canCreateWaybill = Boolean(selectedCarrier?.enabled) && !createWaybill.isPending;
+  const canTrackWaybill = Boolean(recentWaybill) && !trackingMutation.isPending;
+  const canCancelWaybill = Boolean(recentWaybill) && recentWaybill?.status !== "cancelled" && !cancelWaybill.isPending;
+  const canPrintWaybill = Boolean(recentWaybill);
+
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
-      <PageHeader title="H5 快递对接" subtitle="快递商配置、选择规则、快递下单、面单打印与轨迹查询" />
+      <PageHeader title="H5 快递对接" subtitle="配置与运单作业分区：快递商 / 选择规则配置，下单 / 轨迹 / 取消 / 面单打印" />
       <NoticePanel notice={notice} />
       <QueryPanel
         fields={queryFields}
@@ -285,6 +291,74 @@ export function H5ExpressPage() {
           setAppliedQuery(next);
         }}
       />
+
+      <Card className="rounded-lg shadow-sm">
+        <CardContent className="space-y-4 p-5">
+          <SectionTitle icon={<PackageCheck className="size-4" aria-hidden />} title="运单作业" />
+          <div className="flex flex-col gap-3 rounded-md border border-border/70 bg-muted/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1 text-sm">
+              <div className="text-muted-foreground">最近运单</div>
+              {recentWaybill ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-foreground">{recentWaybill.waybill_no}</span>
+                  <StatusBadge
+                    status={waybillStatusKey(recentWaybill.status)}
+                    label={waybillStatusLabel(recentWaybill.status)}
+                    size="sm"
+                  />
+                  <span className="text-muted-foreground">快递商 {recentWaybill.carrier_code}</span>
+                </div>
+              ) : (
+                <div className="text-muted-foreground">尚未生成运单；请先在下方选中已启用快递商后下单</div>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                disabled={!canCreateWaybill}
+                onClick={() => selectedCarrier && openWaybillDialog(selectedCarrier)}
+              >
+                <PackageCheck className="size-4" aria-hidden />
+                下单
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={!canTrackWaybill}
+                onClick={() => setTrackingDialogOpen(true)}
+              >
+                <Route className="size-4" aria-hidden />
+                轨迹
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={!canCancelWaybill}
+                onClick={() => setCancelDialogOpen(true)}
+              >
+                <Ban className="size-4" aria-hidden />
+                取消
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={!canPrintWaybill}
+                onClick={() => setPrintDialogOpen(true)}
+              >
+                <Printer className="size-4" aria-hidden />
+                打印面单
+              </Button>
+            </div>
+          </div>
+          {!selectedCarrier?.enabled && (
+            <p className="text-xs text-muted-foreground">下单依赖快递商配置表中选中且已启用的快递商。</p>
+          )}
+        </CardContent>
+      </Card>
 
       <Card className="rounded-lg shadow-sm">
         <CardContent className="space-y-4 p-5">
@@ -314,38 +388,6 @@ export function H5ExpressPage() {
                 disabled: () => selectedCarrierKeys.length !== 1,
                 onClick: () => openCarrierDialog(selectedCarrier),
               }}
-              printAction={{
-                label: "打印",
-                description: "打印最近生成的面单预览",
-                disabled: () => !recentWaybill,
-                onClick: () => setPrintDialogOpen(true),
-              }}
-              toolbarActions={[
-                {
-                  key: "waybill",
-                  label: "下单",
-                  description: "按选中快递商创建快递运单",
-                  icon: <PackageCheck className="size-4" aria-hidden />,
-                  disabled: () => !selectedCarrier || !selectedCarrier.enabled || createWaybill.isPending,
-                  onClick: () => selectedCarrier && openWaybillDialog(selectedCarrier),
-                },
-                {
-                  key: "tracking",
-                  label: "轨迹",
-                  description: "查询最近运单轨迹",
-                  icon: <Route className="size-4" aria-hidden />,
-                  disabled: () => !recentWaybill || trackingMutation.isPending,
-                  onClick: () => setTrackingDialogOpen(true),
-                },
-                {
-                  key: "cancel",
-                  label: "取消",
-                  description: "取消最近生成的快递单",
-                  icon: <Ban className="size-4" aria-hidden />,
-                  disabled: () => !recentWaybill || recentWaybill.status === "cancelled" || cancelWaybill.isPending,
-                  onClick: () => setCancelDialogOpen(true),
-                },
-              ]}
               queryState={appliedQuery}
               querySummaryItems={buildQueryPanelSummaryItems(queryFields, appliedQuery)}
               onApplyQueryState={(queryState) => {
@@ -687,6 +729,22 @@ function waybillRequestFromForm(form: WaybillForm): CreateExpressWaybillRequest 
 
 function providerLabel(value: string) {
   return value === "own_fleet" ? "自有配送" : "三方快递";
+}
+
+function waybillStatusLabel(status: string) {
+  if (status === "created" || status === "pushed") return "已下单";
+  if (status === "printed") return "已打印";
+  if (status === "in_transit") return "运输中";
+  if (status === "delivered") return "已签收";
+  if (status === "cancelled") return "已取消";
+  return status;
+}
+
+function waybillStatusKey(status: string): "completed" | "pending" | "isolated" | "in_progress" {
+  if (status === "delivered" || status === "printed") return "completed";
+  if (status === "cancelled") return "isolated";
+  if (status === "in_transit") return "in_progress";
+  return "pending";
 }
 
 function queryString(value: unknown) {
