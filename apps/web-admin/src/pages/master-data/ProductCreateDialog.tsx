@@ -22,6 +22,7 @@ import {
   useSpecialDrugCategoriesQuery,
   type CreateProductRequest,
 } from "@/features/master-data/master-data-queries";
+import { productStorageConditionOptions } from "./m1-product-edit-model";
 
 interface ProductCreateDialogProps {
   open: boolean;
@@ -108,9 +109,10 @@ export function ProductCreateDialog({ open, onOpenChange, onCreate }: ProductCre
           <TextField label="批准文号" value={form.approvalNo} onChange={(approvalNo) => updateForm({ approvalNo })} />
           <TextField label="剂型" value={form.dosageForm} onChange={(dosageForm) => updateForm({ dosageForm })} />
           <TextField label="生产企业" value={form.manufacturer} onChange={(manufacturer) => updateForm({ manufacturer })} />
-          <TextField
+          <SelectField
             label="储存条件"
             value={form.storageCondition}
+            options={productStorageConditionOptions}
             onChange={(storageCondition) => updateForm({ storageCondition })}
           />
           <SelectField

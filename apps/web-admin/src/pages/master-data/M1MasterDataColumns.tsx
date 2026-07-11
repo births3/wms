@@ -109,13 +109,14 @@ export const locationMasterDataColumns: DataGridColumn<MasterDataRow>[] = [
   {
     key: "owner",
     header: "货主",
-    width: 230,
-    minWidth: 200,
+    width: 160,
+    minWidth: 140,
     sortable: true,
     sortValue: (row) => locationValue(row, "owner"),
     filterValue: (row) => locationValue(row, "owner"),
     copyValue: (row) => locationValue(row, "owner"),
     filter: { type: "text" },
+    render: (row) => shortDisplayId(locationValue(row, "owner")),
   },
   {
     key: "warehouse",
@@ -123,10 +124,10 @@ export const locationMasterDataColumns: DataGridColumn<MasterDataRow>[] = [
     width: 280,
     minWidth: 240,
     filterValue: (row) => `${locationValue(row, "warehouse")} ${locationValue(row, "zone")}`,
-    copyValue: (row) => `仓库 ${locationValue(row, "warehouse")} / 库区 ${locationValue(row, "zone")}`,
+    copyValue: (row) => `${locationValue(row, "warehouse")} / ${locationValue(row, "zone")}`,
     filter: { type: "text" },
     render: (row) => (
-      <FieldText label={`库区 ${locationValue(row, "zone")}`} value={`仓库 ${locationValue(row, "warehouse")}`} />
+      <FieldText label={`库区 ${locationValue(row, "zone")}`} value={locationValue(row, "warehouse")} />
     ),
   },
   {
@@ -264,4 +265,9 @@ function formatDateTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value || "-";
   return date.toLocaleString("zh-CN", { hour12: false });
+}
+
+function shortDisplayId(value: string) {
+  if (!value || value === "-") return "-";
+  return value.length > 8 ? value.slice(0, 8) : value;
 }

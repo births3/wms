@@ -314,7 +314,23 @@ function formFromTarget(target: MasterDataCrudTarget, firstScope: LocationScopeO
   if (target.kind === "warehouse") return { kind: "warehouse", mode: "create", code: "", name: "", status: "active" };
   if (target.kind === "location" && target.mode === "edit") {
     const fields = target.row.locationFields;
-    return { kind: "location", mode: "edit", id: target.row.id, scopeKey: fields ? `${fields.warehouse}:${fields.zone}:${fields.owner === "-" ? "none" : fields.owner}` : "", code: target.row.code, rowNo: int(fields?.rowNo, 1), columnNo: int(fields?.columnNo, 1), layerNo: int(fields?.layerNo, 1), maxVolumeCm3: int(fields?.maxVolumeCm3, 5_000_000), usedVolumeCm3: int(fields?.usedVolumeCm3, 0), maxSkuCount: int(fields?.maxSku, 1), locationType: clean(fields?.locationTypeCode) || "storage", status: target.row.status || "available" };
+    return {
+      kind: "location",
+      mode: "edit",
+      id: target.row.id,
+      scopeKey: fields
+        ? `${fields.warehouseId}:${fields.zoneId}:${fields.owner === "-" ? "none" : fields.owner}`
+        : "",
+      code: target.row.code,
+      rowNo: int(fields?.rowNo, 1),
+      columnNo: int(fields?.columnNo, 1),
+      layerNo: int(fields?.layerNo, 1),
+      maxVolumeCm3: int(fields?.maxVolumeCm3, 5_000_000),
+      usedVolumeCm3: int(fields?.usedVolumeCm3, 0),
+      maxSkuCount: int(fields?.maxSku, 1),
+      locationType: clean(fields?.locationTypeCode) || "storage",
+      status: target.row.status || "available",
+    };
   }
   return { kind: "location", mode: "create", scopeKey: firstScope?.key ?? "", code: "", rowNo: 1, columnNo: 1, layerNo: 1, maxVolumeCm3: 5_000_000, usedVolumeCm3: 0, maxSkuCount: 1, locationType: "storage", status: "available" };
 }

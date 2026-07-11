@@ -26,7 +26,7 @@ try {
     secondaryLabel: "批准文号",
     secondaryValue: "国药准字H20260001",
     extraLabel: "储存条件",
-    extraValue: "cold",
+    extraValue: "冷藏",
     createdAt: "2026-06-29T00:00:00.000Z",
     updatedAt: "2026-06-29T00:00:00.000Z",
     productFields: {
@@ -47,6 +47,13 @@ try {
       specialDrugCategoryCode: "none",
       spec: "10ml*1支",
       storageCondition: "cold",
+      middlePackage: "10 件/中包",
+      largePackage: "20 件/大包",
+      unitLengthMm: "120",
+      unitWidthMm: "100",
+      unitHeightMm: "30",
+      unitWeightG: "180",
+      unitVolumeCm3: "360",
     },
     searchText: "",
   };
@@ -55,6 +62,12 @@ try {
   assert.equal(form.productCode, "P-M1-001");
   assert.equal(form.productName, "冷藏胰岛素注射液");
   assert.equal(form.storageCondition, "cold");
+  const formFromChineseExtra = productEditFormFromRow({
+    ...row,
+    productFields: { ...row.productFields, storageCondition: null },
+    extraValue: "冷藏",
+  });
+  assert.equal(formFromChineseExtra.storageCondition, "cold");
   assert.equal(form.middlePackage, "10 件/中包");
   assert.equal(form.largePackage, "20 件/大包");
   assert.equal(form.unitLengthMm, "120");

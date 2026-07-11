@@ -16,9 +16,15 @@ try {
     "/src/pages/master-data/M1MasterDataColumns.tsx",
   );
   const { productColumns } = await server.ssrLoadModule("/src/pages/master-data/ProductEditTable.tsx");
-  const { productRow, supplierRow, customerRow } = await server.ssrLoadModule(
-    "/src/features/master-data/master-data-queries.ts",
-  );
+  const {
+    productRow,
+    supplierRow,
+    customerRow,
+    warehouseRow,
+    locationRow,
+    warehouseZoneRowsFromLocations,
+    storageConditionDisplayLabel,
+  } = await server.ssrLoadModule("/src/features/master-data/master-data-queries.ts");
   const { crudTargetForRow } = await server.ssrLoadModule(
     "/src/pages/master-data/MasterDataCrudDialog.tsx",
   );
@@ -65,6 +71,10 @@ try {
 
   assert.equal(row.secondaryLabel, "批准文号");
   assert.equal(row.secondaryValue, "国药准字H20260001");
+  assert.equal(row.extraValue, "冷藏");
+  assert.equal(row.productFields.storageCondition, "cold");
+  assert.equal(storageConditionDisplayLabel("cold"), "冷藏");
+  assert.equal(storageConditionDisplayLabel("normal"), "常温");
   assert.equal(row.sourceValue, "API接口导入");
   assert.match(row.searchText, /api接口导入/i);
   assert.equal(row.productFields.middlePackage, "10 件/中包");
@@ -77,14 +87,78 @@ try {
   assert.match(row.searchText, /10 件\/中包/);
   assert.match(row.searchText, /180/);
 
+  const warehouse = warehouseRow({
+    id: "00000000-0000-0000-0000-000000003001",
+    owner_id: "00000000-0000-0000-0000-000000000001",
+    warehouse_code: "WH-M1-001",
+    warehouse_name: "鹏鹞冷链仓",
+    status: "active",
+    created_at: "2026-06-29T00:00:00.000Z",
+    updated_at: "2026-06-29T00:00:00.000Z",
+  });
+  assert.equal(warehouse.code, "WH-M1-001");
+  assert.equal(warehouse.name, "鹏鹞冷链仓");
+  assert.notEqual(warehouse.primaryValue, warehouse.id);
+  assert.doesNotMatch(warehouse.primaryValue, /^[0-9a-f-]{36}$/i);
+
+  const warehouseRefs = new Map([
+    [
+      "00000000-0000-0000-0000-000000003001",
+      { id: "00000000-0000-0000-0000-000000003001", code: "WH-M1-001", name: "鹏鹞冷链仓" },
+    ],
+  ]);
+  const location = locationRow(
+    {
+      id: "00000000-0000-0000-0000-000000000201",
+      owner_id: "00000000-0000-0000-0000-000000000001",
+      warehouse_id: "00000000-0000-0000-0000-000000003001",
+      zone_id: "00000000-0000-0000-0000-000000003101",
+      location_code: "A01-01-02-03",
+      row_no: 1,
+      column_no: 2,
+      layer_no: 3,
+      max_volume_cm3: 1000000,
+      used_volume_cm3: 120000,
+      max_sku_count: 3,
+      location_type: "storage",
+      bound_owner_id: null,
+      status: "available",
+      created_at: "2026-06-29T00:00:00.000Z",
+      updated_at: "2026-06-29T00:00:00.000Z",
+    },
+    new Map([["storage", "存储位"]]),
+    warehouseRefs,
+  );
+  assert.equal(location.locationFields.warehouse, "WH-M1-001 · 鹏鹞冷链仓");
+  assert.equal(location.locationFields.warehouseId, "00000000-0000-0000-0000-000000003001");
+  assert.equal(location.locationFields.zone, "A01");
+  assert.equal(location.locationFields.zoneId, "00000000-0000-0000-0000-000000003101");
+  assert.doesNotMatch(location.locationFields.warehouse, /^[0-9a-f-]{36}$/i);
+  assert.doesNotMatch(location.locationFields.zone, /^[0-9a-f-]{36}$/i);
+
+  const zones = warehouseZoneRowsFromLocations([location]);
+  assert.equal(zones.length, 1);
+  assert.equal(zones[0].code, "A01");
+  assert.equal(zones[0].primaryValue, "WH-M1-001 · 鹏鹞冷链仓");
+  assert.equal(zones[0].secondaryValue, "A01");
+  assert.doesNotMatch(zones[0].primaryValue, /^[0-9a-f-]{36}$/i);
+
   const productBaseColumns = masterDataColumns("m1-products", baseMasterDataColumns, []);
   assert.equal(productBaseColumns.find((column) => column.key === "primary")?.header, "规格");
   assert.equal(productBaseColumns.find((column) => column.key === "secondary")?.header, "批准文号");
   assert.equal(productBaseColumns.find((column) => column.key === "extra")?.header, "储存条件");
   const businessPartnerBaseColumns = masterDataColumns("m1-business-partners", baseMasterDataColumns, []);
-  assert.equal(businessPartnerBaseColumns.find((column) => column.key === "primary")?.header, "关键字段");
-  assert.equal(businessPartnerBaseColumns.find((column) => column.key === "secondary")?.header, "扩展字段");
-  assert.equal(businessPartnerBaseColumns.find((column) => column.key === "extra")?.header, "运行字段");
+  assert.equal(businessPartnerBaseColumns.find((column) => column.key === "primary")?.header, "资质证号");
+  assert.equal(businessPartnerBaseColumns.find((column) => column.key === "secondary")?.header, "联系人 / 类型");
+  assert.equal(businessPartnerBaseColumns.find((column) => column.key === "extra")?.header, "档案类型 / 货主");
+  const warehouseColumns = masterDataColumns("m1-warehouses", baseMasterDataColumns, []);
+  assert.equal(warehouseColumns.find((column) => column.key === "primary")?.header, "货主");
+  assert.equal(warehouseColumns.find((column) => column.key === "secondary")?.header, "档案类型");
+  assert.equal(warehouseColumns.find((column) => column.key === "extra")?.header, "仓库名称");
+  const zoneColumns = masterDataColumns("m1-zones", baseMasterDataColumns, []);
+  assert.equal(zoneColumns.find((column) => column.key === "primary")?.header, "仓库");
+  assert.equal(zoneColumns.find((column) => column.key === "secondary")?.header, "库区");
+  assert.equal(zoneColumns.find((column) => column.key === "extra")?.header, "库位数");
 
   const sourceColumn = masterDataColumns("m1-products", [], []).find(
     (column) => column.key === "source",

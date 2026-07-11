@@ -33,10 +33,18 @@ const batchCreateSource = apiSource.slice(
 );
 assert.match(
   batchCreateSource,
-  /await listSystemDictionaryItemOptions/,
+  /listSystemDictionaryItemOptions/,
   "库位批量创建必须显式等待字典读取",
 );
+// 允许 await listSystemDictionaryItemOptions(...) 或 await Promise.all([listSystemDictionaryItemOptions(...), ...])
+assert.match(
+  batchCreateSource,
+  /await (?:listSystemDictionaryItemOptions|Promise\.all\([\s\S]*listSystemDictionaryItemOptions)/,
+  "库位批量创建必须以 await 等待字典读取完成",
+);
+const dictReadAt = batchCreateSource.search(/listSystemDictionaryItemOptions/);
+const postAt = batchCreateSource.indexOf('api.POST("/api/v1/master-data/locations/batch-create"');
 assert.ok(
-  batchCreateSource.indexOf("await listSystemDictionaryItemOptions") < batchCreateSource.indexOf('api.POST("/api/v1/master-data/locations/batch-create"'),
+  dictReadAt >= 0 && postAt >= 0 && dictReadAt < postAt,
   "库位批量创建必须先读取字典，再执行写入，避免写成功后因字典失败误报",
 );

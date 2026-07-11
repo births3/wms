@@ -74,8 +74,12 @@ export interface ProductMasterDataFields {
 
 export interface LocationMasterDataFields {
   owner: string;
+  /** 仓库业务展示（编码 · 名称），非 UUID */
   warehouse: string;
+  warehouseId: string;
+  /** 库区业务展示（区域码或可读别名），非 UUID */
   zone: string;
+  zoneId: string;
   area: string;
   rowNo: string;
   columnNo: string;
@@ -90,10 +94,21 @@ export interface LocationMasterDataFields {
 
 export interface WarehouseZoneMasterDataFields {
   owner: string;
+  /** 仓库业务展示（编码 · 名称），非 UUID */
   warehouse: string;
+  warehouseId: string;
+  /** 库区业务展示，非 UUID */
   zone: string;
+  zoneId: string;
   locationCount: string;
   availableLocationCount: string;
+}
+
+/** 仓库 ID → 业务可读码/名，供库位 / 库区列表解析 */
+export interface WarehouseRef {
+  id: string;
+  code: string;
+  name: string;
 }
 
 export interface SystemDictionaryPaneItem {

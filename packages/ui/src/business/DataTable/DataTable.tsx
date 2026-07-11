@@ -104,7 +104,10 @@ export function DataTable<T>({
           {data.length === 0 ? (
             <TableRow>
               <TableCell colSpan={columns.length} className="py-10">
-                <EmptyState title={emptyTitle ?? "暂无数据"} description={emptyDescription} />
+                {/* sticky left：宽表横滚时空态仍落在可视区左侧，避免居中到超宽表格中间不可见 */}
+                <div className="sticky left-0 w-max max-w-[min(100vw-4rem,28rem)]">
+                  <EmptyState title={emptyTitle ?? "暂无数据"} description={emptyDescription} />
+                </div>
               </TableCell>
             </TableRow>
           ) : (

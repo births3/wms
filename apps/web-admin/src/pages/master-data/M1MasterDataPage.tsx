@@ -66,42 +66,54 @@ import { useProductEditDialog } from "./use-product-edit-dialog";
 export type { MasterDataViewId } from "@/features/master-data/master-data-queries";
 export const masterDataViewMeta: Record<
   MasterDataViewId,
-  { title: string; subtitle: string; emptyTitle: string; storageKey: string }
+  {
+    title: string;
+    subtitle: string;
+    emptyTitle: string;
+    emptyDescription: string;
+    storageKey: string;
+  }
 > = {
   "m1-products": {
     title: "M1 商品档案",
     subtitle: "商品编码、规格、批准文号与储存条件",
     emptyTitle: "暂无商品档案",
+    emptyDescription: "当前筛选条件下没有商品，请调整关键字或清空筛选。",
     storageKey: "m1-products-datagrid",
   },
   "m1-business-partners": {
     title: "M1 客商档案",
     subtitle: "供应商、客户/门店与资质来源",
     emptyTitle: "暂无客商档案",
+    emptyDescription: "当前筛选条件下没有客商，请调整关键字或清空筛选。",
     storageKey: "m1-business-partners-datagrid",
   },
   "m1-warehouses": {
     title: "M1 仓库管理",
     subtitle: "仓库编码、名称与启停状态",
     emptyTitle: "暂无仓库档案",
+    emptyDescription: "当前筛选条件下没有仓库，请调整关键字或清空筛选。",
     storageKey: "m1-warehouses-datagrid",
   },
   "m1-zones": {
     title: "M1 库区管理",
     subtitle: "基于真实库位 API 派生的库区上下文",
     emptyTitle: "暂无库区上下文",
+    emptyDescription: "当前没有可派生的库区，请先维护库位或调整筛选。",
     storageKey: "m1-zones-datagrid",
   },
   "m1-locations": {
     title: "M1 库位管理",
     subtitle: "库位编码、容量、类型与状态",
     emptyTitle: "暂无库位档案",
+    emptyDescription: "当前筛选条件下没有库位，请调整关键字或清空筛选。",
     storageKey: "m1-locations-datagrid",
   },
   "m1-system-dictionary": {
     title: "M1 系统字典",
     subtitle: "单据类型、特殊药品分类等系统字典项",
     emptyTitle: "暂无系统字典项",
+    emptyDescription: "当前分类下没有可展示字典项。",
     storageKey: "m1-system-dictionary-datagrid",
   },
 };
@@ -190,15 +202,15 @@ function M1MasterDataGridPage({ viewId }: Pick<M1MasterDataPageProps, "viewId">)
     const scopes = new Map<string, LocationScopeOption>();
     for (const row of rowsQuery.data ?? []) {
       const fields = row.locationFields;
-      if (!fields || fields.warehouse === "-" || fields.zone === "-") continue;
+      if (!fields || fields.warehouseId === "-" || fields.zoneId === "-") continue;
       const ownerId = fields.owner === "-" ? null : fields.owner;
-      const key = `${fields.warehouse}:${fields.zone}:${ownerId ?? "none"}`;
+      const key = `${fields.warehouseId}:${fields.zoneId}:${ownerId ?? "none"}`;
       if (scopes.has(key)) continue;
       scopes.set(key, {
         key,
-        label: `仓库 ${shortId(fields.warehouse)} / 库区 ${shortId(fields.zone)}`,
-        warehouseId: fields.warehouse,
-        zoneId: fields.zone,
+        label: `仓库 ${fields.warehouse} / 库区 ${fields.zone}`,
+        warehouseId: fields.warehouseId,
+        zoneId: fields.zoneId,
         ownerId,
       });
     }
@@ -548,6 +560,13 @@ function M1MasterDataGridPage({ viewId }: Pick<M1MasterDataPageProps, "viewId">)
         onSelectedRowKeysChange={setSelectedRowKeys}
         caption={rowsQuery.isPending ? "加载基础档案..." : undefined}
         emptyTitle={meta.emptyTitle}
+        emptyDescription={
+          rowsQuery.isPending
+            ? "正在读取基础档案。"
+            : normalizedKeyword
+              ? meta.emptyDescription
+              : `${meta.emptyTitle}，可通过右上角操作新增或导入。`
+        }
         storageKey={meta.storageKey}
         exportFileBaseName={meta.title}
         refreshAction={gridRefreshAction}
@@ -624,10 +643,6 @@ function M1MasterDataGridPage({ viewId }: Pick<M1MasterDataPageProps, "viewId">)
       />
     </section>
   );
-}
-
-function shortId(value: string) {
-  return value.length > 8 ? value.slice(0, 8) : value;
 }
 
 function defaultM1QueryValue(): QueryPanelValue {

@@ -30,6 +30,7 @@ interface SystemDictionaryMeta {
   title: string;
   subtitle: string;
   emptyTitle: string;
+  emptyDescription?: string;
 }
 
 interface M1SystemDictionaryPageProps {
@@ -144,9 +145,9 @@ export function M1SystemDictionaryPage({ meta }: M1SystemDictionaryPageProps) {
     event.preventDefault();
     setDialogError(null);
     try {
-      const itemCode = requiredText(itemForm.itemCode, "item_code");
+      const itemCode = requiredText(itemForm.itemCode, "编码");
       const request: UpsertSystemDictionaryItemRequest = {
-        item_name: requiredText(itemForm.itemName, "item_name"),
+        item_name: requiredText(itemForm.itemName, "名称"),
         owner_id: nullableText(itemForm.ownerId),
         enabled: itemForm.enabled,
         params: parseJsonObject(itemForm.paramsText),
@@ -176,7 +177,7 @@ export function M1SystemDictionaryPage({ meta }: M1SystemDictionaryPageProps) {
       };
       const disabled = await disableMutation.mutateAsync({
         dictCode: activeGroup.code,
-        itemCode: requiredText(disableForm.itemCode, "item_code"),
+        itemCode: requiredText(disableForm.itemCode, "编码"),
         request,
       });
       await groupsQuery.refetch();
@@ -256,7 +257,7 @@ export function M1SystemDictionaryPage({ meta }: M1SystemDictionaryPageProps) {
         emptyDescription={
           groupsQuery.isPending
             ? "正在读取系统字典项。"
-            : `${activeGroup.name} 暂无可展示字典项。`
+            : (meta.emptyDescription ?? `${activeGroup.name} 暂无可展示字典项。`)
         }
       />
 
@@ -327,18 +328,18 @@ function DictionaryDialogs({
               </DialogDescription>
             </DialogHeader>
             <TextField
-              label="item_code"
+              label="编码"
               value={itemForm.itemCode}
               readOnly={editing}
               onChange={(itemCode) => onItemFormChange((value) => ({ ...value, itemCode }))}
             />
             <TextField
-              label="item_name"
+              label="名称"
               value={itemForm.itemName}
               onChange={(itemName) => onItemFormChange((value) => ({ ...value, itemName }))}
             />
             <TextField
-              label="owner_id"
+              label="货主 ID（可选）"
               value={itemForm.ownerId}
               onChange={(ownerId) => onItemFormChange((value) => ({ ...value, ownerId }))}
             />
@@ -350,10 +351,10 @@ function DictionaryDialogs({
                   onItemFormChange((value) => ({ ...value, enabled: checked === true }))
                 }
               />
-              <Label htmlFor="dictionary-item-enabled">enabled</Label>
+              <Label htmlFor="dictionary-item-enabled">启用</Label>
             </div>
             <TextField
-              label="effective_from"
+              label="生效开始"
               type="datetime-local"
               value={itemForm.effectiveFrom}
               onChange={(effectiveFrom) =>
@@ -361,13 +362,18 @@ function DictionaryDialogs({
               }
             />
             <TextField
-              label="effective_to"
+              label="生效结束"
               type="datetime-local"
               value={itemForm.effectiveTo}
               onChange={(effectiveTo) => onItemFormChange((value) => ({ ...value, effectiveTo }))}
             />
             <label className="grid gap-1 text-xs text-muted-foreground md:col-span-2">
-              params JSON
+              <span>
+                参数 JSON
+                <span className="ml-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                  高级
+                </span>
+              </span>
               <textarea
                 className={[
                   "min-h-40 rounded-md border border-input bg-background px-3 py-2",
@@ -399,7 +405,7 @@ function DictionaryDialogs({
               </DialogDescription>
             </DialogHeader>
             <TextField
-              label="owner_id"
+              label="货主 ID（可选）"
               value={disableForm.ownerId}
               onChange={(ownerId) => onDisableFormChange((value) => ({ ...value, ownerId }))}
             />
@@ -474,7 +480,7 @@ function parseJsonObject(value: string): Record<string, unknown> {
   if (!trimmed) return {};
   const parsed: unknown = JSON.parse(trimmed);
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("params 必须是 JSON 对象");
+    throw new Error("参数必须是 JSON 对象");
   }
   return parsed as Record<string, unknown>;
 }

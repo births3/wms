@@ -8,6 +8,7 @@ import {
   type SystemDictionaryPaneItem,
   type Supplier,
   type Warehouse,
+  type WarehouseRef,
 } from "./types";
 
 export function warehouseZoneRowsFromLocations(
@@ -17,8 +18,11 @@ export function warehouseZoneRowsFromLocations(
     string,
     {
       owner: string;
+      warehouseId: string;
       warehouse: string;
+      zoneId: string;
       zone: string;
+      areas: Set<string>;
       locationCount: number;
       availableLocationCount: number;
       createdAt: string;
@@ -28,14 +32,19 @@ export function warehouseZoneRowsFromLocations(
 
   for (const location of locations) {
     const fields = location.locationFields;
-    if (!fields || fields.warehouse === "-" || fields.zone === "-") continue;
+    if (!fields || fields.warehouseId === "-" || fields.zoneId === "-") continue;
     const owner = fields.owner === "-" ? location.ownerId : fields.owner;
-    const key = `${owner}:${fields.warehouse}:${fields.zone}`;
+    const key = `${owner}:${fields.warehouseId}:${fields.zoneId}`;
     const current = zones.get(key);
+    const areas = current?.areas ?? new Set<string>();
+    if (fields.area && fields.area !== "-") areas.add(fields.area);
     zones.set(key, {
       owner,
+      warehouseId: fields.warehouseId,
       warehouse: fields.warehouse,
+      zoneId: fields.zoneId,
       zone: fields.zone,
+      areas,
       locationCount: (current?.locationCount ?? 0) + 1,
       availableLocationCount:
         (current?.availableLocationCount ?? 0) + (location.status === "available" ? 1 : 0),
@@ -48,18 +57,19 @@ export function warehouseZoneRowsFromLocations(
     .sort((left, right) =>
       `${left.warehouse}:${left.zone}`.localeCompare(`${right.warehouse}:${right.zone}`, "zh-CN"),
     )
-    .map((zone) =>
-      row({
-        id: `${zone.owner}:${zone.warehouse}:${zone.zone}`,
-        code: zone.zone,
-        name: `库区 ${shortId(zone.zone)}`,
+    .map((zone) => {
+      const zoneCode = zoneDisplayCode(zone.areas, zone.zoneId, zone.zone);
+      return row({
+        id: `${zone.owner}:${zone.warehouseId}:${zone.zoneId}`,
+        code: zoneCode,
+        name: `库区 ${zoneCode}`,
         status: "derived_readonly",
         statusLabel: "只读派生",
         ownerId: zone.owner,
-        primaryLabel: "仓库 ID",
+        primaryLabel: "仓库",
         primaryValue: zone.warehouse,
-        secondaryLabel: "库区 ID",
-        secondaryValue: zone.zone,
+        secondaryLabel: "库区",
+        secondaryValue: zoneCode,
         extraLabel: "库位数",
         extraValue: `${zone.locationCount} 个 / 可用 ${zone.availableLocationCount} 个`,
         createdAt: zone.createdAt,
@@ -67,15 +77,19 @@ export function warehouseZoneRowsFromLocations(
         zoneFields: {
           owner: zone.owner,
           warehouse: zone.warehouse,
-          zone: zone.zone,
+          warehouseId: zone.warehouseId,
+          zone: zoneCode,
+          zoneId: zone.zoneId,
           locationCount: String(zone.locationCount),
           availableLocationCount: String(zone.availableLocationCount),
         },
-      }),
-    );
+      });
+    });
 }
+
 export function productRow(item: Product): MasterDataRow {
-  const storageCondition = text(item.attrs.storage_condition ?? item.attrs.storage);
+  const storageConditionCode = text(item.attrs.storage_condition ?? item.attrs.storage);
+  const storageConditionLabel = storageConditionDisplayLabel(storageConditionCode);
   const sourceValue = productSourceLabel(item.attrs.source);
   const middlePackage = productAttrText(item.attrs, "middle_package");
   const largePackage = productAttrText(item.attrs, "large_package");
@@ -96,7 +110,7 @@ export function productRow(item: Product): MasterDataRow {
     secondaryLabel: "批准文号",
     secondaryValue: text(item.approval_no),
     extraLabel: "储存条件",
-    extraValue: storageCondition,
+    extraValue: storageConditionLabel,
     createdAt: item.created_at,
     sourceValue,
     updatedAt: item.updated_at,
@@ -107,7 +121,7 @@ export function productRow(item: Product): MasterDataRow {
       manufacturer: item.manufacturer,
       specialDrugCategoryCode: item.special_drug_category_code,
       spec: item.spec,
-      storageCondition,
+      storageCondition: storageConditionCode === "-" ? null : storageConditionCode,
       middlePackage,
       largePackage,
       unitLengthMm,
@@ -154,7 +168,7 @@ export function customerRow(item: Customer): MasterDataRow {
     secondaryLabel: "档案类型",
     secondaryValue: "客户/门店",
     extraLabel: "货主",
-    extraValue: item.owner_id,
+    extraValue: shortId(item.owner_id),
     createdAt: item.created_at,
     sourceValue: customerSource(item),
     updatedAt: item.updated_at,
@@ -163,7 +177,7 @@ export function customerRow(item: Customer): MasterDataRow {
   });
 }
 
- export function warehouseRow(item: Warehouse): MasterDataRow {
+export function warehouseRow(item: Warehouse): MasterDataRow {
   return row({
     id: item.id,
     code: item.warehouse_code,
@@ -171,24 +185,42 @@ export function customerRow(item: Customer): MasterDataRow {
     status: item.status,
     statusLabel: activeStatusLabel(item.status),
     ownerId: item.owner_id,
-    primaryLabel: "仓库 ID",
-    primaryValue: item.id,
-    secondaryLabel: "货主",
-    secondaryValue: item.owner_id,
-    extraLabel: "档案类型",
-    extraValue: "仓库",
+    primaryLabel: "货主",
+    primaryValue: shortId(item.owner_id),
+    secondaryLabel: "档案类型",
+    secondaryValue: "仓库",
+    extraLabel: "仓库名称",
+    extraValue: item.warehouse_name,
     createdAt: item.created_at,
     updatedAt: item.updated_at,
   });
 }
 
-export function locationRow(item: Location, locationTypeLabels: ReadonlyMap<string, string>): MasterDataRow {
+export function warehouseRefFromWarehouse(item: Warehouse): WarehouseRef {
+  return {
+    id: item.id,
+    code: item.warehouse_code,
+    name: item.warehouse_name,
+  };
+}
+
+export function locationRow(
+  item: Location,
+  locationTypeLabels: ReadonlyMap<string, string>,
+  warehouseRefs: ReadonlyMap<string, WarehouseRef> = new Map(),
+): MasterDataRow {
   const locationType = locationTypeLabels.get(item.location_type) ?? text(item.location_type);
   const volume = `${item.used_volume_cm3}/${item.max_volume_cm3} cm³`;
+  const area = locationAreaCode(item.location_code);
+  const warehouse = warehouseDisplayLabel(warehouseRefs.get(item.warehouse_id), item.warehouse_id);
+  const zone = zoneDisplayCode(
+    area && area !== "-" ? new Set([area]) : new Set(),
+    item.zone_id,
+  );
   return row({
     id: item.id,
     code: item.location_code,
-    name: `${locationAreaCode(item.location_code)}-${item.row_no}-${item.column_no}-${item.layer_no}`,
+    name: `${area}-${item.row_no}-${item.column_no}-${item.layer_no}`,
     status: item.status,
     statusLabel: locationStatusLabel(item.status),
     ownerId: item.owner_id,
@@ -202,9 +234,11 @@ export function locationRow(item: Location, locationTypeLabels: ReadonlyMap<stri
     updatedAt: item.updated_at,
     locationFields: {
       owner: item.owner_id,
-      warehouse: item.warehouse_id,
-      zone: item.zone_id,
-      area: locationAreaCode(item.location_code),
+      warehouse,
+      warehouseId: item.warehouse_id,
+      zone,
+      zoneId: item.zone_id,
+      area,
       rowNo: String(item.row_no),
       columnNo: String(item.column_no),
       layerNo: String(item.layer_no),
@@ -321,6 +355,46 @@ export function productSourceLabel(value: unknown) {
     return "API接口导入";
   }
   return value.trim();
+}
+
+/** 列表展示用储存条件中文；表单仍使用英文 code（cold/normal/...） */
+export function storageConditionDisplayLabel(value: unknown): string {
+  if (typeof value !== "string") return "-";
+  const raw = value.trim();
+  if (!raw || raw === "-") return "-";
+  const normalized = raw.toLowerCase();
+  if (["frozen", "freeze", "冷冻"].includes(normalized)) return "冷冻";
+  if (["cold", "refrigerated", "冷藏"].includes(normalized)) return "冷藏";
+  if (["cool", "cool_storage", "阴凉"].includes(normalized)) return "阴凉";
+  if (["normal", "ambient", "room", "常温"].includes(normalized)) return "常温";
+  return raw;
+}
+
+export function warehouseDisplayLabel(
+  ref: WarehouseRef | undefined,
+  warehouseId: string,
+): string {
+  if (ref?.code && ref.name) return `${ref.code} · ${ref.name}`;
+  if (ref?.code) return ref.code;
+  if (ref?.name) return ref.name;
+  return warehouseId && warehouseId !== "-" ? shortId(warehouseId) : "-";
+}
+
+function zoneDisplayCode(
+  areas: ReadonlySet<string>,
+  zoneId: string,
+  fallbackDisplay?: string,
+): string {
+  if (areas.size === 1) return Array.from(areas)[0] ?? shortId(zoneId);
+  if (fallbackDisplay && fallbackDisplay !== "-" && !looksLikeUuid(fallbackDisplay)) {
+    return fallbackDisplay;
+  }
+  if (areas.size > 1) return `多区域`;
+  return zoneId && zoneId !== "-" ? `Z-${shortId(zoneId)}` : "-";
+}
+
+function looksLikeUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value.trim());
 }
 
 function supplierSource(item: Supplier) {

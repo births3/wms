@@ -21,6 +21,7 @@ import {
   type UpdateSupplierRequest,
   type UpdateWarehouseRequest,
   type UpsertSystemDictionaryItemRequest,
+  type WarehouseRef,
   specialDrugCategoryDictCode,
 } from "./types";
 import {
@@ -32,6 +33,7 @@ import {
   supplierRow,
   systemDictionaryPaneItem,
   systemDictionaryRow,
+  warehouseRefFromWarehouse,
   warehouseRow,
   warehouseZoneRowsFromLocations,
 } from "./mappers";
@@ -90,23 +92,23 @@ export async function listBusinessPartners(): Promise<MasterDataRow[]> {
 }
 
 export async function listWarehouses(): Promise<MasterDataRow[]> {
-  const result = await api.GET("/api/v1/master-data/warehouses");
-  if (!result.data) {
-    throw new ApiError(result.error, "读取仓库档案失败", result.response.status);
-  }
-  return result.data.data.map(warehouseRow);
+  const warehouses = await fetchWarehouses();
+  return warehouses.map(warehouseRow);
 }
 
 export async function listLocations(): Promise<MasterDataRow[]> {
-  const [result, locationTypeOptions] = await Promise.all([
+  const [result, locationTypeOptions, warehouseRefs] = await Promise.all([
     api.GET("/api/v1/master-data/locations"),
     listSystemDictionaryItemOptions("location_type"),
+    listWarehouseRefs(),
   ]);
   if (!result.data) {
     throw new ApiError(result.error, "读取库位档案失败", result.response.status);
   }
   const locationTypeLabels = new Map(locationTypeOptions);
-  return result.data.data.map((location) => locationRow(location, locationTypeLabels));
+  return result.data.data.map((location) =>
+    locationRow(location, locationTypeLabels, warehouseRefs),
+  );
 }
 
 export async function listWarehouseZones(): Promise<MasterDataRow[]> {
@@ -116,7 +118,10 @@ export async function listWarehouseZones(): Promise<MasterDataRow[]> {
 export async function batchCreateLocations(
   request: BatchCreateLocationsRequest,
 ): Promise<MasterDataRow[]> {
-  const locationTypeOptions = await listSystemDictionaryItemOptions("location_type");
+  const [locationTypeOptions, warehouseRefs] = await Promise.all([
+    listSystemDictionaryItemOptions("location_type"),
+    listWarehouseRefs(),
+  ]);
   const result = await api.POST("/api/v1/master-data/locations/batch-create", {
     params: {
       header: { "Idempotency-Key": idempotencyKey("web-m1-location-batch") },
@@ -127,7 +132,9 @@ export async function batchCreateLocations(
     throw new ApiError(result.error, "批量新增库位失败", result.response.status);
   }
   const locationTypeLabels = new Map(locationTypeOptions);
-  return result.data.data.map((location) => locationRow(location, locationTypeLabels));
+  return result.data.data.map((location) =>
+    locationRow(location, locationTypeLabels, warehouseRefs),
+  );
 }
 
 export async function createProduct(request: CreateProductRequest): Promise<MasterDataRow> {
@@ -205,31 +212,46 @@ export async function updateWarehouse(input: {
 }
 
 export async function createLocation(request: CreateLocationRequest): Promise<MasterDataRow> {
-  const [result, locationTypeOptions] = await Promise.all([
+  const [result, locationTypeOptions, warehouseRefs] = await Promise.all([
     api.POST("/api/v1/master-data/locations", { body: request }),
     listSystemDictionaryItemOptions("location_type"),
+    listWarehouseRefs(),
   ]);
   if (!result.data) {
     throw new ApiError(result.error, "新建库位失败", result.response.status);
   }
-  return locationRow(result.data, new Map(locationTypeOptions));
+  return locationRow(result.data, new Map(locationTypeOptions), warehouseRefs);
 }
 
 export async function updateLocation(input: {
   id: string;
   request: UpdateLocationRequest;
 }): Promise<MasterDataRow> {
-  const [result, locationTypeOptions] = await Promise.all([
+  const [result, locationTypeOptions, warehouseRefs] = await Promise.all([
     api.PATCH("/api/v1/master-data/locations/{id}", {
       params: { path: { id: input.id } },
       body: input.request,
     }),
     listSystemDictionaryItemOptions("location_type"),
+    listWarehouseRefs(),
   ]);
   if (!result.data) {
     throw new ApiError(result.error, "保存库位失败", result.response.status);
   }
-  return locationRow(result.data, new Map(locationTypeOptions));
+  return locationRow(result.data, new Map(locationTypeOptions), warehouseRefs);
+}
+
+async function fetchWarehouses() {
+  const result = await api.GET("/api/v1/master-data/warehouses");
+  if (!result.data) {
+    throw new ApiError(result.error, "读取仓库档案失败", result.response.status);
+  }
+  return result.data.data;
+}
+
+async function listWarehouseRefs(): Promise<ReadonlyMap<string, WarehouseRef>> {
+  const warehouses = await fetchWarehouses();
+  return new Map(warehouses.map((item) => [item.id, warehouseRefFromWarehouse(item)]));
 }
 
 export async function listSystemDictionaryItems(): Promise<MasterDataRow[]> {
