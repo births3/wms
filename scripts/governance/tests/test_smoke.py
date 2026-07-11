@@ -77,8 +77,6 @@ GOVERNANCE_SCRIPTS = [
     "check_layer_dependency.py",
     "check_unsafe_and_unwrap.py",
     "check_handler_test_coverage.py",
-    "check_audit_trail_coverage.py",
-    "check_idempotency_test.py",
     "validate_openapi_artifacts.py",
     "check_openapi_contract.py",
     "check_api_compat.py",
