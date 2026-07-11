@@ -125,6 +125,15 @@ async fn event_bus_delivers_by_pattern_and_dead_letters_after_retries(pool: PgPo
 
     assert_eq!(delivery.status, DeliveryStatus::DeadLetter);
     assert_eq!(delivery.attempt_count, 3);
+    let audit_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM audit_event WHERE owner_id = $1 AND resource_id = $2 AND action = 'event_bus.delivery.nack'",
+    )
+    .bind(owner_id)
+    .bind(delivery.id.to_string())
+    .fetch_one(&pool)
+    .await
+    .expect("nack audit_event should query");
+    assert_eq!(audit_count, 3);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -192,6 +201,16 @@ async fn event_bus_acknowledges_and_replays_deliveries(pool: PgPool) {
         .find(|delivery| delivery.id == acknowledged.id)
         .expect("acknowledged delivery should be pending again");
     assert_eq!(replayed_delivery.status, DeliveryStatus::Pending);
+
+    let audit_actions: Vec<String> = sqlx::query_scalar(
+        "SELECT action FROM audit_event WHERE owner_id = $1 AND resource_id = $2 ORDER BY occurred_at",
+    )
+    .bind(owner_id)
+    .bind(delivery.id.to_string())
+    .fetch_all(&pool)
+    .await
+    .expect("acknowledge audit_event should query");
+    assert_eq!(audit_actions, vec!["event_bus.delivery.ack"]);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -313,4 +332,16 @@ async fn business_retention_policy_plans_archive_without_delete(pool: PgPool) {
     assert!(!job.delete_allowed);
     assert_eq!(skipped.status, "skipped");
     assert_eq!(skipped.target_layer, "skip");
+
+    let audit_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM audit_event WHERE owner_id = $1 AND action = 'business_archive.plan'",
+    )
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("business retention audit_event should query");
+    assert_eq!(
+        audit_count, 2,
+        "same-key replay must not duplicate audit_event"
+    );
 }

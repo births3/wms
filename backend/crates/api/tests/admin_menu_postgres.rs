@@ -9,7 +9,8 @@ use wms_api::{
     auth::AuthContext,
 };
 use wms_domain::{
-    CreateAdminMenuNodeRequest, PublishAdminMenuRequest, UpsertAdminMenuButtonPermissionRequest,
+    BatchEnableAdminMenuRequest, CreateAdminMenuNodeRequest, PublishAdminMenuRequest,
+    RollbackAdminMenuRequest, UpsertAdminMenuButtonPermissionRequest,
 };
 
 fn ctx(owner_id: Uuid) -> AuthContext {
@@ -66,9 +67,7 @@ fn platform_extra_request() -> CreateAdminMenuNodeRequest {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn admin_menu_draft_publish_is_versioned_idempotent_and_validates_registered_views(
-    pool: PgPool,
-) {
+async fn admin_menu_draft_publish_batch_enable_rollback_is_idempotent_and_audited(pool: PgPool) {
     let owner_id = Uuid::new_v4();
     seed_owner(&pool, owner_id).await;
     let service = PgAdminMenuService::new();
@@ -164,6 +163,22 @@ async fn admin_menu_draft_publish_is_versioned_idempotent_and_validates_register
         .expect("same idempotency key should replay");
     assert_eq!(created.value.id, replay.value.id);
     assert!(replay.replayed);
+    let created_rows: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*)::BIGINT FROM admin_menu_draft_nodes WHERE code = 'platform.extra'",
+    )
+    .fetch_one(&pool)
+    .await
+    .expect("created menu row count should query");
+    let create_audit_rows: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*)::BIGINT FROM audit_event WHERE owner_id = $1 AND action = 'admin_menu.create_node' AND resource_id = $2",
+    )
+    .bind(owner_id)
+    .bind("h1-menu-create-extra")
+    .fetch_one(&pool)
+    .await
+    .expect("create menu audit count should query");
+    assert_eq!(created_rows, 1);
+    assert_eq!(create_audit_rows, 1);
 
     let published_version = service
         .publish(
@@ -178,6 +193,63 @@ async fn admin_menu_draft_publish_is_versioned_idempotent_and_validates_register
         .await
         .expect("menu should publish");
     assert_eq!(published_version.value.version_no, 2);
+
+    let batch_request = BatchEnableAdminMenuRequest {
+        ids: vec![created.value.id],
+        enabled: false,
+    };
+    let batch_enabled = service
+        .batch_enable(
+            &pool,
+            &auth,
+            batch_request.clone(),
+            now,
+            "h1-menu-batch-enable",
+        )
+        .await
+        .expect("batch enable should update draft nodes");
+    let batch_replay = service
+        .batch_enable(&pool, &auth, batch_request, now, "h1-menu-batch-enable")
+        .await
+        .expect("batch enable should replay the same idempotency key");
+    assert!(!batch_enabled.replayed);
+    assert!(batch_replay.replayed);
+
+    let rollback_request = RollbackAdminMenuRequest {
+        target_version_no: Some(1),
+    };
+    let rollback = service
+        .rollback(
+            &pool,
+            &auth,
+            rollback_request.clone(),
+            now,
+            "h1-menu-rollback",
+        )
+        .await
+        .expect("menu rollback should publish a restored version");
+    let rollback_replay = service
+        .rollback(&pool, &auth, rollback_request, now, "h1-menu-rollback")
+        .await
+        .expect("menu rollback should replay the same idempotency key");
+    assert!(!rollback.replayed);
+    assert!(rollback_replay.replayed);
+    assert_eq!(rollback.value.id, rollback_replay.value.id);
+
+    let governance_counts: (i64, i64, i64, i64) = sqlx::query_as(
+        r#"
+        SELECT
+            (SELECT COUNT(*) FROM audit_event WHERE owner_id = $1 AND action = 'admin_menu.batch_enable'),
+            (SELECT COUNT(*) FROM audit_event WHERE owner_id = $1 AND action = 'admin_menu.rollback'),
+            (SELECT COUNT(*) FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = 'h1-menu-batch-enable'),
+            (SELECT COUNT(*) FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = 'h1-menu-rollback')
+        "#,
+    )
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("menu audit and idempotency evidence should query");
+    assert_eq!(governance_counts, (1, 1, 1, 1));
 
     let invalid = service
         .create_node(

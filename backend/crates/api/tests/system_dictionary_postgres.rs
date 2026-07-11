@@ -4,6 +4,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 use wms_api::{
     auth::AuthContext,
+    master_data_postgres::PgMasterDataReadRepository,
     system_dictionary::{PgSystemDictionaryRepository, SystemDictionaryError},
 };
 use wms_domain::{
@@ -128,7 +129,7 @@ async fn print_template_type_presets_are_queryable_and_require_field_library(poo
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn owner_dictionary_item_overrides_global_and_disable_hides_it(pool: PgPool) {
-    let repo = PgSystemDictionaryRepository::new(pool);
+    let repo = PgSystemDictionaryRepository::new(pool.clone());
     let owner_id = Uuid::new_v4();
     let ctx = ctx(owner_id);
     let now = Utc
@@ -136,26 +137,59 @@ async fn owner_dictionary_item_overrides_global_and_disable_hides_it(pool: PgPoo
         .single()
         .expect("valid time");
 
+    let request = UpsertSystemDictionaryItemRequest {
+        owner_id: Some(owner_id),
+        item_name: "货主采购入库".to_string(),
+        enabled: true,
+        params: valid_document_type_params(),
+        effective_from: None,
+        effective_to: None,
+    };
     let created = repo
         .upsert_item(
             &ctx,
             SYSTEM_DICTIONARY_DOCUMENT_TYPE,
             DOCUMENT_TYPE_PURCHASE_INBOUND,
-            UpsertSystemDictionaryItemRequest {
-                owner_id: Some(owner_id),
-                item_name: "货主采购入库".to_string(),
-                enabled: true,
-                params: valid_document_type_params(),
-                effective_from: None,
-                effective_to: None,
-            },
+            request.clone(),
             now,
             "system-dictionary-owner-override",
         )
         .await
-        .expect("owner override should save")
-        .value;
-    assert_eq!(created.source, "owner");
+        .expect("owner override should save");
+    let replay = repo
+        .upsert_item(
+            &ctx,
+            SYSTEM_DICTIONARY_DOCUMENT_TYPE,
+            DOCUMENT_TYPE_PURCHASE_INBOUND,
+            request,
+            now,
+            "system-dictionary-owner-override",
+        )
+        .await
+        .expect("same dictionary idempotency key should replay");
+    assert_eq!(created.value.id, replay.value.id);
+    assert_eq!(created.value.source, "owner");
+    assert!(replay.replayed);
+
+    let item_rows: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*)::BIGINT FROM system_dictionary_items WHERE dict_code = $1 AND item_code = $2 AND owner_id = $3",
+    )
+    .bind(SYSTEM_DICTIONARY_DOCUMENT_TYPE)
+    .bind(DOCUMENT_TYPE_PURCHASE_INBOUND)
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("dictionary item count should query");
+    let audit_rows: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*)::BIGINT FROM audit_event WHERE owner_id = $1 AND action = 'upsert_system_dictionary_item' AND resource_id = $2",
+    )
+    .bind(owner_id)
+    .bind(created.value.id.to_string())
+    .fetch_one(&pool)
+    .await
+    .expect("dictionary audit count should query");
+    assert_eq!(item_rows, 1);
+    assert_eq!(audit_rows, 1);
 
     let items = repo
         .list_effective_items(&ctx, SYSTEM_DICTIONARY_DOCUMENT_TYPE, now)
@@ -192,6 +226,80 @@ async fn owner_dictionary_item_overrides_global_and_disable_hides_it(pool: PgPoo
             .all(|item| item.item_code != DOCUMENT_TYPE_PURCHASE_INBOUND),
         "disabled owner override must fail closed instead of falling back to global"
     );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn special_drug_category_write_replays_once_and_is_queryable_with_one_audit(pool: PgPool) {
+    let dictionary = PgSystemDictionaryRepository::new(pool.clone());
+    let master_data = PgMasterDataReadRepository::new(pool.clone());
+    let owner_id = Uuid::new_v4();
+    let ctx = ctx(owner_id);
+    let now = Utc
+        .with_ymd_and_hms(2026, 7, 6, 9, 0, 0)
+        .single()
+        .expect("valid time");
+    let request = UpsertSystemDictionaryItemRequest {
+        owner_id: Some(owner_id),
+        item_name: "货主管制药品".to_string(),
+        enabled: true,
+        params: json!({ "requires_dual_sign": true }),
+        effective_from: None,
+        effective_to: None,
+    };
+
+    let created = dictionary
+        .upsert_item(
+            &ctx,
+            "special_drug_category",
+            "narcotic",
+            request.clone(),
+            now,
+            "special-drug-category-controlled",
+        )
+        .await
+        .expect("owner special drug category should save");
+    let replay = dictionary
+        .upsert_item(
+            &ctx,
+            "special_drug_category",
+            "narcotic",
+            request,
+            now,
+            "special-drug-category-controlled",
+        )
+        .await
+        .expect("same special drug category idempotency key should replay");
+    assert_eq!(created.value.id, replay.value.id);
+    assert!(replay.replayed);
+
+    let categories = master_data
+        .list_special_drug_categories(&ctx)
+        .await
+        .expect("special drug categories should query through postgres");
+    let category = categories
+        .iter()
+        .find(|category| category.category_code == "narcotic")
+        .expect("owner special drug category should override global item");
+    assert_eq!(category.category_name, "货主管制药品");
+    assert!(category.requires_dual_sign);
+
+    let item_rows: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*)::BIGINT FROM system_dictionary_items WHERE dict_code = 'special_drug_category' AND item_code = 'narcotic' AND owner_id = $1",
+    )
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("special drug category row count should query");
+    let audit_rows: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*)::BIGINT FROM audit_event WHERE owner_id = $1 AND action = 'upsert_system_dictionary_item' AND resource_id = $2",
+    )
+    .bind(owner_id)
+    .bind(created.value.id.to_string())
+    .fetch_one(&pool)
+    .await
+    .expect("special drug category audit count should query");
+    assert_eq!(item_rows, 1);
+    assert_eq!(audit_rows, 1);
 }
 
 #[sqlx::test(migrations = "../../migrations")]

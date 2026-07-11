@@ -188,6 +188,7 @@ pub async fn acknowledge_event_delivery(
     delivery_id: Uuid,
     now: DateTime<Utc>,
 ) -> Result<EventDelivery, H2LifecycleError> {
+    let mut tx = pool.begin().await.map_err(db_error)?;
     let row = sqlx::query_as::<_, EventDeliveryRow>(
         r#"
         UPDATE event_bus_delivery
@@ -202,12 +203,26 @@ pub async fn acknowledge_event_delivery(
     .bind(owner_id)
     .bind(delivery_id)
     .bind(now)
-    .fetch_optional(pool)
+    .fetch_optional(&mut *tx)
     .await
     .map_err(db_error)?
     .ok_or(H2LifecycleError::NotFound)?;
 
-    EventDelivery::try_from(row)
+    let status = row.status.clone();
+    let delivery = EventDelivery::try_from(row)?;
+    append_system_audit_in_tx(
+        &mut tx,
+        owner_id,
+        "event_bus.delivery.ack",
+        "event_bus_delivery",
+        &delivery.id.to_string(),
+        serde_json::json!({"status": status}),
+        now,
+        "system-event-bus",
+    )
+    .await?;
+    tx.commit().await.map_err(db_error)?;
+    Ok(delivery)
 }
 
 pub async fn record_delivery_failure(
@@ -261,6 +276,22 @@ pub async fn record_delivery_failure(
         .await
         .map_err(db_error)?;
     }
+
+    append_system_audit_in_tx(
+        &mut tx,
+        owner_id,
+        "event_bus.delivery.nack",
+        "event_bus_delivery",
+        &row.id.to_string(),
+        serde_json::json!({
+            "status": row.status,
+            "attempt_count": row.attempt_count,
+            "error": error,
+        }),
+        now,
+        "system-event-bus",
+    )
+    .await?;
 
     tx.commit().await.map_err(db_error)?;
     EventDelivery::try_from(row)

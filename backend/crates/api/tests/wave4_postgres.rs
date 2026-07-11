@@ -16,6 +16,10 @@ use wms_domain::{
     TraceabilityOutboundReportRequest, TraceabilityStatusChangeEvent,
 };
 
+#[path = "support/wave4.rs"]
+mod support;
+use support::seed_inventory_batch;
+
 fn ctx(owner_id: Uuid) -> AuthContext {
     AuthContext {
         user_id: Uuid::new_v4(),
@@ -29,31 +33,6 @@ fn ctx(owner_id: Uuid) -> AuthContext {
         ],
         jti: Uuid::new_v4().to_string(),
     }
-}
-
-async fn seed_inventory_batch(pool: &PgPool, owner_id: Uuid, now: chrono::DateTime<Utc>) -> Uuid {
-    let batch_id = Uuid::new_v4();
-    sqlx::query(
-        r#"
-        INSERT INTO inventory_batches (
-            id, owner_id, product_code, batch_no, production_date, expiry_date,
-            qty_on_hand, qty_locked, quality_status, location_id, location_code,
-            recall_flag, created_at, updated_at
-        )
-        VALUES ($1, $2, 'P-COLD-001', 'B-TEMP-001', $3, $4, 10, 0, $5, $6, 'COLD-A-01', FALSE, $7, $7)
-        "#,
-    )
-    .bind(batch_id)
-    .bind(owner_id)
-    .bind(NaiveDate::from_ymd_opt(2026, 1, 1).expect("valid date"))
-    .bind(NaiveDate::from_ymd_opt(2028, 1, 1).expect("valid date"))
-    .bind(STATUS_QUALIFIED)
-    .bind(Uuid::new_v4())
-    .bind(now)
-    .execute(pool)
-    .await
-    .expect("seed inventory batch");
-    batch_id
 }
 
 async fn seed_outbound_inventory(
@@ -153,7 +132,7 @@ async fn create_read_order(
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn outbound_short_pick_must_be_replenished_before_ship_and_deducts_inventory(pool: PgPool) {
+async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: PgPool) {
     let owner_id = Uuid::new_v4();
     let ctx = ctx(owner_id);
     let repo = PgWave4Repository::new(pool.clone());
@@ -263,46 +242,78 @@ async fn outbound_short_pick_must_be_replenished_before_ship_and_deducts_invento
         Wave4RepositoryError::ShortPickNotReplenished
     ));
 
-    repo.complete_pick_task(
-        &ctx,
-        order.id,
-        CompletePickTaskRequest {
-            line_no: 1,
-            picked_qty: 10,
-            exception_code: None,
-            exception_note: Some("补拣补齐".to_string()),
-        },
-        now,
-        "outbound-pick-replenished-1",
-        None,
-    )
-    .await
-    .expect("replenishment pick should clear short pick");
-    repo.review_outbound_order(
-        &ctx,
-        order.id,
-        ReviewOutboundOrderRequest {
-            reviewer_id: Uuid::new_v4(),
-            review_mode: "pda_loose".to_string(),
-            second_reviewer_id: None,
-        },
-        now,
-        "outbound-review-replenished-1",
-        None,
-    )
-    .await
-    .expect("replenished order should be reviewed again");
+    let replenished_request = CompletePickTaskRequest {
+        line_no: 1,
+        picked_qty: 10,
+        exception_code: None,
+        exception_note: Some("补拣补齐".to_string()),
+    };
+    let replenished = repo
+        .complete_pick_task(
+            &ctx,
+            order.id,
+            replenished_request.clone(),
+            now,
+            "outbound-pick-replenished-1",
+            None,
+        )
+        .await
+        .expect("replenishment pick should clear short pick");
+    let pick_replay = repo
+        .complete_pick_task(
+            &ctx,
+            order.id,
+            replenished_request,
+            now,
+            "outbound-pick-replenished-1",
+            None,
+        )
+        .await
+        .expect("same-key complete pick should replay");
+    assert!(pick_replay.replayed);
+    assert_eq!(pick_replay.value.id, replenished.value.id);
 
+    let review_request = ReviewOutboundOrderRequest {
+        reviewer_id: Uuid::new_v4(),
+        review_mode: "pda_loose".to_string(),
+        second_reviewer_id: None,
+    };
+    let reviewed = repo
+        .review_outbound_order(
+            &ctx,
+            order.id,
+            review_request.clone(),
+            now,
+            "outbound-review-replenished-1",
+            None,
+        )
+        .await
+        .expect("replenished order should be reviewed again");
+    let review_replay = repo
+        .review_outbound_order(
+            &ctx,
+            order.id,
+            review_request,
+            now,
+            "outbound-review-replenished-1",
+            None,
+        )
+        .await
+        .expect("same-key outbound review should replay");
+    assert!(review_replay.replayed);
+    assert_eq!(review_replay.value.id, reviewed.value.id);
+
+    let ship_request = ShipOutboundOrderRequest {
+        carrier_type: "own_fleet".to_string(),
+        handover_to: "driver-001".to_string(),
+        package_count: 1,
+        shipped_at: Some(now),
+    };
     let shipped = repo
         .ship_outbound_order(
             &ctx,
             order.id,
-            ShipOutboundOrderRequest {
-                carrier_type: "own_fleet".to_string(),
-                handover_to: "driver-001".to_string(),
-                package_count: 1,
-                shipped_at: Some(now),
-            },
+            ship_request.clone(),
             now,
             "outbound-ship-1",
             None,
@@ -312,6 +323,12 @@ async fn outbound_short_pick_must_be_replenished_before_ship_and_deducts_invento
         .value;
     assert_eq!(shipped.status, "shipped");
     assert_eq!(shipped.lines[0].shipped_qty, 10);
+    let ship_replay = repo
+        .ship_outbound_order(&ctx, order.id, ship_request, now, "outbound-ship-1", None)
+        .await
+        .expect("same-key outbound ship should replay");
+    assert!(ship_replay.replayed);
+    assert_eq!(ship_replay.value.id, shipped.id);
 
     let counts: (i64, i64, i64) = sqlx::query_as(
         r#"

@@ -207,6 +207,23 @@ async fn document_number_rule_management_is_owner_scoped_idempotent_and_audited(
         .expect("same rule idempotency key should replay");
     assert_eq!(created.value.id, replay.value.id);
     assert!(replay.replayed);
+    let upserted_rows: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*)::BIGINT FROM document_number_rules WHERE owner_id = $1 AND rule_code = 'purchase-inbound-api'",
+    )
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("upserted rule count should query");
+    let upsert_audit_rows: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*)::BIGINT FROM audit_event WHERE owner_id = $1 AND action = 'upsert_document_number_rule' AND resource_id = $2",
+    )
+    .bind(owner_id)
+    .bind(created.value.id.to_string())
+    .fetch_one(&pool)
+    .await
+    .expect("upsert rule audit count should query");
+    assert_eq!(upserted_rows, 1);
+    assert_eq!(upsert_audit_rows, 1);
 
     let disabled = service
         .set_rule_enabled(

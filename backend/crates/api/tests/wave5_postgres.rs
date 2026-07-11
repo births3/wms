@@ -13,6 +13,10 @@ use wms_domain::{
     ReceiveTmsDispatchRequest, WeighPackJobRequest,
 };
 
+#[path = "support/wave5.rs"]
+mod support;
+use support::audit_count;
+
 struct SeededOutboundOrder {
     id: Uuid,
     customer_id: Uuid,
@@ -137,22 +141,6 @@ async fn owner_row_count(pool: &PgPool, table: &str, owner_id: Uuid) -> i64 {
         .fetch_one(pool)
         .await
         .expect("count owner rows")
-}
-
-async fn audit_count(pool: &PgPool, owner_id: Uuid) -> i64 {
-    sqlx::query_scalar(
-        r#"
-        SELECT COUNT(*)::BIGINT
-          FROM audit_event
-         WHERE owner_id = $1
-           AND module = ANY($2)
-        "#,
-    )
-    .bind(owner_id)
-    .bind(vec!["M-PK", "M8", "M9", "M10"])
-    .fetch_one(pool)
-    .await
-    .expect("count audit events")
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -362,16 +350,17 @@ async fn chain_store_replenishment_to_packing_tms_and_billing(pool: PgPool) {
         .value;
     assert_eq!(suggestion.suggested_qty, 27);
 
+    let crossdock_request = CreateCrossdockPlanRequest {
+        asn_id: Uuid::new_v4(),
+        outbound_order_id: outbound.id,
+        store_id,
+        product_code: product_code.clone(),
+        qty: suggestion.suggested_qty,
+    };
     let crossdock = repo
         .create_crossdock_plan(
             &ctx,
-            CreateCrossdockPlanRequest {
-                asn_id: Uuid::new_v4(),
-                outbound_order_id: outbound.id,
-                store_id,
-                product_code: product_code.clone(),
-                qty: suggestion.suggested_qty,
-            },
+            crossdock_request.clone(),
             now,
             "wave5-chain-crossdock",
             None,
@@ -380,6 +369,12 @@ async fn chain_store_replenishment_to_packing_tms_and_billing(pool: PgPool) {
         .expect("create crossdock")
         .value;
     assert_eq!(crossdock.status, "planned");
+    let crossdock_replay = repo
+        .create_crossdock_plan(&ctx, crossdock_request, now, "wave5-chain-crossdock", None)
+        .await
+        .expect("same-key crossdock plan should replay");
+    assert!(crossdock_replay.replayed);
+    assert_eq!(crossdock_replay.value.id, crossdock.id);
 
     let station = repo
         .create_packing_station(
@@ -419,16 +414,17 @@ async fn chain_store_replenishment_to_packing_tms_and_billing(pool: PgPool) {
         .await
         .expect("create pack job")
         .value;
+    let weigh_request = WeighPackJobRequest {
+        actual_weight_grams: 1000,
+        theoretical_weight_grams: 1000,
+        tolerance_percent: 5,
+        override_reason: None,
+    };
     let weighed = repo
         .weigh_pack_job(
             &ctx,
             pack_job.id,
-            WeighPackJobRequest {
-                actual_weight_grams: 1000,
-                theoretical_weight_grams: 1000,
-                tolerance_percent: 5,
-                override_reason: None,
-            },
+            weigh_request.clone(),
             now,
             "wave5-chain-weigh",
             None,
@@ -437,6 +433,19 @@ async fn chain_store_replenishment_to_packing_tms_and_billing(pool: PgPool) {
         .expect("weigh pack job")
         .value;
     assert_eq!(weighed.status, "weighed");
+    let weigh_replay = repo
+        .weigh_pack_job(
+            &ctx,
+            pack_job.id,
+            weigh_request,
+            now,
+            "wave5-chain-weigh",
+            None,
+        )
+        .await
+        .expect("same-key weigh should replay");
+    assert!(weigh_replay.replayed);
+    assert_eq!(weigh_replay.value.id, weighed.id);
     let waybill = repo
         .print_pack_job_waybill(
             &ctx,
@@ -476,19 +485,20 @@ async fn chain_store_replenishment_to_packing_tms_and_billing(pool: PgPool) {
         .await
         .expect("receive tms dispatch")
         .value;
+    let temperature_request = IngestTransitTemperatureRequest {
+        dispatch_id: dispatch.id,
+        device_code: "TEMP-W5-CHAIN".to_string(),
+        plate_no: "ZJ-A12345".to_string(),
+        measured_at: now,
+        temperature_celsius: 4.2,
+        humidity_percent: Some(55.0),
+        is_exceeded: false,
+        external_trace_url: Some("https://tms.example.invalid/traces/W5".to_string()),
+    };
     let reading = repo
         .ingest_transit_temperature(
             &ctx,
-            IngestTransitTemperatureRequest {
-                dispatch_id: dispatch.id,
-                device_code: "TEMP-W5-CHAIN".to_string(),
-                plate_no: "ZJ-A12345".to_string(),
-                measured_at: now,
-                temperature_celsius: 4.2,
-                humidity_percent: Some(55.0),
-                is_exceeded: false,
-                external_trace_url: Some("https://tms.example.invalid/traces/W5".to_string()),
-            },
+            temperature_request.clone(),
             now,
             "wave5-chain-temperature",
             None,
@@ -497,16 +507,29 @@ async fn chain_store_replenishment_to_packing_tms_and_billing(pool: PgPool) {
         .expect("ingest transit temperature")
         .value;
     assert!(!reading.is_exceeded);
+    let temperature_replay = repo
+        .ingest_transit_temperature(
+            &ctx,
+            temperature_request,
+            now,
+            "wave5-chain-temperature",
+            None,
+        )
+        .await
+        .expect("same-key transit temperature should replay");
+    assert!(temperature_replay.replayed);
+    assert_eq!(temperature_replay.value.id, reading.id);
+    let recovery_request = ConfirmContainerRecoveryRequest {
+        container_lpn: format!("BOX-{}", owner_id.simple()),
+        dispatch_id: Some(dispatch.id),
+        customer_id: outbound.customer_id,
+        delivery_provider_type: "third_party_express".to_string(),
+        shipped_at: Some(now),
+    };
     let recovery = repo
         .confirm_container_recovery(
             &ctx,
-            ConfirmContainerRecoveryRequest {
-                container_lpn: format!("BOX-{}", owner_id.simple()),
-                dispatch_id: Some(dispatch.id),
-                customer_id: outbound.customer_id,
-                delivery_provider_type: "third_party_express".to_string(),
-                shipped_at: Some(now),
-            },
+            recovery_request.clone(),
             now,
             "wave5-chain-recovery",
             None,
@@ -515,6 +538,12 @@ async fn chain_store_replenishment_to_packing_tms_and_billing(pool: PgPool) {
         .expect("confirm container recovery")
         .value;
     assert_eq!(recovery.status, "recovered");
+    let recovery_replay = repo
+        .confirm_container_recovery(&ctx, recovery_request, now, "wave5-chain-recovery", None)
+        .await
+        .expect("same-key container recovery should replay");
+    assert!(recovery_replay.replayed);
+    assert_eq!(recovery_replay.value.id, recovery.id);
 
     let charge = repo
         .calculate_period_charges(
@@ -590,7 +619,18 @@ async fn chain_store_replenishment_to_packing_tms_and_billing(pool: PgPool) {
         owner_row_count(&pool, "billing_statements", owner_id).await,
         1
     );
-    assert_eq!(audit_count(&pool, owner_id).await, 12);
+    let audit_events: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM audit_event WHERE owner_id = $1 AND module = ANY($2)",
+    )
+    .bind(owner_id)
+    .bind(vec!["M-PK", "M8", "M9", "M10"])
+    .fetch_one(&pool)
+    .await
+    .expect("wave5 audit_event should query");
+    assert_eq!(
+        audit_events, 12,
+        "same-key replays must not duplicate audit_event"
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]

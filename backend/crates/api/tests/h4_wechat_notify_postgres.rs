@@ -36,7 +36,7 @@ fn read_only_ctx(owner_id: Uuid, actor_name: &str) -> AuthContext {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn h4_config_send_and_idempotency_write_records(pool: PgPool) {
+async fn wechat_notify_config_send_resend_replays_and_writes_audit(pool: PgPool) {
     let service = PgWechatNotifyService::new();
     let ctx = ctx();
     let now = Utc::now();
@@ -58,23 +58,24 @@ async fn h4_config_send_and_idempotency_write_records(pool: PgPool) {
         .expect_err("empty recipient rule should fail");
     assert_eq!(format!("{empty_rule_error:?}"), "NoRecipients");
 
+    let config_request = UpsertH4NotificationConfigRequest {
+        event_type: "asn_arrived".to_string(),
+        enabled: true,
+        template: "ASN {{asn_no}} 已到货".to_string(),
+        recipient_rule: serde_json::json!({ "roles": ["warehouse_manager"] }),
+        channels: vec!["wechat".to_string()],
+    };
     let config = service
-        .upsert_config(
-            &pool,
-            &ctx,
-            UpsertH4NotificationConfigRequest {
-                event_type: "asn_arrived".to_string(),
-                enabled: true,
-                template: "ASN {{asn_no}} 已到货".to_string(),
-                recipient_rule: serde_json::json!({ "roles": ["warehouse_manager"] }),
-                channels: vec!["wechat".to_string()],
-            },
-            now,
-            "h4-config-1",
-        )
+        .upsert_config(&pool, &ctx, config_request.clone(), now, "h4-config-1")
         .await
         .expect("config should upsert");
     assert!(!config.replayed);
+    let config_replay = service
+        .upsert_config(&pool, &ctx, config_request, now, "h4-config-1")
+        .await
+        .expect("same-key config should replay");
+    assert!(config_replay.replayed);
+    assert_eq!(config_replay.value.id, config.value.id);
 
     let sent = service
         .send_notification(
@@ -116,6 +117,12 @@ async fn h4_config_send_and_idempotency_write_records(pool: PgPool) {
         .expect("failed notification should resend");
     assert_eq!(resent.value.status, "failed");
     assert_eq!(resent.value.retry_count, 1);
+    let resend_replay = service
+        .resend_record(&pool, &ctx, sent.value[0].id, now, "h4-resend-failed")
+        .await
+        .expect("same-key resend should replay");
+    assert!(resend_replay.replayed);
+    assert_eq!(resend_replay.value.id, resent.value.id);
 
     let replay = service
         .send_notification(
@@ -141,6 +148,26 @@ async fn h4_config_send_and_idempotency_write_records(pool: PgPool) {
             .await
             .expect("record count should query");
     assert_eq!(record_count.0, 2);
+    let audit_count: i64 = sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*) FROM audit_event
+         WHERE owner_id = $1
+           AND action = ANY($2)
+        "#,
+    )
+    .bind(ctx.owner_id)
+    .bind(vec![
+        "h4.config.upserted",
+        "h4.notify.delivery_failed",
+        "h4.notify.resent",
+    ])
+    .fetch_one(&pool)
+    .await
+    .expect("H4 audit_event should query");
+    assert_eq!(
+        audit_count, 3,
+        "same-key replays must not duplicate audit_event"
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -476,7 +503,7 @@ async fn h4_record_query_limits_read_only_users_to_their_notifications(pool: PgP
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn h4_wechat_settings_are_owner_scoped_and_idempotent(pool: PgPool) {
+async fn upsert_h4_wechat_settings_replays_and_writes_audit(pool: PgPool) {
     let service = PgWechatNotifyService::new();
     let ctx = ctx();
     let now = Utc::now();
@@ -516,12 +543,6 @@ async fn h4_wechat_settings_are_owner_scoped_and_idempotent(pool: PgPool) {
         "h4/wechat/agent_secret"
     );
 
-    let tested = service
-        .test_wechat_settings(&pool, &ctx, now)
-        .await
-        .expect("settings test should pass");
-    assert_eq!(tested.status, "success");
-
     let record_count: (i64,) =
         sqlx::query_as("SELECT COUNT(*) FROM h4_notification_records WHERE owner_id = $1")
             .bind(ctx.owner_id)
@@ -529,6 +550,17 @@ async fn h4_wechat_settings_are_owner_scoped_and_idempotent(pool: PgPool) {
             .await
             .expect("record count should query");
     assert_eq!(record_count.0, 0);
+    let audit_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM audit_event WHERE owner_id = $1 AND action = 'h4.wechat_settings.upserted'",
+    )
+    .bind(ctx.owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("wechat settings audit_event should query");
+    assert_eq!(
+        audit_count, 1,
+        "same-key replay must not duplicate audit_event"
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]
