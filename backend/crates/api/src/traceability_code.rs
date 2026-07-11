@@ -276,7 +276,7 @@ mod tests {
             .expect("success with receipt should classify");
 
         assert_eq!(success.status, "reported");
-        assert_eq!(success.should_retry, false);
+        assert!(!success.should_retry);
         assert_eq!(success.audit_action, "traceability.report.success");
 
         assert!(matches!(
@@ -301,7 +301,7 @@ mod tests {
             .expect("retryable failure should classify");
 
         assert_eq!(retry.status, "pending_replay");
-        assert_eq!(retry.should_retry, true);
+        assert!(retry.should_retry);
         assert_eq!(retry.audit_action, "traceability.report.retry_scheduled");
         assert_eq!(retry.error_code.as_deref(), Some("RATE_LIMITED"));
     }

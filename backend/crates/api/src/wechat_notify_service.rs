@@ -27,7 +27,7 @@ pub const DEFAULT_H4_QUERY_LIMIT: u32 = 50;
 pub const MAX_H4_QUERY_LIMIT: u32 = 100;
 const PROVIDER_NOT_CONFIGURED_REASON: &str = "企业微信外部发送能力尚未启用";
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct PgWechatNotifyService;
 
 #[derive(Clone, Debug, PartialEq)]

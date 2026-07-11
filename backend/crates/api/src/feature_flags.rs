@@ -152,10 +152,7 @@ fn push_partial(
         owner: required(partial.owner, "owner")?,
         created_at: required(partial.created_at, "created_at")?,
         cleanup_by: required(partial.cleanup_by, "cleanup_by")?,
-        enabled: match partial.enabled {
-            Some(enabled) => enabled,
-            None => false,
-        },
+        enabled: partial.enabled == Some(true),
     };
     registry.flags.insert(key, flag);
     Ok(())

@@ -109,12 +109,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         })
         .connect(&database_url)
         .await
-        .map_err(|error| {
-            io::Error::new(
-                io::ErrorKind::Other,
-                format!("failed to connect PostgreSQL: {error:?}"),
-            )
-        })?;
+        .map_err(|error| io::Error::other(format!("failed to connect PostgreSQL: {error:?}")))?;
     let config_center_state = ConfigCenterAppState::from_registry(file_registry);
     let auth_state = AuthAppState::new(pool.clone());
     let audit_query_state = AuditQueryState { pool: pool.clone() };

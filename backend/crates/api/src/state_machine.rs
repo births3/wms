@@ -147,7 +147,7 @@ fn validate_transition(
             && query
                 .event_code
                 .as_ref()
-                .map_or(true, |event_code| transition.event_code == *event_code)
+                .is_none_or(|event_code| transition.event_code == *event_code)
     });
 
     let reason = if !has_from {

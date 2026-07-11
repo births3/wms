@@ -31,7 +31,7 @@ pub const ADMIN_MENU_READ_PERMISSION: &str = "h1.menu.read";
 pub const ADMIN_MENU_WRITE_PERMISSION: &str = "h1.menu.write";
 pub const ADMIN_MENU_PUBLISH_PERMISSION: &str = "h1.menu.publish";
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct PgAdminMenuService;
 
 #[derive(Clone, Debug, PartialEq)]

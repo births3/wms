@@ -128,17 +128,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .connect(&database_url)
         .await
         .map_err(|error| {
-            io::Error::new(
-                io::ErrorKind::Other,
-                format!("failed to connect PostgreSQL for deploy audit: {error:?}"),
-            )
+            io::Error::other(format!(
+                "failed to connect PostgreSQL for deploy audit: {error:?}"
+            ))
         })?;
 
     ensure_current_audit_partition(&pool).await?;
 
     let inserted = append_event(&pool, &request)
         .await
-        .map_err(|error| io::Error::new(io::ErrorKind::Other, format!("{error:?}")))?;
+        .map_err(|error| io::Error::other(format!("{error:?}")))?;
     let audit_event_query_ref = audit_event_query_ref(&environment, &inserted);
 
     println!(
@@ -250,10 +249,9 @@ async fn ensure_current_audit_partition(pool: &PgPool) -> Result<(), io::Error> 
         .execute(pool)
         .await
         .map_err(|error| {
-            io::Error::new(
-                io::ErrorKind::Other,
-                format!("failed to ensure current audit partition: {error:?}"),
-            )
+            io::Error::other(format!(
+                "failed to ensure current audit partition: {error:?}"
+            ))
         })?;
     Ok(())
 }

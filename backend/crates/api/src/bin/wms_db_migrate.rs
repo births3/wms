@@ -15,17 +15,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .connect(&database_url)
         .await
         .map_err(|error| {
-            io::Error::new(
-                io::ErrorKind::Other,
-                format!("failed to connect PostgreSQL for migrations: {error:?}"),
-            )
+            io::Error::other(format!(
+                "failed to connect PostgreSQL for migrations: {error:?}"
+            ))
         })?;
 
     MIGRATOR.run(&pool).await.map_err(|error| {
-        io::Error::new(
-            io::ErrorKind::Other,
-            format!("failed to run PostgreSQL migrations: {error:?}"),
-        )
+        io::Error::other(format!("failed to run PostgreSQL migrations: {error:?}"))
     })?;
 
     Ok(())

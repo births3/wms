@@ -41,7 +41,7 @@ pub struct DeployAuditInput {
 }
 
 pub fn validate_deploy_audit_input(input: &DeployAuditInput) -> Result<(), String> {
-    if input.environment.trim().to_ascii_lowercase() != "staging" {
+    if !input.environment.trim().eq_ignore_ascii_case("staging") {
         return Err(
             "environment must be staging; W6.H deploy audit cannot be written for dev/local/prod"
                 .to_string(),

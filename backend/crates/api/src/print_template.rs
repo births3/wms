@@ -16,7 +16,7 @@ use crate::{
     auth::AuthContext,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct PgPrintTemplateRepository;
 
 #[derive(Clone, Debug, PartialEq)]

@@ -4,7 +4,7 @@ use std::{
     error::Error,
     io::{self, Write},
     net::{IpAddr, ToSocketAddrs},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use chrono::{DateTime, Datelike, Duration, NaiveDate, TimeZone, Utc};
@@ -97,10 +97,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .connect(&args.database_url)
         .await
         .map_err(|error| {
-            io::Error::new(
-                io::ErrorKind::Other,
-                format!("failed to connect PostgreSQL for baseline load: {error:?}"),
-            )
+            io::Error::other(format!(
+                "failed to connect PostgreSQL for baseline load: {error:?}"
+            ))
         })?;
 
     ensure_baseline_schema(&pool).await?;
@@ -290,7 +289,7 @@ fn validate_execution_guards(args: &BaselineLoadArgs) -> Result<(), io::Error> {
 }
 
 fn validate_dev_database_url(database_url: &str, execute: bool) -> Result<(), io::Error> {
-    validate_dev_database_url_with_resolver(database_url, execute, |host| resolve_host_ips(host))?;
+    validate_dev_database_url_with_resolver(database_url, execute, resolve_host_ips)?;
     Ok(())
 }
 
@@ -448,7 +447,7 @@ fn host_contains_dev_token(host: &str) -> bool {
         .any(|part| part == "dev")
 }
 
-fn validate_summary_output(path: &PathBuf) -> Result<(), io::Error> {
+fn validate_summary_output(path: &Path) -> Result<(), io::Error> {
     let normalized = path.to_string_lossy();
     if normalized.contains("docs/retros") || normalized.contains("wave-1-h2-runtime-evidence") {
         return Err(invalid(
@@ -983,6 +982,7 @@ struct DayState {
 }
 
 impl DayState {
+    #[allow(clippy::type_complexity)]
     fn build_requests(
         &self,
         args: &BaselineLoadArgs,
@@ -1198,7 +1198,7 @@ fn summary_payload(
 }
 
 fn database_error(error: sqlx::Error) -> io::Error {
-    io::Error::new(io::ErrorKind::Other, format!("{error:?}"))
+    io::Error::other(format!("{error:?}"))
 }
 
 fn invalid(message: impl Into<String>) -> io::Error {

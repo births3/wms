@@ -28,12 +28,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let seal = seal_audit_chain(&pool, seal_date, Utc::now())
         .await
-        .map_err(|error| {
-            io::Error::new(
-                io::ErrorKind::Other,
-                format!("failed to seal audit chain: {error:?}"),
-            )
-        })?;
+        .map_err(|error| io::Error::other(format!("failed to seal audit chain: {error:?}")))?;
 
     println!(
         "audit maintenance ok seal_date={} last_id={} last_self_hash={}",
