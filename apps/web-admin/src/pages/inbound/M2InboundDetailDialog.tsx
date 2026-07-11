@@ -52,15 +52,17 @@ export function M2InboundDetailDialog({ order, currentOwner, defaultStage, open,
     if (open) setSelectedStage(defaultStage);
   }, [defaultStage, open]);
 
+  // 关闭且无单时不渲染；有单时也必须容忍 list 摘要缺 lines/status
   if (!order) return null;
-  const line = order.lines[0];
-  const lineSummary = order.lines.length > 1 ? ` 等 ${order.lines.length} 行` : "";
+  const line = order.lines?.[0];
+  const lineCount = order.lines?.length ?? 0;
+  const lineSummary = lineCount > 1 ? ` 等 ${lineCount} 行` : "";
   const expectedQty = totalExpectedQty(order);
   const documentType = inboundDocumentTypeOf(order);
-  const currentStage = inboundDetailStageIndex(order.status);
+  const currentStage = inboundDetailStageIndex(order.status ?? "");
   const selectedProcess = processDetail(selectedStage, expectedQty, currentStage);
   const orderRows: Array<[string, string]> = [
-    ["单据状态", statusLabel(order.status)],
+    ["单据状态", statusLabel(order.status ?? "")],
     ["单据类型", inboundDocumentTypeLabel(documentType)],
     ["货主", ownerLabel(order.owner_id, currentOwner)],
     ["供应商", shortId(order.supplier_id)],

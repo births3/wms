@@ -70,7 +70,8 @@ export interface ProcessState {
   status: "completed" | "in_progress" | "pending";
 }
 
-export function inboundDetailStageIndex(status: string) {
+export function inboundDetailStageIndex(status: string | null | undefined) {
+  if (!status) return 0;
   if (status === "completed") return 3;
   if (status.includes("putaway")) return 2;
   if (status.includes("inspect")) return 1;
@@ -131,7 +132,7 @@ export function processDetail(stage: InboundDetailStage, expectedQty: number, cu
 
 export function productInfoRows(order: Pick<ReceivingOrder, "lines">) {
   const rows = new Map<string, number>();
-  for (const item of order.lines) {
+  for (const item of order.lines ?? []) {
     rows.set(item.product_code, (rows.get(item.product_code) ?? 0) + item.expected_qty);
   }
   return [...rows.entries()].map(([productCode, orderQty]) => ({
@@ -144,7 +145,7 @@ export function productInfoRows(order: Pick<ReceivingOrder, "lines">) {
 }
 
 export function batchInfoRows(order: Pick<ReceivingOrder, "lines">) {
-  return order.lines.map((item) => ({
+  return (order.lines ?? []).map((item) => ({
     ...batchLicenseFields(item.product_code),
     key: `${item.line_no}-${item.batch_no ?? ""}`,
     lineNo: `#${item.line_no}`,
@@ -157,7 +158,7 @@ export function batchInfoRows(order: Pick<ReceivingOrder, "lines">) {
 }
 
 export function orderLicenseRows(order: Pick<ReceivingOrder, "lines">): Array<[string, string]> {
-  const rows = order.lines.map((item) => batchLicenseFields(item.product_code));
+  const rows = (order.lines ?? []).map((item) => batchLicenseFields(item.product_code));
   return [
     ["批准文号", uniqueText(rows.map((item) => item.approvalNo))],
     ["进口注册证", uniqueText(rows.map((item) => item.importRegistrationCertificate))],

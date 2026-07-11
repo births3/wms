@@ -261,7 +261,8 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
   const selectedFromList = ordersQuery.data?.find((order) => order.id === selectedId) ?? null;
   const detailQuery = useReceivingOrderQuery(selectedId);
   const order = detailQuery.data ?? selectedFromList;
-  const line = order?.lines[0];
+  // optional chain must cover lines: `order?.lines[0]` still throws when order is null
+  const line = order?.lines?.[0];
   const totalQty = order ? String(totalExpectedQty(order)) : "";
   const inspectExamples: InspectFormExamples = {
     batchNo: exampleText(line?.batch_no, "请输入验收批号"),
@@ -300,7 +301,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
   React.useEffect(() => {
     if (!order) return;
     const qty = String(totalExpectedQty(order));
-    const firstLine = order.lines[0];
+    const firstLine = order.lines?.[0];
     const batchNo = firstLine?.batch_no?.trim() ?? "";
     setReceiveForm((value) => ({
       ...value,

@@ -20,6 +20,7 @@ export function createAsnBatchNo(type: InboundDocumentType, batchNo: string) {
   return batchNo.trim() || null;
 }
 
-export function matchesInboundDocumentTypeFilter(order: ReceivingOrder, filter: InboundDocumentTypeFilter) {
-  return filter.length === 0 || filter.includes(inboundDocumentTypeOf(order));
+export function matchesInboundDocumentTypeFilter(order: ReceivingOrder, filter: InboundDocumentTypeFilter | null | undefined) {
+  if (!filter || filter.length === 0) return true;
+  return filter.includes(inboundDocumentTypeOf(order));
 }

@@ -30,7 +30,7 @@ export interface M2InboundQueryValue extends QueryPanelValue {
 }
 
 export function workFieldText(order: ReceivingOrder, mode: M2InboundMode) {
-  const line = order.lines[0];
+  const line = order.lines?.[0];
   return {
     receiving: [`供应商 ${shortId(order.supplier_id ?? "00000000")}`, "承运商 华东冷链 / 车牌沪A-12345"],
     inspecting: [`批号 ${line?.batch_no ?? "-"}`, `效期 ${line?.expiry_date ?? "-"} / 质量待验`],
@@ -68,15 +68,16 @@ export function filterOrders(
     const matchesOwner = matchesOwnerFilter(order.owner_id, normalizedOwner, ownerContext);
     const arrivalDate = order.expected_arrival_at?.slice(0, 10) ?? "";
     const matchesDate = (!arrivalDateFrom || arrivalDate >= arrivalDateFrom) && (!arrivalDateTo || arrivalDate <= arrivalDateTo);
-    const createdDate = order.created_at.slice(0, 10);
+    const createdDate = order.created_at?.slice(0, 10) ?? "";
     const matchesCreatedAt = (!createdAtFrom || createdDate >= createdAtFrom) && (!createdAtTo || createdDate <= createdAtTo);
+    const lines = order.lines ?? [];
     const searchable = [
       order.receipt_no,
       order.status,
       order.owner_id,
       ownerLabel(order.owner_id, ownerContext),
       inboundDocumentTypeLabel(documentType),
-      ...order.lines.flatMap((line) => [line.product_code, line.batch_no ?? ""]),
+      ...lines.flatMap((line) => [line.product_code, line.batch_no ?? ""]),
     ]
       .join(" ")
       .toLowerCase();
@@ -176,7 +177,8 @@ export function canPutaway(status: string) {
   return status === "inspecting" || status === "inspected" || status === "putaway";
 }
 
-export function statusKey(status: string): StatusKey {
+export function statusKey(status: string | null | undefined): StatusKey {
+  if (!status) return "pending";
   if (status === "completed") return "completed";
   if (status.includes("receiv") || status.includes("inspect") || status.includes("putaway")) return "in_progress";
   if (status.includes("reject") || status.includes("closed")) return "unqualified";
@@ -197,7 +199,7 @@ export function statusLabel(status: string) {
 }
 
 export function totalExpectedQty(order: ReceivingOrder) {
-  return order.lines.reduce((sum, line) => sum + line.expected_qty, 0);
+  return (order.lines ?? []).reduce((sum, line) => sum + line.expected_qty, 0);
 }
 
 export function productTemperatureAttribute(productCode: string | null | undefined) {
@@ -252,8 +254,9 @@ export function formatDateTime(value: string | null | undefined) {
   return date.toLocaleString("zh-CN", { hour12: false });
 }
 
-function matchesStatusFilter(status: string, filter: StatusFilter) {
-  if (filter.length === 0) return true;
+function matchesStatusFilter(status: string | null | undefined, filter: StatusFilter | null | undefined) {
+  if (!filter || filter.length === 0) return true;
+  if (!status) return false;
   return filter.some((item) => (item === "receiving" ? canReceiveOrReject(status) : status === item));
 }
 

@@ -138,17 +138,17 @@ export function M2InboundOrderTable({
       width: 200,
       minWidth: 180,
       copyValue: (row) => {
-        const line = row.lines[0];
+        const line = row.lines?.[0];
         return `${line?.product_code ?? "-"} ${totalExpectedQty(row)} 件`;
       },
       filterValue: (row) => {
-        const line = row.lines[0];
+        const line = row.lines?.[0];
         return [line?.product_code ?? "", line?.batch_no ?? "", totalExpectedQty(row)].join(" ");
       },
       filter: { type: "text" },
       render: (row) => (
         <div className="text-sm">
-          <div className="font-medium">{row.lines[0]?.product_code ?? "-"}</div>
+          <div className="font-medium">{row.lines?.[0]?.product_code ?? "-"}</div>
           <div className="text-xs text-muted-foreground">{totalExpectedQty(row)} 件</div>
         </div>
       ),
