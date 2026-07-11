@@ -159,8 +159,21 @@ export function inboundPageMeta(mode: M2InboundMode) {
   return meta[mode];
 }
 
+/** 策略要求验收双人签字时，作业端不可关闭（GSP 双人作业）。 */
+export const INSPECTION_DUAL_SIGN_REQUIRED_BY_STRATEGY = true;
+
 export function canReceiveOrReject(status: string) {
   return status === "released" || status === "receiving";
+}
+
+/** 验收：仅收货中/已收/验收中等可作业状态；终态禁用。 */
+export function canInspect(status: string) {
+  return status === "receiving" || status === "received" || status === "inspecting";
+}
+
+/** 上架：仅验收中/已验/上架中等可作业状态；终态禁用。 */
+export function canPutaway(status: string) {
+  return status === "inspecting" || status === "inspected" || status === "putaway";
 }
 
 export function statusKey(status: string): StatusKey {

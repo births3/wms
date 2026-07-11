@@ -8,6 +8,7 @@ import {
   type QueryPanelValue,
 } from "@wms/ui";
 
+import { useCurrentUserQuery } from "@/features/auth/auth-queries";
 import {
   useCreateReceivingOrderMutation,
   useInspectReceivingOrderMutation,
@@ -43,6 +44,7 @@ import {
   detailStageFromMode,
   filterOrders,
   inboundPageMeta,
+  INSPECTION_DUAL_SIGN_REQUIRED_BY_STRATEGY,
   nextM2InboundSelectedId,
   productTemperatureAttribute,
   splitCodes,
@@ -65,8 +67,8 @@ interface M2InboundPageProps {
   onBack: () => void;
 }
 
-const firstSignerId = "00000000-0000-0000-0000-000000000101";
-const secondSignerId = "00000000-0000-0000-0000-000000000102";
+/** 可读示例账号（placeholder / 第二收货员默认提示），勿用 UUID 样例。 */
+const secondSignerExample = "receiver.pc";
 const defaultLocationId = "00000000-0000-0000-0000-000000000201";
 const defaultLocationCode = "A-01-01";
 const emptyCreateForm: CreateFormState = {
@@ -105,6 +107,8 @@ const emptySignForm: SignFormState = {
 const m2InboundCoreQueryFieldKeys = ["keyword", "ownerKeyword", "statusFilter"];
 
 export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
+  const currentUserQuery = useCurrentUserQuery(true);
+  const currentUser = currentUserQuery.data;
   const m2InboundQueryFields: QueryPanelField[] = React.useMemo(() => [
     {
       key: "keyword",
@@ -182,14 +186,16 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
     filingChecked: "已核对",
     deliveryQty: "",
     batchQty: "",
-    secondReceiverId: secondSignerId,
+    secondReceiverId: secondSignerExample,
     note: "",
   });
   const [rejectForm, setRejectForm] = React.useState<RejectFormState>({
     reason: "",
   });
   const [inspectForm, setInspectForm] = React.useState<InspectFormState>(emptyInspectForm);
-  const [signForm, setSignForm] = React.useState<SignFormState>(emptySignForm);
+  const [signForm, setSignForm] = React.useState<SignFormState>(() =>
+    createSignFormForCurrentUser(undefined),
+  );
   const [putawayForm, setPutawayForm] = React.useState<PutawayFormState>({
     lpn: "LPN-M2-PC-0001",
     productCode: "",
@@ -268,8 +274,8 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
     packageCheck: "例如 包装合格",
     instructionCheck: "例如 说明书合格",
     labelCheck: "例如 标签合格",
-    firstSignerId: `例如 ${firstSignerId}`,
-    secondSignerId: `例如 ${secondSignerId}`,
+    firstSignerId: "当前用户 / 工号",
+    secondSignerId: `例如 ${secondSignerExample}`,
     strategyNote: "例如 process=入库，node=验收，dual_scan",
   };
   const currentProductTemperatureAttribute = productTemperatureAttribute(line?.product_code);
@@ -312,14 +318,14 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
     }));
     setRejectForm({ reason: "" });
     setInspectForm(emptyInspectForm);
-    setSignForm(emptySignForm);
+    setSignForm(createSignFormForCurrentUser(currentUser));
     setPutawayForm((value) => ({
       ...value,
       productCode: firstLine?.product_code ?? "",
       batchNo: batchNo || "BATCH-202606",
       qty,
     }));
-  }, [order?.id]);
+  }, [order?.id, currentUser?.user_id, currentUser?.username, currentUser?.display_name]);
 
   async function refreshInbound(message = "入库列表已刷新") {
     await ordersQuery.refetch();
@@ -336,7 +342,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
     selectOrder(id);
     if (dialog === "inspect") {
       setInspectForm(emptyInspectForm);
-      setSignForm(emptySignForm);
+      setSignForm(createSignFormForCurrentUser(currentUser));
     }
     setActiveDialog(dialog);
   }
@@ -423,6 +429,14 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
   async function submitInspect(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!order) return;
+    // 策略要求时强制 dual_required，作业员不可关闭
+    const dualRequired = INSPECTION_DUAL_SIGN_REQUIRED_BY_STRATEGY || signForm.dualRequired;
+    const firstSignerInput = signForm.firstSignerId.trim();
+    const firstSignerId = resolveSignerIdForSubmit(firstSignerInput, currentUser);
+    const secondSignerInput = signForm.secondSignerId.trim();
+    const secondSignerId = dualRequired
+      ? resolveSignerIdForSubmit(secondSignerInput, currentUser, { allowCurrentUser: false })
+      : null;
     await inspectMutation.mutateAsync({
       id: order.id,
       request: {
@@ -438,9 +452,9 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
     await signMutation.mutateAsync({
       id: order.id,
       request: {
-        first_signer_id: signForm.firstSignerId.trim(),
-        second_signer_id: signForm.dualRequired ? signForm.secondSignerId.trim() : null,
-        dual_required: signForm.dualRequired,
+        first_signer_id: firstSignerId,
+        second_signer_id: secondSignerId,
+        dual_required: dualRequired,
       },
     });
     setActiveDialog(null);
@@ -598,6 +612,38 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
 
 function sameStringArray(left: string[], right: string[]) {
   return left.length === right.length && left.every((item, index) => item === right[index]);
+}
+
+function createSignFormForCurrentUser(
+  user: { username?: string; display_name?: string } | null | undefined,
+): SignFormState {
+  const account = user?.username?.trim() || user?.display_name?.trim() || "";
+  return {
+    ...emptySignForm,
+    firstSignerId: account,
+    dualRequired: INSPECTION_DUAL_SIGN_REQUIRED_BY_STRATEGY || emptySignForm.dualRequired,
+  };
+}
+
+/**
+ * 签字字段展示账号/工号；提交时若匹配当前登录用户则映射为 user_id（API 契约为 id）。
+ * 未匹配时透传输入，兼容手填 UUID 或后续账号解析。
+ */
+function resolveSignerIdForSubmit(
+  input: string,
+  user: { user_id: string; username?: string; display_name?: string } | null | undefined,
+  options?: { allowCurrentUser?: boolean },
+) {
+  if (!input) return input;
+  const allowCurrentUser = options?.allowCurrentUser !== false;
+  if (
+    allowCurrentUser &&
+    user &&
+    (input === user.user_id || input === user.username || input === user.display_name)
+  ) {
+    return user.user_id;
+  }
+  return input;
 }
 
 function defaultM2InboundQueryValue(

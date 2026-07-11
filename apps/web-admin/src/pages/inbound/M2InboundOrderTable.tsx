@@ -23,6 +23,8 @@ import type { ReceivingOrder } from "@/features/inbound/inbound-queries";
 import type { InboundDialog } from "./M2InboundDialogs";
 import { inboundDocumentTypeLabel, inboundDocumentTypeOf } from "./m2-inbound-document-type";
 import {
+  canInspect,
+  canPutaway,
   canReceiveOrReject,
   formatDateTime,
   ownerLabel,
@@ -256,9 +258,11 @@ function inboundPrivateActions(
         label: "验收",
         description: "验收操作",
         icon: <ClipboardCheck className="size-4" aria-hidden />,
-        disabled: !selectedOrder,
+        disabled: !selectedOrder || !canInspect(selectedOrder.status),
         onClick: () => {
-          if (selectedOrder) onOpenDialog(selectedOrder.id, "inspect");
+          if (selectedOrder && canInspect(selectedOrder.status)) {
+            onOpenDialog(selectedOrder.id, "inspect");
+          }
         },
       },
     ];
@@ -271,9 +275,11 @@ function inboundPrivateActions(
         label: "上架",
         description: "上架操作",
         icon: <PackageCheck className="size-4" aria-hidden />,
-        disabled: !selectedOrder,
+        disabled: !selectedOrder || !canPutaway(selectedOrder.status),
         onClick: () => {
-          if (selectedOrder) onOpenDialog(selectedOrder.id, "putaway");
+          if (selectedOrder && canPutaway(selectedOrder.status)) {
+            onOpenDialog(selectedOrder.id, "putaway");
+          }
         },
       },
     ];

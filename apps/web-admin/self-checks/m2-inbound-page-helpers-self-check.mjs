@@ -12,7 +12,11 @@ const server = await createServer({
 
 try {
   const {
+    canInspect,
+    canPutaway,
+    canReceiveOrReject,
     filterOrders,
+    INSPECTION_DUAL_SIGN_REQUIRED_BY_STRATEGY,
     nextM2InboundSelectedId,
     ownerLabel,
     statusColumnFilterOptions,
@@ -49,6 +53,19 @@ try {
   assert.deepEqual(statusFilterOptions("putaway").map((item) => item.value), ["putaway", "completed"]);
   assert.ok(statusColumnFilterOptions("putaway").some((item) => item.value === "putaway"));
 
+  assert.equal(canReceiveOrReject("released"), true);
+  assert.equal(canReceiveOrReject("receiving"), true);
+  assert.equal(canReceiveOrReject("completed"), false);
+  assert.equal(canInspect("inspecting"), true);
+  assert.equal(canInspect("receiving"), true);
+  assert.equal(canInspect("completed"), false);
+  assert.equal(canInspect("closed_rejected"), false);
+  assert.equal(canPutaway("putaway"), true);
+  assert.equal(canPutaway("inspecting"), true);
+  assert.equal(canPutaway("completed"), false);
+  assert.equal(canPutaway("closed_rejected"), false);
+  assert.equal(INSPECTION_DUAL_SIGN_REQUIRED_BY_STRATEGY, true, "验收双人签字策略默认锁定");
+
   const pageSource = readFileSync(fileURLToPath(new URL("../src/pages/inbound/M2InboundPage.tsx", import.meta.url)), "utf8");
   const orderTableSource = readFileSync(fileURLToPath(new URL("../src/pages/inbound/M2InboundOrderTable.tsx", import.meta.url)), "utf8");
   const dialogSource = readFileSync(fileURLToPath(new URL("../src/pages/inbound/M2InboundDialogs.tsx", import.meta.url)), "utf8");
@@ -68,6 +85,8 @@ try {
   assert.match(pageSource, /onClick: openCreateDialog/, "新建 ASN 按钮必须走重置入口");
   assert.match(pageSource, /const \[selectedRowKeys, setSelectedRowKeys\] = React\.useState<string\[\]>\(\[\]\);/, "M2 DataGrid 必须保留多选 keys，表头全选再取消才能清空");
   assert.doesNotMatch(orderTableSource, /onSelectedRowKeysChange=\{\(keys\) => onSelectOrder\(keys\.at\(-1\) \?\? null\)\}/, "M2 表格不能把全选结果压成最后一条");
+  assert.match(orderTableSource, /canInspect\(selectedOrder\.status\)/, "验收动作必须按状态裁剪");
+  assert.match(orderTableSource, /canPutaway\(selectedOrder\.status\)/, "上架动作必须按状态裁剪");
   assert.match(dialogSource, /<TextField label="ASN 号" required placeholder="例如 ASN-M2-PC-0002"/, "ASN 样例只允许作为 placeholder");
   assert.match(dialogSource, /<ProductLookupField[\s\S]*placeholder="例如 P-M2-002"[\s\S]*required/, "商品编码样例只允许作为 ProductLookupField placeholder");
   assert.match(dialogSource, /<TextField label="预报数量" type="number" required placeholder="例如 60"/, "预报数量样例只允许作为 placeholder");
@@ -79,6 +98,18 @@ try {
   for (const field of ["firstSignerId", "secondSignerId", "strategyNote", "note"]) {
     assert.match(signFormBlock, new RegExp(`${field}: ""`), `验收签字默认值必须为空: ${field}`);
   }
+  assert.match(signFormBlock, /dualRequired: true/, "签字表单 dualRequired 默认 true");
+  assert.match(pageSource, /createSignFormForCurrentUser/, "打开验收时第一签字人默认当前用户账号");
+  assert.match(pageSource, /INSPECTION_DUAL_SIGN_REQUIRED_BY_STRATEGY \|\| signForm\.dualRequired/, "提交验收时 dualRequired 必须被策略锁定");
+  assert.match(pageSource, /firstSignerId: "当前用户 \/ 工号"/, "第一签字人 placeholder 应为当前用户/工号类文案");
+  assert.match(pageSource, /secondSignerExample = "receiver\.pc"/, "第二签字人示例应为可读账号而非 UUID");
+  assert.doesNotMatch(pageSource, /firstSignerId: `例如 \$\{firstSignerId\}`|secondSignerId: `例如 \$\{secondSignerId\}`/, "签字人 placeholder 不得以 UUID 样例为主");
+  assert.match(dialogSource, /label="第二人账号\/工号"/, "第二签字人 label 应为第二人账号/工号");
+  assert.match(dialogSource, /disabled=\{INSPECTION_DUAL_SIGN_REQUIRED_BY_STRATEGY\}/, "策略要求时双人签字 checkbox 必须 disabled");
+  assert.match(dialogSource, /策略要求，不可关闭/, "策略锁定需有可读提示");
+  assert.match(dialogSource, /SelectField label="质量状态"[\s\S]*\["qualified", "合格"\]/, "质量状态选项需中文");
+  assert.match(dialogSource, /activeDialog === "inspect"[\s\S]*DialogDescription>\{orderReceiptNo/, "验收弹窗需保留单号上下文");
+  assert.match(dialogSource, /activeDialog === "putaway"[\s\S]*DialogDescription>\{orderReceiptNo/, "上架弹窗需保留单号上下文");
   assert.match(dialogSource, /<TextField label="验收批号" required placeholder=\{inspectExamples\.batchNo\}/, "验收批号背景值只允许作为 placeholder");
   assert.match(dialogSource, /<TextField label="通过数量" type="number" required placeholder=\{inspectExamples\.acceptedQty\}/, "通过数量背景值只允许作为 placeholder");
   assert.doesNotMatch(submitInspectBlock, /line\?\.batch_no \|\| "BATCH-202606"|inspectForm\.traceCodes \|\| "TC-M2-0001"/, "验收提交不能用背景值或样例值兜底");

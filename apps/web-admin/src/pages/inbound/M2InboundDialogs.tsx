@@ -26,6 +26,7 @@ import { Ban, CheckCircle2, ClipboardCheck, PackageCheck, Plus } from "lucide-re
 
 import { useMasterDataRowsQuery, type MasterDataRow } from "@/features/master-data/master-data-queries";
 import type { InboundDocumentType } from "./m2-inbound-document-type";
+import { INSPECTION_DUAL_SIGN_REQUIRED_BY_STRATEGY } from "./m2-inbound-page-helpers";
 import { ProductLookupDialog, ProductLookupField } from "./M2InboundProductLookup";
 
 export type InboundDialog = "create" | "receive" | "reject" | "inspect" | "putaway";
@@ -358,12 +359,23 @@ export function M2InboundDialogs({
             <section className="grid gap-3 rounded-md border bg-muted/20 p-3 md:col-span-2 md:grid-cols-2">
               <div className="text-xs font-medium text-muted-foreground md:col-span-2">验收复核</div>
               <TextField label="第一签字人" required placeholder={inspectExamples.firstSignerId} value={signForm.firstSignerId} onChange={(firstSignerId) => setSignForm((value) => ({ ...value, firstSignerId }))} />
-              <TextField label="第二签字人" required={signForm.dualRequired} placeholder={inspectExamples.secondSignerId} value={signForm.secondSignerId} onChange={(secondSignerId) => setSignForm((value) => ({ ...value, secondSignerId }))} />
+              <TextField label="第二人账号/工号" required={signForm.dualRequired} placeholder={inspectExamples.secondSignerId} value={signForm.secondSignerId} onChange={(secondSignerId) => setSignForm((value) => ({ ...value, secondSignerId }))} />
               <TextField label="策略命中说明" placeholder={inspectExamples.strategyNote} value={signForm.strategyNote} onChange={(strategyNote) => setSignForm((value) => ({ ...value, strategyNote }))} />
               <TextField label="签字备注" value={signForm.note} onChange={(note) => setSignForm((value) => ({ ...value, note }))} />
               <label className="flex items-center gap-2 text-sm text-muted-foreground md:col-span-2">
-                <input type="checkbox" checked={signForm.dualRequired} onChange={(event) => setSignForm((value) => ({ ...value, dualRequired: event.target.checked }))} />
+                <input
+                  type="checkbox"
+                  checked={signForm.dualRequired}
+                  disabled={INSPECTION_DUAL_SIGN_REQUIRED_BY_STRATEGY}
+                  onChange={(event) => {
+                    if (INSPECTION_DUAL_SIGN_REQUIRED_BY_STRATEGY) return;
+                    setSignForm((value) => ({ ...value, dualRequired: event.target.checked }));
+                  }}
+                />
                 需要双人签字
+                {INSPECTION_DUAL_SIGN_REQUIRED_BY_STRATEGY && (
+                  <span className="text-xs text-muted-foreground">（策略要求，不可关闭）</span>
+                )}
               </label>
             </section>
             <TextField className="md:col-span-2" label="验收备注" value={inspectForm.note} onChange={(note) => setInspectForm((value) => ({ ...value, note }))} />
