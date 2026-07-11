@@ -78,8 +78,12 @@
     {
       "id": "h2-audit-trail",
       "title": "H2 审计追踪",
-      "required": false,
-      "reason": "横向能力入口页只展示审计能力与接口证据，不承担列表查询"
+      "required": true,
+      "source": "apps/web-admin/src/pages/platform/HorizontalCapabilityPages.tsx",
+      "fieldConstant": "h2AuditQueryFields",
+      "coreConstant": "h2AuditCoreQueryFieldKeys",
+      "core": ["keyword", "action", "resourceType", "occurredAt"],
+      "more": []
     },
     {
       "id": "h3-api-contract",

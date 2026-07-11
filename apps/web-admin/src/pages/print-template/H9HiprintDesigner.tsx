@@ -1,24 +1,49 @@
 import * as React from "react";
 import { Button, cn } from "@wms/ui";
-import { Maximize2, Minimize2, RefreshCw } from "lucide-react";
+import { Maximize2, Minimize2, RefreshCw, Save, X } from "lucide-react";
 
 import "hiprint/dist/print-lock.css";
 
+type DesignerReadyState = "initializing" | "ready" | "error";
+
 interface H9HiprintDesignerProps {
   templateJson: unknown;
+  /** 切换模板/打开设计器时变化，用于重新初始化，避免每次 JSON 变更触发重载 */
+  designSessionKey?: string;
   templateSettingsPanel: React.ReactNode;
   fieldBindingPanel: React.ReactNode;
   fields: Array<{ fieldPath: string; displayName: string }>;
   onJsonChange: (value: unknown) => void;
+  onCancel?: () => void;
+  onSave?: () => void;
+  saveLabel?: string;
+  saveDisabled?: boolean;
+  onReadyStateChange?: (state: DesignerReadyState) => void;
 }
 
 export interface H9HiprintDesignerHandle {
   getJson: () => unknown;
   print: (data: unknown) => void;
+  getReadyState: () => DesignerReadyState;
 }
 
 export const H9HiprintDesigner = React.forwardRef<H9HiprintDesignerHandle, H9HiprintDesignerProps>(
-  function H9HiprintDesigner({ templateJson, templateSettingsPanel, fieldBindingPanel, fields, onJsonChange }, ref) {
+  function H9HiprintDesigner(
+    {
+      templateJson,
+      designSessionKey = "default",
+      templateSettingsPanel,
+      fieldBindingPanel,
+      fields,
+      onJsonChange,
+      onCancel,
+      onSave,
+      saveLabel = "保存",
+      saveDisabled = false,
+      onReadyStateChange,
+    },
+    ref,
+  ) {
     const id = React.useId().replace(/:/g, "");
     const paletteId = `h9-hiprint-palette-${id}`;
     const canvasId = `h9-hiprint-canvas-${id}`;
@@ -26,11 +51,23 @@ export const H9HiprintDesigner = React.forwardRef<H9HiprintDesignerHandle, H9Hip
     const paginationId = `h9-hiprint-pagination-${id}`;
     const designerRootRef = React.useRef<HTMLDivElement | null>(null);
     const templateRef = React.useRef<HiprintTemplate | null>(null);
-    const [status, setStatus] = React.useState("hiprint 设计器初始化中");
+    const initialTemplateJsonRef = React.useRef(templateJson);
+    const [readyState, setReadyState] = React.useState<DesignerReadyState>("initializing");
+    const [status, setStatus] = React.useState("设计器初始化中…");
     const [error, setError] = React.useState<string | null>(null);
     const [fieldPanelOpen, setFieldPanelOpen] = React.useState(true);
     const [fieldPanelTab, setFieldPanelTab] = React.useState<"binding" | "components">("binding");
     const [designerFullscreen, setDesignerFullscreen] = React.useState(false);
+
+    const updateReadyState = React.useCallback(
+      (next: DesignerReadyState, nextStatus: string, nextError: string | null = null) => {
+        setReadyState(next);
+        setStatus(nextStatus);
+        setError(nextError);
+        onReadyStateChange?.(next);
+      },
+      [onReadyStateChange],
+    );
 
     React.useImperativeHandle(ref, () => ({
       getJson: () => {
@@ -41,14 +78,21 @@ export const H9HiprintDesigner = React.forwardRef<H9HiprintDesignerHandle, H9Hip
       print: (data: unknown) => {
         templateRef.current?.print(data);
       },
+      getReadyState: () => readyState,
     }));
+
+    React.useEffect(() => {
+      initialTemplateJsonRef.current = templateJson;
+    }, [designSessionKey, templateJson]);
 
     React.useEffect(() => {
       let disposed = false;
       async function setupDesigner() {
-        setError(null);
+        updateReadyState("initializing", "设计器初始化中…");
+        templateRef.current = null;
         try {
           const jqueryModule = await import("jquery");
+          if (disposed) return;
           const win = window as unknown as { jQuery?: unknown; $?: unknown };
           win.jQuery = jqueryModule.default;
           win.$ = jqueryModule.default;
@@ -61,20 +105,24 @@ export const H9HiprintDesigner = React.forwardRef<H9HiprintDesignerHandle, H9Hip
             hiprint.PrintElementTypeManager.buildByHtml(jqueryModule.default(palette).find(".ep-draggable-item"));
           }
           const canvas = document.getElementById(canvasId);
-          if (!canvas) return;
+          if (!canvas) {
+            updateReadyState("error", "设计器加载失败", "未找到设计器画布容器，请关闭后重试");
+            return;
+          }
           canvas.innerHTML = "";
           const template = new hiprint.PrintTemplate({
-            template: normalizeHiprintTemplate(templateJson),
+            template: normalizeHiprintTemplate(initialTemplateJsonRef.current),
             settingContainer: `#${settingId}`,
             paginationContainer: `#${paginationId}`,
           });
           template.design(`#${canvasId}`);
+          if (disposed) return;
           templateRef.current = template;
-          setStatus("hiprint 设计器已就绪");
+          updateReadyState("ready", "设计器已就绪");
         } catch (cause) {
-          const message = cause instanceof Error ? cause.message : "hiprint 初始化失败";
-          setError(message);
-          setStatus("hiprint 设计器不可用");
+          if (disposed) return;
+          const message = cause instanceof Error ? cause.message : "设计器初始化失败";
+          updateReadyState("error", "设计器加载失败", message);
         }
       }
       void setupDesigner();
@@ -82,7 +130,7 @@ export const H9HiprintDesigner = React.forwardRef<H9HiprintDesignerHandle, H9Hip
         disposed = true;
         templateRef.current = null;
       };
-    }, [canvasId, paletteId, paginationId, settingId, templateJson]);
+    }, [canvasId, designSessionKey, paletteId, paginationId, settingId, updateReadyState]);
 
     React.useEffect(() => {
       function syncFullscreenState() {
@@ -94,9 +142,13 @@ export const H9HiprintDesigner = React.forwardRef<H9HiprintDesignerHandle, H9Hip
     }, []);
 
     function syncJson() {
-      const json = templateRef.current?.getJson() ?? templateJson;
+      if (readyState !== "ready" || !templateRef.current) {
+        setStatus(readyState === "error" ? "设计器不可用，无法同步" : "设计器尚未就绪");
+        return;
+      }
+      const json = templateRef.current.getJson();
       onJsonChange(json);
-      setStatus("hiprint JSON 已同步");
+      setStatus("模板 JSON 已同步");
     }
 
     async function toggleDesignerFullscreen() {
@@ -112,10 +164,14 @@ export const H9HiprintDesigner = React.forwardRef<H9HiprintDesignerHandle, H9Hip
       await designerRootRef.current?.requestFullscreen?.().catch(() => undefined);
     }
 
+    const showActionBar = Boolean(onCancel || onSave);
+    const canSave = readyState === "ready" && !saveDisabled;
+
     return (
       <div
         ref={designerRootRef}
         data-h9-hiprint-designer="true"
+        data-h9-ready-state={readyState}
         className={cn(
           "grid min-h-[34rem] gap-3",
           fieldPanelOpen ? "lg:grid-cols-[18rem_minmax(0,1fr)_18rem]" : "lg:grid-cols-[4rem_minmax(0,1fr)_18rem]",
@@ -176,10 +232,18 @@ export const H9HiprintDesigner = React.forwardRef<H9HiprintDesignerHandle, H9Hip
         </aside>
 
         <main className="min-w-0 rounded-md border bg-background">
-          <div className="flex items-center justify-between border-b px-3 py-2">
-            <span className={cn("text-sm", error ? "text-destructive" : "text-muted-foreground")}>{status}</span>
-            <div className="flex items-center gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={syncJson}>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2">
+            <span
+              className={cn(
+                "text-sm",
+                readyState === "error" ? "text-destructive" : readyState === "ready" ? "text-emerald-700" : "text-muted-foreground",
+              )}
+              data-h9-designer-status={readyState}
+            >
+              {status}
+            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={syncJson} disabled={readyState !== "ready"}>
                 <RefreshCw className="size-4" aria-hidden />
                 同步
               </Button>
@@ -194,10 +258,31 @@ export const H9HiprintDesigner = React.forwardRef<H9HiprintDesignerHandle, H9Hip
                 {designerFullscreen ? <Minimize2 className="size-4" aria-hidden /> : <Maximize2 className="size-4" aria-hidden />}
                 {designerFullscreen ? "退出" : "全屏"}
               </Button>
+              {showActionBar && (
+                <>
+                  {onCancel && (
+                    <Button type="button" variant="outline" size="sm" onClick={onCancel}>
+                      <X className="size-4" aria-hidden />
+                      取消
+                    </Button>
+                  )}
+                  {onSave && (
+                    <Button type="button" size="sm" onClick={onSave} disabled={!canSave}>
+                      <Save className="size-4" aria-hidden />
+                      {saveLabel}
+                    </Button>
+                  )}
+                </>
+              )}
             </div>
           </div>
           <div className="border-b bg-muted/10">{templateSettingsPanel}</div>
           {error && <div className="border-b bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}
+          {readyState === "initializing" && (
+            <div className="border-b bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+              正在加载 hiprint 组件与画布，请稍候…
+            </div>
+          )}
           <div id={paginationId} className="border-b px-3 py-2 text-sm text-muted-foreground" />
           <div id={canvasId} className={cn("h-[30rem] overflow-auto bg-muted/30 p-4", designerFullscreen && "h-[calc(100vh-9rem)]")} />
         </main>

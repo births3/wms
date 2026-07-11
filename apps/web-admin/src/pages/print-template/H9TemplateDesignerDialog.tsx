@@ -62,6 +62,8 @@ export function H9TemplateDesignerDialog({
   const [jsonOpen, setJsonOpen] = React.useState(false);
   const [boundFields, setBoundFields] = React.useState<string[]>(["asn.code"]);
   const [error, setError] = React.useState<string | null>(null);
+  const [designerReadyState, setDesignerReadyState] = React.useState<"initializing" | "ready" | "error">("initializing");
+  const formRef = React.useRef<HTMLFormElement | null>(null);
   const selectedType = templateTypes.find((type) => type.code === templateTypeCode) ?? firstType;
   const selectedLibrary =
     libraries.find((library) => library.libraryCode === selectedType?.fieldLibraryCode) ?? libraries[0] ?? null;
@@ -97,6 +99,7 @@ export function H9TemplateDesignerDialog({
     if (!open) return;
     setError(null);
     setJsonOpen(false);
+    setDesignerReadyState("initializing");
     if (!initialTemplate) {
       const paper = defaultPaper();
       setTemplateCode("m2_asn_default");
@@ -280,11 +283,16 @@ export function H9TemplateDesignerDialog({
   );
   const dialogTitle = mode === "edit" ? "修改打印模板" : mode === "copy" ? "复制打印模板" : "新增打印模板";
   const saveLabel = mode === "edit" ? "保存版本" : "保存";
+  const designSessionKey = open
+    ? `${mode}:${initialTemplate?.id ?? "new"}:${initialTemplate?.template_code ?? "create"}`
+    : "closed";
+  const formSaveDisabled =
+    designerReadyState !== "ready" || !selectedLibrary || boundFields.length === 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] max-w-[96vw] overflow-auto">
-        <form className="flex flex-col gap-4" onSubmit={submit}>
+        <form ref={formRef} className="flex flex-col gap-4" onSubmit={submit}>
           <DialogHeader>
             <DialogTitle>{dialogTitle}</DialogTitle>
             <DialogDescription>使用 hiprint 设计模板，保存模板主数据、字段绑定和版本。</DialogDescription>
@@ -292,11 +300,17 @@ export function H9TemplateDesignerDialog({
 
           <H9HiprintDesigner
             ref={designerRef}
+            designSessionKey={designSessionKey}
             templateSettingsPanel={templateSettingsPanel}
             fieldBindingPanel={fieldBindingPanel}
             fields={fields.map((field) => ({ fieldPath: field.fieldPath, displayName: field.displayName }))}
             templateJson={parseJsonOrDefault(jsonText)}
             onJsonChange={(value) => setJsonText(JSON.stringify(value, null, 2))}
+            onReadyStateChange={setDesignerReadyState}
+            onCancel={() => onOpenChange(false)}
+            onSave={() => formRef.current?.requestSubmit()}
+            saveLabel={saveLabel}
+            saveDisabled={!selectedLibrary || boundFields.length === 0}
           />
 
           <div className="rounded-md border bg-background">
@@ -318,6 +332,11 @@ export function H9TemplateDesignerDialog({
           </div>
 
           {error && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}
+          {designerReadyState === "error" && (
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              设计器未就绪，可取消关闭或检查浏览器控制台后重试。
+            </div>
+          )}
 
           <DialogFooter>
             <label className="mr-auto flex items-center gap-2 text-sm text-muted-foreground">
@@ -327,7 +346,7 @@ export function H9TemplateDesignerDialog({
             <DialogClose asChild>
               <Button type="button" variant="outline">取消</Button>
             </DialogClose>
-            <Button type="submit" disabled={!selectedLibrary || boundFields.length === 0}>
+            <Button type="submit" disabled={formSaveDisabled}>
               <Save className="size-4" aria-hidden />
               {saveLabel}
             </Button>
