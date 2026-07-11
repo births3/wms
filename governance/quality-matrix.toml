@@ -8,6 +8,7 @@ module = "M1"
 story_file = "docs/domain/user-stories-m1-master-data-warehouse.md"
 types = ["write", "config_rule", "frontend_interaction"]
 frontend_pages = ["m1-system-dictionary"]
+navigation_checks = ["pnpm --dir apps/web-admin run test:e2e:shell-dev"]
 api_paths = [
   "GET /api/v1/system-dictionaries/{dict_code}/items",
   "PUT /api/v1/system-dictionaries/{dict_code}/items/{item_code}",
@@ -966,6 +967,7 @@ module = "M2"
 story_file = "docs/domain/user-stories-m2-inbound-asn.md"
 types = ["write", "inventory_change", "frontend_interaction", "critical_path"]
 frontend_pages = ["m2-receiving"]
+navigation_checks = ["pnpm --dir apps/web-admin run test:e2e:shell-dev"]
 api_paths = [
   "POST /api/v1/inbound/receiving-orders/{id}/receive",
 ]
@@ -995,6 +997,7 @@ module = "M3"
 story_file = "docs/domain/user-stories-m3-inventory-query.md"
 types = ["read_only", "frontend_interaction"]
 frontend_pages = ["m3-batches"]
+navigation_checks = ["pnpm --dir apps/web-admin run test:e2e:shell-dev"]
 api_paths = [
   "GET /api/v1/inventory/batches",
 ]
@@ -1024,6 +1027,7 @@ module = "M4"
 story_file = "docs/domain/user-stories-m4-outbound-order.md"
 types = ["write", "frontend_interaction", "api_change"]
 frontend_pages = ["m4-orders"]
+navigation_checks = ["pnpm --dir apps/web-admin run test:e2e:shell-dev"]
 api_paths = [
   "GET /api/v1/outbound/orders",
   "POST /api/v1/outbound/orders",

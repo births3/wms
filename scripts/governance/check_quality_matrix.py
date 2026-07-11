@@ -29,6 +29,10 @@ MATRIX = REPO_ROOT / "governance" / "quality-matrix.toml"
 DOC = REPO_ROOT / "docs" / "governance" / "quality-matrix.md"
 OPENAPI_JSON = REPO_ROOT / "shared" / "openapi" / "openapi.json"
 STORY_GLOB = "docs/domain/user-stories-*.md"
+NAVIGATION_CHECK_SOURCES = {
+    "pnpm --dir apps/web-admin run test:e2e:shell-dev": REPO_ROOT
+    / "prototypes/e2e/web-admin-shell.spec.ts",
+}
 
 DIMENSIONS = (
     "requirement",
@@ -184,6 +188,23 @@ def check_story(story: dict[str, Any], *, story_files: set[str], openapi_paths: 
         operation = f"{method.upper()} {path}"
         if openapi_paths and operation not in openapi_paths:
             issues.append(Issue(story_id, "api", f"OpenAPI 缺少 operation: {operation}"))
+
+    navigation_checks = story.get("navigation_checks", [])
+    if not isinstance(navigation_checks, list) or not all(
+        isinstance(item, str) for item in navigation_checks
+    ):
+        issues.append(Issue(story_id, "evidence", "navigation_checks 必须是字符串数组"))
+    else:
+        frontend_pages = story.get("frontend_pages", [])
+        for command in navigation_checks:
+            source = NAVIGATION_CHECK_SOURCES.get(command)
+            if source is None:
+                issues.append(Issue(story_id, "evidence", f"未登记的导航检查命令: {command}"))
+                continue
+            source_text = source.read_text(encoding="utf-8") if source.exists() else ""
+            for page in frontend_pages if isinstance(frontend_pages, list) else []:
+                if isinstance(page, str) and f'"{page}"' not in source_text:
+                    issues.append(Issue(story_id, "evidence", f"导航检查未覆盖页面: {page}"))
 
     return issues
 

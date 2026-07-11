@@ -316,6 +316,30 @@ test("侧边栏筛选菜单支持 Escape 和点击页面内容关闭", async ({ 
   await expect(page.getByRole("button", { name: "筛选菜单" })).toBeVisible();
 });
 
+for (const target of [
+  { section: "基础档案", group: "系统配置", id: "m1-system-dictionary", heading: "M1 系统字典" },
+  { section: "入库业务", group: "入库作业", id: "m2-receiving", heading: "M2 收货管理" },
+  { section: "库内业务", group: "库存管理", id: "m3-batches", heading: "M3 批号管理" },
+  { section: "出库业务", group: "出库作业", id: "m4-orders", heading: "M4 出库订单管理" },
+]) {
+  test(`${target.heading} 能通过三层菜单打开`, async ({ page }) => {
+    await page.goto("/");
+    await Promise.all([
+      page.waitForResponse((response) => response.url().includes("/api/v1/admin/menus/published")),
+      page.getByRole("button", { name: "登录" }).click(),
+    ]);
+    await expect(page.getByRole("heading", { name: "WMS Web Admin" })).toBeVisible();
+
+    const sectionButton = page.getByRole("button", { name: target.section });
+    if (await sectionButton.getAttribute("aria-expanded") !== "true") await sectionButton.click();
+    const groupButton = page.getByRole("button", { name: target.group });
+    if (await groupButton.getAttribute("aria-expanded") !== "true") await groupButton.click();
+    await page.getByRole("button", { name: `${target.heading} ${target.id}`, exact: true }).click();
+
+    await expect(page.getByRole("heading", { name: target.heading, exact: true })).toBeVisible();
+  });
+}
+
 test("H1 菜单管理能通过三层菜单打开", async ({ page }) => {
   fs.mkdirSync(artifactsDir, { recursive: true });
 

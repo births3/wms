@@ -207,3 +207,28 @@ def test_quality_matrix_rejects_module_mismatch_and_missing_openapi_method():
         Issue("US-M2-002", "requirement", "story id 模块 M2 与 module M1 不一致"),
         Issue("US-M2-002", "api", "OpenAPI 缺少 operation: POST /api/v1/inbound/receiving-orders/{id}/receive"),
     ]
+
+
+def test_quality_matrix_rejects_unregistered_navigation_command():
+    from check_quality_matrix import Issue, check_story
+
+    story = {
+        "id": "US-M2-002",
+        "title": "收货",
+        "module": "M2",
+        "types": ["frontend_interaction"],
+        "story_file": "docs/domain/user-stories-m2-inbound-asn.md",
+        "navigation_checks": ["echo fake-e2e"],
+        "dimensions": {dimension: "verified" for dimension in (
+            "requirement", "fields", "frontend", "api", "backend", "database",
+            "security", "audit", "tests", "evidence", "docs", "governance",
+        )},
+        "tests": {
+            "required_layers": ["L1", "L3", "L7"],
+            "covered_layers": ["L1", "L3", "L7"],
+        },
+    }
+
+    issues = check_story(story, story_files=set(), openapi_paths=set())
+
+    assert Issue("US-M2-002", "evidence", "未登记的导航检查命令: echo fake-e2e") in issues
