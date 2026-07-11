@@ -24,6 +24,44 @@ impl PgWave3Repository {
         Ok(map_receiving_order(row, lines))
     }
 
+    pub async fn delete_receiving_order(
+        &self,
+        ctx: &AuthContext,
+        id: Uuid,
+        now: DateTime<Utc>,
+    ) -> Result<ReceivingOrder, Wave3RepositoryError> {
+        let mut tx = self.begin().await?;
+        let locked = lock_receiving_order(&mut tx, ctx.owner_id, id).await?;
+        if locked.status != "draft" {
+            return Err(Wave3RepositoryError::InvalidStatus {
+                expected: "draft".to_string(),
+                actual: locked.status,
+            });
+        }
+        let lines = load_receiving_order_lines_in_tx(&mut tx, ctx.owner_id, id).await?;
+        let order = map_receiving_order(locked, lines);
+        let mut audit = AuditWriteRequest::from_auth_context(
+            ctx,
+            "delete",
+            "M2",
+            "receiving_order",
+            id.to_string(),
+            None,
+        );
+        audit.occurred_at = now;
+        append_event_in_tx(&mut tx, &audit)
+            .await
+            .map_err(|error| Wave3RepositoryError::Audit(format!("{error:?}")))?;
+        sqlx::query("DELETE FROM receiving_orders WHERE id = $1 AND owner_id = $2")
+            .bind(id)
+            .bind(ctx.owner_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(map_db_error)?;
+        tx.commit().await.map_err(map_db_error)?;
+        Ok(order)
+    }
+
     pub async fn release_receiving_order(
         &self,
         ctx: &AuthContext,

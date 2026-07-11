@@ -8,7 +8,9 @@ pub(super) fn apply_receiving_order_routes() -> Router<Wave3AppState> {
         )
         .route(
             "/api/v1/inbound/receiving-orders/:id",
-            get(get_receiving_order_handler).patch(update_receiving_order_handler),
+            get(get_receiving_order_handler)
+                .patch(update_receiving_order_handler)
+                .delete(delete_receiving_order_handler),
         )
         .route(
             "/api/v1/inbound/receiving-orders/:id/release",
@@ -46,6 +48,33 @@ pub(super) async fn get_receiving_order_handler(
     } else {
         let store = state.inbound_store.lock().await;
         store.get(&ctx, id)?
+    };
+    Ok(Json(order))
+}
+
+pub(super) async fn delete_receiving_order_handler(
+    ctx: AuthContext,
+    State(state): State<Wave3AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ReceivingOrder>, Wave3HandlerError> {
+    ctx.require_permission("m2.write")?;
+    let order = if let Some(repository) = &state.wave3_repository {
+        repository
+            .delete_receiving_order(&ctx, id, Utc::now())
+            .await?
+    } else {
+        let mut store = state.inbound_store.lock().await;
+        let order = store.delete(&ctx, id)?;
+        append_audit(
+            &state,
+            &ctx,
+            "delete",
+            "M2",
+            "receiving_order",
+            id.to_string(),
+        )
+        .await;
+        order
     };
     Ok(Json(order))
 }

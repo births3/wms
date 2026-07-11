@@ -117,6 +117,37 @@ async fn receiving_order_persists_document_type(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn delete_receiving_order_is_owner_scoped_draft_only_and_audited(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let ctx = ctx(owner_id);
+    let repo = PgWave3Repository::new(pool.clone());
+    let now = Utc
+        .with_ymd_and_hms(2026, 7, 11, 12, 0, 0)
+        .single()
+        .expect("valid time");
+    let order = repo
+        .create_receiving_order(&ctx, receiving_order_req("ASN-DELETE-001"), now)
+        .await
+        .expect("draft order should create");
+
+    let deleted = repo
+        .delete_receiving_order(&ctx, order.id, now)
+        .await
+        .expect("draft order should delete");
+    assert_eq!(deleted.id, order.id);
+    let counts: (i64, i64) = sqlx::query_as(
+        "SELECT (SELECT COUNT(*) FROM receiving_orders WHERE id = $1), (SELECT COUNT(*) FROM audit_event WHERE owner_id = $2 AND action = 'delete' AND resource_id = $3)",
+    )
+    .bind(order.id)
+    .bind(owner_id)
+    .bind(order.id.to_string())
+    .fetch_one(&pool)
+    .await
+    .expect("delete evidence should query");
+    assert_eq!(counts, (0, 1));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn receiving_order_update_is_draft_only_and_audits_before_after(pool: PgPool) {
     let owner_id = Uuid::new_v4();
     let ctx = ctx(owner_id);

@@ -171,6 +171,12 @@ impl ReceivingOrderStore {
         id: Uuid,
     ) -> Result<ReceivingOrder, ReceivingOrderError> {
         let order = self.get(ctx, id)?;
+        if order.status != "draft" {
+            return Err(ReceivingOrderError::InvalidStatus {
+                expected: "draft",
+                actual: order.status,
+            });
+        }
         self.orders.remove(&id);
         Ok(order)
     }
