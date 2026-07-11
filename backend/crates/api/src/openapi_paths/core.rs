@@ -367,6 +367,22 @@ pub(crate) fn update_warehouse() {}
 #[allow(dead_code)]
 pub(crate) fn delete_warehouse() {}
 
+#[utoipa::path(get, path = "/api/v1/master-data/warehouse-zones", tag = "master-data", responses((status = 200, description = "库区列表", body = WarehouseZoneListResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn list_warehouse_zones() {}
+
+#[utoipa::path(post, path = "/api/v1/master-data/warehouse-zones", tag = "master-data", params(("Idempotency-Key" = String, Header, description = "幂等键")), request_body = CreateWarehouseZoneRequest, responses((status = 200, description = "创建库区", body = WarehouseZone), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn create_warehouse_zone() {}
+
+#[utoipa::path(patch, path = "/api/v1/master-data/warehouse-zones/{id}", tag = "master-data", params(("id" = uuid::Uuid, Path, description = "库区 ID"), ("Idempotency-Key" = String, Header, description = "幂等键")), request_body = UpdateWarehouseZoneRequest, responses((status = 200, description = "更新库区", body = WarehouseZone), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn update_warehouse_zone() {}
+
+#[utoipa::path(delete, path = "/api/v1/master-data/warehouse-zones/{id}", tag = "master-data", params(("id" = uuid::Uuid, Path, description = "库区 ID"), ("Idempotency-Key" = String, Header, description = "幂等键")), responses((status = 200, description = "停用库区", body = WarehouseZone), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn delete_warehouse_zone() {}
+
 #[utoipa::path(get, path = "/api/v1/master-data/locations", tag = "master-data", responses((status = 200, description = "库位列表", body = LocationListResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn list_locations() {}

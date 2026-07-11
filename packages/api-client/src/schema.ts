@@ -1092,6 +1092,38 @@ export interface paths {
         patch: operations["update_supplier"];
         trace?: never;
     };
+    "/api/v1/master-data/warehouse-zones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_warehouse_zones"];
+        put?: never;
+        post: operations["create_warehouse_zone"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/master-data/warehouse-zones/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["delete_warehouse_zone"];
+        options?: never;
+        head?: never;
+        patch: operations["update_warehouse_zone"];
+        trace?: never;
+    };
     "/api/v1/master-data/warehouses": {
         parameters: {
             query?: never;
@@ -2491,6 +2523,14 @@ export interface components {
         CreateWarehouseRequest: {
             warehouse_code: string;
             warehouse_name: string;
+        };
+        CreateWarehouseZoneRequest: {
+            quality_color: string;
+            temperature_zone: string;
+            /** Format: uuid */
+            warehouse_id: string;
+            zone_code: string;
+            zone_name: string;
         };
         CrossdockPlan: {
             /** Format: uuid */
@@ -4173,6 +4213,12 @@ export interface components {
             status?: string | null;
             warehouse_name?: string | null;
         };
+        UpdateWarehouseZoneRequest: {
+            quality_color?: string | null;
+            status?: string | null;
+            temperature_zone?: string | null;
+            zone_name?: string | null;
+        };
         UpsertAdminMenuButtonPermissionRequest: {
             action_key: string;
             action_kind: string;
@@ -4275,6 +4321,28 @@ export interface components {
         };
         WarehouseListResponse: {
             data: components["schemas"]["Warehouse"][];
+            page: components["schemas"]["PageMeta"];
+        };
+        /** @description 库区基础档案。 */
+        WarehouseZone: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            quality_color: string;
+            status: string;
+            temperature_zone: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            warehouse_id: string;
+            zone_code: string;
+            zone_name: string;
+        };
+        WarehouseZoneListResponse: {
+            data: components["schemas"]["WarehouseZone"][];
             page: components["schemas"]["PageMeta"];
         };
         WeighPackJobRequest: {
@@ -7844,6 +7912,145 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Supplier"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_warehouse_zones: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 库区列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseZoneListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_warehouse_zone: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateWarehouseZoneRequest"];
+            };
+        };
+        responses: {
+            /** @description 创建库区 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseZone"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_warehouse_zone: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 库区 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 停用库区 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseZone"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_warehouse_zone: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 库区 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateWarehouseZoneRequest"];
+            };
+        };
+        responses: {
+            /** @description 更新库区 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseZone"];
                 };
             };
             /** @description 未登录 */

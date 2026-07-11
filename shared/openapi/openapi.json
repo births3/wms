@@ -789,8 +789,8 @@
           }
         },
         "security": [],
-        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。",
-        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。"
+        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。",
+        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。"
       }
     },
     "/api/v1/auth/me": {
@@ -4668,6 +4668,195 @@
           }
         },
         "x-idempotency-exempt-reason": "M1 基础档案 CRUD 旧契约未接入 L11 幂等，本轮不扩大调用侧 header 面。"
+      }
+    },
+    "/api/v1/master-data/warehouse-zones": {
+      "get": {
+        "tags": [
+          "master-data"
+        ],
+        "operationId": "list_warehouse_zones",
+        "responses": {
+          "200": {
+            "description": "库区列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WarehouseZoneListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "master-data"
+        ],
+        "operationId": "create_warehouse_zone",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWarehouseZoneRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "创建库区",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WarehouseZone"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/master-data/warehouse-zones/{id}": {
+      "delete": {
+        "tags": [
+          "master-data"
+        ],
+        "operationId": "delete_warehouse_zone",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "库区 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "停用库区",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WarehouseZone"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "master-data"
+        ],
+        "operationId": "update_warehouse_zone",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "库区 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWarehouseZoneRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "更新库区",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WarehouseZone"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/master-data/warehouses": {
@@ -10252,6 +10441,34 @@
           }
         }
       },
+      "CreateWarehouseZoneRequest": {
+        "type": "object",
+        "required": [
+          "warehouse_id",
+          "zone_code",
+          "zone_name",
+          "temperature_zone",
+          "quality_color"
+        ],
+        "properties": {
+          "quality_color": {
+            "type": "string"
+          },
+          "temperature_zone": {
+            "type": "string"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "zone_code": {
+            "type": "string"
+          },
+          "zone_name": {
+            "type": "string"
+          }
+        }
+      },
       "CrossdockPlan": {
         "type": "object",
         "required": [
@@ -15416,6 +15633,27 @@
           }
         }
       },
+      "UpdateWarehouseZoneRequest": {
+        "type": "object",
+        "properties": {
+          "quality_color": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "temperature_zone": {
+            "type": "string",
+            "nullable": true
+          },
+          "zone_name": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
       "UpsertAdminMenuButtonPermissionRequest": {
         "type": "object",
         "required": [
@@ -15744,6 +15982,77 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Warehouse"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "WarehouseZone": {
+        "type": "object",
+        "description": "库区基础档案。",
+        "required": [
+          "id",
+          "owner_id",
+          "warehouse_id",
+          "zone_code",
+          "zone_name",
+          "temperature_zone",
+          "quality_color",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quality_color": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "temperature_zone": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "zone_code": {
+            "type": "string"
+          },
+          "zone_name": {
+            "type": "string"
+          }
+        }
+      },
+      "WarehouseZoneListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WarehouseZone"
             }
           },
           "page": {

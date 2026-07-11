@@ -220,6 +220,10 @@ async fn store_idempotency_success<T: Serialize>(
     request_hash: &str,
     response: &T,
     now: DateTime<Utc>,
+    method: &str,
+    path: &str,
+    resource_type: &str,
+    resource_id: &str,
 ) -> Result<(), MasterDataError> {
     let response_body = serde_json::to_value(response)
         .map_err(|error| MasterDataError::Serialize(error.to_string()))?;
@@ -229,17 +233,18 @@ async fn store_idempotency_success<T: Serialize>(
             id, owner_id, idempotency_key, request_hash, method, path,
             status_code, response_body, resource_type, resource_id, expires_at, created_at
         )
-        VALUES (
-            $1, $2, $3, $4, 'POST', '/api/v1/master-data/locations/batch-create',
-            200, $5, 'warehouse_location', 'batch-create', $6, $7
-        )
+        VALUES ($1, $2, $3, $4, $5, $6, 200, $7, $8, $9, $10, $11)
         "#,
     )
     .bind(Uuid::new_v4())
     .bind(owner_id)
     .bind(idempotency_key)
     .bind(request_hash)
+    .bind(method)
+    .bind(path)
     .bind(response_body)
+    .bind(resource_type)
+    .bind(resource_id)
     .bind(now + Duration::hours(24))
     .bind(now)
     .execute(&mut **tx)
@@ -272,6 +277,57 @@ async fn append_master_data_audit<T: Serialize>(
         .await
         .map(|_| ())
         .map_err(|error| MasterDataError::Audit(format!("{error:?}")))
+}
+
+async fn append_master_data_update_audit<T: Serialize>(
+    tx: &mut Transaction<'_, Postgres>,
+    ctx: &AuthContext,
+    action: &str,
+    resource_type: &str,
+    resource_id: Uuid,
+    before: Value,
+    response: &T,
+    now: DateTime<Utc>,
+) -> Result<(), MasterDataError> {
+    let after = serde_json::to_value(response)
+        .map_err(|error| MasterDataError::Serialize(error.to_string()))?;
+    let mut audit = AuditWriteRequest::from_auth_context(
+        ctx,
+        action,
+        "M1",
+        resource_type,
+        resource_id.to_string(),
+        Some(AuditDiff::compute(before, after)),
+    );
+    audit.occurred_at = now;
+    append_event_in_tx(tx, &audit)
+        .await
+        .map(|_| ())
+        .map_err(|error| MasterDataError::Audit(format!("{error:?}")))
+}
+
+async fn load_master_data_before(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    id: Uuid,
+    resource_type: &str,
+) -> Result<Value, MasterDataError> {
+    let sql = match resource_type {
+        "product" => "SELECT to_jsonb(t) FROM (SELECT id, owner_id, product_code, product_name, specification, dosage_form, storage_condition, special_drug_category, approval_no, manufacturer, source, status, created_at, updated_at FROM products WHERE owner_id=$1 AND id=$2) t",
+        "supplier" => "SELECT to_jsonb(t) FROM (SELECT id, owner_id, supplier_code, supplier_name, uscc, contact_name, source, status, created_at, updated_at FROM suppliers WHERE owner_id=$1 AND id=$2) t",
+        "customer" => "SELECT to_jsonb(t) FROM (SELECT id, owner_id, customer_code, customer_name, license_no, source, status, created_at, updated_at FROM customers WHERE owner_id=$1 AND id=$2) t",
+        "warehouse" => "SELECT to_jsonb(t) FROM (SELECT id, owner_id, warehouse_code, warehouse_name, status, created_at, updated_at FROM warehouses WHERE owner_id=$1 AND id=$2) t",
+        "location" => "SELECT to_jsonb(t) FROM (SELECT id, owner_id, warehouse_id, zone_id, location_code, row_no, column_no, layer_no, max_volume_cm3, used_volume_cm3, max_sku_count, location_type, bound_owner_id, status, created_at, updated_at FROM warehouse_locations WHERE owner_id=$1 AND id=$2) t",
+        "warehouse_zone" => "SELECT to_jsonb(t) FROM (SELECT id, owner_id, warehouse_id, zone_code, zone_name, temperature_zone, quality_color, status, created_at, updated_at FROM warehouse_zones WHERE owner_id=$1 AND id=$2) t",
+        _ => return Err(MasterDataError::Serialize("unsupported audit resource".into())),
+    };
+    sqlx::query_scalar(sql)
+        .bind(owner_id)
+        .bind(id)
+        .fetch_optional(&mut **tx)
+        .await
+        .map_err(map_db_error)?
+        .ok_or(MasterDataError::NotFound)
 }
 
 fn request_hash(value: &Value) -> Result<String, MasterDataError> {
@@ -337,7 +393,7 @@ impl From<CustomerRow> for Customer {
             owner_id: row.owner_id,
             customer_code: row.customer_code,
             customer_name: row.customer_name,
-            license_no: None,
+            license_no: row.license_no,
             source: row.source,
             status: row.status,
             created_at: row.created_at,

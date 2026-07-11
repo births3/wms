@@ -18,8 +18,9 @@ use wms_api::{
     master_data_postgres::PgMasterDataReadRepository,
 };
 use wms_domain::{
-    Customer, CustomerListResponse, ErrorResponse, LocationListResponse, Product,
+    Customer, CustomerListResponse, ErrorResponse, Location, LocationListResponse, Product,
     ProductListResponse, SpecialDrugCategoryListResponse, Supplier, SupplierListResponse,
+    Warehouse, WarehouseZone,
 };
 
 struct AllowAllRevocationStore;

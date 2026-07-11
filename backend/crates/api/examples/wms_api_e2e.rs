@@ -13,8 +13,11 @@ use wms_api::{
         JWT_SECRET_ENV,
     },
     auth_handlers::{auth_router, AuthAppState},
+    config_center::{config_center_router, ConfigCenterAppState},
+    feature_flags::FeatureFlagRegistry,
     master_data_handlers::{master_data_router, MasterDataAppState},
     system_dictionary_handlers::{system_dictionary_router, SystemDictionaryAppState},
+    wave3_handlers::{wave3_router, Wave3AppState},
 };
 use wms_domain::HealthzResponse;
 
@@ -55,12 +58,21 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let app = Router::new()
         .route("/api/v1/healthz", get(healthz))
         .merge(auth_router(AuthAppState::new(pool.clone())))
+        .merge(config_center_router(ConfigCenterAppState::with_postgres(
+            FeatureFlagRegistry::from_file(
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("../../../deploy/feature_flags.toml"),
+            )
+            .map_err(|error| io::Error::other(format!("feature flags: {error:?}")))?,
+            pool.clone(),
+        )))
         .merge(master_data_router(MasterDataAppState::with_postgres(
             pool.clone(),
         )))
         .merge(system_dictionary_router(
-            SystemDictionaryAppState::with_postgres(pool),
+            SystemDictionaryAppState::with_postgres(pool.clone()),
         ))
+        .merge(wave3_router(Wave3AppState::with_postgres(pool)))
         .layer(auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(
             AllowAllRevocationStore,
         ))));
@@ -195,20 +207,40 @@ async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
             "m1.master_data.write",
             "基础档案写入",
         ),
+        (
+            "00000000-0000-0000-0000-000000000114",
+            "m2.write",
+            "入库作业写入",
+        ),
+        (
+            "00000000-0000-0000-0000-000000000115",
+            "m3.write",
+            "库存作业写入",
+        ),
+        (
+            "00000000-0000-0000-0000-000000000116",
+            "m3.read",
+            "库存读取",
+        ),
+        (
+            "00000000-0000-0000-0000-000000000117",
+            "audit.read",
+            "审计读取",
+        ),
     ] {
-        sqlx::query(
+        let permission_id: Uuid = sqlx::query_scalar(
             r#"
             INSERT INTO auth_permissions (id, permission_code, permission_name)
             VALUES ($1, $2, $3)
-            ON CONFLICT (id) DO UPDATE
-            SET permission_code = EXCLUDED.permission_code,
-                permission_name = EXCLUDED.permission_name
+            ON CONFLICT (lower(permission_code)) DO UPDATE
+            SET permission_name = EXCLUDED.permission_name
+            RETURNING id
             "#,
         )
         .bind(Uuid::parse_str(id)?)
         .bind(code)
         .bind(name)
-        .execute(pool)
+        .fetch_one(pool)
         .await?;
         sqlx::query(
             r#"
@@ -217,7 +249,7 @@ async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
             ON CONFLICT DO NOTHING
             "#,
         )
-        .bind(Uuid::parse_str(id)?)
+        .bind(permission_id)
         .execute(pool)
         .await?;
     }

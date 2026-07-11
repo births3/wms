@@ -6,8 +6,11 @@ use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{
     BatchCreateLocationsRequest, CreateCustomerRequest, CreateProductRequest,
-    CreateSupplierRequest, Customer, Location, LocationListResponse, PageMeta, Product,
-    SpecialDrugCategory, Supplier, Warehouse,
+    CreateLocationRequest, CreateSupplierRequest, CreateWarehouseRequest,
+    CreateWarehouseZoneRequest, Customer, Location,
+    LocationListResponse, PageMeta, Product, SpecialDrugCategory, Supplier,
+    UpdateCustomerRequest, UpdateLocationRequest, UpdateProductRequest, UpdateSupplierRequest,
+    UpdateWarehouseRequest, UpdateWarehouseZoneRequest, Warehouse, WarehouseZone,
 };
 
 use crate::{
@@ -18,6 +21,8 @@ use crate::{
 
 const SPECIAL_DRUG_CATEGORY_DICT: &str = "special_drug_category";
 const LOCATION_TYPE_DICT: &str = "location_type";
+const QUALITY_COLOR_DICT: &str = "quality_color";
+const TEMPERATURE_ZONE_DICT: &str = "temperature_zone";
 const LOCATION_BATCH_MAX_COUNT: i32 = 500;
 
 #[derive(Clone, Debug)]
@@ -63,6 +68,7 @@ struct CustomerRow {
     owner_id: Uuid,
     customer_code: String,
     customer_name: String,
+    license_no: Option<String>,
     source: String,
     status: String,
     created_at: DateTime<Utc>,
@@ -75,6 +81,20 @@ struct WarehouseRow {
     owner_id: Uuid,
     warehouse_code: String,
     warehouse_name: String,
+    status: String,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(FromRow)]
+struct WarehouseZoneRow {
+    id: Uuid,
+    owner_id: Uuid,
+    warehouse_id: Uuid,
+    zone_code: String,
+    zone_name: String,
+    temperature_zone: String,
+    quality_color: String,
     status: String,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
@@ -218,7 +238,7 @@ impl PgMasterDataReadRepository {
     ) -> Result<Vec<Customer>, MasterDataError> {
         let rows = sqlx::query_as::<_, CustomerRow>(
             r#"
-            SELECT id, owner_id, customer_code, customer_name, source, status, created_at, updated_at
+            SELECT id, owner_id, customer_code, customer_name, license_no, source, status, created_at, updated_at
               FROM customers
              WHERE owner_id = $1
              ORDER BY updated_at DESC, customer_code
@@ -295,16 +315,17 @@ impl PgMasterDataReadRepository {
             r#"
             INSERT INTO customers (
                 id, owner_id, customer_code, customer_name, customer_type,
-                source, status, created_at, updated_at
+                license_no, source, status, created_at, updated_at
             )
-            VALUES ($1, $2, $3, $4, 'customer', $5, 'active', $6, $6)
-            RETURNING id, owner_id, customer_code, customer_name, source, status, created_at, updated_at
+            VALUES ($1, $2, $3, $4, 'customer', $5, $6, 'active', $7, $7)
+            RETURNING id, owner_id, customer_code, customer_name, license_no, source, status, created_at, updated_at
             "#,
         )
         .bind(id)
         .bind(ctx.owner_id)
         .bind(&req.customer_code)
         .bind(&req.customer_name)
+        .bind(&req.license_no)
         .bind(&source)
         .bind(now)
         .fetch_one(&mut *tx)
@@ -454,6 +475,10 @@ impl PgMasterDataReadRepository {
             &request_hash,
             &response,
             now,
+            "POST",
+            "/api/v1/master-data/locations/batch-create",
+            "warehouse_location",
+            "batch-create",
         )
         .await?;
         let response_body = serde_json::to_value(&response)

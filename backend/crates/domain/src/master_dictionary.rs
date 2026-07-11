@@ -174,6 +174,44 @@ pub struct WarehouseListResponse {
     pub page: PageMeta,
 }
 
+/// 库区基础档案。
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct WarehouseZone {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub warehouse_id: Uuid,
+    pub zone_code: String,
+    pub zone_name: String,
+    pub temperature_zone: String,
+    pub quality_color: String,
+    pub status: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CreateWarehouseZoneRequest {
+    pub warehouse_id: Uuid,
+    pub zone_code: String,
+    pub zone_name: String,
+    pub temperature_zone: String,
+    pub quality_color: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct UpdateWarehouseZoneRequest {
+    pub zone_name: Option<String>,
+    pub temperature_zone: Option<String>,
+    pub quality_color: Option<String>,
+    pub status: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct WarehouseZoneListResponse {
+    pub data: Vec<WarehouseZone>,
+    pub page: PageMeta,
+}
+
 /// 库位基础档案。
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct Location {
