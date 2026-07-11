@@ -1,30 +1,20 @@
-use std::{env, error::Error, io, net::SocketAddr, path::PathBuf, sync::Arc};
-
 use axum::{
-    extract::{Query, State},
+    extract::State,
     http::{header, HeaderMap, StatusCode},
     middleware::from_fn_with_state,
     response::{Html, IntoResponse, Response},
     routing::get,
     Extension, Json, Router,
 };
-use chrono::{DateTime, TimeZone, Utc};
-use serde::Deserialize;
-use sqlx::{postgres::PgPoolOptions, PgPool};
+use chrono::Utc;
+use sqlx::postgres::PgPoolOptions;
+use std::{env, error::Error, io, net::SocketAddr, path::PathBuf, sync::Arc};
 use tokio::net::TcpListener;
 use utoipa::OpenApi;
-use uuid::Uuid;
 use wms_api::ApiDoc;
 use wms_api::{
     admin_menu_handlers::{admin_menu_router, AdminMenuAppState},
-    audit::{
-        list_events, AuditError, AuditEventPage, AuditEventQuery, AuditEventQueryCursor,
-        AuditEventRecord, DEFAULT_AUDIT_EVENT_QUERY_LIMIT, MAX_AUDIT_EVENT_QUERY_LIMIT,
-    },
-    auth::{
-        auth_runtime_layer, AuthContext, AuthRuntimePolicy, RedisAuthRevocationStore,
-        JWT_SECRET_ENV,
-    },
+    auth::{auth_runtime_layer, AuthRuntimePolicy, RedisAuthRevocationStore, JWT_SECRET_ENV},
     auth_handlers::{auth_router, AuthAppState},
     config_center::{config_center_router, ConfigCenterAppState},
     document_numbering_handlers::{document_numbering_router, DocumentNumberingAppState},
@@ -33,6 +23,7 @@ use wms_api::{
     h2_lifecycle_handlers::{h2_lifecycle_router, H2LifecycleAppState},
     master_data_handlers::{master_data_router, MasterDataAppState},
     print_template_handlers::{print_template_router, PrintTemplateAppState},
+    reports_handlers::mount_reports,
     resilience::{resilience_middleware, resilience_status, ResilienceState},
     state_machine::state_machine_router,
     system_dictionary_handlers::{system_dictionary_router, SystemDictionaryAppState},
@@ -41,8 +32,11 @@ use wms_api::{
     wave5_handlers::{wave5_router, Wave5AppState},
     wechat_notify::{wechat_notify_router, WechatNotifyAppState},
 };
-use wms_domain::{AuditActor, AuditEvent, AuditEventListResponse, ErrorResponse, HealthzResponse};
+use wms_domain::HealthzResponse;
 
+#[path = "wms_api/audit_query.rs"]
+mod wms_api_audit_query;
+use wms_api_audit_query::{audit_query_router, AuditQueryState};
 const BIND_ADDR_ENV: &str = "WMS_BIND_ADDR";
 const REDIS_URL_ENV: &str = "WMS_REDIS_URL";
 const DATABASE_URL_ENV: &str = "DATABASE_URL";
@@ -53,7 +47,6 @@ const DEFAULT_BIND_ADDR: &str = "0.0.0.0:8080";
 const DEFAULT_DB_MAX_CONNECTIONS: u32 = 32;
 const DEFAULT_FEATURE_FLAGS_FILE: &str = "deploy/feature_flags.toml";
 const API_DOCS_MODE_ENV: &str = "WMS_API_DOCS_MODE";
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let bind_addr = env::var(BIND_ADDR_ENV)
@@ -184,11 +177,6 @@ fn database_max_connections() -> Result<u32, io::Error> {
     })
 }
 
-#[derive(Clone)]
-struct AuditQueryState {
-    pool: PgPool,
-}
-
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum ApiDocsMode {
     Development,
@@ -212,7 +200,6 @@ impl ApiDocsMode {
         matches!(self, Self::Production)
     }
 }
-
 fn app(
     config_center_state: ConfigCenterAppState,
     auth_state: AuthAppState,
@@ -232,7 +219,6 @@ fn app(
     let wechat_notify_state = WechatNotifyAppState::with_postgres(audit_query_state.pool.clone());
     let resilience_state =
         ResilienceState::from_env().with_audit_pool(audit_query_state.pool.clone());
-
     Router::new()
         .route("/healthz", get(healthz))
         .route("/readyz", get(healthz))
@@ -247,6 +233,7 @@ fn app(
                 .with_state(resilience_state.clone()),
         )
         .merge(auth_router(auth_state))
+        .merge(mount_reports(audit_query_state.pool.clone()))
         .merge(audit_query_router(audit_query_state))
         .merge(h2_lifecycle_router(h2_lifecycle_state))
         .merge(config_center_router(config_center_state))
@@ -377,149 +364,6 @@ fn ip_is_internal(ip: &str) -> bool {
             .is_some_and(|octet| (16..=31).contains(&octet))
 }
 
-fn audit_query_router(state: AuditQueryState) -> Router {
-    Router::new()
-        .route("/api/v1/audit/events", get(list_audit_events_handler))
-        .with_state(state)
-}
-
-#[derive(Debug, Deserialize)]
-struct AuditEventQueryParams {
-    resource_type: Option<String>,
-    actor_id: Option<Uuid>,
-    from: Option<DateTime<Utc>>,
-    to: Option<DateTime<Utc>>,
-    limit: Option<u32>,
-    cursor: Option<String>,
-}
-
-#[derive(Debug)]
-enum AuditQueryError {
-    InvalidCursor,
-    PermissionDenied,
-    Query,
-}
-
-impl From<AuditError> for AuditQueryError {
-    fn from(_value: AuditError) -> Self {
-        Self::Query
-    }
-}
-
-impl IntoResponse for AuditQueryError {
-    fn into_response(self) -> Response {
-        let (status, code, message) = match self {
-            AuditQueryError::InvalidCursor => (
-                StatusCode::BAD_REQUEST,
-                "H2_AUDIT_QUERY_CURSOR_INVALID",
-                "审计查询游标格式无效",
-            ),
-            AuditQueryError::PermissionDenied => {
-                (StatusCode::FORBIDDEN, "AUTH_003", "缺少审计查询权限")
-            }
-            AuditQueryError::Query => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "H2_AUDIT_QUERY_FAILED",
-                "审计查询失败",
-            ),
-        };
-
-        (
-            status,
-            Json(ErrorResponse {
-                code: code.to_string(),
-                message: message.to_string(),
-                severity: "error".to_string(),
-                details: serde_json::json!({}),
-                trace_id: "unavailable".to_string(),
-                retry_hint: None,
-            }),
-        )
-            .into_response()
-    }
-}
-
-async fn list_audit_events_handler(
-    ctx: AuthContext,
-    State(state): State<AuditQueryState>,
-    Query(params): Query<AuditEventQueryParams>,
-) -> Result<Json<AuditEventListResponse>, AuditQueryError> {
-    ctx.require_permission("audit.read")
-        .map_err(|_| AuditQueryError::PermissionDenied)?;
-    let query = AuditEventQuery {
-        owner_id: ctx.owner_id,
-        resource_type: params.resource_type,
-        actor_id: params.actor_id,
-        from: params.from,
-        to: params.to,
-        cursor: params
-            .cursor
-            .as_deref()
-            .map(parse_audit_cursor)
-            .transpose()?,
-        limit: params
-            .limit
-            .unwrap_or(DEFAULT_AUDIT_EVENT_QUERY_LIMIT)
-            .clamp(1, MAX_AUDIT_EVENT_QUERY_LIMIT),
-    };
-    let page = list_events(&state.pool, &query).await?;
-    Ok(Json(audit_event_response(page)?))
-}
-
-fn audit_event_response(page: AuditEventPage) -> Result<AuditEventListResponse, AuditQueryError> {
-    Ok(AuditEventListResponse {
-        data: page.events.into_iter().map(audit_event_dto).collect(),
-        next_cursor: page.next_cursor.map(format_audit_cursor),
-    })
-}
-
-fn audit_event_dto(record: AuditEventRecord) -> AuditEvent {
-    let trace_id = record
-        .request_id
-        .map(|value| value.to_string())
-        .unwrap_or_else(|| "unavailable".to_string());
-    AuditEvent {
-        id: record.id,
-        owner_id: record.owner_id,
-        resource_type: record.resource_type,
-        resource_id: record.resource_id,
-        action: record.action,
-        trace_id,
-        occurred_at: record.occurred_at,
-        actor: AuditActor {
-            actor_id: record.actor_id,
-            actor_name: record.actor_name,
-            owner_id: record.owner_id,
-            jti: record.jti,
-        },
-        diff: record
-            .diff
-            .map(|value| serde_json::to_value(value).unwrap_or_else(|_| serde_json::json!({})))
-            .unwrap_or_else(|| serde_json::json!({})),
-    }
-}
-
-fn parse_audit_cursor(value: &str) -> Result<AuditEventQueryCursor, AuditQueryError> {
-    let (micros, id) = value
-        .split_once(':')
-        .ok_or(AuditQueryError::InvalidCursor)?;
-    let timestamp_micros = micros
-        .parse::<i64>()
-        .map_err(|_| AuditQueryError::InvalidCursor)?;
-    let id = id
-        .parse::<i64>()
-        .map_err(|_| AuditQueryError::InvalidCursor)?;
-    let occurred_at = Utc
-        .timestamp_micros(timestamp_micros)
-        .single()
-        .ok_or(AuditQueryError::InvalidCursor)?;
-    Ok(AuditEventQueryCursor { occurred_at, id })
-}
-
-fn format_audit_cursor(cursor: AuditEventQueryCursor) -> String {
-    format!("{}:{}", cursor.occurred_at.timestamp_micros(), cursor.id)
-}
-
 #[cfg(test)]
 mod tests {
     use std::sync::{Arc, Mutex, OnceLock};
@@ -528,6 +372,7 @@ mod tests {
         body::{to_bytes, Body},
         http::{Request, StatusCode},
     };
+    use sqlx::PgPool;
     use tower::ServiceExt;
     use uuid::Uuid;
     use wms_api::{
@@ -592,12 +437,16 @@ mod tests {
     }
 
     fn bearer_token(owner_id: Uuid) -> String {
+        bearer_token_with_permissions(owner_id, vec!["audit.read".to_string()])
+    }
+
+    fn bearer_token_with_permissions(owner_id: Uuid, permissions: Vec<String>) -> String {
         std::env::set_var(JWT_SECRET_ENV, "test-secret");
         let claims = build_access_claims(
             Uuid::new_v4(),
             owner_id,
             "audit-reader",
-            vec![],
+            permissions,
             Uuid::new_v4().to_string(),
             Utc::now(),
         );
@@ -721,7 +570,10 @@ mod tests {
                     .uri("/api/v1/audit/events")
                     .header(
                         "authorization",
-                        format!("Bearer {}", bearer_token(Uuid::new_v4())),
+                        format!(
+                            "Bearer {}",
+                            bearer_token_with_permissions(Uuid::new_v4(), vec![])
+                        ),
                     )
                     .body(Body::empty())
                     .expect("request should build"),

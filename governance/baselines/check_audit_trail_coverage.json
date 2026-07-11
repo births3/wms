@@ -1,281 +1,201 @@
 {
   "check": "check_audit_trail_coverage",
   "version": 1,
-  "generated_at": "2026-07-11T12:14:05Z",
+  "generated_at": "2026-07-11T14:57:50Z",
   "ignored": [
     {
       "id": "DELETE /api/v1/inbound/receiving-orders/{id}",
-      "reason": "G0-E review inventory correction 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "DELETE /api/v1/master-data/special-drug-categories/{id}",
-      "reason": "G0-E initial inventory 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "PATCH /api/v1/admin/menus/draft/nodes/{id}",
-      "reason": "G0-E initial inventory 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "PATCH /api/v1/master-data/special-drug-categories/{id}",
-      "reason": "G0-E initial inventory 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "PATCH /api/v1/system-dictionaries/{dict_code}/items/{item_code}/disable",
-      "reason": "G0-E review inventory correction 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "POST /api/v1/admin/menus/draft/batch-enable",
-      "reason": "G0-E initial inventory 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "POST /api/v1/admin/menus/draft/nodes",
-      "reason": "G0-E initial inventory 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "POST /api/v1/admin/menus/publish",
-      "reason": "G0-E initial inventory 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "POST /api/v1/admin/menus/rollback",
-      "reason": "G0-E initial inventory 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "POST /api/v1/billing/accounts",
-      "reason": "G0-E review inventory correction 2026-07-11",
-      "added_at": "2026-07-11"
-    },
-    {
-      "id": "POST /api/v1/billing/charges/calculate",
-      "reason": "G0-E review inventory correction 2026-07-11",
-      "added_at": "2026-07-11"
-    },
-    {
-      "id": "POST /api/v1/billing/contracts",
-      "reason": "G0-E review inventory correction 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "POST /api/v1/billing/rules",
-      "reason": "G0-E review inventory correction 2026-07-11",
-      "added_at": "2026-07-11"
-    },
-    {
-      "id": "POST /api/v1/billing/statements",
-      "reason": "G0-E review inventory correction 2026-07-11",
-      "added_at": "2026-07-11"
-    },
-    {
-      "id": "POST /api/v1/billing/statements/{id}/confirm",
-      "reason": "G0-E review inventory correction 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "POST /api/v1/business-retention/jobs",
-      "reason": "G0-E review inventory correction 2026-07-11",
-      "added_at": "2026-07-11"
-    },
-    {
-      "id": "POST /api/v1/cold-chain/devices",
-      "reason": "G0-E initial inventory 2026-07-11",
-      "added_at": "2026-07-11"
-    },
-    {
-      "id": "POST /api/v1/cold-chain/excursions",
-      "reason": "G0-E initial inventory 2026-07-11",
-      "added_at": "2026-07-11"
-    },
-    {
-      "id": "POST /api/v1/cold-chain/readings",
-      "reason": "G0-E initial inventory 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "POST /api/v1/config-center/feature-flags/archive-file-source",
-      "reason": "G0-E initial inventory 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "POST /api/v1/config-center/feature-flags/import",
-      "reason": "G0-E initial inventory 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "POST /api/v1/config-center/feature-flags/migrate",
-      "reason": "G0-E initial inventory 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "POST /api/v1/config-center/feature-flags/source",
-      "reason": "G0-E initial inventory 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "POST /api/v1/event-bus/deliveries/{delivery_id}/ack",
-      "reason": "G0-E review inventory correction 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "POST /api/v1/event-bus/deliveries/{delivery_id}/nack",
-      "reason": "G0-E initial inventory 2026-07-11",
-      "added_at": "2026-07-11"
-    },
-    {
-      "id": "POST /api/v1/express/carriers",
-      "reason": "G0-E review inventory correction 2026-07-11",
-      "added_at": "2026-07-11"
-    },
-    {
-      "id": "POST /api/v1/express/routing-rules",
-      "reason": "G0-E initial inventory 2026-07-11",
-      "added_at": "2026-07-11"
-    },
-    {
-      "id": "POST /api/v1/express/waybills",
-      "reason": "G0-E review inventory correction 2026-07-11",
-      "added_at": "2026-07-11"
-    },
-    {
-      "id": "POST /api/v1/express/waybills/{waybill_no}/cancel",
-      "reason": "G0-E initial inventory 2026-07-11",
-      "added_at": "2026-07-11"
-    },
-    {
-      "id": "POST /api/v1/inbound/receiving-orders/{id}/inspect",
-      "reason": "G0-E initial inventory 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "POST /api/v1/inbound/receiving-orders/{id}/putaway",
-      "reason": "G0-E review inventory correction 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "POST /api/v1/inbound/receiving-orders/{id}/receive",
-      "reason": "G0-E review inventory correction 2026-07-11",
-      "added_at": "2026-07-11"
-    },
-    {
-      "id": "POST /api/v1/inbound/receiving-orders/{id}/sign",
-      "reason": "G0-E initial inventory 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "POST /api/v1/inventory/batches/putaway",
-      "reason": "G0-E review inventory correction 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "POST /api/v1/master-data/special-drug-categories",
-      "reason": "G0-E review inventory correction 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "POST /api/v1/packing/jobs",
-      "reason": "G0-E review inventory correction 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "POST /api/v1/packing/jobs/{id}/waybill",
-      "reason": "G0-E review inventory correction 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "POST /api/v1/packing/jobs/{id}/weigh",
-      "reason": "G0-E review inventory correction 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "POST /api/v1/packing/stations",
-      "reason": "G0-E review inventory correction 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "POST /api/v1/parameter-mapping/execute",
-      "reason": "G0-E initial inventory 2026-07-11",
-      "added_at": "2026-07-11"
-    },
-    {
-      "id": "POST /api/v1/reports/gsp/inbound-ledger",
-      "reason": "G0-E initial inventory 2026-07-11",
-      "added_at": "2026-07-11"
-    },
-    {
-      "id": "POST /api/v1/reports/gsp/inventory-ledger",
-      "reason": "G0-E initial inventory 2026-07-11",
-      "added_at": "2026-07-11"
-    },
-    {
-      "id": "POST /api/v1/reports/gsp/outbound-ledger",
-      "reason": "G0-E initial inventory 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "POST /api/v1/retail/crossdock-plans",
-      "reason": "G0-E review inventory correction 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "POST /api/v1/retail/replenishment-suggestions",
-      "reason": "G0-E review inventory correction 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "POST /api/v1/tms/container-recoveries",
-      "reason": "G0-E review inventory correction 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "POST /api/v1/tms/dispatches",
-      "reason": "G0-E review inventory correction 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "POST /api/v1/tms/transit-temperature-readings",
-      "reason": "G0-E review inventory correction 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "POST /api/v1/wechat-notify/configs",
-      "reason": "G0-E review inventory correction 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "POST /api/v1/wechat-notify/records/{record_id}/resend",
-      "reason": "G0-E review inventory correction 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "POST /api/v1/wechat-notify/send",
-      "reason": "G0-E review inventory correction 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "POST /api/v1/wechat-notify/settings",
-      "reason": "G0-E review inventory correction 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "POST /api/v1/wechat-notify/settings/test",
-      "reason": "G0-E review inventory correction 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "PUT /api/v1/code-generator/document-number-rules/{rule_code}",
-      "reason": "G0-E initial inventory 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     },
     {
       "id": "PUT /api/v1/system-dictionaries/{dict_code}/items/{item_code}",
-      "reason": "G0-E initial inventory 2026-07-11",
+      "reason": "G0-E/G0-A initial inventory 2026-07-11",
       "added_at": "2026-07-11"
     }
   ]

@@ -93,6 +93,7 @@ use utoipa::OpenApi;
         get_receiving_order,
         update_receiving_order,
         delete_receiving_order,
+        release_receiving_order,
         receive_receiving_order,
         reject_receiving_order,
         inspect_receiving_order,

@@ -41,10 +41,9 @@ use crate::{
 };
 
 mod receiving_handlers;
-use receiving_handlers::{
-    get_receiving_order_handler, receive_receiving_order_handler, reject_receiving_order_handler,
-    update_receiving_order_handler,
-};
+use receiving_handlers::apply_receiving_order_routes;
+#[cfg(test)]
+use receiving_handlers::{receive_receiving_order_handler, update_receiving_order_handler};
 
 const IDEMPOTENCY_KEY_HEADER: &str = "idempotency-key";
 const EXTERNAL_API_KEY_HEADER: &str = "x-wms-api-key";
@@ -312,35 +311,7 @@ impl IntoResponse for Wave3HandlerError {
 }
 
 pub fn wave3_router(state: Wave3AppState) -> Router {
-    Router::new()
-        .route(
-            "/api/v1/inbound/receiving-orders",
-            get(list_receiving_orders_handler).post(create_receiving_order_handler),
-        )
-        .route(
-            "/api/v1/inbound/receiving-orders/:id",
-            get(get_receiving_order_handler).patch(update_receiving_order_handler),
-        )
-        .route(
-            "/api/v1/inbound/receiving-orders/:id/receive",
-            post(receive_receiving_order_handler),
-        )
-        .route(
-            "/api/v1/inbound/receiving-orders/:id/reject",
-            post(reject_receiving_order_handler),
-        )
-        .route(
-            "/api/v1/inbound/receiving-orders/:id/inspect",
-            post(inspect_receiving_order_handler),
-        )
-        .route(
-            "/api/v1/inbound/receiving-orders/:id/sign",
-            post(sign_receiving_order_handler),
-        )
-        .route(
-            "/api/v1/inbound/receiving-orders/:id/putaway",
-            post(putaway_receiving_order_handler),
-        )
+    apply_receiving_order_routes()
         .route(
             "/api/v1/inventory/batches",
             get(list_inventory_batches_handler),
@@ -1205,7 +1176,7 @@ mod tests {
                     CreateReceivingOrderRequest {
                         receipt_no: "ASN-HANDLER-001".to_string(),
                         document_type: "purchase_inbound".to_string(),
-                        supplier_id: None,
+                        supplier_id: Some(Uuid::new_v4()),
                         warehouse_id: Uuid::new_v4(),
                         external_ref: None,
                         expected_arrival_at: None,
@@ -1291,14 +1262,17 @@ mod tests {
             .wave3_repository
             .as_ref()
             .expect("postgres repository");
+        let (supplier_id, warehouse_id) = (Uuid::new_v4(), Uuid::new_v4());
+        sqlx::query("INSERT INTO suppliers (id, owner_id, supplier_code, supplier_name, uscc, status) VALUES ($1,$2,'SUP-H1','S','USCC-H1','active')").bind(supplier_id).bind(owner_id).execute(&pool).await.expect("seed supplier");
+        sqlx::query("INSERT INTO warehouses (id, owner_id, warehouse_code, warehouse_name, warehouse_type, status) VALUES ($1,$2,'WH-H1','W','normal','active')").bind(warehouse_id).bind(owner_id).execute(&pool).await.expect("seed warehouse");
         let order = repository
             .create_receiving_order(
                 &authorized,
                 CreateReceivingOrderRequest {
                     receipt_no: "ASN-HANDLER-PG-001".to_string(),
                     document_type: "purchase_inbound".to_string(),
-                    supplier_id: None,
-                    warehouse_id: Uuid::new_v4(),
+                    supplier_id: Some(supplier_id),
+                    warehouse_id,
                     external_ref: None,
                     expected_arrival_at: None,
                     lines: vec![receiving_line()],

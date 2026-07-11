@@ -36,6 +36,8 @@ SKIP_PATH_PREFIXES = (
     "/api/v1/healthz",
     "/api/v1/auth/login",
     "/api/v1/auth/refresh",
+    # 查询型 POST（读台账），不按状态变更写路径要求 audit 写入证据
+    "/api/v1/reports/",
 )
 
 REQUEST_BUILDER_RE = re.compile(
@@ -195,6 +197,10 @@ def collect_write_success_tests(test_root: Path) -> list[dict]:
             span = _test_function_span(text, test_name)
             body = text[span[0] : span[1]] if span else text
             uri = match.group("uri")
+            if any(uri.startswith(prefix.rstrip("/")) or prefix.rstrip("/") in uri for prefix in SKIP_PATH_PREFIXES if prefix.startswith("/api/v1/reports")):
+                continue
+            if uri.startswith("/api/v1/reports/"):
+                continue
             samples.append(
                 {
                     "method": method,

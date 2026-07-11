@@ -33,6 +33,7 @@ pub mod parameter_mapping;
 pub mod print_template;
 pub mod print_template_handlers;
 pub mod reports;
+pub mod reports_handlers;
 pub mod resilience;
 pub mod retail_chain;
 pub mod state_machine;

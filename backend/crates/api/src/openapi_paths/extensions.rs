@@ -195,6 +195,10 @@ pub(crate) fn update_receiving_order() {}
 #[allow(dead_code)]
 pub(crate) fn delete_receiving_order() {}
 
+#[utoipa::path(post, path = "/api/v1/inbound/receiving-orders/{id}/release", tag = "inbound", params(("id" = uuid::Uuid, Path, description = "收货单 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), responses((status = 200, description = "草稿 ASN 校验通过并放行收货", body = ReceivingOrder), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "权限不足", body = ErrorResponse), (status = 422, description = "状态或供应商校验失败", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn release_receiving_order() {}
+
 #[utoipa::path(post, path = "/api/v1/inbound/receiving-orders/{id}/receive", tag = "inbound", params(("id" = uuid::Uuid, Path, description = "收货单 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = ReceiveReceivingOrderRequest, responses((status = 200, description = "PDA 收货闭环记录", body = ReceivingOrderReceipt), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn receive_receiving_order() {}

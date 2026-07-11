@@ -23,12 +23,12 @@ strict 检查仍应失败并暴露以下真实缺口，禁止挂载返回空台�
 
 | 批次 | 缺口 | 完成条件 |
 |---|---|---|
-| G0-A | M6 报表 OpenAPI 已声明，但现有 `ReportService` 只返回示例或空数据 | 接入按 `owner_id` 隔离的 PostgreSQL 真实查询、权限、审计、成功/错误行为测试后再挂载 |
+| G0-A | ~~M6 报表占位~~ **已关闭（最小生产闭环）** | 已挂载 `reports_handlers`：`/reports/query` 与 GSP 入/出/库存台账按 `owner_id` 查询 PostgreSQL；`m6.report.read` 权限；integration 测试覆盖汇总与入库台账 |
 | G0-B | M-PM OpenAPI 已声明，但现有服务没有持久化字典、规则、队列和五年追溯 | 完成数据库迁移、配置 API、缓存失效、权限授权、审计和多实例测试后再挂载 |
 | G0-C | 收货单 `DELETE` 是已发布契约但没有运行时实现，且业务故事要求作废而非物理删除 | 先确定兼容迁移，再实现带状态机、权限、幂等和审计的作废语义；不得物理删除历史单据 |
 | G0-D | 多数 OpenAPI operation 只有路径提及或未授权状态测试 | 每个 operation 至少覆盖成功路径、权限、业务错误和关键事务；route inventory 只能作为挂载检查 |
 | G0-E | ~~T3 审计/幂等脚本未实现~~ **已关闭** | 已实现真实规则：`check_audit_trail_coverage`（OpenAPI 写路径 + HTTP 写成功测试 → audit_event 证据）与 `check_idempotency_test`（Idempotency-Key 写操作 → 测试幂等证据）；已知缺口入 `governance/baselines/`，禁止新增回退 |
-| G0-F | API 创建后的 ASN 停留在 `draft`，现有 `release_receiving_order` 没有运行时入口，且供应商资质有效期所需主数据和 M-VR 调用尚未落地 | 按故事实现“待校验 → 校验异常 / 待收货”动作，接入有效供应商及资质规则、权限、幂等和同事务审计；真实 API 创建后必须能继续收货 |
+| G0-F | ~~ASN 无放行入口~~ **已关闭（最小生产闭环）** | 新增 `POST /receiving-orders/{id}/release`：draft→released，校验 active 供应商/仓库，幂等 + 同事务审计；内存路径要求 supplier_id；完整 M-VR 资质引擎仍待后续增强 |
 
 退出命令：
 

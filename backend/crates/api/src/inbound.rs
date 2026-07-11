@@ -156,6 +156,10 @@ impl ReceivingOrderStore {
                 actual: order.status.clone(),
             });
         }
+        // G0-F：放行收货前必须绑定供应商（内存路径无法校验资质，仅要求字段存在）
+        if order.supplier_id.is_none() {
+            return Err(ReceivingOrderError::InvalidReason);
+        }
         order.status = "released".to_string();
         order.updated_at = now;
         Ok(order.clone())
@@ -456,7 +460,7 @@ mod tests {
                 CreateReceivingOrderRequest {
                     receipt_no: "ASN-001".to_string(),
                     document_type: "purchase_inbound".to_string(),
-                    supplier_id: None,
+                    supplier_id: Some(Uuid::new_v4()),
                     warehouse_id: Uuid::new_v4(),
                     external_ref: Some("ERP-ASN-001".to_string()),
                     expected_arrival_at: None,
@@ -497,7 +501,7 @@ mod tests {
             CreateReceivingOrderRequest {
                 receipt_no: "ASN-EMPTY".to_string(),
                 document_type: "purchase_inbound".to_string(),
-                supplier_id: None,
+                supplier_id: Some(Uuid::new_v4()),
                 warehouse_id: Uuid::new_v4(),
                 external_ref: None,
                 expected_arrival_at: None,
@@ -520,7 +524,7 @@ mod tests {
                 CreateReceivingOrderRequest {
                     receipt_no: "ASN-ATOMIC-001".to_string(),
                     document_type: "purchase_inbound".to_string(),
-                    supplier_id: None,
+                    supplier_id: Some(Uuid::new_v4()),
                     warehouse_id: Uuid::new_v4(),
                     external_ref: None,
                     expected_arrival_at: None,
@@ -534,7 +538,7 @@ mod tests {
             &ctx,
             created.id,
             UpdateReceivingOrderRequest {
-                supplier_id: Some(Uuid::new_v4()),
+                supplier_id: None,
                 warehouse_id: Some(Uuid::new_v4()),
                 external_ref: Some(Some("MUST-NOT-PERSIST".to_string())),
                 expected_arrival_at: None,
@@ -605,7 +609,7 @@ mod tests {
             CreateReceivingOrderRequest {
                 receipt_no: "ASN-BAD-TYPE".to_string(),
                 document_type: "purchase_return".to_string(),
-                supplier_id: None,
+                supplier_id: Some(Uuid::new_v4()),
                 warehouse_id: Uuid::new_v4(),
                 external_ref: None,
                 expected_arrival_at: None,
@@ -634,7 +638,7 @@ mod tests {
                 CreateReceivingOrderRequest {
                     receipt_no: "ASN-W3-001".to_string(),
                     document_type: "purchase_inbound".to_string(),
-                    supplier_id: None,
+                    supplier_id: Some(Uuid::new_v4()),
                     warehouse_id: Uuid::new_v4(),
                     external_ref: None,
                     expected_arrival_at: None,
@@ -758,7 +762,7 @@ mod tests {
                 CreateReceivingOrderRequest {
                     receipt_no: "ASN-W3-REJECT".to_string(),
                     document_type: "purchase_inbound".to_string(),
-                    supplier_id: None,
+                    supplier_id: Some(Uuid::new_v4()),
                     warehouse_id: Uuid::new_v4(),
                     external_ref: None,
                     expected_arrival_at: None,
@@ -801,7 +805,7 @@ mod tests {
                 CreateReceivingOrderRequest {
                     receipt_no: "ASN-W3-002".to_string(),
                     document_type: "purchase_inbound".to_string(),
-                    supplier_id: None,
+                    supplier_id: Some(Uuid::new_v4()),
                     warehouse_id: Uuid::new_v4(),
                     external_ref: None,
                     expected_arrival_at: None,

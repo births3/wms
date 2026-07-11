@@ -1,5 +1,41 @@
 use super::*;
 
+pub(super) fn apply_receiving_order_routes() -> Router<Wave3AppState> {
+    Router::new()
+        .route(
+            "/api/v1/inbound/receiving-orders",
+            get(super::list_receiving_orders_handler).post(super::create_receiving_order_handler),
+        )
+        .route(
+            "/api/v1/inbound/receiving-orders/:id",
+            get(get_receiving_order_handler).patch(update_receiving_order_handler),
+        )
+        .route(
+            "/api/v1/inbound/receiving-orders/:id/release",
+            post(release_receiving_order_handler),
+        )
+        .route(
+            "/api/v1/inbound/receiving-orders/:id/receive",
+            post(receive_receiving_order_handler),
+        )
+        .route(
+            "/api/v1/inbound/receiving-orders/:id/reject",
+            post(reject_receiving_order_handler),
+        )
+        .route(
+            "/api/v1/inbound/receiving-orders/:id/inspect",
+            post(super::inspect_receiving_order_handler),
+        )
+        .route(
+            "/api/v1/inbound/receiving-orders/:id/sign",
+            post(super::sign_receiving_order_handler),
+        )
+        .route(
+            "/api/v1/inbound/receiving-orders/:id/putaway",
+            post(super::putaway_receiving_order_handler),
+        )
+}
+
 pub(super) async fn get_receiving_order_handler(
     ctx: AuthContext,
     State(state): State<Wave3AppState>,
@@ -58,6 +94,45 @@ pub(super) async fn update_receiving_order_handler(
         )
         .await;
     }
+    Ok(Json(order))
+}
+
+pub(super) async fn release_receiving_order_handler(
+    ctx: AuthContext,
+    State(state): State<Wave3AppState>,
+    Path(id): Path<Uuid>,
+    headers: HeaderMap,
+) -> Result<Json<ReceivingOrder>, Wave3HandlerError> {
+    ctx.require_permission("m2.write")?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
+    let now = Utc::now();
+    if let Some(repository) = &state.wave3_repository {
+        let audit = AuditWriteRequest::from_auth_context(
+            &ctx,
+            "release",
+            "M2",
+            "receiving_order",
+            id.to_string(),
+            None,
+        );
+        let order = repository
+            .release_receiving_order_with_audit(&ctx, id, now, Some(&idempotency_key), Some(audit))
+            .await?;
+        return Ok(Json(order));
+    }
+    let order = {
+        let mut store = state.inbound_store.lock().await;
+        store.release(&ctx, id, now)?
+    };
+    append_audit(
+        &state,
+        &ctx,
+        "release",
+        "M2",
+        "receiving_order",
+        id.to_string(),
+    )
+    .await;
     Ok(Json(order))
 }
 
