@@ -88,7 +88,7 @@ function OrderDetail({ order }: { order: OutboundOrder }) {
           title="执行摘要"
           rows={[
             ["当前状态", statusLabel(order.status)],
-            ["明细行数", `${order.lines.length} 行`],
+            ["明细行数", `${(order.lines ?? []).length} 行`],
             ["计划数量", `${totalPlannedQty(order)} 件`],
             ["短拣标识", order.short_pick ? "是" : "否"],
           ]}
@@ -112,7 +112,7 @@ function OrderDetail({ order }: { order: OutboundOrder }) {
           ]}
         />
       </div>
-      <Lines title="出库明细" lines={order.lines.map((line) => ({
+      <Lines title="出库明细" lines={(order.lines ?? []).map((line) => ({
         key: String(line.line_no),
         cells: [`#${line.line_no}`, line.product_code, line.batch_no, `${line.planned_qty} 件`],
       }))} />
@@ -128,8 +128,8 @@ function WaveDetail({ wave, orders }: { wave: OutboundWave; orders: OutboundOrde
         rows={[
           ["波次号", wave.wave_no],
           ["当前状态", statusLabel(wave.status)],
-          ["订单数", `${wave.order_ids.length}`],
-          ["明细行数", `${orders.reduce((sum, order) => sum + order.lines.length, 0)}`],
+          ["订单数", `${(wave.order_ids ?? []).length}`],
+          ["明细行数", `${orders.reduce((sum, order) => sum + (order.lines ?? []).length, 0)}`],
           ["路径策略", "S 型最短路径"],
           ["温区", "常温"],
           ["容量上限", "100 单 / 10000 件"],
@@ -265,7 +265,7 @@ function stageLabels(kind: DetailTarget["kind"]) {
 }
 
 function stageIndex(target: DetailTarget) {
-  const status = target.value.status;
+  const status = target.value.status ?? "";
   if (target.kind === "return") {
     if (status === "shipped") return 4;
     if (status === "reviewed") return 3;
@@ -287,7 +287,8 @@ function stageIndex(target: DetailTarget) {
   return 0;
 }
 
-export function statusLabel(status: string) {
+export function statusLabel(status: string | null | undefined) {
+  if (!status) return "-";
   const labels: Record<string, string> = {
     pending_validation: "待校验",
     validation_exception: "校验异常",
@@ -321,7 +322,7 @@ function purchaseReturnApprovalSourceLabel(value: PurchaseReturnOrder["approval_
 }
 
 function totalPlannedQty(order: OutboundOrder) {
-  return order.lines.reduce((sum, line) => sum + line.planned_qty, 0);
+  return (order.lines ?? []).reduce((sum, line) => sum + line.planned_qty, 0);
 }
 
 function shortId(value: string) {

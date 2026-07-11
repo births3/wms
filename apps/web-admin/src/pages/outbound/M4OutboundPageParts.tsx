@@ -27,7 +27,8 @@ export function TextField({
 
 /** 主显：商品编码 + 件数；批号 / 行数 / 校验另列展示 */
 export function ProductSummary({ order }: { order: OutboundOrder }) {
-  const first = order.lines[0];
+  // lines 可能在空查询/不完整载荷中缺失；`order.lines[0]` 会直接抛错拖垮列表壳层
+  const first = order.lines?.[0];
   return (
     <div className="text-sm">
       <div className="font-medium">{first?.product_code ?? "-"}</div>
@@ -59,7 +60,7 @@ export function OrderNoSummary({ order }: { order: OutboundOrder }) {
 }
 
 export function BatchNoCell({ order }: { order: OutboundOrder }) {
-  const first = order.lines[0];
+  const first = order.lines?.[0];
   return <span className="font-mono text-sm">{first?.batch_no ?? "-"}</span>;
 }
 
@@ -167,5 +168,5 @@ function StaticField({ label, defaultValue, placeholder }: { label: string; defa
 }
 
 function lineTotalPlannedQty(order: OutboundOrder) {
-  return order.lines.reduce((sum, line) => sum + line.planned_qty, 0);
+  return (order.lines ?? []).reduce((sum, line) => sum + line.planned_qty, 0);
 }

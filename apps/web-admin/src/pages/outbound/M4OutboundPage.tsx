@@ -262,7 +262,7 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
 
   const waveColumns: DataGridColumn<OutboundWave>[] = [
     { key: "wave_no", header: "波次号", mono: true, minWidth: 180, onDoubleClick: (row) => openWaveDetail(row.id), render: (row) => <span className="text-primary">{row.wave_no}</span> },
-    { key: "orders", header: "订单 / 明细", minWidth: 140, render: (row) => `${row.order_ids.length} 单 / ${waveLineCount(row, orders)} 行` },
+    { key: "orders", header: "订单 / 明细", minWidth: 140, render: (row) => `${(row.order_ids ?? []).length} 单 / ${waveLineCount(row, orders)} 行` },
     { key: "qty", header: "件数 / 温区", align: "right", minWidth: 130, render: (row) => `${waveQty(row, orders)} 件 / 常温` },
     { key: "route", header: "路径策略 / 容量", minWidth: 180, render: () => <TwoLine top="S 型最短路径" bottom="容量上限 100 单 / 10000 件" /> },
     { key: "created_at", header: "创建时间", minWidth: 150, filter: { type: "dateRange" }, render: (row) => formatDate(row.created_at) },
@@ -307,7 +307,7 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
     const wave = waves.find((item) => item.id === id);
     if (!wave) return;
     setSelectedId(id);
-    setDetailTarget({ kind: "wave", value: wave, orders: orders.filter((order) => wave.order_ids.includes(order.id)) });
+    setDetailTarget({ kind: "wave", value: wave, orders: orders.filter((order) => (wave.order_ids ?? []).includes(order.id)) });
     setDetailOpen(true);
   }
 
@@ -377,8 +377,11 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
       const now = new Date().toISOString();
       const order = makeOrder(crypto.randomUUID(), createForm.wmsOrderNo, createForm.erpOrderNo, "pending_validation", toInteger(createForm.plannedQty), false, now);
       order.required_ship_at = createForm.requiredShipDate ? `${createForm.requiredShipDate}T09:00:00.000Z` : order.required_ship_at;
-      order.lines[0].product_code = createForm.productCode;
-      order.lines[0].batch_no = createForm.batchNo;
+      const firstLine = order.lines?.[0];
+      if (firstLine) {
+        firstLine.product_code = createForm.productCode;
+        firstLine.batch_no = createForm.batchNo;
+      }
       setOrders((value) => [order, ...value]);
       setLastEvent(`${order.wms_order_no} 已创建`);
       return;
@@ -809,7 +812,8 @@ function statusOptions(mode: M4OutboundMode) {
   return [["pending_validation", "待校验"], ["validation_exception", "校验异常"], ["confirmed", "已确认"], ["inventory_locked", "库存锁定"], ["reviewed", "已复核"], ["shipped", "已发货"]];
 }
 
-function statusKey(status: string): StatusKey {
+function statusKey(status: string | null | undefined): StatusKey {
+  if (!status) return "pending";
   if (status.includes("exception") || status === "cancelled") return "unqualified";
   if (status === "completed" || status === "shipped" || status === "signed") return "completed";
   if (status === "inventory_locked" || status === "reviewed" || status === "released" || status === "pickup" || status === "inspecting" || status === "picking") return "in_progress";
@@ -838,7 +842,8 @@ function filterOrders(orders: OutboundOrder[], query: QueryPanelValue, mode: M4O
   const statuses = new Set(queryStringArray(query.statusFilter));
   const businessDate = queryRange(query.businessDate);
   return orders.filter((order) => {
-    const searchable = [order.wms_order_no, order.erp_order_no ?? "", order.customer_id, order.status, ...order.lines.flatMap((line) => [line.product_code, line.batch_no])].join(" ").toLowerCase();
+    const lines = order.lines ?? [];
+    const searchable = [order.wms_order_no, order.erp_order_no ?? "", order.customer_id, order.status ?? "", ...lines.flatMap((line) => [line.product_code, line.batch_no])].join(" ").toLowerCase();
     return (!allowed || allowed.has(order.status)) && matches(searchable, keyword) && matchesStatus(order.status, statuses) && dateInRange(order.required_ship_at, businessDate);
   });
 }
@@ -945,15 +950,17 @@ function makeReturn(returnNo: string): PurchaseReturnOrder {
 }
 
 function totalPlannedQty(order: OutboundOrder) {
-  return order.lines.reduce((sum, line) => sum + line.planned_qty, 0);
+  return (order.lines ?? []).reduce((sum, line) => sum + line.planned_qty, 0);
 }
 
 function waveQty(wave: OutboundWave, orders: OutboundOrder[]) {
-  return orders.filter((order) => wave.order_ids.includes(order.id)).reduce((sum, order) => sum + totalPlannedQty(order), 0);
+  const orderIds = wave.order_ids ?? [];
+  return orders.filter((order) => orderIds.includes(order.id)).reduce((sum, order) => sum + totalPlannedQty(order), 0);
 }
 
 function waveLineCount(wave: OutboundWave, orders: OutboundOrder[]) {
-  return orders.filter((order) => wave.order_ids.includes(order.id)).reduce((sum, order) => sum + order.lines.length, 0);
+  const orderIds = wave.order_ids ?? [];
+  return orders.filter((order) => orderIds.includes(order.id)).reduce((sum, order) => sum + (order.lines ?? []).length, 0);
 }
 
 function formatDate(value: string | null | undefined) {
