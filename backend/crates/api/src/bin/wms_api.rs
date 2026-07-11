@@ -396,6 +396,7 @@ struct AuditEventQueryParams {
 #[derive(Debug)]
 enum AuditQueryError {
     InvalidCursor,
+    PermissionDenied,
     Query,
 }
 
@@ -413,6 +414,9 @@ impl IntoResponse for AuditQueryError {
                 "H2_AUDIT_QUERY_CURSOR_INVALID",
                 "审计查询游标格式无效",
             ),
+            AuditQueryError::PermissionDenied => {
+                (StatusCode::FORBIDDEN, "AUTH_003", "缺少审计查询权限")
+            }
             AuditQueryError::Query => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "H2_AUDIT_QUERY_FAILED",
@@ -440,6 +444,8 @@ async fn list_audit_events_handler(
     State(state): State<AuditQueryState>,
     Query(params): Query<AuditEventQueryParams>,
 ) -> Result<Json<AuditEventListResponse>, AuditQueryError> {
+    ctx.require_permission("audit.read")
+        .map_err(|_| AuditQueryError::PermissionDenied)?;
     let query = AuditEventQuery {
         owner_id: ctx.owner_id,
         resource_type: params.resource_type,
@@ -678,7 +684,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn audit_events_route_requires_auth_context() {
+    async fn audit_events_route_requires_auth_and_permission() {
         let pool = sqlx::PgPool::connect_lazy("postgres://localhost/wms")
             .expect("lazy pool should not connect during auth rejection test");
         let app = app(
@@ -697,6 +703,7 @@ mod tests {
         ))));
 
         let response = app
+            .clone()
             .oneshot(
                 Request::builder()
                     .uri("/api/v1/audit/events")
@@ -707,6 +714,22 @@ mod tests {
             .expect("router should respond");
 
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/audit/events")
+                    .header(
+                        "authorization",
+                        format!("Bearer {}", bearer_token(Uuid::new_v4())),
+                    )
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
     }
 
     #[tokio::test]

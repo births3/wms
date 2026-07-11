@@ -142,6 +142,7 @@ pub(crate) fn rollback_admin_menu() {}
     responses(
         (status = 200, description = "审计事件列表", body = AuditEventListResponse),
         (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
     ),
 )]
 #[allow(dead_code)]
