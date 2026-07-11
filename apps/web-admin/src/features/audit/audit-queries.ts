@@ -7,8 +7,6 @@ import { api } from "@/lib/api";
 export type AuditEvent = components["schemas"]["AuditEvent"];
 
 export interface AuditEventQueryParams {
-  keyword?: string;
-  action?: string;
   resourceType?: string;
   actorId?: string;
   from?: string;
@@ -25,10 +23,7 @@ export interface AuditEventRow {
   resourceType: string;
   resourceId: string;
   objectLabel: string;
-  result: "success" | "failed";
-  resultLabel: string;
   traceId: string;
-  searchText: string;
 }
 
 export const auditQueryKey = ["audit"] as const;
@@ -55,19 +50,10 @@ async function listAuditEvents(params: AuditEventQueryParams): Promise<AuditEven
   if (!result.data) {
     throw new ApiError(result.error, "读取审计事件失败", result.response.status);
   }
-  const keyword = (params.keyword ?? "").trim().toLowerCase();
-  const actionFilter = (params.action ?? "").trim().toLowerCase();
-  return result.data.data
-    .map(mapAuditEventRow)
-    .filter((row) => {
-      if (actionFilter && !row.action.toLowerCase().includes(actionFilter)) return false;
-      if (!keyword) return true;
-      return row.searchText.includes(keyword);
-    });
+  return result.data.data.map(mapAuditEventRow);
 }
 
 function mapAuditEventRow(event: AuditEvent): AuditEventRow {
-  const result = deriveResult(event.action, event.diff);
   const objectLabel = `${event.resource_type} / ${event.resource_id}`;
   return {
     id: String(event.id),
@@ -78,26 +64,8 @@ function mapAuditEventRow(event: AuditEvent): AuditEventRow {
     resourceType: event.resource_type,
     resourceId: event.resource_id,
     objectLabel,
-    result,
-    resultLabel: result === "success" ? "成功" : "失败",
     traceId: event.trace_id,
-    searchText: [
-      event.action,
-      event.actor.actor_name,
-      event.actor.actor_id,
-      event.resource_type,
-      event.resource_id,
-      event.trace_id,
-    ]
-      .join(" ")
-      .toLowerCase(),
   };
-}
-
-function deriveResult(action: string, diff: Record<string, unknown>): "success" | "failed" {
-  const text = `${action} ${JSON.stringify(diff)}`.toLowerCase();
-  if (/(fail|failed|reject|rejected|error|驳回|失败)/.test(text)) return "failed";
-  return "success";
 }
 
 function emptyToUndefined(value?: string) {

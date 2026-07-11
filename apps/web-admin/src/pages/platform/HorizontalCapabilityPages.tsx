@@ -22,20 +22,6 @@ import {
 
 const h2AuditQueryFields: QueryPanelField[] = [
   {
-    key: "keyword",
-    label: "关键字",
-    type: "text",
-    placeholder: "操作者 / 动作 / 对象 / Trace",
-    ariaLabel: "搜索审计事件",
-  },
-  {
-    key: "action",
-    label: "动作",
-    type: "text",
-    placeholder: "例如 验收提交、出库复核",
-    ariaLabel: "按动作过滤",
-  },
-  {
     key: "resourceType",
     label: "对象类型",
     type: "select",
@@ -53,7 +39,7 @@ const h2AuditQueryFields: QueryPanelField[] = [
     type: "dateRange",
   },
 ];
-const h2AuditCoreQueryFieldKeys = ["keyword", "action", "resourceType", "occurredAt"];
+const h2AuditCoreQueryFieldKeys = ["resourceType", "occurredAt"];
 
 const h2AuditColumns: DataGridColumn<AuditEventRow>[] = [
   {
@@ -101,30 +87,6 @@ const h2AuditColumns: DataGridColumn<AuditEventRow>[] = [
     filterValue: (row) => row.objectLabel,
     copyValue: (row) => row.objectLabel,
     filter: { type: "text" },
-  },
-  {
-    key: "result",
-    header: "结果",
-    width: 120,
-    minWidth: 100,
-    sortable: true,
-    sortValue: (row) => row.result,
-    filterValue: (row) => row.result,
-    copyValue: (row) => row.resultLabel,
-    filter: {
-      type: "multiSelect",
-      options: [
-        { label: "成功", value: "success" },
-        { label: "失败", value: "failed" },
-      ],
-    },
-    render: (row) => (
-      <StatusBadge
-        status={row.result === "success" ? "completed" : "unqualified"}
-        label={row.resultLabel}
-        size="sm"
-      />
-    ),
   },
   {
     key: "traceId",
@@ -219,13 +181,13 @@ export function H2AuditTrailPage() {
             ? "加载审计事件..."
             : eventsQuery.isFetching
               ? "刷新中..."
-              : `共 ${rows.length} 条 · 按时间倒序`
+              : `当前页 ${rows.length} 条 · 按时间倒序`
         }
         emptyTitle={eventsQuery.isError ? "读取审计事件失败" : "暂无匹配的审计事件"}
         emptyDescription={
           eventsQuery.isError
             ? eventsQuery.error.message
-            : "可调整时间范围、关键字或动作后重新查询"
+            : "可调整对象类型或时间范围后重新查询"
         }
         exportFileBaseName="H2 审计追踪"
         tableClassName="min-w-[1100px]"
@@ -322,8 +284,6 @@ export function H3ApiContractPage() {
 
 function defaultH2QueryValue(): QueryPanelValue {
   return {
-    keyword: "",
-    action: "",
     resourceType: "",
     occurredAt: { from: "", to: "" },
   };
@@ -331,8 +291,6 @@ function defaultH2QueryValue(): QueryPanelValue {
 
 function normalizeH2QueryValue(value: QueryPanelValue): QueryPanelValue {
   return {
-    keyword: queryString(value.keyword),
-    action: queryString(value.action),
     resourceType: queryString(value.resourceType),
     occurredAt: queryRange(value.occurredAt),
   };
@@ -342,8 +300,6 @@ function normalizeH2Query(value: QueryPanelValue) {
   const normalized = normalizeH2QueryValue(value);
   const range = queryRange(normalized.occurredAt);
   return {
-    keyword: queryString(normalized.keyword),
-    action: queryString(normalized.action),
     resourceType: queryString(normalized.resourceType),
     from: toRfc3339Start(range.from ?? ""),
     to: toRfc3339End(range.to ?? ""),
@@ -368,13 +324,13 @@ function queryRange(value: QueryPanelValue[string]): QueryPanelRangeValue {
 function toRfc3339Start(value: string) {
   if (!value) return undefined;
   if (value.includes("T")) return value;
-  return `${value}T00:00:00.000Z`;
+  return new Date(`${value}T00:00:00`).toISOString();
 }
 
 function toRfc3339End(value: string) {
   if (!value) return undefined;
   if (value.includes("T")) return value;
-  return `${value}T23:59:59.999Z`;
+  return new Date(`${value}T23:59:59.999`).toISOString();
 }
 
 function formatDateTime(value: string) {

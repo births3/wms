@@ -102,9 +102,10 @@ try {
   assert.match(pageSource, /createSignFormForCurrentUser/, "打开验收时第一签字人默认当前用户账号");
   assert.match(pageSource, /INSPECTION_DUAL_SIGN_REQUIRED_BY_STRATEGY \|\| signForm\.dualRequired/, "提交验收时 dualRequired 必须被策略锁定");
   assert.match(pageSource, /firstSignerId: "当前用户 \/ 工号"/, "第一签字人 placeholder 应为当前用户/工号类文案");
-  assert.match(pageSource, /secondSignerExample = "receiver\.pc"/, "第二签字人示例应为可读账号而非 UUID");
+  assert.match(pageSource, /secondSignerExample = "00000000-0000-0000-0000-000000000102"/, "第二签字人示例应符合 UUID 契约");
   assert.doesNotMatch(pageSource, /firstSignerId: `例如 \$\{firstSignerId\}`|secondSignerId: `例如 \$\{secondSignerId\}`/, "签字人 placeholder 不得以 UUID 样例为主");
-  assert.match(dialogSource, /label="第二人账号\/工号"/, "第二签字人 label 应为第二人账号/工号");
+  assert.match(dialogSource, /label="第二签字人 ID"/, "第二签字人 label 应明确要求用户 ID");
+  assert.match(pageSource, /if \(!isUuid\(firstSignerId\) \|\| \(secondSignerId !== null && !isUuid\(secondSignerId\)\)\)/, "签字 ID 必须在验收提交前校验");
   assert.match(dialogSource, /disabled=\{INSPECTION_DUAL_SIGN_REQUIRED_BY_STRATEGY\}/, "策略要求时双人签字 checkbox 必须 disabled");
   assert.match(dialogSource, /策略要求，不可关闭/, "策略锁定需有可读提示");
   assert.match(dialogSource, /SelectField label="质量状态"[\s\S]*\["qualified", "合格"\]/, "质量状态选项需中文");

@@ -212,14 +212,14 @@ export async function updateWarehouse(input: {
 }
 
 export async function createLocation(request: CreateLocationRequest): Promise<MasterDataRow> {
-  const [result, locationTypeOptions, warehouseRefs] = await Promise.all([
-    api.POST("/api/v1/master-data/locations", { body: request }),
-    listSystemDictionaryItemOptions("location_type"),
-    listWarehouseRefs(),
-  ]);
+  const result = await api.POST("/api/v1/master-data/locations", { body: request });
   if (!result.data) {
     throw new ApiError(result.error, "新建库位失败", result.response.status);
   }
+  const [locationTypeOptions, warehouseRefs] = await Promise.all([
+    listSystemDictionaryItemOptions("location_type").catch(() => []),
+    listWarehouseRefs().catch(() => new Map<string, WarehouseRef>()),
+  ]);
   return locationRow(result.data, new Map(locationTypeOptions), warehouseRefs);
 }
 
@@ -227,17 +227,17 @@ export async function updateLocation(input: {
   id: string;
   request: UpdateLocationRequest;
 }): Promise<MasterDataRow> {
-  const [result, locationTypeOptions, warehouseRefs] = await Promise.all([
-    api.PATCH("/api/v1/master-data/locations/{id}", {
-      params: { path: { id: input.id } },
-      body: input.request,
-    }),
-    listSystemDictionaryItemOptions("location_type"),
-    listWarehouseRefs(),
-  ]);
+  const result = await api.PATCH("/api/v1/master-data/locations/{id}", {
+    params: { path: { id: input.id } },
+    body: input.request,
+  });
   if (!result.data) {
     throw new ApiError(result.error, "保存库位失败", result.response.status);
   }
+  const [locationTypeOptions, warehouseRefs] = await Promise.all([
+    listSystemDictionaryItemOptions("location_type").catch(() => []),
+    listWarehouseRefs().catch(() => new Map<string, WarehouseRef>()),
+  ]);
   return locationRow(result.data, new Map(locationTypeOptions), warehouseRefs);
 }
 

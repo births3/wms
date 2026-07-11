@@ -359,7 +359,7 @@ export function M2InboundDialogs({
             <section className="grid gap-3 rounded-md border bg-muted/20 p-3 md:col-span-2 md:grid-cols-2">
               <div className="text-xs font-medium text-muted-foreground md:col-span-2">验收复核</div>
               <TextField label="第一签字人" required placeholder={inspectExamples.firstSignerId} value={signForm.firstSignerId} onChange={(firstSignerId) => setSignForm((value) => ({ ...value, firstSignerId }))} />
-              <TextField label="第二人账号/工号" required={signForm.dualRequired} placeholder={inspectExamples.secondSignerId} value={signForm.secondSignerId} onChange={(secondSignerId) => setSignForm((value) => ({ ...value, secondSignerId }))} />
+              <TextField label="第二签字人 ID" required={signForm.dualRequired} placeholder={inspectExamples.secondSignerId} value={signForm.secondSignerId} onChange={(secondSignerId) => setSignForm((value) => ({ ...value, secondSignerId }))} />
               <TextField label="策略命中说明" placeholder={inspectExamples.strategyNote} value={signForm.strategyNote} onChange={(strategyNote) => setSignForm((value) => ({ ...value, strategyNote }))} />
               <TextField label="签字备注" value={signForm.note} onChange={(note) => setSignForm((value) => ({ ...value, note }))} />
               <label className="flex items-center gap-2 text-sm text-muted-foreground md:col-span-2">

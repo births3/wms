@@ -86,7 +86,7 @@
       "source": "apps/web-admin/src/pages/platform/HorizontalCapabilityPages.tsx",
       "fieldConstant": "h2AuditQueryFields",
       "coreConstant": "h2AuditCoreQueryFieldKeys",
-      "core": ["keyword", "action", "resourceType", "occurredAt"],
+      "core": ["resourceType", "occurredAt"],
       "more": []
     },
     {

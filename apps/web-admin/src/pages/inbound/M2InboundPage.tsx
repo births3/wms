@@ -68,7 +68,7 @@ interface M2InboundPageProps {
 }
 
 /** 可读示例账号（placeholder / 第二收货员默认提示），勿用 UUID 样例。 */
-const secondSignerExample = "receiver.pc";
+const secondSignerExample = "00000000-0000-0000-0000-000000000102";
 const defaultLocationId = "00000000-0000-0000-0000-000000000201";
 const defaultLocationCode = "A-01-01";
 const emptyCreateForm: CreateFormState = {
@@ -437,6 +437,14 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
     const secondSignerId = dualRequired
       ? resolveSignerIdForSubmit(secondSignerInput, currentUser, { allowCurrentUser: false })
       : null;
+    if (!isUuid(firstSignerId) || (secondSignerId !== null && !isUuid(secondSignerId))) {
+      setLastEvent("签字人必须填写有效的用户 ID");
+      return;
+    }
+    if (secondSignerId === firstSignerId) {
+      setLastEvent("第二签字人不能与第一签字人相同");
+      return;
+    }
     await inspectMutation.mutateAsync({
       id: order.id,
       request: {
@@ -627,7 +635,7 @@ function createSignFormForCurrentUser(
 
 /**
  * 签字字段展示账号/工号；提交时若匹配当前登录用户则映射为 user_id（API 契约为 id）。
- * 未匹配时透传输入，兼容手填 UUID 或后续账号解析。
+ * 未匹配时仅允许手填 UUID；账号解析需等待受控人员目录接口。
  */
 function resolveSignerIdForSubmit(
   input: string,
@@ -644,6 +652,10 @@ function resolveSignerIdForSubmit(
     return user.user_id;
   }
   return input;
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 function defaultM2InboundQueryValue(
