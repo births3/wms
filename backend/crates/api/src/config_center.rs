@@ -10,6 +10,7 @@ use axum::{
     Json, Router,
 };
 use chrono::{DateTime, Utc};
+use sqlx::PgPool;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 use wms_domain::{
@@ -20,6 +21,7 @@ use wms_domain::{
 };
 
 use crate::{
+    audit::{append_event, AuditWriteRequest},
     auth::{AuthContext, AuthError},
     feature_flags::FeatureFlagRegistry,
 };
@@ -52,6 +54,7 @@ pub struct ConfigCenterStore {
 pub struct ConfigCenterAppState {
     store: Arc<Mutex<ConfigCenterStore>>,
     file_registry: Arc<FeatureFlagRegistry>,
+    pool: Option<PgPool>,
 }
 
 impl Default for ConfigCenterAppState {
@@ -65,7 +68,38 @@ impl ConfigCenterAppState {
         Self {
             store: Arc::new(Mutex::new(ConfigCenterStore::default())),
             file_registry: Arc::new(file_registry),
+            pool: None,
         }
+    }
+
+    pub fn with_postgres(file_registry: FeatureFlagRegistry, pool: PgPool) -> Self {
+        Self {
+            pool: Some(pool),
+            ..Self::from_registry(file_registry)
+        }
+    }
+
+    async fn append_feature_flag_audit(
+        &self,
+        ctx: &AuthContext,
+        action: &str,
+    ) -> Result<(), ConfigCenterHandlerError> {
+        if let Some(pool) = &self.pool {
+            append_event(
+                pool,
+                &AuditWriteRequest::from_auth_context(
+                    ctx,
+                    action,
+                    "M1",
+                    "feature_flag",
+                    "feature_flags",
+                    None,
+                ),
+            )
+            .await
+            .map_err(|error| ConfigCenterHandlerError::Audit(format!("{error:?}")))?;
+        }
+        Ok(())
     }
 
     pub async fn migrate_feature_flags_from_file(&self) -> FeatureFlagMigrationResult {
@@ -118,6 +152,7 @@ impl ConfigCenterAppState {
 pub enum ConfigCenterHandlerError {
     Auth(AuthError),
     ConfigCenter(ConfigCenterError),
+    Audit(String),
 }
 
 impl From<AuthError> for ConfigCenterHandlerError {
@@ -139,6 +174,11 @@ impl IntoResponse for ConfigCenterHandlerError {
         }
 
         let (status, code, message) = match self {
+            ConfigCenterHandlerError::Audit(_) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "M1_CONFIG_AUDIT_FAILED",
+                "Feature Flag 审计写入失败",
+            ),
             ConfigCenterHandlerError::ConfigCenter(ConfigCenterError::MissingFlag(_)) => (
                 StatusCode::NOT_FOUND,
                 CONFIG_FLAG_MISSING_CODE,
@@ -367,7 +407,14 @@ async fn migrate_feature_flags_handler(
     State(state): State<ConfigCenterAppState>,
 ) -> Result<Json<FeatureFlagMigrationResult>, ConfigCenterHandlerError> {
     ctx.require_permission("m1.config.write")?;
-    Ok(Json(state.migrate_feature_flags_from_file().await))
+    let mut store = state.store.lock().await;
+    let mut next = store.clone();
+    let result = next.migrate_feature_flags_from_file(&state.file_registry);
+    state
+        .append_feature_flag_audit(&ctx, "migrate_feature_flags")
+        .await?;
+    *store = next;
+    Ok(Json(result))
 }
 
 async fn reconcile_feature_flags_handler(
@@ -392,7 +439,14 @@ async fn import_feature_flags_handler(
     Json(req): Json<FeatureFlagBatchImportRequest>,
 ) -> Result<Json<FeatureFlagBatchImportResult>, ConfigCenterHandlerError> {
     ctx.require_permission("m1.config.write")?;
-    Ok(Json(state.import_feature_flags_batch(req.flags).await))
+    let mut store = state.store.lock().await;
+    let mut next = store.clone();
+    let result = next.import_feature_flags_batch(req.flags);
+    state
+        .append_feature_flag_audit(&ctx, "import_feature_flags")
+        .await?;
+    *store = next;
+    Ok(Json(result))
 }
 
 async fn switch_feature_flag_source_handler(
@@ -408,7 +462,14 @@ async fn switch_feature_flag_source_handler(
             return Err(ConfigCenterError::InvalidFeatureFlagSource(other.to_string()).into());
         }
     };
-    Ok(Json(state.switch_feature_flag_source(source).await))
+    let mut store = state.store.lock().await;
+    let mut next = store.clone();
+    let result = next.switch_feature_flag_source(source);
+    state
+        .append_feature_flag_audit(&ctx, "switch_feature_flag_source")
+        .await?;
+    *store = next;
+    Ok(Json(result))
 }
 
 async fn archive_feature_flag_file_source_handler(
@@ -417,11 +478,14 @@ async fn archive_feature_flag_file_source_handler(
     Json(req): Json<FeatureFlagArchiveRequest>,
 ) -> Result<Json<FeatureFlagArchiveResult>, ConfigCenterHandlerError> {
     ctx.require_permission("m1.config.write")?;
-    Ok(Json(
-        state
-            .archive_file_feature_flags(req.archive_ref, Utc::now())
-            .await,
-    ))
+    let mut store = state.store.lock().await;
+    let next = store.clone();
+    let result = next.archive_file_feature_flags(req.archive_ref, Utc::now());
+    state
+        .append_feature_flag_audit(&ctx, "archive_feature_flag_file_source")
+        .await?;
+    *store = next;
+    Ok(Json(result))
 }
 
 #[cfg(test)]

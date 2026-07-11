@@ -22,6 +22,7 @@ use wms_api::{
     feature_flags::FeatureFlagRegistry,
     h2_lifecycle_handlers::{h2_lifecycle_router, H2LifecycleAppState},
     master_data_handlers::{master_data_router, MasterDataAppState},
+    parameter_mapping::{parameter_mapping_router, ParameterMappingAppState},
     print_template_handlers::{print_template_router, PrintTemplateAppState},
     reports_handlers::mount_reports,
     resilience::{resilience_middleware, resilience_status, ResilienceState},
@@ -103,7 +104,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .connect(&database_url)
         .await
         .map_err(|error| io::Error::other(format!("failed to connect PostgreSQL: {error:?}")))?;
-    let config_center_state = ConfigCenterAppState::from_registry(file_registry);
+    let config_center_state = ConfigCenterAppState::with_postgres(file_registry, pool.clone());
     let auth_state = AuthAppState::new(pool.clone());
     let audit_query_state = AuditQueryState { pool: pool.clone() };
     let master_data_state = MasterDataAppState::with_postgres(pool.clone());
@@ -217,6 +218,8 @@ fn app(
     let admin_menu_state = AdminMenuAppState::with_postgres(audit_query_state.pool.clone());
     let h2_lifecycle_state = H2LifecycleAppState::with_postgres(audit_query_state.pool.clone());
     let wechat_notify_state = WechatNotifyAppState::with_postgres(audit_query_state.pool.clone());
+    let parameter_mapping_state =
+        ParameterMappingAppState::with_postgres(audit_query_state.pool.clone());
     let resilience_state =
         ResilienceState::from_env().with_audit_pool(audit_query_state.pool.clone());
     Router::new()
@@ -238,6 +241,7 @@ fn app(
         .merge(h2_lifecycle_router(h2_lifecycle_state))
         .merge(config_center_router(config_center_state))
         .merge(master_data_router(master_data_state))
+        .merge(parameter_mapping_router(parameter_mapping_state))
         .merge(admin_menu_router(admin_menu_state))
         .merge(system_dictionary_router(system_dictionary_state))
         .merge(state_machine_router())
