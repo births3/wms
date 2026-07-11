@@ -367,16 +367,18 @@ test("H2 H3 基础能力能通过三层菜单打开", async ({ page }) => {
 
   await page.getByRole("button", { name: "基础能力" }).click();
   await page.getByRole("button", { name: "H2 审计能力" }).click();
-  await page.getByRole("button", { name: /H2 审计追踪/ }).click();
+  // 与快捷入口按钮区分：侧栏菜单 accessible name 含 view id
+  await page.getByRole("button", { name: "H2 审计追踪 h2-audit-trail", exact: true }).click();
 
   const h2Page = page.locator("section").filter({ has: page.getByRole("heading", { name: "H2 审计追踪" }) });
-  await expect(h2Page.getByText("GET /api/v1/audit/events")).toBeVisible();
+  await expect(h2Page.getByRole("heading", { name: "H2 审计追踪" })).toBeVisible();
+  await expect(h2Page.getByText(/GET \/api\/v1\/audit\/events/).first()).toBeVisible();
   await page.screenshot({ path: path.join(artifactsDir, "h2-audit-trail.png"), fullPage: false });
 
   await page.getByRole("button", { name: "H3 契约能力" }).click();
-  await page.getByRole("button", { name: /H3 OpenAPI/ }).click();
+  await page.getByRole("button", { name: "H3 OpenAPI h3-api-contract", exact: true }).click();
   const h3Page = page.locator("section").filter({ has: page.getByRole("heading", { name: "H3 OpenAPI 契约" }) });
-  await expect(h3Page.getByText("GET /openapi.json")).toBeVisible();
+  await expect(h3Page.getByText(/GET \/openapi\.json/).first()).toBeVisible();
   await page.screenshot({ path: path.join(artifactsDir, "h3-api-contract.png"), fullPage: false });
 });
 
@@ -389,7 +391,7 @@ test("H5 快递对接能通过三层菜单打开", async ({ page }) => {
 
   await page.getByRole("button", { name: "基础能力" }).click();
   await page.getByRole("button", { name: "H5 快递能力" }).click();
-  await page.getByRole("button", { name: /H5 快递对接/ }).click();
+  await page.getByRole("button", { name: "H5 快递对接 h5-express", exact: true }).click();
 
   const h5Page = page.locator("section").filter({ has: page.getByRole("heading", { name: "H5 快递对接" }) });
   await expect(h5Page.getByRole("heading", { name: "快递商配置" })).toBeVisible();

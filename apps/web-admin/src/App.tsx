@@ -831,7 +831,7 @@ function Dashboard({
               </Button>
               <Button type="button" variant="outline" onClick={onOpenH2Audit}>
                 <History className="size-4" aria-hidden />
-                H2 审计追踪
+                H2 审计
               </Button>
             </div>
           </div>
