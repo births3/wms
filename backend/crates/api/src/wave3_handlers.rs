@@ -1121,11 +1121,11 @@ mod tests {
             ctx(owner_id, &[]),
             State(state.clone()),
             Path(created.id),
+            idempotency_headers("update-denied"),
             Json(UpdateReceivingOrderRequest {
                 supplier_id: None,
                 warehouse_id: None,
                 external_ref: Some(Some("ERP-UPDATED".to_string())),
-                status: None,
                 expected_arrival_at: None,
                 lines: None,
             }),
@@ -1137,15 +1137,34 @@ mod tests {
                 if permission == "m2.write"
         ));
 
-        let updated = update_receiving_order_handler(
-            authorized,
+        let missing_key = update_receiving_order_handler(
+            authorized.clone(),
             State(state.clone()),
             Path(created.id),
+            HeaderMap::new(),
             Json(UpdateReceivingOrderRequest {
                 supplier_id: None,
                 warehouse_id: None,
                 external_ref: Some(Some("ERP-UPDATED".to_string())),
-                status: None,
+                expected_arrival_at: None,
+                lines: None,
+            }),
+        )
+        .await;
+        assert!(matches!(
+            missing_key,
+            Err(Wave3HandlerError::MissingIdempotencyKey)
+        ));
+
+        let updated = update_receiving_order_handler(
+            authorized,
+            State(state.clone()),
+            Path(created.id),
+            idempotency_headers("update-authorized"),
+            Json(UpdateReceivingOrderRequest {
+                supplier_id: None,
+                warehouse_id: None,
+                external_ref: Some(Some("ERP-UPDATED".to_string())),
                 expected_arrival_at: None,
                 lines: None,
             }),
@@ -1166,27 +1185,6 @@ mod tests {
         assert_eq!(diff.before["external_ref"], serde_json::Value::Null);
         assert_eq!(diff.after["external_ref"], "ERP-UPDATED");
         drop(audit);
-
-        let status_bypass = update_receiving_order_handler(
-            ctx(owner_id, &["m2.write"]),
-            State(state),
-            Path(created.id),
-            Json(UpdateReceivingOrderRequest {
-                supplier_id: None,
-                warehouse_id: None,
-                external_ref: None,
-                status: Some("completed".to_string()),
-                expected_arrival_at: None,
-                lines: None,
-            }),
-        )
-        .await;
-        assert!(matches!(
-            status_bypass,
-            Err(Wave3HandlerError::Receiving(
-                crate::inbound::ReceivingOrderError::InvalidStatus { .. }
-            ))
-        ));
     }
 
     #[tokio::test]

@@ -4137,7 +4137,6 @@ export interface components {
             expected_arrival_at?: string | null;
             external_ref?: string | null;
             lines?: components["schemas"]["ReceivingOrderLine"][] | null;
-            status?: string | null;
             /** Format: uuid */
             supplier_id?: string | null;
             /** Format: uuid */
@@ -6607,7 +6606,10 @@ export interface operations {
     update_receiving_order: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
             path: {
                 /** @description 收货单 ID */
                 id: string;
@@ -6629,8 +6631,44 @@ export interface operations {
                     "application/json": components["schemas"]["ReceivingOrder"];
                 };
             };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description 未登录 */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等键冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 状态或字段校验失败 */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

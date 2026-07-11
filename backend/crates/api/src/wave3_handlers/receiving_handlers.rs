@@ -18,9 +18,11 @@ pub(super) async fn update_receiving_order_handler(
     ctx: AuthContext,
     State(state): State<Wave3AppState>,
     Path(id): Path<Uuid>,
+    headers: HeaderMap,
     Json(req): Json<UpdateReceivingOrderRequest>,
 ) -> Result<Json<ReceivingOrder>, Wave3HandlerError> {
     ctx.require_permission("m2.write")?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
     let now = Utc::now();
     let (order, audit_diff) = if let Some(repository) = &state.wave3_repository {
         let audit = AuditWriteRequest::from_auth_context(
@@ -33,7 +35,7 @@ pub(super) async fn update_receiving_order_handler(
         );
         (
             repository
-                .update_receiving_order(&ctx, id, req, now, audit)
+                .update_receiving_order(&ctx, id, req, now, &idempotency_key, audit)
                 .await?,
             None,
         )

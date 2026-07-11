@@ -112,12 +112,6 @@ impl ReceivingOrderStore {
         if order.owner_id != ctx.owner_id {
             return Err(ReceivingOrderError::NotFound);
         }
-        if req.status.is_some() {
-            return Err(ReceivingOrderError::InvalidStatus {
-                expected: "workflow action",
-                actual: order.status.clone(),
-            });
-        }
         if order.status != "draft" {
             return Err(ReceivingOrderError::InvalidStatus {
                 expected: "draft",
@@ -543,7 +537,6 @@ mod tests {
                 supplier_id: Some(Uuid::new_v4()),
                 warehouse_id: Some(Uuid::new_v4()),
                 external_ref: Some(Some("MUST-NOT-PERSIST".to_string())),
-                status: None,
                 expected_arrival_at: None,
                 lines: Some(Vec::new()),
             },
@@ -586,7 +579,6 @@ mod tests {
                     supplier_id: None,
                     warehouse_id: None,
                     external_ref: Some(None),
-                    status: None,
                     expected_arrival_at: None,
                     lines: None,
                 },

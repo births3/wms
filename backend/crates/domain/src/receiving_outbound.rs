@@ -49,6 +49,7 @@ pub struct CreateReceivingOrderRequest {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct UpdateReceivingOrderRequest {
     pub supplier_id: Option<Uuid>,
     pub warehouse_id: Option<Uuid>,
@@ -58,7 +59,6 @@ pub struct UpdateReceivingOrderRequest {
         skip_serializing_if = "Option::is_none"
     )]
     pub external_ref: Option<Option<String>>,
-    pub status: Option<String>,
     pub expected_arrival_at: Option<DateTime<Utc>>,
     pub lines: Option<Vec<ReceivingOrderLine>>,
 }
@@ -188,5 +188,13 @@ mod tests {
         assert_eq!(clear.external_ref, Some(None));
         assert_eq!(value.external_ref, Some(Some("ERP-001".to_string())));
         assert!(value.expected_arrival_at.is_some());
+    }
+
+    #[test]
+    fn receiving_order_patch_rejects_workflow_status_field() {
+        let result =
+            serde_json::from_str::<UpdateReceivingOrderRequest>(r#"{"status":"completed"}"#);
+
+        assert!(result.is_err());
     }
 }

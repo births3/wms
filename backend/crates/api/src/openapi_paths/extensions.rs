@@ -187,7 +187,7 @@ pub(crate) fn create_receiving_order() {}
 #[allow(dead_code)]
 pub(crate) fn get_receiving_order() {}
 
-#[utoipa::path(patch, path = "/api/v1/inbound/receiving-orders/{id}", tag = "inbound", params(("id" = uuid::Uuid, Path, description = "收货单 ID")), request_body = UpdateReceivingOrderRequest, responses((status = 200, description = "更新收货单", body = ReceivingOrder), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(patch, path = "/api/v1/inbound/receiving-orders/{id}", tag = "inbound", params(("id" = uuid::Uuid, Path, description = "收货单 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = UpdateReceivingOrderRequest, responses((status = 200, description = "更新收货单", body = ReceivingOrder), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "权限不足", body = ErrorResponse), (status = 409, description = "幂等键冲突", body = ErrorResponse), (status = 422, description = "状态或字段校验失败", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn update_receiving_order() {}
 

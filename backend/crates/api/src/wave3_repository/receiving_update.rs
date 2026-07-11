@@ -21,19 +21,23 @@ impl PgWave3Repository {
         id: Uuid,
         req: UpdateReceivingOrderRequest,
         now: DateTime<Utc>,
+        idempotency_key: &str,
         audit: AuditWriteRequest,
     ) -> Result<ReceivingOrder, Wave3RepositoryError> {
         if req.lines.as_ref().is_some_and(Vec::is_empty) {
             return Err(Wave3RepositoryError::InvalidQuantity);
         }
-        if req.status.is_some() {
-            return Err(Wave3RepositoryError::InvalidStatus {
-                expected: "workflow action".to_string(),
-                actual: req.status.unwrap_or_default(),
-            });
-        }
-
+        let request_hash = request_hash(&serde_json::json!({
+            "receiving_order_id": id,
+            "request": &req,
+        }))?;
         let mut tx = self.begin().await?;
+        lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
+        if let Some(replay) =
+            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash, now).await?
+        {
+            return Ok(replay);
+        }
         let locked = lock_receiving_order(&mut tx, ctx.owner_id, id).await?;
         if locked.status != "draft" {
             return Err(Wave3RepositoryError::InvalidStatus {
@@ -109,6 +113,19 @@ impl PgWave3Repository {
         append_event_in_tx(&mut tx, &audit)
             .await
             .map_err(|error| Wave3RepositoryError::Audit(format!("{error:?}")))?;
+        store_idempotency_success(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            "PATCH",
+            "/api/v1/inbound/receiving-orders/{id}",
+            "receiving_order",
+            id.to_string(),
+            &after,
+            now,
+        )
+        .await?;
         tx.commit().await.map_err(map_db_error)?;
         Ok(after)
     }

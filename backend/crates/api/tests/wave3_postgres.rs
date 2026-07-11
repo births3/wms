@@ -104,16 +104,51 @@ async fn receiving_order_update_is_draft_only_and_audits_before_after(pool: PgPo
                 supplier_id: None,
                 warehouse_id: None,
                 external_ref: Some(Some("ERP-UPDATED".to_string())),
-                status: None,
                 expected_arrival_at: None,
                 lines: None,
             },
             now,
+            "update-external-ref",
             audit,
         )
         .await
         .expect("draft order update should succeed");
     assert_eq!(updated.external_ref.as_deref(), Some("ERP-UPDATED"));
+
+    let replayed = repo
+        .update_receiving_order(
+            &ctx,
+            order.id,
+            UpdateReceivingOrderRequest {
+                supplier_id: None,
+                warehouse_id: None,
+                external_ref: Some(Some("ERP-UPDATED".to_string())),
+                expected_arrival_at: None,
+                lines: None,
+            },
+            now,
+            "update-external-ref",
+            update_audit(&ctx, order.id),
+        )
+        .await
+        .expect("same idempotency key should replay");
+    assert_eq!(replayed.id, updated.id);
+    assert_eq!(replayed.external_ref, updated.external_ref);
+    let version: i64 = sqlx::query_scalar("SELECT version FROM receiving_orders WHERE id = $1")
+        .bind(order.id)
+        .fetch_one(&pool)
+        .await
+        .expect("receiving order version");
+    let audit_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM audit_event WHERE owner_id = $1 AND resource_id = $2",
+    )
+    .bind(owner_id)
+    .bind(order.id.to_string())
+    .fetch_one(&pool)
+    .await
+    .expect("update audit count");
+    assert_eq!(version, 2);
+    assert_eq!(audit_count, 1);
 
     let diff: serde_json::Value =
         sqlx::query_scalar("SELECT diff FROM audit_event WHERE owner_id = $1 AND resource_id = $2")
@@ -134,38 +169,16 @@ async fn receiving_order_update_is_draft_only_and_audits_before_after(pool: PgPo
                 supplier_id: None,
                 warehouse_id: None,
                 external_ref: Some(None),
-                status: None,
                 expected_arrival_at: None,
                 lines: None,
             },
             now,
+            "update-clear-external-ref",
             update_audit(&ctx, order.id),
         )
         .await
         .expect("nullable field should be clearable");
     assert_eq!(cleared.external_ref, None);
-
-    let status_bypass = repo
-        .update_receiving_order(
-            &ctx,
-            order.id,
-            UpdateReceivingOrderRequest {
-                supplier_id: None,
-                warehouse_id: None,
-                external_ref: None,
-                status: Some("completed".to_string()),
-                expected_arrival_at: None,
-                lines: None,
-            },
-            now,
-            update_audit(&ctx, order.id),
-        )
-        .await;
-    assert!(matches!(
-        status_bypass,
-        Err(Wave3RepositoryError::InvalidStatus { expected, .. })
-            if expected == "workflow action"
-    ));
 
     repo.release_receiving_order(&ctx, order.id, now)
         .await
@@ -178,11 +191,11 @@ async fn receiving_order_update_is_draft_only_and_audits_before_after(pool: PgPo
                 supplier_id: None,
                 warehouse_id: None,
                 external_ref: Some(Some("TOO-LATE".to_string())),
-                status: None,
                 expected_arrival_at: None,
                 lines: None,
             },
             now,
+            "update-after-release",
             update_audit(&ctx, order.id),
         )
         .await;
@@ -221,11 +234,11 @@ async fn receiving_order_update_rejects_cross_owner_and_missing_master_data(pool
                 supplier_id: None,
                 warehouse_id: Some(foreign_warehouse_id),
                 external_ref: None,
-                status: None,
                 expected_arrival_at: None,
                 lines: None,
             },
             now,
+            "update-foreign-warehouse",
             update_audit(&ctx, order.id),
         )
         .await;
@@ -248,11 +261,11 @@ async fn receiving_order_update_rejects_cross_owner_and_missing_master_data(pool
                 supplier_id: Some(disabled_supplier_id),
                 warehouse_id: None,
                 external_ref: None,
-                status: None,
                 expected_arrival_at: None,
                 lines: None,
             },
             now,
+            "update-disabled-supplier",
             update_audit(&ctx, order.id),
         )
         .await;
@@ -269,7 +282,6 @@ async fn receiving_order_update_rejects_cross_owner_and_missing_master_data(pool
                 supplier_id: None,
                 warehouse_id: None,
                 external_ref: None,
-                status: None,
                 expected_arrival_at: None,
                 lines: Some(vec![ReceivingOrderLine {
                     line_no: 1,
@@ -282,6 +294,7 @@ async fn receiving_order_update_rejects_cross_owner_and_missing_master_data(pool
                 }]),
             },
             now,
+            "update-missing-product",
             update_audit(&ctx, order.id),
         )
         .await;

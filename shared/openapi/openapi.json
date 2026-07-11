@@ -3070,6 +3070,15 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -3093,8 +3102,48 @@
               }
             }
           },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "幂等键冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "状态或字段校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -15222,10 +15271,6 @@
             },
             "nullable": true
           },
-          "status": {
-            "type": "string",
-            "nullable": true
-          },
           "supplier_id": {
             "type": "string",
             "format": "uuid",
@@ -15236,7 +15281,8 @@
             "format": "uuid",
             "nullable": true
           }
-        }
+        },
+        "additionalProperties": false
       },
       "UpdateSpecialDrugCategoryRequest": {
         "type": "object",
