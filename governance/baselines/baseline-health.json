@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "generated_at": "2026-07-11T15:14:28Z",
+  "generated_at": "2026-07-11T15:43:56Z",
   "max_counts": {
-    "check_audit_trail_coverage": 8,
+    "check_audit_trail_coverage": 0,
     "check_idempotency_test": 0,
     "openapi-compat-v1": 0
   },

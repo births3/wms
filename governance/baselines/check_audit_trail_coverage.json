@@ -1,47 +1,6 @@
 {
   "check": "check_audit_trail_coverage",
   "version": 1,
-  "generated_at": "2026-07-11T15:14:28Z",
-  "ignored": [
-    {
-      "id": "DELETE /api/v1/inbound/receiving-orders/{id}",
-      "reason": "G0-E/G0-A initial inventory 2026-07-11",
-      "added_at": "2026-07-11"
-    },
-    {
-      "id": "POST /api/v1/billing/accounts",
-      "reason": "G0-E/G0-A initial inventory 2026-07-11",
-      "added_at": "2026-07-11"
-    },
-    {
-      "id": "POST /api/v1/billing/rules",
-      "reason": "G0-E/G0-A initial inventory 2026-07-11",
-      "added_at": "2026-07-11"
-    },
-    {
-      "id": "POST /api/v1/config-center/feature-flags/archive-file-source",
-      "reason": "G0-E/G0-A initial inventory 2026-07-11",
-      "added_at": "2026-07-11"
-    },
-    {
-      "id": "POST /api/v1/config-center/feature-flags/import",
-      "reason": "G0-E/G0-A initial inventory 2026-07-11",
-      "added_at": "2026-07-11"
-    },
-    {
-      "id": "POST /api/v1/config-center/feature-flags/migrate",
-      "reason": "G0-E/G0-A initial inventory 2026-07-11",
-      "added_at": "2026-07-11"
-    },
-    {
-      "id": "POST /api/v1/config-center/feature-flags/source",
-      "reason": "G0-E/G0-A initial inventory 2026-07-11",
-      "added_at": "2026-07-11"
-    },
-    {
-      "id": "POST /api/v1/parameter-mapping/execute",
-      "reason": "G0-E/G0-A initial inventory 2026-07-11",
-      "added_at": "2026-07-11"
-    }
-  ]
+  "generated_at": "2026-07-11T15:43:56Z",
+  "ignored": []
 }
