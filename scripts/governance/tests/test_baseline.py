@@ -1,5 +1,4 @@
 """tests for _baseline.py"""
-import json
 import sys
 from pathlib import Path
 

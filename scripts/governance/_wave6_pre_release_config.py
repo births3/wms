@@ -4,9 +4,9 @@ from pathlib import Path
 from check_wave6_evidence_preflight import GATES as PREFLIGHT_GATES
 from check_wave6_evidence_preflight import REQUIRED_EXECUTION_FILES
 from check_wave6_evidence_preflight import WAVE6_CLOSEOUT_JUST_ENTRIES
-from check_wave6_evidence_preflight import gate_commands_by_phase
-from check_wave6_evidence_preflight import gate_execution_file_map
-from check_wave6_evidence_preflight import gate_just_entries
+from check_wave6_evidence_preflight import gate_commands_by_phase as gate_commands_by_phase
+from check_wave6_evidence_preflight import gate_execution_file_map as gate_execution_file_map
+from check_wave6_evidence_preflight import gate_just_entries as gate_just_entries
 from check_wave6_evidence_preflight import validation_commands as preflight_validation_commands
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent

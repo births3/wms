@@ -17,7 +17,6 @@ import json
 import subprocess
 import sys
 from dataclasses import asdict, dataclass, field
-from pathlib import Path
 
 from check_wave6_evidence_preflight import GATES as PREFLIGHT_GATES
 from check_wave6_evidence_preflight import REQUIRED_EXECUTION_FILES
@@ -27,7 +26,6 @@ from check_wave6_evidence_preflight import gate_execution_file_map
 from check_wave6_evidence_preflight import gate_just_entries
 from check_wave6_evidence_preflight import gate_commands_by_phase
 from check_wave6_evidence_preflight import required_runbooks as preflight_required_runbooks
-from check_wave6_evidence_preflight import validation_commands as preflight_validation_commands
 
 from _wave6_pre_release_config import *  # noqa: F403
 

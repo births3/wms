@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import re
 import shlex
@@ -15,10 +14,9 @@ import signal
 import socket
 import subprocess
 import sys
-import tempfile
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from shlex import quote
 from typing import Any

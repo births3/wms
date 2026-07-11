@@ -1,7 +1,5 @@
 """Wave 3 PDA runtime readiness 预检测试。"""
 import json
-import os
-import subprocess
 import sys
 from pathlib import Path
 

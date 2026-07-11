@@ -1,7 +1,5 @@
 """Self-test for issue_runner."""
-import json
 import tempfile
-from datetime import datetime, timezone
 from pathlib import Path
 
 from issue_runner import *  # noqa: F403

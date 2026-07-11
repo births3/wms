@@ -1,4 +1,3 @@
-import * as React from "react";
 import { createPortal } from "react-dom";
 import { ArrowDown, ArrowUp, GripVertical } from "lucide-react";
 import { cn } from "../../lib/utils";

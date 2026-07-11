@@ -77,7 +77,6 @@ def test_validate_wave1_runtime_evidence_rejects_example_refs_unless_explicitly_
     tmp_path,
 ):
     """正式 evidence 不能复制 .example.json 模板引用；模板自检必须显式豁免。"""
-    import json
     import validate_wave1_runtime_evidence as validator
 
     w1d_file = tmp_path / "wave-1-runtime-evidence.example.json"

@@ -1,6 +1,5 @@
 """Local merge helpers for issue_runner."""
 import re
-from pathlib import Path
 from typing import Any
 
 from issue_runner import *  # noqa: F403

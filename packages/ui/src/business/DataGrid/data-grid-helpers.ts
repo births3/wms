@@ -115,7 +115,7 @@ export function isDataGridColumn<T>(column: DataGridColumn<T> | undefined): colu
   return Boolean(column);
 }
 
-export function buildDataGridActionDescriptors<T>({
+export function buildDataGridActionDescriptors({
   refreshAction,
   queryAction,
   createAction,

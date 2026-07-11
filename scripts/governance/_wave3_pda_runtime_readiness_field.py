@@ -2,7 +2,6 @@
 import json
 import os
 from pathlib import Path
-from typing import Any
 
 from check_wave3_pda_runtime_readiness import *  # noqa: F403
 

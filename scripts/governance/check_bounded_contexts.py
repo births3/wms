@@ -125,7 +125,7 @@ def load_manifests() -> list[BCManifest]:
                 shared_kernel_consumes=data.get("shared_kernel", {}).get("consumes", []),
             )
             manifests.append(m)
-        except Exception as e:
+        except Exception:
             manifests.append(BCManifest(bc_code=bc_code, file=str(m_path)))
 
     return manifests

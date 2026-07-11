@@ -1,5 +1,4 @@
 """PDA production gate 对 pnpm workspace 条目的阻断测试。"""
-import json
 import sys
 from pathlib import Path
 

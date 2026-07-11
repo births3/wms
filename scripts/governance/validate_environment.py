@@ -51,6 +51,7 @@ TOOLS: list[Tool] = [
     Tool("just", required=False),
     Tool("lefthook", required=False),
     Tool("gitleaks", required=True),
+    Tool("ruff", required=True),
 ]
 
 

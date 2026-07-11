@@ -1,5 +1,4 @@
 """Issue context summaries for issue_runner."""
-from pathlib import Path
 from typing import Any
 
 from issue_runner import *  # noqa: F403

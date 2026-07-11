@@ -1,5 +1,4 @@
 """Text and Markdown output for Wave 3 PDA runtime readiness."""
-from typing import Any
 
 from check_wave3_pda_runtime_readiness import *  # noqa: F403
 from _wave3_pda_runtime_readiness_field import *  # noqa: F403

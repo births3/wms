@@ -92,18 +92,8 @@ def _stop_process(process: subprocess.Popen) -> None:
 
 
 def _measure_page_height(chrome: str, url: str, width: int, fallback_height: int) -> int:
-    """用 JS 查询页面真实高度。失败回退到 fallback_height。"""
-    js_html = (
-        "<!doctype html><html><body><script>"
-        f"window.location.replace({url!r});"
-        "</script></body></html>"
-    )
-    # 不使用 dump-dom；直接让 chrome 跑一遍小 viewport 然后用 print-to-pdf 不靠谱
-    # 改用：让前端注入一个 hash 参数，页面渲染后读取 scrollHeight 写到 window.title
-    # 但 chrome --headless 没法回读 title。
-    # 最简单：用一个固定高度（manifest 配置）作下界 + 加倍尝试 + 实际看图调
-    # 这里直接返回 fallback_height（manifest 里的 height），让 manifest 控制
-    # （取消"自动探测"：复杂度不值；下面改成两轮策略）
+    """返回 manifest 配置的截图高度。"""
+    _ = chrome, url, width
     return fallback_height
 
 

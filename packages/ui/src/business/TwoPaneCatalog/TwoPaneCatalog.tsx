@@ -14,7 +14,6 @@ import {
   splitTwoPaneCatalogFields,
   summarizeTwoPaneCatalogGroup,
   toggleTwoPaneCatalogSelection,
-  twoPaneCatalogText,
   type TwoPaneCatalogField,
   type TwoPaneCatalogGroup,
   type TwoPaneCatalogItemBase,

@@ -275,7 +275,6 @@ def validate_compose_env_values(compose_file: Path, compose_env_file: str, error
 
 def validate_h2(require_wrk_output: bool) -> list[str]:
     errors: list[str] = []
-    environment = "dev"
 
     database_url = env_value("WAVE1_H2_DATABASE_URL", errors)
     wrk_output = env_value("WAVE1_H2_WRK_OUTPUT", errors)

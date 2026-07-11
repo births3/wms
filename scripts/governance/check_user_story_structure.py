@@ -205,7 +205,6 @@ def check_file(path: Path) -> FileCheck:
     # 区分活跃故事和 strikethrough 占位故事
     ids = [s[0] for s in stories]
     active_ids = [s[0] for s in stories if not s[2]]
-    strikethrough_ids = [s[0] for s in stories if s[2]]
     # 按模块分组检查
     modules: dict[str, list[int]] = {}
     for sid in ids:
