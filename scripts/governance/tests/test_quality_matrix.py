@@ -39,6 +39,33 @@ def test_quality_matrix_runtime_guard_requires_resilience_layers():
     ]
 
 
+def test_quality_matrix_derives_acceptance_level_from_story_types():
+    """验收深度必须由故事风险推导，不能由执行人手工降级。"""
+    from check_quality_matrix import derive_acceptance_level
+
+    assert derive_acceptance_level(["read_only", "frontend_interaction"]) == "S1"
+    assert derive_acceptance_level(["write"]) == "S2"
+    assert derive_acceptance_level(["write", "inventory_change"]) == "S3"
+    assert derive_acceptance_level(["integration", "external_runtime"]) == "S4"
+
+
+def test_module_completion_rejects_deferred_stories():
+    """模块验收时，只要仍有延期故事就不能声明模块完成。"""
+    from check_quality_matrix import check_module_completion, Issue
+
+    matrix = {
+        "stories": [{"id": "US-M2-001", "module": "M2"}],
+        "deferred_stories": [
+            {"id": "US-M2-002", "title": "收货", "module": "M2"},
+            {"id": "US-M3-001", "title": "库存查询", "module": "M3"},
+        ],
+    }
+
+    assert check_module_completion(matrix, "M2") == [
+        Issue("US-M2-002", "module_completion", "模块 M2 仍有延期故事: 收货"),
+    ]
+
+
 def test_quality_matrix_rejects_non_strict_dimension_status():
     """矩阵维度状态只能是 verified 或 not_applicable。"""
     from check_quality_matrix import check_story, Issue

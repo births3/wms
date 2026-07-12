@@ -54,6 +54,13 @@ description: WMS 全链路质量矩阵治理技能。用户要求建立或维护
 11. 最终汇报必须分开写：已实现、已登记、待实现、经确认延期。缺少“已实现”证据时，不能说“闭环完成”。
 12. 验证：`check_quality_matrix.py --json`、`check_scope_gap_discovery.py --json`、相关 pytest、接线改动跑 dispatch/smoke、最后 `just gov-t1`。
 
+## 验收退出条件
+
+- 故事完成：十二维度闭环，故事类型推导的测试层全部覆盖；写入故事必须有真实 PostgreSQL 测试，有页面必须有真实数据 E2E。
+- 模块完成：运行 `check_quality_matrix.py --complete-module <模块>`，该模块仍有任一 `deferred_stories` 时禁止宣称完成。
+- 发布完成：PDA、硬件、外部系统、性能和灰度发布必须使用真实环境证据，不能以 mock、localhost 或静态文件替代。
+- 验收深度按故事类型自动取最高层级：S1 查询展示、S2 普通写入、S3 库存/并发/关键路径、S4 PDA/硬件/外部系统/发布；不得手工降级。
+
 ## 页面分类分区联动
 
 新增管理端页面时，同时使用 `wms-page-query-governance`：

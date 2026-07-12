@@ -19,6 +19,51 @@
 | S2 | 深度验证层 | 由故事类型自动推导 L1-L11 测试层，`tests=verified` 时必须覆盖全部推导层。 |
 | S3 | 运行反馈层 | issue、Bug、review 漏检和线上反馈必须判断是否需要新增矩阵维度、故事类型或脚本规则。 |
 
+上述 S0-S3 是治理成熟度。单个故事另按业务风险推导验收深度，二者不能混用：
+
+| 验收层级 | 适用范围 | 最低验收要求 |
+|---|---|---|
+| S1 | 查询、展示、普通配置 | 需求、字段、前端/API 可达、权限和基本测试闭环 |
+| S2 | 普通业务写操作 | S1 + PostgreSQL、审计、幂等和真实数据 E2E |
+| S3 | 库存、状态、批号、冷链、GSP、并发资源和关键路径 | S2 + 并发、事务一致性、异常路径和性能证据 |
+| S4 | PDA、硬件、外部系统和发布 | S3 + 真实环境、真实设备或外部回执及人工验收证据 |
+
+验收层级由故事类型自动取最高级：`write` / `integration` 至少 S2，`inventory_change` / `concurrent_resource` / `critical_path` / `audit_compliance` 至少 S3，`pda_runtime` / `hardware_runtime` / `external_runtime` / `release_runtime` 为 S4。执行人不得手工降低层级。
+
+## 完成标准
+
+### 故事级
+
+延期故事从 `deferred_stories` 移入 `stories` 前，必须满足：
+
+1. 需求与验收条件无待定业务语义。
+2. 字段、字典、状态和权限点对齐。
+3. 前端页面、菜单、按钮、弹窗和错误状态可达；无页面时写明 `not_applicable` 原因。
+4. OpenAPI 与生成的 `@wms/api-client` 同步。
+5. 后端按既定 handler / service / domain / repository 边界落地。
+6. PostgreSQL 表、约束、索引、迁移和货主隔离完成。
+7. 写操作具备权限、幂等、审计和适用的并发控制。
+8. 故事类型推导的 L1-L11 测试层全部覆盖。
+9. 数据写入故事有真实 PostgreSQL 测试；有页面的故事有真实数据 E2E。
+10. 十二个质量维度全部为 `verified` 或有理由的 `not_applicable`。
+11. 模块严格范围检查通过。
+12. 不存在 mock 替代生产实现、无效按钮或只登记未实现。
+
+### 模块级
+
+模块验收必须同时满足：模块内无延期故事；菜单、页面、API、后端和数据库形成完整业务链；正常、拒绝、撤销、重复提交、越权和跨货主路径按适用范围通过；字段矩阵、状态机和审计一致；真实 E2E 覆盖主要流程；质量矩阵、OpenAPI、范围和治理检查通过。
+
+使用以下命令验收，延期故事未清零时硬失败：
+
+```bash
+python3 scripts/governance/check_quality_matrix.py --complete-module M2
+python3 scripts/governance/check_scope_gap_discovery.py --strict --module M2
+```
+
+### 发布级
+
+PDA 必须有真机扫码、离线重放、幂等和易用性证据；外部系统必须有真实 dev/staging 请求、回执、重试和审计证据；硬件必须有设备、校准和产物证据；性能必须有约定数据量下的 P95/P99 与并发结果；发布必须有迁移、灰度、监控、回滚和双人审批证据。代码完成不能替代这些证据。
+
 ## 维度
 
 每个故事都必须写完整维度：需求、字段、前端、API、后端、数据库、安全、审计、测试、证据、文档、治理。不能用 `partial`、`missing`、`todo` 这类模糊状态。

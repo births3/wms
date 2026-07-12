@@ -77,7 +77,13 @@ STORY_TYPE_LAYERS = {
     "audit_compliance": {"L5", "L8", "L10", "L11"},
     "integration": {"L2", "L3", "L4", "L9", "L10"},
     "runtime_guard": {"L1", "L2", "L4", "L5", "L7", "L8", "L9", "L10", "L11"},
+    "pda_runtime": {f"L{index}" for index in range(1, 12)},
+    "hardware_runtime": {f"L{index}" for index in range(1, 12)},
+    "external_runtime": {f"L{index}" for index in range(1, 12)},
+    "release_runtime": {f"L{index}" for index in range(1, 12)},
 }
+S4_TYPES = {"pda_runtime", "hardware_runtime", "external_runtime", "release_runtime"}
+S3_TYPES = {"inventory_change", "concurrent_resource", "critical_path", "audit_compliance"}
 
 
 @dataclass(frozen=True)
@@ -121,6 +127,31 @@ def derive_required_layers(types: list[str]) -> list[str]:
     for story_type in types:
         layers.update(STORY_TYPE_LAYERS.get(story_type, set()))
     return sorted(layers, key=layer_sort_key)
+
+
+def derive_acceptance_level(types: list[str]) -> str:
+    """按最高风险故事类型推导验收深度，避免手工降级。"""
+    type_set = set(types)
+    if type_set & S4_TYPES:
+        return "S4"
+    if type_set & S3_TYPES:
+        return "S3"
+    if "write" in type_set or "integration" in type_set:
+        return "S2"
+    return "S1"
+
+
+def check_module_completion(matrix: dict[str, Any], module: str) -> list[Issue]:
+    """模块完成要求该模块不存在延期故事。"""
+    return [
+        Issue(
+            str(story.get("id", "<missing>")),
+            "module_completion",
+            f"模块 {module} 仍有延期故事: {story.get('title', '-')}",
+        )
+        for story in matrix.get("deferred_stories", [])
+        if isinstance(story, dict) and story.get("module") == module
+    ]
 
 
 def check_story(story: dict[str, Any], *, story_files: set[str], openapi_paths: set[str]) -> list[Issue]:
@@ -244,7 +275,7 @@ def check_evidence_profiles(
     return issues
 
 
-def scan() -> list[Issue]:
+def scan(*, complete_module: str | None = None) -> list[Issue]:
     matrix = load_matrix()
     stories = matrix.get("stories")
     if not isinstance(stories, list):
@@ -263,6 +294,8 @@ def scan() -> list[Issue]:
         seen.add(story_id)
         issues.extend(check_story(raw_story, story_files=known_story_files, openapi_paths=known_openapi_paths))
     issues.extend(check_evidence_profiles(matrix, [story for story in stories if isinstance(story, dict)]))
+    if complete_module:
+        issues.extend(check_module_completion(matrix, complete_module))
 
     expected_doc = build_markdown(matrix)
     if DOC.exists() and DOC.read_text(encoding="utf-8") != expected_doc:
@@ -284,11 +317,12 @@ def build_markdown(matrix: dict[str, Any]) -> str:
         "- 强门禁范围：M1、M2、M3、M4 和已进入执行的 H 层横向能力。",
         "- 状态只允许 `verified` 或 `not_applicable`；不适用必须在事实源写原因。",
         "- S2 测试层由故事类型自动推导。",
+        "- 验收深度由故事类型自动推导：S1 查询/展示，S2 普通写操作，S3 库存/并发/关键路径/GSP，S4 PDA/硬件/外部系统/发布。",
         "",
         "## 矩阵",
         "",
-        "| 故事 | 模块 | 类型 | 测试层 | 前端 | API | 状态 |",
-        "|---|---|---|---|---|---|---|",
+        "| 故事 | 模块 | 验收层级 | 类型 | 测试层 | 前端 | API | 状态 |",
+        "|---|---|---|---|---|---|---|---|",
     ]
     for story in stories if isinstance(stories, list) else []:
         if not isinstance(story, dict):
@@ -302,10 +336,11 @@ def build_markdown(matrix: dict[str, Any]) -> str:
             status = dimension_status(story, dimension) or "missing"
             statuses.append(f"{dimension}:{status}")
         lines.append(
-            "| {id} {title} | {module} | {types} | {layers} | {frontend} | {api} | {status} |".format(
+            "| {id} {title} | {module} | {level} | {types} | {layers} | {frontend} | {api} | {status} |".format(
                 id=story.get("id", "-"),
                 title=story.get("title", "-"),
                 module=story.get("module", "-"),
+                level=derive_acceptance_level(types) if isinstance(types, list) else "-",
                 types="、".join(types) if isinstance(types, list) else "-",
                 layers="、".join(layers) or "-",
                 frontend=frontend_pages,
@@ -341,6 +376,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--write-doc", action="store_true", help="按 TOML 刷新 MkDocs 展示页")
+    parser.add_argument("--complete-module", help="模块验收：只要仍有延期故事即失败")
     args = parser.parse_args(argv)
 
     if args.write_doc:
@@ -348,7 +384,7 @@ def main(argv: list[str] | None = None) -> int:
         DOC.parent.mkdir(parents=True, exist_ok=True)
         DOC.write_text(build_markdown(matrix), encoding="utf-8")
 
-    issues = scan()
+    issues = scan(complete_module=args.complete_module)
     payload = {
         "check": "check_quality_matrix",
         "tier": "T1",
