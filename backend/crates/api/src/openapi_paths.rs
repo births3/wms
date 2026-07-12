@@ -10,6 +10,11 @@ pub use crate::print_template::{
     PrintTemplateVersionListResponse, ResolvePrintTemplateRequest, ResolvePrintTemplateResponse,
     SavePrintTemplateRequest,
 };
+pub use crate::role_management::{
+    BatchAssignRolesRequest, BatchAssignRolesResponse, CreateRoleRequest, DeleteRoleResponse,
+    PermissionListResponse, PermissionResponse, ReplaceRolePermissionsRequest, RoleListResponse,
+    RoleResponse, RoleUserListResponse, RoleUserResponse, UpdateRoleRequest,
+};
 pub use wms_domain::{
     AdminMenuButtonPermission, AdminMenuNode, AdminMenuTreeResponse, AdminMenuVersion, AuditActor,
     AuditArchivePartitionState, AuditArchivePartitionStateListResponse, AuditArchiveRunRequest,

@@ -212,6 +212,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_permissions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_roles"];
+        put?: never;
+        post: operations["create_role"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/roles/{role_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["update_role"];
+        post?: never;
+        delete: operations["delete_role"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/roles/{role_id}/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["replace_role_permissions"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/user-roles/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["batch_assign_roles"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_role_users"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/billing/accounts": {
         parameters: {
             query?: never;
@@ -2082,6 +2178,14 @@ export interface components {
             /** @description 下一页游标；为空表示无更多数据。 */
             next_cursor?: string | null;
         };
+        BatchAssignRolesRequest: {
+            role_ids: string[];
+            user_ids: string[];
+        };
+        BatchAssignRolesResponse: {
+            role_ids: string[];
+            user_ids: string[];
+        };
         BatchCreateLocationsRequest: {
             area_code: string;
             /** Format: uuid */
@@ -2508,6 +2612,13 @@ export interface components {
             /** Format: uuid */
             store_id: string;
         };
+        CreateRoleRequest: {
+            data_scope: string;
+            /** Format: uuid */
+            parent_role_id?: string | null;
+            role_code: string;
+            role_name: string;
+        };
         CreateSpecialDrugCategoryRequest: {
             category_code: string;
             category_name: string;
@@ -2592,6 +2703,10 @@ export interface components {
         CustomerListResponse: {
             data: components["schemas"]["Customer"][];
             page: components["schemas"]["PageMeta"];
+        };
+        DeleteRoleResponse: {
+            /** Format: uuid */
+            id: string;
         };
         DisableSystemDictionaryItemRequest: {
             disabled_reason?: string | null;
@@ -3350,6 +3465,15 @@ export interface components {
             /** @description 下一页游标；为空表示无更多数据。 */
             next_cursor?: string | null;
         };
+        PermissionListResponse: {
+            items: components["schemas"]["PermissionResponse"][];
+        };
+        PermissionResponse: {
+            /** Format: uuid */
+            id: string;
+            permission_code: string;
+            permission_name: string;
+        };
         PlanBusinessArchiveJobRequest: {
             policy_code: string;
             /** Format: date */
@@ -3719,6 +3843,9 @@ export interface components {
         RejectReceivingOrderRequest: {
             reason: string;
         };
+        ReplaceRolePermissionsRequest: {
+            permission_codes: string[];
+        };
         ReportQueryRequest: {
             /** @description 自由结构 JSON 对象。 */
             filters: {
@@ -3816,6 +3943,29 @@ export interface components {
             reviewer_id: string;
             /** Format: uuid */
             second_reviewer_id?: string | null;
+        };
+        RoleListResponse: {
+            items: components["schemas"]["RoleResponse"][];
+        };
+        RoleResponse: {
+            data_scope: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            parent_role_id?: string | null;
+            permission_codes: string[];
+            role_code: string;
+            role_name: string;
+        };
+        RoleUserListResponse: {
+            items: components["schemas"]["RoleUserResponse"][];
+        };
+        RoleUserResponse: {
+            display_name: string;
+            role_ids: string[];
+            /** Format: uuid */
+            user_id: string;
+            username: string;
         };
         RollbackAdminMenuRequest: {
             /** Format: int64 */
@@ -4197,6 +4347,12 @@ export interface components {
             supplier_id?: string | null;
             /** Format: uuid */
             warehouse_id?: string | null;
+        };
+        UpdateRoleRequest: {
+            data_scope: string;
+            /** Format: uuid */
+            parent_role_id?: string | null;
+            role_name: string;
         };
         UpdateSpecialDrugCategoryRequest: {
             category_name?: string | null;
@@ -4980,6 +5136,319 @@ export interface operations {
             };
             /** @description 未登录 */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_permissions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PermissionListResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_roles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前货主角色列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleListResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_role: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRoleRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_role: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 角色 ID */
+                role_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRoleRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_role: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 角色 ID */
+                role_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteRoleResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    replace_role_permissions: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 角色 ID */
+                role_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplaceRolePermissionsRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    batch_assign_roles: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchAssignRolesRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchAssignRolesResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_role_users: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleUserListResponse"];
+                };
+            };
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

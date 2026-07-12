@@ -36,6 +36,8 @@ pub mod reports;
 pub mod reports_handlers;
 pub mod resilience;
 pub mod retail_chain;
+pub mod role_management;
+mod role_management_models;
 pub mod state_machine;
 pub mod system_dictionary;
 pub mod system_dictionary_handlers;

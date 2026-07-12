@@ -99,6 +99,38 @@ pub(crate) fn login() {}
 #[allow(dead_code)]
 pub(crate) fn me() {}
 
+#[utoipa::path(get, path = "/api/v1/auth/roles", tag = "auth", responses((status = 200, description = "当前货主角色列表", body = RoleListResponse), (status = 401, body = ErrorResponse), (status = 403, body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn list_roles() {}
+
+#[utoipa::path(post, path = "/api/v1/auth/roles", tag = "auth", params(("Idempotency-Key" = String, Header, description = "幂等键")), request_body = CreateRoleRequest, responses((status = 200, body = RoleResponse), (status = 400, body = ErrorResponse), (status = 403, body = ErrorResponse), (status = 409, body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn create_role() {}
+
+#[utoipa::path(put, path = "/api/v1/auth/roles/{role_id}", tag = "auth", params(("role_id" = uuid::Uuid, Path, description = "角色 ID"), ("Idempotency-Key" = String, Header, description = "幂等键")), request_body = UpdateRoleRequest, responses((status = 200, body = RoleResponse), (status = 403, body = ErrorResponse), (status = 422, body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn update_role() {}
+
+#[utoipa::path(delete, path = "/api/v1/auth/roles/{role_id}", tag = "auth", params(("role_id" = uuid::Uuid, Path, description = "角色 ID"), ("Idempotency-Key" = String, Header, description = "幂等键")), responses((status = 200, body = DeleteRoleResponse), (status = 403, body = ErrorResponse), (status = 409, body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn delete_role() {}
+
+#[utoipa::path(put, path = "/api/v1/auth/roles/{role_id}/permissions", tag = "auth", params(("role_id" = uuid::Uuid, Path, description = "角色 ID"), ("Idempotency-Key" = String, Header, description = "幂等键")), request_body = ReplaceRolePermissionsRequest, responses((status = 200, body = RoleResponse), (status = 403, body = ErrorResponse), (status = 422, body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn replace_role_permissions() {}
+
+#[utoipa::path(put, path = "/api/v1/auth/user-roles/batch", tag = "auth", params(("Idempotency-Key" = String, Header, description = "幂等键")), request_body = BatchAssignRolesRequest, responses((status = 200, body = BatchAssignRolesResponse), (status = 403, body = ErrorResponse), (status = 422, body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn batch_assign_roles() {}
+
+#[utoipa::path(get, path = "/api/v1/auth/permissions", tag = "auth", responses((status = 200, body = PermissionListResponse), (status = 403, body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn list_permissions() {}
+
+#[utoipa::path(get, path = "/api/v1/auth/users", tag = "auth", responses((status = 200, body = RoleUserListResponse), (status = 403, body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn list_role_users() {}
+
 #[utoipa::path(get, path = "/api/v1/admin/menus/published", tag = "admin-menu", responses((status = 200, description = "已发布三层菜单树", body = AdminMenuTreeResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn list_published_admin_menu() {}

@@ -26,6 +26,7 @@ use wms_api::{
     print_template_handlers::{print_template_router, PrintTemplateAppState},
     reports_handlers::mount_reports,
     resilience::{resilience_middleware, resilience_status, ResilienceState},
+    role_management::{role_management_router, RoleManagementState},
     state_machine::state_machine_router,
     system_dictionary_handlers::{system_dictionary_router, SystemDictionaryAppState},
     wave3_handlers::{wave3_router, Wave3AppState},
@@ -85,14 +86,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
             ),
         )
     })?;
-    let revocation_store = RedisAuthRevocationStore::from_url(&redis_url)
-        .await
-        .map_err(|error| {
-            io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("failed to configure Redis auth revocation store: {error:?}"),
-            )
-        })?;
+    let revocation_store = Arc::new(
+        RedisAuthRevocationStore::from_url(&redis_url)
+            .await
+            .map_err(|error| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    format!("failed to configure Redis auth revocation store: {error:?}"),
+                )
+            })?,
+    );
     let pool = PgPoolOptions::new()
         .max_connections(database_max_connections()?)
         .after_connect(|connection, _metadata| {
@@ -106,6 +109,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .map_err(|error| io::Error::other(format!("failed to connect PostgreSQL: {error:?}")))?;
     let config_center_state = ConfigCenterAppState::with_postgres(file_registry, pool.clone());
     let auth_state = AuthAppState::new(pool.clone());
+    let role_management_state = RoleManagementState::new(pool.clone(), revocation_store.clone());
     let audit_query_state = AuditQueryState { pool: pool.clone() };
     let master_data_state = MasterDataAppState::with_postgres(pool.clone());
     let system_dictionary_state = SystemDictionaryAppState::with_postgres(pool.clone());
@@ -125,9 +129,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         master_data_state,
         system_dictionary_state,
     )
-    .layer(auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(
-        revocation_store,
-    ))));
+    .merge(role_management_router(role_management_state))
+    .layer(auth_runtime_layer(AuthRuntimePolicy::new(revocation_store)));
 
     let listener = TcpListener::bind(bind_addr).await?;
     axum::serve(listener, app).await?;
