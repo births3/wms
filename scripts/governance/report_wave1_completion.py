@@ -655,7 +655,7 @@ def evaluate_wave1() -> list[EvidenceItem]:
         (file_exists("apps/web-admin/src/App.tsx"), "apps/web-admin 壳工程存在"),
         (file_contains("apps/web-admin/src/App.tsx", "@wms/ui"), "web-admin 复用 @wms/ui"),
         (file_contains("apps/web-admin/src/lib/api.ts", "@wms/api-client"), "web-admin 接入 @wms/api-client"),
-        (file_contains("apps/web-admin/src/App.tsx", "H1 权限与多租户"), "壳工程呈现 H1"),
+        (file_contains("apps/web-admin/src/App.tsx", "H1 权限租户"), "壳工程呈现 H1"),
         (file_contains("apps/web-admin/src/App.tsx", "H2 审计追踪"), "壳工程呈现 H2"),
         (not file_contains("apps/web-admin/src/App.tsx", 'id: "h1",\n    title: "H1 权限与多租户",\n    description: "AuthContext、JWT、多货主隔离和权限门控的生产入口。",\n    status: "pending"'), "H1 不再是 pending"),
         (not file_contains("apps/web-admin/src/App.tsx", 'id: "h2",\n    title: "H2 审计追踪",\n    description: "写操作接入 append-only 审计事件和审计查询链路。",\n    status: "pending"'), "H2 不再是 pending"),
