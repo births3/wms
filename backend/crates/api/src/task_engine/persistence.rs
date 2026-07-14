@@ -64,6 +64,41 @@ fn normalize_create_request(
     Ok(request)
 }
 
+fn validate_priority_rule(
+    request: &UpsertTaskPriorityRuleRequest,
+) -> Result<(), TaskEngineError> {
+    let bonuses = [
+        request.urgent_order_bonus,
+        request.cold_chain_bonus,
+        request.manual_expedite_bonus,
+    ];
+    if bonuses.iter().any(|value| !(0..=1000).contains(value))
+        || !(1..=1440).contains(&request.waiting_minutes_per_point)
+    {
+        return Err(TaskEngineError::PriorityRuleInvalid);
+    }
+    Ok(())
+}
+
+async fn load_priority_rule_for_update(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+) -> Result<Option<TaskPriorityRuleRow>, TaskEngineError> {
+    sqlx::query_as::<_, TaskPriorityRuleRow>(
+        r#"
+        SELECT id, owner_id, urgent_order_bonus, waiting_minutes_per_point,
+               cold_chain_bonus, manual_expedite_bonus, created_at, updated_at, version
+          FROM task_priority_rules
+         WHERE owner_id = $1
+         FOR UPDATE
+        "#,
+    )
+    .bind(owner_id)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(map_database_error)
+}
+
 async fn validate_task_group_references(
     tx: &mut Transaction<'_, Postgres>,
     owner_id: Uuid,
@@ -217,7 +252,8 @@ async fn load_task_for_update(
                warehouse_id, task_group_code, product_id, product_code, batch_id,
                batch_no, planned_qty, actual_qty, source_location_id,
                source_location_code, target_location_id, target_location_code,
-               priority, estimated_minutes, assignee_user_id, status, exception_code,
+               priority, urgent_order, cold_chain, manually_expedited,
+               estimated_minutes, assignee_user_id, status, exception_code,
                exception_note, assigned_at, dispatched_at, started_at, completed_at,
                created_at, updated_at, version
           FROM warehouse_tasks
@@ -244,7 +280,8 @@ async fn load_task_by_source_key(
                warehouse_id, task_group_code, product_id, product_code, batch_id,
                batch_no, planned_qty, actual_qty, source_location_id,
                source_location_code, target_location_id, target_location_code,
-               priority, estimated_minutes, assignee_user_id, status, exception_code,
+               priority, urgent_order, cold_chain, manually_expedited,
+               estimated_minutes, assignee_user_id, status, exception_code,
                exception_note, assigned_at, dispatched_at, started_at, completed_at,
                created_at, updated_at, version
           FROM warehouse_tasks
@@ -270,7 +307,8 @@ async fn load_task_by_source_identity(
                warehouse_id, task_group_code, product_id, product_code, batch_id,
                batch_no, planned_qty, actual_qty, source_location_id,
                source_location_code, target_location_id, target_location_code,
-               priority, estimated_minutes, assignee_user_id, status, exception_code,
+               priority, urgent_order, cold_chain, manually_expedited,
+               estimated_minutes, assignee_user_id, status, exception_code,
                exception_note, assigned_at, dispatched_at, started_at, completed_at,
                created_at, updated_at, version
           FROM warehouse_tasks
@@ -315,6 +353,7 @@ fn task_matches_request(row: &WarehouseTaskRow, request: &CreateWarehouseTaskReq
         && row.source_location_code == request.source_location_code
         && row.target_location_id == request.target_location_id
         && row.target_location_code == request.target_location_code
+        && row.urgent_order == request.urgent_order
 }
 
 async fn append_task_event(
@@ -525,5 +564,6 @@ fn action_name(action: &TaskTransitionAction) -> &'static str {
         TaskTransitionAction::ReportException => "report_task_exception",
         TaskTransitionAction::ResolveComplete => "resolve_task_complete",
         TaskTransitionAction::Cancel => "cancel_task",
+        TaskTransitionAction::Expedite => "expedite_task",
     }
 }

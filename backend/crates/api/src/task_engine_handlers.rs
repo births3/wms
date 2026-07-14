@@ -10,8 +10,9 @@ use sqlx::PgPool;
 use uuid::Uuid;
 use wms_domain::{
     CreateWarehouseTaskRequest, ErrorResponse, PageMeta, TaskGroup, TaskGroupListResponse,
-    TaskListQuery, TaskTransitionAction, TaskWorkerListResponse, TransitionWarehouseTaskRequest,
-    UpsertTaskGroupRequest, WarehouseTask, WarehouseTaskListResponse,
+    TaskListQuery, TaskPriorityRule, TaskTransitionAction, TaskWorkerListResponse,
+    TransitionWarehouseTaskRequest, UpsertTaskGroupRequest, UpsertTaskPriorityRuleRequest,
+    WarehouseTask, WarehouseTaskListResponse,
 };
 
 use crate::{
@@ -26,6 +27,7 @@ const WRITE_PERMISSION: &str = "mte.task.write";
 const ASSIGN_PERMISSION: &str = "mte.task.assign";
 const EXECUTE_PERMISSION: &str = "mte.task.execute";
 const GROUP_WRITE_PERMISSION: &str = "mte.task_group.write";
+const PRIORITY_RULE_WRITE_PERMISSION: &str = "mte.priority_rule.write";
 
 #[derive(Clone, Debug)]
 pub struct TaskEngineAppState {
@@ -74,6 +76,11 @@ impl IntoResponse for TaskEngineHandlerError {
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "M_TE_TASK_INVALID",
                 "任务数据非法",
+            ),
+            Self::TaskEngine(TaskEngineError::PriorityRuleInvalid) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M_TE_RULE_INVALID",
+                "优先级规则参数非法",
             ),
             Self::TaskEngine(TaskEngineError::TaskTypeNotFound) => (
                 StatusCode::NOT_FOUND,
@@ -196,7 +203,34 @@ pub fn task_engine_router(state: TaskEngineAppState) -> Router {
             "/api/v1/task-engine/tasks/:task_id/transitions",
             post(transition_task_handler),
         )
+        .route(
+            "/api/v1/task-engine/priority-rule",
+            get(get_priority_rule_handler).put(upsert_priority_rule_handler),
+        )
         .with_state(state)
+}
+
+async fn get_priority_rule_handler(
+    ctx: AuthContext,
+    State(state): State<TaskEngineAppState>,
+) -> Result<Json<TaskPriorityRule>, TaskEngineHandlerError> {
+    ctx.require_permission(READ_PERMISSION)?;
+    Ok(Json(state.repository.get_priority_rule(&ctx).await?))
+}
+
+async fn upsert_priority_rule_handler(
+    ctx: AuthContext,
+    State(state): State<TaskEngineAppState>,
+    headers: HeaderMap,
+    Json(request): Json<UpsertTaskPriorityRuleRequest>,
+) -> Result<Json<TaskPriorityRule>, TaskEngineHandlerError> {
+    ctx.require_permission(PRIORITY_RULE_WRITE_PERMISSION)?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
+    let outcome = state
+        .repository
+        .upsert_priority_rule(&ctx, request, Utc::now(), &idempotency_key)
+        .await?;
+    Ok(Json(outcome.value))
 }
 
 async fn list_task_workers_handler(
@@ -301,7 +335,8 @@ async fn transition_task_handler(
         | TaskTransitionAction::Reassign
         | TaskTransitionAction::Recall
         | TaskTransitionAction::ResolveComplete
-        | TaskTransitionAction::Cancel => ASSIGN_PERMISSION,
+        | TaskTransitionAction::Cancel
+        | TaskTransitionAction::Expedite => ASSIGN_PERMISSION,
     };
     ctx.require_permission(permission)?;
     let idempotency_key = idempotency_key_from_headers(&headers)?;

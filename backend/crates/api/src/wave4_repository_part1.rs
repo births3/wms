@@ -403,6 +403,7 @@ pub fn new(pool: PgPool) -> Self {
                     target_location_id: None,
                     target_location_code: None,
                     priority: None,
+                    urgent_order: false,
                 },
                 now,
             )
@@ -751,6 +752,7 @@ pub fn new(pool: PgPool) -> Self {
                     target_location_id: None,
                     target_location_code: None,
                     priority: None,
+                    urgent_order: false,
                     },
                     now,
                 )

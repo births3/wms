@@ -6,10 +6,10 @@ use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{
     normalize_task_type_code, CreateWarehouseTaskRequest, TaskGroup, TaskGroupMemberQualification,
-    TaskListQuery, TaskTransitionAction, TransitionWarehouseTaskRequest, UpsertTaskGroupRequest,
-    WarehouseTask, TASK_STATUS_ASSIGNED, TASK_STATUS_CANCELLED, TASK_STATUS_COMPLETED,
-    TASK_STATUS_DISPATCHED, TASK_STATUS_EXCEPTION, TASK_STATUS_IN_PROGRESS,
-    TASK_STATUS_PENDING_ASSIGNMENT,
+    TaskListQuery, TaskPriorityRule, TaskTransitionAction, TransitionWarehouseTaskRequest,
+    UpsertTaskGroupRequest, UpsertTaskPriorityRuleRequest, WarehouseTask, TASK_STATUS_ASSIGNED,
+    TASK_STATUS_CANCELLED, TASK_STATUS_COMPLETED, TASK_STATUS_DISPATCHED, TASK_STATUS_EXCEPTION,
+    TASK_STATUS_IN_PROGRESS, TASK_STATUS_PENDING_ASSIGNMENT,
 };
 
 use crate::{
@@ -44,6 +44,7 @@ pub enum TaskEngineError {
     WorkerQualificationExpired,
     WorkerAtCapacity,
     NoAvailableWorker,
+    PriorityRuleInvalid,
     TaskNotFound,
     NotAssignee,
     InvalidTransition,
@@ -98,6 +99,9 @@ struct WarehouseTaskRow {
     target_location_id: Option<Uuid>,
     target_location_code: Option<String>,
     priority: i32,
+    urgent_order: bool,
+    cold_chain: bool,
+    manually_expedited: bool,
     estimated_minutes: i32,
     assignee_user_id: Option<Uuid>,
     status: String,
@@ -107,6 +111,19 @@ struct WarehouseTaskRow {
     dispatched_at: Option<DateTime<Utc>>,
     started_at: Option<DateTime<Utc>>,
     completed_at: Option<DateTime<Utc>>,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+    version: i64,
+}
+
+#[derive(Clone, Debug, FromRow)]
+struct TaskPriorityRuleRow {
+    id: Uuid,
+    owner_id: Uuid,
+    urgent_order_bonus: i32,
+    waiting_minutes_per_point: i32,
+    cold_chain_bonus: i32,
+    manual_expedite_bonus: i32,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
     version: i64,

@@ -13260,6 +13260,135 @@
         }
       }
     },
+    "/api/v1/task-engine/priority-rule": {
+      "get": {
+        "tags": [
+          "task-engine"
+        ],
+        "operationId": "get_task_priority_rule",
+        "responses": {
+          "200": {
+            "description": "当前货主任务优先级权重",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskPriorityRule"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "task-engine"
+        ],
+        "operationId": "upsert_task_priority_rule",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertTaskPriorityRuleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "保存任务优先级权重",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskPriorityRule"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "规则参数非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/task-engine/task-groups": {
       "get": {
         "tags": [
@@ -17871,6 +18000,9 @@
           },
           "task_type_code": {
             "type": "string"
+          },
+          "urgent_order": {
+            "type": "boolean"
           },
           "warehouse_id": {
             "type": "string",
@@ -24246,6 +24378,58 @@
           }
         }
       },
+      "TaskPriorityRule": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "urgent_order_bonus",
+          "waiting_minutes_per_point",
+          "cold_chain_bonus",
+          "manual_expedite_bonus",
+          "created_at",
+          "updated_at",
+          "version"
+        ],
+        "properties": {
+          "cold_chain_bonus": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "manual_expedite_bonus": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "urgent_order_bonus": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "waiting_minutes_per_point": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "TaskTransitionAction": {
         "type": "string",
         "enum": [
@@ -24257,7 +24441,8 @@
           "complete",
           "report_exception",
           "resolve_complete",
-          "cancel"
+          "cancel",
+          "expedite"
         ]
       },
       "TaskType": {
@@ -25770,6 +25955,33 @@
           }
         }
       },
+      "UpsertTaskPriorityRuleRequest": {
+        "type": "object",
+        "required": [
+          "urgent_order_bonus",
+          "waiting_minutes_per_point",
+          "cold_chain_bonus",
+          "manual_expedite_bonus"
+        ],
+        "properties": {
+          "cold_chain_bonus": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "manual_expedite_bonus": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "urgent_order_bonus": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "waiting_minutes_per_point": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "UpsertTaskTypeRequest": {
         "type": "object",
         "required": [
@@ -25881,6 +26093,9 @@
           "product_code",
           "planned_qty",
           "priority",
+          "urgent_order",
+          "cold_chain",
+          "manually_expedited",
           "estimated_minutes",
           "status",
           "created_at",
@@ -25912,6 +26127,9 @@
             "type": "string",
             "nullable": true
           },
+          "cold_chain": {
+            "type": "boolean"
+          },
           "completed_at": {
             "type": "string",
             "format": "date-time",
@@ -25941,6 +26159,9 @@
           "id": {
             "type": "string",
             "format": "uuid"
+          },
+          "manually_expedited": {
+            "type": "boolean"
           },
           "owner_id": {
             "type": "string",
@@ -26022,6 +26243,9 @@
           "updated_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "urgent_order": {
+            "type": "boolean"
           },
           "version": {
             "type": "integer",

@@ -50,6 +50,37 @@ pub(crate) fn upsert_task_group() {}
 
 #[utoipa::path(
     get,
+    path = "/api/v1/task-engine/priority-rule",
+    tag = "task-engine",
+    responses(
+        (status = 200, description = "当前货主任务优先级权重", body = TaskPriorityRule),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn get_task_priority_rule() {}
+
+#[utoipa::path(
+    put,
+    path = "/api/v1/task-engine/priority-rule",
+    tag = "task-engine",
+    params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")),
+    request_body = UpsertTaskPriorityRuleRequest,
+    responses(
+        (status = 200, description = "保存任务优先级权重", body = TaskPriorityRule),
+        (status = 400, description = "缺少幂等键", body = ErrorResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+        (status = 409, description = "幂等冲突", body = ErrorResponse),
+        (status = 422, description = "规则参数非法", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn upsert_task_priority_rule() {}
+
+#[utoipa::path(
+    get,
     path = "/api/v1/task-engine/tasks",
     tag = "task-engine",
     params(TaskListQuery),

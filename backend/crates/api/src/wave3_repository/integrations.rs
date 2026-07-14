@@ -64,6 +64,7 @@ pub(super) async fn create_putaway_tasks_for_receiving_order(
                 target_location_id: None,
                 target_location_code: None,
                 priority: None,
+                urgent_order: false,
             },
             now,
         )

@@ -2564,6 +2564,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/task-engine/priority-rule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_task_priority_rule"];
+        put: operations["upsert_task_priority_rule"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/task-engine/task-groups": {
         parameters: {
             query?: never;
@@ -3773,6 +3789,7 @@ export interface components {
             target_location_id?: string | null;
             task_group_code: string;
             task_type_code: string;
+            urgent_order?: boolean;
             /** Format: uuid */
             warehouse_id: string;
         };
@@ -5806,8 +5823,28 @@ export interface components {
             /** Format: date-time */
             valid_until?: string | null;
         };
+        TaskPriorityRule: {
+            /** Format: int32 */
+            cold_chain_bonus: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: int32 */
+            manual_expedite_bonus: number;
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: int32 */
+            urgent_order_bonus: number;
+            /** Format: int64 */
+            version: number;
+            /** Format: int32 */
+            waiting_minutes_per_point: number;
+        };
         /** @enum {string} */
-        TaskTransitionAction: "assign" | "dispatch" | "reassign" | "recall" | "start" | "complete" | "report_exception" | "resolve_complete" | "cancel";
+        TaskTransitionAction: "assign" | "dispatch" | "reassign" | "recall" | "start" | "complete" | "report_exception" | "resolve_complete" | "cancel" | "expedite";
         TaskType: {
             /** Format: date-time */
             created_at: string;
@@ -6266,6 +6303,16 @@ export interface components {
             warehouse_id: string;
             zone_ids?: string[];
         };
+        UpsertTaskPriorityRuleRequest: {
+            /** Format: int32 */
+            cold_chain_bonus: number;
+            /** Format: int32 */
+            manual_expedite_bonus: number;
+            /** Format: int32 */
+            urgent_order_bonus: number;
+            /** Format: int32 */
+            waiting_minutes_per_point: number;
+        };
         UpsertTaskTypeRequest: {
             /** Format: int32 */
             default_priority: number;
@@ -6305,6 +6352,7 @@ export interface components {
             /** Format: uuid */
             batch_id?: string | null;
             batch_no?: string | null;
+            cold_chain: boolean;
             /** Format: date-time */
             completed_at?: string | null;
             /** Format: date-time */
@@ -6317,6 +6365,7 @@ export interface components {
             exception_note?: string | null;
             /** Format: uuid */
             id: string;
+            manually_expedited: boolean;
             /** Format: uuid */
             owner_id: string;
             /** Format: int64 */
@@ -6348,6 +6397,7 @@ export interface components {
             task_type_code: string;
             /** Format: date-time */
             updated_at: string;
+            urgent_order: boolean;
             /** Format: int64 */
             version: number;
             /** Format: uuid */
@@ -16191,6 +16241,116 @@ export interface operations {
                 };
             };
             /** @description 运行时字典参数无效，fail closed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_task_priority_rule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前货主任务优先级权重 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskPriorityRule"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    upsert_task_priority_rule: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertTaskPriorityRuleRequest"];
+            };
+        };
+        responses: {
+            /** @description 保存任务优先级权重 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskPriorityRule"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 规则参数非法 */
             422: {
                 headers: {
                     [name: string]: unknown;

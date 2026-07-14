@@ -67,12 +67,40 @@ async fn create_normalized_task_in_tx(
     {
         return Err(TaskEngineError::TaskGroupNotFound);
     }
-    let priority = request.priority.unwrap_or(default_priority);
-    if !(0..=1000).contains(&priority) {
+    let base_priority = request.priority.unwrap_or(default_priority);
+    if !(0..=1000).contains(&base_priority) {
         return Err(TaskEngineError::Validation(
             "priority must be between 0 and 1000".to_string(),
         ));
     }
+    let rule: (i32, i32) = sqlx::query_as(
+        "SELECT urgent_order_bonus, cold_chain_bonus FROM task_priority_rules WHERE owner_id = $1",
+    )
+    .bind(ctx.owner_id)
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(map_database_error)?;
+    let cold_chain: bool = sqlx::query_scalar(
+        r#"
+        SELECT COALESCE((
+            SELECT storage_condition IN ('frozen', 'cold', 'cool')
+              FROM products
+             WHERE owner_id = $1
+               AND (id = $2 OR ($2::UUID IS NULL AND product_code = $3))
+             LIMIT 1
+        ), FALSE)
+        "#,
+    )
+    .bind(ctx.owner_id)
+    .bind(request.product_id)
+    .bind(&request.product_code)
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(map_database_error)?;
+    let priority = (base_priority
+        + if request.urgent_order { rule.0 } else { 0 }
+        + if cold_chain { rule.1 } else { 0 })
+        .min(1000);
     let id = Uuid::new_v4();
     let task_no = format!(
         "TE-{}-{}",
@@ -86,19 +114,20 @@ async fn create_normalized_task_in_tx(
             source_doc_id, source_doc_no, source_line_no, source_task_key,
             warehouse_id, task_group_code, product_id, product_code, batch_id,
             batch_no, planned_qty, source_location_id, source_location_code,
-            target_location_id, target_location_code, priority, estimated_minutes,
-            status, created_at, updated_at
+            target_location_id, target_location_code, priority, urgent_order,
+            cold_chain, estimated_minutes, status, created_at, updated_at
         ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
             $11, $12, $13, $14, $15, $16, $17, $18, $19,
-            $20, $21, $22, $23, 'pending_assignment', $24, $24
+            $20, $21, $22, $23, $24, $25, 'pending_assignment', $26, $26
         )
         RETURNING id, owner_id, task_no, task_type_code, source_module, source_doc_type,
                   source_doc_id, source_doc_no, source_line_no, source_task_key,
                   warehouse_id, task_group_code, product_id, product_code, batch_id,
                   batch_no, planned_qty, actual_qty, source_location_id,
                   source_location_code, target_location_id, target_location_code,
-                  priority, estimated_minutes, assignee_user_id, status, exception_code,
+                  priority, urgent_order, cold_chain, manually_expedited,
+                  estimated_minutes, assignee_user_id, status, exception_code,
                   exception_note, assigned_at, dispatched_at, started_at, completed_at,
                   created_at, updated_at, version
         "#,
@@ -125,6 +154,8 @@ async fn create_normalized_task_in_tx(
     .bind(request.target_location_id)
     .bind(&request.target_location_code)
     .bind(priority)
+    .bind(request.urgent_order)
+    .bind(cold_chain)
     .bind(estimated_minutes)
     .bind(now)
     .fetch_one(&mut **tx)
@@ -229,11 +260,13 @@ async fn ensure_default_task_group_in_tx(
 
 #[derive(Debug)]
 struct ResolvedTransition {
-    status: &'static str,
+    status: String,
     assignee_user_id: Option<Uuid>,
     actual_qty: Option<i64>,
     exception_code: Option<String>,
     exception_note: Option<String>,
+    priority: i32,
+    manually_expedited: bool,
 }
 
 async fn resolve_transition(
@@ -244,11 +277,13 @@ async fn resolve_transition(
     now: DateTime<Utc>,
 ) -> Result<ResolvedTransition, TaskEngineError> {
     let unchanged = || ResolvedTransition {
-        status: TASK_STATUS_PENDING_ASSIGNMENT,
+        status: TASK_STATUS_PENDING_ASSIGNMENT.to_string(),
         assignee_user_id: None,
         actual_qty: task.actual_qty,
         exception_code: task.exception_code.clone(),
         exception_note: task.exception_note.clone(),
+        priority: task.priority,
+        manually_expedited: task.manually_expedited,
     };
     match request.action {
         TaskTransitionAction::Assign | TaskTransitionAction::Reassign => {
@@ -279,14 +314,14 @@ async fn resolve_transition(
                 select_least_loaded_worker(tx, task, now).await?
             };
             Ok(ResolvedTransition {
-                status: TASK_STATUS_ASSIGNED,
+                status: TASK_STATUS_ASSIGNED.to_string(),
                 assignee_user_id: Some(assignee),
                 ..unchanged()
             })
         }
         TaskTransitionAction::Dispatch if task.status == TASK_STATUS_ASSIGNED => {
             Ok(ResolvedTransition {
-                status: TASK_STATUS_DISPATCHED,
+                status: TASK_STATUS_DISPATCHED.to_string(),
                 assignee_user_id: task.assignee_user_id,
                 ..unchanged()
             })
@@ -302,7 +337,7 @@ async fn resolve_transition(
         TaskTransitionAction::Start if task.status == TASK_STATUS_DISPATCHED => {
             require_assignee(ctx, task)?;
             Ok(ResolvedTransition {
-                status: TASK_STATUS_IN_PROGRESS,
+                status: TASK_STATUS_IN_PROGRESS.to_string(),
                 assignee_user_id: task.assignee_user_id,
                 ..unchanged()
             })
@@ -316,11 +351,13 @@ async fn resolve_transition(
                 return Err(TaskEngineError::QuantityDifferenceRequiresException);
             }
             Ok(ResolvedTransition {
-                status: TASK_STATUS_COMPLETED,
+                status: TASK_STATUS_COMPLETED.to_string(),
                 assignee_user_id: task.assignee_user_id,
                 actual_qty: Some(actual_qty),
                 exception_code: None,
                 exception_note: None,
+                priority: task.priority,
+                manually_expedited: task.manually_expedited,
             })
         }
         TaskTransitionAction::ReportException if task.status == TASK_STATUS_IN_PROGRESS => {
@@ -330,20 +367,24 @@ async fn resolve_transition(
                 TaskEngineError::Validation("exception_code is required".into())
             })?;
             Ok(ResolvedTransition {
-                status: TASK_STATUS_EXCEPTION,
+                status: TASK_STATUS_EXCEPTION.to_string(),
                 assignee_user_id: task.assignee_user_id,
                 actual_qty: request.actual_qty,
                 exception_code: Some(exception_code),
                 exception_note: normalized_optional_text(request.exception_note.as_deref(), 500)?,
+                priority: task.priority,
+                manually_expedited: task.manually_expedited,
             })
         }
         TaskTransitionAction::ResolveComplete if task.status == TASK_STATUS_EXCEPTION => {
             Ok(ResolvedTransition {
-                status: TASK_STATUS_COMPLETED,
+                status: TASK_STATUS_COMPLETED.to_string(),
                 assignee_user_id: task.assignee_user_id,
                 actual_qty: task.actual_qty,
                 exception_code: task.exception_code.clone(),
                 exception_note: task.exception_note.clone(),
+                priority: task.priority,
+                manually_expedited: task.manually_expedited,
             })
         }
         TaskTransitionAction::Cancel
@@ -353,9 +394,33 @@ async fn resolve_transition(
             ) =>
         {
             Ok(ResolvedTransition {
-                status: TASK_STATUS_CANCELLED,
+                status: TASK_STATUS_CANCELLED.to_string(),
                 assignee_user_id: task.assignee_user_id,
                 ..unchanged()
+            })
+        }
+        TaskTransitionAction::Expedite
+            if !task.manually_expedited
+                && !matches!(
+                    task.status.as_str(),
+                    TASK_STATUS_COMPLETED | TASK_STATUS_CANCELLED
+                ) =>
+        {
+            let bonus: i32 = sqlx::query_scalar(
+                "SELECT manual_expedite_bonus FROM task_priority_rules WHERE owner_id = $1",
+            )
+            .bind(task.owner_id)
+            .fetch_one(&mut **tx)
+            .await
+            .map_err(map_database_error)?;
+            Ok(ResolvedTransition {
+                status: task.status.clone(),
+                assignee_user_id: task.assignee_user_id,
+                actual_qty: task.actual_qty,
+                exception_code: task.exception_code.clone(),
+                exception_note: task.exception_note.clone(),
+                priority: (task.priority + bonus).min(1000),
+                manually_expedited: true,
             })
         }
         _ => Err(TaskEngineError::InvalidTransition),

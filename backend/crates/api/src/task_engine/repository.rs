@@ -82,6 +82,112 @@ impl PgTaskEngineRepository {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
+    pub async fn get_priority_rule(
+        &self,
+        ctx: &AuthContext,
+    ) -> Result<TaskPriorityRule, TaskEngineError> {
+        sqlx::query_as::<_, TaskPriorityRuleRow>(
+            r#"
+            SELECT id, owner_id, urgent_order_bonus, waiting_minutes_per_point,
+                   cold_chain_bonus, manual_expedite_bonus, created_at, updated_at, version
+              FROM task_priority_rules
+             WHERE owner_id = $1
+            "#,
+        )
+        .bind(ctx.owner_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(map_database_error)?
+        .map(Into::into)
+        .ok_or_else(|| TaskEngineError::Database("priority rule was not seeded".to_string()))
+    }
+
+    pub async fn upsert_priority_rule(
+        &self,
+        ctx: &AuthContext,
+        request: UpsertTaskPriorityRuleRequest,
+        now: DateTime<Utc>,
+        idempotency_key: &str,
+    ) -> Result<IdempotentTaskMutation<TaskPriorityRule>, TaskEngineError> {
+        validate_priority_rule(&request)?;
+        let request_hash = request_hash(&serde_json::json!({
+            "operation": "upsert_priority_rule",
+            "request": request,
+        }))?;
+        let mut tx = self.pool.begin().await.map_err(map_database_error)?;
+        lock_key(&mut tx, "mte-idempotency", ctx.owner_id, idempotency_key).await?;
+        if let Some(value) = replay_idempotency::<TaskPriorityRule>(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            now,
+        )
+        .await?
+        {
+            return Ok(IdempotentTaskMutation {
+                value,
+                replayed: true,
+            });
+        }
+        let before = load_priority_rule_for_update(&mut tx, ctx.owner_id)
+            .await?
+            .ok_or_else(|| TaskEngineError::Database("priority rule was not seeded".to_string()))?;
+        let row = sqlx::query_as::<_, TaskPriorityRuleRow>(
+            r#"
+            UPDATE task_priority_rules
+               SET urgent_order_bonus = $1,
+                   waiting_minutes_per_point = $2,
+                   cold_chain_bonus = $3,
+                   manual_expedite_bonus = $4,
+                   updated_at = $5,
+                   version = version + 1
+             WHERE owner_id = $6
+             RETURNING id, owner_id, urgent_order_bonus, waiting_minutes_per_point,
+                       cold_chain_bonus, manual_expedite_bonus, created_at, updated_at, version
+            "#,
+        )
+        .bind(request.urgent_order_bonus)
+        .bind(request.waiting_minutes_per_point)
+        .bind(request.cold_chain_bonus)
+        .bind(request.manual_expedite_bonus)
+        .bind(now)
+        .bind(ctx.owner_id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(map_database_error)?;
+        let value = TaskPriorityRule::from(row);
+        append_audit(
+            &mut tx,
+            ctx,
+            "upsert_priority_rule",
+            "task_priority_rule",
+            value.id,
+            Some(TaskPriorityRule::from(before)),
+            &value,
+            now,
+        )
+        .await?;
+        store_idempotency_success(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            "PUT",
+            "/api/v1/task-engine/priority-rule",
+            "task_priority_rule",
+            value.id,
+            &value,
+            now,
+        )
+        .await?;
+        tx.commit().await.map_err(map_database_error)?;
+        Ok(IdempotentTaskMutation {
+            value,
+            replayed: false,
+        })
+    }
+
     pub async fn upsert_task_group(
         &self,
         ctx: &AuthContext,
@@ -265,20 +371,31 @@ impl PgTaskEngineRepository {
         let limit = query.limit.unwrap_or(100).clamp(1, 500);
         let rows = sqlx::query_as::<_, WarehouseTaskRow>(
             r#"
-            SELECT id, owner_id, task_no, task_type_code, source_module, source_doc_type,
-                   source_doc_id, source_doc_no, source_line_no, source_task_key,
-                   warehouse_id, task_group_code, product_id, product_code, batch_id,
-                   batch_no, planned_qty, actual_qty, source_location_id,
-                   source_location_code, target_location_id, target_location_code,
-                   priority, estimated_minutes, assignee_user_id, status, exception_code,
-                   exception_note, assigned_at, dispatched_at, started_at, completed_at,
-                   created_at, updated_at, version
-              FROM warehouse_tasks
-             WHERE owner_id = $1
-               AND (NOT $2 OR assignee_user_id = $3)
-               AND ($4::TEXT IS NULL OR status = $4)
-               AND ($5::TEXT IS NULL OR task_type_code = $5)
-               AND ($6::UUID IS NULL OR warehouse_id = $6)
+            SELECT task.id, task.owner_id, task.task_no, task.task_type_code,
+                   task.source_module, task.source_doc_type, task.source_doc_id,
+                   task.source_doc_no, task.source_line_no, task.source_task_key,
+                   task.warehouse_id, task.task_group_code, task.product_id, task.product_code,
+                   task.batch_id, task.batch_no, task.planned_qty, task.actual_qty,
+                   task.source_location_id, task.source_location_code, task.target_location_id,
+                   task.target_location_code,
+                   LEAST(1000, task.priority + CASE
+                       WHEN task.status IN ('pending_release', 'pending_assignment', 'assigned', 'dispatched')
+                       THEN GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (now() - task.created_at)) / 60
+                                  / rule.waiting_minutes_per_point)::INT)
+                       ELSE 0
+                   END)::INT AS priority,
+                   task.urgent_order, task.cold_chain, task.manually_expedited,
+                   task.estimated_minutes, task.assignee_user_id, task.status,
+                   task.exception_code, task.exception_note, task.assigned_at,
+                   task.dispatched_at, task.started_at, task.completed_at,
+                   task.created_at, task.updated_at, task.version
+              FROM warehouse_tasks task
+              JOIN task_priority_rules rule ON rule.owner_id = task.owner_id
+             WHERE task.owner_id = $1
+               AND (NOT $2 OR task.assignee_user_id = $3)
+               AND ($4::TEXT IS NULL OR task.status = $4)
+               AND ($5::TEXT IS NULL OR task.task_type_code = $5)
+               AND ($6::UUID IS NULL OR task.warehouse_id = $6)
              ORDER BY priority DESC, created_at, id
              LIMIT $7
             "#,
@@ -337,19 +454,22 @@ impl PgTaskEngineRepository {
                    actual_qty = $3,
                    exception_code = $4,
                    exception_note = $5,
-                   assigned_at = CASE WHEN $1 = 'assigned' THEN $6 ELSE assigned_at END,
-                   dispatched_at = CASE WHEN $1 = 'dispatched' THEN $6 ELSE dispatched_at END,
-                   started_at = CASE WHEN $1 = 'in_progress' THEN $6 ELSE started_at END,
-                   completed_at = CASE WHEN $1 = 'completed' THEN $6 ELSE completed_at END,
-                   updated_at = $6,
+                   priority = $6,
+                   manually_expedited = $7,
+                   assigned_at = CASE WHEN $1 = 'assigned' THEN $8 ELSE assigned_at END,
+                   dispatched_at = CASE WHEN $1 = 'dispatched' THEN $8 ELSE dispatched_at END,
+                   started_at = CASE WHEN $1 = 'in_progress' THEN $8 ELSE started_at END,
+                   completed_at = CASE WHEN $1 = 'completed' THEN $8 ELSE completed_at END,
+                   updated_at = $8,
                    version = version + 1
-             WHERE id = $7 AND owner_id = $8
+             WHERE id = $9 AND owner_id = $10
              RETURNING id, owner_id, task_no, task_type_code, source_module, source_doc_type,
                        source_doc_id, source_doc_no, source_line_no, source_task_key,
                        warehouse_id, task_group_code, product_id, product_code, batch_id,
                        batch_no, planned_qty, actual_qty, source_location_id,
                        source_location_code, target_location_id, target_location_code,
-                       priority, estimated_minutes, assignee_user_id, status, exception_code,
+                       priority, urgent_order, cold_chain, manually_expedited,
+                       estimated_minutes, assignee_user_id, status, exception_code,
                        exception_note, assigned_at, dispatched_at, started_at, completed_at,
                        created_at, updated_at, version
             "#,
@@ -359,6 +479,8 @@ impl PgTaskEngineRepository {
         .bind(transition.actual_qty)
         .bind(&transition.exception_code)
         .bind(&transition.exception_note)
+        .bind(transition.priority)
+        .bind(transition.manually_expedited)
         .bind(now)
         .bind(task_id)
         .bind(ctx.owner_id)

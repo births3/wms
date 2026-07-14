@@ -72,6 +72,27 @@ pub struct TaskWorkerListResponse {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+pub struct TaskPriorityRule {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub urgent_order_bonus: i32,
+    pub waiting_minutes_per_point: i32,
+    pub cold_chain_bonus: i32,
+    pub manual_expedite_bonus: i32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub version: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+pub struct UpsertTaskPriorityRuleRequest {
+    pub urgent_order_bonus: i32,
+    pub waiting_minutes_per_point: i32,
+    pub cold_chain_bonus: i32,
+    pub manual_expedite_bonus: i32,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 pub struct WarehouseTask {
     pub id: Uuid,
     pub owner_id: Uuid,
@@ -96,6 +117,9 @@ pub struct WarehouseTask {
     pub target_location_id: Option<Uuid>,
     pub target_location_code: Option<String>,
     pub priority: i32,
+    pub urgent_order: bool,
+    pub cold_chain: bool,
+    pub manually_expedited: bool,
     pub estimated_minutes: i32,
     pub assignee_user_id: Option<Uuid>,
     pub status: String,
@@ -131,6 +155,8 @@ pub struct CreateWarehouseTaskRequest {
     pub target_location_id: Option<Uuid>,
     pub target_location_code: Option<String>,
     pub priority: Option<i32>,
+    #[serde(default)]
+    pub urgent_order: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
@@ -145,6 +171,7 @@ pub enum TaskTransitionAction {
     ReportException,
     ResolveComplete,
     Cancel,
+    Expedite,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]

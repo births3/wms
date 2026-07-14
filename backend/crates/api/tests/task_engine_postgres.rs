@@ -18,8 +18,13 @@ use wms_api::{
 };
 use wms_domain::{
     CreateWarehouseTaskRequest, TaskGroupMemberQualification, TaskListQuery, TaskTransitionAction,
-    TransitionWarehouseTaskRequest, UpsertTaskGroupRequest,
+    TransitionWarehouseTaskRequest, UpsertTaskGroupRequest, UpsertTaskPriorityRuleRequest,
 };
+
+#[path = "task_engine_postgres/priority.rs"]
+mod priority;
+#[path = "task_engine_postgres/routes.rs"]
+mod routes;
 
 struct AllowAllRevocationStore;
 
@@ -63,6 +68,7 @@ fn ctx(owner_id: Uuid, user_id: Uuid) -> AuthContext {
             "mte.task.write".to_string(),
             "mte.task.assign".to_string(),
             "mte.task_group.write".to_string(),
+            "mte.priority_rule.write".to_string(),
             "mte.task.execute".to_string(),
         ],
         jti: Uuid::new_v4().to_string(),
@@ -149,6 +155,7 @@ fn create_request(warehouse_id: Uuid) -> CreateWarehouseTaskRequest {
         target_location_id: None,
         target_location_code: Some("PACK-01".to_string()),
         priority: None,
+        urgent_order: false,
     }
 }
 
@@ -620,201 +627,4 @@ async fn assignment_rejects_expired_or_full_worker_qualification(pool: PgPool) {
         .await
         .expect("task groups should query");
     assert_eq!(visible_groups[0].member_user_ids, vec![full_worker_id]);
-}
-
-#[sqlx::test(migrations = "../../migrations")]
-async fn task_routes_require_idempotency_and_expose_worker_queue(pool: PgPool) {
-    let owner_id = Uuid::new_v4();
-    seed_owner(&pool, owner_id).await;
-    let warehouse_id = seed_warehouse(&pool, owner_id).await;
-    let manager_id = Uuid::new_v4();
-    let worker_id = Uuid::new_v4();
-    seed_user(&pool, owner_id, manager_id, "API 主管").await;
-    seed_user(&pool, owner_id, worker_id, "API 拣选员").await;
-    let repository = PgTaskEngineRepository::new(pool.clone());
-    repository
-        .upsert_task_group(
-            &ctx(owner_id, manager_id),
-            "pick-a",
-            UpsertTaskGroupRequest {
-                task_group_name: "API A 区拣选组".to_string(),
-                warehouse_id,
-                zone_ids: vec![],
-                task_type_codes: vec!["pick".to_string()],
-                member_user_ids: vec![worker_id],
-                member_qualifications: vec![],
-                enabled: true,
-            },
-            Utc::now(),
-            "mte-api-group-1",
-        )
-        .await
-        .expect("group should seed");
-
-    std::env::set_var(JWT_SECRET_ENV, "test-secret");
-    let manager_claims = build_access_claims(
-        manager_id,
-        owner_id,
-        "mte-api-manager",
-        vec![
-            "mte.task.read".to_string(),
-            "mte.task.write".to_string(),
-            "mte.task.assign".to_string(),
-            "mte.task_group.write".to_string(),
-        ],
-        Uuid::new_v4().to_string(),
-        Utc::now(),
-    );
-    let worker_claims = build_access_claims(
-        worker_id,
-        owner_id,
-        "mte-api-worker",
-        vec!["mte.task.read".to_string(), "mte.task.execute".to_string()],
-        Uuid::new_v4().to_string(),
-        Utc::now(),
-    );
-    let manager_token =
-        encode_access_token(&manager_claims, "test-secret").expect("manager token should encode");
-    let worker_token =
-        encode_access_token(&worker_claims, "test-secret").expect("worker token should encode");
-    let app = task_engine_router(TaskEngineAppState::with_postgres(pool.clone())).layer(
-        auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(AllowAllRevocationStore))),
-    );
-
-    let groups = app
-        .clone()
-        .oneshot(
-            Request::get("/api/v1/task-engine/task-groups")
-                .header(AUTHORIZATION, format!("Bearer {manager_token}"))
-                .body(Body::empty())
-                .unwrap(),
-        )
-        .await
-        .expect("task group list should respond");
-    assert_eq!(groups.status(), StatusCode::OK);
-
-    let workers = app
-        .clone()
-        .oneshot(
-            Request::get("/api/v1/task-engine/workers")
-                .header(AUTHORIZATION, format!("Bearer {manager_token}"))
-                .body(Body::empty())
-                .unwrap(),
-        )
-        .await
-        .expect("worker candidate list should respond");
-    assert_eq!(workers.status(), StatusCode::OK);
-
-    let upserted_group = app
-        .clone()
-        .oneshot(
-            Request::put("/api/v1/task-engine/task-groups/pick-b")
-                .header(AUTHORIZATION, format!("Bearer {manager_token}"))
-                .header("content-type", "application/json")
-                .header("Idempotency-Key", "mte-api-group-2")
-                .body(Body::from(
-                    serde_json::json!({
-                        "task_group_name": "API B 区拣选组",
-                        "warehouse_id": warehouse_id,
-                        "zone_ids": [],
-                        "task_type_codes": ["pick"],
-                        "member_user_ids": [worker_id],
-                        "enabled": true
-                    })
-                    .to_string(),
-                ))
-                .unwrap(),
-        )
-        .await
-        .expect("task group upsert should respond");
-    assert_eq!(upserted_group.status(), StatusCode::OK);
-
-    let missing_key = app
-        .clone()
-        .oneshot(
-            Request::post("/api/v1/task-engine/tasks")
-                .header(AUTHORIZATION, format!("Bearer {manager_token}"))
-                .header("content-type", "application/json")
-                .body(Body::from(
-                    serde_json::to_string(&create_request(warehouse_id)).unwrap(),
-                ))
-                .unwrap(),
-        )
-        .await
-        .expect("missing key request should respond");
-    assert_eq!(missing_key.status(), StatusCode::BAD_REQUEST);
-
-    let created = app
-        .clone()
-        .oneshot(
-            Request::post("/api/v1/task-engine/tasks")
-                .header(AUTHORIZATION, format!("Bearer {manager_token}"))
-                .header("content-type", "application/json")
-                .header("Idempotency-Key", "mte-api-create-1")
-                .body(Body::from(
-                    serde_json::to_string(&create_request(warehouse_id)).unwrap(),
-                ))
-                .unwrap(),
-        )
-        .await
-        .expect("create route should respond");
-    assert_eq!(created.status(), StatusCode::CREATED);
-    let body: serde_json::Value = serde_json::from_slice(
-        &to_bytes(created.into_body(), usize::MAX)
-            .await
-            .expect("created response body should read"),
-    )
-    .expect("created response should be json");
-    let task_id = body["id"].as_str().expect("task id should exist");
-
-    let assigned = app
-        .clone()
-        .oneshot(
-            Request::post(format!("/api/v1/task-engine/tasks/{task_id}/transitions"))
-                .header(AUTHORIZATION, format!("Bearer {manager_token}"))
-                .header("content-type", "application/json")
-                .header("Idempotency-Key", "mte-api-assign-1")
-                .body(Body::from(
-                    serde_json::json!({
-                        "action": "assign",
-                        "assignee_user_id": worker_id
-                    })
-                    .to_string(),
-                ))
-                .unwrap(),
-        )
-        .await
-        .expect("assign route should respond");
-    assert_eq!(assigned.status(), StatusCode::OK);
-
-    let queue = app
-        .clone()
-        .oneshot(
-            Request::get("/api/v1/task-engine/tasks?mine_only=true")
-                .header(AUTHORIZATION, format!("Bearer {worker_token}"))
-                .body(Body::empty())
-                .unwrap(),
-        )
-        .await
-        .expect("worker queue should respond");
-    assert_eq!(queue.status(), StatusCode::OK);
-    let body: serde_json::Value = serde_json::from_slice(
-        &to_bytes(queue.into_body(), usize::MAX)
-            .await
-            .expect("queue body should read"),
-    )
-    .expect("queue should be json");
-    assert_eq!(body["page"]["count"], 1);
-    assert_eq!(body["data"][0]["assignee_user_id"], worker_id.to_string());
-
-    let forbidden_all = app
-        .oneshot(
-            Request::get("/api/v1/task-engine/tasks?mine_only=false")
-                .header(AUTHORIZATION, format!("Bearer {worker_token}"))
-                .body(Body::empty())
-                .unwrap(),
-        )
-        .await
-        .expect("worker all-task query should respond");
-    assert_eq!(forbidden_all.status(), StatusCode::FORBIDDEN);
 }

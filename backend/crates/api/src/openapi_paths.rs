@@ -100,9 +100,9 @@ pub use wms_domain::{
 };
 pub use wms_domain::{
     CreateWarehouseTaskRequest, TaskGroup, TaskGroupListResponse, TaskGroupMemberQualification,
-    TaskListQuery, TaskTransitionAction, TaskWorker, TaskWorkerListResponse,
-    TransitionWarehouseTaskRequest, UpsertTaskGroupRequest, WarehouseTask,
-    WarehouseTaskListResponse,
+    TaskListQuery, TaskPriorityRule, TaskTransitionAction, TaskWorker, TaskWorkerListResponse,
+    TransitionWarehouseTaskRequest, UpsertTaskGroupRequest, UpsertTaskPriorityRuleRequest,
+    WarehouseTask, WarehouseTaskListResponse,
 };
 pub use wms_domain::{
     SetTaskTypeEnabledRequest, TaskType, TaskTypeListResponse, UpsertTaskTypeRequest,
