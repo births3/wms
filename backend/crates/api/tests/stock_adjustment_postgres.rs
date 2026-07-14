@@ -11,7 +11,10 @@ use wms_api::{
     stock_adjustment::{PgStockAdjustmentRepository, StockAdjustmentError},
     stock_adjustment_handlers::{stock_adjustment_router, StockAdjustmentAppState},
 };
-use wms_domain::{CreateStockLossOrderRequest, StockAdjustmentSource, StockLossReason};
+use wms_domain::{
+    CreateStockLossOrderRequest, CreateStockSurplusOrderRequest, StockAdjustmentSource,
+    StockLossReason, StockSurplusReason,
+};
 
 fn ctx(owner_id: Uuid, user_id: Uuid) -> AuthContext {
     AuthContext {
@@ -31,6 +34,8 @@ fn ctx(owner_id: Uuid, user_id: Uuid) -> AuthContext {
 async fn seed_loss_fixture(pool: &PgPool, category: &str) -> (Uuid, Uuid, Uuid, Uuid, Uuid) {
     let owner_id = Uuid::new_v4();
     let warehouse_id = Uuid::new_v4();
+    let zone_id = Uuid::new_v4();
+    let location_id = Uuid::new_v4();
     let product_id = Uuid::new_v4();
     let batch_id = Uuid::new_v4();
     let first_operator_id = Uuid::new_v4();
@@ -52,7 +57,7 @@ async fn seed_loss_fixture(pool: &PgPool, category: &str) -> (Uuid, Uuid, Uuid, 
     .await
     .expect("warehouse should seed");
     sqlx::query(
-        "INSERT INTO products (id, owner_id, product_code, product_name, specification, storage_condition, special_drug_category, status) VALUES ($1, $2, $3, '报损测试商品', '1 unit', 'normal', $4, 'active')",
+        "INSERT INTO products (id, owner_id, product_code, product_name, specification, storage_condition, special_drug_category, attrs, status) VALUES ($1, $2, $3, '报损测试商品', '1 unit', 'normal', $4, '{\"unit_volume_cm3\":100}', 'active')",
     )
     .bind(product_id)
     .bind(owner_id)
@@ -68,6 +73,32 @@ async fn seed_loss_fixture(pool: &PgPool, category: &str) -> (Uuid, Uuid, Uuid, 
             .await
             .expect("product code should load");
     sqlx::query(
+        "INSERT INTO warehouse_zones (id, owner_id, warehouse_id, zone_code, zone_name, temperature_zone, quality_color, status) VALUES ($1,$2,$3,$4,'报损测试区','normal','unqualified_red','active')",
+    )
+    .bind(zone_id)
+    .bind(owner_id)
+    .bind(warehouse_id)
+    .bind(format!("SA-Z-{}", &zone_id.to_string()[..8]))
+    .execute(pool)
+    .await
+    .expect("zone should seed");
+    sqlx::query(
+        r#"
+        INSERT INTO warehouse_locations (
+            id, owner_id, warehouse_id, zone_id, location_code, row_no, column_no,
+            layer_no, max_volume_cm3, used_volume_cm3, max_sku_count, location_type, status
+        ) VALUES ($1,$2,$3,$4,$5,1,1,1,100000,1000,10,'storage','occupied')
+        "#,
+    )
+    .bind(location_id)
+    .bind(owner_id)
+    .bind(warehouse_id)
+    .bind(zone_id)
+    .bind(format!("SA-L-{}", &location_id.to_string()[..8]))
+    .execute(pool)
+    .await
+    .expect("location should seed");
+    sqlx::query(
         r#"
         INSERT INTO inventory_batches (
             id, owner_id, product_code, batch_no, production_date, expiry_date,
@@ -81,7 +112,7 @@ async fn seed_loss_fixture(pool: &PgPool, category: &str) -> (Uuid, Uuid, Uuid, 
     .bind(batch_id)
     .bind(owner_id)
     .bind(product_code)
-    .bind(Uuid::new_v4())
+    .bind(location_id)
     .bind(Utc::now())
     .execute(pool)
     .await
@@ -146,6 +177,8 @@ fn create_request(
         requires_quality_approval: false,
     }
 }
+
+include!("stock_adjustment_postgres/surplus.rs");
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn manual_loss_is_numbered_executed_atomically_audited_and_idempotent(pool: PgPool) {
@@ -459,6 +492,15 @@ async fn repeated_erp_reference_does_not_create_duplicate_loss_order(pool: PgPoo
 async fn stock_loss_api_requires_write_permission_and_idempotency_key(pool: PgPool) {
     let (owner_id, warehouse_id, _, batch_id, first_operator_id) =
         seed_loss_fixture(&pool, "none").await;
+    let created = PgStockAdjustmentRepository::new(pool.clone())
+        .create_loss_order(
+            &ctx(owner_id, first_operator_id),
+            create_request(warehouse_id, batch_id, StockLossReason::Damaged),
+            Utc::now(),
+            "sa-api-dynamic-route-create",
+        )
+        .await
+        .expect("loss order should seed dynamic route test");
     let app = stock_adjustment_router(StockAdjustmentAppState::with_postgres(pool));
     let request_body = serde_json::to_vec(&create_request(
         warehouse_id,
@@ -480,13 +522,30 @@ async fn stock_loss_api_requires_write_permission_and_idempotency_key(pool: PgPo
                 .method("POST")
                 .uri("/api/v1/stock-adjustments/loss-orders")
                 .header("content-type", "application/json")
-                .extension(read_only_ctx)
+                .extension(read_only_ctx.clone())
                 .body(Body::from(request_body.clone()))
                 .expect("request should build"),
         )
         .await
         .expect("router should respond");
     assert_eq!(forbidden.status(), StatusCode::FORBIDDEN);
+
+    let detail = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(format!(
+                    "/api/v1/stock-adjustments/loss-orders/{}",
+                    created.value.id
+                ))
+                .extension(read_only_ctx)
+                .body(Body::empty())
+                .expect("request should build"),
+        )
+        .await
+        .expect("router should respond");
+    assert_eq!(detail.status(), StatusCode::OK);
 
     let missing_key = app
         .oneshot(
