@@ -141,12 +141,88 @@ curl -sS \
   "Authorization: Bearer $WMS_TOKEN"
 ```
 
+## GET /api/v1/audit/events/export
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/audit/events/export" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## GET /api/v1/auth/api-keys
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/auth/api-keys" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/auth/api-keys
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/auth/api-keys" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/auth/api-keys/{api_key_id}/revoke
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/auth/api-keys/<api_key_id>/revoke" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/auth/api-keys/{api_key_id}/rotate
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/auth/api-keys/<api_key_id>/rotate" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
 ## POST /api/v1/auth/login
 
 ```bash
 curl -sS \
   -X POST \
   "$WMS_API_BASE/api/v1/auth/login" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/auth/logout
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/auth/logout" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -161,6 +237,196 @@ curl -sS \
   "$WMS_API_BASE/api/v1/auth/me" \
   -H \
   "Authorization: Bearer $WMS_TOKEN"
+```
+
+## PUT /api/v1/auth/me/password
+
+```bash
+curl -sS \
+  -X PUT \
+  "$WMS_API_BASE/api/v1/auth/me/password" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/auth/permissions
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/auth/permissions" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## GET /api/v1/auth/roles
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/auth/roles" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/auth/roles
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/auth/roles" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## DELETE /api/v1/auth/roles/{role_id}
+
+```bash
+curl -sS \
+  -X DELETE \
+  "$WMS_API_BASE/api/v1/auth/roles/<role_id>" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## PUT /api/v1/auth/roles/{role_id}
+
+```bash
+curl -sS \
+  -X PUT \
+  "$WMS_API_BASE/api/v1/auth/roles/<role_id>" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## PUT /api/v1/auth/roles/{role_id}/permissions
+
+```bash
+curl -sS \
+  -X PUT \
+  "$WMS_API_BASE/api/v1/auth/roles/<role_id>/permissions" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/auth/sessions
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/auth/sessions" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/auth/sessions/revoke-others
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/auth/sessions/revoke-others" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/auth/sessions/{session_id}/revoke
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/auth/sessions/<session_id>/revoke" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## PUT /api/v1/auth/user-roles/batch
+
+```bash
+curl -sS \
+  -X PUT \
+  "$WMS_API_BASE/api/v1/auth/user-roles/batch" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/auth/users
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/auth/users" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/auth/users
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/auth/users" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/auth/users/{user_id}/kick
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/auth/users/<user_id>/kick" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## PUT /api/v1/auth/users/{user_id}/status
+
+```bash
+curl -sS \
+  -X PUT \
+  "$WMS_API_BASE/api/v1/auth/users/<user_id>/status" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
 ```
 
 ## POST /api/v1/billing/accounts
@@ -319,12 +585,50 @@ curl -sS \
   '{}'
 ```
 
+## GET /api/v1/cold-chain/devices
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/cold-chain/devices" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
 ## POST /api/v1/cold-chain/devices
 
 ```bash
 curl -sS \
   -X POST \
   "$WMS_API_BASE/api/v1/cold-chain/devices" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## PATCH /api/v1/cold-chain/devices/{device_code}
+
+```bash
+curl -sS \
+  -X PATCH \
+  "$WMS_API_BASE/api/v1/cold-chain/devices/<device_code>" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/cold-chain/devices/{device_code}/disable
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/cold-chain/devices/<device_code>/disable" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
@@ -461,6 +765,134 @@ curl -sS \
   '{}'
 ```
 
+## GET /api/v1/dock-appointments
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/dock-appointments" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/dock-appointments
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/dock-appointments" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## PATCH /api/v1/dock-appointments/{id}
+
+```bash
+curl -sS \
+  -X PATCH \
+  "$WMS_API_BASE/api/v1/dock-appointments/<id>" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/dock-appointments/{id}/arrive
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/dock-appointments/<id>/arrive" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/dock-appointments/{id}/cancel
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/dock-appointments/<id>/cancel" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/docks
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/docks" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/docks
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/docks" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/docks/import
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/docks/import" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## DELETE /api/v1/docks/{id}
+
+```bash
+curl -sS \
+  -X DELETE \
+  "$WMS_API_BASE/api/v1/docks/<id>" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## PATCH /api/v1/docks/{id}
+
+```bash
+curl -sS \
+  -X PATCH \
+  "$WMS_API_BASE/api/v1/docks/<id>" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
 ## GET /api/v1/driver/tasks/today
 
 ```bash
@@ -469,6 +901,44 @@ curl -sS \
   "$WMS_API_BASE/api/v1/driver/tasks/today" \
   -H \
   "Authorization: Bearer $WMS_TOKEN"
+```
+
+## GET /api/v1/drug-inspection/platforms
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/drug-inspection/platforms" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/drug-inspection/platforms
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/drug-inspection/platforms" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## PATCH /api/v1/drug-inspection/platforms/{platform_id}/status
+
+```bash
+curl -sS \
+  -X PATCH \
+  "$WMS_API_BASE/api/v1/drug-inspection/platforms/<platform_id>/status" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
 ```
 
 ## GET /api/v1/event-bus/deliveries/pending
@@ -509,12 +979,108 @@ curl -sS \
   '{}'
 ```
 
+## GET /api/v1/express/carriers
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/express/carriers" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/express/carriers
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/express/carriers" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/express/routing-rules
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/express/routing-rules" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/express/routing-rules
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/express/routing-rules" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/express/waybills
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/express/waybills" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/express/waybills/{waybill_no}/cancel
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/express/waybills/<waybill_no>/cancel" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/express/waybills/{waybill_no}/tracking
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/express/waybills/<waybill_no>/tracking" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
 ## GET /api/v1/healthz
 
 ```bash
 curl -sS \
   -X GET \
   "$WMS_API_BASE/api/v1/healthz"
+```
+
+## GET /api/v1/inbound/receiving-dashboard
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/inbound/receiving-dashboard" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
 ```
 
 ## GET /api/v1/inbound/receiving-orders
@@ -589,6 +1155,16 @@ curl -sS \
   '{}'
 ```
 
+## GET /api/v1/inbound/receiving-orders/{id}/print-data
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/inbound/receiving-orders/<id>/print-data" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
 ## POST /api/v1/inbound/receiving-orders/{id}/putaway
 
 ```bash
@@ -601,6 +1177,16 @@ curl -sS \
   "Content-Type: application/json" \
   -d \
   '{}'
+```
+
+## GET /api/v1/inbound/receiving-orders/{id}/putaway-recommendations
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/inbound/receiving-orders/<id>/putaway-recommendations" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
 ```
 
 ## POST /api/v1/inbound/receiving-orders/{id}/receive
@@ -623,6 +1209,20 @@ curl -sS \
 curl -sS \
   -X POST \
   "$WMS_API_BASE/api/v1/inbound/receiving-orders/<id>/reject" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/inbound/receiving-orders/{id}/release
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/inbound/receiving-orders/<id>/release" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
@@ -655,6 +1255,30 @@ curl -sS \
   "Authorization: Bearer $WMS_TOKEN"
 ```
 
+## POST /api/v1/inventory/batches/expire
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/inventory/batches/expire" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/inventory/batches/near-expiry-report
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/inventory/batches/near-expiry-report" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
 ## POST /api/v1/inventory/batches/putaway
 
 ```bash
@@ -669,12 +1293,194 @@ curl -sS \
   '{}'
 ```
 
+## POST /api/v1/inventory/batches/recall
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/inventory/batches/recall" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/inventory/batches/recall/cancel
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/inventory/batches/recall/cancel" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
 ## POST /api/v1/inventory/batches/status
 
 ```bash
 curl -sS \
   -X POST \
   "$WMS_API_BASE/api/v1/inventory/batches/status" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/inventory/batches/{id}/trace
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/inventory/batches/<id>/trace" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/inventory/counts
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/inventory/counts" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/inventory/counts/{id}
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/inventory/counts/<id>" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/inventory/counts/{id}/approve
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/inventory/counts/<id>/approve" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/inventory/counts/{id}/lines/{line_id}/submit
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/inventory/counts/<id>/lines/<line_id>/submit" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/inventory/maintenance/records
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/inventory/maintenance/records" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/inventory/maintenance/records
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/inventory/maintenance/records" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/inventory/maintenance/tasks
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/inventory/maintenance/tasks" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## GET /api/v1/inventory/status-transitions
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/inventory/status-transitions" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## PUT /api/v1/inventory/status-transitions/{from_status}/{to_status}
+
+```bash
+curl -sS \
+  -X PUT \
+  "$WMS_API_BASE/api/v1/inventory/status-transitions/<from_status>/<to_status>" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/m-vr/dual-person-policy
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/m-vr/dual-person-policy" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## GET /api/v1/m-vr/dual-person-policy/rules
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/m-vr/dual-person-policy/rules" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## PUT /api/v1/m-vr/dual-person-policy/rules
+
+```bash
+curl -sS \
+  -X PUT \
+  "$WMS_API_BASE/api/v1/m-vr/dual-person-policy/rules" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
@@ -699,6 +1505,82 @@ curl -sS \
 curl -sS \
   -X POST \
   "$WMS_API_BASE/api/v1/master-data/customers" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/master-data/customers/batch-sync
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/master-data/customers/batch-sync" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/master-data/customers/{customer_id}/addresses
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/master-data/customers/<customer_id>/addresses" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/master-data/customers/{customer_id}/addresses
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/master-data/customers/<customer_id>/addresses" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## PATCH /api/v1/master-data/customers/{customer_id}/addresses/{address_id}
+
+```bash
+curl -sS \
+  -X PATCH \
+  "$WMS_API_BASE/api/v1/master-data/customers/<customer_id>/addresses/<address_id>" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/master-data/customers/{customer_id}/profile
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/master-data/customers/<customer_id>/profile" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## PATCH /api/v1/master-data/customers/{customer_id}/profile
+
+```bash
+curl -sS \
+  -X PATCH \
+  "$WMS_API_BASE/api/v1/master-data/customers/<customer_id>/profile" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
@@ -817,6 +1699,20 @@ curl -sS \
   '{}'
 ```
 
+## POST /api/v1/master-data/products/batch-sync
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/master-data/products/batch-sync" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
 ## DELETE /api/v1/master-data/products/{id}
 
 ```bash
@@ -923,6 +1819,20 @@ curl -sS \
   '{}'
 ```
 
+## POST /api/v1/master-data/suppliers/batch-sync
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/master-data/suppliers/batch-sync" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
 ## DELETE /api/v1/master-data/suppliers/{id}
 
 ```bash
@@ -939,6 +1849,54 @@ curl -sS \
 curl -sS \
   -X PATCH \
   "$WMS_API_BASE/api/v1/master-data/suppliers/<id>" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/master-data/warehouse-zones
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/master-data/warehouse-zones" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/master-data/warehouse-zones
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/master-data/warehouse-zones" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## DELETE /api/v1/master-data/warehouse-zones/{id}
+
+```bash
+curl -sS \
+  -X DELETE \
+  "$WMS_API_BASE/api/v1/master-data/warehouse-zones/<id>" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## PATCH /api/v1/master-data/warehouse-zones/{id}
+
+```bash
+curl -sS \
+  -X PATCH \
+  "$WMS_API_BASE/api/v1/master-data/warehouse-zones/<id>" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
@@ -1029,6 +1987,16 @@ curl -sS \
   "Authorization: Bearer $WMS_TOKEN"
 ```
 
+## GET /api/v1/outbound/orders/{id}/review
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/outbound/orders/<id>/review" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
 ## POST /api/v1/outbound/orders/{id}/review
 
 ```bash
@@ -1071,12 +2039,46 @@ curl -sS \
   '{}'
 ```
 
+## GET /api/v1/outbound/waves
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/outbound/waves" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
 ## POST /api/v1/outbound/waves
 
 ```bash
 curl -sS \
   -X POST \
   "$WMS_API_BASE/api/v1/outbound/waves" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/outbound/waves/{wave_id}
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/outbound/waves/<wave_id>" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/outbound/waves/{wave_id}/cancel
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/outbound/waves/<wave_id>/cancel" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
@@ -1353,6 +2355,102 @@ curl -sS \
   '{}'
 ```
 
+## GET /api/v1/state-machines
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/state-machines" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## GET /api/v1/state-machines/{machine_code}
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/state-machines/<machine_code>" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## GET /api/v1/state-machines/{machine_code}/transition-validation
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/state-machines/<machine_code>/transition-validation" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/stock-adjustments/loss-orders
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/stock-adjustments/loss-orders" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/stock-adjustments/loss-orders/{id}
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/stock-adjustments/loss-orders/<id>" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/stock-adjustments/loss-orders/{id}/execute
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/stock-adjustments/loss-orders/<id>/execute" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/stock-adjustments/loss-orders/{id}/quality-approval
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/stock-adjustments/loss-orders/<id>/quality-approval" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/stock-adjustments/loss-orders/{id}/start
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/stock-adjustments/loss-orders/<id>/start" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
 ## GET /api/v1/store/dashboard
 
 ```bash
@@ -1411,6 +2509,140 @@ curl -sS \
   "Authorization: Bearer $WMS_TOKEN"
 ```
 
+## GET /api/v1/task-engine/priority-rule
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/task-engine/priority-rule" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## PUT /api/v1/task-engine/priority-rule
+
+```bash
+curl -sS \
+  -X PUT \
+  "$WMS_API_BASE/api/v1/task-engine/priority-rule" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/task-engine/task-groups
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/task-engine/task-groups" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## PUT /api/v1/task-engine/task-groups/{task_group_code}
+
+```bash
+curl -sS \
+  -X PUT \
+  "$WMS_API_BASE/api/v1/task-engine/task-groups/<task_group_code>" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/task-engine/task-types
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/task-engine/task-types" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## PUT /api/v1/task-engine/task-types/{task_type_code}
+
+```bash
+curl -sS \
+  -X PUT \
+  "$WMS_API_BASE/api/v1/task-engine/task-types/<task_type_code>" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## PATCH /api/v1/task-engine/task-types/{task_type_code}/enabled
+
+```bash
+curl -sS \
+  -X PATCH \
+  "$WMS_API_BASE/api/v1/task-engine/task-types/<task_type_code>/enabled" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/task-engine/tasks
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/task-engine/tasks" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/task-engine/tasks
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/task-engine/tasks" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/task-engine/tasks/{task_id}/transitions
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/task-engine/tasks/<task_id>/transitions" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/task-engine/workers
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/task-engine/workers" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
 ## POST /api/v1/tms/container-recoveries
 
 ```bash
@@ -1439,6 +2671,20 @@ curl -sS \
   '{}'
 ```
 
+## POST /api/v1/tms/route-plans
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/tms/route-plans" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
 ## POST /api/v1/tms/transit-temperature-readings
 
 ```bash
@@ -1459,6 +2705,134 @@ curl -sS \
 curl -sS \
   -X POST \
   "$WMS_API_BASE/api/v1/traceability/outbound-reports" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/wechat-notify/approvals
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/wechat-notify/approvals" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/wechat-notify/approvals/{approval_id}/callback
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/wechat-notify/approvals/<approval_id>/callback" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/wechat-notify/configs
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/wechat-notify/configs" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/wechat-notify/configs
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/wechat-notify/configs" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/wechat-notify/records
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/wechat-notify/records" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/wechat-notify/records/{record_id}/resend
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/wechat-notify/records/<record_id>/resend" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/wechat-notify/send
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/wechat-notify/send" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/wechat-notify/settings
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/wechat-notify/settings" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/wechat-notify/settings
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/wechat-notify/settings" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/wechat-notify/settings/test
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/wechat-notify/settings/test" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
