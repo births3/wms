@@ -12838,6 +12838,492 @@
         }
       }
     },
+    "/api/v1/stock-adjustments/loss-orders": {
+      "post": {
+        "tags": [
+          "stock-adjustment"
+        ],
+        "operationId": "create_stock_loss_order",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateStockLossOrderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "报损单已创建并由 M-CG 分配单号",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockLossOrder"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "仓库或库存批次不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "数量、来源或召回销毁参数非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/stock-adjustments/loss-orders/{id}": {
+      "get": {
+        "tags": [
+          "stock-adjustment"
+        ],
+        "operationId": "get_stock_loss_order",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "报损单 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "报损单详情与执行证据摘要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockLossOrder"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "报损单不存在或不属于当前货主",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/stock-adjustments/loss-orders/{id}/execute": {
+      "post": {
+        "tags": [
+          "stock-adjustment"
+        ],
+        "operationId": "execute_stock_loss_order",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "报损单 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecuteStockLossOrderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "按 M-VR 双人策略完成报损并原子扣减库存",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockLossOrder"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "报损单不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态、主管审批或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "数量超限、第二操作人缺失/相同/无资格",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/stock-adjustments/loss-orders/{id}/quality-approval": {
+      "post": {
+        "tags": [
+          "stock-adjustment"
+        ],
+        "operationId": "approve_stock_loss_order",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "报损单 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockLossQualityApprovalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "质量联系单审批结果已回写",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockLossOrder"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "报损单不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "质量联系单 ID 为空",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/stock-adjustments/loss-orders/{id}/start": {
+      "post": {
+        "tags": [
+          "stock-adjustment"
+        ],
+        "operationId": "start_stock_loss_order",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "报损单 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "报损单进入执行中",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockLossOrder"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "报损单不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "第一操作人无有效保管员资格",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/store/dashboard": {
       "get": {
         "tags": [
@@ -17839,6 +18325,48 @@
           }
         }
       },
+      "CreateStockLossOrderRequest": {
+        "type": "object",
+        "required": [
+          "warehouse_id",
+          "batch_id",
+          "quantity",
+          "reason",
+          "source",
+          "requires_quality_approval"
+        ],
+        "properties": {
+          "batch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "external_ref": {
+            "type": "string",
+            "nullable": true
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/StockLossReason"
+          },
+          "recall_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "requires_quality_approval": {
+            "type": "boolean"
+          },
+          "source": {
+            "$ref": "#/components/schemas/StockAdjustmentSource"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "CreateSupplierRequest": {
         "type": "object",
         "required": [
@@ -19122,6 +19650,16 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "ExecuteStockLossOrderRequest": {
+        "type": "object",
+        "properties": {
+          "second_operator_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
           }
         }
       },
@@ -23927,6 +24465,172 @@
           }
         }
       },
+      "StockAdjustmentSource": {
+        "type": "string",
+        "enum": [
+          "erp",
+          "manual"
+        ]
+      },
+      "StockAdjustmentStatus": {
+        "type": "string",
+        "enum": [
+          "pending_approval",
+          "pending_execution",
+          "in_progress",
+          "completed",
+          "rejected",
+          "cancelled",
+          "exception_suspended"
+        ]
+      },
+      "StockLossOrder": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "warehouse_id",
+          "order_no",
+          "batch_id",
+          "product_code",
+          "batch_no",
+          "quantity",
+          "reason",
+          "source",
+          "status",
+          "requires_quality_approval",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "approval_record_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "batch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "batch_no": {
+            "type": "string"
+          },
+          "completed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "external_ref": {
+            "type": "string",
+            "nullable": true
+          },
+          "first_operator_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "order_no": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "policy": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DualPersonPolicy"
+              }
+            ],
+            "nullable": true
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "quality_liaison_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/StockLossReason"
+          },
+          "recall_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "requires_quality_approval": {
+            "type": "boolean"
+          },
+          "second_operator_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "source": {
+            "$ref": "#/components/schemas/StockAdjustmentSource"
+          },
+          "source_rule_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/StockAdjustmentStatus"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "StockLossQualityApprovalRequest": {
+        "type": "object",
+        "required": [
+          "quality_liaison_id",
+          "approved"
+        ],
+        "properties": {
+          "approved": {
+            "type": "boolean"
+          },
+          "quality_liaison_id": {
+            "type": "string"
+          }
+        }
+      },
+      "StockLossReason": {
+        "type": "string",
+        "enum": [
+          "expired",
+          "damaged",
+          "quality_unqualified",
+          "inventory_loss",
+          "destruction",
+          "recall_destruction",
+          "other"
+        ]
+      },
       "StoreDashboardResponse": {
         "type": "object",
         "required": [
@@ -26557,6 +27261,10 @@
     {
       "name": "validation-rules",
       "description": "M-VR 校验与双人策略"
+    },
+    {
+      "name": "stock-adjustment",
+      "description": "M-SA 报损报溢"
     },
     {
       "name": "express",

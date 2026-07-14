@@ -37,6 +37,7 @@ use wms_api::{
     resilience::{resilience_middleware, resilience_status, ResilienceState},
     role_management::{role_management_router, RoleManagementState},
     state_machine::state_machine_router,
+    stock_adjustment_handlers::{stock_adjustment_router, StockAdjustmentAppState},
     system_dictionary_handlers::{system_dictionary_router, SystemDictionaryAppState},
     task_engine_handlers::{task_engine_router, TaskEngineAppState},
     task_type_handlers::{task_type_router, TaskTypeAppState},
@@ -297,6 +298,9 @@ fn app(
             InventoryStatusConfigAppState::with_postgres(shared_pool.clone()),
         ))
         .merge(state_machine_router())
+        .merge(stock_adjustment_router(
+            StockAdjustmentAppState::with_postgres(shared_pool.clone()),
+        ))
         .merge(document_numbering_router(document_numbering_state))
         .merge(print_template_router(print_template_state))
         .merge(wechat_notify_router(wechat_notify_state))

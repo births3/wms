@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 
 use chrono::{DateTime, NaiveDate, Utc};
+use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{
     CancelInventoryRecallRequest, ChangeInventoryStatusRequest, InventoryBatch,
@@ -17,6 +18,63 @@ pub const STATUS_UNQUALIFIED: &str = "unqualified";
 pub const STATUS_PENDING_DESTRUCTION: &str = "pending_destruction";
 pub const STATUS_LOSS_DEDUCTED: &str = "loss_deducted";
 pub const APPROVAL_SOURCE_EXPIRY: &str = "M3-002-EXPIRY";
+
+pub(crate) async fn deduct_for_stock_loss_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    batch_id: Uuid,
+    quantity: i64,
+    source_document_id: Uuid,
+    approval_source: &str,
+    approval_id: &str,
+    clear_recall: bool,
+    now: DateTime<Utc>,
+) -> Result<Option<i64>, sqlx::Error> {
+    let remaining = sqlx::query_scalar::<_, i64>(
+        r#"
+        UPDATE inventory_batches
+           SET qty_on_hand = qty_on_hand - $3,
+               recall_flag = CASE WHEN $4 THEN FALSE ELSE recall_flag END,
+               updated_at = $5,
+               version = version + 1
+         WHERE owner_id = $1
+           AND id = $2
+           AND $3 > 0
+           AND qty_on_hand - qty_locked >= $3
+        RETURNING qty_on_hand
+        "#,
+    )
+    .bind(owner_id)
+    .bind(batch_id)
+    .bind(quantity)
+    .bind(clear_recall)
+    .bind(now)
+    .fetch_optional(&mut **tx)
+    .await?;
+    if remaining.is_none() {
+        return Ok(None);
+    }
+    sqlx::query(
+        r#"
+        INSERT INTO inventory_movements (
+            id, owner_id, batch_id, movement_type, qty_delta,
+            source_document_type, source_document_id, approval_source,
+            approval_id, occurred_at
+        ) VALUES ($1,$2,$3,'stock_loss',$4,'stock_loss_order',$5,$6,$7,$8)
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(owner_id)
+    .bind(batch_id)
+    .bind(-quantity)
+    .bind(source_document_id)
+    .bind(approval_source)
+    .bind(approval_id)
+    .bind(now)
+    .execute(&mut **tx)
+    .await?;
+    Ok(remaining)
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum InventoryError {

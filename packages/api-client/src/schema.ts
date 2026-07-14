@@ -2484,6 +2484,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stock-adjustments/loss-orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create_stock_loss_order"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stock-adjustments/loss-orders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_stock_loss_order"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stock-adjustments/loss-orders/{id}/execute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["execute_stock_loss_order"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stock-adjustments/loss-orders/{id}/quality-approval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["approve_stock_loss_order"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stock-adjustments/loss-orders/{id}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["start_stock_loss_order"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/store/dashboard": {
         parameters: {
             query?: never;
@@ -3743,6 +3823,19 @@ export interface components {
             category_name: string;
             requires_dual_sign: boolean;
         };
+        CreateStockLossOrderRequest: {
+            /** Format: uuid */
+            batch_id: string;
+            external_ref?: string | null;
+            /** Format: int64 */
+            quantity: number;
+            reason: components["schemas"]["StockLossReason"];
+            recall_id?: string | null;
+            requires_quality_approval: boolean;
+            source: components["schemas"]["StockAdjustmentSource"];
+            /** Format: uuid */
+            warehouse_id: string;
+        };
         CreateSupplierRequest: {
             contact_name?: string | null;
             license_no?: string | null;
@@ -4151,6 +4244,10 @@ export interface components {
             /** Format: uuid */
             queue_item_id?: string | null;
             unresolved_fields: string[];
+        };
+        ExecuteStockLossOrderRequest: {
+            /** Format: uuid */
+            second_operator_id?: string | null;
         };
         ExpireInventoryBatchesRequest: {
             as_of?: string | null;
@@ -5680,6 +5777,55 @@ export interface components {
             reason?: string | null;
             to_state: string;
         };
+        /** @enum {string} */
+        StockAdjustmentSource: "erp" | "manual";
+        /** @enum {string} */
+        StockAdjustmentStatus: "pending_approval" | "pending_execution" | "in_progress" | "completed" | "rejected" | "cancelled" | "exception_suspended";
+        StockLossOrder: {
+            /** Format: uuid */
+            approval_record_id?: string | null;
+            /** Format: uuid */
+            batch_id: string;
+            batch_no: string;
+            /** Format: date-time */
+            completed_at?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            external_ref?: string | null;
+            /** Format: uuid */
+            first_operator_id?: string | null;
+            /** Format: uuid */
+            id: string;
+            order_no: string;
+            /** Format: uuid */
+            owner_id: string;
+            policy?: components["schemas"]["DualPersonPolicy"] | null;
+            product_code: string;
+            quality_liaison_id?: string | null;
+            /** Format: int64 */
+            quantity: number;
+            reason: components["schemas"]["StockLossReason"];
+            recall_id?: string | null;
+            requires_quality_approval: boolean;
+            /** Format: uuid */
+            second_operator_id?: string | null;
+            source: components["schemas"]["StockAdjustmentSource"];
+            /** Format: uuid */
+            source_rule_id?: string | null;
+            /** Format: date-time */
+            started_at?: string | null;
+            status: components["schemas"]["StockAdjustmentStatus"];
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            warehouse_id: string;
+        };
+        StockLossQualityApprovalRequest: {
+            approved: boolean;
+            quality_liaison_id: string;
+        };
+        /** @enum {string} */
+        StockLossReason: "expired" | "damaged" | "quality_unqualified" | "inventory_loss" | "destruction" | "recall_destruction" | "other";
         StoreDashboardResponse: {
             /** Format: int32 */
             exceptions_this_month: number;
@@ -15960,6 +16106,385 @@ export interface operations {
             };
             /** @description 状态机不存在 */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_stock_loss_order: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateStockLossOrderRequest"];
+            };
+        };
+        responses: {
+            /** @description 报损单已创建并由 M-CG 分配单号 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockLossOrder"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 仓库或库存批次不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 数量、来源或召回销毁参数非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_stock_loss_order: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 报损单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 报损单详情与执行证据摘要 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockLossOrder"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 报损单不存在或不属于当前货主 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    execute_stock_loss_order: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 报损单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExecuteStockLossOrderRequest"];
+            };
+        };
+        responses: {
+            /** @description 按 M-VR 双人策略完成报损并原子扣减库存 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockLossOrder"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 报损单不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 状态、主管审批或幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 数量超限、第二操作人缺失/相同/无资格 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    approve_stock_loss_order: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 报损单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockLossQualityApprovalRequest"];
+            };
+        };
+        responses: {
+            /** @description 质量联系单审批结果已回写 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockLossOrder"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 报损单不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 状态或幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 质量联系单 ID 为空 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    start_stock_loss_order: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 报损单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 报损单进入执行中 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockLossOrder"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 报损单不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 状态或幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 第一操作人无有效保管员资格 */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

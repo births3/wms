@@ -18,6 +18,7 @@ mod menu;
 mod operations;
 mod receiving_outbound;
 mod reporting;
+mod stock_adjustment;
 mod task_engine;
 mod task_type;
 
@@ -43,6 +44,7 @@ pub use menu::*;
 pub use operations::*;
 pub use receiving_outbound::*;
 pub use reporting::*;
+pub use stock_adjustment::*;
 pub use task_engine::*;
 pub use task_type::*;
 
