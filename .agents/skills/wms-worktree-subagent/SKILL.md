@@ -17,6 +17,8 @@ description: 用户要求在 WMS 仓库使用 subagent、codex exec、worktree�
 
 启动前必须记录模式、模型、可见快照、读写范围、依赖和输出文件。`read-only-current-diff` 运行期间主代理不得修改工作区；全部子代理退出后重新核对 `git status --short`。
 
+`write-worktree` 启动前必须逐个检查授权写入路径在主工作区的状态：已修改、已暂存或未跟踪的目标路径都视为“脏基线”。脏基线不能直接从旧 `HEAD` 新建实现 worktree；必须先由主代理审查并提交/建立明确的 reviewed baseline，或改为 `read-only-current-diff` 只读审查。禁止让子代理基于旧 `HEAD` 重建与主区未提交 schema/接口并行的第二套实现。
+
 用户指定模型时使用 `-m <model>`；未指定时沿用本机 Codex 默认值。启动前用 `codex exec --help` 确认参数，模型不可用时停止并报告，禁止静默降级。
 
 ## 并行规则
@@ -24,7 +26,26 @@ description: 用户要求在 WMS 仓库使用 subagent、codex exec、worktree�
 - 默认最多 3 个子代理并行；任务存在依赖时按顺序运行。
 - 写任务必须使用互不重叠的授权路径；只读任务可以读取同一文件，但审查目标必须不同。
 - 每个子代理使用唯一 slug 和输出文件；主代理记录任务、模式、模型、范围、依赖、进程状态和退出码。
+- 启动延期故事任务前必须从当前 `governance/quality-matrix.toml` 读取目标 ID 的实际分区：只有位于 `deferred_stories` 的故事才能按“延期故事推进”启动；已经位于 `stories` 且状态为 `verified` 的故事不得重复启动。若任务只是补充已验证故事的证据，提示词必须明确写成“证据补强”，不能计入延期故事完成数。
+- 新 worktree 只包含 `HEAD` 的技能版本；若主区 `.agents/skills/wms-worktree-subagent/SKILL.md` 或任务模板有未提交差异，启动前必须比较并把本轮硬门禁摘要写入提示词，或先提交技能基线；不能假定子代理能看到主区未提交规则。
 - 主代理等待本批全部进程退出后再修改当前工作区、汇总结论或启动下一批。
+- 原生 subagent 的 `close_agent` / `resume_agent` 不等价于底层 `codex exec` 进程收口。恢复同一 agent、复用同一 worktree 或同步主区快照前，必须按真实 worktree 路径检查 `/proc/<pid>/cwd`，确认没有属于该 worktree 的 `codex exec`、timeout、sandbox 或编译子进程；发现残留时先按 PGID 终止并复查，禁止直接恢复或同步。
+
+## 硬停止门禁
+
+- 启动前和每轮验证前运行 `df -h . /tmp`；可用空间低于 5GiB 不得启动写代理，低于 2GiB 立即停止重型验证。
+- 主代理每 60 秒轮询一次；单个切片默认最长运行 20 分钟。超过时限、连续两轮没有新验证证据，或 `git diff --stat` 超出任务预算，立即终止代理并标记“不可合并”。
+- 写任务必须在启动提示词中写出数字预算；未写时默认最多 8 个文件、净增删 350 行、3 个可测试行为。一个切片同时改变共享 Domain DTO、两个业务模块、OpenAPI、PC 页面和 E2E 时，必须拆成多个有依赖顺序的切片。
+- 任务涉及页面时，目标页面或新增页面预计达到 600 行必须先拆出页面私有组件；达到 800 行禁止继续，不能用豁免注释掩盖切片过大。
+- 任务涉及 PostgreSQL、pnpm、OpenAPI 生成器或真实浏览器时，先做依赖预检再改码：数据库命令必须通过 `set -a; source /home/test1/workspace/wms/.env; set +a` 注入环境但不得打印连接串；前端优先复用已有 `node_modules`，不得先运行会触发安装的脚本。
+- 依赖预检失败最多明确修复/重试一次；不得创建 `/tmp` shim、包装命令、手写生成物或继续扩大代码差异。第二次失败立即标记“不可合并”。
+- 子代理退出时必须存在指定输出文件且包含最终输出契约；无报告、被终止、退出码非 0、磁盘/依赖/凭据阻断，均不可合并，worktree 保留到分流队列。
+- 读取范围也是硬门禁：除“必须先读”文档外，只能读取任务授权路径和覆盖矩阵列出的文件；禁止对仓库根目录、`backend/`、`apps/` 或 `tests/` 使用无范围的 `rg --files`、`find`、`rg`/`grep`。任务文件最多读取 12 个，单条命令输出超过 400 行必须立即停止并改用局部 `sed`/`rg`；再次超出或违反授权范围时直接写“不可合并”，不得继续实现。
+- 授权路径预检是必做项：开始分析前逐个执行 `test -f` / `test -d` 检查提示词列出的路径；路径不存在时必须用限定范围的 `rg -n` 检查同模块的 `*_part*.rs`、子目录、`bin/<binary>/`、`tests/<module>/` 和 router/repository 注册点。不能把“未授权读取”或“路径写错”推断成“实现不存在”；若无法确定规范路径，立即报告“审查阻断”并要求主代理修正范围。
+- 过程输出也是硬门禁：启动命令必须丢弃 JSON stdout，只把 stderr 重定向到唯一 `/tmp/wms-agent-<slug>.log`；`-o` 指定的最终报告是唯一事实输出。使用下方“启动封装”实时检查 stderr 行数和字节数；stderr 超过 600 行或 200 KiB、最终报告未生成、或进程超过 20 分钟，立即终止整个进程组并标记“不可合并”。代理提示词必须要求单次命令最多输出 120 行，禁止粘贴完整源文件、完整 diff 或递归扫描结果；JSON 事件流不得落盘或读取，主代理只读取最终报告和退出码。
+- 子代理不得把 `governance/quality-matrix.toml` / `docs/governance/quality-matrix.md` 中延期故事提前改为 `verified`，也不得用“计划覆盖”填证据；只有主代理在真实验证、截图和 review 证据齐全后才能迁移矩阵状态。
+- 发现 `No space left on device` 时先停止所有写代理，再只清理 `backend/target`、pnpm store、Playwright/Node 临时缓存等可重建产物；禁止删除源码、未合并 diff、主工作区 `target` 或用 `git clean` 掩盖污染。
+- 同批代理中任一任务超预算或无报告，不得启动下一批；先完成 closeout、记录根因，再重新拆分更小切片。
 
 ## 子代理原则
 
@@ -48,6 +69,7 @@ description: 用户要求在 WMS 仓库使用 subagent、codex exec、worktree�
    - `git worktree list`
 2. 任务命名用短 slug，例如 `m2-inbound-pc`。
 3. 新 worktree 看不到未提交文件；需要审查当前脏区时改用 `read-only-current-diff`，需要基于脏区写入时先由主代理审查并提交相关基线。
+   - 启动前用 `git status --short -- <授权路径>` 逐项核对；任一授权路径非干净，登记“基线阻断”，不得用“当前 HEAD 已有基础”替代主区实际代码。目标是未跟踪文件时同样阻断。
 4. 先写清任务边界；没有边界，不建 worktree：
    - 按 [references/module-slice-boundary.md](references/module-slice-boundary.md) 填覆盖矩阵。
    - 本轮切片覆盖哪些层，不覆盖哪些层。
@@ -61,15 +83,51 @@ git worktree add -b agent/<slug> ../wms-agent-<slug> HEAD
 6. 在子 worktree 跑：
 
 ```bash
-codex exec -C ../wms-agent-<slug> -s workspace-write --ephemeral -m <model> -o ../wms-agent-<slug>.out.md "<任务提示词>"
+timeout --foreground --signal=TERM --kill-after=10s 1200s codex exec --json -C ../wms-agent-<slug> -s workspace-write --ephemeral -m <model> -o ../wms-agent-<slug>.out.md "<任务提示词>" > /tmp/wms-agent-<slug>.log 2>&1
 ```
+
+上面的单进程命令只用于串行、低输出校准；正式并行批次必须使用实时日志门禁封装，不能只依赖主代理轮询。
+
+并行调度时每个封装调用必须后台启动（`run_agent ... &`），批次末尾再统一 `wait`；启动后逐个核对 slug、PID、PGID、报告路径，禁止因第一个同步调用阻塞而遗漏后续代理：
+
+```bash
+log=/tmp/wms-agent-<slug>.log
+report=../wms-agent-<slug>.out.md
+setsid bash -c 'exec timeout --foreground --signal=TERM --kill-after=10s 1200s codex exec --json -C ../wms-agent-<slug> -s workspace-write --ephemeral -m <model> -o "$1" "$2" >/dev/null 2>"$3"' _ "$report" "<任务提示词>" "$log" &
+agent_pid=$!
+agent_pgid=$(ps -o pgid= -p "$agent_pid" 2>/dev/null | tr -d ' ')
+stop_agent() {
+  if [ -n "${agent_pgid:-}" ]; then kill -TERM -- -"$agent_pgid" 2>/dev/null || true; fi
+  kill -TERM "$agent_pid" 2>/dev/null || true
+  sleep 2
+  if [ -n "${agent_pgid:-}" ]; then kill -KILL -- -"$agent_pgid" 2>/dev/null || true; fi
+}
+trap 'stop_agent; exit 143' TERM INT
+while kill -0 "$agent_pid" 2>/dev/null; do
+  state=$(ps -o stat= -p "$agent_pid" 2>/dev/null | tr -d ' ')
+  case "$state" in
+    Z*|"") break ;;
+  esac
+  lines=$(wc -l < "$log" 2>/dev/null || printf '0')
+  bytes=$(wc -c < "$log" 2>/dev/null || printf '0')
+  if [ "$lines" -gt 600 ] || [ "$bytes" -gt 204800 ]; then
+    stop_agent
+    printf 'log gate exceeded: lines=%s bytes=%s\n' "$lines" "$bytes" >> "$log"
+    break
+  fi
+  sleep 2
+done
+wait "$agent_pid" || true
+```
+
+`read-only` 和 `read-only-current-diff` 只替换 sandbox 参数；每个并行代理必须使用独立 `log/report`，记录 `agent_pid/PGID`，并在门禁触发后删除或归档临时输出。若封装本身不可用，停止启动代理，不能退回到无监控后台命令。启动前必须先执行 `df -h . /tmp`，启动后每 30 秒记录一次进程状态；门禁触发时不得读取过程日志或报告并继续采用结论。需要人工中止时必须调用封装内的 `stop_agent`，同时终止 wrapper、timeout、Codex、sandbox 和编译子进程，不能只终止外层等待 shell。
 
 加新 `codex exec` 参数前先用 `codex exec --help` 核对。未跟踪输入必须显式纳入。
 
 只读校准命令：
 
 ```bash
-codex exec -C ../wms-agent-<slug> -s read-only --ephemeral -m <model> -o ../wms-agent-<slug>.out.md "<只读校准提示词>"
+timeout --foreground --signal=TERM --kill-after=10s 1200s codex exec --json -C ../wms-agent-<slug> -s read-only --ephemeral -m <model> -o ../wms-agent-<slug>.out.md "<只读校准提示词>" > /tmp/wms-agent-<slug>.log 2>&1
 ```
 
 审查当前未提交差异：
@@ -132,7 +190,15 @@ codex exec -C "$PWD" -s read-only --ephemeral -m <model> -o /tmp/wms-agent-<slug
 - 低磁盘、pnpm、本地凭据或外部服务阻断：补停止条件。
 - 生成链路失败后手写产物：默认不可合并，主代理复跑生成器。
 - 子代理切片过大：补写文件数、行数和行为预算，超预算必须停下汇报。
+- 子代理依赖缺失仍继续造临时 shim 或把完整 diff 写入过程输出：收紧预检和输出契约，主代理不可合并该批改动。
 - 子代理输出不可审查：收紧“最终输出”字段。
+- 子代理从旧 `HEAD` 启动漏读主区未提交技能，或过程输出污染主会话：启动前比较技能基线；`codex exec` 必须重定向日志，使用 20 分钟 timeout 和 600 行/200 KiB 日志硬上限，主代理只读取最终报告并按退出码收口。
+- 子代理用全仓 glob/递归检索替代授权读取，或过程输出超过门限：把检索范围、文件数和输出行数写入启动提示词；主代理终止该代理并标记不可合并。
+- 仅在提示词中要求“少输出”仍可能因代理持续命令输出而失效；并行批次必须使用实时日志门禁封装，超限要自动终止整个进程组，禁止读取超限过程日志并继续采用其结论。
+- 调度了已在 `stories`/`verified` 中的故事：启动前强制读取质量矩阵分区并把 `deferred` / `verified` 状态写入任务登记；误选任务不可合并，重新选择延期故事。
+- 人工停止只结束外层等待 shell、留下 Codex 或 Rust 编译子进程：记录真实 `agent_pgid`，用 `stop_agent` 先终止 PGID 再终止 wrapper；收口前用 `ps` 确认没有残留 `codex exec`、sandbox 或 worktree `target` 编译进程。
+- 原生 subagent `close_agent` 后仍可能保留底层执行进程；`resume_agent` 前必须执行 worktree 路径级残留扫描。若同一 worktree 出现两个 `codex exec`，立即终止整个旧 PGID，当前批次标记“不可合并”，不得读取并发写入产生的 diff 或报告作为证据。
+- 并行启动脚本若把代理调用写成同步序列，后续任务未启动也必须记录为调度失败；修正为每个任务后台启动、批次统一等待，并重新核对全部报告，不得用单个代理结果代表整批。
 - 留下未解释 worktree：收紧收尾门禁。
 
 技能文件实际修改后运行 `git diff --check` 和 `just gov-t1`，再由主代理按 `wms-review-fix-commit` 提交；只读模式本身不触发提交。
