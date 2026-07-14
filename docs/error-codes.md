@@ -1,7 +1,7 @@
 # 错误码字典（Error Codes Dictionary）
 
-> 时间：2026-05-18
-> 版本：v3.1（初版 ~50 项）
+> 时间：2026-07-13
+> 版本：v3.4（当前 117 项）
 > 文档层级：L2 规范（必须遵守）
 > 关联：[ADR-0010](adr/0010-error-codes.md) / [coding-standards.md §4](coding-standards.md)
 
@@ -76,10 +76,10 @@
 | 级别 | 数量 | 主要场景 |
 |---|---|---|
 | info | 1 | 状态变更通知 / 数据已存在等正常路径 |
-| warning | 28 | 业务规则拦截（库存不足 / 资质过期等）|
-| error | 39 | 业务异常（数据冲突 / 校验失败）|
+| warning | 39 | 业务规则拦截（库存不足 / 资质过期等）|
+| error | 70 | 业务异常（数据冲突 / 校验失败）|
 | critical | 7 | 合规/安全异常（跨货主访问 / 篡改尝试）|
-| **合计** | **75** | — |
+| **合计** | **117** | — |
 
 ---
 
@@ -87,21 +87,23 @@
 
 | 前缀 | 错误码数 | 主要场景 |
 |---|---|---|
-| H1 | 12 | 鉴权 / 多租户隔离 |
+| H1 | 24 | 鉴权 / 多租户隔离 / API Key 生命周期 |
 | H2 | 5 | 审计 / 事件总线 |
 | H4 | 14 | 通知发送 / 审批 / 重发 |
 | H6 | 2 | 状态机查询与校验 |
 | H5 | 2 | 快递面单 |
-| H_DOCK | 3 | 月台预约 |
+| H_DOCK | 11 | 月台预约 |
 | H_AL | 2 | 告警引擎 |
-| M1 | 8 | 主数据校验 / 配置中心 |
-| M2 | 6 | 入库流程 |
+| M1 | 12 | 主数据校验 / 配置中心 |
+| M2 | 7 | 入库流程 |
 | M3 | 8 | 库存与状态 |
 | M4 | 7 | 出库与拣选 |
 | M_VR | 2 | 规则引擎 |
 | M_QL | 1 | 质量联系单 |
 | M_TC | 2 | 追溯码 |
 | M_PM | 1 | 参数对照 |
+| M_DI | 12 | 药检平台配置 |
+| M_TE | 5 | 任务类型配置 |
 
 ---
 
@@ -294,6 +296,151 @@ error_codes:
     message_en: 'Password does not meet policy'
     related_fields: []
     related_stories: [US-H1-001]
+    introduced_in: v3.1
+
+  # ========== H1 API Key 生命周期 ==========
+  - code: H1_APIKEY_IDEMPOTENCY_REQUIRED
+    module: H1
+    category: APIKEY
+    detail: IDEMPOTENCY_REQUIRED
+    http_status: 400
+    severity: error
+    message_zh: '缺少 Idempotency-Key'
+    message_en: 'Idempotency-Key is required'
+    related_fields: []
+    related_stories: [US-H1-006]
+    introduced_in: v3.1
+
+  - code: H1_APIKEY_INVALID_REQUEST
+    module: H1
+    category: APIKEY
+    detail: INVALID_REQUEST
+    http_status: 422
+    severity: warning
+    message_zh: 'API Key 请求字段非法'
+    message_en: 'API Key request is invalid'
+    related_fields: []
+    related_stories: [US-H1-006]
+    introduced_in: v3.1
+
+  - code: H1_APIKEY_INVALID_SCOPE
+    module: H1
+    category: APIKEY
+    detail: INVALID_SCOPE
+    http_status: 422
+    severity: warning
+    message_zh: 'API Key 作用域非法'
+    message_en: 'API Key scope is invalid'
+    related_fields: []
+    related_stories: [US-H1-006]
+    introduced_in: v3.1
+
+  - code: H1_APIKEY_INVALID_EXPIRY
+    module: H1
+    category: APIKEY
+    detail: INVALID_EXPIRY
+    http_status: 422
+    severity: warning
+    message_zh: 'API Key 过期时间非法'
+    message_en: 'API Key expiry is invalid'
+    related_fields: []
+    related_stories: [US-H1-006]
+    introduced_in: v3.1
+
+  - code: H1_APIKEY_INVALID_GRACE_PERIOD
+    module: H1
+    category: APIKEY
+    detail: INVALID_GRACE_PERIOD
+    http_status: 422
+    severity: warning
+    message_zh: 'API Key 轮换宽限期非法'
+    message_en: 'API Key grace period is invalid'
+    related_fields: []
+    related_stories: [US-H1-006]
+    introduced_in: v3.1
+
+  - code: H1_APIKEY_NOT_FOUND
+    module: H1
+    category: APIKEY
+    detail: NOT_FOUND
+    http_status: 404
+    severity: error
+    message_zh: 'API Key 不存在'
+    message_en: 'API Key not found'
+    related_fields: []
+    related_stories: [US-H1-006]
+    introduced_in: v3.1
+
+  - code: H1_APIKEY_IDEMPOTENCY_CONFLICT
+    module: H1
+    category: APIKEY
+    detail: IDEMPOTENCY_CONFLICT
+    http_status: 409
+    severity: error
+    message_zh: '幂等键已被不同请求使用'
+    message_en: 'Idempotency-Key conflicts with another request'
+    related_fields: []
+    related_stories: [US-H1-006]
+    introduced_in: v3.1
+
+  - code: H1_APIKEY_REVOKED
+    module: H1
+    category: APIKEY
+    detail: REVOKED
+    http_status: 409
+    severity: warning
+    message_zh: 'API Key 已吊销，不能轮换'
+    message_en: 'Revoked API Key cannot be rotated'
+    related_fields: []
+    related_stories: [US-H1-006]
+    introduced_in: v3.1
+
+  - code: H1_APIKEY_INVALID_RESPONSIBLE_USER
+    module: H1
+    category: APIKEY
+    detail: INVALID_RESPONSIBLE_USER
+    http_status: 422
+    severity: warning
+    message_zh: '负责人不属于当前货主'
+    message_en: 'Responsible user does not belong to the current owner'
+    related_fields: []
+    related_stories: [US-H1-006]
+    introduced_in: v3.1
+
+  - code: H1_APIKEY_INVALID_WAREHOUSE_SCOPE
+    module: H1
+    category: APIKEY
+    detail: INVALID_WAREHOUSE_SCOPE
+    http_status: 422
+    severity: warning
+    message_zh: '仓库范围不属于当前货主'
+    message_en: 'Warehouse scope does not belong to the current owner'
+    related_fields: []
+    related_stories: [US-H1-006]
+    introduced_in: v3.1
+
+  - code: H1_APIKEY_INTERNAL
+    module: H1
+    category: APIKEY
+    detail: INTERNAL
+    http_status: 500
+    severity: error
+    message_zh: 'API Key 处理失败'
+    message_en: 'API Key processing failed'
+    related_fields: []
+    related_stories: [US-H1-006]
+    introduced_in: v3.1
+
+  - code: H1_APIKEY_REQUEST_REJECTED
+    module: H1
+    category: APIKEY
+    detail: REQUEST_REJECTED
+    http_status: 422
+    severity: error
+    message_zh: 'API Key 请求被拒绝'
+    message_en: 'API Key request was rejected'
+    related_fields: []
+    related_stories: [US-H1-006]
     introduced_in: v3.1
 
   # ========== H2 审计与事件总线 ==========
@@ -613,6 +760,102 @@ error_codes:
     related_stories: [US-DOCK-002]
     introduced_in: v3.1
 
+  - code: H_DOCK_IDEMPOTENCY_REQUIRED
+    module: H_DOCK
+    category: IDEMPOTENCY
+    detail: REQUIRED
+    http_status: 400
+    severity: error
+    message_zh: '缺少 Idempotency-Key'
+    message_en: 'Idempotency-Key is required'
+    related_fields: []
+    related_stories: [US-DOCK-002]
+    introduced_in: v3.2
+
+  - code: H_DOCK_DOCK_NOT_FOUND
+    module: H_DOCK
+    category: APPOINTMENT
+    detail: DOCK_NOT_FOUND
+    http_status: 404
+    severity: error
+    message_zh: '月台或仓库不存在'
+    message_en: 'Dock or warehouse was not found'
+    related_fields: [仓库 ID, 月台号]
+    related_stories: [US-DOCK-002]
+    introduced_in: v3.2
+
+  - code: H_DOCK_IDEMPOTENCY_CONFLICT
+    module: H_DOCK
+    category: IDEMPOTENCY
+    detail: CONFLICT
+    http_status: 409
+    severity: error
+    message_zh: '幂等键已被不同请求使用'
+    message_en: 'Idempotency-Key was used by a different request'
+    related_fields: []
+    related_stories: [US-DOCK-002]
+    introduced_in: v3.2
+
+  - code: H_DOCK_APPOINTMENT_INVALID
+    module: H_DOCK
+    category: APPOINTMENT
+    detail: INVALID
+    http_status: 422
+    severity: error
+    message_zh: '预约字段或时间窗非法'
+    message_en: 'Dock appointment fields or time window are invalid'
+    related_fields: []
+    related_stories: [US-DOCK-002]
+    introduced_in: v3.2
+
+  - code: H_DOCK_PERSISTENCE_FAILED
+    module: H_DOCK
+    category: STORAGE
+    detail: PERSISTENCE_FAILED
+    http_status: 500
+    severity: error
+    message_zh: '月台预约持久化失败'
+    message_en: 'Dock appointment persistence failed'
+    related_fields: []
+    related_stories: [US-DOCK-002]
+    introduced_in: v3.2
+
+  - code: H_DOCK_APPOINTMENT_NOT_FOUND
+    module: H_DOCK
+    category: APPOINTMENT
+    detail: NOT_FOUND
+    http_status: 404
+    severity: error
+    message_zh: '预约不存在'
+    message_en: 'Dock appointment was not found'
+    related_fields: []
+    related_stories: [US-DOCK-005]
+    introduced_in: v3.3
+
+  - code: H_DOCK_ARRIVAL_CHECK_FAILED
+    module: H_DOCK
+    category: APPOINTMENT
+    detail: ARRIVAL_CHECK_FAILED
+    http_status: 409
+    severity: error
+    message_zh: '预约到达核对不一致'
+    message_en: 'Dock appointment arrival check failed'
+    related_fields: []
+    related_stories: [US-DOCK-005]
+    introduced_in: v3.3
+
+  - code: H_DOCK_APPOINTMENT_NOT_ARRIVABLE
+    module: H_DOCK
+    category: APPOINTMENT
+    detail: NOT_ARRIVABLE
+    http_status: 409
+    severity: error
+    message_zh: '预约当前状态不允许到达核对'
+    message_en: 'Dock appointment cannot be marked as arrived in its current state'
+    related_fields: []
+    related_stories: [US-DOCK-005]
+    introduced_in: v3.3
+
   # ========== H-AL 告警引擎 ==========
   - code: H_AL_GSP_ALERT_DISABLE_DENIED
     module: H_AL
@@ -650,6 +893,54 @@ error_codes:
     related_fields: [商品编码]
     related_stories: [US-M1-001]
     introduced_in: v3.1
+
+  - code: M1_LOCATION_HAS_STOCK
+    module: M1
+    category: LOCATION
+    detail: HAS_STOCK
+    http_status: 422
+    severity: warning
+    message_zh: '库位仍有库存，不能停用'
+    message_en: 'Location with stock cannot be disabled'
+    related_fields: []
+    related_stories: [US-M1-004]
+    introduced_in: v25
+
+  - code: M1_LOCATION_CAPACITY_INVALID
+    module: M1
+    category: LOCATION
+    detail: CAPACITY_INVALID
+    http_status: 422
+    severity: warning
+    message_zh: '库位已用容积不能超过最大容积'
+    message_en: 'Used location volume cannot exceed maximum volume'
+    related_fields: []
+    related_stories: [US-M1-004]
+    introduced_in: v25
+
+  - code: M1_LOCATION_OWNER_INVALID
+    module: M1
+    category: LOCATION
+    detail: OWNER_INVALID
+    http_status: 422
+    severity: warning
+    message_zh: '库位绑定货主不存在'
+    message_en: 'Bound location owner does not exist'
+    related_fields: []
+    related_stories: [US-M1-004]
+    introduced_in: v25
+
+  - code: M1_WAREHOUSE_TYPE_INVALID
+    module: M1
+    category: WAREHOUSE
+    detail: TYPE_INVALID
+    http_status: 422
+    severity: warning
+    message_zh: '仓库类型必须是物理仓、逻辑仓或虚拟仓'
+    message_en: 'Warehouse type must be physical, logical, or virtual'
+    related_fields: []
+    related_stories: [US-M1-004]
+    introduced_in: v25
 
   - code: M1_PRODUCT_APPROVAL_NO_INVALID
     module: M1
@@ -795,6 +1086,18 @@ error_codes:
     related_fields: [验收员 user_id]
     related_stories: [US-M2-004]
     introduced_in: v3.1
+
+  - code: M2_VERIFIER_UNAUTHORIZED
+    module: M2
+    category: AUTHORIZATION
+    detail: VERIFIER_UNAUTHORIZED
+    http_status: 422
+    severity: error
+    message_zh: '签字人不是当前货主的有效验收岗用户'
+    message_en: 'Signer is not an active receiving verifier for the owner'
+    related_fields: [验收员 user_id, 货主]
+    related_stories: [US-M2-004]
+    introduced_in: v3.2
 
   - code: M2_QUANTITY_MISMATCH
     module: M2
@@ -1065,6 +1368,212 @@ error_codes:
     related_fields: []
     related_stories: [US-MPM-003]
     introduced_in: v3.1
+
+  # ========== M-DI 药检平台配置 ==========
+  - code: M_DI_PLATFORM_IDEMPOTENCY_REQUIRED
+    module: M_DI
+    category: PLATFORM
+    detail: IDEMPOTENCY_REQUIRED
+    http_status: 400
+    severity: error
+    message_zh: '缺少 Idempotency-Key'
+    message_en: 'Idempotency-Key is required'
+    related_fields: []
+    related_stories: [US-DI-001]
+    introduced_in: v3.4
+
+  - code: M_DI_PLATFORM_NOT_FOUND
+    module: M_DI
+    category: PLATFORM
+    detail: NOT_FOUND
+    http_status: 404
+    severity: error
+    message_zh: '药检平台不存在'
+    message_en: 'Drug inspection platform was not found'
+    related_fields: []
+    related_stories: [US-DI-001]
+    introduced_in: v3.4
+
+  - code: M_DI_PLATFORM_IDEMPOTENCY_CONFLICT
+    module: M_DI
+    category: PLATFORM
+    detail: IDEMPOTENCY_CONFLICT
+    http_status: 409
+    severity: error
+    message_zh: '幂等键已被不同请求使用'
+    message_en: 'Idempotency-Key was used by a different request'
+    related_fields: []
+    related_stories: [US-DI-001]
+    introduced_in: v3.4
+
+  - code: M_DI_PLATFORM_PERSISTENCE_FAILED
+    module: M_DI
+    category: PLATFORM
+    detail: PERSISTENCE_FAILED
+    http_status: 500
+    severity: error
+    message_zh: '药检平台配置持久化或审计失败'
+    message_en: 'Drug inspection platform persistence or audit failed'
+    related_fields: []
+    related_stories: [US-DI-001]
+    introduced_in: v3.4
+
+  - code: M_DI_PLATFORM_FIELD_REQUIRED
+    module: M_DI
+    category: PLATFORM
+    detail: FIELD_REQUIRED
+    http_status: 422
+    severity: error
+    message_zh: '药检平台配置必填字段缺失'
+    message_en: 'A required drug inspection platform field is missing'
+    related_fields: []
+    related_stories: [US-DI-001]
+    introduced_in: v3.4
+
+  - code: M_DI_PLATFORM_FIELD_TOO_LONG
+    module: M_DI
+    category: PLATFORM
+    detail: FIELD_TOO_LONG
+    http_status: 422
+    severity: error
+    message_zh: '药检平台配置字段超长'
+    message_en: 'A drug inspection platform field is too long'
+    related_fields: []
+    related_stories: [US-DI-001]
+    introduced_in: v3.4
+
+  - code: M_DI_PLATFORM_API_URL_INVALID
+    module: M_DI
+    category: PLATFORM
+    detail: API_URL_INVALID
+    http_status: 422
+    severity: error
+    message_zh: 'API 地址必须是带主机的 HTTP 或 HTTPS 地址'
+    message_en: 'The API URL must be an HTTP or HTTPS URL with a host'
+    related_fields: []
+    related_stories: [US-DI-001]
+    introduced_in: v3.4
+
+  - code: M_DI_PLATFORM_AUTH_METHOD_INVALID
+    module: M_DI
+    category: PLATFORM
+    detail: AUTH_METHOD_INVALID
+    http_status: 422
+    severity: error
+    message_zh: '认证方式必须是 API Key 或账号密码'
+    message_en: 'Authentication must use an API key or username and password'
+    related_fields: []
+    related_stories: [US-DI-001]
+    introduced_in: v3.4
+
+  - code: M_DI_PLATFORM_CREDENTIAL_REF_INVALID
+    module: M_DI
+    category: PLATFORM
+    detail: CREDENTIAL_REF_INVALID
+    http_status: 422
+    severity: error
+    message_zh: '认证凭证必须使用 Vault 引用'
+    message_en: 'Credentials must use a Vault reference'
+    related_fields: []
+    related_stories: [US-DI-001]
+    introduced_in: v3.4
+
+  - code: M_DI_PLATFORM_CREDENTIAL_COMBINATION_INVALID
+    module: M_DI
+    category: PLATFORM
+    detail: CREDENTIAL_COMBINATION_INVALID
+    http_status: 422
+    severity: error
+    message_zh: '认证参数与认证方式不匹配'
+    message_en: 'Credentials do not match the selected authentication method'
+    related_fields: []
+    related_stories: [US-DI-001]
+    introduced_in: v3.4
+
+  - code: M_DI_PLATFORM_TIMEOUT_INVALID
+    module: M_DI
+    category: PLATFORM
+    detail: TIMEOUT_INVALID
+    http_status: 422
+    severity: error
+    message_zh: '超时必须在 1 到 300 秒之间'
+    message_en: 'Timeout must be between 1 and 300 seconds'
+    related_fields: []
+    related_stories: [US-DI-001]
+    introduced_in: v3.4
+
+  - code: M_DI_PLATFORM_STATUS_INVALID
+    module: M_DI
+    category: PLATFORM
+    detail: STATUS_INVALID
+    http_status: 422
+    severity: error
+    message_zh: '平台状态必须是 connected、testing 或 disabled'
+    message_en: 'Platform status must be connected, testing, or disabled'
+    related_fields: []
+    related_stories: [US-DI-001]
+    introduced_in: v3.4
+
+  # ========== M-TE 任务类型配置 ==========
+  - code: M_TE_TASK_TYPE_IDEMPOTENCY_REQUIRED
+    module: M_TE
+    category: TASK_TYPE
+    detail: IDEMPOTENCY_REQUIRED
+    http_status: 400
+    severity: error
+    message_zh: '缺少 Idempotency-Key'
+    message_en: 'Idempotency-Key is required'
+    related_fields: []
+    related_stories: [US-TE-001]
+    introduced_in: v3.4
+
+  - code: M_TE_TASK_TYPE_INVALID
+    module: M_TE
+    category: TASK_TYPE
+    detail: INVALID
+    http_status: 422
+    severity: error
+    message_zh: '任务类型配置非法'
+    message_en: 'Task type configuration is invalid'
+    related_fields: [任务优先级]
+    related_stories: [US-TE-001]
+    introduced_in: v3.4
+
+  - code: M_TE_TASK_TYPE_NOT_FOUND
+    module: M_TE
+    category: TASK_TYPE
+    detail: NOT_FOUND
+    http_status: 404
+    severity: error
+    message_zh: '任务类型不存在'
+    message_en: 'Task type was not found'
+    related_fields: []
+    related_stories: [US-TE-001]
+    introduced_in: v3.4
+
+  - code: M_TE_TASK_TYPE_IDEMPOTENCY_CONFLICT
+    module: M_TE
+    category: TASK_TYPE
+    detail: IDEMPOTENCY_CONFLICT
+    http_status: 409
+    severity: error
+    message_zh: '幂等键已被不同请求使用'
+    message_en: 'Idempotency-Key was used by a different request'
+    related_fields: []
+    related_stories: [US-TE-001]
+    introduced_in: v3.4
+
+  - code: M_TE_TASK_TYPE_INTERNAL
+    module: M_TE
+    category: TASK_TYPE
+    detail: INTERNAL
+    http_status: 500
+    severity: error
+    message_zh: '任务类型处理失败'
+    message_en: 'Task type processing failed'
+    related_fields: []
+    related_stories: [US-TE-001]
+    introduced_in: v3.4
 ```
 
 ---
@@ -1085,3 +1594,6 @@ error_codes:
 | 2026-05-18 | v1 | 初版：50 个错误码（H1×6 + H2×3 + H4×2 + H5×2 + H_DOCK×3 + H_AL×2 + M1×5 + M2×6 + M3×8 + M4×7 + M_VR×2 + M_QL×1 + M_TC×2 + M_PM×1）|
 | 2026-06-07 | v2 | W6.C 配置中心 Feature Flag smoke 新增 M1_CONFIG_FLAG_* 3 项；脚本统计当前合计 59 项 |
 | 2026-07-10 | v3 | 补齐当前 H4 handler 的 12 个业务错误码，并登记 H6 状态机查询与不存在错误码；脚本统计当前合计 75 项 |
+| 2026-07-13 | v3.2 | 新增 M2_VERIFIER_UNAUTHORIZED，约束双人验收签字人必须是同货主有效验收岗；脚本统计当前合计 92 项 |
+| 2026-07-13 | v3.3 | 登记 H-DOCK 实到对账的预约不存在、到达核对失败和不可到达状态错误码；脚本统计当前合计 100 项 |
+| 2026-07-14 | v3.4 | 登记 M-DI 药检平台配置与 M-TE 任务类型配置 API 错误码；脚本统计当前合计 117 项 |

@@ -180,6 +180,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/audit/events/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["export_audit_events"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/api-keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_api_keys"];
+        put?: never;
+        post: operations["create_api_key"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/api-keys/{api_key_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["revoke_api_key"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/api-keys/{api_key_id}/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["rotate_api_key"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/login": {
         parameters: {
             query?: never;
@@ -196,6 +260,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/me": {
         parameters: {
             query?: never;
@@ -205,6 +285,22 @@ export interface paths {
         };
         get: operations["me"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/me/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["change_auth_password"];
         post?: never;
         delete?: never;
         options?: never;
@@ -276,6 +372,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_auth_sessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sessions/revoke-others": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["revoke_other_auth_sessions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sessions/{session_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["revoke_auth_session"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/user-roles/batch": {
         parameters: {
             query?: never;
@@ -301,6 +445,38 @@ export interface paths {
         };
         get: operations["list_role_users"];
         put?: never;
+        post: operations["create_auth_user"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/users/{user_id}/kick": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["kick_auth_user"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/users/{user_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["change_auth_user_status"];
         post?: never;
         delete?: never;
         options?: never;
@@ -507,9 +683,41 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["list_cold_chain_devices"];
         put?: never;
         post: operations["create_cold_chain_device"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cold-chain/devices/{device_code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["update_cold_chain_device"];
+        trace?: never;
+    };
+    "/api/v1/cold-chain/devices/{device_code}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["disable_cold_chain_device"];
         delete?: never;
         options?: never;
         head?: never;
@@ -676,6 +884,118 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dock-appointments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_dock_appointments"];
+        put?: never;
+        post: operations["create_dock_appointment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dock-appointments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["update_dock_appointment"];
+        trace?: never;
+    };
+    "/api/v1/dock-appointments/{id}/arrive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["arrive_dock_appointment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dock-appointments/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["cancel_dock_appointment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/docks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_docks"];
+        put?: never;
+        post: operations["create_dock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/docks/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["import_docks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/docks/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["delete_dock"];
+        options?: never;
+        head?: never;
+        patch: operations["update_dock"];
+        trace?: never;
+    };
     "/api/v1/driver/tasks/today": {
         parameters: {
             query?: never;
@@ -690,6 +1010,38 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/drug-inspection/platforms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_drug_inspection_platforms"];
+        put?: never;
+        post: operations["upsert_drug_inspection_platform"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/drug-inspection/platforms/{platform_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["change_drug_inspection_platform_status"];
         trace?: never;
     };
     "/api/v1/event-bus/deliveries/pending": {
@@ -836,6 +1188,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/inbound/receiving-dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_receiving_dashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/inbound/receiving-orders": {
         parameters: {
             query?: never;
@@ -884,6 +1252,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/inbound/receiving-orders/{id}/print-data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_receiving_order_print_data"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/inbound/receiving-orders/{id}/putaway": {
         parameters: {
             query?: never;
@@ -894,6 +1278,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["putaway_receiving_order"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inbound/receiving-orders/{id}/putaway-recommendations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["recommend_putaway_locations"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -980,6 +1380,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/inventory/batches/expire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["isolate_expired_inventory_batches"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/batches/near-expiry-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["near_expiry_report"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/inventory/batches/putaway": {
         parameters: {
             query?: never;
@@ -990,6 +1422,38 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["putaway_inventory_batch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/batches/recall": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mark_inventory_batch_recall"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/batches/recall/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["cancel_inventory_batch_recall"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1012,6 +1476,150 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/inventory/batches/{id}/trace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_inventory_batch_trace"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create_inventory_count"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/counts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_inventory_count"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/counts/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["approve_inventory_count"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/counts/{id}/lines/{line_id}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["submit_inventory_count_line"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/maintenance/records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_maintenance_records"];
+        put?: never;
+        post: operations["create_maintenance_record"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/maintenance/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_maintenance_tasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/status-transitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_inventory_status_transitions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/status-transitions/{from_status}/{to_status}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["upsert_inventory_status_transition"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/master-data/customers": {
         parameters: {
             query?: never;
@@ -1026,6 +1634,70 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/master-data/customers/batch-sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["batch_create_customers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/master-data/customers/{customer_id}/addresses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_customer_addresses"];
+        put?: never;
+        post: operations["create_customer_address"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/master-data/customers/{customer_id}/addresses/{address_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["update_customer_address"];
+        trace?: never;
+    };
+    "/api/v1/master-data/customers/{customer_id}/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_customer_profile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["upsert_customer_profile"];
         trace?: never;
     };
     "/api/v1/master-data/customers/{id}": {
@@ -1108,6 +1780,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/master-data/products/batch-sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["batch_create_products"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/master-data/products/{id}": {
         parameters: {
             query?: never;
@@ -1166,6 +1854,22 @@ export interface paths {
         get: operations["list_suppliers"];
         put?: never;
         post: operations["create_supplier"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/master-data/suppliers/batch-sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["batch_create_suppliers"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1291,7 +1995,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["get_outbound_review"];
         put?: never;
         post: operations["review_outbound_order"];
         delete?: never;
@@ -1339,9 +2043,41 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["list_outbound_waves"];
         put?: never;
         post: operations["create_outbound_wave"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/outbound/waves/{wave_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_outbound_wave"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/outbound/waves/{wave_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["cancel_outbound_wave"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1796,6 +2532,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/task-engine/task-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_task_types"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/task-engine/task-types/{task_type_code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["upsert_task_type"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/task-engine/task-types/{task_type_code}/enabled": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["set_task_type_enabled"];
+        trace?: never;
+    };
     "/api/v1/tms/container-recoveries": {
         parameters: {
             query?: never;
@@ -1822,6 +2606,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["receive_tms_dispatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tms/route-plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["receive_tms_route_plan"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2091,6 +2891,55 @@ export interface components {
             /** Format: int64 */
             version_no: number;
         };
+        ApiKey: {
+            caller_name: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            expires_at: string;
+            /** Format: date-time */
+            grace_expires_at?: string | null;
+            /** Format: uuid */
+            key_id: string;
+            /** Format: date-time */
+            last_used_at?: string | null;
+            /** Format: uuid */
+            owner_id: string;
+            purpose: string;
+            /** Format: uuid */
+            responsible_user_id: string;
+            /** Format: date-time */
+            revoked_at?: string | null;
+            scopes: string[];
+            secret?: string | null;
+            status: string;
+            /** Format: date-time */
+            temporarily_disabled_until?: string | null;
+            /** Format: date-time */
+            updated_at: string;
+            warehouse_ids: string[];
+        };
+        ApiKeyListResponse: {
+            data: components["schemas"]["ApiKey"][];
+            page: components["schemas"]["PageMeta"];
+        };
+        ApiKeyRotationResponse: {
+            new_key: components["schemas"]["ApiKey"];
+            /** Format: date-time */
+            previous_grace_expires_at: string;
+            /** Format: uuid */
+            previous_key_id: string;
+        };
+        ApproveInventoryCountRequest: {
+            approval_id: string;
+            approval_source: string;
+        };
+        ArriveDockAppointmentRequest: {
+            appointment_no: string;
+            driver_name: string;
+            vehicle_plate_no: string;
+            vehicle_type: string;
+        };
         /** @description 审计事件操作者摘要。 */
         AuditActor: {
             /**
@@ -2154,6 +3003,8 @@ export interface components {
              * @description 审计事件 ID。
              */
             id: number;
+            /** @description 操作来源 IP。 */
+            ip?: string | null;
             /**
              * Format: date-time
              * @description 发生时间。
@@ -2177,6 +3028,58 @@ export interface components {
             data: components["schemas"]["AuditEvent"][];
             /** @description 下一页游标；为空表示无更多数据。 */
             next_cursor?: string | null;
+        };
+        /** @description token 撤销结果。 */
+        AuthRevocationResponse: {
+            /** @description Redis 不可用时为 true；此时按 ADR-0024 进入 TTL 降级窗口。 */
+            revocation_degraded: boolean;
+            /** @description 被撤销的 jti。 */
+            revoked_jti: string;
+        };
+        /** @description 活跃登录会话。 */
+        AuthSession: {
+            /** @description 设备 / 客户端标识。 */
+            device_name: string;
+            /**
+             * Format: date-time
+             * @description access token 过期时间。
+             */
+            expires_at: string;
+            /** @description 登录来源 IP。 */
+            ip?: string | null;
+            /** @description 是否为当前请求使用的会话。 */
+            is_current: boolean;
+            /**
+             * Format: date-time
+             * @description 登录时间。
+             */
+            logged_in_at: string;
+            /** @description JWT jti，会话撤销的唯一标识。 */
+            session_id: string;
+            /**
+             * Format: uuid
+             * @description 所属用户。
+             */
+            user_id: string;
+        };
+        /** @description 活跃登录会话列表。 */
+        AuthSessionListResponse: {
+            /** Format: int32 */
+            count: number;
+            data: components["schemas"]["AuthSession"][];
+        };
+        /** @description 会话批量撤销结果。 */
+        AuthSessionRevokeResponse: {
+            revocation_degraded: boolean;
+            /** Format: int32 */
+            revoked_sessions: number;
+            /** Format: uuid */
+            user_id: string;
+        };
+        /** @description 修改用户状态。 */
+        AuthUserStatusRequest: {
+            /** @description active / disabled。 */
+            status: string;
         };
         BatchAssignRolesRequest: {
             role_ids: string[];
@@ -2336,8 +3239,22 @@ export interface components {
             quantity: number;
             source_refs: string[];
         };
+        CancelDockAppointmentRequest: {
+            reason?: string | null;
+        };
         CancelExpressWaybillRequest: {
             reason?: string | null;
+        };
+        CancelInventoryRecallRequest: {
+            approval_id: string;
+            /** Format: uuid */
+            batch_id: string;
+            reason: string;
+            /** Format: uuid */
+            second_approver_id: string;
+        };
+        ChangeDrugInspectionPlatformStatusRequest: {
+            status: string;
         };
         ChangeInventoryStatusRequest: {
             approval_id: string;
@@ -2433,6 +3350,16 @@ export interface components {
             title: string;
             view_id?: string | null;
         };
+        CreateApiKeyRequest: {
+            caller_name: string;
+            /** Format: date-time */
+            expires_at?: string | null;
+            purpose: string;
+            /** Format: uuid */
+            responsible_user_id: string;
+            scopes: string[];
+            warehouse_ids: string[];
+        };
         CreateBillingAccountRequest: {
             account_code: string;
             account_name: string;
@@ -2473,11 +3400,50 @@ export interface components {
             /** Format: uuid */
             store_id: string;
         };
+        CreateCustomerAddressRequest: {
+            city: string;
+            contact_name: string;
+            contact_phone: string;
+            detail_address: string;
+            district: string;
+            is_default: boolean;
+            province: string;
+        };
         CreateCustomerRequest: {
             customer_code: string;
             customer_name: string;
             license_no?: string | null;
             source?: string | null;
+        };
+        CreateDockAppointmentRequest: {
+            appointment_no: string;
+            /** Format: uuid */
+            dock_id: string;
+            document_no: string;
+            document_type: string;
+            driver_name: string;
+            driver_phone: string;
+            vehicle_plate_no?: string | null;
+            vehicle_type: string;
+            /** Format: uuid */
+            warehouse_id: string;
+            /** Format: date-time */
+            window_end_at: string;
+            /** Format: date-time */
+            window_start_at: string;
+        };
+        CreateDockImportRequest: {
+            docks: components["schemas"]["CreateDockRequest"][];
+            /** Format: uuid */
+            warehouse_id: string;
+        };
+        CreateDockRequest: {
+            dock_code: string;
+            dock_type: string;
+            location_description?: string | null;
+            temperature_zone: string;
+            /** Format: uuid */
+            warehouse_id: string;
         };
         CreateExpressWaybillRequest: {
             carrier_code: string;
@@ -2507,6 +3473,14 @@ export interface components {
             scenario: string;
             summary: string;
         };
+        CreateInventoryCountRequest: {
+            count_type: string;
+            product_code?: string | null;
+            /** Format: uuid */
+            warehouse_id?: string | null;
+            /** Format: uuid */
+            zone_id?: string | null;
+        };
         CreateLocationRequest: {
             /** Format: uuid */
             bound_owner_id?: string | null;
@@ -2527,6 +3501,22 @@ export interface components {
             /** Format: uuid */
             zone_id: string;
         };
+        CreateMaintenanceRecordRequest: {
+            appearance: string;
+            conclusion: string;
+            exception_type?: string | null;
+            /** Format: double */
+            humidity_percent: number;
+            mildew: string;
+            notes?: string | null;
+            packaging: string;
+            pest: string;
+            rodent: string;
+            /** Format: uuid */
+            task_id: string;
+            /** Format: double */
+            temperature_celsius: number;
+        };
         CreateOutboundOrderLineRequest: {
             batch_no: string;
             /** Format: int32 */
@@ -2538,6 +3528,7 @@ export interface components {
         CreateOutboundOrderRequest: {
             /** Format: uuid */
             customer_id: string;
+            document_type: string;
             erp_order_no?: string | null;
             lines: components["schemas"]["CreateOutboundOrderLineRequest"][];
             /** Format: date-time */
@@ -2631,9 +3622,17 @@ export interface components {
             supplier_code: string;
             supplier_name: string;
         };
+        CreateUserRequest: {
+            display_name: string;
+            password: string;
+            phone: string;
+            role_ids: string[];
+            username: string;
+        };
         CreateWarehouseRequest: {
             warehouse_code: string;
             warehouse_name: string;
+            warehouse_type?: string;
         };
         CreateWarehouseZoneRequest: {
             quality_color: string;
@@ -2700,9 +3699,52 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
         };
+        /** @description 客户收货地址。 */
+        CustomerAddress: {
+            city: string;
+            contact_name: string;
+            contact_phone: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            customer_id: string;
+            detail_address: string;
+            district: string;
+            /** Format: uuid */
+            id: string;
+            is_default: boolean;
+            /** Format: uuid */
+            owner_id: string;
+            province: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        CustomerAddressListResponse: {
+            data: components["schemas"]["CustomerAddress"][];
+            page: components["schemas"]["PageMeta"];
+        };
         CustomerListResponse: {
             data: components["schemas"]["Customer"][];
             page: components["schemas"]["PageMeta"];
+        };
+        CustomerProfile: {
+            business_scope: string[];
+            chain_name?: string | null;
+            contact_name?: string | null;
+            contact_phone?: string | null;
+            /** Format: uuid */
+            customer_id: string;
+            customer_type: string;
+            /** Format: uuid */
+            owner_id: string;
+            qualification_certificates: components["schemas"]["CustomerQualification"][];
+            /** Format: date-time */
+            updated_at: string;
+        };
+        CustomerQualification: {
+            certificate_no: string;
+            certificate_type: string;
+            expires_at?: string | null;
         };
         DeleteRoleResponse: {
             /** Format: uuid */
@@ -2715,6 +3757,57 @@ export interface components {
         };
         DisposeTemperatureExcursionRequest: {
             selected_batch_ids: string[];
+        };
+        Dock: {
+            /** Format: date-time */
+            created_at: string;
+            dock_code: string;
+            dock_type: string;
+            /** Format: uuid */
+            id: string;
+            location_description?: string | null;
+            /** Format: date-time */
+            maintenance_recovery_at?: string | null;
+            status: string;
+            temperature_zone: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            warehouse_id: string;
+        };
+        DockAppointment: {
+            appointment_no: string;
+            /** Format: int64 */
+            arrival_deviation_minutes?: number | null;
+            /** Format: date-time */
+            arrived_at?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            dock_id: string;
+            document_no: string;
+            document_type: string;
+            driver_name: string;
+            driver_phone: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            status: string;
+            /** Format: uuid */
+            supersedes_id?: string | null;
+            /** Format: date-time */
+            updated_at: string;
+            vehicle_plate_no?: string | null;
+            vehicle_type: string;
+            /** Format: int64 */
+            version: number;
+            /** Format: uuid */
+            warehouse_id: string;
+            /** Format: date-time */
+            window_end_at: string;
+            /** Format: date-time */
+            window_start_at: string;
         };
         DocumentNumberAllocation: {
             counter_key: string;
@@ -2782,6 +3875,32 @@ export interface components {
             data: components["schemas"]["DriverTask"][];
             page: components["schemas"]["PageMeta"];
         };
+        DrugInspectionPlatform: {
+            api_key_configured: boolean;
+            api_url: string;
+            auth_method: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            password_configured: boolean;
+            platform_code: string;
+            platform_name: string;
+            status: string;
+            /** Format: int32 */
+            timeout_seconds: number;
+            /** Format: date-time */
+            updated_at: string;
+            username?: string | null;
+            /** Format: int64 */
+            version: number;
+        };
+        DrugInspectionPlatformListResponse: {
+            data: components["schemas"]["DrugInspectionPlatform"][];
+            page: components["schemas"]["PageMeta"];
+        };
         /** @description 统一错误响应。 */
         ErrorResponse: {
             /** @description 业务错误码。 */
@@ -2833,6 +3952,9 @@ export interface components {
             /** Format: uuid */
             queue_item_id?: string | null;
             unresolved_fields: string[];
+        };
+        ExpireInventoryBatchesRequest: {
+            as_of?: string | null;
         };
         ExpressCarrier: {
             account_no?: string | null;
@@ -3232,6 +4354,61 @@ export interface components {
             data: components["schemas"]["InventoryBatch"][];
             page: components["schemas"]["PageMeta"];
         };
+        InventoryBatchTrace: {
+            batch: components["schemas"]["InventoryBatch"];
+            movements: components["schemas"]["InventoryMovement"][];
+            status_changes: components["schemas"]["InventoryStatusChange"][];
+        };
+        InventoryCount: {
+            approval_id?: string | null;
+            approval_source?: string | null;
+            /** Format: date-time */
+            approved_at?: string | null;
+            /** Format: uuid */
+            approved_by?: string | null;
+            count_type: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            created_by: string;
+            /** Format: uuid */
+            id: string;
+            lines: components["schemas"]["InventoryCountLine"][];
+            /** Format: uuid */
+            owner_id: string;
+            product_code?: string | null;
+            /** Format: date-time */
+            started_at: string;
+            status: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            warehouse_id?: string | null;
+            /** Format: uuid */
+            zone_id?: string | null;
+        };
+        InventoryCountLine: {
+            batch_no: string;
+            /** Format: int64 */
+            book_qty: number;
+            /** Format: uuid */
+            count_id: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            inventory_batch_id: string;
+            location_code: string;
+            /** Format: uuid */
+            location_id: string;
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: int64 */
+            physical_qty?: number | null;
+            product_code: string;
+            /** Format: int64 */
+            variance_qty?: number | null;
+            variance_type?: string | null;
+        };
         InventoryMovement: {
             /** Format: uuid */
             batch_id: string;
@@ -3247,6 +4424,39 @@ export interface components {
             /** Format: uuid */
             source_document_id: string;
             source_document_type: string;
+        };
+        InventoryStatusChange: {
+            approval_id: string;
+            approval_source: string;
+            /** Format: uuid */
+            batch_id: string;
+            from_status: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            occurred_at: string;
+            /** Format: uuid */
+            owner_id: string;
+            reason: string;
+            to_status: string;
+        };
+        InventoryStatusTransition: {
+            approval_sources: string[];
+            /** Format: date-time */
+            created_at: string;
+            enabled: boolean;
+            from_status: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id?: string | null;
+            to_status: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        InventoryStatusTransitionListResponse: {
+            data: components["schemas"]["InventoryStatusTransition"][];
+            page: components["schemas"]["PageMeta"];
         };
         /** @description 库位基础档案。 */
         Location: {
@@ -3306,6 +4516,70 @@ export interface components {
             token_type: string;
             user: components["schemas"]["CurrentUser"];
         };
+        MaintenanceRecord: {
+            appearance: string;
+            /** Format: uuid */
+            batch_id: string;
+            batch_no: string;
+            conclusion: string;
+            exception_type?: string | null;
+            /** Format: date */
+            expiry_date: string;
+            /** Format: double */
+            humidity_percent: number;
+            /** Format: uuid */
+            id: string;
+            inventory_status: string;
+            mildew: string;
+            notes?: string | null;
+            /** Format: uuid */
+            owner_id: string;
+            packaging: string;
+            /** Format: date-time */
+            performed_at: string;
+            /** Format: uuid */
+            performed_by: string;
+            pest: string;
+            product_code: string;
+            rodent: string;
+            /** Format: uuid */
+            task_id: string;
+            /** Format: double */
+            temperature_celsius: number;
+        };
+        MaintenanceRecordListResponse: {
+            data: components["schemas"]["MaintenanceRecord"][];
+            page: components["schemas"]["PageMeta"];
+        };
+        MaintenanceTask: {
+            /** Format: uuid */
+            assigned_user_id?: string | null;
+            /** Format: uuid */
+            batch_id: string;
+            batch_no: string;
+            /** Format: date-time */
+            completed_at?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date */
+            expiry_date: string;
+            /** Format: uuid */
+            id: string;
+            location_code: string;
+            /** Format: uuid */
+            location_id: string;
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: date-time */
+            planned_at: string;
+            product_code: string;
+            quality_status: string;
+            status: string;
+        };
+        MaintenanceTaskListResponse: {
+            data: components["schemas"]["MaintenanceTask"][];
+            page: components["schemas"]["PageMeta"];
+        };
         /** @description M-PM 参数对照字典。 */
         MappingDictionary: {
             /** Format: date-time */
@@ -3360,11 +4634,19 @@ export interface components {
             source_system: string;
             unresolved_fields: string[];
         };
+        MarkInventoryRecallRequest: {
+            approval_id: string;
+            approval_source: string;
+            /** Format: uuid */
+            batch_id: string;
+            reason: string;
+        };
         OutboundOrder: {
             /** Format: date-time */
             created_at: string;
             /** Format: uuid */
             customer_id: string;
+            document_type: string;
             erp_order_no?: string | null;
             /** Format: uuid */
             id: string;
@@ -3413,6 +4695,10 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
             wave_no: string;
+        };
+        OutboundWaveListResponse: {
+            data: components["schemas"]["OutboundWave"][];
+            page: components["schemas"]["PageMeta"];
         };
         PackJob: {
             actual_box_type: string;
@@ -3464,6 +4750,11 @@ export interface components {
             count: number;
             /** @description 下一页游标；为空表示无更多数据。 */
             next_cursor?: string | null;
+        };
+        /** @description 修改当前用户密码。 */
+        PasswordChangeRequest: {
+            current_password: string;
+            new_password: string;
         };
         PermissionListResponse: {
             items: components["schemas"]["PermissionResponse"][];
@@ -3715,6 +5006,39 @@ export interface components {
             /** Format: uuid */
             source_receiving_order_id: string;
         };
+        PutawayLocationRecommendation: {
+            /** Format: int64 */
+            available_volume_cm3: number;
+            location_code: string;
+            /** Format: uuid */
+            location_id: string;
+            quality_color: string;
+            /** Format: int64 */
+            required_volume_cm3: number;
+            same_product: boolean;
+            temperature_zone: string;
+        };
+        PutawayRecommendationQuery: {
+            batch_no: string;
+            /** Format: int32 */
+            limit?: number | null;
+            product_code: string;
+            /** Format: int64 */
+            qty: number;
+            quality_status: string;
+        };
+        PutawayRecommendationResponse: {
+            batch_no: string;
+            data: components["schemas"]["PutawayLocationRecommendation"][];
+            /** Format: uuid */
+            owner_id: string;
+            product_code: string;
+            /** Format: int64 */
+            qty: number;
+            quality_status: string;
+            /** Format: uuid */
+            receiving_order_id: string;
+        };
         PutawayRecord: {
             batch_no: string;
             /** Format: uuid */
@@ -3747,6 +5071,7 @@ export interface components {
             actual_qty: number;
             /** Format: double */
             arrival_temperature_celsius?: number | null;
+            details?: components["schemas"]["ReceivingReceiptDetails"] | null;
             exception_note?: string | null;
             /** Format: int64 */
             rejected_qty: number;
@@ -3768,6 +5093,44 @@ export interface components {
             /** Format: int32 */
             version: number;
             waybill_no?: string | null;
+        };
+        /** @description M10-001 的 TMS 路径规划结果。路径算法和车辆排班仍由外部 TMS 负责。 */
+        ReceiveTmsRoutePlanRequest: {
+            /** Format: date */
+            delivery_date: string;
+            dispatch_result_id: string;
+            /** Format: uuid */
+            driver_user_id: string;
+            outbound_order_ids: string[];
+            plate_no: string;
+            stops: components["schemas"]["TmsRouteStopRequest"][];
+            vehicle_no: string;
+            /** Format: int32 */
+            version: number;
+        };
+        ReceivingDashboardQuery: {
+            /** Format: date-time */
+            from?: string | null;
+            product_code?: string | null;
+            /** Format: uuid */
+            supplier_id?: string | null;
+            /** Format: date-time */
+            to?: string | null;
+        };
+        ReceivingDashboardResponse: {
+            data: components["schemas"]["ReceivingDashboardRow"][];
+            /** Format: date-time */
+            refreshed_at: string;
+        };
+        ReceivingDashboardRow: {
+            abnormal: boolean;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: int64 */
+            expected_qty: number;
+            /** Format: int64 */
+            order_count: number;
+            status: string;
         };
         ReceivingInspectionRecord: {
             /** Format: int64 */
@@ -3824,9 +5187,20 @@ export interface components {
             data: components["schemas"]["ReceivingOrder"][];
             page: components["schemas"]["PageMeta"];
         };
+        /** @description 收货单打印所需的业务事实，按货主范围聚合，不包含模板或渲染逻辑。 */
+        ReceivingOrderPrintData: {
+            inspections: components["schemas"]["ReceivingInspectionRecord"][];
+            order: components["schemas"]["ReceivingOrder"];
+            receipts: components["schemas"]["ReceivingOrderReceipt"][];
+            signatures: components["schemas"]["InspectionSignatureRecord"][];
+        };
         ReceivingOrderReceipt: {
             /** Format: int64 */
             actual_qty: number;
+            /** Format: double */
+            arrival_temperature_celsius?: number | null;
+            details?: components["schemas"]["ReceivingReceiptDetails"] | null;
+            exception_note?: string | null;
             /** Format: uuid */
             id: string;
             /** Format: date-time */
@@ -3839,6 +5213,25 @@ export interface components {
             rejected_qty: number;
             /** Format: int64 */
             shortage_qty: number;
+        };
+        /** @description 收货现场信息。固定字段使用类型化结构，避免打印或审计依赖前端展示字符串。 */
+        ReceivingReceiptDetails: {
+            /** Format: date-time */
+            arrival_at?: string | null;
+            carrier?: string | null;
+            contact_id_no?: string | null;
+            contact_name?: string | null;
+            contact_phone?: string | null;
+            /** Format: date-time */
+            departure_at?: string | null;
+            filing_checked?: string | null;
+            origin?: string | null;
+            seal_checked?: string | null;
+            /** Format: date-time */
+            storage_at?: string | null;
+            temperature_control_method?: string | null;
+            transport_mode?: string | null;
+            vehicle_no?: string | null;
         };
         RejectReceivingOrderRequest: {
             reason: string;
@@ -3937,7 +5330,15 @@ export interface components {
             /** Format: int64 */
             suggested_qty: number;
         };
+        ReviewOutboundOrderLineRequest: {
+            /** Format: int32 */
+            line_no: number;
+            product_code: string;
+            /** Format: int64 */
+            reviewed_qty: number;
+        };
         ReviewOutboundOrderRequest: {
+            lines: components["schemas"]["ReviewOutboundOrderLineRequest"][];
             review_mode: string;
             /** Format: uuid */
             reviewer_id: string;
@@ -3948,6 +5349,8 @@ export interface components {
             items: components["schemas"]["RoleResponse"][];
         };
         RoleResponse: {
+            /** Format: date-time */
+            created_at: string;
             data_scope: string;
             /** Format: uuid */
             id: string;
@@ -3970,6 +5373,12 @@ export interface components {
         RollbackAdminMenuRequest: {
             /** Format: int64 */
             target_version_no?: number | null;
+        };
+        RotateApiKeyRequest: {
+            /** Format: date-time */
+            expires_at?: string | null;
+            /** Format: int64 */
+            grace_period_days?: number | null;
         };
         SavePrintTemplateRequest: {
             designer_version: string;
@@ -3997,6 +5406,9 @@ export interface components {
             recipients: string[];
         };
         SetDocumentNumberRuleEnabledRequest: {
+            enabled: boolean;
+        };
+        SetTaskTypeEnabledRequest: {
             enabled: boolean;
         };
         ShipOutboundOrderRequest: {
@@ -4082,6 +5494,10 @@ export interface components {
             signed_orders_last_7_days: number;
             /** Format: uuid */
             store_id?: string | null;
+        };
+        SubmitInventoryCountLineRequest: {
+            /** Format: int64 */
+            physical_qty: number;
         };
         /** @description 供应商基础档案。 */
         Supplier: {
@@ -4173,6 +5589,31 @@ export interface components {
             data: components["schemas"]["SystemDictionaryItem"][];
             page: components["schemas"]["PageMeta"];
         };
+        TaskType: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: int32 */
+            default_priority: number;
+            enabled: boolean;
+            /** Format: int32 */
+            estimated_minutes: number;
+            /** Format: uuid */
+            id: string;
+            insertable: boolean;
+            mergeable: boolean;
+            /** Format: uuid */
+            owner_id: string;
+            task_type_code: string;
+            task_type_name: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: int64 */
+            version: number;
+        };
+        TaskTypeListResponse: {
+            data: components["schemas"]["TaskType"][];
+            page: components["schemas"]["PageMeta"];
+        };
         TemperatureExcursionDispositionResponse: {
             approval_source: string;
             event: components["schemas"]["TemperatureExcursionEvent"];
@@ -4243,6 +5684,48 @@ export interface components {
             version: number;
             waybill_no?: string | null;
         };
+        TmsRoutePlan: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date */
+            delivery_date: string;
+            dispatch_result_id: string;
+            /** Format: uuid */
+            driver_user_id: string;
+            /** Format: uuid */
+            id: string;
+            outbound_order_ids: string[];
+            /** Format: uuid */
+            owner_id: string;
+            plate_no: string;
+            status: string;
+            stops: components["schemas"]["TmsRouteStop"][];
+            /** Format: date-time */
+            updated_at: string;
+            vehicle_no: string;
+            /** Format: int32 */
+            version: number;
+        };
+        TmsRouteStop: {
+            /** Format: date-time */
+            estimated_arrival_at: string;
+            /** Format: uuid */
+            id: string;
+            outbound_order_ids: string[];
+            /** Format: int32 */
+            sequence: number;
+            /** Format: uuid */
+            store_id: string;
+        };
+        TmsRouteStopRequest: {
+            /** Format: date-time */
+            estimated_arrival_at: string;
+            outbound_order_ids: string[];
+            /** Format: int32 */
+            sequence: number;
+            /** Format: uuid */
+            store_id: string;
+        };
         TraceabilityOutboundReport: {
             events: components["schemas"]["TraceabilityStatusChangeEvent"][];
             /** Format: date-time */
@@ -4298,10 +5781,43 @@ export interface components {
             title?: string | null;
             view_id?: string | null;
         };
+        UpdateColdChainDeviceRequest: {
+            /** Format: date-time */
+            calibration_due_at?: string | null;
+            device_type?: string | null;
+            installed_at_location_code?: string | null;
+        };
+        UpdateCustomerAddressRequest: {
+            city?: string | null;
+            contact_name?: string | null;
+            contact_phone?: string | null;
+            detail_address?: string | null;
+            district?: string | null;
+            is_default?: boolean | null;
+            province?: string | null;
+        };
         UpdateCustomerRequest: {
             customer_name?: string | null;
             license_no?: string | null;
             status?: string | null;
+        };
+        UpdateDockAppointmentRequest: {
+            /** Format: uuid */
+            dock_id: string;
+            driver_name: string;
+            driver_phone: string;
+            reason?: string | null;
+            vehicle_plate_no?: string | null;
+            vehicle_type: string;
+            /** Format: date-time */
+            window_end_at: string;
+            /** Format: date-time */
+            window_start_at: string;
+        };
+        UpdateDockRequest: {
+            /** Format: date-time */
+            maintenance_recovery_at?: string | null;
+            status: string;
         };
         UpdateLocationRequest: {
             /** Format: uuid */
@@ -4368,6 +5884,7 @@ export interface components {
         UpdateWarehouseRequest: {
             status?: string | null;
             warehouse_name?: string | null;
+            warehouse_type?: string | null;
         };
         UpdateWarehouseZoneRequest: {
             quality_color?: string | null;
@@ -4383,6 +5900,14 @@ export interface components {
             /** Format: int32 */
             sort_order: number;
         };
+        UpsertCustomerProfileRequest: {
+            business_scope?: string[];
+            chain_name?: string | null;
+            contact_name: string;
+            contact_phone: string;
+            customer_type: string;
+            qualification_certificates?: components["schemas"]["CustomerQualification"][];
+        };
         UpsertDocumentNumberRuleRequest: {
             document_type: string;
             /** Format: date-time */
@@ -4395,6 +5920,18 @@ export interface components {
             /** Format: int32 */
             sequence_width: number;
             template: string;
+        };
+        UpsertDrugInspectionPlatformRequest: {
+            api_key_alias?: string | null;
+            api_url: string;
+            auth_method: string;
+            password_alias?: string | null;
+            platform_code: string;
+            platform_name: string;
+            status: string;
+            /** Format: int32 */
+            timeout_seconds: number;
+            username?: string | null;
         };
         UpsertExpressCarrierRequest: {
             account_no?: string | null;
@@ -4447,6 +5984,12 @@ export interface components {
             retry_max_attempts: number;
             secret_alias: string;
         };
+        UpsertInventoryStatusTransitionRequest: {
+            approval_sources: string[];
+            enabled: boolean;
+            /** Format: uuid */
+            owner_id?: string | null;
+        };
         UpsertSystemDictionaryItemRequest: {
             /** Format: date-time */
             effective_from?: string | null;
@@ -4461,6 +6004,16 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        UpsertTaskTypeRequest: {
+            /** Format: int32 */
+            default_priority: number;
+            enabled: boolean;
+            /** Format: int32 */
+            estimated_minutes: number;
+            insertable: boolean;
+            mergeable: boolean;
+            task_type_name: string;
+        };
         /** @description 仓库基础档案。 */
         Warehouse: {
             /** Format: date-time */
@@ -4474,6 +6027,7 @@ export interface components {
             updated_at: string;
             warehouse_code: string;
             warehouse_name: string;
+            warehouse_type: string;
         };
         WarehouseListResponse: {
             data: components["schemas"]["Warehouse"][];
@@ -5037,6 +6591,14 @@ export interface operations {
             query?: {
                 /** @description 按资源类型过滤 */
                 resource_type?: string | null;
+                /** @description 按操作类型过滤 */
+                action?: string | null;
+                /** @description 按关联资源编号过滤 */
+                resource_id?: string | null;
+                /** @description 按商品编码过滤（匹配审计变更前后值） */
+                product_code?: string | null;
+                /** @description 按批号过滤（匹配审计变更前后值） */
+                batch_no?: string | null;
                 /** @description 按操作者过滤 */
                 actor_id?: string | null;
                 /** @description 开始时间（RFC3339） */
@@ -5083,6 +6645,311 @@ export interface operations {
             };
         };
     };
+    export_audit_events: {
+        parameters: {
+            query?: {
+                /** @description 按资源类型过滤 */
+                resource_type?: string | null;
+                /** @description 按操作类型过滤 */
+                action?: string | null;
+                /** @description 按关联资源编号过滤 */
+                resource_id?: string | null;
+                /** @description 按商品编码过滤（匹配审计变更前后值） */
+                product_code?: string | null;
+                /** @description 按批号过滤（匹配审计变更前后值） */
+                batch_no?: string | null;
+                /** @description 按操作者过滤 */
+                actor_id?: string | null;
+                /** @description 开始时间（RFC3339） */
+                from?: string | null;
+                /** @description 结束时间（RFC3339） */
+                to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 完整审计事件 CSV 导出 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 结果超过导出上限 */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_api_keys: {
+        parameters: {
+            query?: {
+                /** @description 调用方名称或用途 */
+                q?: string | null;
+                /** @description active / revoked / temporarily_disabled */
+                status?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前货主 API Key 列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiKeyListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 仅系统管理员可访问 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_api_key: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 创建幂等键；明文只在首次响应展示 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateApiKeyRequest"];
+            };
+        };
+        responses: {
+            /** @description 创建 API Key，secret 只展示一次 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiKey"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 仅系统管理员可操作 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 作用域或过期时间非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    revoke_api_key: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 吊销幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description API Key ID */
+                api_key_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 吊销 API Key；重复吊销幂等 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiKey"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 仅系统管理员可操作 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description API Key 不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    rotate_api_key: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 轮换幂等键；新 secret 只展示一次 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description API Key ID */
+                api_key_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RotateApiKeyRequest"];
+            };
+        };
+        responses: {
+            /** @description 轮换 API Key 并返回旧 Key 宽限期 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiKeyRotationResponse"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 仅系统管理员可操作 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description API Key 不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 宽限期或过期时间非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     login: {
         parameters: {
             query?: never;
@@ -5106,6 +6973,38 @@ export interface operations {
                 };
             };
             /** @description 认证失败 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    logout: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 重复登出幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 登出并撤销当前 token */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthRevocationResponse"];
+                };
+            };
+            /** @description token 无效 */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -5145,6 +7044,51 @@ export interface operations {
             };
         };
     };
+    change_auth_password: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 修改密码幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordChangeRequest"];
+            };
+        };
+        responses: {
+            /** @description 修改密码并撤销全部会话 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthSessionRevokeResponse"];
+                };
+            };
+            /** @description 认证失败 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 密码策略不满足 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     list_permissions: {
         parameters: {
             query?: never;
@@ -5160,6 +7104,14 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PermissionListResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             403: {
@@ -5240,6 +7192,14 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5285,6 +7245,14 @@ export interface operations {
                     "application/json": components["schemas"]["RoleResponse"];
                 };
             };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5324,6 +7292,14 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeleteRoleResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             403: {
@@ -5371,6 +7347,14 @@ export interface operations {
                     "application/json": components["schemas"]["RoleResponse"];
                 };
             };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5380,6 +7364,123 @@ export interface operations {
                 };
             };
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_auth_sessions: {
+        parameters: {
+            query?: {
+                /** @description 管理员查看指定用户会话 */
+                user_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 活跃登录会话 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthSessionListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无权查看其他用户会话 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    revoke_other_auth_sessions: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 撤销其他会话幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 撤销当前用户其他设备 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthSessionRevokeResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    revoke_auth_session: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 单设备撤销幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 会话 jti */
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 单设备会话失效 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthRevocationResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 会话不存在 */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5411,6 +7512,14 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BatchAssignRolesResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             403: {
@@ -5448,7 +7557,208 @@ export interface operations {
                     "application/json": components["schemas"]["RoleUserListResponse"];
                 };
             };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_auth_user: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateUserRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleUserResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    kick_auth_user: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 强制下线幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 目标用户 ID */
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 管理员强制踢出用户 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthSessionRevokeResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无会话管理权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 用户不存在或不属于当前货主 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    change_auth_user_status: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 用户状态变更幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 目标用户 ID */
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuthUserStatusRequest"];
+            };
+        };
+        responses: {
+            /** @description 更新用户状态并撤销会话 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthSessionRevokeResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无会话管理权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 用户不存在或不属于当前货主 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 用户状态非法 */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5557,7 +7867,10 @@ export interface operations {
     create_billing_contract: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -5576,8 +7889,35 @@ export interface operations {
                     "application/json": components["schemas"]["BillingContract"];
                 };
             };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description 未登录 */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 货主下的计费账户不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等冲突或合同重复 */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5590,7 +7930,10 @@ export interface operations {
     create_billing_rule: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -5609,8 +7952,44 @@ export interface operations {
                     "application/json": components["schemas"]["BillingRule"];
                 };
             };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description 未登录 */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 货主下的计费合同不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等冲突或规则生效窗口重复 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 规则项、单位、周期、费率或生效窗口校验失败 */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -6088,10 +8467,51 @@ export interface operations {
             };
         };
     };
-    create_cold_chain_device: {
+    list_cold_chain_devices: {
         parameters: {
             query?: never;
             header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 按货主查询冷链设备台账 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ColdChainDevice"][];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无冷链设备读取权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_cold_chain_device: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -6110,8 +8530,163 @@ export interface operations {
                     "application/json": components["schemas"]["ColdChainDevice"];
                 };
             };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description 未登录 */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 设备编码重复或幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 设备类型非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_cold_chain_device: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 设备编码 */
+                device_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateColdChainDeviceRequest"];
+            };
+        };
+        responses: {
+            /** @description 更新冷链设备台账 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ColdChainDevice"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 设备不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 设备类型非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    disable_cold_chain_device: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 设备编码 */
+                device_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 停用冷链设备台账 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ColdChainDevice"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 设备不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 设备仍处于监控中 */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -6484,6 +9059,663 @@ export interface operations {
             };
         };
     };
+    list_dock_appointments: {
+        parameters: {
+            query: {
+                /** @description 仓库 ID */
+                warehouse_id: string;
+                /** @description 月台 ID */
+                dock_id?: string | null;
+                /** @description 查询窗口起点（RFC3339） */
+                from?: string | null;
+                /** @description 查询窗口终点（RFC3339） */
+                to?: string | null;
+                /** @description 预约状态 */
+                status?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 查询月台预约列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DockAppointment"][];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 仓库或月台不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 时间窗非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_dock_appointment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 预约创建幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDockAppointmentRequest"];
+            };
+        };
+        responses: {
+            /** @description 创建月台预约 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DockAppointment"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 月台或仓库不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 预约冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 预约字段或时间窗非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_dock_appointment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 预约变更幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 预约 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateDockAppointmentRequest"];
+            };
+        };
+        responses: {
+            /** @description 变更月台预约并创建新版本 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DockAppointment"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 预约或月台不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 预约冲突或状态不允许 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 预约字段或时间窗非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    arrive_dock_appointment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 预约到达核对幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 预约 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ArriveDockAppointmentRequest"];
+            };
+        };
+        responses: {
+            /** @description 预约到达核对 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DockAppointment"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 预约不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 到达核对冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 到达核对字段非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    cancel_dock_appointment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 预约取消幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 预约 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelDockAppointmentRequest"];
+            };
+        };
+        responses: {
+            /** @description 取消月台预约 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DockAppointment"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 预约不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 预约状态不允许取消 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_docks: {
+        parameters: {
+            query: {
+                /** @description 物理仓库 ID */
+                warehouse_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 月台档案列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dock"][];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_dock: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 创建幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDockRequest"];
+            };
+        };
+        responses: {
+            /** @description 创建月台档案 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dock"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 月台编号已存在 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    import_docks: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 批量导入幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDockImportRequest"];
+            };
+        };
+        responses: {
+            /** @description 批量导入月台档案 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dock"][];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 月台编号已存在 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_dock: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 删除幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 月台档案 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 删除月台档案 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 月台档案不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 月台存在关联预约 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_dock: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 更新幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 月台档案 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateDockRequest"];
+            };
+        };
+        responses: {
+            /** @description 更新月台状态 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dock"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 月台档案不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     list_driver_today_tasks: {
         parameters: {
             query?: never;
@@ -6504,6 +9736,212 @@ export interface operations {
             };
             /** @description 未登录 */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_drug_inspection_platforms: {
+        parameters: {
+            query?: {
+                /** @description connected / testing / disabled */
+                status?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 药检平台配置列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DrugInspectionPlatformListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 状态筛选非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    upsert_drug_inspection_platform: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertDrugInspectionPlatformRequest"];
+            };
+        };
+        responses: {
+            /** @description 新增或更新药检平台配置 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DrugInspectionPlatform"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 平台配置非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    change_drug_inspection_platform_status: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 药检平台配置 ID */
+                platform_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeDrugInspectionPlatformStatusRequest"];
+            };
+        };
+        responses: {
+            /** @description 变更药检平台状态 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DrugInspectionPlatform"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 平台不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 平台状态非法 */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -7030,6 +10468,53 @@ export interface operations {
             };
         };
     };
+    list_receiving_dashboard: {
+        parameters: {
+            query?: {
+                /** @description 供应商 */
+                supplier_id?: string | null;
+                /** @description 商品编码 */
+                product_code?: string | null;
+                /** @description 预计到货时间起点 */
+                from?: string | null;
+                /** @description 预计到货时间终点 */
+                to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 入库进度看板 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceivingDashboardResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     list_receiving_orders: {
         parameters: {
             query?: never;
@@ -7062,7 +10547,10 @@ export interface operations {
     create_receiving_order: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -7081,8 +10569,26 @@ export interface operations {
                     "application/json": components["schemas"]["ReceivingOrder"];
                 };
             };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description 未登录 */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等键冲突 */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -7279,6 +10785,47 @@ export interface operations {
             };
         };
     };
+    get_receiving_order_print_data: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 收货单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 收货单打印业务数据 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceivingOrderPrintData"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 收货单不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     putaway_receiving_order: {
         parameters: {
             query?: never;
@@ -7318,6 +10865,76 @@ export interface operations {
             };
             /** @description 未登录 */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    recommend_putaway_locations: {
+        parameters: {
+            query: {
+                /** @description 商品编码 */
+                product_code: string;
+                /** @description 批号 */
+                batch_no: string;
+                /** @description 待上架数量 */
+                qty: number;
+                /** @description 质量状态 */
+                quality_status: string;
+                /** @description 推荐条数，默认 5，最大 50 */
+                limit?: number | null;
+            };
+            header?: never;
+            path: {
+                /** @description 收货单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 智能上架库位推荐 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PutawayRecommendationResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无上架确认权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 收货单或批次不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 库位、数量或商品体积校验失败 */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -7535,7 +11152,32 @@ export interface operations {
     };
     list_inventory_batches: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 商品编码模糊匹配 */
+                product_code?: string | null;
+                /** @description 批号模糊匹配 */
+                batch_no?: string | null;
+                /** @description 库位编码模糊匹配 */
+                location_code?: string | null;
+                /** @description 库位类型精确匹配 */
+                location_type?: string | null;
+                /** @description 库区编码精确匹配 */
+                zone_code?: string | null;
+                /** @description 质量状态精确匹配 */
+                quality_status?: string | null;
+                /** @description 生产日期起始日，格式 YYYY-MM-DD */
+                production_from?: string | null;
+                /** @description 生产日期截止日，格式 YYYY-MM-DD */
+                production_to?: string | null;
+                /** @description 有效期起始日，格式 YYYY-MM-DD */
+                expiry_from?: string | null;
+                /** @description 有效期截止日，格式 YYYY-MM-DD */
+                expiry_to?: string | null;
+                /** @description 创建时间起点，RFC3339 */
+                created_from?: string | null;
+                /** @description 创建时间终点，RFC3339 */
+                created_to?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -7553,6 +11195,103 @@ export interface operations {
             };
             /** @description 未登录 */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    isolate_expired_inventory_batches: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExpireInventoryBatchesRequest"];
+            };
+        };
+        responses: {
+            /** @description 按日期隔离过期库存批次 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryBatchListResponse"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 日期格式非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    near_expiry_report: {
+        parameters: {
+            query?: {
+                /** @description 报告基准日，格式 YYYY-MM-DD */
+                as_of?: string | null;
+                /** @description 预警阈值天数，缺省读取货主覆盖或全局 inventory_policy */
+                warning_days?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 库存批次近效期预警报表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryBatchListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 日期或阈值非法 */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -7586,6 +11325,123 @@ export interface operations {
             };
             /** @description 未登录 */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    mark_inventory_batch_recall: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkInventoryRecallRequest"];
+            };
+        };
+        responses: {
+            /** @description 标记库存批次召回并隔离 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryBatch"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 审批源或状态非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    cancel_inventory_batch_recall: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelInventoryRecallRequest"];
+            };
+        };
+        responses: {
+            /** @description 双人审批取消库存批次召回 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryBatch"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 召回状态已被其他流程改变 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 双人审批或召回状态非法 */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -7640,6 +11496,605 @@ export interface operations {
             };
         };
     };
+    get_inventory_batch_trace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 库存批次 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 库存批次流转追溯 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryBatchTrace"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 库存批次不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_inventory_count: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateInventoryCountRequest"];
+            };
+        };
+        responses: {
+            /** @description 创建库存盘点单及盘点明细 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryCount"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无盘点执行权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 范围已被盘点锁占用 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 盘点类型非法或范围无库存 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_inventory_count: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 盘点单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 库存盘点单详情 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryCount"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无盘点查询权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 盘点单不存在或不属于当前货主 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    approve_inventory_count: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 盘点单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApproveInventoryCountRequest"];
+            };
+        };
+        responses: {
+            /** @description 审批盘点差异并原子调整库存 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryCount"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无盘点审批权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 盘点单不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 审批源、数量或盘点状态非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    submit_inventory_count_line: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 盘点单 ID */
+                id: string;
+                /** @description 盘点明细 ID */
+                line_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitInventoryCountLineRequest"];
+            };
+        };
+        responses: {
+            /** @description 提交盲盘实盘数量并计算差异 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryCountLine"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无盘点执行权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 盘点明细不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 数量或盘点状态非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_maintenance_records: {
+        parameters: {
+            query?: {
+                /** @description 养护任务 ID */
+                task_id?: string | null;
+                /** @description 库存批次 ID */
+                batch_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 养护记录列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MaintenanceRecordListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_maintenance_record: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateMaintenanceRecordRequest"];
+            };
+        };
+        responses: {
+            /** @description 写入一次养护结果 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MaintenanceRecord"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 仅养护员可写入 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 养护任务不存在或不属于当前货主 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等键冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 批号、效期、库存状态或养护字段校验失败 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_maintenance_tasks: {
+        parameters: {
+            query?: {
+                /** @description 养护任务 ID */
+                task_id?: string | null;
+                /** @description 库存批次 ID */
+                batch_id?: string | null;
+                /** @description 任务状态：pending/completed */
+                status?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 养护任务列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MaintenanceTaskListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_inventory_status_transitions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 库存状态转换规则 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryStatusTransitionListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    upsert_inventory_status_transition: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 起始库存状态 */
+                from_status: string;
+                /** @description 目标库存状态 */
+                to_status: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertInventoryStatusTransitionRequest"];
+            };
+        };
+        responses: {
+            /** @description 库存状态转换规则已保存 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryStatusTransition"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 规则非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     list_customers: {
         parameters: {
             query?: never;
@@ -7672,7 +12127,10 @@ export interface operations {
     create_customer: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -7702,10 +12160,376 @@ export interface operations {
             };
         };
     };
-    delete_customer: {
+    batch_create_customers: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 整批幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCustomerRequest"][];
+            };
+        };
+        responses: {
+            /** @description 批量同步客户 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerListResponse"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 客户编码或幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_customer_addresses: {
         parameters: {
             query?: never;
             header?: never;
+            path: {
+                /** @description 客户 ID */
+                customer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 客户收货地址列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAddressListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 客户不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_customer_address: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 客户 ID */
+                customer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCustomerAddressRequest"];
+            };
+        };
+        responses: {
+            /** @description 创建客户收货地址 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAddress"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 客户不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 地址字段非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_customer_address: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 客户 ID */
+                customer_id: string;
+                /** @description 地址 ID */
+                address_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCustomerAddressRequest"];
+            };
+        };
+        responses: {
+            /** @description 更新客户收货地址 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAddress"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 客户或地址不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 地址字段非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_customer_profile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 客户 ID */
+                customer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 客户与门店档案扩展信息 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerProfile"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 客户不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    upsert_customer_profile: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 客户 ID */
+                customer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertCustomerProfileRequest"];
+            };
+        };
+        responses: {
+            /** @description 保存客户与门店档案扩展信息 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerProfile"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 客户不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 客户档案字段非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_customer: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
             path: {
                 /** @description 客户 ID */
                 id: string;
@@ -7737,7 +12561,10 @@ export interface operations {
     update_customer: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
             path: {
                 /** @description 客户 ID */
                 id: string;
@@ -7802,7 +12629,10 @@ export interface operations {
     create_location: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -7907,7 +12737,10 @@ export interface operations {
     delete_location: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
             path: {
                 /** @description 库位 ID */
                 id: string;
@@ -7939,7 +12772,10 @@ export interface operations {
     update_location: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
             path: {
                 /** @description 库位 ID */
                 id: string;
@@ -8004,7 +12840,10 @@ export interface operations {
     create_product: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -8025,6 +12864,78 @@ export interface operations {
             };
             /** @description 未登录 */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    batch_create_products: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 整批幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateProductRequest"][];
+            };
+        };
+        responses: {
+            /** @description 批量同步商品 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductListResponse"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 商品编码或幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 商品字段非法 */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -8069,7 +12980,10 @@ export interface operations {
     delete_product: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
             path: {
                 /** @description 商品 ID */
                 id: string;
@@ -8101,7 +13015,10 @@ export interface operations {
     update_product: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
             path: {
                 /** @description 商品 ID */
                 id: string;
@@ -8296,7 +13213,10 @@ export interface operations {
     create_supplier: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -8326,10 +13246,76 @@ export interface operations {
             };
         };
     };
+    batch_create_suppliers: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 整批幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSupplierRequest"][];
+            };
+        };
+        responses: {
+            /** @description 批量同步供应商 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierListResponse"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 供应商编码或幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     delete_supplier: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
             path: {
                 /** @description 供应商 ID */
                 id: string;
@@ -8361,7 +13347,10 @@ export interface operations {
     update_supplier: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
             path: {
                 /** @description 供应商 ID */
                 id: string;
@@ -8565,7 +13554,10 @@ export interface operations {
     create_warehouse: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -8598,7 +13590,10 @@ export interface operations {
     delete_warehouse: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
             path: {
                 /** @description 仓库 ID */
                 id: string;
@@ -8630,7 +13625,10 @@ export interface operations {
     update_warehouse: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
             path: {
                 /** @description 仓库 ID */
                 id: string;
@@ -8794,6 +13792,47 @@ export interface operations {
             };
         };
     };
+    get_outbound_review: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 出库订单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 查询出库复核明细 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutboundOrder"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 出库订单不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     review_outbound_order: {
         parameters: {
             query?: never;
@@ -8840,7 +13879,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description 订单状态不可复核 */
+            /** @description 订单状态或复核明细不一致 */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -8965,6 +14004,42 @@ export interface operations {
             };
         };
     };
+    list_outbound_waves: {
+        parameters: {
+            query?: {
+                /** @description 按波次状态过滤 */
+                status?: string | null;
+                /** @description 按波次号模糊查询 */
+                q?: string | null;
+                /** @description 返回条数，默认 50，最大 200 */
+                limit?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 出库波次列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutboundWaveListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     create_outbound_wave: {
         parameters: {
             query?: never;
@@ -9009,6 +14084,118 @@ export interface operations {
                 };
             };
             /** @description 订单状态不可入波次 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_outbound_wave: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 出库波次 ID */
+                wave_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 出库波次详情 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutboundWave"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 出库波次不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    cancel_outbound_wave: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 出库波次 ID */
+                wave_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 取消未开始拣选的出库波次并释放库存锁定 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutboundWave"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无出库写权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 出库波次不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 波次状态不允许取消 */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -10498,6 +15685,194 @@ export interface operations {
             };
         };
     };
+    list_task_types: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前货主任务类型 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskTypeListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    upsert_task_type: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 任务类型编码 */
+                task_type_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertTaskTypeRequest"];
+            };
+        };
+        responses: {
+            /** @description 保存任务类型 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskType"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 任务类型参数非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    set_task_type_enabled: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 任务类型编码 */
+                task_type_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetTaskTypeEnabledRequest"];
+            };
+        };
+        responses: {
+            /** @description 更新任务类型启停状态 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskType"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 任务类型不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     confirm_container_recovery: {
         parameters: {
             query?: never;
@@ -10615,6 +15990,78 @@ export interface operations {
             };
             /** @description 调度或幂等冲突 */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    receive_tms_route_plan: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 外部 TMS 生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReceiveTmsRoutePlanRequest"];
+            };
+        };
+        responses: {
+            /** @description 接收 TMS 路径规划结果 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TmsRoutePlan"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 出库订单或司机不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 路径规划结果或幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 路径规划结果非法 */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
