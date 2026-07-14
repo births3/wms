@@ -2,9 +2,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn h6_permission_is_granted_only_to_late_system_admin_role(pool: PgPool) {
+async fn h6_permission_is_granted_only_to_seeded_system_admin_role(pool: PgPool) {
     let owner_id = Uuid::new_v4();
-    let system_admin_role_id = Uuid::new_v4();
     let operator_role_id = Uuid::new_v4();
     sqlx::query(
         "INSERT INTO auth_owners (id, owner_code, owner_name) VALUES ($1, $2, 'H6 permission owner')",
@@ -14,20 +13,24 @@ async fn h6_permission_is_granted_only_to_late_system_admin_role(pool: PgPool) {
     .execute(&pool)
     .await
     .expect("owner should insert");
+    let system_admin_role_id: Uuid = sqlx::query_scalar(
+        "SELECT id FROM auth_roles WHERE owner_id = $1 AND lower(role_code) = 'system_admin'",
+    )
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("system admin role should be seeded");
     sqlx::query(
         r#"
         INSERT INTO auth_roles (id, owner_id, role_code, role_name)
-        VALUES
-            ($1, $3, 'system_admin', '系统管理员'),
-            ($2, $3, 'warehouse_operator', '仓库操作员')
+        VALUES ($1, $2, 'warehouse_operator', '仓库操作员')
         "#,
     )
-    .bind(system_admin_role_id)
     .bind(operator_role_id)
     .bind(owner_id)
     .execute(&pool)
     .await
-    .expect("roles should insert after migrations");
+    .expect("operator role should insert after migrations");
 
     let rows = sqlx::query_as::<_, (Uuid, String)>(
         r#"
