@@ -30,7 +30,6 @@ import {
 } from "@/features/inbound/inbound-queries";
 import { useMasterDataRowsQuery, type MasterDataRow } from "@/features/master-data/master-data-queries";
 import type { InboundDocumentType } from "./m2-inbound-document-type";
-import { INSPECTION_DUAL_SIGN_REQUIRED_BY_STRATEGY } from "./m2-inbound-page-helpers";
 import { ProductLookupDialog, ProductLookupField } from "./M2InboundProductLookup";
 
 export type InboundDialog = "create" | "receive" | "reject" | "inspect" | "putaway";
@@ -141,6 +140,8 @@ interface M2InboundDialogsProps {
   inspectForm: InspectFormState;
   inspectExamples: InspectFormExamples;
   signForm: SignFormState;
+  dualSignRequiredByStrategy: boolean;
+  dualPolicyDescription: string;
   putawayForm: PutawayFormState;
   setActiveDialog: (dialog: InboundDialog | null) => void;
   setCreateForm: React.Dispatch<React.SetStateAction<CreateFormState>>;
@@ -172,6 +173,8 @@ export function M2InboundDialogs({
   inspectForm,
   inspectExamples,
   signForm,
+  dualSignRequiredByStrategy,
+  dualPolicyDescription,
   putawayForm,
   setActiveDialog,
   setCreateForm,
@@ -399,15 +402,15 @@ export function M2InboundDialogs({
                 <input
                   type="checkbox"
                   checked={signForm.dualRequired}
-                  disabled={INSPECTION_DUAL_SIGN_REQUIRED_BY_STRATEGY}
+                  disabled={dualSignRequiredByStrategy}
                   onChange={(event) => {
-                    if (INSPECTION_DUAL_SIGN_REQUIRED_BY_STRATEGY) return;
+                    if (dualSignRequiredByStrategy) return;
                     setSignForm((value) => ({ ...value, dualRequired: event.target.checked }));
                   }}
                 />
                 需要双人签字
-                {INSPECTION_DUAL_SIGN_REQUIRED_BY_STRATEGY && (
-                  <span className="text-xs text-muted-foreground">（策略要求，不可关闭）</span>
+                {dualSignRequiredByStrategy && (
+                  <span className="text-xs text-muted-foreground">（{dualPolicyDescription}，不可关闭）</span>
                 )}
               </label>
             </section>

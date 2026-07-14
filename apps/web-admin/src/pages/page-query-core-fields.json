@@ -266,6 +266,26 @@
       "more": []
     },
     {
+      "id": "mte-task-groups",
+      "title": "M-TE 任务组资格",
+      "required": true,
+      "source": "apps/web-admin/src/pages/task-engine/TaskGroupConfigPage.tsx",
+      "fieldConstant": "mteTaskGroupQueryFields",
+      "coreConstant": "mteTaskGroupCoreQueryFieldKeys",
+      "core": ["keyword", "status"],
+      "more": ["warehouseId"]
+    },
+    {
+      "id": "mte-task-dispatch",
+      "title": "M-TE 任务调度",
+      "required": true,
+      "source": "apps/web-admin/src/pages/task-engine/TaskDispatchPage.tsx",
+      "fieldConstant": "mteTaskDispatchQueryFields",
+      "coreConstant": "mteTaskDispatchCoreQueryFieldKeys",
+      "core": ["keyword", "status"],
+      "more": ["taskTypeCode", "warehouseId"]
+    },
+    {
       "id": "m9-billing-rules",
       "title": "M9 计费规则",
       "required": false,

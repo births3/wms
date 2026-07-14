@@ -154,7 +154,14 @@ test("M2 PC 真实入库链路落库并生成库存与审计", async ({ page }) 
     if (pathname.endsWith(`/api/v1/inbound/receiving-orders/${receivingOrderId}/sign`)) signatureRequests.push(request);
   };
   page.on("request", trackAcceptanceRequests);
+  const policyResponsePromise = page.waitForResponse(
+    (response) => response.url().includes("/api/v1/m-vr/dual-person-policy?") && response.request().method() === "GET",
+  );
   await page.getByRole("button", { name: "验收", exact: true }).click();
+  const policyResponse = await policyResponsePromise;
+  expect(policyResponse.ok()).toBeTruthy();
+  expect(await policyResponse.json()).toMatchObject({ policy: "dual_scan", process: "入库", node: "验收" });
+  await expect(page.getByText(/M-VR：双人扫码/)).toBeVisible();
   await page.getByLabel("验收批号").fill("B-M2-E2E-001");
   await page.getByLabel("通过数量").fill("10");
   await page.getByLabel("拒收数量", { exact: true }).fill("0");

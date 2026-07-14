@@ -11,6 +11,7 @@ import {
 
 import { useCurrentUserQuery } from "@/features/auth/auth-queries";
 import { useMasterDataRowsQuery } from "@/features/master-data/master-data-queries";
+import { useDualPersonPolicyQuery } from "@/features/validation-rules/dual-person-policy-queries";
 import {
   useCreateReceivingOrderMutation,
   useInspectReceivingOrderMutation,
@@ -49,7 +50,7 @@ import {
   detailStageFromMode,
   filterOrders,
   inboundPageMeta,
-  INSPECTION_DUAL_SIGN_REQUIRED_BY_STRATEGY,
+  dualSignRequiredForPolicy,
   nextM2InboundSelectedId,
   productTemperatureAttribute,
   splitCodes,
@@ -270,6 +271,23 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
   const order = detailQuery.data ?? selectedFromList;
   // optional chain must cover lines: `order?.lines[0]` still throws when order is null
   const line = order?.lines?.[0];
+  const dualPolicyQuery = useDualPersonPolicyQuery(
+    activeDialog === "inspect" && line?.product_id && order
+      ? {
+          productId: line.product_id,
+          process: "入库",
+          node: "验收",
+          ownerId: currentOwner.ownerId,
+          warehouseId: order.warehouse_id,
+        }
+      : null,
+  );
+  const dualSignRequiredByStrategy = dualSignRequiredForPolicy(dualPolicyQuery.data?.policy);
+  const dualPolicyDescription = dualPolicyQuery.data?.policy === "dual_scan_with_approval"
+    ? "M-VR：双人扫码 + 主管审批"
+    : dualPolicyQuery.data?.policy === "dual_scan"
+      ? "M-VR：双人扫码"
+      : "M-VR：单人";
   const totalQty = order ? String(totalExpectedQty(order)) : "";
   const inspectExamples: InspectFormExamples = {
     batchNo: exampleText(line?.batch_no, "请输入验收批号"),
@@ -295,7 +313,8 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
     rejectMutation.isPending ||
     inspectMutation.isPending ||
     signMutation.isPending ||
-    putawayMutation.isPending || (mode === "putaway" && locationsQuery.isPending);
+    putawayMutation.isPending || (mode === "putaway" && locationsQuery.isPending)
+    || (activeDialog === "inspect" && dualPolicyQuery.isFetching);
   const error =
     createMutation.error ??
     releaseMutation.error ??
@@ -306,7 +325,8 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
     putawayMutation.error ??
     locationsQuery.error ??
     ordersQuery.error ??
-    detailQuery.error;
+    detailQuery.error ??
+    (activeDialog === "inspect" ? dualPolicyQuery.error : null);
   const errorMessage = putawayValidationError ?? (error ? inboundErrorMessage(error) : undefined);
   React.useEffect(() => {
     if (!order) return;
@@ -329,7 +349,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
     }));
     setRejectForm({ reason: "" });
     setInspectForm(emptyInspectForm);
-    setSignForm(createSignFormForCurrentUser(currentUser));
+    setSignForm(createSignFormForCurrentUser(currentUser, dualSignRequiredByStrategy));
     setPutawayForm((value) => ({
       ...value,
       productCode: firstLine?.product_code ?? "",
@@ -338,7 +358,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
       locationId: "",
       locationCode: "",
     }));
-  }, [order?.id, currentUser?.user_id, currentUser?.username, currentUser?.display_name]);
+  }, [order?.id, currentUser?.user_id, currentUser?.username, currentUser?.display_name, dualSignRequiredByStrategy]);
 
   async function refreshInbound(message = "入库列表已刷新") {
     await ordersQuery.refetch();
@@ -470,7 +490,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
     event.preventDefault();
     if (!order) return;
     // 策略要求时强制 dual_required，作业员不可关闭
-    const dualRequired = INSPECTION_DUAL_SIGN_REQUIRED_BY_STRATEGY || signForm.dualRequired;
+    const dualRequired = dualSignRequiredByStrategy || signForm.dualRequired;
     const firstSignerInput = signForm.firstSignerId.trim();
     const firstSignerId = resolveSignerIdForSubmit(firstSignerInput, currentUser);
     const secondSignerInput = signForm.secondSignerId.trim();
@@ -656,6 +676,8 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
           inspectForm={inspectForm}
           inspectExamples={inspectExamples}
           signForm={signForm}
+          dualSignRequiredByStrategy={dualSignRequiredByStrategy}
+          dualPolicyDescription={dualPolicyDescription}
           putawayForm={putawayForm}
           setActiveDialog={setActiveDialog}
           setCreateForm={setCreateForm}
@@ -696,12 +718,13 @@ function sameStringArray(left: string[], right: string[]) {
 
 function createSignFormForCurrentUser(
   user: { username?: string; display_name?: string } | null | undefined,
+  dualSignRequired = false,
 ): SignFormState {
   const account = user?.username?.trim() || user?.display_name?.trim() || "";
   return {
     ...emptySignForm,
     firstSignerId: account,
-    dualRequired: INSPECTION_DUAL_SIGN_REQUIRED_BY_STRATEGY || emptySignForm.dualRequired,
+    dualRequired: dualSignRequired,
   };
 }
 

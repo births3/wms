@@ -50,6 +50,9 @@ assert.match(page, /await createOutboundWaveMutation\.mutateAsync/, "M4 新建�
 assert.match(page, /order_ids: orderIds/, "M4 新建波次必须提交订单选择");
 assert.match(page, /review_mode:\s*"packing_station"/, "M4 PC 复核必须提交包装站复核模式");
 assert.match(page, /reviewer_id:\s*reviewerId/, "M4 复核必须提交当前登录用户");
+assert.match(page, /useDualPersonPolicyQueries/, "M4 复核前必须查询整单商品的 M-VR 出库\/复核策略");
+assert.match(page, /strictestDualPersonPolicy/, "M4 复核必须在前端展示整单最严格的 M-VR 策略");
+assert.match(page, /second_reviewer_id:\s*normalizedSecondReviewerId \|\| null/, "M4 复核必须提交策略要求的第二复核员");
 assert.match(page, /reviewed_qty:\s*line\.picked_qty/, "M4 复核数量必须来自真实复核明细");
 assert.doesNotMatch(page, /if \(action\.kind === "review"\) updateOrder/, "M4 复核不得使用本地 updateOrder 演示成功");
 assert.match(page, /reviewOutboundOrderMutation\.mutateAsync/, "M4 复核提交必须等待真实 API 返回");

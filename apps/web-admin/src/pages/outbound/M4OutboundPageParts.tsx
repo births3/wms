@@ -9,6 +9,7 @@ export function TextField({
   type = "text",
   placeholder,
   className,
+  required = false,
 }: {
   label: string;
   value: string;
@@ -16,11 +17,12 @@ export function TextField({
   type?: string;
   placeholder?: string;
   className?: string;
+  required?: boolean;
 }) {
   return (
     <label className={className}>
       <span className="mb-1 block text-xs text-muted-foreground">{label}</span>
-      <Input type={type} value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
+      <Input required={required} type={type} value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
     </label>
   );
 }

@@ -17,7 +17,7 @@ try {
     canRelease,
     canReceiveOrReject,
     filterOrders,
-    INSPECTION_DUAL_SIGN_REQUIRED_BY_STRATEGY,
+    dualSignRequiredForPolicy,
     localDayRange,
     nextM2InboundSelectedId,
     ownerLabel,
@@ -74,7 +74,9 @@ try {
   assert.equal(canPutaway("inspecting"), true);
   assert.equal(canPutaway("completed"), false);
   assert.equal(canPutaway("closed_rejected"), false);
-  assert.equal(INSPECTION_DUAL_SIGN_REQUIRED_BY_STRATEGY, true, "验收双人签字策略默认锁定");
+  assert.equal(dualSignRequiredForPolicy("single"), false);
+  assert.equal(dualSignRequiredForPolicy("dual_scan"), true);
+  assert.equal(dualSignRequiredForPolicy("dual_scan_with_approval"), true);
 
   const pageSource = readFileSync(fileURLToPath(new URL("../src/pages/inbound/M2InboundPage.tsx", import.meta.url)), "utf8");
   const dashboardPageSource = readFileSync(fileURLToPath(new URL("../src/pages/inbound/M2InboundDashboardPage.tsx", import.meta.url)), "utf8");
@@ -136,7 +138,8 @@ try {
   }
   assert.match(signFormBlock, /dualRequired: true/, "签字表单 dualRequired 默认 true");
   assert.match(pageSource, /createSignFormForCurrentUser/, "打开验收时第一签字人默认当前用户账号");
-  assert.match(pageSource, /INSPECTION_DUAL_SIGN_REQUIRED_BY_STRATEGY \|\| signForm\.dualRequired/, "提交验收时 dualRequired 必须被策略锁定");
+  assert.match(pageSource, /dualSignRequiredByStrategy \|\| signForm\.dualRequired/, "提交验收时 dualRequired 必须由实时策略锁定");
+  assert.match(pageSource, /useDualPersonPolicyQuery/, "验收弹窗必须按商品、货主、仓库实时查询 M-VR 策略");
   assert.match(pageSource, /firstSignerId: "当前用户 \/ 工号"/, "第一签字人 placeholder 应为当前用户/工号类文案");
   assert.match(pageSource, /secondSignerExample = "00000000-0000-0000-0000-000000000102"/, "第二签字人示例应符合 UUID 契约");
   assert.doesNotMatch(pageSource, /firstSignerId: `例如 \$\{firstSignerId\}`|secondSignerId: `例如 \$\{secondSignerId\}`/, "签字人 placeholder 不得以 UUID 样例为主");
@@ -145,8 +148,8 @@ try {
   assert.match(pageSource, /if \(secondSignerId === firstSignerId\) \{[\s\S]*第二签字人不能与第一签字人相同/, "相同签字人必须在发起验收请求前阻断");
   assert.match(pageSource, /await inspectMutation\.mutateAsync\([\s\S]*await signMutation\.mutateAsync\(/, "PC 验收必须先写入验收记录再提交双人签字");
   assert.match(inboundQueriesSource, /api\.POST\("\/api\/v1\/inbound\/receiving-orders\/\{id\}\/sign"/, "PC 验收必须调用真实双人签字 API");
-  assert.match(dialogSource, /disabled=\{INSPECTION_DUAL_SIGN_REQUIRED_BY_STRATEGY\}/, "策略要求时双人签字 checkbox 必须 disabled");
-  assert.match(dialogSource, /策略要求，不可关闭/, "策略锁定需有可读提示");
+  assert.match(dialogSource, /disabled=\{dualSignRequiredByStrategy\}/, "策略要求时双人签字 checkbox 必须 disabled");
+  assert.match(dialogSource, /dualPolicyDescription/, "策略锁定需显示实时命中策略");
   assert.match(dialogSource, /SelectField label="质量状态"[\s\S]*\["qualified", "合格"\]/, "质量状态选项需中文");
   assert.match(dialogSource, /activeDialog === "inspect"[\s\S]*DialogDescription>\{orderReceiptNo/, "验收弹窗需保留单号上下文");
   assert.match(dialogSource, /activeDialog === "putaway"[\s\S]*DialogDescription>\{orderReceiptNo/, "上架弹窗需保留单号上下文");

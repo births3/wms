@@ -231,6 +231,9 @@ function devAdminMenuSeed(): DevAdminMenuNode[] {
       group(parent, "inventory-work", "库存管理", "Layers", 10, [
         ["m3-batches", "M3 批号管理", "Layers"],
         ["m3-status-config", "M3 状态规则", "ClipboardList"],
+        ["mte-task-dispatch", "M-TE 任务调度", "ClipboardList"],
+        ["mte-task-groups", "M-TE 任务组资格", "Users"],
+        ["mte-task-types", "M-TE 任务类型配置", "ClipboardList"],
       ]),
     ]),
     section("value-added", "增值业务", "ClipboardList", 55, (parent) => [
@@ -326,6 +329,9 @@ function devViewPermissionKey(viewId: string) {
     "m2-putaway": "m2.write",
     "m3-batches": "m3.read",
     "m3-status-config": "m3.read",
+    "mte-task-dispatch": "mte.task.read_all",
+    "mte-task-groups": "mte.task_group.write",
+    "mte-task-types": "mte.task_type.read",
     "m9-billing-rules": "m9.billing.read",
     "m10-route-plans": "m10.tms.read",
     "m4-orders": "m4.read",

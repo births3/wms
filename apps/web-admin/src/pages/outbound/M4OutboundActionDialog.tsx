@@ -163,7 +163,7 @@ function toolbarAction(
   };
 }
 
-export function M4OutboundActionDialog({ action, target, createForm, documentTypeOptions, reviewOrder, reviewLoading, reviewError, note, actionError, pending, setCreateForm, setNote, onClose, onSubmit }: {
+export function M4OutboundActionDialog({ action, target, createForm, documentTypeOptions, reviewOrder, reviewLoading, reviewError, reviewPolicy, reviewPolicyLoading, secondReviewerId, note, actionError, pending, setCreateForm, setSecondReviewerId, setNote, onClose, onSubmit }: {
   action: ActionState | null;
   target: ActionTargetContext | null;
   createForm: OutboundCreateForm;
@@ -171,10 +171,14 @@ export function M4OutboundActionDialog({ action, target, createForm, documentTyp
   reviewOrder: OutboundOrder | null;
   reviewLoading: boolean;
   reviewError: string | null;
+  reviewPolicy: "single" | "dual_scan" | "dual_scan_with_approval" | null;
+  reviewPolicyLoading: boolean;
+  secondReviewerId: string;
   note: string;
   actionError: string | null;
   pending: boolean;
   setCreateForm: React.Dispatch<React.SetStateAction<OutboundCreateForm>>;
+  setSecondReviewerId: (value: string) => void;
   setNote: (value: string) => void;
   onClose: () => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
@@ -204,7 +208,28 @@ export function M4OutboundActionDialog({ action, target, createForm, documentTyp
             </div>
           )}
           {action.kind === "review" ? (
-            <ReviewDetails order={reviewOrder} loading={reviewLoading} error={reviewError} />
+            <>
+              <ReviewDetails order={reviewOrder} loading={reviewLoading} error={reviewError} />
+              <div className="md:col-span-2 rounded-md border bg-muted/20 px-3 py-2 text-sm" role="status">
+                {reviewPolicyLoading
+                  ? "正在读取 M-VR 出库/复核策略..."
+                  : reviewPolicy === "dual_scan_with_approval"
+                    ? "M-VR：双人扫码 + 主管审批。请先完成业务单号对应的 H4 审批。"
+                    : reviewPolicy === "dual_scan"
+                      ? "M-VR：双人扫码。第二复核员必须是本货主有效保管员。"
+                      : reviewPolicy === "single"
+                        ? "M-VR：单人复核。仍强制复核员与拣选员分离。"
+                        : "未能在页面解析策略，提交时由服务端按整单最严格策略校验。"}
+              </div>
+              <TextField
+                className="md:col-span-2"
+                label="第二复核员用户 ID"
+                required={reviewPolicy === "dual_scan" || reviewPolicy === "dual_scan_with_approval"}
+                value={secondReviewerId}
+                onChange={setSecondReviewerId}
+                placeholder="策略要求双人时必填"
+              />
+            </>
           ) : action.kind === "create-order" ? (
             <>
               <TextField label="WMS 单号（可选）" placeholder="留空自动生成" value={createForm.wmsOrderNo} onChange={(wmsOrderNo) => setCreateForm((value) => ({ ...value, wmsOrderNo }))} />

@@ -44,7 +44,11 @@ import {
   type CreateOutboundWaveRequest,
 } from "@/features/outbound/outbound-queries";
 import { useCurrentUserQuery } from "@/features/auth/auth-queries";
-import { useSystemDictionaryItemOptionsQuery } from "@/features/master-data/master-data-queries";
+import { useMasterDataRowsQuery, useSystemDictionaryItemOptionsQuery } from "@/features/master-data/master-data-queries";
+import {
+  useDualPersonPolicyQueries,
+  type DualPersonPolicy,
+} from "@/features/validation-rules/dual-person-policy-queries";
 import {
   BatchNoCell,
   CustomerCell,
@@ -155,6 +159,7 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
   const [lastEvent, setLastEvent] = React.useState<string | null>(null);
   const [note, setNote] = React.useState("");
   const [actionError, setActionError] = React.useState<string | null>(null);
+  const [secondReviewerId, setSecondReviewerId] = React.useState("");
   const [createForm, setCreateForm] = React.useState<OutboundCreateForm>({
     wmsOrderNo: "",
     erpOrderNo: "ERP-SO-NEW",
@@ -175,6 +180,32 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
   const orderDetailQuery = useOutboundOrderQuery(detailTarget?.kind === "order" ? detailTarget.value.id : null);
   const waveDetailQuery = useOutboundWaveQuery(detailTarget?.kind === "wave" ? detailTarget.value.id : null);
   const reviewDetailQuery = useOutboundReviewQuery(activeAction?.kind === "review" ? activeAction.targetId ?? null : null);
+  const reviewProductsQuery = useMasterDataRowsQuery("m1-products", activeAction?.kind === "review");
+  const reviewPolicyInputs = React.useMemo(() => {
+    if (activeAction?.kind !== "review" || !reviewDetailQuery.data || !reviewProductsQuery.data) return [];
+    const productsByCode = new Map(reviewProductsQuery.data.map((item) => [item.code, item]));
+    const productIds = new Set<string>();
+    for (const line of reviewDetailQuery.data.lines ?? []) {
+      const product = productsByCode.get(line.product_code);
+      if (!product) return [];
+      productIds.add(product.id);
+    }
+    return [...productIds].map((productId) => ({
+      productId,
+      process: "出库",
+      node: "复核",
+      ownerId: reviewDetailQuery.data!.owner_id,
+      warehouseId: reviewDetailQuery.data!.warehouse_id,
+    }));
+  }, [activeAction?.kind, reviewDetailQuery.data, reviewProductsQuery.data]);
+  const reviewPolicyQueries = useDualPersonPolicyQueries(reviewPolicyInputs);
+  const reviewPolicyLoading = reviewProductsQuery.isPending
+    || reviewPolicyQueries.some((query) => query.isFetching);
+  const reviewPolicy = reviewPolicyInputs.length > 0
+    && reviewPolicyQueries.every((query) => query.data)
+    ? strictestDualPersonPolicy(reviewPolicyQueries.map((query) => query.data!.policy))
+    : null;
+  const reviewNeedsSecond = reviewPolicy === "dual_scan" || reviewPolicy === "dual_scan_with_approval";
   const documentTypeOptionsQuery = useSystemDictionaryItemOptionsQuery("document_type", mode === "orders");
   const documentTypeOptions = React.useMemo(
     () => (documentTypeOptionsQuery.data ?? [])
@@ -363,6 +394,7 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
     if (kind === "review") reviewOutboundOrderMutation.reset();
     setActiveAction({ kind, targetId });
     setNote("");
+    setSecondReviewerId("");
     setActionError(null);
   }
 
@@ -478,6 +510,13 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
       const reviewerId = currentUserQuery.data?.user_id;
       if (!order) throw new Error(reviewDetailQuery.error?.message ?? "复核明细尚未读取完成");
       if (!reviewerId) throw new Error("当前登录用户信息不可用，无法提交复核");
+      const normalizedSecondReviewerId = secondReviewerId.trim();
+      if (reviewNeedsSecond && !isUuid(normalizedSecondReviewerId)) {
+        throw new Error("当前 M-VR 策略要求填写有效的第二复核员用户 ID");
+      }
+      if (normalizedSecondReviewerId === reviewerId) {
+        throw new Error("第二复核员不能与第一复核员相同");
+      }
       const lines = (order.lines ?? []).map((line) => ({
         line_no: line.line_no,
         product_code: line.product_code,
@@ -489,7 +528,7 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
         request: {
           reviewer_id: reviewerId,
           review_mode: "packing_station",
-          second_reviewer_id: null,
+          second_reviewer_id: normalizedSecondReviewerId || null,
           lines,
         },
       });
@@ -688,6 +727,9 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
         reviewOrder={activeAction?.kind === "review" ? reviewDetailQuery.data ?? null : null}
         reviewLoading={activeAction?.kind === "review" && reviewDetailQuery.isPending}
         reviewError={activeAction?.kind === "review" ? reviewDetailQuery.error?.message ?? null : null}
+        reviewPolicy={reviewPolicy}
+        reviewPolicyLoading={reviewPolicyLoading}
+        secondReviewerId={secondReviewerId}
         note={note}
         actionError={actionError ?? (
           activeAction?.kind === "create-order"
@@ -702,10 +744,15 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
           || (cancelOutboundWaveMutation.isPending && activeAction?.kind === "cancel-wave")
           || (reviewOutboundOrderMutation.isPending && activeAction?.kind === "review")
           || (reviewDetailQuery.isPending && activeAction?.kind === "review")
+          || (reviewPolicyLoading && activeAction?.kind === "review")
         }
         setCreateForm={setCreateForm}
         setNote={(value) => {
           setNote(value);
+          if (actionError) setActionError(null);
+        }}
+        setSecondReviewerId={(value) => {
+          setSecondReviewerId(value);
           if (actionError) setActionError(null);
         }}
         onClose={() => {
@@ -777,4 +824,14 @@ function formatDate(value: string | null | undefined) {
 function toInteger(value: string) {
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function strictestDualPersonPolicy(policies: DualPersonPolicy[]): DualPersonPolicy {
+  if (policies.includes("dual_scan_with_approval")) return "dual_scan_with_approval";
+  if (policies.includes("dual_scan")) return "dual_scan";
+  return "single";
 }

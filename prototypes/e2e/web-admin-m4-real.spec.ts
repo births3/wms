@@ -140,6 +140,8 @@ test("M4 PC 复核使用真实详情和提交 API", async ({ page }) => {
   const reviewDialog = page.getByRole("dialog", { name: "复核" });
   await expect(reviewDialog).toBeVisible();
   await expect(reviewDialog).toContainText("P-M4-REVIEW-E2E-001");
+  await expect(reviewDialog).toContainText("M-VR：双人扫码");
+  await reviewDialog.getByLabel("第二复核员用户 ID").fill("00000000-0000-4000-8000-000000000104");
   await page.screenshot({ path: path.join(artifactsDir, "outbound-review-detail.png"), fullPage: false });
 
   const submitResponsePromise = page.waitForResponse(

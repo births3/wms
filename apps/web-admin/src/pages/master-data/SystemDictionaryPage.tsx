@@ -25,6 +25,7 @@ import {
   type SystemDictionaryPaneItem,
   type UpsertSystemDictionaryItemRequest,
 } from "@/features/master-data/master-data-queries";
+import { DualPersonPolicyMatrix } from "./DualPersonPolicyMatrix";
 
 interface SystemDictionaryMeta {
   title: string;
@@ -260,6 +261,10 @@ export function M1SystemDictionaryPage({ meta }: M1SystemDictionaryPageProps) {
             : (meta.emptyDescription ?? `${activeGroup.name} 暂无可展示字典项。`)
         }
       />
+
+      {activeGroup.code === "special_drug_category" && (
+        <DualPersonPolicyMatrix categories={activeGroup.items} />
+      )}
 
       <DictionaryDialogs
         activeDialog={activeDialog}

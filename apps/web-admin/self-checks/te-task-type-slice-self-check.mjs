@@ -5,6 +5,7 @@ const root = new URL("..", import.meta.url);
 const read = (file) => readFileSync(new URL(file, root), "utf8");
 const page = read("src/pages/task-engine/TaskTypeConfigPage.tsx");
 const queries = read("src/features/task-engine/task-type-queries.ts");
+const pageId = "mte-task-types";
 
 assert.match(page, /<QueryPanel/);
 assert.match(page, /<DataGrid[\s\S]*storageKey="mte\.task-types"/);
@@ -14,4 +15,5 @@ assert.match(queries, /task-engine\/task-types/);
 assert.match(queries, /Idempotency-Key/);
 assert.match(page, /类型编码必须以字母或数字开头/);
 assert.match(page, /读取任务类型失败/);
+assert.equal(pageId, "mte-task-types");
 console.log("TE task type slice self-check passed");

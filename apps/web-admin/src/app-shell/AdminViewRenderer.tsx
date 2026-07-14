@@ -18,6 +18,8 @@ import { MCGDocumentNumberingPage } from "@/pages/document-numbering/MCGDocument
 import { DockManagementPage } from "@/pages/dock/DockManagementPage";
 import { DrugInspectionPlatformPage } from "@/pages/drug-inspection/DrugInspectionPlatformPage";
 import { TaskTypeConfigPage } from "@/pages/task-engine/TaskTypeConfigPage";
+import { TaskGroupConfigPage } from "@/pages/task-engine/TaskGroupConfigPage";
+import { TaskDispatchPage } from "@/pages/task-engine/TaskDispatchPage";
 import { BillingRuleConfigPage } from "@/pages/billing/BillingRuleConfigPage";
 import { TmsRoutePlanPage } from "@/pages/tms/TmsRoutePlanPage";
 import type { CurrentUser } from "@/features/auth/auth-queries";
@@ -55,6 +57,8 @@ export function renderAdminView(
   }
   if (view === "m3-status-config") return <M3InventoryStatusConfigPage currentUser={currentUser} />;
   if (view === "mte-task-types") return <TaskTypeConfigPage />;
+  if (view === "mte-task-groups") return <TaskGroupConfigPage />;
+  if (view === "mte-task-dispatch") return <TaskDispatchPage />;
   if (view === "m9-billing-rules") return <BillingRuleConfigPage />;
   if (view === "m10-route-plans") return <TmsRoutePlanPage />;
   if (outboundMode) {

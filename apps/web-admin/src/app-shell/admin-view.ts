@@ -12,6 +12,8 @@ export type AdminView =
   | "m3-batches"
   | "m3-status-config"
   | "mte-task-types"
+  | "mte-task-groups"
+  | "mte-task-dispatch"
   | "m9-billing-rules"
   | "m10-route-plans"
   | "m4-orders"

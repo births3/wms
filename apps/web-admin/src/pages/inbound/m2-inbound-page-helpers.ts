@@ -161,8 +161,10 @@ export function inboundPageMeta(mode: M2InboundMode) {
   return meta[mode];
 }
 
-/** 策略要求验收双人签字时，作业端不可关闭（GSP 双人作业）。 */
-export const INSPECTION_DUAL_SIGN_REQUIRED_BY_STRATEGY = true;
+/** 服务端返回双人策略时，作业端必须同步锁定第二签字人。 */
+export function dualSignRequiredForPolicy(policy: string | null | undefined) {
+  return policy === "dual_scan" || policy === "dual_scan_with_approval";
+}
 
 export function canReceiveOrReject(status: string) {
   return status === "released" || status === "receiving";

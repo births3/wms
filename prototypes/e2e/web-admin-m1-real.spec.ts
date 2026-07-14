@@ -25,8 +25,8 @@ test("M1 管理端读取真实后端数据", async ({ page }) => {
     { group: "仓储资料", menu: /M1 仓库管理/, title: "M1 仓库管理", text: "WH-M1-E2E-001", shot: "warehouses.png" },
     { group: "仓储资料", menu: /M1 库区管理/, title: "M1 库区管理", text: "A01", shot: "zones.png" },
     { group: "仓储资料", menu: /M1 库位管理/, title: "M1 库位管理", text: "A01-01-02-03", shot: "locations.png" },
+    { group: "系统配置", menu: /M1 (功能开关|Feature Flag)/, title: "功能开关 / 配置中心", text: "m3_inventory_batches_config_center_smoke", shot: "feature-flags.png" },
     { group: "系统配置", menu: /M1 系统字典/, title: "M1 系统字典", text: "purchase_inbound", shot: "dictionary.png" },
-    { group: "系统配置", menu: /M1 功能开关/, title: "功能开关 / 配置中心", text: "m3_inventory_batches_config_center_smoke", shot: "feature-flags.png" },
   ];
 
   for (const item of cases) {
@@ -44,8 +44,22 @@ test("M1 管理端读取真实后端数据", async ({ page }) => {
       await expect(page.getByRole("button", { name: "purchase_inbound", exact: true })).toBeVisible();
       await page.getByRole("button", { name: /特殊药品分类 special_drug_category/ }).click();
       await expect(page.getByRole("button", { name: "narcotic", exact: true })).toBeVisible();
+      await expect(page.getByText("双人作业矩阵", { exact: true })).toBeVisible();
+      await page.getByLabel("矩阵确认人").selectOption("00000000-0000-0000-0000-000000000103");
+      const policySelect = page.getByLabel(/普通药品 入库 收货 双人策略/);
+      const policyResponse = page.waitForResponse(
+        (response) => response.url().includes("/api/v1/m-vr/dual-person-policy/rules") && response.request().method() === "PUT",
+      );
+      await policySelect.selectOption("dual_scan");
+      const policyResponseValue = await policyResponse;
+      expect(policyResponseValue.status(), await policyResponseValue.text()).toBe(200);
+      await expect(policySelect).toHaveValue("dual_scan");
       await page.screenshot({
         path: path.join(artifactsDir, "dictionary-special-drug.png"),
+        fullPage: false,
+      });
+      await page.screenshot({
+        path: path.join(artifactsDir, "dual-person-policy-matrix.png"),
         fullPage: false,
       });
     }
@@ -161,7 +175,9 @@ test("M1 管理端读取真实后端数据", async ({ page }) => {
   });
 
   const docksMenu = page.getByRole("navigation").getByRole("button", { name: /M1 月台管理/ });
-  if (!(await docksMenu.isVisible())) await page.getByRole("button", { name: "仓储资料", exact: true }).click();
+  const storageGroup = page.getByRole("navigation").getByRole("button", { name: "仓储资料", exact: true });
+  if ((await storageGroup.getAttribute("aria-expanded")) !== "true") await storageGroup.click();
+  await expect(docksMenu).toBeVisible();
   await docksMenu.click();
   await expect(page.getByRole("heading", { name: "M1 月台管理" })).toBeVisible();
   const dockCode = `D-E2E-${Date.now()}`;
@@ -319,6 +335,36 @@ test("M1 供应商资质 PC 真实维护", async ({ page }) => {
   await expect(supplierDialog).toBeHidden();
   await expect(page.getByText("E2E 供应商联系人").first()).toBeVisible();
   await page.screenshot({ path: path.join(artifactsDir, "supplier-qualification-updated.png"), fullPage: false });
+});
+
+test("M-VR 双人策略矩阵真实保存", async ({ page }) => {
+  fs.mkdirSync(artifactsDir, { recursive: true });
+  await page.goto("/");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.getByLabel("货主编码").fill("PY_OWNER");
+  await page.getByLabel("登录账号").fill("admin");
+  await page.getByRole("textbox", { name: "密码", exact: true }).fill("CorrectHorse1!");
+  await page.getByRole("button", { name: "登录" }).click();
+  await expect(page.getByRole("heading", { name: "运营总览" })).toBeVisible();
+
+  await page.getByRole("button", { name: "基础档案" }).click();
+  const systemGroup = page.getByRole("navigation").getByRole("button", { name: "系统配置", exact: true });
+  if ((await systemGroup.getAttribute("aria-expanded")) !== "true") await systemGroup.click();
+  await page.getByRole("navigation").getByRole("button", { name: /M1 系统字典/ }).click();
+  await page.getByRole("button", { name: /特殊药品分类 special_drug_category/ }).click();
+  await expect(page.getByText("双人作业矩阵", { exact: true })).toBeVisible();
+  await page.getByLabel("矩阵确认人").selectOption("00000000-0000-0000-0000-000000000103");
+
+  const policySelect = page.getByLabel(/普通药品 入库 收货 双人策略/);
+  const response = page.waitForResponse(
+    (value) => value.url().includes("/api/v1/m-vr/dual-person-policy/rules") && value.request().method() === "PUT",
+  );
+  await policySelect.selectOption("dual_scan");
+  const responseValue = await response;
+  expect(responseValue.status(), await responseValue.text()).toBe(200);
+  await expect(policySelect).toHaveValue("dual_scan");
+  await page.screenshot({ path: path.join(artifactsDir, "dual-person-policy-matrix.png"), fullPage: true });
 });
 
 function pad2(value: string) {
