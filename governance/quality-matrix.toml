@@ -73,6 +73,12 @@ database_objects = ["warehouse_docks", "dock_appointments", "auth_roles", "auth_
 test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test dock_postgres", "pnpm --dir apps/web-admin run test:e2e:m1-real"]
 evidence_refs = ["backend/crates/api/tests/dock_postgres.rs", "prototypes/e2e/web-admin-m1-real.spec.ts", "apps/web-admin/.e2e-artifacts/m1-real/screenshots/docks-imported.png"]
 
+[evidence_profiles.TE]
+backend_files = ["backend/crates/api/src/task_type.rs", "backend/crates/api/src/task_engine.rs", "backend/crates/api/src/task_engine_handlers.rs"]
+database_objects = ["task_types", "task_groups", "task_group_memberships", "warehouse_tasks", "task_execution_events", "audit_event"]
+test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test task_type_postgres --test task_engine_postgres -- --test-threads=1", "pnpm --dir apps/web-admin run test:e2e:mte-real"]
+evidence_refs = ["backend/crates/api/tests/task_type_postgres.rs", "backend/crates/api/tests/task_engine_postgres.rs", "prototypes/e2e/web-admin-te-real.spec.ts", "prototypes/playwright-web-admin-mte-real-config.ts"]
+
 [[stories]]
 id = "US-M1-011"
 title = "系统字典中心"
@@ -1517,9 +1523,9 @@ evidence_refs = [
 id = "US-AL-001"
 title = "告警定义注册"
 module = "AL"
-reason = "已完成 M-CG 同事务 no-gap 生成服务、M2 ASN 自动编号，以及 M4 出库订单按 M1 单据类型字典校验并自动编号的 PostgreSQL 后端切片；仍缺 M4 真实前端创建接口接入、M3/其他单据创建方接入、配置审批和全链路真实 E2E 证据，不能关闭故事。"
+reason = "已完成告警定义领域模型、PostgreSQL 表与 6 条 GSP 强制告警种子、货主级编码唯一、GSP 告警不可禁用及已有触发记录不可删除的仓储层验证；仍缺完整查询/更新接口与 OpenAPI、PC 配置页面、角色权限、条件表达式和通知渠道校验、M-QL 变更联系单、幂等审计及真实浏览器 E2E，不能关闭故事。"
 owner = "AL 模块负责人"
-resume_when = "补齐 M4 真实前端创建接口、M3/其他单据创建方接入、配置审批，并完成并发/异常/真实浏览器证据后移入 stories。"
+resume_when = "补齐告警定义 API、PC 页面、权限、规则校验、M-QL 变更联系单、幂等审计和真实浏览器 E2E 后移入 stories。"
 
 [[deferred_stories]]
 id = "US-AL-002"
@@ -1996,9 +2002,9 @@ evidence_refs = [
   "apps/web-admin/self-checks/m1-special-drug-system-dictionary-self-check.mjs",
   "docs/compliance/gsp-special-drugs.md",
 ]
-reason = "已补齐特殊药品字典的 8 类预置、合规属性矩阵、通用字典维护和自定义启用分类被商品真实 PostgreSQL 写入路径消费；仍缺分类字段/合规属性修改的仓库主管+质量负责人双人审批及企业微信生效回调、M-PM 枚举同步、M-VR 规则模板自动重生成、专用台账与专柜专库运行联动、真实浏览器 E2E 和完整 GSP 回查证据，禁止标记完成。"
+reason = "已补齐特殊药品字典 8 类预置、合规属性矩阵、通用字典维护、自定义分类消费，并由数据库触发器与 M-VR 双人策略规则双向同步，矩阵 UI 已通过真实浏览器 E2E；仍缺分类字段/合规属性修改的仓库主管+质量负责人审批、M-PM 枚举同步、专用台账与专柜专库运行联动及完整 GSP 回查证据，禁止标记完成。"
 owner = "M1 模块负责人"
-resume_when = "补齐审批生效回调、M-PM/M-VR 联动、专用台账与专柜专库运行联动，并通过真实浏览器 E2E、审计和 GSP 回查证据后复核。"
+resume_when = "补齐审批生效回调、M-PM 联动、专用台账与专柜专库运行联动，并通过审计和 GSP 回查证据后复核。"
 
 [[deferred_stories]]
 id = "US-M10-001"
@@ -2125,13 +2131,18 @@ database_objects = [
   "receiving_order_lines",
   "receiving_inspections",
   "receiving_inspection_signatures",
+  "warehouse_tasks",
+  "task_execution_events",
 ]
 evidence_refs = [
   "docs/domain/user-stories-m2-inbound-verify.md",
   "backend/crates/api/src/inbound.rs",
   "backend/crates/api/src/wave3_repository_part2.rs",
+  "backend/crates/api/src/task_engine.rs",
   "backend/crates/api/src/wave3_handlers_part3.rs",
   "backend/crates/api/tests/m2_deferred_closeout_postgres.rs",
+  "backend/crates/api/tests/task_engine_postgres.rs",
+  "backend/migrations/202607150003_mte_task_execution.sql",
   "backend/crates/api/tests/wave3_evidence_postgres.rs",
   "apps/web-admin/src/pages/inbound/M2InboundPage.tsx",
   "apps/web-admin/src/pages/inbound/M2InboundDialogs.tsx",
@@ -2140,9 +2151,9 @@ evidence_refs = [
   "prototypes/playwright-web-admin-m2-real-config.ts",
   "apps/web-admin/.e2e-artifacts/m2-real/screenshots/inspection.png",
 ]
-reason = "已补验收累计量不得超过实际收货量、零数量拒绝、签字前总量闭合及每条入库明细必须存在验收记录，并用内存、PostgreSQL、审计回放和真实浏览器 E2E（含超量 422 失败路径与截图）验证；故事仍不能整体关闭：验收岗角色与 M-VR 动态策略/规则 ID、逐商品/逐批号前端作业、多商品 ASN、质量联系单/企业微信、不合格分流、档案补录、PDA 离线和完整权限/审计断言尚未闭环。"
+reason = "已补验收累计量、零数量、签字前总量闭合和逐明细验收门禁，并完成 PC Web 按商品/货主/仓库实时查询 M-VR 入库/验收策略、服务端防降级、规则 ID 与主管审批 ID 落库；PostgreSQL、审计回放和一次性数据库真实浏览器 E2E 均已验证。故事仍不能整体关闭：逐商品/逐批号 UI、多商品 ASN、质量联系单/不合格分流、档案补录、PDA 离线和完整权限/审计断言尚未闭环。"
 owner = "M2 模块负责人"
-resume_when = "补齐验收岗角色和 M-VR 策略接线、逐商品/逐批号验收 UI、多商品 ASN、质量联系单与不合格分流、档案补录、PDA 离线及权限/审计断言后再移入 stories。"
+resume_when = "补齐逐商品/逐批号验收 UI、多商品 ASN、质量联系单与不合格分流、档案补录、PDA 离线及权限/审计断言后再移入 stories。"
 
 [[deferred_stories]]
 id = "US-M2-004"
@@ -2150,8 +2161,10 @@ title = "双人验收签字"
 module = "M2"
 story_file = "docs/domain/user-stories-m2-inbound-verify.md"
 types = ["write", "api_change", "audit_compliance"]
-api_paths = ["POST /api/v1/inbound/receiving-orders/{id}/sign"]
-database_objects = ["auth_users", "auth_user_owner_bindings", "auth_user_roles", "auth_roles", "receiving_inspection_signatures", "audit_event"]
+frontend_pages = ["m2-inspecting"]
+api_paths = ["GET /api/v1/m-vr/dual-person-policy", "POST /api/v1/inbound/receiving-orders/{id}/sign"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
+database_objects = ["auth_users", "auth_user_owner_bindings", "auth_user_roles", "auth_roles", "dual_person_policy_rules", "h4_approval_records", "receiving_inspection_signatures", "audit_event"]
 test_checks = [
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --lib receiving_ -- --nocapture",
   "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_deferred_closeout_postgres inspection_uses_actual_receipt_quantity_and_blocks_early_signature",
@@ -2170,10 +2183,15 @@ evidence_refs = [
   "backend/crates/api/tests/support/auth.rs",
   "backend/crates/api/tests/m2_deferred_closeout_postgres.rs",
   "backend/crates/api/tests/wave3_evidence_postgres.rs",
+  "backend/crates/api/src/dual_person_policy.rs",
+  "apps/web-admin/src/features/validation-rules/dual-person-policy-queries.ts",
+  "apps/web-admin/src/pages/inbound/M2InboundPage.tsx",
+  "prototypes/e2e/web-admin-m2-real.spec.ts",
+  "apps/web-admin/.e2e-artifacts/m2-real/screenshots/inspection.png",
 ]
-reason = "已补服务端双签资格门禁：内存路径限制第一签字人为当前调用者，PostgreSQL 路径要求两名签字人均为同一货主下启用的 receiving_clerk 验收岗并拥有 m2.write，跨货主/未绑定用户返回 M2_VERIFIER_UNAUTHORIZED；已用内存、PostgreSQL、处理器、幂等和审计回放测试验证。故事仍不能整体关闭：M-VR 三档策略与规则 ID、待第二人签字状态、签字结论/备注、30 分钟超时、电子药检单附件、真实前端双签 E2E/截图和完整审计断言尚未闭环。"
+reason = "已补同货主启用 receiving_clerk 双签资格门禁，并完成 M-VR single/dual_scan/dual_scan_with_approval 三档策略解析、客户端不可降级、规则 ID/H4 审批 ID 落库和审计 diff；PC Web 实时查询策略，一次性 PostgreSQL 真实浏览器 E2E 覆盖相同签字人拦截与双签成功。故事仍不能整体关闭：待第二人签字状态、签字结论/备注、30 分钟超时、电子药检单附件、PDA 离线和完整审计回查尚未闭环。"
 owner = "M2 模块负责人"
-resume_when = "补齐 M-VR 动态策略与规则命中、待第二人状态、结论备注、超时、附件、前端双签真实 E2E/截图和完整审计断言后再移入 stories。"
+resume_when = "补齐待第二人状态、结论备注、超时、附件、PDA 离线和完整审计回查后再移入 stories。"
 
 [[deferred_stories]]
 id = "US-M2-005"
@@ -2197,6 +2215,8 @@ database_objects = [
   "idempotency_request",
   "audit_event",
   "auth_permissions",
+  "warehouse_tasks",
+  "task_execution_events",
 ]
 test_checks = [
   "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_smart_putaway_postgres -- --nocapture",
@@ -2207,15 +2227,22 @@ evidence_refs = [
   "docs/domain/user-stories-m2-inbound-verify.md",
   "backend/crates/domain/src/operations.rs",
   "backend/crates/api/src/m2_putaway.rs",
+  "backend/crates/api/src/task_engine.rs",
+  "backend/crates/api/src/wave3_repository_part2.rs",
   "backend/crates/api/src/wave3_repository/putaway.rs",
   "backend/crates/api/src/wave3_handlers_part4.rs",
   "backend/crates/api/src/openapi_paths/extensions.rs",
   "backend/crates/api/tests/m2_smart_putaway_postgres.rs",
   "backend/migrations/202607140007_m2_smart_putaway.sql",
+  "backend/migrations/202607150003_mte_task_execution.sql",
+  "apps/web-admin/src/features/inbound/inbound-queries.ts",
+  "apps/web-admin/src/pages/inbound/M2InboundPage.tsx",
+  "apps/web-admin/src/pages/inbound/M2InboundDialogs.tsx",
+  "prototypes/e2e/web-admin-m2-real.spec.ts",
 ]
-reason = "已补推荐库位 API 与既有 PC Web 上架确认的同货主、温区/质量颜色、容量、SKU 数量、验收数量、幂等和审计约束，并以真实 PostgreSQL 覆盖推荐排序、跨货主、非法状态/数量和角色权限；故事仍不能整体关闭：m2-putaway 页面尚未接入真实接口，M-VR 动态上架策略、LPN/任务引擎、全自动模式、PDA 离线冲突和真实浏览器 E2E/截图证据尚未闭环。"
+reason = "已补推荐库位 API 与 PC Web 上架确认的真实接口接线，覆盖同货主、温区/质量颜色、容量、SKU 数量、验收数量、幂等和审计约束；真实 PostgreSQL 和浏览器 E2E 已验证推荐读取、失败校验、上架提交与库存追溯。验收签字后已原子创建 M-TE 上架任务，但任务完成尚未驱动上架确认；M-VR 动态上架策略、LPN、全自动模式和 PDA 离线冲突仍未闭环。"
 owner = "M2 模块负责人"
-resume_when = "补齐 m2-putaway 真实页面、M-VR 规则命中、LPN/任务引擎、全自动模式、PDA 离线冲突及真实浏览器 E2E/截图后再移入 stories。"
+resume_when = "补齐 M-VR 规则命中、LPN/任务引擎、全自动模式和 PDA 离线冲突，并复跑真实浏览器 E2E/截图后再移入 stories。"
 
 [[deferred_stories]]
 id = "US-M2-006"
@@ -2373,10 +2400,12 @@ evidence_refs = [
   "prototypes/e2e/web-admin-m3-real.spec.ts",
   "prototypes/playwright-web-admin-m3-real-config.ts",
   "apps/web-admin/.e2e-artifacts/m3-real/screenshots/inventory-query.png",
+  "apps/web-admin/.e2e-artifacts/m3-real/screenshots/inventory-export-dialog.png",
+  "apps/web-admin/.e2e-artifacts/m3-real/screenshots/inventory-exported.png",
 ]
-reason = "已补实时库存查询的库位类型 location_type、库区编码 zone_code 过滤、库位/库区关联查询和货主隔离，并以真实 PostgreSQL 覆盖组合条件、空值条件、未知条件和跨货主数据；故事仍不能整体关闭：内存 mock 没有库位主数据、库位专项视图及温区/库位元信息、批次专项视图、Excel 导出、开放 API 调用凭据和完整真实 E2E 证据尚未闭环。"
+reason = "已补实时库存查询的库位类型 location_type、库区编码 zone_code 过滤、库位/库区关联查询和货主隔离，并以真实 PostgreSQL 覆盖组合条件、空值条件、未知条件和跨货主数据；管理端已复用 DataGrid 标准 Excel 导出，真实 PostgreSQL 浏览器 E2E 验证组合筛选仅导出当前 1 条结果，下载文件为非空 .xlsx 且具有 ZIP 文件头。故事仍不能整体关闭：内存 mock 没有库位主数据、库位专项视图及温区/库位元信息、批次专项视图、剩余筛选参数和开放 API 调用凭据尚未闭环。"
 owner = "M3 模块负责人"
-resume_when = "补齐库位和批次专项视图、库位元信息、Excel 导出、剩余筛选参数和外部 API 鉴权后移入 stories。"
+resume_when = "补齐库位和批次专项视图、库位元信息、剩余筛选参数和外部 API 鉴权后移入 stories。"
 
 [[deferred_stories]]
 id = "US-M4-002"
@@ -2399,11 +2428,14 @@ test_checks = [
 api_paths = ["GET /api/v1/outbound/waves", "GET /api/v1/outbound/waves/{wave_id}", "POST /api/v1/outbound/waves", "POST /api/v1/outbound/waves/{wave_id}/cancel"]
 evidence_refs = [
   "backend/crates/api/src/wave4_repository_part1.rs",
+  "backend/crates/api/src/task_engine.rs",
   "backend/crates/api/src/wave4_repository.rs",
   "backend/crates/api/src/wave4_repository_waves.rs",
   "backend/crates/api/tests/wave4_postgres/wave_reads.rs",
   "backend/crates/api/tests/wave4_wave_planning_postgres.rs",
+  "backend/crates/api/tests/task_engine_postgres.rs",
   "backend/migrations/202607140004_m4_outbound_pick_tasks.sql",
+  "backend/migrations/202607150003_mte_task_execution.sql",
   "apps/web-admin/src/features/outbound/outbound-queries.ts",
   "apps/web-admin/src/pages/outbound/M4OutboundPage.tsx",
   "apps/web-admin/dev-mocks/outbound-dev-mock.ts",
@@ -2413,7 +2445,7 @@ evidence_refs = [
   "apps/web-admin/.e2e-artifacts/m4-real/screenshots/outbound-wave-detail.png",
   "apps/web-admin/.e2e-artifacts/m4-real/screenshots/outbound-wave-cancelled.png",
 ]
-reason = "已补 M4 PC 波次列表、详情、创建、刷新和未拣选取消真实 API：后端在同一事务内校验已确认订单、按合格库存进行货主隔离锁定、生成按库位排序的拣选任务、更新订单入波次，取消时释放库存锁定并恢复订单状态，且写入幂等和审计；独立 PostgreSQL 回归与临时数据库浏览器 E2E 已验证列表读取、创建响应、库存分配、拣选任务、刷新回显、详情读取、取消响应和真实页面截图。故事仍不能整体关闭：容量/完整路径规则、真正下发状态、拣选任务执行、异常回滚和完整波次规则证据尚未闭环。"
+reason = "已补 M4 PC 波次列表、详情、创建、刷新和未拣选取消真实 API：后端在同一事务内校验已确认订单、按合格库存进行货主隔离锁定、生成按库位排序的拣选明细和 M-TE 拣选任务、更新订单入波次，取消时释放库存锁定并恢复订单状态，且写入幂等和审计；独立 PostgreSQL 回归与临时数据库浏览器 E2E 已验证列表读取、创建响应、库存分配、拣选任务、刷新回显、详情读取、取消响应和真实页面截图。故事仍不能整体关闭：容量/完整路径规则、任务执行回写、异常回滚和完整波次规则证据尚未闭环。"
 owner = "M4 模块负责人"
 resume_when = "补齐容量与完整路径规则、真正下发状态、拣选任务执行、异常回滚和全链路真实 E2E/截图证据后移入 stories。"
 
@@ -2444,6 +2476,11 @@ database_objects = [
   "outbound_orders",
   "outbound_order_lines",
   "inventory_allocations",
+  "dual_person_policy_rules",
+  "h4_approval_records",
+  "outbound_review_records",
+  "warehouse_tasks",
+  "task_execution_events",
   "audit_event",
   "idempotency_request",
 ]
@@ -2460,10 +2497,16 @@ evidence_refs = [
   "backend/crates/api/src/wave4_handlers.rs",
   "backend/crates/api/src/wave4_handlers_review_tests.rs",
   "backend/crates/api/src/wave4_repository_part1.rs",
+  "backend/crates/api/src/task_engine.rs",
   "backend/crates/api/src/openapi_paths/extensions.rs",
   "backend/crates/api/tests/wave4_postgres/review.rs",
   "backend/crates/api/tests/wave4_postgres.rs",
+  "backend/crates/api/tests/task_engine_postgres.rs",
   "backend/crates/api/examples/support/wms_api_e2e_seed.rs",
+  "backend/crates/api/src/dual_person_policy.rs",
+  "backend/migrations/202607150002_mvr_downstream_enforcement.sql",
+  "backend/migrations/202607150003_mte_task_execution.sql",
+  "apps/web-admin/src/features/validation-rules/dual-person-policy-queries.ts",
   "apps/web-admin/src/features/outbound/outbound-queries.ts",
   "apps/web-admin/src/pages/outbound/m4-outbound-page-model.ts",
   "apps/web-admin/src/pages/outbound/M4OutboundActionDialog.tsx",
@@ -2473,9 +2516,9 @@ evidence_refs = [
   "shared/openapi/openapi.json",
   "packages/api-client/src/schema.ts",
 ]
-reason = "已补出库复核查询/提交最小闭环：复核岗权限、订单状态、逐行商品和数量一致性、拣选人与复核人分离、短拣状态、货主隔离、幂等重放和审计 diff，并接入 m4-review PC 页面真实 GET/POST API；修正复核页状态筛选，使用临时 PostgreSQL 数据库完成真实浏览器详情读取、弹窗展示、提交复核和截图验证。故事仍不能整体关闭：包装站/PDA 三模式扫码、M-VR 动态双人策略与主管审批、离线冲突、追溯码、完整复核记录以及真实外部运行证据尚未闭环。"
+reason = "已补出库复核查询/提交闭环：状态、逐行商品/数量、拣选与复核分离、短拣、货主隔离、幂等和审计；PC 页面提交前查询 M-VR 出库/复核策略，服务端按整单最严格策略强制第二复核员资质和已通过的 H4 主管审批，并在 outbound_review_records 落规则/双人/审批证据；全量复核完成后原子创建 M-TE 装车任务，短拣不提前创建。一次性 PostgreSQL 真实浏览器 E2E 已验证策略展示、第二人提交与成功回显。故事仍不能整体关闭：装车任务执行回写、PDA 整件/零件扫码、离线冲突、追溯码和真实 PDA/外部运行证据尚未闭环。"
 owner = "M4 模块负责人"
-resume_when = "补齐包装站/PDA 三模式、M-VR 策略、离线冲突、追溯码、完整复核记录和外部运行证据后再移入 stories。"
+resume_when = "补齐 PDA 整件/零件扫码、离线冲突、追溯码和真实 PDA/外部运行证据后再移入 stories。"
 
 [[deferred_stories]]
 id = "US-M4-005"
@@ -3171,14 +3214,15 @@ reason = "当前实现和证据不足以证明该故事全部验收标准，禁�
 owner = "TC 模块负责人"
 resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
 
-[[deferred_stories]]
+[[stories]]
 id = "US-TE-001"
 title = "任务类型配置"
 module = "TE"
+story_file = "docs/domain/user-stories-mte-task-engine.md"
 types = ["write", "config_rule", "frontend_interaction"]
 frontend_pages = ["mte-task-types"]
 navigation_checks = ["node apps/web-admin/self-checks/te-task-type-slice-self-check.mjs"]
-e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:h1-real"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:mte-real"]
 api_paths = [
   "GET /api/v1/task-engine/task-types",
   "PUT /api/v1/task-engine/task-types/{task_type_code}",
@@ -3192,6 +3236,7 @@ test_checks = [
   "python3 scripts/governance/check_error_codes.py",
   "node apps/web-admin/self-checks/te-task-type-slice-self-check.mjs",
   "pnpm --dir apps/web-admin exec tsc --noEmit",
+  "pnpm --dir apps/web-admin run test:e2e:mte-real",
 ]
 evidence_refs = [
   "apps/web-admin/src/pages/task-engine/TaskTypeConfigPage.tsx",
@@ -3210,25 +3255,82 @@ evidence_refs = [
   "docs/error-codes.md",
   "backend/migrations/202607140011_mdi_mte_admin_menu.sql",
 ]
-reason = "已补任务类型配置后端和 PC 管理端切片：预置拣选/上架/补货/移库/盘点/装车/退货上架并支持扩展编码，维护默认优先级、预计耗时、可合并、可插单和启停状态；支持货主隔离、角色权限、幂等、审计、真实 PostgreSQL、真实 PC API E2E 和截图，并已挂载 OpenAPI 与菜单迁移。仍缺任务引擎创建/分配/执行链路、跨模块触发、PDA 和发布证据，不能标记完成。"
-owner = "TE 模块负责人"
-resume_when = "补齐任务创建、分配、执行及跨模块触发链路、PDA 端，并通过真实全链路 E2E、截图和发布证据后复核。"
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
 
 [[deferred_stories]]
 id = "US-TE-002"
 title = "任务组与人员资格"
 module = "TE"
-reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+types = ["write", "config_rule", "frontend_interaction", "audit_compliance"]
+frontend_pages = ["mte-task-groups"]
+navigation_checks = ["node apps/web-admin/self-checks/mte-task-execution-slice-self-check.mjs"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:mte-real -- --grep '任务组和调度'"]
+api_paths = ["GET /api/v1/task-engine/task-groups", "GET /api/v1/task-engine/workers", "PUT /api/v1/task-engine/task-groups/{task_group_code}"]
+database_objects = ["task_groups", "task_group_memberships", "auth_user_owner_bindings", "audit_event", "idempotency_request"]
+test_checks = [
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test task_engine_postgres -- --test-threads=1",
+  "node apps/web-admin/self-checks/mte-task-execution-slice-self-check.mjs",
+  "pnpm --dir apps/web-admin exec tsc --noEmit",
+  "pnpm --dir apps/web-admin run test:e2e:mte-real -- --grep '任务组和调度'",
+]
+evidence_refs = [
+  "backend/crates/domain/src/task_engine.rs",
+  "backend/crates/api/src/task_engine.rs",
+  "backend/crates/api/src/task_engine_handlers.rs",
+  "backend/crates/api/tests/task_engine_postgres.rs",
+  "backend/migrations/202607150003_mte_task_execution.sql",
+  "apps/web-admin/src/pages/task-engine/TaskGroupConfigPage.tsx",
+  "apps/web-admin/src/features/task-engine/task-engine-queries.ts",
+  "apps/web-admin/self-checks/mte-task-execution-slice-self-check.mjs",
+  "prototypes/e2e/web-admin-te-real.spec.ts",
+  "prototypes/playwright-web-admin-mte-real-config.ts",
+  "artifacts/screenshot-portal/real-web/m-te-task-execution/task-dispatched.png",
+]
+reason = "已实现按仓库、库区、任务类型配置任务组和多成员资格，分派时强制同货主有效成员校验，配置写入审计且支持幂等，并以一次性 PostgreSQL 完成真实 PC 浏览器 E2E 与截图。仍缺资格证书有效期和到期自动移出，暂不标记完成。"
 owner = "TE 模块负责人"
-resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+resume_when = "补资格证书有效期模型与到期移出任务组，并完成正式发布证据后复核。"
 
 [[deferred_stories]]
 id = "US-TE-003"
 title = "任务创建（各模块触发）"
 module = "TE"
-reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+types = ["write", "api_change", "integration", "audit_compliance"]
+api_paths = ["POST /api/v1/task-engine/tasks", "GET /api/v1/task-engine/tasks"]
+database_objects = ["warehouse_tasks", "task_execution_events", "task_types", "task_groups", "audit_event", "idempotency_request"]
+test_checks = [
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test task_engine_postgres -- --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_deferred_closeout_postgres inspection_uses_actual_receipt_quantity_and_blocks_early_signature -- --exact --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave4_postgres outbound_complete_pick_review_ship_replays_and_deducts_inventory -- --exact --test-threads=1",
+]
+evidence_refs = [
+  "backend/crates/api/src/task_engine.rs",
+  "backend/crates/api/src/wave3_repository_part2.rs",
+  "backend/crates/api/src/wave4_repository_part1.rs",
+  "backend/crates/api/tests/task_engine_postgres.rs",
+  "backend/crates/api/tests/m2_deferred_closeout_postgres.rs",
+  "backend/crates/api/tests/wave4_postgres/review.rs",
+  "backend/migrations/202607150003_mte_task_execution.sql",
+]
+reason = "已实现统一任务模型、业务源幂等、待分配初态和审计，并接入 M2 验收通过→上架、M4 波次下发→拣选、最终复核→装车三条原子触发链。仍缺补货、移库、盘点、销退上架等其余业务触发源以及全链路发布证据。"
 owner = "TE 模块负责人"
-resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+resume_when = "M-RP/M3/M4 退货故事实现后逐项接入剩余触发源，并完成真实跨模块 E2E 与发布证据。"
 
 [[deferred_stories]]
 id = "US-TE-004"
@@ -3242,9 +3344,30 @@ resume_when = "该故事进入已批准实施波次，并具备前端、API、�
 id = "US-TE-005"
 title = "任务分配"
 module = "TE"
-reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+types = ["write", "frontend_interaction", "runtime_guard", "audit_compliance"]
+frontend_pages = ["mte-task-dispatch"]
+navigation_checks = ["node apps/web-admin/self-checks/mte-task-execution-slice-self-check.mjs"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:mte-real -- --grep '任务组和调度'"]
+api_paths = ["POST /api/v1/task-engine/tasks/{task_id}/transitions", "GET /api/v1/task-engine/tasks"]
+database_objects = ["warehouse_tasks", "task_groups", "task_group_memberships", "task_execution_events", "audit_event", "idempotency_request"]
+test_checks = [
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test task_engine_postgres -- --test-threads=1",
+  "node apps/web-admin/self-checks/mte-task-execution-slice-self-check.mjs",
+  "pnpm --dir apps/web-admin exec tsc --noEmit",
+  "pnpm --dir apps/web-admin run test:e2e:mte-real -- --grep '任务组和调度'",
+]
+evidence_refs = [
+  "backend/crates/api/src/task_engine.rs",
+  "backend/crates/api/src/task_engine_handlers.rs",
+  "backend/crates/api/tests/task_engine_postgres.rs",
+  "apps/web-admin/src/pages/task-engine/TaskDispatchPage.tsx",
+  "apps/web-admin/src/features/task-engine/task-engine-queries.ts",
+  "prototypes/e2e/web-admin-te-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/m-te-task-execution/task-dispatched.png",
+]
+reason = "已实现手工分派、按资格与当前活跃负荷自动分派、改派、下发、召回，状态与分配事件原子写入，PC 调度页已通过一次性 PostgreSQL 真实浏览器 E2E，PDA 仅能查询本人任务。仍缺就近定位、最大并发容量、冷库证书等扩展权重与真实 PDA 推送证据。"
 owner = "TE 模块负责人"
-resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+resume_when = "定位、人员容量和证书模型可用后补齐自动分派权重，并完成真 PDA 推送与全链路发布证据。"
 
 [[deferred_stories]]
 id = "US-TE-006"
@@ -3266,17 +3389,47 @@ resume_when = "该故事进入已批准实施波次，并具备前端、API、�
 id = "US-TE-008"
 title = "任务执行（PDA）"
 module = "TE"
-reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+types = ["write", "api_change", "offline_sync", "runtime_guard", "audit_compliance"]
+api_paths = ["GET /api/v1/task-engine/tasks", "POST /api/v1/task-engine/tasks/{task_id}/transitions"]
+database_objects = ["warehouse_tasks", "task_execution_events", "audit_event", "idempotency_request"]
+test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test task_engine_postgres -- --test-threads=1"]
+evidence_refs = [
+  "backend/crates/domain/src/task_engine.rs",
+  "backend/crates/api/src/task_engine.rs",
+  "backend/crates/api/src/task_engine_handlers.rs",
+  "backend/crates/api/tests/task_engine_postgres.rs",
+  "backend/migrations/202607150003_mte_task_execution.sql",
+]
+reason = "已实现 PDA 面向的本人统一待办 API，以及已下发→执行中→完成/异常状态机、本人执行权限、数量差异拦截、幂等和审计。受 ADR-0027 约束尚未启动生产 PDA 应用，扫码三/四步、SQLite 离线缓存、冲突待主管处理和真机证据仍缺。"
 owner = "TE 模块负责人"
-resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+resume_when = "ADR-0027 放行生产 PDA 后实现扫码与离线同步，并在真 PDA 上完成断网、恢复、冲突和截图/录像验收。"
 
 [[deferred_stories]]
 id = "US-TE-009"
 title = "任务跟踪看板"
 module = "TE"
-reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+types = ["read_only", "frontend_interaction", "monitoring"]
+frontend_pages = ["mte-task-dispatch"]
+navigation_checks = ["node apps/web-admin/self-checks/mte-task-execution-slice-self-check.mjs"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:mte-real -- --grep '任务组和调度'"]
+api_paths = ["GET /api/v1/task-engine/tasks"]
+database_objects = ["warehouse_tasks"]
+test_checks = [
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test task_engine_postgres -- --test-threads=1",
+  "node apps/web-admin/self-checks/mte-task-execution-slice-self-check.mjs",
+  "pnpm --dir apps/web-admin exec tsc --noEmit",
+  "pnpm --dir apps/web-admin run test:e2e:mte-real -- --grep '任务组和调度'",
+]
+evidence_refs = [
+  "apps/web-admin/src/pages/task-engine/TaskDispatchPage.tsx",
+  "apps/web-admin/src/features/task-engine/task-engine-queries.ts",
+  "backend/crates/api/src/task_engine.rs",
+  "prototypes/e2e/web-admin-te-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/m-te-task-execution/task-dispatched.png",
+]
+reason = "已补按状态、类型、仓库、人员与优先级展示的 PC 任务调度列表和主管干预，并完成一次性 PostgreSQL 真实浏览器 E2E/截图。仍缺实时推送/刷新周期配置、超时高亮、超时企业微信通知和 PAD 视图。"
 owner = "TE 模块负责人"
-resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+resume_when = "补超时规则与 H4 通知、实时刷新策略和 PAD 适配，并完成正式发布证据。"
 
 [[deferred_stories]]
 id = "US-TE-010"
@@ -3338,6 +3491,38 @@ resume_when = "该故事进入已批准实施波次，并具备前端、API、�
 id = "US-VR-006"
 title = "双人策略矩阵规则"
 module = "VR"
-reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+story_file = "docs/domain/user-stories-mvr-validation-rules.md"
+types = ["read_only", "write", "api_change", "integration", "runtime_guard", "audit_compliance"]
+frontend_pages = ["m1-system-dictionary"]
+api_paths = ["GET /api/v1/m-vr/dual-person-policy", "GET /api/v1/m-vr/dual-person-policy/rules", "PUT /api/v1/m-vr/dual-person-policy/rules"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:mvr-real", "pnpm --dir apps/web-admin run test:e2e:m2-real", "pnpm --dir apps/web-admin run test:e2e:m4-real"]
+database_objects = ["system_dictionary_items", "dual_person_policy_rules", "receiving_inspection_signatures", "outbound_review_records", "h4_approval_records", "audit_event", "idempotency_request"]
+test_checks = [
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test dual_person_policy_postgres -- --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_deferred_closeout_postgres inspection_uses_actual_receipt_quantity_and_blocks_early_signature -- --exact --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave4_postgres outbound_complete_pick_review_ship_replays_and_deducts_inventory -- --exact --test-threads=1",
+  "pnpm --dir apps/web-admin exec tsc --noEmit",
+  "pnpm --dir apps/web-admin exec node self-checks/mvr-dual-person-matrix-self-check.mjs",
+]
+evidence_refs = [
+  "backend/migrations/202607150001_mvr_dual_person_policy.sql",
+  "backend/migrations/202607150002_mvr_downstream_enforcement.sql",
+  "backend/crates/domain/src/dual_person_policy.rs",
+  "backend/crates/api/src/dual_person_policy.rs",
+  "backend/crates/api/src/dual_person_policy_handlers.rs",
+  "backend/crates/api/tests/dual_person_policy_postgres.rs",
+  "backend/crates/api/tests/m2_deferred_closeout_postgres.rs",
+  "backend/crates/api/tests/wave4_postgres/review.rs",
+  "apps/web-admin/src/pages/master-data/DualPersonPolicyMatrix.tsx",
+  "apps/web-admin/src/features/validation-rules/dual-person-policy-queries.ts",
+  "apps/web-admin/self-checks/mvr-dual-person-matrix-self-check.mjs",
+  "prototypes/e2e/web-admin-m1-real.spec.ts",
+  "prototypes/e2e/web-admin-m2-real.spec.ts",
+  "prototypes/e2e/web-admin-m4-real.spec.ts",
+  "apps/web-admin/.e2e-artifacts/m1-real/screenshots/dual-person-policy-matrix.png",
+  "apps/web-admin/.e2e-artifacts/m2-real/screenshots/inspection.png",
+  "apps/web-admin/.e2e-artifacts/m4-real/screenshots/outbound-review-submitted.png",
+]
+reason = "已完成 6 流程 12 节点、8 类默认模板、全局/货主/仓库优先级、双人确认、M1 字典双向同步、幂等、审计、权限、查询缓存与变更失效；PC 矩阵及 M2 验收、M4 复核已接入三档策略，规则/第二人/H4 审批证据可回查，并通过 PostgreSQL 与真实浏览器验证。仍缺 M-SA/M-QL 执行节点接线、正式环境 P95 指标，以及 ADR-0027 解禁后的 PDA 离线 24 小时缓存/恢复校验和真实 PDA 证据，故不得整体关闭。"
 owner = "VR 模块负责人"
-resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+resume_when = "补齐 M-SA/M-QL 接线、正式环境 P95 证据，并在 ADR-0027 解禁后完成 PDA 离线缓存、恢复校验与真机证据。"

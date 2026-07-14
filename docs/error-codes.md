@@ -1,7 +1,7 @@
 # 错误码字典（Error Codes Dictionary）
 
-> 时间：2026-07-13
-> 版本：v3.4（当前 117 项）
+> 时间：2026-07-15
+> 版本：v3.7（当前 144 项）
 > 文档层级：L2 规范（必须遵守）
 > 关联：[ADR-0010](adr/0010-error-codes.md) / [coding-standards.md §4](coding-standards.md)
 
@@ -77,9 +77,9 @@
 |---|---|---|
 | info | 1 | 状态变更通知 / 数据已存在等正常路径 |
 | warning | 39 | 业务规则拦截（库存不足 / 资质过期等）|
-| error | 70 | 业务异常（数据冲突 / 校验失败）|
-| critical | 7 | 合规/安全异常（跨货主访问 / 篡改尝试）|
-| **合计** | **117** | — |
+| error | 96 | 业务异常（数据冲突 / 校验失败）|
+| critical | 8 | 合规/安全异常（跨货主访问 / 篡改尝试）|
+| **合计** | **144** | — |
 
 ---
 
@@ -95,15 +95,15 @@
 | H_DOCK | 11 | 月台预约 |
 | H_AL | 2 | 告警引擎 |
 | M1 | 12 | 主数据校验 / 配置中心 |
-| M2 | 7 | 入库流程 |
+| M2 | 8 | 入库流程 |
 | M3 | 8 | 库存与状态 |
-| M4 | 7 | 出库与拣选 |
-| M_VR | 2 | 规则引擎 |
+| M4 | 10 | 出库与拣选 |
+| M_VR | 10 | 规则引擎与双人策略 |
 | M_QL | 1 | 质量联系单 |
 | M_TC | 2 | 追溯码 |
 | M_PM | 1 | 参数对照 |
 | M_DI | 12 | 药检平台配置 |
-| M_TE | 5 | 任务类型配置 |
+| M_TE | 20 | 任务类型、任务组与执行主链 |
 
 ---
 
@@ -1087,6 +1087,18 @@ error_codes:
     related_stories: [US-M2-004]
     introduced_in: v3.1
 
+  - code: M2_DUAL_PERSON_APPROVAL_REQUIRED
+    module: M2
+    category: APPROVAL
+    detail: DUAL_PERSON_APPROVAL_REQUIRED
+    http_status: 422
+    severity: error
+    message_zh: 'M-VR 策略要求先完成主管审批'
+    message_en: 'Supervisor approval required by M-VR dual-person policy'
+    related_fields: [双人策略命中规则 ID]
+    related_stories: [US-M2-004, US-VR-006]
+    introduced_in: v3.2
+
   - code: M2_VERIFIER_UNAUTHORIZED
     module: M2
     category: AUTHORIZATION
@@ -1233,6 +1245,42 @@ error_codes:
     related_stories: [US-M4-003, US-M4-004]
     introduced_in: v3.1
 
+  - code: M4_DUAL_PERSON_REQUIRED
+    module: M4
+    category: VALIDATION
+    detail: DUAL_PERSON_REQUIRED
+    http_status: 422
+    severity: error
+    message_zh: 'M-VR 策略要求第二复核员'
+    message_en: 'Second reviewer required by M-VR policy'
+    related_fields: [验收员 user_id, 双人策略命中规则 ID]
+    related_stories: [US-M4-004, US-VR-006]
+    introduced_in: v3.2
+
+  - code: M4_SECOND_REVIEWER_UNAUTHORIZED
+    module: M4
+    category: AUTHORIZATION
+    detail: SECOND_REVIEWER_UNAUTHORIZED
+    http_status: 422
+    severity: error
+    message_zh: '第二复核员不是当前货主的有效保管员'
+    message_en: 'Second reviewer is not an active custodian for the owner'
+    related_fields: [验收员 user_id, 货主]
+    related_stories: [US-M4-004, US-VR-006]
+    introduced_in: v3.2
+
+  - code: M4_DUAL_PERSON_APPROVAL_REQUIRED
+    module: M4
+    category: APPROVAL
+    detail: DUAL_PERSON_APPROVAL_REQUIRED
+    http_status: 422
+    severity: error
+    message_zh: 'M-VR 策略要求先完成主管审批'
+    message_en: 'Supervisor approval required by M-VR dual-person policy'
+    related_fields: [双人策略命中规则 ID]
+    related_stories: [US-M4-004, US-VR-006]
+    introduced_in: v3.2
+
   - code: M4_WAVE_RELEASED_TWICE
     module: M4
     category: WAVE
@@ -1317,6 +1365,102 @@ error_codes:
     related_fields: []
     related_stories: [US-VR-002]
     introduced_in: v3.1
+
+  - code: M_VR_DUAL_PERSON_POLICY_INVALID
+    module: M_VR
+    category: VALIDATION
+    detail: DUAL_PERSON_POLICY_INVALID
+    http_status: 422
+    severity: error
+    message_zh: '双人策略流程、节点或规则参数非法'
+    message_en: 'Invalid process, node, or dual-person policy rule'
+    related_fields: [特殊药品分类, 双人策略命中规则 ID]
+    related_stories: [US-VR-006]
+    introduced_in: v3.2
+
+  - code: M_VR_DUAL_PERSON_IDEMPOTENCY_REQUIRED
+    module: M_VR
+    category: DUAL_PERSON
+    detail: IDEMPOTENCY_REQUIRED
+    http_status: 400
+    severity: error
+    message_zh: '双人策略写操作缺少幂等键'
+    message_en: 'Dual-person policy write requires an idempotency key'
+    related_fields: []
+    related_stories: [US-VR-006]
+    introduced_in: v3.7
+
+  - code: M_VR_DUAL_PERSON_CROSS_OWNER
+    module: M_VR
+    category: DUAL_PERSON
+    detail: CROSS_OWNER
+    http_status: 403
+    severity: critical
+    message_zh: '跨货主访问双人策略被拒绝'
+    message_en: 'Cross-owner dual-person policy access was denied'
+    related_fields: []
+    related_stories: [US-VR-006]
+    introduced_in: v3.7
+
+  - code: M_VR_DUAL_PERSON_SAME_PERSON
+    module: M_VR
+    category: DUAL_PERSON
+    detail: SAME_PERSON
+    http_status: 422
+    severity: error
+    message_zh: '双人策略变更的操作人和确认人不能相同'
+    message_en: 'Dual-person policy operator and confirmer must differ'
+    related_fields: []
+    related_stories: [US-VR-006]
+    introduced_in: v3.7
+
+  - code: M_VR_DUAL_PERSON_UNQUALIFIED
+    module: M_VR
+    category: DUAL_PERSON
+    detail: UNQUALIFIED
+    http_status: 422
+    severity: error
+    message_zh: '双人策略变更确认人不具备对应资格'
+    message_en: 'Dual-person policy confirmer lacks the required qualification'
+    related_fields: []
+    related_stories: [US-VR-006]
+    introduced_in: v3.7
+
+  - code: M_VR_DUAL_PERSON_REFERENCE_NOT_FOUND
+    module: M_VR
+    category: DUAL_PERSON
+    detail: REFERENCE_NOT_FOUND
+    http_status: 404
+    severity: error
+    message_zh: '双人策略关联的商品、仓库或特殊药品分类不存在'
+    message_en: 'A product, warehouse, or special-drug category referenced by the policy was not found'
+    related_fields: [特殊药品分类]
+    related_stories: [US-VR-006]
+    introduced_in: v3.7
+
+  - code: M_VR_DUAL_PERSON_IDEMPOTENCY_CONFLICT
+    module: M_VR
+    category: DUAL_PERSON
+    detail: IDEMPOTENCY_CONFLICT
+    http_status: 409
+    severity: error
+    message_zh: '双人策略幂等键已被不同请求使用'
+    message_en: 'Dual-person policy idempotency key was used by a different request'
+    related_fields: []
+    related_stories: [US-VR-006]
+    introduced_in: v3.7
+
+  - code: M_VR_DUAL_PERSON_INTERNAL
+    module: M_VR
+    category: DUAL_PERSON
+    detail: INTERNAL
+    http_status: 500
+    severity: error
+    message_zh: '双人策略处理失败'
+    message_en: 'Dual-person policy processing failed'
+    related_fields: []
+    related_stories: [US-VR-006]
+    introduced_in: v3.7
 
   # ========== M-QL 质量联系单 ==========
   - code: M_QL_TIMEOUT_EXCEEDED
@@ -1548,7 +1692,7 @@ error_codes:
     message_zh: '任务类型不存在'
     message_en: 'Task type was not found'
     related_fields: []
-    related_stories: [US-TE-001]
+    related_stories: [US-TE-001, US-TE-003]
     introduced_in: v3.4
 
   - code: M_TE_TASK_TYPE_IDEMPOTENCY_CONFLICT
@@ -1574,6 +1718,187 @@ error_codes:
     related_fields: []
     related_stories: [US-TE-001]
     introduced_in: v3.4
+
+  # ========== M-TE 任务组、创建、分派与执行 ==========
+  - code: M_TE_IDEMPOTENCY_REQUIRED
+    module: M_TE
+    category: TASK
+    detail: IDEMPOTENCY_REQUIRED
+    http_status: 400
+    severity: error
+    message_zh: '缺少 Idempotency-Key'
+    message_en: 'Idempotency-Key is required'
+    related_fields: []
+    related_stories: [US-TE-002, US-TE-003, US-TE-005, US-TE-008]
+    introduced_in: v3.6
+
+  - code: M_TE_TASK_INVALID
+    module: M_TE
+    category: TASK
+    detail: INVALID
+    http_status: 422
+    severity: error
+    message_zh: '任务数据非法'
+    message_en: 'Warehouse task data is invalid'
+    related_fields: []
+    related_stories: [US-TE-002, US-TE-003, US-TE-005, US-TE-008]
+    introduced_in: v3.6
+
+  - code: M_TE_TASK_GROUP_NOT_FOUND
+    module: M_TE
+    category: TASK_GROUP
+    detail: NOT_FOUND
+    http_status: 422
+    severity: error
+    message_zh: '任务组不存在、不适用或未启用'
+    message_en: 'Task group was not found, applicable, or enabled'
+    related_fields: []
+    related_stories: [US-TE-002, US-TE-003]
+    introduced_in: v3.6
+
+  - code: M_TE_WAREHOUSE_NOT_FOUND
+    module: M_TE
+    category: TASK_GROUP
+    detail: WAREHOUSE_NOT_FOUND
+    http_status: 422
+    severity: error
+    message_zh: '仓库不存在或未启用'
+    message_en: 'Warehouse was not found or enabled'
+    related_fields: []
+    related_stories: [US-TE-002, US-TE-003]
+    introduced_in: v3.6
+
+  - code: M_TE_ZONE_NOT_FOUND
+    module: M_TE
+    category: TASK_GROUP
+    detail: ZONE_NOT_FOUND
+    http_status: 422
+    severity: error
+    message_zh: '任务组库区不存在或不属于指定仓库'
+    message_en: 'Task group zone was not found in the selected warehouse'
+    related_fields: []
+    related_stories: [US-TE-002]
+    introduced_in: v3.6
+
+  - code: M_TE_USER_NOT_FOUND
+    module: M_TE
+    category: TASK_GROUP
+    detail: USER_NOT_FOUND
+    http_status: 422
+    severity: error
+    message_zh: '任务组成员不存在或未启用'
+    message_en: 'Task group member was not found or active'
+    related_fields: []
+    related_stories: [US-TE-002]
+    introduced_in: v3.6
+
+  - code: M_TE_WORKER_NOT_QUALIFIED
+    module: M_TE
+    category: ASSIGNMENT
+    detail: WORKER_NOT_QUALIFIED
+    http_status: 422
+    severity: error
+    message_zh: '人员不具备该任务组资格'
+    message_en: 'Worker is not qualified for the task group'
+    related_fields: []
+    related_stories: [US-TE-002, US-TE-005]
+    introduced_in: v3.6
+
+  - code: M_TE_NO_AVAILABLE_WORKER
+    module: M_TE
+    category: ASSIGNMENT
+    detail: NO_AVAILABLE_WORKER
+    http_status: 422
+    severity: error
+    message_zh: '任务组内没有可用人员'
+    message_en: 'No available worker exists in the task group'
+    related_fields: []
+    related_stories: [US-TE-005]
+    introduced_in: v3.6
+
+  - code: M_TE_TASK_NOT_FOUND
+    module: M_TE
+    category: TASK
+    detail: NOT_FOUND
+    http_status: 404
+    severity: error
+    message_zh: '任务不存在'
+    message_en: 'Warehouse task was not found'
+    related_fields: []
+    related_stories: [US-TE-005, US-TE-008]
+    introduced_in: v3.6
+
+  - code: M_TE_NOT_ASSIGNEE
+    module: M_TE
+    category: EXECUTION
+    detail: NOT_ASSIGNEE
+    http_status: 403
+    severity: error
+    message_zh: '仅任务当前执行人可执行此操作'
+    message_en: 'Only the current task assignee may execute this operation'
+    related_fields: []
+    related_stories: [US-TE-008]
+    introduced_in: v3.6
+
+  - code: M_TE_INVALID_TRANSITION
+    module: M_TE
+    category: EXECUTION
+    detail: INVALID_TRANSITION
+    http_status: 409
+    severity: error
+    message_zh: '当前任务状态不允许此操作'
+    message_en: 'Current task status does not allow this transition'
+    related_fields: []
+    related_stories: [US-TE-005, US-TE-008]
+    introduced_in: v3.6
+
+  - code: M_TE_QUANTITY_DIFFERENCE_REQUIRES_EXCEPTION
+    module: M_TE
+    category: EXECUTION
+    detail: QUANTITY_DIFFERENCE_REQUIRES_EXCEPTION
+    http_status: 422
+    severity: error
+    message_zh: '实际数量与计划数量不一致时必须上报异常'
+    message_en: 'A quantity difference must be reported as an exception'
+    related_fields: []
+    related_stories: [US-TE-008]
+    introduced_in: v3.6
+
+  - code: M_TE_SOURCE_TASK_CONFLICT
+    module: M_TE
+    category: TASK
+    detail: SOURCE_TASK_CONFLICT
+    http_status: 409
+    severity: error
+    message_zh: '同一业务触发源已存在参数不同的任务'
+    message_en: 'The business source already has a task with different parameters'
+    related_fields: []
+    related_stories: [US-TE-003]
+    introduced_in: v3.6
+
+  - code: M_TE_IDEMPOTENCY_CONFLICT
+    module: M_TE
+    category: TASK
+    detail: IDEMPOTENCY_CONFLICT
+    http_status: 409
+    severity: error
+    message_zh: '幂等键已被不同请求使用'
+    message_en: 'Idempotency-Key was used by a different request'
+    related_fields: []
+    related_stories: [US-TE-002, US-TE-003, US-TE-005, US-TE-008]
+    introduced_in: v3.6
+
+  - code: M_TE_EXECUTION_INTERNAL
+    module: M_TE
+    category: EXECUTION
+    detail: INTERNAL
+    http_status: 500
+    severity: error
+    message_zh: '任务引擎处理失败'
+    message_en: 'Task engine processing failed'
+    related_fields: []
+    related_stories: [US-TE-002, US-TE-003, US-TE-005, US-TE-008]
+    introduced_in: v3.6
 ```
 
 ---
@@ -1597,3 +1922,5 @@ error_codes:
 | 2026-07-13 | v3.2 | 新增 M2_VERIFIER_UNAUTHORIZED，约束双人验收签字人必须是同货主有效验收岗；脚本统计当前合计 92 项 |
 | 2026-07-13 | v3.3 | 登记 H-DOCK 实到对账的预约不存在、到达核对失败和不可到达状态错误码；脚本统计当前合计 100 项 |
 | 2026-07-14 | v3.4 | 登记 M-DI 药检平台配置与 M-TE 任务类型配置 API 错误码；脚本统计当前合计 117 项 |
+| 2026-07-15 | v3.6 | 登记 M-TE 任务组、创建、分派与执行主链 15 个错误码；脚本统计当前合计 137 项 |
+| 2026-07-15 | v3.7 | 补齐 M-VR 双人策略实际返回的 7 个错误码，并统一 M-TE 内部错误命名；脚本统计当前合计 144 项 |

@@ -45,6 +45,10 @@ NAVIGATION_CHECK_SOURCES = {
     / "apps/web-admin/self-checks/m1-location-contract-self-check.mjs",
     "node apps/web-admin/self-checks/m1-dock-management-navigation-self-check.mjs": REPO_ROOT
     / "apps/web-admin/self-checks/m1-dock-management-navigation-self-check.mjs",
+    "node apps/web-admin/self-checks/te-task-type-slice-self-check.mjs": REPO_ROOT
+    / "apps/web-admin/self-checks/te-task-type-slice-self-check.mjs",
+    "node apps/web-admin/self-checks/mte-task-execution-slice-self-check.mjs": REPO_ROOT
+    / "apps/web-admin/self-checks/mte-task-execution-slice-self-check.mjs",
 }
 
 DIMENSIONS = (
@@ -78,6 +82,7 @@ ALLOWED_MODULES = {
     "H8",
     "H9",
     "H10",
+    "TE",
 }
 STORY_TYPE_LAYERS = {
     "read_only": {"L1", "L2", "L3", "L8"},

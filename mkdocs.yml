@@ -197,6 +197,7 @@ nav:
       - Oracle WMS 对照矩阵: legacy-analysis/legacy-comparison-matrix.md
       - 表结构对比待办: domain/todo-legacy-comparison.md
   - 评审记录:
+    - 延期故事快速闭环审计 (2026-07-15): reviews/deferred-story-closure-audit-2026-07-15.md
     - 全项目治理真实缺口修复计划: reviews/governance-remediation-plan-2026-07-11.md
     - 用户故事审计 v1-v10: reviews/user-stories-audit-2026-05-16.md
     - 软件设计审计 (12 维度): reviews/software-design-audit-2026-05-18.md
