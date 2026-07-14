@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-const page = fs.readFileSync("src/pages/dock/DockManagementPage.tsx", "utf8");
-const mock = fs.readFileSync("dev-mocks/dock-dev-mock.ts", "utf8");
-const queries = fs.readFileSync("src/features/dock/dock-queries.ts", "utf8");
-const dialog = fs.readFileSync("src/pages/dock/DockAppointmentChangeDialog.tsx", "utf8");
+const root = new URL("../", import.meta.url);
+const read = (path) => fs.readFileSync(new URL(path, root), "utf8");
+
+const page = read("src/pages/dock/DockManagementPage.tsx");
+const mock = read("dev-mocks/dock-dev-mock.ts");
+const queries = read("src/features/dock/dock-queries.ts");
+const dialog = read("src/pages/dock/DockAppointmentChangeDialog.tsx");
 
 assert.match(queries, /useUpdateDockAppointmentMutation/);
 assert.match(queries, /PATCH\("\/api\/v1\/dock-appointments\/\{id\}"/);
