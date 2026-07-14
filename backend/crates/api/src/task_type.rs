@@ -5,8 +5,8 @@ use sha2::{Digest, Sha256};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{
-    normalize_task_type_code, SetTaskTypeEnabledRequest, TaskType, TaskTypeValidationError,
-    UpsertTaskTypeRequest,
+    normalize_task_type_code, SetTaskTypeEnabledRequest, TaskReleaseStrategy, TaskType,
+    TaskTypeValidationError, UpsertTaskTypeRequest,
 };
 
 use crate::{
@@ -45,6 +45,9 @@ struct TaskTypeRow {
     estimated_minutes: i32,
     mergeable: bool,
     insertable: bool,
+    release_strategy: String,
+    release_interval_minutes: Option<i32>,
+    release_batch_size: Option<i32>,
     enabled: bool,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
@@ -60,7 +63,8 @@ impl PgTaskTypeRepository {
         let rows = sqlx::query_as::<_, TaskTypeRow>(
             r#"
             SELECT id, owner_id, task_type_code, task_type_name, default_priority,
-                   estimated_minutes, mergeable, insertable, enabled,
+                   estimated_minutes, mergeable, insertable, release_strategy,
+                   release_interval_minutes, release_batch_size, enabled,
                    created_at, updated_at, version
               FROM task_types
              WHERE owner_id = $1
@@ -120,12 +124,16 @@ impl PgTaskTypeRepository {
                        estimated_minutes = $3,
                        mergeable = $4,
                        insertable = $5,
-                       enabled = $6,
-                       updated_at = $7,
+                       release_strategy = $6,
+                       release_interval_minutes = $7,
+                       release_batch_size = $8,
+                       enabled = $9,
+                       updated_at = $10,
                        version = version + 1
-                 WHERE id = $8 AND owner_id = $9
+                 WHERE id = $11 AND owner_id = $12
                  RETURNING id, owner_id, task_type_code, task_type_name, default_priority,
-                           estimated_minutes, mergeable, insertable, enabled,
+                           estimated_minutes, mergeable, insertable, release_strategy,
+                           release_interval_minutes, release_batch_size, enabled,
                            created_at, updated_at, version
                 "#,
             )
@@ -134,6 +142,9 @@ impl PgTaskTypeRepository {
             .bind(request.estimated_minutes)
             .bind(request.mergeable)
             .bind(request.insertable)
+            .bind(release_strategy_name(request.release_strategy))
+            .bind(request.release_interval_minutes)
+            .bind(request.release_batch_size)
             .bind(request.enabled)
             .bind(now)
             .bind(existing.id)
@@ -146,11 +157,13 @@ impl PgTaskTypeRepository {
                 r#"
                 INSERT INTO task_types (
                     id, owner_id, task_type_code, task_type_name, default_priority,
-                    estimated_minutes, mergeable, insertable, enabled, created_at, updated_at
+                    estimated_minutes, mergeable, insertable, release_strategy,
+                    release_interval_minutes, release_batch_size, enabled, created_at, updated_at
                 )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $13)
                 RETURNING id, owner_id, task_type_code, task_type_name, default_priority,
-                          estimated_minutes, mergeable, insertable, enabled,
+                          estimated_minutes, mergeable, insertable, release_strategy,
+                          release_interval_minutes, release_batch_size, enabled,
                           created_at, updated_at, version
                 "#,
             )
@@ -162,6 +175,9 @@ impl PgTaskTypeRepository {
             .bind(request.estimated_minutes)
             .bind(request.mergeable)
             .bind(request.insertable)
+            .bind(release_strategy_name(request.release_strategy))
+            .bind(request.release_interval_minutes)
+            .bind(request.release_batch_size)
             .bind(request.enabled)
             .bind(now)
             .fetch_one(&mut *tx)
@@ -229,7 +245,8 @@ impl PgTaskTypeRepository {
                SET enabled = $1, updated_at = $2, version = version + 1
              WHERE id = $3 AND owner_id = $4
              RETURNING id, owner_id, task_type_code, task_type_name, default_priority,
-                       estimated_minutes, mergeable, insertable, enabled,
+                       estimated_minutes, mergeable, insertable, release_strategy,
+                       release_interval_minutes, release_batch_size, enabled,
                        created_at, updated_at, version
             "#,
         )
@@ -272,6 +289,9 @@ impl From<TaskTypeRow> for TaskType {
             estimated_minutes: row.estimated_minutes,
             mergeable: row.mergeable,
             insertable: row.insertable,
+            release_strategy: release_strategy(&row.release_strategy),
+            release_interval_minutes: row.release_interval_minutes,
+            release_batch_size: row.release_batch_size,
             enabled: row.enabled,
             created_at: row.created_at,
             updated_at: row.updated_at,
@@ -288,7 +308,8 @@ async fn load_task_type_for_update(
     sqlx::query_as::<_, TaskTypeRow>(
         r#"
         SELECT id, owner_id, task_type_code, task_type_name, default_priority,
-               estimated_minutes, mergeable, insertable, enabled,
+               estimated_minutes, mergeable, insertable, release_strategy,
+               release_interval_minutes, release_batch_size, enabled,
                created_at, updated_at, version
           FROM task_types
          WHERE owner_id = $1 AND task_type_code = $2
@@ -300,6 +321,24 @@ async fn load_task_type_for_update(
     .fetch_optional(&mut **tx)
     .await
     .map_err(map_database_error)
+}
+
+fn release_strategy_name(value: TaskReleaseStrategy) -> &'static str {
+    match value {
+        TaskReleaseStrategy::Immediate => "immediate",
+        TaskReleaseStrategy::Scheduled => "scheduled",
+        TaskReleaseStrategy::Conditional => "conditional",
+        TaskReleaseStrategy::Capacity => "capacity",
+    }
+}
+
+fn release_strategy(value: &str) -> TaskReleaseStrategy {
+    match value {
+        "scheduled" => TaskReleaseStrategy::Scheduled,
+        "conditional" => TaskReleaseStrategy::Conditional,
+        "capacity" => TaskReleaseStrategy::Capacity,
+        _ => TaskReleaseStrategy::Immediate,
+    }
 }
 
 async fn finish_mutation(

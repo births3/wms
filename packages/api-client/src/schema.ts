@@ -3768,6 +3768,8 @@ export interface components {
             batch_no?: string | null;
             /** Format: int64 */
             planned_qty: number;
+            /** Format: uuid */
+            predecessor_task_id?: string | null;
             /** Format: int32 */
             priority?: number | null;
             product_code: string;
@@ -5844,7 +5846,9 @@ export interface components {
             waiting_minutes_per_point: number;
         };
         /** @enum {string} */
-        TaskTransitionAction: "assign" | "dispatch" | "reassign" | "recall" | "start" | "complete" | "report_exception" | "resolve_complete" | "cancel" | "expedite";
+        TaskReleaseStrategy: "immediate" | "scheduled" | "conditional" | "capacity";
+        /** @enum {string} */
+        TaskTransitionAction: "release" | "assign" | "dispatch" | "reassign" | "recall" | "start" | "complete" | "report_exception" | "resolve_complete" | "cancel" | "expedite";
         TaskType: {
             /** Format: date-time */
             created_at: string;
@@ -5859,6 +5863,11 @@ export interface components {
             mergeable: boolean;
             /** Format: uuid */
             owner_id: string;
+            /** Format: int32 */
+            release_batch_size?: number | null;
+            /** Format: int32 */
+            release_interval_minutes?: number | null;
+            release_strategy: components["schemas"]["TaskReleaseStrategy"];
             task_type_code: string;
             task_type_name: string;
             /** Format: date-time */
@@ -6321,6 +6330,11 @@ export interface components {
             estimated_minutes: number;
             insertable: boolean;
             mergeable: boolean;
+            /** Format: int32 */
+            release_batch_size?: number | null;
+            /** Format: int32 */
+            release_interval_minutes?: number | null;
+            release_strategy?: components["schemas"]["TaskReleaseStrategy"];
             task_type_name: string;
         };
         /** @description 仓库基础档案。 */
@@ -6370,11 +6384,17 @@ export interface components {
             owner_id: string;
             /** Format: int64 */
             planned_qty: number;
+            /** Format: uuid */
+            predecessor_task_id?: string | null;
             /** Format: int32 */
             priority: number;
             product_code: string;
             /** Format: uuid */
             product_id?: string | null;
+            /** Format: date-time */
+            release_due_at?: string | null;
+            /** Format: date-time */
+            released_at?: string | null;
             /** Format: uuid */
             source_doc_id?: string | null;
             source_doc_no: string;
@@ -16722,7 +16742,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description 创建待分配任务 */
+            /** @description 按任务类型释放规则创建待释放或待分配任务 */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -16860,7 +16880,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description 资格或执行结果非法 */
+            /** @description 释放条件、资格或执行结果非法 */
             422: {
                 headers: {
                     [name: string]: unknown;

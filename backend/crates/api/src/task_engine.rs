@@ -9,7 +9,7 @@ use wms_domain::{
     TaskListQuery, TaskPriorityRule, TaskTransitionAction, TransitionWarehouseTaskRequest,
     UpsertTaskGroupRequest, UpsertTaskPriorityRuleRequest, WarehouseTask, TASK_STATUS_ASSIGNED,
     TASK_STATUS_CANCELLED, TASK_STATUS_COMPLETED, TASK_STATUS_DISPATCHED, TASK_STATUS_EXCEPTION,
-    TASK_STATUS_IN_PROGRESS, TASK_STATUS_PENDING_ASSIGNMENT,
+    TASK_STATUS_IN_PROGRESS, TASK_STATUS_PENDING_ASSIGNMENT, TASK_STATUS_PENDING_RELEASE,
 };
 
 use crate::{
@@ -45,6 +45,7 @@ pub enum TaskEngineError {
     WorkerAtCapacity,
     NoAvailableWorker,
     PriorityRuleInvalid,
+    ReleaseConditionNotMet,
     TaskNotFound,
     NotAssignee,
     InvalidTransition,
@@ -103,6 +104,9 @@ struct WarehouseTaskRow {
     cold_chain: bool,
     manually_expedited: bool,
     estimated_minutes: i32,
+    predecessor_task_id: Option<Uuid>,
+    release_due_at: Option<DateTime<Utc>>,
+    released_at: Option<DateTime<Utc>>,
     assignee_user_id: Option<Uuid>,
     status: String,
     exception_code: Option<String>,

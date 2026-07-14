@@ -35,15 +35,15 @@ async fn create_normalized_task_in_tx(
         }
         return Err(TaskEngineError::SourceTaskConflict);
     }
-    let task_type: Option<(i32, i32, bool)> = sqlx::query_as(
-        "SELECT default_priority, estimated_minutes, enabled FROM task_types WHERE owner_id = $1 AND task_type_code = $2",
+    let task_type: Option<(i32, i32, bool, String, Option<i32>)> = sqlx::query_as(
+        "SELECT default_priority, estimated_minutes, enabled, release_strategy, release_interval_minutes FROM task_types WHERE owner_id = $1 AND task_type_code = $2",
     )
     .bind(ctx.owner_id)
     .bind(&request.task_type_code)
     .fetch_optional(&mut **tx)
     .await
     .map_err(map_database_error)?;
-    let (default_priority, estimated_minutes, task_type_enabled) =
+    let (default_priority, estimated_minutes, task_type_enabled, release_strategy, release_interval) =
         task_type.ok_or(TaskEngineError::TaskTypeNotFound)?;
     if !task_type_enabled {
         return Err(TaskEngineError::TaskTypeNotFound);
@@ -67,6 +67,16 @@ async fn create_normalized_task_in_tx(
     {
         return Err(TaskEngineError::TaskGroupNotFound);
     }
+    let capacity_available = release_strategy == "capacity"
+        && has_available_worker(
+            tx,
+            ctx.owner_id,
+            &request.task_group_code,
+            request.warehouse_id,
+            &request.task_type_code,
+            now,
+        )
+        .await?;
     let base_priority = request.priority.unwrap_or(default_priority);
     if !(0..=1000).contains(&base_priority) {
         return Err(TaskEngineError::Validation(
@@ -107,6 +117,39 @@ async fn create_normalized_task_in_tx(
         now.format("%Y%m%d%H%M%S"),
         &id.simple().to_string()[..8]
     );
+    let predecessor_completed = match request.predecessor_task_id {
+        Some(predecessor_id) => sqlx::query_scalar::<_, String>(
+            "SELECT status FROM warehouse_tasks WHERE owner_id = $1 AND id = $2",
+        )
+        .bind(ctx.owner_id)
+        .bind(predecessor_id)
+        .fetch_optional(&mut **tx)
+        .await
+        .map_err(map_database_error)?
+        .map(|status| status == TASK_STATUS_COMPLETED)
+        .ok_or(TaskEngineError::ReleaseConditionNotMet)?,
+        None => false,
+    };
+    if release_strategy == "conditional" && request.predecessor_task_id.is_none() {
+        return Err(TaskEngineError::Validation(
+            "predecessor_task_id is required for conditional release".to_string(),
+        ));
+    }
+    if release_strategy != "conditional" && request.predecessor_task_id.is_some() {
+        return Err(TaskEngineError::Validation(
+            "predecessor_task_id is only allowed for conditional release".to_string(),
+        ));
+    }
+    let (status, release_due_at, released_at) = match release_strategy.as_str() {
+        "scheduled" => (
+            TASK_STATUS_PENDING_RELEASE,
+            Some(now + Duration::minutes(i64::from(release_interval.unwrap_or(1)))),
+            None,
+        ),
+        "conditional" if !predecessor_completed => (TASK_STATUS_PENDING_RELEASE, None, None),
+        "capacity" if !capacity_available => (TASK_STATUS_PENDING_RELEASE, None, None),
+        _ => (TASK_STATUS_PENDING_ASSIGNMENT, None, Some(now)),
+    };
     let row = sqlx::query_as::<_, WarehouseTaskRow>(
         r#"
         INSERT INTO warehouse_tasks (
@@ -115,11 +158,13 @@ async fn create_normalized_task_in_tx(
             warehouse_id, task_group_code, product_id, product_code, batch_id,
             batch_no, planned_qty, source_location_id, source_location_code,
             target_location_id, target_location_code, priority, urgent_order,
-            cold_chain, estimated_minutes, status, created_at, updated_at
+            cold_chain, estimated_minutes, predecessor_task_id, release_due_at,
+            released_at, status,
+            created_at, updated_at
         ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
             $11, $12, $13, $14, $15, $16, $17, $18, $19,
-            $20, $21, $22, $23, $24, $25, 'pending_assignment', $26, $26
+            $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $30
         )
         RETURNING id, owner_id, task_no, task_type_code, source_module, source_doc_type,
                   source_doc_id, source_doc_no, source_line_no, source_task_key,
@@ -127,7 +172,8 @@ async fn create_normalized_task_in_tx(
                   batch_no, planned_qty, actual_qty, source_location_id,
                   source_location_code, target_location_id, target_location_code,
                   priority, urgent_order, cold_chain, manually_expedited,
-                  estimated_minutes, assignee_user_id, status, exception_code,
+                  estimated_minutes, predecessor_task_id, release_due_at, released_at,
+                  assignee_user_id, status, exception_code,
                   exception_note, assigned_at, dispatched_at, started_at, completed_at,
                   created_at, updated_at, version
         "#,
@@ -157,6 +203,10 @@ async fn create_normalized_task_in_tx(
     .bind(request.urgent_order)
     .bind(cold_chain)
     .bind(estimated_minutes)
+    .bind(request.predecessor_task_id)
+    .bind(release_due_at)
+    .bind(released_at)
+    .bind(status)
     .bind(now)
     .fetch_one(&mut **tx)
     .await
@@ -286,6 +336,43 @@ async fn resolve_transition(
         manually_expedited: task.manually_expedited,
     };
     match request.action {
+        TaskTransitionAction::Release if task.status == TASK_STATUS_PENDING_RELEASE => {
+            let strategy: String = sqlx::query_scalar(
+                "SELECT release_strategy FROM task_types WHERE owner_id = $1 AND task_type_code = $2",
+            )
+            .bind(task.owner_id)
+            .bind(&task.task_type_code)
+            .fetch_one(&mut **tx)
+            .await
+            .map_err(map_database_error)?;
+            let condition_met = match strategy.as_str() {
+                "scheduled" => task.release_due_at.is_some_and(|due_at| now >= due_at),
+                "conditional" => sqlx::query_scalar(
+                    "SELECT EXISTS (SELECT 1 FROM warehouse_tasks WHERE owner_id = $1 AND id = $2 AND status = 'completed')",
+                )
+                .bind(task.owner_id)
+                .bind(task.predecessor_task_id)
+                .fetch_one(&mut **tx)
+                .await
+                .map_err(map_database_error)?,
+                "capacity" => {
+                    has_available_worker(
+                        tx,
+                        task.owner_id,
+                        &task.task_group_code,
+                        task.warehouse_id,
+                        &task.task_type_code,
+                        now,
+                    )
+                    .await?
+                }
+                _ => true,
+            };
+            if !condition_met {
+                return Err(TaskEngineError::ReleaseConditionNotMet);
+            }
+            Ok(unchanged())
+        }
         TaskTransitionAction::Assign | TaskTransitionAction::Reassign => {
             let valid_status = match request.action {
                 TaskTransitionAction::Assign => task.status == TASK_STATUS_PENDING_ASSIGNMENT,
@@ -390,7 +477,7 @@ async fn resolve_transition(
         TaskTransitionAction::Cancel
             if matches!(
                 task.status.as_str(),
-                TASK_STATUS_PENDING_ASSIGNMENT | TASK_STATUS_EXCEPTION
+                TASK_STATUS_PENDING_RELEASE | TASK_STATUS_PENDING_ASSIGNMENT | TASK_STATUS_EXCEPTION
             ) =>
         {
             Ok(ResolvedTransition {
@@ -433,6 +520,65 @@ fn require_assignee(ctx: &AuthContext, task: &WarehouseTaskRow) -> Result<(), Ta
     } else {
         Err(TaskEngineError::NotAssignee)
     }
+}
+
+async fn has_available_worker(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    task_group_code: &str,
+    warehouse_id: Uuid,
+    task_type_code: &str,
+    now: DateTime<Utc>,
+) -> Result<bool, TaskEngineError> {
+    sqlx::query_scalar(
+        r#"
+        SELECT COALESCE(sum(worker_capacity.free_slots), 0) > (
+            SELECT count(*)
+              FROM warehouse_tasks queued_task
+             WHERE queued_task.owner_id = $1
+               AND queued_task.task_group_code = $2
+               AND queued_task.warehouse_id = $3
+               AND queued_task.status = 'pending_assignment'
+        )
+          FROM (
+            SELECT GREATEST(
+                       COALESCE(membership.max_active_tasks, 2147483647)::BIGINT
+                       - count(active_task.id),
+                       0
+                   ) AS free_slots
+              FROM task_groups task_group
+              JOIN task_group_memberships membership
+                ON membership.task_group_id = task_group.id
+               AND membership.owner_id = task_group.owner_id
+              JOIN auth_users auth_user ON auth_user.id = membership.user_id
+              JOIN auth_user_owner_bindings binding
+                ON binding.user_id = membership.user_id
+               AND binding.owner_id = membership.owner_id
+              LEFT JOIN warehouse_tasks active_task
+                ON active_task.owner_id = membership.owner_id
+               AND active_task.assignee_user_id = membership.user_id
+               AND active_task.status IN ('assigned', 'dispatched', 'in_progress')
+             WHERE task_group.owner_id = $1
+               AND task_group.task_group_code = $2
+               AND task_group.warehouse_id = $3
+               AND task_group.enabled
+               AND $4 = ANY(task_group.task_type_codes)
+               AND auth_user.status = 'active'
+               AND binding.is_active
+               AND (membership.qualification_valid_until IS NULL OR
+                    membership.qualification_valid_until > $5)
+             GROUP BY membership.user_id, membership.max_active_tasks
+        ) worker_capacity
+        "#,
+    )
+    .bind(owner_id)
+    .bind(task_group_code)
+    .bind(warehouse_id)
+    .bind(task_type_code)
+    .bind(now)
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(map_database_error)
 }
 
 async fn validate_worker_qualification(
@@ -519,6 +665,7 @@ async fn select_least_loaded_worker(
            AND $4 = ANY(task_group.task_type_codes)
            AND auth_user.status = 'active'
            AND binding.is_active
+           AND ($7::UUID IS NULL OR membership.user_id <> $7)
            AND (membership.qualification_valid_until IS NULL OR
                 membership.qualification_valid_until > $5)
          GROUP BY membership.user_id, membership.max_active_tasks
@@ -533,6 +680,7 @@ async fn select_least_loaded_worker(
     .bind(&task.task_type_code)
     .bind(now)
     .bind(task.id)
+    .bind(task.assignee_user_id)
     .fetch_optional(&mut **tx)
     .await
     .map_err(map_database_error)?

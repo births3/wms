@@ -385,7 +385,8 @@ impl PgTaskEngineRepository {
                        ELSE 0
                    END)::INT AS priority,
                    task.urgent_order, task.cold_chain, task.manually_expedited,
-                   task.estimated_minutes, task.assignee_user_id, task.status,
+                   task.estimated_minutes, task.predecessor_task_id, task.release_due_at, task.released_at,
+                   task.assignee_user_id, task.status,
                    task.exception_code, task.exception_note, task.assigned_at,
                    task.dispatched_at, task.started_at, task.completed_at,
                    task.created_at, task.updated_at, task.version
@@ -445,6 +446,27 @@ impl PgTaskEngineRepository {
         let before = load_task_for_update(&mut tx, ctx.owner_id, task_id)
             .await?
             .ok_or(TaskEngineError::TaskNotFound)?;
+        if request.action == TaskTransitionAction::Release && before.released_at.is_some() {
+            let value = WarehouseTask::from(before);
+            store_idempotency_success(
+                &mut tx,
+                ctx.owner_id,
+                idempotency_key,
+                &request_hash,
+                "POST",
+                &format!("/api/v1/task-engine/tasks/{task_id}/transitions"),
+                "warehouse_task",
+                value.id,
+                &value,
+                now,
+            )
+            .await?;
+            tx.commit().await.map_err(map_database_error)?;
+            return Ok(IdempotentTaskMutation {
+                value,
+                replayed: true,
+            });
+        }
         let transition = resolve_transition(&mut tx, ctx, &before, &request, now).await?;
         let row = sqlx::query_as::<_, WarehouseTaskRow>(
             r#"
@@ -460,6 +482,10 @@ impl PgTaskEngineRepository {
                    dispatched_at = CASE WHEN $1 = 'dispatched' THEN $8 ELSE dispatched_at END,
                    started_at = CASE WHEN $1 = 'in_progress' THEN $8 ELSE started_at END,
                    completed_at = CASE WHEN $1 = 'completed' THEN $8 ELSE completed_at END,
+                   released_at = CASE
+                       WHEN status = 'pending_release' AND $1 = 'pending_assignment' THEN $8
+                       ELSE released_at
+                   END,
                    updated_at = $8,
                    version = version + 1
              WHERE id = $9 AND owner_id = $10
@@ -469,7 +495,8 @@ impl PgTaskEngineRepository {
                        batch_no, planned_qty, actual_qty, source_location_id,
                        source_location_code, target_location_id, target_location_code,
                        priority, urgent_order, cold_chain, manually_expedited,
-                       estimated_minutes, assignee_user_id, status, exception_code,
+                       estimated_minutes, predecessor_task_id, release_due_at, released_at, assignee_user_id,
+                       status, exception_code,
                        exception_note, assigned_at, dispatched_at, started_at, completed_at,
                        created_at, updated_at, version
             "#,

@@ -1,7 +1,7 @@
 # 错误码字典（Error Codes Dictionary）
 
 > 时间：2026-07-15
-> 版本：v3.7（当前 147 项）
+> 版本：v3.8（当前 148 项）
 > 文档层级：L2 规范（必须遵守）
 > 关联：[ADR-0010](adr/0010-error-codes.md) / [coding-standards.md §4](coding-standards.md)
 
@@ -77,9 +77,9 @@
 |---|---|---|
 | info | 1 | 状态变更通知 / 数据已存在等正常路径 |
 | warning | 39 | 业务规则拦截（库存不足 / 资质过期等）|
-| error | 99 | 业务异常（数据冲突 / 校验失败）|
+| error | 100 | 业务异常（数据冲突 / 校验失败）|
 | critical | 8 | 合规/安全异常（跨货主访问 / 篡改尝试）|
-| **合计** | **147** | — |
+| **合计** | **148** | — |
 
 ---
 
@@ -103,7 +103,7 @@
 | M_TC | 2 | 追溯码 |
 | M_PM | 1 | 参数对照 |
 | M_DI | 12 | 药检平台配置 |
-| M_TE | 23 | 任务类型、任务组、优先级规则与执行主链 |
+| M_TE | 24 | 任务类型、任务组、优先级规则、释放控制与执行主链 |
 
 ---
 
@@ -1756,6 +1756,18 @@ error_codes:
     related_stories: [US-TE-004]
     introduced_in: v3.7
 
+  - code: M_TE_RELEASE_CONDITION_NOT_MET
+    module: M_TE
+    category: RELEASE
+    detail: CONDITION_NOT_MET
+    http_status: 422
+    severity: error
+    message_zh: '任务释放条件未满足'
+    message_en: 'Task release condition is not met'
+    related_fields: []
+    related_stories: [US-TE-006]
+    introduced_in: v3.8
+
   - code: M_TE_TASK_GROUP_NOT_FOUND
     module: M_TE
     category: TASK_GROUP
@@ -1960,3 +1972,4 @@ error_codes:
 | 2026-07-14 | v3.4 | 登记 M-DI 药检平台配置与 M-TE 任务类型配置 API 错误码；脚本统计当前合计 117 项 |
 | 2026-07-15 | v3.6 | 登记 M-TE 任务组、创建、分派与执行主链 15 个错误码；脚本统计当前合计 137 项 |
 | 2026-07-15 | v3.7 | 补齐 M-VR 双人策略实际返回的 7 个错误码，并统一 M-TE 内部错误命名；脚本统计当前合计 144 项 |
+| 2026-07-15 | v3.8 | 登记 M-TE 任务释放条件未满足错误码；脚本统计当前合计 148 项 |

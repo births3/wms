@@ -100,7 +100,7 @@ pub(crate) fn list_warehouse_tasks() {}
     params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")),
     request_body = CreateWarehouseTaskRequest,
     responses(
-        (status = 201, description = "创建待分配任务", body = WarehouseTask),
+        (status = 201, description = "按任务类型释放规则创建待释放或待分配任务", body = WarehouseTask),
         (status = 400, description = "缺少幂等键", body = ErrorResponse),
         (status = 401, description = "未登录", body = ErrorResponse),
         (status = 403, description = "权限不足", body = ErrorResponse),
@@ -128,7 +128,7 @@ pub(crate) fn create_warehouse_task() {}
         (status = 403, description = "权限不足或非任务执行人", body = ErrorResponse),
         (status = 404, description = "任务不存在", body = ErrorResponse),
         (status = 409, description = "状态或幂等冲突", body = ErrorResponse),
-        (status = 422, description = "资格或执行结果非法", body = ErrorResponse),
+        (status = 422, description = "释放条件、资格或执行结果非法", body = ErrorResponse),
     ),
 )]
 #[allow(dead_code)]

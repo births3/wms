@@ -3,7 +3,7 @@ use crate::openapi_paths::*;
 use utoipa::OpenApi;
 use wms_domain::{
     ArriveDockAppointmentRequest, ChangeDrugInspectionPlatformStatusRequest,
-    DrugInspectionPlatform, DrugInspectionPlatformListResponse,
+    DrugInspectionPlatform, DrugInspectionPlatformListResponse, TaskReleaseStrategy,
     UpsertDrugInspectionPlatformRequest,
 };
 #[derive(OpenApi)]
@@ -526,6 +526,7 @@ use wms_domain::{
         UpsertInventoryStatusTransitionRequest,
         UpsertDocumentNumberRuleRequest,
         SetTaskTypeEnabledRequest,
+        TaskReleaseStrategy,
         TaskType,
         TaskTypeListResponse,
         UpsertTaskTypeRequest,

@@ -120,6 +120,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .map_err(|error| io::Error::other(format!("failed to connect PostgreSQL: {error:?}")))?;
     wms_api::api_key_expiry::spawn(pool.clone());
     wms_api::inventory_expiry_job::spawn(pool.clone());
+    wms_api::task_release_job::spawn(pool.clone());
     let config_center_state = ConfigCenterAppState::with_postgres(file_registry, pool.clone());
     let auth_state = AuthAppState::new(pool.clone());
     let role_management_state = RoleManagementState::new(pool.clone(), revocation_store.clone());

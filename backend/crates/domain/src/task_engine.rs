@@ -121,6 +121,9 @@ pub struct WarehouseTask {
     pub cold_chain: bool,
     pub manually_expedited: bool,
     pub estimated_minutes: i32,
+    pub predecessor_task_id: Option<Uuid>,
+    pub release_due_at: Option<DateTime<Utc>>,
+    pub released_at: Option<DateTime<Utc>>,
     pub assignee_user_id: Option<Uuid>,
     pub status: String,
     pub exception_code: Option<String>,
@@ -157,11 +160,14 @@ pub struct CreateWarehouseTaskRequest {
     pub priority: Option<i32>,
     #[serde(default)]
     pub urgent_order: bool,
+    #[serde(default)]
+    pub predecessor_task_id: Option<Uuid>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskTransitionAction {
+    Release,
     Assign,
     Dispatch,
     Reassign,

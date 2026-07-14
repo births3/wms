@@ -14,6 +14,16 @@ pub const TASK_TYPE_INVENTORY_COUNT: &str = "inventory_count";
 pub const TASK_TYPE_LOADING: &str = "loading";
 pub const TASK_TYPE_RETURN_PUTAWAY: &str = "return_putaway";
 
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskReleaseStrategy {
+    #[default]
+    Immediate,
+    Scheduled,
+    Conditional,
+    Capacity,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 pub struct TaskType {
     pub id: Uuid,
@@ -24,6 +34,9 @@ pub struct TaskType {
     pub estimated_minutes: i32,
     pub mergeable: bool,
     pub insertable: bool,
+    pub release_strategy: TaskReleaseStrategy,
+    pub release_interval_minutes: Option<i32>,
+    pub release_batch_size: Option<i32>,
     pub enabled: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -43,6 +56,12 @@ pub struct UpsertTaskTypeRequest {
     pub estimated_minutes: i32,
     pub mergeable: bool,
     pub insertable: bool,
+    #[serde(default)]
+    pub release_strategy: TaskReleaseStrategy,
+    #[serde(default)]
+    pub release_interval_minutes: Option<i32>,
+    #[serde(default)]
+    pub release_batch_size: Option<i32>,
     pub enabled: bool,
 }
 
@@ -59,6 +78,7 @@ pub enum TaskTypeValidationError {
     NameInvalid,
     PriorityInvalid,
     EstimatedMinutesInvalid,
+    ReleaseRuleInvalid,
 }
 
 impl fmt::Display for TaskTypeValidationError {
@@ -70,6 +90,9 @@ impl fmt::Display for TaskTypeValidationError {
             Self::NameInvalid => "任务类型名称非法",
             Self::PriorityInvalid => "默认优先级必须在 0 到 1000 之间",
             Self::EstimatedMinutesInvalid => "预计耗时必须在 1 到 10080 分钟之间",
+            Self::ReleaseRuleInvalid => {
+                "定时释放间隔必须在 1 到 1440 分钟之间，批量必须在 1 到 1000 之间"
+            }
         };
         f.write_str(message)
     }
@@ -90,11 +113,25 @@ impl UpsertTaskTypeRequest {
         if !(1..=10_080).contains(&self.estimated_minutes) {
             return Err(TaskTypeValidationError::EstimatedMinutesInvalid);
         }
+        if self.release_strategy == TaskReleaseStrategy::Scheduled
+            && (!self
+                .release_interval_minutes
+                .is_some_and(|value| (1..=1440).contains(&value))
+                || !self
+                    .release_batch_size
+                    .is_some_and(|value| (1..=1000).contains(&value)))
+        {
+            return Err(TaskTypeValidationError::ReleaseRuleInvalid);
+        }
         Ok(())
     }
 
     pub fn normalized(mut self) -> Self {
         self.task_type_name = self.task_type_name.trim().to_string();
+        if self.release_strategy != TaskReleaseStrategy::Scheduled {
+            self.release_interval_minutes = None;
+            self.release_batch_size = None;
+        }
         self
     }
 }
@@ -134,6 +171,9 @@ mod tests {
             estimated_minutes: 0,
             mergeable: true,
             insertable: false,
+            release_strategy: TaskReleaseStrategy::Immediate,
+            release_interval_minutes: None,
+            release_batch_size: None,
             enabled: true,
         };
 

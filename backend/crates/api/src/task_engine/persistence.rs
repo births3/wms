@@ -253,7 +253,8 @@ async fn load_task_for_update(
                batch_no, planned_qty, actual_qty, source_location_id,
                source_location_code, target_location_id, target_location_code,
                priority, urgent_order, cold_chain, manually_expedited,
-               estimated_minutes, assignee_user_id, status, exception_code,
+               estimated_minutes, predecessor_task_id, release_due_at, released_at, assignee_user_id,
+               status, exception_code,
                exception_note, assigned_at, dispatched_at, started_at, completed_at,
                created_at, updated_at, version
           FROM warehouse_tasks
@@ -281,7 +282,8 @@ async fn load_task_by_source_key(
                batch_no, planned_qty, actual_qty, source_location_id,
                source_location_code, target_location_id, target_location_code,
                priority, urgent_order, cold_chain, manually_expedited,
-               estimated_minutes, assignee_user_id, status, exception_code,
+               estimated_minutes, predecessor_task_id, release_due_at, released_at, assignee_user_id,
+               status, exception_code,
                exception_note, assigned_at, dispatched_at, started_at, completed_at,
                created_at, updated_at, version
           FROM warehouse_tasks
@@ -308,7 +310,8 @@ async fn load_task_by_source_identity(
                batch_no, planned_qty, actual_qty, source_location_id,
                source_location_code, target_location_id, target_location_code,
                priority, urgent_order, cold_chain, manually_expedited,
-               estimated_minutes, assignee_user_id, status, exception_code,
+               estimated_minutes, predecessor_task_id, release_due_at, released_at, assignee_user_id,
+               status, exception_code,
                exception_note, assigned_at, dispatched_at, started_at, completed_at,
                created_at, updated_at, version
           FROM warehouse_tasks
@@ -354,6 +357,7 @@ fn task_matches_request(row: &WarehouseTaskRow, request: &CreateWarehouseTaskReq
         && row.target_location_id == request.target_location_id
         && row.target_location_code == request.target_location_code
         && row.urgent_order == request.urgent_order
+        && row.predecessor_task_id == request.predecessor_task_id
 }
 
 async fn append_task_event(
@@ -556,6 +560,7 @@ fn map_database_error(error: sqlx::Error) -> TaskEngineError {
 fn action_name(action: &TaskTransitionAction) -> &'static str {
     match action {
         TaskTransitionAction::Assign => "assign_task",
+        TaskTransitionAction::Release => "release_task",
         TaskTransitionAction::Dispatch => "dispatch_task",
         TaskTransitionAction::Reassign => "reassign_task",
         TaskTransitionAction::Recall => "recall_task",

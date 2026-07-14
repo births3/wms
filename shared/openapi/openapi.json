@@ -13884,7 +13884,7 @@
         },
         "responses": {
           "201": {
-            "description": "创建待分配任务",
+            "description": "按任务类型释放规则创建待释放或待分配任务",
             "content": {
               "application/json": {
                 "schema": {
@@ -14055,7 +14055,7 @@
             }
           },
           "422": {
-            "description": "资格或执行结果非法",
+            "description": "释放条件、资格或执行结果非法",
             "content": {
               "application/json": {
                 "schema": {
@@ -17941,6 +17941,11 @@
           "planned_qty": {
             "type": "integer",
             "format": "int64"
+          },
+          "predecessor_task_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
           },
           "priority": {
             "type": "integer",
@@ -24430,9 +24435,19 @@
           }
         }
       },
+      "TaskReleaseStrategy": {
+        "type": "string",
+        "enum": [
+          "immediate",
+          "scheduled",
+          "conditional",
+          "capacity"
+        ]
+      },
       "TaskTransitionAction": {
         "type": "string",
         "enum": [
+          "release",
           "assign",
           "dispatch",
           "reassign",
@@ -24456,6 +24471,7 @@
           "estimated_minutes",
           "mergeable",
           "insertable",
+          "release_strategy",
           "enabled",
           "created_at",
           "updated_at",
@@ -24490,6 +24506,19 @@
           "owner_id": {
             "type": "string",
             "format": "uuid"
+          },
+          "release_batch_size": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "release_interval_minutes": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "release_strategy": {
+            "$ref": "#/components/schemas/TaskReleaseStrategy"
           },
           "task_type_code": {
             "type": "string"
@@ -26010,6 +26039,19 @@
           "mergeable": {
             "type": "boolean"
           },
+          "release_batch_size": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "release_interval_minutes": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "release_strategy": {
+            "$ref": "#/components/schemas/TaskReleaseStrategy"
+          },
           "task_type_name": {
             "type": "string"
           }
@@ -26171,6 +26213,11 @@
             "type": "integer",
             "format": "int64"
           },
+          "predecessor_task_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
           "priority": {
             "type": "integer",
             "format": "int32"
@@ -26181,6 +26228,16 @@
           "product_id": {
             "type": "string",
             "format": "uuid",
+            "nullable": true
+          },
+          "release_due_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "released_at": {
+            "type": "string",
+            "format": "date-time",
             "nullable": true
           },
           "source_doc_id": {

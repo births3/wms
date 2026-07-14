@@ -82,6 +82,11 @@ impl IntoResponse for TaskEngineHandlerError {
                 "M_TE_RULE_INVALID",
                 "优先级规则参数非法",
             ),
+            Self::TaskEngine(TaskEngineError::ReleaseConditionNotMet) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M_TE_RELEASE_CONDITION_NOT_MET",
+                "任务释放条件未满足",
+            ),
             Self::TaskEngine(TaskEngineError::TaskTypeNotFound) => (
                 StatusCode::NOT_FOUND,
                 "M_TE_TASK_TYPE_NOT_FOUND",
@@ -331,6 +336,7 @@ async fn transition_task_handler(
         | TaskTransitionAction::Complete
         | TaskTransitionAction::ReportException => EXECUTE_PERMISSION,
         TaskTransitionAction::Assign
+        | TaskTransitionAction::Release
         | TaskTransitionAction::Dispatch
         | TaskTransitionAction::Reassign
         | TaskTransitionAction::Recall

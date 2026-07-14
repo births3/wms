@@ -60,6 +60,7 @@ pub mod system_dictionary;
 pub mod system_dictionary_handlers;
 pub mod task_engine;
 pub mod task_engine_handlers;
+pub mod task_release_job;
 pub mod task_type;
 pub mod task_type_handlers;
 pub mod tms_plus;
