@@ -30,6 +30,8 @@ mod priority;
 mod release;
 #[path = "task_engine_postgres/release_capacity.rs"]
 mod release_capacity;
+#[path = "task_engine_postgres/release_routes.rs"]
+mod release_routes;
 #[path = "task_engine_postgres/release_rule_change.rs"]
 mod release_rule_change;
 #[path = "task_engine_postgres/routes.rs"]

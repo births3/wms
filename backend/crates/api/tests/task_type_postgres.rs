@@ -16,7 +16,7 @@ use wms_api::{
     task_type::{PgTaskTypeRepository, TaskTypeError},
     task_type_handlers::{task_type_router, TaskTypeAppState},
 };
-use wms_domain::{SetTaskTypeEnabledRequest, UpsertTaskTypeRequest};
+use wms_domain::{SetTaskTypeEnabledRequest, TaskReleaseStrategy, UpsertTaskTypeRequest};
 
 struct AllowAllRevocationStore;
 
@@ -81,6 +81,9 @@ fn request() -> UpsertTaskTypeRequest {
         estimated_minutes: 45,
         mergeable: false,
         insertable: true,
+        release_strategy: TaskReleaseStrategy::Immediate,
+        release_interval_minutes: None,
+        release_batch_size: None,
         enabled: true,
     }
 }
@@ -163,6 +166,20 @@ async fn task_type_mutations_are_idempotent_and_audited(pool: PgPool) {
         )
         .await
         .expect_err("invalid task type configuration must be rejected");
+    assert!(matches!(invalid, TaskTypeError::Validation(_)));
+
+    let mut invalid_release = request();
+    invalid_release.release_strategy = TaskReleaseStrategy::Scheduled;
+    let invalid = repository
+        .upsert(
+            &ctx(owner_id),
+            "invalid_release_rule",
+            invalid_release,
+            now,
+            "task-type-invalid-release-1",
+        )
+        .await
+        .expect_err("scheduled release must configure interval and batch size");
     assert!(matches!(invalid, TaskTypeError::Validation(_)));
 
     let first = repository
