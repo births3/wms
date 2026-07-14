@@ -96,7 +96,7 @@ export function supplierRow(item: Supplier): MasterDataRow {
     status: item.status,
     statusLabel: activeStatusLabel(item.status),
     ownerId: item.owner_id,
-    primaryLabel: "资质证号",
+    primaryLabel: "统一社会信用代码",
     primaryValue: text(item.license_no),
     secondaryLabel: "联系人",
     secondaryValue: text(item.contact_name),
@@ -133,6 +133,7 @@ export function customerRow(item: Customer): MasterDataRow {
 }
 
 export function warehouseRow(item: Warehouse): MasterDataRow {
+  const warehouseTypeLabel = ({ physical: "物理仓", logical: "逻辑仓", virtual: "虚拟仓" } as Record<string, string>)[item.warehouse_type] ?? item.warehouse_type;
   return row({
     id: item.id,
     code: item.warehouse_code,
@@ -142,12 +143,13 @@ export function warehouseRow(item: Warehouse): MasterDataRow {
     ownerId: item.owner_id,
     primaryLabel: "货主",
     primaryValue: shortId(item.owner_id),
-    secondaryLabel: "档案类型",
-    secondaryValue: "仓库",
+    secondaryLabel: "仓库类型",
+    secondaryValue: warehouseTypeLabel,
     extraLabel: "仓库名称",
     extraValue: item.warehouse_name,
     createdAt: item.created_at,
     updatedAt: item.updated_at,
+    warehouseFields: { warehouseType: item.warehouse_type },
   });
 }
 
@@ -165,7 +167,8 @@ export function locationRow(
   warehouseRefs: ReadonlyMap<string, WarehouseRef> = new Map(),
 ): MasterDataRow {
   const locationType = locationTypeLabels.get(item.location_type) ?? text(item.location_type);
-  const volume = `${item.used_volume_cm3}/${item.max_volume_cm3} cm³`;
+  const remainingVolumeCm3 = Math.max(item.max_volume_cm3 - item.used_volume_cm3, 0);
+  const volume = `${item.used_volume_cm3}/${item.max_volume_cm3} cm³（余 ${remainingVolumeCm3}）`;
   const area = locationAreaCode(item.location_code);
   const warehouse = warehouseDisplayLabel(warehouseRefs.get(item.warehouse_id), item.warehouse_id);
   const zone = zoneDisplayCode(
@@ -202,6 +205,7 @@ export function locationRow(
       volume,
       maxVolumeCm3: String(item.max_volume_cm3),
       usedVolumeCm3: String(item.used_volume_cm3),
+      remainingVolumeCm3: String(remainingVolumeCm3),
       maxSku: String(item.max_sku_count),
     },
   });

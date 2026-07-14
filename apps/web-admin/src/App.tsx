@@ -33,41 +33,12 @@ import {
   type SidebarMenuItem,
   type SidebarMenuTreeSection,
 } from "@/app-shell/AdminSidebarMenu";
+import { renderAdminView } from "@/app-shell/AdminViewRenderer";
+import type { AdminView } from "@/app-shell/admin-view";
 import { usePublishedAdminMenuQuery } from "@/features/admin-menu/admin-menu-queries";
 import { useCurrentUserQuery, useLogout, type CurrentUser } from "@/features/auth/auth-queries";
 import { clearAuthSession, hasActiveAuthSession } from "@/lib/auth-session";
-import { H1AdminMenuPage } from "@/pages/admin-menu/H1AdminMenuPage";
 import { LoginPage } from "@/pages/auth/LoginPage";
-import { FeatureFlagConfigCenterPage } from "@/pages/config-center/FeatureFlagConfigCenterPage";
-import { H4WechatNotifyPage, type H4WechatNotifyMode } from "@/pages/wechat-notify/H4WechatNotifyPage";
-import { M2InboundPage, type M2InboundMode } from "@/pages/inbound/M2InboundPage";
-import { M3BatchManagementPage } from "@/pages/inventory/M3BatchManagementPage";
-import { M1MasterDataPage, type MasterDataViewId } from "@/pages/master-data/M1MasterDataPage";
-import { M4OutboundPage, type M4OutboundMode } from "@/pages/outbound/M4OutboundPage";
-import { H2AuditTrailPage, H3ApiContractPage } from "@/pages/platform/HorizontalCapabilityPages";
-import { H5ExpressPage } from "@/pages/express/H5ExpressPage";
-import { H9PrintTemplatePage } from "@/pages/print-template/H9PrintTemplatePage";
-
-type AdminView =
-  | "dashboard"
-  | MasterDataViewId
-  | "m1-feature-flags"
-  | "m2-receiving"
-  | "m2-inspecting"
-  | "m2-putaway"
-  | "m3-batches"
-  | "m4-orders"
-  | "m4-waves"
-  | "m4-review"
-  | "m4-returns"
-  | "h1-menu-management"
-  | "h2-audit-trail"
-  | "h3-api-contract"
-  | "h4-wechat-settings"
-  | "h4-notify-configs"
-  | "h4-notify-records"
-  | "h5-express"
-  | "h9-print-templates";
 
 /** 作业 KPI 示例数据（尚未接入真实待办接口，勿当作生产统计） */
 const operationKpis = [
@@ -114,6 +85,7 @@ const menuSections: Array<{ label: string; items: SidebarMenuItem<AdminView>[] }
       { id: "m1-warehouses", title: "M1 仓库管理", subtitle: "仓库 / 状态", icon: Warehouse },
       { id: "m1-zones", title: "M1 库区管理", subtitle: "库区 / 仓库", icon: MapPinned },
       { id: "m1-locations", title: "M1 库位管理", subtitle: "库位 / 容量", icon: MapPinned },
+      { id: "dock-management", title: "M1 月台管理", subtitle: "月台 / 作业类型 / 温区", icon: MapPinned },
       { id: "m1-system-dictionary", title: "M1 系统字典", subtitle: "单据类型 / 特殊药品分类", icon: BookOpen },
       { id: "m1-feature-flags", title: "M1 功能开关", subtitle: "配置中心 / Feature Flag", icon: KeyRound },
     ],
@@ -124,6 +96,7 @@ const menuSections: Array<{ label: string; items: SidebarMenuItem<AdminView>[] }
       { id: "m2-receiving", title: "M2 收货管理", subtitle: "ASN / 到货确认", icon: CheckCircle2 },
       { id: "m2-inspecting", title: "M2 验收管理", subtitle: "批号 / 效期 / 签字", icon: ClipboardList },
       { id: "m2-putaway", title: "M2 上架管理", subtitle: "库位 / 数量确认", icon: PackageCheck },
+      { id: "m-di-platforms", title: "M-DI 药检平台", subtitle: "平台 / 认证 / 状态", icon: KeyRound },
     ],
   },
   {
@@ -137,12 +110,26 @@ const menuSections: Array<{ label: string; items: SidebarMenuItem<AdminView>[] }
   },
   {
     label: "库内业务",
-    items: [{ id: "m3-batches", title: "M3 批号管理", subtitle: "批号 / 效期 / 库位", icon: Layers }],
+    items: [
+      { id: "m3-batches", title: "M3 批号管理", subtitle: "批号 / 效期 / 库位", icon: Layers },
+      { id: "m3-status-config", title: "M3 状态规则", subtitle: "状态转换 / 货主覆盖", icon: ClipboardList },
+      { id: "mte-task-types", title: "M-TE 任务类型配置", subtitle: "任务 / 调度参数", icon: ClipboardList },
+    ],
+  },
+  {
+    label: "增值业务",
+    items: [
+      { id: "m9-billing-rules", title: "M9 计费规则", subtitle: "货主 / 合同 / 费率", icon: ClipboardList },
+      { id: "m10-route-plans", title: "M10 路径规划接收", subtitle: "TMS / 路线 / 订单", icon: Truck },
+    ],
   },
   {
     label: "基础能力",
     items: [
       { id: "h1-menu-management", title: "H1 菜单管理", subtitle: "三层菜单 / 权限点", icon: ShieldCheck },
+      { id: "h1-role-permission", title: "H1 角色权限", subtitle: "角色 / 权限矩阵 / 批量授权", icon: ShieldCheck },
+      { id: "h1-session-management", title: "H1 登录会话", subtitle: "Token / 设备 / 强制踢人", icon: ShieldCheck },
+      { id: "h1-api-keys", title: "H1 API Key 管理", subtitle: "创建 / 轮换 / 吊销", icon: KeyRound },
       { id: "h2-audit-trail", title: "H2 审计追踪", subtitle: "审计 / 归档 / 事件", icon: ClipboardList },
       { id: "h3-api-contract", title: "H3 OpenAPI", subtitle: "契约 / 文档 / 类型", icon: KeyRound },
       { id: "h4-wechat-settings", title: "H4 参数设置", subtitle: "企业微信 / 回调 / 重试", icon: KeyRound },
@@ -150,6 +137,7 @@ const menuSections: Array<{ label: string; items: SidebarMenuItem<AdminView>[] }
       { id: "h4-notify-records", title: "H4 发送记录", subtitle: "通知 / 重发 / 排查", icon: History },
       { id: "h5-express", title: "H5 快递对接", subtitle: "快递商 / 规则 / 面单", icon: Truck },
       { id: "h9-print-templates", title: "H9 打印模板", subtitle: "字段库 / 模板类型", icon: Printer },
+      { id: "mcg-numbering", title: "M-CG 单据号规则", subtitle: "单据类型 / 编码规则", icon: KeyRound },
     ],
   },
 ];
@@ -166,28 +154,30 @@ const defaultMenuTree: SidebarMenuTreeSection<AdminView>[] = [
     label: "基础档案",
     groups: [
       { label: "主数据", items: [menuItem("m1-products"), menuItem("m1-business-partners")] },
-      { label: "仓储资料", items: [menuItem("m1-warehouses"), menuItem("m1-zones"), menuItem("m1-locations")] },
+      { label: "仓储资料", items: [menuItem("m1-warehouses"), menuItem("m1-zones"), menuItem("m1-locations"), menuItem("dock-management")] },
       { label: "系统配置", items: [menuItem("m1-system-dictionary"), menuItem("m1-feature-flags")] },
     ],
   },
   {
     label: "入库业务",
-    groups: [{ label: "入库作业", items: [menuItem("m2-receiving"), menuItem("m2-inspecting"), menuItem("m2-putaway")] }],
+    groups: [{ label: "入库作业", items: [menuItem("m2-receiving"), menuItem("m2-inspecting"), menuItem("m2-putaway"), menuItem("m-di-platforms")] }],
   },
   {
     label: "出库业务",
     groups: [{ label: "出库作业", items: [menuItem("m4-orders"), menuItem("m4-waves"), menuItem("m4-review"), menuItem("m4-returns")] }],
   },
-  { label: "库内业务", groups: [{ label: "库存管理", items: [menuItem("m3-batches")] }] },
+  { label: "库内业务", groups: [{ label: "库存管理", items: [menuItem("m3-batches"), menuItem("m3-status-config"), menuItem("mte-task-types")] }] },
+  { label: "增值业务", groups: [{ label: "增值作业", items: [menuItem("m9-billing-rules"), menuItem("m10-route-plans")] }] },
   {
     label: "基础能力",
     groups: [
-      { label: "H1 权限租户", items: [menuItem("h1-menu-management")] },
+      { label: "H1 权限租户", items: [menuItem("h1-menu-management"), menuItem("h1-role-permission"), menuItem("h1-session-management"), menuItem("h1-api-keys")] },
       { label: "H2 审计能力", items: [menuItem("h2-audit-trail")] },
       { label: "H3 契约能力", items: [menuItem("h3-api-contract")] },
       { label: "H4 企业微信", items: [menuItem("h4-wechat-settings"), menuItem("h4-notify-configs"), menuItem("h4-notify-records")] },
       { label: "H5 快递能力", items: [menuItem("h5-express")] },
       { label: "H9 打印能力", items: [menuItem("h9-print-templates")] },
+      { label: "M-CG 编码能力", items: [menuItem("mcg-numbering")] },
     ],
   },
 ];
@@ -363,107 +353,19 @@ export function App() {
     >
       {openTabs.map((tab) => (
         <div key={tab.view} hidden={tab.view !== view}>
-          {renderAdminView(tab.view, currentUserQuery.data, navigateTo)}
+          {renderAdminView(tab.view, currentUserQuery.data, navigateTo) ?? (
+            <Dashboard
+              currentUser={currentUserQuery.data}
+              onOpenM2Inbound={() => navigateTo("m2-receiving")}
+              onOpenM4Outbound={() => navigateTo("m4-orders")}
+              onOpenM3Batches={() => navigateTo("m3-batches")}
+              onOpenH2Audit={() => navigateTo("h2-audit-trail")}
+            />
+          )}
         </div>
       ))}
     </AppShell>
   );
-}
-
-function renderAdminView(
-  view: AdminView,
-  currentUser: CurrentUser,
-  navigateTo: (view: AdminView) => void,
-) {
-  const inboundMode = inboundViewToMode(view);
-  const outboundMode = outboundViewToMode(view);
-  const wechatNotifyMode = wechatNotifyViewToMode(view);
-  const masterDataViewId = masterDataViewToId(view);
-
-  if (view === "m1-feature-flags") {
-    return <FeatureFlagConfigCenterPage onBack={() => navigateTo("dashboard")} />;
-  }
-  if (masterDataViewId) {
-    return <M1MasterDataPage viewId={masterDataViewId} onBack={() => navigateTo("dashboard")} />;
-  }
-  if (inboundMode) {
-    return (
-      <M2InboundPage
-        mode={inboundMode}
-        currentOwner={{ ownerId: currentUser.owner_id, ownerCode: currentUser.owner_code }}
-        onBack={() => navigateTo("dashboard")}
-      />
-    );
-  }
-  if (view === "m3-batches") {
-    return <M3BatchManagementPage onBack={() => navigateTo("dashboard")} />;
-  }
-  if (outboundMode) {
-    return <M4OutboundPage mode={outboundMode} onBack={() => navigateTo("dashboard")} />;
-  }
-  if (view === "h1-menu-management") {
-    return <H1AdminMenuPage />;
-  }
-  if (view === "h2-audit-trail") {
-    return <H2AuditTrailPage />;
-  }
-  if (view === "h3-api-contract") {
-    return <H3ApiContractPage />;
-  }
-  if (wechatNotifyMode) {
-    return <H4WechatNotifyPage mode={wechatNotifyMode} />;
-  }
-  if (view === "h5-express") {
-    return <H5ExpressPage />;
-  }
-  if (view === "h9-print-templates") {
-    return <H9PrintTemplatePage />;
-  }
-  return (
-    <Dashboard
-      currentUser={currentUser}
-      onOpenM2Inbound={() => navigateTo("m2-receiving")}
-      onOpenM4Outbound={() => navigateTo("m4-orders")}
-      onOpenM3Batches={() => navigateTo("m3-batches")}
-      onOpenH2Audit={() => navigateTo("h2-audit-trail")}
-    />
-  );
-}
-
-function inboundViewToMode(view: AdminView): M2InboundMode | null {
-  if (view === "m2-receiving") return "receiving";
-  if (view === "m2-inspecting") return "inspecting";
-  if (view === "m2-putaway") return "putaway";
-  return null;
-}
-
-function masterDataViewToId(view: AdminView): MasterDataViewId | null {
-  if (
-    view === "m1-products" ||
-    view === "m1-business-partners" ||
-    view === "m1-warehouses" ||
-    view === "m1-zones" ||
-    view === "m1-locations" ||
-    view === "m1-system-dictionary"
-  ) {
-    return view;
-  }
-  return null;
-}
-
-function outboundViewToMode(view: AdminView): M4OutboundMode | null {
-  if (view === "m4-orders") return "orders";
-  if (view === "m4-waves") return "waves";
-  if (view === "m4-review") return "review";
-  if (view === "m4-returns") return "returns";
-  return null;
-}
-
-function wechatNotifyViewToMode(view: AdminView): H4WechatNotifyMode | null {
-  if (view === "h4-wechat-settings") return "settings";
-  if (view === "h4-notify-configs") return "configs";
-  if (view === "h4-notify-records") return "records";
-  return null;
 }
 
 function LoadingShell() {

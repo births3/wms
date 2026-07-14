@@ -140,7 +140,7 @@ test("dev mock 保留主数据分页和入库动作状态", async ({ request }) 
     data: { ...batchRequest, area_code: "MIS", row_start: 3, row_end: 3 },
   });
   expect(missingBatchIdempotency.status()).toBe(400);
-  await expect(missingBatchIdempotency.json()).resolves.toMatchObject({ code: "M1_LOCATION_IDEMPOTENCY_REQUIRED" });
+  await expect(missingBatchIdempotency.json()).resolves.toMatchObject({ code: "M1_IDEMPOTENCY_REQUIRED" });
   const batchLocationResponse = await request.post("/api/v1/master-data/locations/batch-create", {
     headers: { "Idempotency-Key": "m1-e2e-location-batch" },
     data: batchRequest,
@@ -163,7 +163,7 @@ test("dev mock 保留主数据分页和入库动作状态", async ({ request }) 
     data: { ...batchRequest, area_code: "CNF" },
   });
   expect(conflictingBatchResponse.status()).toBe(409);
-  await expect(conflictingBatchResponse.json()).resolves.toMatchObject({ code: "M1_LOCATION_IDEMPOTENCY_CONFLICT" });
+  await expect(conflictingBatchResponse.json()).resolves.toMatchObject({ code: "M1_IDEMPOTENCY_CONFLICT" });
   const locationsAfterBatch = await request.get("/api/v1/master-data/locations");
   const locationCodes = (await locationsAfterBatch.json() as { data: Array<{ location_code: string }> })
     .data.map((location) => location.location_code);
@@ -320,6 +320,7 @@ for (const target of [
   { section: "基础档案", group: "系统配置", id: "m1-system-dictionary", heading: "M1 系统字典" },
   { section: "入库业务", group: "入库作业", id: "m2-receiving", heading: "M2 收货管理" },
   { section: "库内业务", group: "库存管理", id: "m3-batches", heading: "M3 批号管理" },
+  { section: "基础能力", group: "M-CG 编码能力", id: "mcg-numbering", heading: "M-CG 单据号规则" },
   { section: "出库业务", group: "出库作业", id: "m4-orders", heading: "M4 出库订单管理" },
   { section: "出库业务", group: "出库作业", id: "m4-waves", heading: "M4 波次规划" },
   { section: "出库业务", group: "出库作业", id: "m4-review", heading: "M4 复核发货" },
@@ -380,6 +381,24 @@ test("H2 H3 基础能力能通过三层菜单打开", async ({ page }) => {
   const h2Page = page.locator("section").filter({ has: page.getByRole("heading", { name: "H2 审计追踪" }) });
   await expect(h2Page.getByRole("heading", { name: "H2 审计追踪" })).toBeVisible();
   await expect(h2Page.getByText(/GET \/api\/v1\/audit\/events/).first()).toBeVisible();
+  await expect(h2Page.getByText("IP 地址")).toBeVisible();
+  await h2Page.getByRole("button", { name: "展开" }).click();
+  await h2Page.getByLabel("动作类型").fill("验收提交");
+  await h2Page.getByLabel("关联资源").fill("PO-2026-0001");
+  await h2Page.getByLabel("商品编码").fill("P-M1-001");
+  await h2Page.getByLabel("批号").fill("BATCH-M3-202606-01");
+  await h2Page.getByRole("button", { name: "查询" }).click();
+  await expect(h2Page.getByText("验收提交").first()).toBeVisible();
+  await expect(h2Page.getByText("192.168.124.25")).toBeVisible();
+  await expect(h2Page.getByText(/验收中/)).toBeVisible();
+  await expect(h2Page.getByText(/已验收/)).toBeVisible();
+  await expect(h2Page.getByText(/P-M1-001/)).toBeVisible();
+  await expect(h2Page.getByText(/BATCH-M3-202606-01/)).toBeVisible();
+  await h2Page.getByRole("button", { name: "导出" }).click();
+  const exportDialog = page.getByRole("dialog");
+  await expect(exportDialog.getByRole("heading", { name: "导出列表" })).toBeVisible();
+  await expect(exportDialog.getByText(/当前筛选结果共 1 条/)).toBeVisible();
+  await exportDialog.getByRole("button", { name: "取消" }).click();
   await page.screenshot({ path: path.join(artifactsDir, "h2-audit-trail.png"), fullPage: false });
 
   await page.getByRole("button", { name: "H3 契约能力" }).click();
@@ -405,4 +424,24 @@ test("H5 快递对接能通过三层菜单打开", async ({ page }) => {
   await expect(h5Page.getByRole("heading", { name: "快递选择规则" })).toBeVisible();
   await expect(h5Page.getByText("顺丰速运")).toBeVisible();
   await page.screenshot({ path: path.join(artifactsDir, "h5-express.png"), fullPage: false });
+});
+
+test("M-CG 单据号规则可查询并打开新增弹窗", async ({ page }) => {
+  fs.mkdirSync(artifactsDir, { recursive: true });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "登录" }).click();
+  await expect(page.getByRole("heading", { name: "运营总览" })).toBeVisible();
+
+  await page.getByRole("button", { name: "基础能力" }).click();
+  await page.getByRole("button", { name: "M-CG 编码能力" }).click();
+  await page.getByRole("button", { name: "M-CG 单据号规则 mcg-numbering", exact: true }).click();
+
+  const pageRoot = page.locator("section").filter({ has: page.getByRole("heading", { name: "M-CG 单据号规则" }) });
+  await expect(pageRoot.getByText("采购入库单号")).toBeVisible();
+  await expect(pageRoot.getByRole("heading", { name: "生成记录" })).toBeVisible();
+  await pageRoot.getByRole("button", { name: "新增" }).click();
+  await expect(page.getByRole("dialog")).toContainText("新增单据号规则");
+  await page.getByRole("button", { name: "取消" }).click();
+  await page.screenshot({ path: path.join(artifactsDir, "mcg-numbering.png"), fullPage: false });
 });

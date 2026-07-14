@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(fileURLToPath(new URL("../../..", import.meta.url)));
 
 const appSource = read("apps/web-admin/src/App.tsx");
+const rendererSource = read("apps/web-admin/src/app-shell/AdminViewRenderer.tsx");
 const queriesSource = [
   read("apps/web-admin/src/features/master-data/master-data-queries/types.ts"),
   read("apps/web-admin/src/features/master-data/master-data-queries/queries.ts"),
@@ -17,7 +18,7 @@ const dialogSource = read("apps/web-admin/src/pages/master-data/MasterDataCrudDi
 const navigationCheckSource = read("scripts/governance/check_admin_navigation.py");
 
 assert.match(appSource, /id: "m1-zones", title: "M1 库区管理"/);
-assert.match(appSource, /view === "m1-zones"/);
+assert.match(rendererSource, /view === "m1-zones"/);
 assert.match(pageSource, /"m1-zones": \{\s*title: "M1 库区管理"/);
 
 assert.match(queriesSource, /\|\s*"m1-zones"/);

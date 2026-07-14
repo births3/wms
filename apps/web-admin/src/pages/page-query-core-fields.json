@@ -58,6 +58,16 @@
       "more": []
     },
     {
+      "id": "dock-management",
+      "title": "M1 月台管理",
+      "required": true,
+      "source": "apps/web-admin/src/pages/dock/DockManagementPage.tsx",
+      "fieldConstant": "dockQueryFields",
+      "coreConstant": "dockCoreQueryFieldKeys",
+      "core": ["warehouseId", "keyword"],
+      "more": ["status"]
+    },
+    {
       "id": "m1-system-dictionary",
       "title": "M1 系统字典",
       "required": false,
@@ -78,6 +88,36 @@
       "title": "H1 菜单管理",
       "required": false,
       "reason": "菜单管理是三层树和配置编辑页，不使用页面上方 QueryPanel"
+    },
+    {
+      "id": "h1-role-permission",
+      "title": "H1 角色权限",
+      "required": true,
+      "source": "apps/web-admin/src/pages/auth/H1RolePermissionPage.tsx",
+      "fieldConstant": "h1RoleQueryFields",
+      "coreConstant": "h1RoleCoreQueryFieldKeys",
+      "core": ["keyword"],
+      "more": ["dataScope"]
+    },
+    {
+      "id": "h1-session-management",
+      "title": "H1 登录会话",
+      "required": true,
+      "source": "apps/web-admin/src/pages/auth/H1SessionPage.tsx",
+      "fieldConstant": "sessionQueryFields",
+      "coreConstant": "sessionCoreQueryFieldKeys",
+      "core": ["targetUserId"],
+      "more": []
+    },
+    {
+      "id": "h1-api-keys",
+      "title": "H1 API Key 管理",
+      "required": true,
+      "source": "apps/web-admin/src/pages/api-key/H1ApiKeyPage.tsx",
+      "fieldConstant": "apiKeyQueryFields",
+      "coreConstant": "apiKeyCoreQueryFieldKeys",
+      "core": ["keyword", "status"],
+      "more": []
     },
     {
       "id": "h2-audit-trail",
@@ -146,6 +186,16 @@
       "more": []
     },
     {
+      "id": "mcg-numbering",
+      "title": "M-CG 单据号规则",
+      "required": true,
+      "source": "apps/web-admin/src/pages/document-numbering/MCGDocumentNumberingPage.tsx",
+      "fieldConstant": "mcgDocumentNumberQueryFields",
+      "coreConstant": "mcgDocumentNumberCoreQueryFieldKeys",
+      "core": ["documentType"],
+      "more": []
+    },
+    {
       "id": "m2-receiving",
       "title": "M2 收货管理",
       "required": true,
@@ -154,6 +204,16 @@
       "coreConstant": "m2InboundCoreQueryFieldKeys",
       "core": ["keyword", "ownerKeyword", "statusFilter"],
       "more": ["documentTypeFilter", "arrivalDate", "createdAt"]
+    },
+    {
+      "id": "m-di-platforms",
+      "title": "M-DI 药检平台",
+      "required": true,
+      "source": "apps/web-admin/src/pages/drug-inspection/DrugInspectionPlatformPage.tsx",
+      "fieldConstant": "queryFields",
+      "coreConstant": "mDiPlatformCoreQueryFieldKeys",
+      "core": ["status"],
+      "more": []
     },
     {
       "id": "m2-inspecting",
@@ -184,6 +244,38 @@
       "coreConstant": "m3BatchCoreQueryFieldKeys",
       "core": ["keyword", "qualityStatus"],
       "more": ["recallFlag", "productionDate", "expiryDate", "createdAt"]
+    },
+    {
+      "id": "m3-status-config",
+      "title": "M3 状态规则",
+      "required": true,
+      "source": "apps/web-admin/src/pages/inventory/M3InventoryStatusConfigPage.tsx",
+      "fieldConstant": "queryFields",
+      "coreConstant": "defaultVisibleFieldKeys",
+      "core": ["keyword", "scope", "status"],
+      "more": []
+    },
+    {
+      "id": "mte-task-types",
+      "title": "M-TE 任务类型配置",
+      "required": true,
+      "source": "apps/web-admin/src/pages/task-engine/TaskTypeConfigPage.tsx",
+      "fieldConstant": "queryFields",
+      "coreConstant": "mteTaskTypeCoreQueryFieldKeys",
+      "core": ["keyword", "status"],
+      "more": []
+    },
+    {
+      "id": "m9-billing-rules",
+      "title": "M9 计费规则",
+      "required": false,
+      "reason": "当前页面是新增计费规则配置表单，仅展示本次创建结果；真实历史查询接口完成后再升级为页面级 QueryPanel"
+    },
+    {
+      "id": "m10-route-plans",
+      "title": "M10 路径规划接收",
+      "required": false,
+      "reason": "当前页面是接收外部 TMS 路径规划结果的写入表单，不承担历史列表查询"
     },
     {
       "id": "m4-orders",

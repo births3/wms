@@ -16,6 +16,7 @@ import type {
   CreateCustomerRequest,
   CreateSupplierRequest,
 } from "@/features/master-data/master-data-queries";
+import { validateSupplierQualificationFields } from "./supplier-qualification-validation";
 
 type SourceActionKind = "supplier" | "customer";
 type ActiveDialog = "create" | "import" | null;
@@ -74,7 +75,7 @@ const copy: Record<
     importTitle: "批量导入供应商",
     importPlaceholder: [
       "supplier_code,supplier_name,license_no,contact_name",
-      "S-001,配送供应商A,SPL-001,王供应",
+      "S-001,配送供应商A,91350211M000100Y49,王供应",
       "S-002,配送供应商B,,",
     ].join("\n"),
   },
@@ -181,10 +182,15 @@ export const MasterDataSourceActions = React.forwardRef<MasterDataSourceActionsH
               </DialogHeader>
               <TextField label={labels.codeLabel} required value={form.code} onChange={(code) => updateForm({ code })} />
               <TextField label={labels.nameLabel} required value={form.name} onChange={(name) => updateForm({ name })} />
-              <TextField label="资质证号" value={form.licenseNo} onChange={(licenseNo) => updateForm({ licenseNo })} />
+              {props.kind === "supplier" ? (
+                <TextField label="统一社会信用代码" required value={form.licenseNo} onChange={(licenseNo) => updateForm({ licenseNo })} />
+              ) : (
+                <TextField label="资质证号" value={form.licenseNo} onChange={(licenseNo) => updateForm({ licenseNo })} />
+              )}
               {props.kind === "supplier" && (
                 <TextField
                   label="联系人"
+                  required
                   value={form.contactName}
                   onChange={(contactName) => updateForm({ contactName })}
                 />
@@ -243,11 +249,14 @@ MasterDataSourceActions.displayName = "MasterDataSourceActions";
 export function parseSupplierImportText(textValue: string): CreateSupplierRequest[] {
   return importRows(textValue, isSupplierImportHeader).map((row) => {
     const [supplierCode, supplierName, licenseNo = "", contactName = ""] = splitImportRow(row.line);
+    const unifiedSocialCreditCode = requiredText(licenseNo, `第 ${row.lineNumber} 行统一社会信用代码`);
+    const contact = requiredText(contactName, `第 ${row.lineNumber} 行联系人`);
+    validateSupplierQualificationFields({ unifiedSocialCreditCode, contactName: contact });
     return {
       supplier_code: requiredText(supplierCode, `第 ${row.lineNumber} 行供应商编码`),
       supplier_name: requiredText(supplierName, `第 ${row.lineNumber} 行供应商名称`),
-      license_no: nullableText(licenseNo),
-      contact_name: nullableText(contactName),
+      license_no: unifiedSocialCreditCode,
+      contact_name: contact,
       source: "batch_import",
     };
   });
@@ -266,11 +275,14 @@ export function parseCustomerImportText(textValue: string): CreateCustomerReques
 }
 
 function supplierFormToRequest(form: SourceActionForm): CreateSupplierRequest {
+  const unifiedSocialCreditCode = requiredText(form.licenseNo, "统一社会信用代码");
+  const contactName = requiredText(form.contactName, "联系人");
+  validateSupplierQualificationFields({ unifiedSocialCreditCode, contactName });
   return {
     supplier_code: requiredText(form.code, "供应商编码"),
     supplier_name: requiredText(form.name, "供应商名称"),
-    license_no: nullableText(form.licenseNo),
-    contact_name: nullableText(form.contactName),
+    license_no: unifiedSocialCreditCode,
+    contact_name: contactName,
     source: "manual",
   };
 }

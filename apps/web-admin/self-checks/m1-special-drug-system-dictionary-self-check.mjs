@@ -18,6 +18,10 @@ const m1WarehouseStoriesSource = fs.readFileSync(
   path.join(root, "../../docs/domain/user-stories-m1-master-data-warehouse.md"),
   "utf8",
 );
+const complianceMigration = fs.readFileSync(
+  path.join(root, "../../backend/migrations/202607120006_m1_special_drug_compliance_defaults.sql"),
+  "utf8",
+);
 
 assert.doesNotMatch(appSource, /m1-special-drug-categories/);
 assert.equal(fs.existsSync(path.join(root, "src/pages/master-data/SpecialDrugCategoriesPage.tsx")), false);
@@ -29,6 +33,15 @@ assert.doesNotMatch(queriesSource, /\/api\/v1\/master-data\/special-drug-categor
 assert.match(systemDictionaryPageSource, /special_drug_category/);
 assert.match(devMockSource, /special_drug_category/);
 assert.doesNotMatch(devMockSource, /\/api\/v1\/master-data\/special-drug-categories/);
+for (const field of [
+  "requires_dual_person_matrix",
+  "requires_dedicated_ledger",
+  "requires_dedicated_storage",
+  "requires_qualification",
+  "regulation_basis",
+]) {
+  assert.match(complianceMigration, new RegExp(field));
+}
 
 for (const dictCode of ["temperature_zone", "quality_color", "zone_type", "location_type"]) {
   assert.match(queriesSource, new RegExp(`code: "${dictCode}"`));

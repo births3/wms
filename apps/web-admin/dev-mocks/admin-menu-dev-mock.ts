@@ -205,6 +205,7 @@ function devAdminMenuSeed(): DevAdminMenuNode[] {
         ["m1-warehouses", "M1 仓库管理", "Warehouse"],
         ["m1-zones", "M1 库区管理", "MapPinned"],
         ["m1-locations", "M1 库位管理", "MapPinned"],
+        ["dock-management", "M1 月台管理", "MapPinned"],
       ]),
       group(parent, "system", "系统配置", "BookOpen", 30, [
         ["m1-system-dictionary", "M1 系统字典", "BookOpen"],
@@ -227,10 +228,24 @@ function devAdminMenuSeed(): DevAdminMenuNode[] {
       ]),
     ]),
     section("inventory", "库内业务", "Layers", 50, (parent) => [
-      group(parent, "inventory-work", "库存管理", "Layers", 10, [["m3-batches", "M3 批号管理", "Layers"]]),
+      group(parent, "inventory-work", "库存管理", "Layers", 10, [
+        ["m3-batches", "M3 批号管理", "Layers"],
+        ["m3-status-config", "M3 状态规则", "ClipboardList"],
+      ]),
+    ]),
+    section("value-added", "增值业务", "ClipboardList", 55, (parent) => [
+      group(parent, "value-added-work", "增值作业", "ClipboardList", 10, [
+        ["m9-billing-rules", "M9 计费规则", "ClipboardList"],
+        ["m10-route-plans", "M10 路径规划接收", "Truck"],
+      ]),
     ]),
     section("platform", "基础能力", "ShieldCheck", 60, (parent) => [
-      group(parent, "h1-auth", "H1 权限租户", "ShieldCheck", 10, [["h1-menu-management", "H1 菜单管理", "ShieldCheck"]]),
+      group(parent, "h1-auth", "H1 权限租户", "ShieldCheck", 10, [
+        ["h1-menu-management", "H1 菜单管理", "ShieldCheck"],
+        ["h1-role-permission", "H1 角色权限", "ShieldCheck"],
+        ["h1-session-management", "H1 登录会话", "ShieldCheck"],
+        ["h1-api-keys", "H1 API Key 管理", "KeyRound"],
+      ]),
       group(parent, "h2-audit", "H2 审计能力", "ClipboardList", 20, [["h2-audit-trail", "H2 审计追踪", "ClipboardList"]]),
       group(parent, "h3-contract", "H3 契约能力", "KeyRound", 30, [["h3-api-contract", "H3 OpenAPI", "KeyRound"]]),
       group(parent, "h4-wechat", "H4 企业微信", "Bell", 40, [
@@ -240,6 +255,7 @@ function devAdminMenuSeed(): DevAdminMenuNode[] {
       ]),
       group(parent, "h5-express", "H5 快递能力", "Truck", 50, [["h5-express", "H5 快递对接", "Truck"]]),
       group(parent, "h9-print", "H9 打印能力", "Printer", 90, [["h9-print-templates", "H9 打印模板", "Printer"]]),
+      group(parent, "mcg-numbering", "M-CG 编码能力", "KeyRound", 100, [["mcg-numbering", "M-CG 单据号规则", "KeyRound"]]),
     ]),
   ];
 }
@@ -309,11 +325,17 @@ function devViewPermissionKey(viewId: string) {
     "m2-inspecting": "m2.write",
     "m2-putaway": "m2.write",
     "m3-batches": "m3.read",
+    "m3-status-config": "m3.read",
+    "m9-billing-rules": "m9.billing.read",
+    "m10-route-plans": "m10.tms.read",
     "m4-orders": "m4.read",
     "m4-waves": "m4.read",
     "m4-review": "m4.read",
     "m4-returns": "m4.read",
     "h1-menu-management": "h1.menu.read",
+    "h1-role-permission": "h1.roles.manage",
+    "h1-session-management": "h1.sessions.manage",
+    "h1-api-keys": "h1.api_keys.manage",
     "h2-audit-trail": "audit.read",
     "h3-api-contract": "h3.contract.read",
     "h4-wechat-settings": "h4.notify.read",
@@ -321,6 +343,7 @@ function devViewPermissionKey(viewId: string) {
     "h4-notify-records": "h4.notify.read",
     "h5-express": "h5.express.read",
     "h9-print-templates": "h9.print_template.read",
+    "mcg-numbering": "mcg.document_numbering.read",
   };
   return permissions[viewId] ?? `menu.${viewId.replace(/-/g, ".")}`;
 }

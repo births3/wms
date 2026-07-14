@@ -84,8 +84,8 @@ export const productCoreColumns: DataGridColumn<MasterDataRow>[] = [
 const viewFieldHeaders: Partial<
   Record<MasterDataViewId, { primary: string; secondary: string; extra: string }>
 > = {
-  "m1-business-partners": { primary: "资质证号", secondary: "联系人 / 类型", extra: "档案类型 / 货主" },
-  "m1-warehouses": { primary: "货主", secondary: "档案类型", extra: "仓库名称" },
+  "m1-business-partners": { primary: "统一代码 / 资质证号", secondary: "联系人 / 类型", extra: "档案类型 / 货主" },
+  "m1-warehouses": { primary: "货主", secondary: "仓库类型", extra: "仓库名称" },
   "m1-zones": { primary: "仓库", secondary: "库区", extra: "库位数" },
   "m1-system-dictionary": { primary: "字典分类", secondary: "来源", extra: "参数" },
 };

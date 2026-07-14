@@ -55,6 +55,7 @@ export interface QueryPanelProps extends Omit<React.HTMLAttributes<HTMLDivElemen
   keywordAriaLabel?: string;
   onKeywordChange?: (value: string) => void;
   fields?: QueryPanelField[];
+  fieldOptions?: Record<string, QueryPanelOption[]>;
   defaultVisibleFieldKeys?: string[];
   value?: QueryPanelValue;
   onValueChange?: (value: QueryPanelValue) => void;
@@ -74,6 +75,7 @@ export const QueryPanel = React.forwardRef<HTMLDivElement, QueryPanelProps>(
       keywordAriaLabel = "搜索关键字",
       onKeywordChange,
       fields = [],
+      fieldOptions,
       defaultVisibleFieldKeys,
       value = {},
       onValueChange,
@@ -137,7 +139,7 @@ export const QueryPanel = React.forwardRef<HTMLDivElement, QueryPanelProps>(
               {visibleFields.map((field) => (
                 <QueryPanelFieldControl
                   key={field.key}
-                  field={field}
+                  field={fieldOptions?.[field.key] ? { ...field, options: fieldOptions[field.key] } : field}
                   value={value[field.key]}
                   onChange={(nextValue) => updateField(field.key, nextValue)}
                 />

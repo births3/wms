@@ -34,6 +34,36 @@ const h2AuditQueryFields: QueryPanelField[] = [
     ],
   },
   {
+    key: "actorId",
+    label: "操作人",
+    type: "text",
+    placeholder: "用户 ID",
+  },
+  {
+    key: "action",
+    label: "动作类型",
+    type: "text",
+    placeholder: "如 receive / update",
+  },
+  {
+    key: "resourceId",
+    label: "关联资源",
+    type: "text",
+    placeholder: "单据号或资源 ID",
+  },
+  {
+    key: "productCode",
+    label: "商品编码",
+    type: "text",
+    placeholder: "商品编码",
+  },
+  {
+    key: "batchNo",
+    label: "批号",
+    type: "text",
+    placeholder: "批号",
+  },
+  {
     key: "occurredAt",
     label: "发生时间",
     type: "dateRange",
@@ -89,6 +119,18 @@ const h2AuditColumns: DataGridColumn<AuditEventRow>[] = [
     filter: { type: "text" },
   },
   {
+    key: "ipAddress",
+    header: "IP 地址",
+    width: 150,
+    minWidth: 120,
+    mono: true,
+    sortable: true,
+    sortValue: (row) => row.ipAddress,
+    filterValue: (row) => row.ipAddress,
+    copyValue: (row) => row.ipAddress,
+    filter: { type: "text" },
+  },
+  {
     key: "traceId",
     header: "Trace",
     width: 160,
@@ -97,6 +139,30 @@ const h2AuditColumns: DataGridColumn<AuditEventRow>[] = [
     filterValue: (row) => row.traceId,
     copyValue: (row) => row.traceId,
     filter: { type: "text" },
+  },
+  {
+    key: "diffBefore",
+    header: "旧值",
+    width: 240,
+    minWidth: 180,
+    mono: true,
+    sortable: false,
+    filterValue: (row) => row.diffBefore,
+    copyValue: (row) => row.diffBefore,
+    filter: { type: "text" },
+    render: (row) => <span className="block max-w-[220px] truncate" title={row.diffBefore}>{row.diffBefore}</span>,
+  },
+  {
+    key: "diffAfter",
+    header: "新值",
+    width: 240,
+    minWidth: 180,
+    mono: true,
+    sortable: false,
+    filterValue: (row) => row.diffAfter,
+    copyValue: (row) => row.diffAfter,
+    filter: { type: "text" },
+    render: (row) => <span className="block max-w-[220px] truncate" title={row.diffAfter}>{row.diffAfter}</span>,
   },
 ];
 
@@ -285,6 +351,11 @@ export function H3ApiContractPage() {
 function defaultH2QueryValue(): QueryPanelValue {
   return {
     resourceType: "",
+    actorId: "",
+    action: "",
+    resourceId: "",
+    productCode: "",
+    batchNo: "",
     occurredAt: { from: "", to: "" },
   };
 }
@@ -292,6 +363,11 @@ function defaultH2QueryValue(): QueryPanelValue {
 function normalizeH2QueryValue(value: QueryPanelValue): QueryPanelValue {
   return {
     resourceType: queryString(value.resourceType),
+    actorId: queryString(value.actorId),
+    action: queryString(value.action),
+    resourceId: queryString(value.resourceId),
+    productCode: queryString(value.productCode),
+    batchNo: queryString(value.batchNo),
     occurredAt: queryRange(value.occurredAt),
   };
 }
@@ -301,6 +377,11 @@ function normalizeH2Query(value: QueryPanelValue) {
   const range = queryRange(normalized.occurredAt);
   return {
     resourceType: queryString(normalized.resourceType),
+    actorId: queryString(normalized.actorId),
+    action: queryString(normalized.action),
+    resourceId: queryString(normalized.resourceId),
+    productCode: queryString(normalized.productCode),
+    batchNo: queryString(normalized.batchNo),
     from: toRfc3339Start(range.from ?? ""),
     to: toRfc3339End(range.to ?? ""),
   };

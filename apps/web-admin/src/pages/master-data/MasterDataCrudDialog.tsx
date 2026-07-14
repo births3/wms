@@ -11,6 +11,8 @@ import {
   type DataGridColumn,
 } from "@wms/ui";
 import { Ban, Pencil } from "lucide-react";
+import { CustomerAddressEditor } from "./CustomerAddressEditor";
+import { CustomerProfileEditor } from "./CustomerProfileEditor";
 
 import {
   createLocation,
@@ -22,6 +24,7 @@ import {
   updateWarehouse,
   updateWarehouseZone,
 } from "@/features/master-data/master-data-queries";
+import { isValidUnifiedSocialCreditCode, validateSupplierQualificationFields } from "./supplier-qualification-validation";
 import type {
   CreateLocationRequest,
   CreateWarehouseRequest,
@@ -54,7 +57,7 @@ export type SourceEditFormState =
   | { kind: "supplier"; mode: "edit"; id: string; code: string; name: string; licenseNo: string; contactName: string; status: string }
   | { kind: "customer"; mode: "edit"; id: string; code: string; name: string; licenseNo: string; status: string };
 
-export interface WarehouseFormState { kind: "warehouse"; mode: "create" | "edit"; id?: string; code: string; name: string; status: string; }
+export interface WarehouseFormState { kind: "warehouse"; mode: "create" | "edit"; id?: string; code: string; name: string; warehouseType: string; status: string; }
 export interface ZoneFormState { kind: "zone"; mode: "create" | "edit"; id?: string; warehouseId: string; code: string; name: string; temperatureZone: string; qualityColor: string; status: string; }
 
 export interface LocationFormState { kind: "location"; mode: "create" | "edit"; id?: string; scopeKey: string; code: string; rowNo: number; columnNo: number; layerNo: number; maxVolumeCm3: number; usedVolumeCm3: number; maxSkuCount: number; locationType: string; status: string; }
@@ -64,6 +67,11 @@ export type MasterDataCrudForm = SourceEditFormState | WarehouseFormState | Zone
 const activeOptions = [
   ["active", "启用"],
   ["disabled", "停用"],
+] as const;
+const warehouseTypeOptions = [
+  ["physical", "物理仓"],
+  ["logical", "逻辑仓"],
+  ["virtual", "虚拟仓"],
 ] as const;
 const locationStatusOptions = [
   ["available", "可用"],
@@ -178,8 +186,8 @@ export function MasterDataCrudDialog({
               <>
                 <TextField label="供应商编码" value={form.code} disabled onChange={() => undefined} />
                 <TextField label="供应商名称" value={form.name} required onChange={(name) => patch({ name })} />
-                <TextField label="资质证号" value={form.licenseNo} onChange={(licenseNo) => patch({ licenseNo })} />
-                <TextField label="联系人" value={form.contactName} onChange={(contactName) => patch({ contactName })} />
+                <TextField label="统一社会信用代码" required value={form.licenseNo} onChange={(licenseNo) => patch({ licenseNo })} />
+                <TextField label="联系人" required value={form.contactName} onChange={(contactName) => patch({ contactName })} />
                 <SelectField label="状态" value={form.status} options={activeOptions} onChange={(status) => patch({ status })} />
               </>
             )}
@@ -189,12 +197,15 @@ export function MasterDataCrudDialog({
                 <TextField label="客户名称" value={form.name} required onChange={(name) => patch({ name })} />
                 <TextField label="资质证号" value={form.licenseNo} onChange={(licenseNo) => patch({ licenseNo })} />
                 <SelectField label="状态" value={form.status} options={activeOptions} onChange={(status) => patch({ status })} />
+                <CustomerProfileEditor customerId={form.id} />
+                <CustomerAddressEditor customerId={form.id} />
               </>
             )}
             {form.kind === "warehouse" && (
               <>
                 <TextField label="仓库编码" value={form.code} required disabled={form.mode === "edit"} onChange={(code) => patch({ code })} />
                 <TextField label="仓库名称" value={form.name} required onChange={(name) => patch({ name })} />
+                <SelectField label="仓库类型" value={form.warehouseType} options={warehouseTypeOptions} onChange={(warehouseType) => patch({ warehouseType })} />
                 {form.mode === "edit" && <SelectField label="状态" value={form.status} options={activeOptions} onChange={(status) => patch({ status })} />}
               </>
             )}
@@ -242,8 +253,8 @@ export function MasterDataCrudDialog({
 
 export const supplierEditRequestFromForm = (form: Extract<SourceEditFormState, { kind: "supplier" }>): UpdateSupplierRequest => ({
   supplier_name: requiredText(form.name),
-  license_no: nullableText(form.licenseNo),
-  contact_name: nullableText(form.contactName),
+  license_no: requiredSupplierQualification(form).unifiedSocialCreditCode,
+  contact_name: requiredSupplierQualification(form).contactName,
   status: form.status,
 });
 
@@ -256,10 +267,12 @@ export const customerEditRequestFromForm = (form: Extract<SourceEditFormState, {
 export const warehouseCreateRequestFromForm = (form: WarehouseFormState): CreateWarehouseRequest => ({
   warehouse_code: requiredText(form.code),
   warehouse_name: requiredText(form.name),
+  warehouse_type: form.warehouseType,
 });
 
 export const warehouseEditRequestFromForm = (form: WarehouseFormState): UpdateWarehouseRequest => ({
   warehouse_name: requiredText(form.name),
+  warehouse_type: form.warehouseType,
   status: form.status,
 });
 
@@ -350,8 +363,8 @@ export async function saveMasterDataCrudForm(
 function formFromTarget(target: MasterDataCrudTarget, firstScope: LocationScopeOption | null, firstWarehouse: MasterDataRow | null): MasterDataCrudForm {
   if (target.kind === "supplier") return { kind: "supplier", mode: "edit", id: target.row.id, code: target.row.code, name: target.row.name, licenseNo: clean(target.row.primaryValue), contactName: clean(target.row.secondaryValue), status: target.row.status || "active" };
   if (target.kind === "customer") return { kind: "customer", mode: "edit", id: target.row.id, code: target.row.code, name: target.row.name, licenseNo: clean(target.row.primaryValue), status: target.row.status || "active" };
-  if (target.kind === "warehouse" && target.mode === "edit") return { kind: "warehouse", mode: "edit", id: target.row.id, code: target.row.code, name: target.row.name, status: target.row.status || "active" };
-  if (target.kind === "warehouse") return { kind: "warehouse", mode: "create", code: "", name: "", status: "active" };
+  if (target.kind === "warehouse" && target.mode === "edit") return { kind: "warehouse", mode: "edit", id: target.row.id, code: target.row.code, name: target.row.name, warehouseType: target.row.warehouseFields?.warehouseType || "physical", status: target.row.status || "active" };
+  if (target.kind === "warehouse") return { kind: "warehouse", mode: "create", code: "", name: "", warehouseType: "physical", status: "active" };
   if (target.kind === "zone" && target.mode === "edit") {
     const fields = target.row.zoneFields;
     return { kind: "zone", mode: "edit", id: target.row.id, warehouseId: fields?.warehouseId ?? "", code: target.row.code, name: target.row.name, temperatureZone: target.row.secondaryValue, qualityColor: target.row.extraValue, status: target.row.status || "active" };
@@ -405,6 +418,7 @@ function canSubmit(
     return hasScope && hasLocationType && !!form.code.trim() && form.rowNo > 0 && form.columnNo > 0 && form.layerNo > 0 && form.maxVolumeCm3 > 0 && form.usedVolumeCm3 >= 0 && form.maxSkuCount > 0;
   }
   if (form.kind === "zone") return !!form.warehouseId && !!form.code.trim() && !!form.name.trim() && !!form.temperatureZone && !!form.qualityColor;
+  if (form.kind === "supplier") return !!form.name.trim() && isValidUnifiedSocialCreditCode(form.licenseNo) && !!form.contactName.trim();
   return !!form.name.trim() && (form.kind !== "warehouse" || !!form.code.trim());
 }
 
@@ -430,6 +444,12 @@ const requiredText = (value: string) => {
 const nullableText = (value: string) => {
   const text = value.trim();
   return text ? text : null;
+};
+const requiredSupplierQualification = (form: Extract<SourceEditFormState, { kind: "supplier" }>) => {
+  const unifiedSocialCreditCode = requiredText(form.licenseNo);
+  const contactName = requiredText(form.contactName);
+  validateSupplierQualificationFields({ unifiedSocialCreditCode, contactName });
+  return { unifiedSocialCreditCode, contactName };
 };
 const positive = (value: number, label: string) => {
   if (!Number.isFinite(value) || value <= 0) throw new Error(`${label}必须大于 0`);

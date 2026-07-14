@@ -1,0 +1,32 @@
+import type { MasterDataViewId } from "@/pages/master-data/M1MasterDataPage";
+
+export type AdminView =
+  | "dashboard"
+  | MasterDataViewId
+  | "dock-management"
+  | "m1-feature-flags"
+  | "m2-receiving"
+  | "m2-inspecting"
+  | "m2-putaway"
+  | "m-di-platforms"
+  | "m3-batches"
+  | "m3-status-config"
+  | "mte-task-types"
+  | "m9-billing-rules"
+  | "m10-route-plans"
+  | "m4-orders"
+  | "m4-waves"
+  | "m4-review"
+  | "m4-returns"
+  | "h1-menu-management"
+  | "h1-role-permission"
+  | "h1-session-management"
+  | "h1-api-keys"
+  | "h2-audit-trail"
+  | "h3-api-contract"
+  | "h4-wechat-settings"
+  | "h4-notify-configs"
+  | "h4-notify-records"
+  | "h5-express"
+  | "h9-print-templates"
+  | "mcg-numbering";

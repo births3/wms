@@ -12,6 +12,13 @@ export const wave1ContractPaths = [
   "/api/v1/healthz",
   "/api/v1/auth/login",
   "/api/v1/auth/me",
+  "/api/v1/auth/logout",
+  "/api/v1/auth/me/password",
+  "/api/v1/auth/sessions",
+  "/api/v1/auth/sessions/revoke-others",
+  "/api/v1/auth/sessions/{session_id}/revoke",
+  "/api/v1/auth/users/{user_id}/kick",
+  "/api/v1/auth/users/{user_id}/status",
   "/api/v1/audit/events",
 ] as const satisfies readonly (keyof paths)[];
 

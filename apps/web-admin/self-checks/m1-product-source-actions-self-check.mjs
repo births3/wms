@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createServer } from "vite";
 
@@ -10,6 +11,10 @@ const server = await createServer({
 });
 
 try {
+  const apiSource = readFileSync(
+    fileURLToPath(new URL("../src/features/master-data/master-data-queries/api.ts", import.meta.url)),
+    "utf8",
+  );
   const { productSourceLabel, masterDataActionLabels, productTableClassName, masterDataColumns } =
     await server.ssrLoadModule("/src/pages/master-data/m1-product-page-model.ts");
   const { baseMasterDataColumns } = await server.ssrLoadModule(
@@ -22,12 +27,25 @@ try {
     customerRow,
     warehouseRow,
     locationRow,
-    warehouseZoneRowsFromLocations,
     storageConditionDisplayLabel,
   } = await server.ssrLoadModule("/src/features/master-data/master-data-queries.ts");
   const { crudTargetForRow } = await server.ssrLoadModule(
     "/src/pages/master-data/MasterDataCrudDialog.tsx",
   );
+  const { parseSupplierImportText } = await server.ssrLoadModule(
+    "/src/pages/master-data/MasterDataSourceActions.tsx",
+  );
+  const { isValidUnifiedSocialCreditCode, validateSupplierQualificationFields } = await server.ssrLoadModule(
+    "/src/pages/master-data/supplier-qualification-validation.ts",
+  );
+  assert.match(apiSource, /web-m1-product-create/);
+  assert.match(apiSource, /web-m1-product-update/);
+  assert.match(apiSource, /web-m1-supplier-create/);
+  assert.match(apiSource, /web-m1-supplier-update-/);
+  assert.match(apiSource, /web-m1-customer-create/);
+  assert.match(apiSource, /web-m1-customer-update-/);
+  assert.match(apiSource, /web-m1-warehouse-create/);
+  assert.match(apiSource, /web-m1-warehouse-update-/);
 
   assert.equal(productSourceLabel("manual"), "手工新建");
   assert.equal(productSourceLabel("batch_import"), "批量导入");
@@ -92,12 +110,15 @@ try {
     owner_id: "00000000-0000-0000-0000-000000000001",
     warehouse_code: "WH-M1-001",
     warehouse_name: "鹏鹞冷链仓",
+    warehouse_type: "physical",
     status: "active",
     created_at: "2026-06-29T00:00:00.000Z",
     updated_at: "2026-06-29T00:00:00.000Z",
   });
   assert.equal(warehouse.code, "WH-M1-001");
   assert.equal(warehouse.name, "鹏鹞冷链仓");
+  assert.equal(warehouse.secondaryValue, "物理仓");
+  assert.equal(warehouse.warehouseFields.warehouseType, "physical");
   assert.notEqual(warehouse.primaryValue, warehouse.id);
   assert.doesNotMatch(warehouse.primaryValue, /^[0-9a-f-]{36}$/i);
 
@@ -136,24 +157,17 @@ try {
   assert.doesNotMatch(location.locationFields.warehouse, /^[0-9a-f-]{36}$/i);
   assert.doesNotMatch(location.locationFields.zone, /^[0-9a-f-]{36}$/i);
 
-  const zones = warehouseZoneRowsFromLocations([location]);
-  assert.equal(zones.length, 1);
-  assert.equal(zones[0].code, "A01");
-  assert.equal(zones[0].primaryValue, "WH-M1-001 · 鹏鹞冷链仓");
-  assert.equal(zones[0].secondaryValue, "A01");
-  assert.doesNotMatch(zones[0].primaryValue, /^[0-9a-f-]{36}$/i);
-
   const productBaseColumns = masterDataColumns("m1-products", baseMasterDataColumns, []);
   assert.equal(productBaseColumns.find((column) => column.key === "primary")?.header, "规格");
   assert.equal(productBaseColumns.find((column) => column.key === "secondary")?.header, "批准文号");
   assert.equal(productBaseColumns.find((column) => column.key === "extra")?.header, "储存条件");
   const businessPartnerBaseColumns = masterDataColumns("m1-business-partners", baseMasterDataColumns, []);
-  assert.equal(businessPartnerBaseColumns.find((column) => column.key === "primary")?.header, "资质证号");
+  assert.equal(businessPartnerBaseColumns.find((column) => column.key === "primary")?.header, "统一代码 / 资质证号");
   assert.equal(businessPartnerBaseColumns.find((column) => column.key === "secondary")?.header, "联系人 / 类型");
   assert.equal(businessPartnerBaseColumns.find((column) => column.key === "extra")?.header, "档案类型 / 货主");
   const warehouseColumns = masterDataColumns("m1-warehouses", baseMasterDataColumns, []);
   assert.equal(warehouseColumns.find((column) => column.key === "primary")?.header, "货主");
-  assert.equal(warehouseColumns.find((column) => column.key === "secondary")?.header, "档案类型");
+  assert.equal(warehouseColumns.find((column) => column.key === "secondary")?.header, "仓库类型");
   assert.equal(warehouseColumns.find((column) => column.key === "extra")?.header, "仓库名称");
   const zoneColumns = masterDataColumns("m1-zones", baseMasterDataColumns, []);
   assert.equal(zoneColumns.find((column) => column.key === "primary")?.header, "仓库");
@@ -207,6 +221,20 @@ try {
   );
   assert.equal(crudTargetForRow("m1-business-partners", supplier).kind, "supplier");
   assert.equal(crudTargetForRow("m1-business-partners", customer).kind, "customer");
+  assert.equal(isValidUnifiedSocialCreditCode("91350211M000100Y49"), true);
+  assert.equal(isValidUnifiedSocialCreditCode("INVALID-USCC"), false);
+  assert.equal(
+    parseSupplierImportText("supplier_code,supplier_name,license_no,contact_name\nS-001,供应商A,91350211M000100Y49,王供应")[0].license_no,
+    "91350211M000100Y49",
+  );
+  assert.throws(
+    () => parseSupplierImportText("supplier_code,supplier_name,license_no,contact_name\nS-001,供应商A,INVALID-USCC,王供应"),
+    /统一社会信用代码格式错误/,
+  );
+  assert.throws(
+    () => validateSupplierQualificationFields({ unifiedSocialCreditCode: "INVALID-USCC", contactName: "王供应" }),
+    /统一社会信用代码格式错误/,
+  );
 } finally {
   await server.close();
 }

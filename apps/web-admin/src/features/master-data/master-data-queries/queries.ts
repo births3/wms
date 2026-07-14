@@ -5,6 +5,7 @@ import { ApiError } from "@/features/auth/auth-queries";
 import {
   type BatchCreateLocationsRequest,
   type CreateCustomerRequest,
+  type CreateCustomerAddressRequest,
   type CreateLocationRequest,
   type CreateProductRequest,
   type CreateSupplierRequest,
@@ -12,10 +13,15 @@ import {
   type CreateWarehouseZoneRequest,
   type MasterDataRow,
   type MasterDataViewId,
+  type CustomerAddress,
+  type CustomerProfile,
+  type CustomerQualification,
   type SpecialDrugCategoryOption,
   type SystemDictionaryOption,
   type SystemDictionaryPaneGroup,
   type UpdateCustomerRequest,
+  type UpdateCustomerAddressRequest,
+  type UpsertCustomerProfileRequest,
   type UpdateLocationRequest,
   type UpdateProductRequest,
   type UpdateSupplierRequest,
@@ -27,6 +33,7 @@ import {
 import {
   batchCreateLocations,
   createCustomer,
+  createCustomerAddress,
   createLocation,
   createProduct,
   createSupplier,
@@ -35,6 +42,8 @@ import {
   disableSystemDictionaryItem,
   listBusinessPartners,
   listCustomers,
+  listCustomerAddresses,
+  getCustomerProfile,
   listLocations,
   listProducts,
   listSpecialDrugCategoryOptions,
@@ -45,6 +54,8 @@ import {
   listWarehouseZones,
   upsertSystemDictionaryItem,
   updateCustomer,
+  updateCustomerAddress,
+  upsertCustomerProfile,
   updateLocation,
   updateProduct,
   updateSupplier,
@@ -71,6 +82,60 @@ export function useMasterDataRowsQuery(viewId: MasterDataViewId, enabled = true)
     queryKey: [...masterDataQueryKey, viewId],
     queryFn: () => listMasterDataRows(viewId),
     enabled,
+  });
+}
+
+export function useCustomerAddressesQuery(customerId: string | null) {
+  return useQuery<CustomerAddress[], ApiError>({
+    queryKey: [...masterDataQueryKey, "customer-addresses", customerId],
+    queryFn: () => listCustomerAddresses(customerId as string),
+    enabled: Boolean(customerId),
+  });
+}
+
+export function useCreateCustomerAddressMutation(customerId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (request: CreateCustomerAddressRequest) =>
+      createCustomerAddress({ customerId, request }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: [...masterDataQueryKey, "customer-addresses", customerId],
+      });
+    },
+  });
+}
+
+export function useUpdateCustomerAddressMutation(customerId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { addressId: string; request: UpdateCustomerAddressRequest }) =>
+      updateCustomerAddress({ customerId, ...input }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: [...masterDataQueryKey, "customer-addresses", customerId],
+      });
+    },
+  });
+}
+
+export function useCustomerProfileQuery(customerId: string | null) {
+  return useQuery<CustomerProfile, ApiError>({
+    queryKey: [...masterDataQueryKey, "customer-profile", customerId],
+    queryFn: () => getCustomerProfile(customerId as string),
+    enabled: Boolean(customerId),
+  });
+}
+
+export function useUpsertCustomerProfileMutation(customerId: string) {
+  const queryClient = useQueryClient();
+  return useMutation<CustomerProfile, ApiError, UpsertCustomerProfileRequest>({
+    mutationFn: (request) => upsertCustomerProfile({ customerId, request }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: [...masterDataQueryKey, "customer-profile", customerId],
+      });
+    },
   });
 }
 
@@ -154,6 +219,7 @@ export function useBatchCreateLocationsMutation() {
 export {
   batchCreateLocations,
   createCustomer,
+  createCustomerAddress,
   createLocation,
   createProduct,
   createSupplier,
@@ -161,6 +227,8 @@ export {
   createWarehouseZone,
   listProducts,
   listCustomers,
+  listCustomerAddresses,
+  getCustomerProfile,
   listSystemDictionaryItemOptions,
   listSystemDictionaryGroups,
   listSpecialDrugCategoryOptions,
@@ -170,6 +238,8 @@ export {
   listBusinessPartners,
   listWarehouseZones,
   updateCustomer,
+  updateCustomerAddress,
+  upsertCustomerProfile,
   updateLocation,
   updateProduct,
   updateSupplier,
@@ -182,12 +252,16 @@ export {
 export type {
   BatchCreateLocationsRequest,
   CreateCustomerRequest,
+  CreateCustomerAddressRequest,
+  CustomerProfile,
   CreateLocationRequest,
   CreateProductRequest,
   CreateSupplierRequest,
   CreateWarehouseRequest,
   CreateWarehouseZoneRequest,
   UpdateCustomerRequest,
+  UpdateCustomerAddressRequest,
+  UpsertCustomerProfileRequest,
   UpdateLocationRequest,
   UpdateProductRequest,
   UpdateSupplierRequest,

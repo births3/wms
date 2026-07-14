@@ -7,6 +7,9 @@ const queriesSource = readFileSync(new URL("../src/features/master-data/master-d
 const apiSource = readFileSync(new URL("../src/features/master-data/master-data-queries/api.ts", import.meta.url), "utf8");
 const crudDialogSource = readFileSync(new URL("../src/pages/master-data/MasterDataCrudDialog.tsx", import.meta.url), "utf8");
 const batchDialogSource = readFileSync(new URL("../src/pages/master-data/LocationBatchDialog.tsx", import.meta.url), "utf8");
+const mapperSource = readFileSync(new URL("../src/features/master-data/master-data-queries/mappers.ts", import.meta.url), "utf8");
+const pageSource = readFileSync(new URL("../src/pages/master-data/M1MasterDataPage.tsx", import.meta.url), "utf8");
+const rendererSource = readFileSync(new URL("../src/app-shell/AdminViewRenderer.tsx", import.meta.url), "utf8");
 
 for (const field of [
   "zone_id",
@@ -21,6 +24,8 @@ for (const field of [
 ]) {
   assert.match(schema, new RegExp(`${field}[?:]`), `Location contract should expose ${field}`);
 }
+
+assert.match(mapperSource, /remainingVolumeCm3/, "location list should derive remaining capacity from API volume fields");
 
 assert.match(glossary, /A01-01-02-03/, "glossary should use the full zone-row-column-layer location code");
 assert.match(queriesSource, /useSystemDictionaryItemOptionsQuery/, "location UI should read dictionary options through a shared query hook");
@@ -48,3 +53,20 @@ assert.ok(
   dictReadAt >= 0 && postAt >= 0 && dictReadAt < postAt,
   "库位批量创建必须先读取字典，再执行写入，避免写成功后因字典失败误报",
 );
+assert.match(
+  apiSource,
+  /web-m1-location-create/,
+  "库位创建必须携带 Idempotency-Key",
+);
+assert.match(
+  apiSource,
+  /web-m1-location-update/,
+  "库位更新必须携带 Idempotency-Key",
+);
+assert.match(
+  pageSource,
+  /currentUser\.permissions\.includes\("m1\.master_data\.write"\)/,
+  "M1 主数据页面必须以当前用户权限决定写操作可见性",
+);
+assert.match(pageSource, /const gridToolbarActions: DataGridToolbarAction\[\] = canWrite \?/i, "M1 写操作工具栏必须受权限门控");
+assert.match(rendererSource, /<M1MasterDataPage currentUser=\{currentUser\}/, "M1 页面必须接收当前用户权限上下文");

@@ -232,7 +232,23 @@ export function splitCodes(value: string) {
 }
 
 export function dateToIso(value: string) {
-  return value ? `${value}T10:00:00.000Z` : null;
+  if (!value) return null;
+  const localDate = new Date(`${value}T10:00:00`);
+  return Number.isNaN(localDate.getTime()) ? null : localDate.toISOString();
+}
+
+export function dateTimeToIso(value: string) {
+  if (!value) return null;
+  const localDate = new Date(value);
+  return Number.isNaN(localDate.getTime()) ? null : localDate.toISOString();
+}
+
+export function localDayRange(value = new Date()) {
+  const from = new Date(value);
+  from.setHours(0, 0, 0, 0);
+  const to = new Date(value);
+  to.setHours(23, 59, 59, 999);
+  return { from: from.toISOString(), to: to.toISOString() };
 }
 
 export function dateInputValue(value: Date) {

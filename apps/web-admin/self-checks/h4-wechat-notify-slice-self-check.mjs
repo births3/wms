@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const appShell = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
+const viewRenderer = readFileSync(new URL("../src/app-shell/AdminViewRenderer.tsx", import.meta.url), "utf8");
 const pageSource = readFileSync(new URL("../src/pages/wechat-notify/H4WechatNotifyPage.tsx", import.meta.url), "utf8");
 const dialogsSource = readFileSync(new URL("../src/pages/wechat-notify/H4WechatNotifyDialogs.tsx", import.meta.url), "utf8");
 const apiSource = readFileSync(new URL("../src/features/wechat-notify/wechat-notify-queries.ts", import.meta.url), "utf8");
@@ -19,12 +20,12 @@ const h4Pages = [
 for (const page of h4Pages) {
   assert.match(appShell, new RegExp(`\\{ id: "${page.id}", title: "${page.title}"`), `${page.id} 必须进入 menuSections`);
   assert.match(appShell, new RegExp(`menuItem\\("${page.id}"\\)`), `${page.id} 必须进入 defaultMenuTree`);
-  assert.match(appShell, new RegExp(`if \\(view === "${page.id}"\\) return "${page.mode}"`), `${page.id} 必须映射到 H4 页面 mode`);
+  assert.match(viewRenderer, new RegExp(`if \\(view === "${page.id}"\\) return "${page.mode}"`), `${page.id} 必须映射到 H4 页面 mode`);
   assert.match(adminMenuDevMock, new RegExp(`\\["${page.id}", "${page.title}"`), `${page.id} 必须进入 admin-menu dev mock 已发布菜单`);
   assert.ok(queryConfig.pages.some((item) => item.id === page.id), `${page.id} 必须进入页面查询配置`);
 }
 
-assert.match(appShell, /<H4WechatNotifyPage mode=\{wechatNotifyMode\}/, "H4 菜单页必须由 renderAdminView 渲染");
+assert.match(viewRenderer, /<H4WechatNotifyPage mode=\{wechatNotifyMode\}/, "H4 菜单页必须由 renderAdminView 渲染");
 assert.match(pageSource, /<QueryPanel[\s\S]*fields=\{h4WechatSettingsQueryFields\}/, "H4 参数设置必须使用公共 QueryPanel");
 assert.match(pageSource, /h4WechatSettingsCoreQueryFieldKeys/, "H4 参数设置必须登记核心查询字段常量");
 assert.match(pageSource, /filterSettings/, "H4 参数设置必须本地过滤 settingsRows");

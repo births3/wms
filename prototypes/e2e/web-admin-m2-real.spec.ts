@@ -5,11 +5,15 @@ import path from "node:path";
 const artifactsDir = path.resolve("../apps/web-admin/.e2e-artifacts/m2-real/screenshots");
 const supplierId = "00000000-0000-0000-0000-000000001101";
 const warehouseId = "00000000-0000-0000-0000-000000001301";
+const productId = "00000000-0000-0000-0000-000000001001";
+const adminUserId = "00000000-0000-0000-0000-000000000101";
 
 test("M2 PC 真实入库链路落库并生成库存与审计", async ({ page }) => {
   fs.mkdirSync(artifactsDir, { recursive: true });
   const receiptNo = `ASN-M2-E2E-${Date.now()}`;
   await login(page);
+  const signerIds = await ensureReceivingClerks(page);
+  await ensurePutawayProduct(page);
 
   await openMenu(page, "入库业务", "入库作业", /M2 收货管理/);
   await page.getByRole("button", { name: "新增", exact: true }).click();
@@ -17,23 +21,139 @@ test("M2 PC 真实入库链路落库并生成库存与审计", async ({ page }) 
   await page.getByLabel("单据类型", { exact: true }).selectOption("purchase_inbound");
   await page.getByLabel("供应商 ID").fill(supplierId);
   await page.getByLabel("仓库 ID").fill(warehouseId);
+  await page.getByRole("dialog").getByLabel("预计到货").fill(localDateInputValue());
   await page.getByLabel("商品编码").fill("P-M1-E2E-001");
   await page.getByLabel("预报数量").fill("10");
+  const createResponsePromise = page.waitForResponse(
+    (response) => response.url().endsWith("/api/v1/inbound/receiving-orders") && response.request().method() === "POST",
+  );
   await page.getByRole("button", { name: "创建 ASN" }).click();
+  const createdOrder = await (await createResponsePromise).json() as { id: string };
+  const receivingOrderId = createdOrder.id;
   await expect(page.getByText(`${receiptNo} 已创建`)).toBeVisible();
 
   await page.getByRole("button", { name: "放行", exact: true }).click();
   await expect(page.getByText(`${receiptNo} 已放行`)).toBeVisible();
+
+  await page
+    .locator("tbody tr")
+    .filter({ hasText: receiptNo })
+    .getByRole("checkbox", { name: "选择此行" })
+    .check();
+  await page.getByRole("button", { name: "打印", exact: true }).click();
+  const asnPrintDialog = page.getByRole("dialog", { name: "M2 ASN E2E 模板" });
+  await expect(asnPrintDialog).toBeVisible();
+  await expect(asnPrintDialog.getByText("ASN 号")).toBeVisible();
+  await page.screenshot({ path: path.join(artifactsDir, "receiving-print-preview.png") });
+  const asnPrintRequestPromise = page.waitForRequest(
+    (request) => request.url().endsWith("/api/v1/print-templates/print") && request.method() === "POST",
+  );
+  await asnPrintDialog.getByRole("button", { name: "打印", exact: true }).click();
+  const asnPrintRequest = await asnPrintRequestPromise;
+  const asnPrintBody = JSON.parse(asnPrintRequest.postData() ?? "{}") as Record<string, unknown>;
+  expect(asnPrintBody.business_module).toBe("M2");
+  expect(asnPrintBody.business_document_type).toBe("asn");
+  expect(typeof asnPrintBody.business_document_id).toBe("string");
+  await expect(page.getByRole("status").filter({ hasText: "打印记录已写入" })).toBeVisible();
+
   await page.getByRole("button", { name: "收货", exact: true }).click();
   await page.getByLabel("实际到货数量").fill("10");
   await page.getByLabel("缺货数量").fill("0");
   await page.getByLabel("拒收数量", { exact: true }).fill("0");
   await page.getByRole("button", { name: "确认收货" }).click();
   await expect(page.getByText(`${receiptNo} 收货已提交`)).toBeVisible();
+  const printDataResponse = await page.evaluate(async (id) => {
+    const session = JSON.parse(window.localStorage.getItem("wms.web-admin.auth-session") ?? "null") as { accessToken?: string } | null;
+    const response = await fetch(`/api/v1/inbound/receiving-orders/${id}/print-data`, {
+      headers: session?.accessToken ? { Authorization: `Bearer ${session.accessToken}` } : undefined,
+    });
+    return { status: response.status, body: await response.json() };
+  }, receivingOrderId);
+  expect(printDataResponse.status).toBe(200);
+  expect(printDataResponse.body).toMatchObject({
+    order: { id: receivingOrderId },
+    receipts: [{ actual_qty: 10, shortage_qty: 0, rejected_qty: 0 }],
+  });
+  expect(printDataResponse.body.receipts[0].details).toMatchObject({
+    vehicle_no: "沪A-12345",
+    carrier: "华东冷链承运商",
+    origin: "上海配送中心",
+  });
   await page.screenshot({ path: path.join(artifactsDir, "receiving.png") });
+
+  await page.getByRole("button", { name: "进度看板" }).click();
+  await expect(page.getByRole("heading", { name: "M2 入库进度看板" })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "刷新间隔" })).toHaveValue("30");
+  await page.getByRole("textbox", { name: "供应商 ID" }).fill(supplierId);
+  await page.getByRole("textbox", { name: "商品编码" }).fill("P-M1-E2E-001");
+  await page.getByRole("button", { name: "查询" }).click();
+  const inspectingRow = page.locator("table tbody tr").filter({ hasText: "验收中" });
+  await expect(inspectingRow).toBeVisible();
+  await inspectingRow.click();
+  await expect(page.getByRole("dialog", { name: "状态单据" })).toBeVisible();
+  await page.getByRole("dialog", { name: "状态单据" }).getByRole("button", { name: new RegExp(receiptNo) }).click();
+  await expect(page.getByRole("dialog", { name: "订单详情" })).toBeVisible();
+  await page.screenshot({ path: path.join(artifactsDir, "receiving-dashboard-detail.png") });
+  await page.keyboard.press("Escape");
 
   await openMenu(page, "入库业务", "入库作业", /M2 验收管理/);
   await expect(page.locator("table").getByText(receiptNo, { exact: true })).toBeVisible();
+
+  await page
+    .locator("tbody tr")
+    .filter({ hasText: receiptNo })
+    .getByRole("checkbox", { name: "选择此行" })
+    .check();
+  await page.getByRole("button", { name: "打印", exact: true }).click();
+  const acceptancePrintDialog = page.getByRole("dialog", { name: "M2 验收记录 E2E 模板" });
+  await expect(acceptancePrintDialog).toBeVisible();
+  await expect(acceptancePrintDialog.getByText("ASN 号")).toBeVisible();
+  await page.screenshot({ path: path.join(artifactsDir, "inspection-print-preview.png") });
+  const acceptancePrintRequestPromise = page.waitForRequest(
+    (request) => request.url().endsWith("/api/v1/print-templates/print") && request.method() === "POST",
+  );
+  await acceptancePrintDialog.getByRole("button", { name: "打印", exact: true }).click();
+  const acceptancePrintRequest = await acceptancePrintRequestPromise;
+  const acceptancePrintBody = JSON.parse(acceptancePrintRequest.postData() ?? "{}") as Record<string, unknown>;
+  expect(acceptancePrintBody.business_module).toBe("M2");
+  expect(acceptancePrintBody.business_document_type).toBe("acceptance_record");
+  expect(typeof acceptancePrintBody.business_document_id).toBe("string");
+  expect((acceptancePrintBody.data as { receiving?: { actual_qty?: number } }).receiving?.actual_qty).toBe(10);
+  await expect(page.getByRole("status").filter({ hasText: "打印记录已写入" })).toBeVisible();
+
+  const overActualInspection = await page.evaluate(async (id) => {
+    const session = JSON.parse(window.localStorage.getItem("wms.web-admin.auth-session") ?? "null") as { accessToken?: string } | null;
+    const response = await fetch(`/api/v1/inbound/receiving-orders/${id}/inspect`, {
+      method: "POST",
+      headers: {
+        Authorization: session?.accessToken ? `Bearer ${session.accessToken}` : "",
+        "Content-Type": "application/json",
+        "Idempotency-Key": `m2-e2e-over-actual-${Date.now()}`,
+      },
+      body: JSON.stringify({
+        batch_no: "B-M2-E2E-OVER",
+        accepted_qty: 11,
+        rejected_qty: 0,
+        production_date: "2026-01-01",
+        expiry_date: "2028-01-01",
+        quality_status: "qualified",
+        trace_codes: ["TRACE-M2-E2E-OVER"],
+      }),
+    });
+    return { status: response.status, body: await response.json() };
+  }, receivingOrderId);
+  expect(overActualInspection.status).toBe(422);
+  expect(overActualInspection.body).toMatchObject({ severity: "error" });
+
+  const inspectionRequests: import("@playwright/test").Request[] = [];
+  const signatureRequests: import("@playwright/test").Request[] = [];
+  const trackAcceptanceRequests = (request: import("@playwright/test").Request) => {
+    const pathname = new URL(request.url()).pathname;
+    if (request.method() !== "POST") return;
+    if (pathname.endsWith(`/api/v1/inbound/receiving-orders/${receivingOrderId}/inspect`)) inspectionRequests.push(request);
+    if (pathname.endsWith(`/api/v1/inbound/receiving-orders/${receivingOrderId}/sign`)) signatureRequests.push(request);
+  };
+  page.on("request", trackAcceptanceRequests);
   await page.getByRole("button", { name: "验收", exact: true }).click();
   await page.getByLabel("验收批号").fill("B-M2-E2E-001");
   await page.getByLabel("通过数量").fill("10");
@@ -43,15 +163,61 @@ test("M2 PC 真实入库链路落库并生成库存与审计", async ({ page }) 
   await page.getByLabel("追溯码").fill("TRACE-M2-E2E-001");
   await page.getByRole("dialog", { name: "验收" }).getByRole("combobox", { name: "质量状态" }).selectOption("qualified");
   for (const label of ["外观核对", "包装核对", "说明书核对", "标签核对"]) await page.getByLabel(label).fill("通过");
-  await page.getByLabel("第一签字人").fill("11111111-1111-4111-8111-111111111111");
-  await page.getByLabel("第二签字人 ID").fill("22222222-2222-4222-8222-222222222222");
+  await page.getByLabel("第一签字人").fill(signerIds.firstSignerId);
+  await page.getByLabel("第二签字人 ID").fill(signerIds.firstSignerId);
   await page.getByRole("button", { name: "提交验收" }).click();
+  await expect(page.getByText("第二签字人不能与第一签字人相同", { exact: true })).toBeVisible();
+  expect(inspectionRequests).toHaveLength(0);
+  expect(signatureRequests).toHaveLength(0);
+  await page.screenshot({ path: path.join(artifactsDir, "inspection-dual-sign-validation.png") });
+
+  await page.getByLabel("第二签字人 ID").fill(signerIds.secondSignerId);
+  const inspectionResponsePromise = page.waitForResponse(
+    (response) => response.url().endsWith(`/api/v1/inbound/receiving-orders/${receivingOrderId}/inspect`) && response.request().method() === "POST",
+  );
+  const signatureResponsePromise = page.waitForResponse(
+    (response) => response.url().endsWith(`/api/v1/inbound/receiving-orders/${receivingOrderId}/sign`) && response.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "提交验收" }).click();
+  const inspectionResponse = await inspectionResponsePromise;
+  const signatureResponse = await signatureResponsePromise;
+  expect(inspectionResponse.status()).toBe(200);
+  expect(signatureResponse.status()).toBe(200);
+  expect(JSON.parse(signatureRequests[0]?.postData() ?? "{}")).toMatchObject({
+    first_signer_id: signerIds.firstSignerId,
+    second_signer_id: signerIds.secondSignerId,
+    dual_required: true,
+  });
+  expect(await signatureResponse.json()).toMatchObject({
+    receiving_order_id: receivingOrderId,
+    first_signer_id: signerIds.firstSignerId,
+    second_signer_id: signerIds.secondSignerId,
+  });
   await expect(page.getByText(`${receiptNo} 验收已提交`)).toBeVisible();
   await page.screenshot({ path: path.join(artifactsDir, "inspection.png") });
+  await page.screenshot({ path: path.join(artifactsDir, "inspection-dual-sign-submitted.png") });
+  page.off("request", trackAcceptanceRequests);
 
   await openMenu(page, "入库业务", "入库作业", /M2 上架管理/);
   await expect(page.locator("table").getByText(receiptNo, { exact: true })).toBeVisible();
+  const recommendationResponsePromise = page.waitForResponse(
+    (response) => response.url().includes(`/api/v1/inbound/receiving-orders/${receivingOrderId}/putaway-recommendations`) && response.request().method() === "GET",
+  );
   await page.getByRole("button", { name: "上架", exact: true }).click();
+  const putawayDialog = page.getByRole("dialog", { name: "上架" });
+  await expect(putawayDialog).toBeVisible();
+  await putawayDialog.getByLabel("数量", { exact: true }).fill("0");
+  await putawayDialog.getByRole("button", { name: "确认上架" }).click();
+  await expect(putawayDialog.getByRole("alert").first()).toContainText("上架数量必须大于 0");
+  await putawayDialog.getByLabel("数量", { exact: true }).fill("10");
+  const recommendationResponse = await recommendationResponsePromise;
+  expect(recommendationResponse.status()).toBe(200);
+  const recommendationBody = await recommendationResponse.json() as { data: Array<{ location_code: string; same_product: boolean }> };
+  expect(recommendationBody.data.length).toBeGreaterThan(0);
+  await expect(putawayDialog.getByText("推荐 #1", { exact: false })).toBeVisible();
+  await expect(putawayDialog.getByText("推荐原因：", { exact: false })).toBeVisible();
+  await page.screenshot({ path: path.join(artifactsDir, "putaway-recommendations.png") });
+  await putawayDialog.locator('input[name="putaway-recommended-location"]').first().check();
   await page.getByLabel("上架商品编码").fill("P-M1-E2E-001");
   await page.getByLabel("上架批号").fill("B-M2-E2E-001");
   await page.getByLabel("数量", { exact: true }).fill("10");
@@ -62,7 +228,46 @@ test("M2 PC 真实入库链路落库并生成库存与审计", async ({ page }) 
 
   await openMenu(page, "库内业务", "库存管理", /M3 批号管理/);
   await expect(page.getByText("B-M2-E2E-001").first()).toBeVisible();
+  const inventoryRow = page.getByRole("row").filter({ hasText: "B-M2-E2E-001" }).first();
+  await inventoryRow.getByRole("checkbox", { name: "选择此行" }).check();
+  await page.getByRole("button", { name: "详情", description: "查看选中批号详情", exact: true }).click();
+  const traceDialog = page.getByRole("dialog", { name: "批号详情" });
+  await expect(traceDialog).toBeVisible();
+  await expect(traceDialog.getByText("库存 movement：1 条")).toBeVisible();
+  await page.screenshot({ path: path.join(artifactsDir, "inventory-trace.png") });
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "状态", exact: true }).click();
+  const statusDialog = page.getByRole("dialog", { name: "变更库存状态" });
+  await expect(statusDialog).toBeVisible();
+  await statusDialog.getByLabel("目标状态").selectOption("quarantined");
+  await statusDialog.getByLabel("审批来源").fill("温度超标事件");
+  await statusDialog.getByLabel("审批编号").fill("TEMP-M2-E2E-001");
+  await statusDialog.getByLabel("变更原因").fill("真实 E2E 状态变更");
+  await statusDialog.getByRole("button", { name: "确认变更" }).click();
+  await expect(page.getByRole("status")).toContainText("状态已更新");
+  await expect(inventoryRow.getByText("隔离")).toBeVisible();
   await page.screenshot({ path: path.join(artifactsDir, "inventory.png") });
+
+  await page.locator('button[title="标记选中库存批次召回并隔离"]').click();
+  const recallDialog = page.getByRole("dialog", { name: "标记召回" });
+  await expect(recallDialog).toBeVisible();
+  await recallDialog.getByLabel("审批编号").fill(`RECALL-M2-E2E-${Date.now()}`);
+  await recallDialog.getByLabel("召回原因").fill("真实 E2E 召回隔离");
+  await recallDialog.getByRole("button", { name: "确认召回" }).click();
+  await expect(page.getByRole("status")).toContainText("已标记召回");
+  await expect(inventoryRow.getByText("已标记")).toBeVisible();
+  await page.screenshot({ path: path.join(artifactsDir, "inventory-recall.png") });
+
+  await page.locator('button[title="双人审批取消选中库存批次召回"]').click();
+  const cancelRecallDialog = page.getByRole("dialog", { name: "取消召回" });
+  await expect(cancelRecallDialog).toBeVisible();
+  await cancelRecallDialog.getByLabel("取消审批编号").fill(`RECALL-CANCEL-M2-E2E-${Date.now()}`);
+  await cancelRecallDialog.getByLabel("质量审批人 ID").fill("00000000-0000-0000-0000-000000000201");
+  await cancelRecallDialog.getByLabel("取消原因").fill("真实 E2E 质量复核后取消召回");
+  await cancelRecallDialog.getByRole("button", { name: "确认取消" }).click();
+  await expect(page.getByRole("status")).toContainText("已取消召回");
+  await expect(inventoryRow.getByText("未标记")).toBeVisible();
+  await page.screenshot({ path: path.join(artifactsDir, "inventory-recall-cancel.png") });
 });
 
 async function login(page: import("@playwright/test").Page) {
@@ -72,6 +277,68 @@ async function login(page: import("@playwright/test").Page) {
   await page.getByRole("textbox", { name: "密码", exact: true }).fill("CorrectHorse1!");
   await page.getByRole("button", { name: "登录" }).click();
   await expect(page.getByRole("heading", { name: "运营总览" })).toBeVisible();
+}
+
+async function ensureReceivingClerks(page: import("@playwright/test").Page) {
+  return page.evaluate(async ({ adminUserId }) => {
+    const session = JSON.parse(window.localStorage.getItem("wms.web-admin.auth-session") ?? "null") as { accessToken?: string } | null;
+    const headers = { Authorization: `Bearer ${session?.accessToken ?? ""}`, "Content-Type": "application/json" };
+    async function request(path: string, init: RequestInit = {}) {
+      const response = await fetch(path, { ...init, headers: { ...headers, ...(init.headers ?? {}) } });
+      if (!response.ok) throw new Error(`E2E 角色准备失败: ${path} ${response.status} ${await response.text()}`);
+      return response.json() as Promise<unknown>;
+    }
+    const roles = await request("/api/v1/auth/roles") as { items: Array<{ id: string; role_code: string }> };
+    let receivingRole = roles.items.find((role) => role.role_code === "receiving_clerk");
+    if (!receivingRole) {
+      receivingRole = await request("/api/v1/auth/roles", {
+        method: "POST",
+        headers: { ...headers, "Idempotency-Key": "m2-e2e-create-receiving-clerk" },
+        body: JSON.stringify({ role_code: "receiving_clerk", role_name: "收货员", data_scope: "warehouse", parent_role_id: null }),
+      }) as { id: string; role_code: string };
+    }
+    const users = await request("/api/v1/auth/users") as { items: Array<{ user_id: string; username: string }> };
+    let firstSigner = users.items.find((user) => user.username === "m2-e2e-receiving-clerk-first");
+    if (!firstSigner) {
+      firstSigner = await request("/api/v1/auth/users", {
+        method: "POST",
+        headers: { ...headers, "Idempotency-Key": "m2-e2e-create-first-receiving-user" },
+        body: JSON.stringify({ username: "m2-e2e-receiving-clerk-first", display_name: "M2 E2E 第一收货员", phone: "13900000001", password: "CorrectHorse1!", role_ids: [receivingRole.id] }),
+      }) as { user_id: string; username: string };
+    }
+    let secondSigner = users.items.find((user) => user.username === "m2-e2e-receiving-clerk");
+    if (!secondSigner) {
+      secondSigner = await request("/api/v1/auth/users", {
+        method: "POST",
+        headers: { ...headers, "Idempotency-Key": "m2-e2e-create-receiving-user" },
+        body: JSON.stringify({ username: "m2-e2e-receiving-clerk", display_name: "M2 E2E 收货员", phone: "13800000001", password: "CorrectHorse1!", role_ids: [receivingRole.id] }),
+      }) as { user_id: string; username: string };
+    }
+    const systemRole = roles.items.find((role) => role.role_code === "system_admin");
+    if (!systemRole) throw new Error("E2E 角色准备失败: 缺少 system_admin");
+    await request("/api/v1/auth/user-roles/batch", {
+      method: "PUT",
+      headers: { ...headers, "Idempotency-Key": "m2-bind-users" },
+      body: JSON.stringify({ user_ids: [adminUserId, firstSigner.user_id, secondSigner.user_id], role_ids: [systemRole.id, receivingRole.id] }),
+    });
+    return { firstSignerId: firstSigner.user_id, secondSignerId: secondSigner.user_id };
+  }, { adminUserId });
+}
+
+async function ensurePutawayProduct(page: import("@playwright/test").Page) {
+  await page.evaluate(async ({ productId }) => {
+    const session = JSON.parse(window.localStorage.getItem("wms.web-admin.auth-session") ?? "null") as { accessToken?: string } | null;
+    const response = await fetch(`/api/v1/master-data/products/${productId}`, {
+      method: "PATCH",
+      headers: {
+        Authorization: session?.accessToken ? `Bearer ${session.accessToken}` : "",
+        "Content-Type": "application/json",
+        "Idempotency-Key": `m2-e2e-product-volume-${Date.now()}`,
+      },
+      body: JSON.stringify({ attrs: { unit_volume_cm3: 1 } }),
+    });
+    if (!response.ok) throw new Error(`E2E 商品准备失败: ${response.status} ${await response.text()}`);
+  }, { productId });
 }
 
 async function openMenu(page: import("@playwright/test").Page, section: string, group: string, item: RegExp) {
@@ -84,4 +351,10 @@ async function openMenu(page: import("@playwright/test").Page, section: string, 
     if ((await groupButton.getAttribute("aria-expanded")) !== "true") await groupButton.click();
   }
   await target.click();
+}
+
+function localDateInputValue(value = new Date()) {
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${value.getFullYear()}-${month}-${day}`;
 }

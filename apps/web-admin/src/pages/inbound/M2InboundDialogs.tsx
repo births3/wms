@@ -24,6 +24,10 @@ import {
 } from "@wms/ui";
 import { Ban, CheckCircle2, ClipboardCheck, PackageCheck, Plus } from "lucide-react";
 
+import {
+  usePutawayRecommendationsQuery,
+  type PutawayRecommendation,
+} from "@/features/inbound/inbound-queries";
 import { useMasterDataRowsQuery, type MasterDataRow } from "@/features/master-data/master-data-queries";
 import type { InboundDocumentType } from "./m2-inbound-document-type";
 import { INSPECTION_DUAL_SIGN_REQUIRED_BY_STRATEGY } from "./m2-inbound-page-helpers";
@@ -116,16 +120,15 @@ export interface PutawayFormState {
   productCode: string;
   batchNo: string;
   qty: string;
-  recommendedLocation: string;
   locationId: string;
   locationCode: string;
   qualityStatus: string;
-  validationResult: string;
   note: string;
 }
 
 interface M2InboundDialogsProps {
   activeDialog: InboundDialog | null;
+  orderId: string | null;
   orderReceiptNo: string | null;
   hasOrder: boolean;
   pending: boolean;
@@ -146,6 +149,7 @@ interface M2InboundDialogsProps {
   setInspectForm: React.Dispatch<React.SetStateAction<InspectFormState>>;
   setSignForm: React.Dispatch<React.SetStateAction<SignFormState>>;
   setPutawayForm: React.Dispatch<React.SetStateAction<PutawayFormState>>;
+  clearPutawayValidationError: () => void;
   submitCreate: (event: React.FormEvent<HTMLFormElement>) => void;
   submitReceive: (event: React.FormEvent<HTMLFormElement>) => void;
   submitReject: (event?: React.FormEvent<HTMLFormElement>) => void;
@@ -155,6 +159,7 @@ interface M2InboundDialogsProps {
 
 export function M2InboundDialogs({
   activeDialog,
+  orderId,
   orderReceiptNo,
   hasOrder,
   pending,
@@ -175,6 +180,7 @@ export function M2InboundDialogs({
   setInspectForm,
   setSignForm,
   setPutawayForm,
+  clearPutawayValidationError,
   submitCreate,
   submitReceive,
   submitReject,
@@ -182,6 +188,18 @@ export function M2InboundDialogs({
   submitPutaway,
 }: M2InboundDialogsProps) {
   const productsQuery = useMasterDataRowsQuery("m1-products", activeDialog === "create");
+  const recommendationInput = {
+    product_code: putawayForm.productCode.trim(),
+    batch_no: putawayForm.batchNo.trim(),
+    qty: Number.parseInt(putawayForm.qty, 10) || 0,
+    quality_status: putawayForm.qualityStatus.trim(),
+    limit: 5,
+  };
+  const putawayRecommendationsQuery = usePutawayRecommendationsQuery(
+    orderId,
+    recommendationInput,
+    activeDialog === "putaway",
+  );
   const [productLookupOpen, setProductLookupOpen] = React.useState(false);
 
   React.useEffect(() => {
@@ -196,6 +214,21 @@ export function M2InboundDialogs({
     setCreateForm((value) => ({ ...value, productCode: product.code }));
     setProductLookupOpen(false);
   }
+
+  function selectRecommendedLocation(location: PutawayRecommendation) {
+    setPutawayForm((value) => ({
+      ...value,
+      locationId: location.location_id,
+      locationCode: location.location_code,
+    }));
+  }
+
+  const recommendationQty = recommendationInput.qty;
+  const recommendationInputError = !recommendationInput.product_code || !recommendationInput.batch_no || !recommendationInput.quality_status
+    ? "商品编码、批号和质量状态完整后才能读取推荐库位"
+    : recommendationQty <= 0
+      ? "上架数量必须大于 0"
+      : null;
 
   return (
     <Dialog open onOpenChange={(open) => !open && setActiveDialog(null)}>
@@ -212,7 +245,7 @@ export function M2InboundDialogs({
               <DialogTitle>新建 ASN</DialogTitle>
               <DialogDescription>手工创建入库通知单。</DialogDescription>
             </DialogHeader>
-            <TextField label="ASN 号" required placeholder="例如 ASN-M2-PC-0002" value={createForm.receiptNo} onChange={(receiptNo) => setCreateForm((value) => ({ ...value, receiptNo }))} />
+            <TextField label="ASN 号" placeholder="留空由 M-CG 编号规则生成" value={createForm.receiptNo} onChange={(receiptNo) => setCreateForm((value) => ({ ...value, receiptNo }))} />
             <div>
               <label className="mb-1 block text-xs text-muted-foreground">单据类型</label>
               <select
@@ -232,9 +265,9 @@ export function M2InboundDialogs({
                 <option value="sales_return">销售退货</option>
               </select>
             </div>
-            <TextField label="供应商 ID" placeholder="例如 00000000-0000-0000-0000-000000005001" value={createForm.supplierId} onChange={(supplierId) => setCreateForm((value) => ({ ...value, supplierId }))} />
+            <TextField label="供应商 ID" required placeholder="例如 00000000-0000-0000-0000-000000005001" value={createForm.supplierId} onChange={(supplierId) => setCreateForm((value) => ({ ...value, supplierId }))} />
             <TextField label="仓库 ID" required placeholder="例如 00000000-0000-0000-0000-000000003001" value={createForm.warehouseId} onChange={(warehouseId) => setCreateForm((value) => ({ ...value, warehouseId }))} />
-            <TextField label="预计到货" type="date" placeholder="例如 2026-06-27" value={createForm.expectedArrivalDate} onChange={(expectedArrivalDate) => setCreateForm((value) => ({ ...value, expectedArrivalDate }))} />
+            <TextField label="预计到货" type="date" required placeholder="例如 2026-06-27" value={createForm.expectedArrivalDate} onChange={(expectedArrivalDate) => setCreateForm((value) => ({ ...value, expectedArrivalDate }))} />
             <ProductLookupField
               batchNo={createForm.batchNo}
               errorMessage={productsQuery.error?.message}
@@ -248,7 +281,7 @@ export function M2InboundDialogs({
               onSelect={selectCreateProduct}
             />
             {createForm.documentType === "sales_return" && (
-              <TextField label="ASN 批号" placeholder="例如 BATCH-202606" value={createForm.batchNo} onChange={(batchNo) => setCreateForm((value) => ({ ...value, batchNo }))} />
+              <TextField label="ASN 批号" required placeholder="例如 BATCH-202606" value={createForm.batchNo} onChange={(batchNo) => setCreateForm((value) => ({ ...value, batchNo }))} />
             )}
             <TextField label="预报数量" type="number" required placeholder="例如 60" value={createForm.expectedQty} onChange={(expectedQty) => setCreateForm((value) => ({ ...value, expectedQty }))} />
             <TextField label="生产日期" type="date" placeholder="例如 2026-02-01" value={createForm.productionDate} onChange={(productionDate) => setCreateForm((value) => ({ ...value, productionDate }))} />
@@ -395,10 +428,31 @@ export function M2InboundDialogs({
             <TextField label="容器 LPN" value={putawayForm.lpn} onChange={(lpn) => setPutawayForm((value) => ({ ...value, lpn }))} />
             <TextField label="上架商品编码" value={putawayForm.productCode} onChange={(productCode) => setPutawayForm((value) => ({ ...value, productCode }))} />
             <TextField label="上架批号" value={putawayForm.batchNo} onChange={(batchNo) => setPutawayForm((value) => ({ ...value, batchNo }))} />
-            <TextField label="数量" type="number" value={putawayForm.qty} onChange={(qty) => setPutawayForm((value) => ({ ...value, qty }))} />
-            <TextField label="推荐库位 Top N" value={putawayForm.recommendedLocation} onChange={(recommendedLocation) => setPutawayForm((value) => ({ ...value, recommendedLocation }))} />
-            <TextField label="实际库位" value={putawayForm.locationCode} onChange={(locationCode) => setPutawayForm((value) => ({ ...value, locationCode }))} />
-            <TextField label="校验结果" value={putawayForm.validationResult} onChange={(validationResult) => setPutawayForm((value) => ({ ...value, validationResult }))} />
+            <TextField label="数量" type="number" value={putawayForm.qty} onChange={(qty) => { clearPutawayValidationError(); setPutawayForm((value) => ({ ...value, qty })); }} />
+            <section className="grid gap-2 rounded-md border bg-muted/20 p-3" aria-label="推荐库位">
+              <div className="text-sm font-medium">推荐库位 Top 5</div>
+              {recommendationInputError && <div className="text-xs text-muted-foreground" role="alert">{recommendationInputError}</div>}
+              {putawayRecommendationsQuery.isPending && <div className="text-xs text-muted-foreground">正在读取推荐库位...</div>}
+              {putawayRecommendationsQuery.error && <div className="text-xs text-destructive" role="alert">{putawayRecommendationsQuery.error.message}</div>}
+              {!recommendationInputError && !putawayRecommendationsQuery.isPending && !putawayRecommendationsQuery.error && putawayRecommendationsQuery.data?.data.length === 0 && (
+                <div className="text-xs text-muted-foreground" role="status">暂无符合温区、色标和容量规则的库位</div>
+              )}
+              {putawayRecommendationsQuery.data?.data.map((location, index) => (
+                <label key={location.location_id} className="grid cursor-pointer grid-cols-[auto_1fr] gap-2 rounded border bg-background p-2 text-xs">
+                  <input
+                    type="radio"
+                    name="putaway-recommended-location"
+                    checked={putawayForm.locationId === location.location_id && putawayForm.locationCode === location.location_code}
+                    onChange={() => selectRecommendedLocation(location)}
+                  />
+                  <span>
+                    <span className="font-medium">推荐 #{index + 1} · {location.location_code}</span>
+                    <span className="block text-muted-foreground">推荐原因：{recommendationReason(location)}；剩余 {location.available_volume_cm3} cm³ / 需 {location.required_volume_cm3} cm³</span>
+                  </span>
+                </label>
+              ))}
+            </section>
+            <TextField label="实际库位" value={putawayForm.locationCode} onChange={(locationCode) => { clearPutawayValidationError(); setPutawayForm((value) => ({ ...value, locationCode, locationId: "" })); }} />
             <TextField label="上架备注" value={putawayForm.note} onChange={(note) => setPutawayForm((value) => ({ ...value, note }))} />
             <DialogFooter>
               <CancelButton />
@@ -419,6 +473,10 @@ export function M2InboundDialogs({
       </DialogContent>
     </Dialog>
   );
+}
+
+function recommendationReason(location: PutawayRecommendation) {
+  return [location.same_product ? "同品就近" : "温区/色标匹配", "容量充足"].join("、");
 }
 
 function CancelButton() {

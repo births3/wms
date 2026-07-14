@@ -11,6 +11,10 @@ export type MasterDataViewId =
 export type Product = components["schemas"]["Product"];
 export type Supplier = components["schemas"]["Supplier"];
 export type Customer = components["schemas"]["Customer"];
+export type CustomerAddress = components["schemas"]["CustomerAddress"];
+export type CustomerAddressListResponse = components["schemas"]["CustomerAddressListResponse"];
+export type CustomerProfile = components["schemas"]["CustomerProfile"];
+export type CustomerQualification = components["schemas"]["CustomerQualification"];
 export type Warehouse = components["schemas"]["Warehouse"];
 export type WarehouseZone = components["schemas"]["WarehouseZone"];
 export type Location = components["schemas"]["Location"];
@@ -20,6 +24,9 @@ export type CreateSupplierRequest = components["schemas"]["CreateSupplierRequest
 export type UpdateSupplierRequest = components["schemas"]["UpdateSupplierRequest"];
 export type CreateCustomerRequest = components["schemas"]["CreateCustomerRequest"];
 export type UpdateCustomerRequest = components["schemas"]["UpdateCustomerRequest"];
+export type CreateCustomerAddressRequest = components["schemas"]["CreateCustomerAddressRequest"];
+export type UpdateCustomerAddressRequest = components["schemas"]["UpdateCustomerAddressRequest"];
+export type UpsertCustomerProfileRequest = components["schemas"]["UpsertCustomerProfileRequest"];
 export type CreateWarehouseRequest = components["schemas"]["CreateWarehouseRequest"];
 export type UpdateWarehouseRequest = components["schemas"]["UpdateWarehouseRequest"];
 export type CreateWarehouseZoneRequest = components["schemas"]["CreateWarehouseZoneRequest"];
@@ -51,6 +58,7 @@ export interface MasterDataRow {
   sourceValue?: string;
   updatedAt: string;
   productFields?: ProductMasterDataFields;
+  warehouseFields?: WarehouseMasterDataFields;
   zoneFields?: WarehouseZoneMasterDataFields;
   locationFields?: LocationMasterDataFields;
   partnerKind?: BusinessPartnerKind;
@@ -75,6 +83,10 @@ export interface ProductMasterDataFields {
   unitVolumeCm3: string;
 }
 
+export interface WarehouseMasterDataFields {
+  warehouseType: string;
+}
+
 export interface LocationMasterDataFields {
   owner: string;
   /** 仓库业务展示（编码 · 名称），非 UUID */
@@ -92,6 +104,7 @@ export interface LocationMasterDataFields {
   volume: string;
   maxVolumeCm3: string;
   usedVolumeCm3: string;
+  remainingVolumeCm3: string;
   maxSku: string;
 }
 

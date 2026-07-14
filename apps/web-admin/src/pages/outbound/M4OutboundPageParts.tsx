@@ -53,10 +53,14 @@ export function OrderNoSummary({ order }: { order: OutboundOrder }) {
     <div className="text-sm">
       <div className="whitespace-nowrap font-medium text-primary">{order.wms_order_no}</div>
       <div className="whitespace-nowrap text-xs text-muted-foreground">
-        {order.erp_order_no ?? "-"} · 销售出库
+        {order.erp_order_no ?? "-"} · {documentTypeLabel(order.document_type)}
       </div>
     </div>
   );
+}
+
+export function documentTypeLabel(value: string) {
+  return value === "purchase_return_outbound" ? "采购退货出库" : "销售出库";
 }
 
 export function BatchNoCell({ order }: { order: OutboundOrder }) {

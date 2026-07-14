@@ -1,15 +1,6 @@
-// @governance: skip-page-size: M4 出库四模式共用本地种子态、状态裁剪动作与动作弹窗，待接真实 API 后拆 feature hooks
 import * as React from "react";
 import {
-  Button,
   DataGrid,
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
   PageHeader,
   QueryPanel,
   StatusBadge,
@@ -20,14 +11,9 @@ import {
   type DataGridExportAction,
   type DataGridPrintAction,
   type DataGridRefreshAction,
-  type DataGridToolbarAction,
   type QueryPanelField,
-  type QueryPanelRangeValue,
   type QueryPanelValue,
-  type StatusKey,
 } from "@wms/ui";
-import { CheckCircle2, ClipboardCheck, Truck, XCircle } from "lucide-react";
-
 import {
   M4OutboundDetailDialog,
   statusLabel,
@@ -37,61 +23,90 @@ import {
   type PurchaseReturnOrder,
 } from "./M4OutboundDetailDialog";
 import {
-  ActionExtraFields,
+  M4OutboundActionDialog,
+  outboundPrivateActions,
+  type ActionKind,
+  type ActionState,
+  type ActionTargetContext,
+  type OutboundCreateForm,
+} from "./M4OutboundActionDialog";
+import {
+  useCancelOutboundWaveMutation,
+  useCreateOutboundOrderMutation,
+  useCreateOutboundWaveMutation,
+  useOutboundOrderQuery,
+  useOutboundOrdersQuery,
+  useOutboundReviewQuery,
+  useOutboundWaveQuery,
+  useOutboundWavesQuery,
+  useReviewOutboundOrderMutation,
+  type CreateOutboundOrderRequest,
+  type CreateOutboundWaveRequest,
+} from "@/features/outbound/outbound-queries";
+import { useCurrentUserQuery } from "@/features/auth/auth-queries";
+import { useSystemDictionaryItemOptionsQuery } from "@/features/master-data/master-data-queries";
+import {
   BatchNoCell,
   CustomerCell,
   OrderNoSummary,
   ProductSummary,
   ReviewSummary,
-  TextField,
   TwoLine,
   ValidationBadge,
-  purchaseReturnApprovalSourceLabel,
   purchaseReturnDocumentTypeLabel,
 } from "./M4OutboundPageParts";
+import {
+  defaultM4OutboundQueryValue,
+  filterOrders,
+  filterReturns,
+  filterWaves,
+  normalizeM4OutboundQueryValue,
+  queryValueFromUnknown,
+  pageMeta,
+  statusKey,
+  statusOptions,
+  type M4OutboundMode,
+} from "./m4-outbound-page-model";
 
-export type M4OutboundMode = "orders" | "waves" | "review" | "returns";
+export type { M4OutboundMode } from "./m4-outbound-page-model";
 
 interface M4OutboundPageProps {
   mode: M4OutboundMode;
   onBack: () => void;
 }
 
-type ActionKind =
-  | "create-order"
-  | "validate"
-  | "void"
-  | "create-wave"
-  | "release-wave"
-  | "cancel-wave"
-  | "review"
-  | "print"
-  | "ship"
-  | "create-return"
-  | "approve-return"
-  | "reject-return"
-  | "pick-return"
-  | "review-return"
-  | "ship-return";
-
-interface ActionState {
-  kind: ActionKind;
-  targetId?: string;
-}
-
-interface ActionTargetContext {
-  id: string;
-  docNo: string;
-  status: string;
-  statusText: string;
-  kindLabel: string;
-}
-
 const ownerId = "00000000-0000-0000-0000-000000000001";
 const warehouseId = "00000000-0000-0000-0000-000000003001";
 const customerId = "00000000-0000-0000-0000-000000004001";
 
-// ponytail: local page state; replace with outbound list/detail hooks when the API exposes GET endpoints.
+const m4OutboundStatusOptions = [
+  { value: "draft", label: "草稿" },
+  { value: "pending_validation", label: "待校验" },
+  { value: "validation_exception", label: "校验异常" },
+  { value: "confirmed", label: "已确认" },
+  { value: "void_requested", label: "作废申请中" },
+  { value: "in_wave", label: "已进波次" },
+  { value: "inventory_locked", label: "库存锁定" },
+  { value: "picked", label: "已拣选" },
+  { value: "picked_short", label: "短拣待补齐" },
+  { value: "released", label: "已下发" },
+  { value: "reviewed", label: "已复核" },
+  { value: "reviewed_short", label: "短拣已复核" },
+  { value: "shipped", label: "已发货" },
+  { value: "pending_approval", label: "待审批" },
+  { value: "approved", label: "已审批" },
+  { value: "picking", label: "拣货中" },
+  { value: "cancelled", label: "已取消" },
+];
+
+const m4OutboundQueryFields: QueryPanelField[] = [
+  { key: "keyword", label: "关键字", type: "text", placeholder: "单号 / 商品 / 批号 / 客商" },
+  { key: "statusFilter", label: "状态", type: "multiSelect", options: m4OutboundStatusOptions },
+  { key: "businessDate", label: "业务日期", type: "dateRange" },
+];
+const m4OutboundCoreQueryFieldKeys = ["keyword", "statusFilter"];
+
+// ponytail: local state mirrors successful API responses so the grid updates without inventing a success result.
 const seedOrders: OutboundOrder[] = [
   makeOrder("00000000-0000-0000-0000-000000006001", "SO-M4-PC-0001", "ERP-SO-0001", "confirmed", 36, false),
   makeOrder("00000000-0000-0000-0000-000000006002", "SO-M4-PC-0002", "ERP-SO-0002", "inventory_locked", 18, true),
@@ -127,30 +142,6 @@ const seedReturns: PurchaseReturnOrder[] = [
   },
 ];
 
-const m4OutboundStatusOptions = [
-  { value: "draft", label: "草稿" },
-  { value: "pending_validation", label: "待校验" },
-  { value: "validation_exception", label: "校验异常" },
-  { value: "confirmed", label: "已确认" },
-  { value: "void_requested", label: "作废申请中" },
-  { value: "in_wave", label: "已进波次" },
-  { value: "inventory_locked", label: "库存锁定" },
-  { value: "released", label: "已下发" },
-  { value: "reviewed", label: "已复核" },
-  { value: "shipped", label: "已发货" },
-  { value: "pending_approval", label: "待审批" },
-  { value: "approved", label: "已审批" },
-  { value: "picking", label: "拣货中" },
-  { value: "cancelled", label: "已取消" },
-];
-
-const m4OutboundQueryFields: QueryPanelField[] = [
-  { key: "keyword", label: "关键字", type: "text", placeholder: "单号 / 商品 / 批号 / 客商" },
-  { key: "statusFilter", label: "状态", type: "multiSelect", options: m4OutboundStatusOptions },
-  { key: "businessDate", label: "业务日期", type: "dateRange" },
-];
-const m4OutboundCoreQueryFieldKeys = ["keyword", "statusFilter"];
-
 export function M4OutboundPage({ mode }: M4OutboundPageProps) {
   const [orders, setOrders] = React.useState<OutboundOrder[]>(seedOrders);
   const [waves, setWaves] = React.useState<OutboundWave[]>(seedWaves);
@@ -164,16 +155,46 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
   const [lastEvent, setLastEvent] = React.useState<string | null>(null);
   const [note, setNote] = React.useState("");
   const [actionError, setActionError] = React.useState<string | null>(null);
-  const [createForm, setCreateForm] = React.useState({
-    wmsOrderNo: "SO-M4-PC-NEW",
+  const [createForm, setCreateForm] = React.useState<OutboundCreateForm>({
+    wmsOrderNo: "",
     erpOrderNo: "ERP-SO-NEW",
-    orderType: "销售出库",
+    documentType: "sales_outbound",
     customerName: "连锁门店 A",
     productCode: "P-M4-NEW",
     batchNo: "BATCH-OUT-202607",
     plannedQty: "12",
     requiredShipDate: "",
   });
+  const ordersQuery = useOutboundOrdersQuery(mode === "orders" || mode === "waves" || mode === "review");
+  const wavesQuery = useOutboundWavesQuery(mode === "waves");
+  const createOutboundOrderMutation = useCreateOutboundOrderMutation();
+  const createOutboundWaveMutation = useCreateOutboundWaveMutation();
+  const cancelOutboundWaveMutation = useCancelOutboundWaveMutation();
+  const reviewOutboundOrderMutation = useReviewOutboundOrderMutation();
+  const currentUserQuery = useCurrentUserQuery(true);
+  const orderDetailQuery = useOutboundOrderQuery(detailTarget?.kind === "order" ? detailTarget.value.id : null);
+  const waveDetailQuery = useOutboundWaveQuery(detailTarget?.kind === "wave" ? detailTarget.value.id : null);
+  const reviewDetailQuery = useOutboundReviewQuery(activeAction?.kind === "review" ? activeAction.targetId ?? null : null);
+  const documentTypeOptionsQuery = useSystemDictionaryItemOptionsQuery("document_type", mode === "orders");
+  const documentTypeOptions = React.useMemo(
+    () => (documentTypeOptionsQuery.data ?? [])
+      .filter(([value]) => value === "sales_outbound" || value === "purchase_return_outbound")
+      .map(([value, label]) => ({ value, label })),
+    [documentTypeOptionsQuery.data],
+  );
+  const renderedDetailTarget = React.useMemo<DetailTarget | null>(() => {
+    if (detailTarget?.kind === "order" && orderDetailQuery.data) {
+      return { kind: "order", value: orderDetailQuery.data };
+    }
+    if (detailTarget?.kind === "wave" && waveDetailQuery.data) {
+      return {
+        kind: "wave",
+        value: waveDetailQuery.data,
+        orders: orders.filter((order) => (waveDetailQuery.data.order_ids ?? []).includes(order.id)),
+      };
+    }
+    return detailTarget;
+  }, [detailTarget, orderDetailQuery.data, orders, waveDetailQuery.data]);
 
   React.useEffect(() => {
     setSelectedId(null);
@@ -184,6 +205,14 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
   }, [mode]);
 
   React.useEffect(() => {
+    if (!ordersQuery.isPending && !ordersQuery.error && ordersQuery.data) setOrders(ordersQuery.data);
+  }, [ordersQuery.data, ordersQuery.error, ordersQuery.isPending]);
+
+  React.useEffect(() => {
+    if (!wavesQuery.isPending && !wavesQuery.error && wavesQuery.data) setWaves(wavesQuery.data);
+  }, [wavesQuery.data, wavesQuery.error, wavesQuery.isPending]);
+
+  React.useEffect(() => {
     if (!lastEvent) return;
     const timer = window.setTimeout(() => setLastEvent(null), 3000);
     return () => window.clearTimeout(timer);
@@ -191,7 +220,10 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
 
   const meta = pageMeta(mode);
   const normalizedQuery = normalizeM4OutboundQueryValue(appliedQuery);
-  const filteredOrders = filterOrders(orders, normalizedQuery, mode);
+  const filteredOrders = (mode === "review"
+    ? filterOrders(orders, normalizedQuery, "orders")
+    : filterOrders(orders, normalizedQuery, mode)
+  ).filter((order) => mode !== "review" || order.status === "picked" || order.status === "picked_short");
   const filteredWaves = filterWaves(waves, normalizedQuery);
   const filteredReturns = filterReturns(returns, normalizedQuery);
   const selectedOrder = filteredOrders.find((item) => item.id === selectedId) ?? null;
@@ -205,7 +237,10 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
   const gridRefreshAction: DataGridRefreshAction = {
     label: "刷新",
     description: `刷新${meta.title}列表`,
-    onClick: refreshOutbound,
+    disabled: ordersQuery.isFetching || wavesQuery.isFetching,
+    onClick: () => {
+      void refreshOutbound();
+    },
   };
   const gridCreateAction: DataGridCreateAction | undefined = createActionKind
     ? {
@@ -278,7 +313,9 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
     { key: "status", header: "状态", minWidth: 130, filter: { type: "multiSelect", options: statusOptions(mode).map(([value, label]) => ({ value, label })) }, render: (row) => <StatusBadge status={statusKey(row.status)} label={statusLabel(row.status)} size="sm" /> },
   ];
 
-  function refreshOutbound() {
+  async function refreshOutbound() {
+    if (mode === "orders" || mode === "review") await ordersQuery.refetch();
+    if (mode === "waves") await Promise.all([ordersQuery.refetch(), wavesQuery.refetch()]);
     setLastEvent(`${meta.title}已刷新`);
   }
 
@@ -320,6 +357,10 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
   }
 
   function openAction(kind: ActionKind, targetId?: string) {
+    if (kind === "create-order") createOutboundOrderMutation.reset();
+    if (kind === "create-wave") createOutboundWaveMutation.reset();
+    if (kind === "cancel-wave") cancelOutboundWaveMutation.reset();
+    if (kind === "review") reviewOutboundOrderMutation.reset();
     setActiveAction({ kind, targetId });
     setNote("");
     setActionError(null);
@@ -360,38 +401,67 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
     return null;
   }
 
-  function submitAction(event: React.FormEvent<HTMLFormElement>) {
+  async function submitAction(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!activeAction) return;
     if (activeAction.kind === "reject-return" && !note.trim()) {
       setActionError("驳回备注必填");
       return;
     }
-    applyAction(activeAction);
-    setActiveAction(null);
-    setActionError(null);
+    try {
+      await applyAction(activeAction);
+      setActiveAction(null);
+      setActionError(null);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "操作失败，请稍后重试");
+    }
   }
 
-  function applyAction(action: ActionState) {
+  async function applyAction(action: ActionState) {
     if (action.kind === "create-order") {
-      const now = new Date().toISOString();
-      const order = makeOrder(crypto.randomUUID(), createForm.wmsOrderNo, createForm.erpOrderNo, "pending_validation", toInteger(createForm.plannedQty), false, now);
-      order.required_ship_at = createForm.requiredShipDate ? `${createForm.requiredShipDate}T09:00:00.000Z` : order.required_ship_at;
-      const firstLine = order.lines?.[0];
-      if (firstLine) {
-        firstLine.product_code = createForm.productCode;
-        firstLine.batch_no = createForm.batchNo;
-      }
-      setOrders((value) => [order, ...value]);
-      setLastEvent(`${order.wms_order_no} 已创建`);
+      const request: CreateOutboundOrderRequest = {
+        document_type: createForm.documentType,
+        wms_order_no: createForm.wmsOrderNo.trim(),
+        erp_order_no: createForm.erpOrderNo.trim() || null,
+        customer_id: customerId,
+        warehouse_id: warehouseId,
+        required_ship_at: createForm.requiredShipDate ? `${createForm.requiredShipDate}T09:00:00.000Z` : null,
+        lines: [{
+          line_no: 1,
+          product_code: createForm.productCode.trim(),
+          batch_no: createForm.batchNo.trim(),
+          planned_qty: toInteger(createForm.plannedQty),
+        }],
+      };
+      const created = await createOutboundOrderMutation.mutateAsync(request);
+      setOrders((value) => [created, ...value]);
+      setSelectedId(created.id);
+      setLastEvent(`${created.wms_order_no} 已创建`);
       return;
     }
     if (action.kind === "create-wave") {
       const orderIds = orders.filter((order) => order.status === "confirmed").map((order) => order.id).slice(0, 2);
-      const wave = makeWave(`WAVE-M4-PC-${Date.now()}`, orderIds);
+      if (orderIds.length === 0) throw new Error("没有可加入波次的已确认出库单");
+      const request: CreateOutboundWaveRequest = {
+        wave_no: `WAVE-M4-PC-${Date.now()}`,
+        order_ids: orderIds,
+      };
+      const wave = await createOutboundWaveMutation.mutateAsync(request);
       setWaves((value) => [wave, ...value]);
       setOrders((value) => value.map((order) => orderIds.includes(order.id) ? { ...order, status: "in_wave" } : order));
       setLastEvent(`${wave.wave_no} 已创建`);
+      return;
+    }
+    if (action.kind === "cancel-wave") {
+      if (!action.targetId) return;
+      const currentWave = waves.find((wave) => wave.id === action.targetId);
+      const cancelled = await cancelOutboundWaveMutation.mutateAsync(action.targetId);
+      setWaves((value) => value.map((wave) => wave.id === cancelled.id ? cancelled : wave));
+      if (currentWave) {
+        const orderIds = currentWave.order_ids ?? [];
+        setOrders((value) => value.map((order) => orderIds.includes(order.id) ? { ...order, status: "confirmed" } : order));
+      }
+      setLastEvent(`${cancelled.wave_no} 已取消`);
       return;
     }
     if (action.kind === "create-return") {
@@ -403,11 +473,34 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
     if (!action.targetId) return;
     if (action.kind === "validate") updateOrder(action.targetId, "confirmed", "重新校验已完成");
     if (action.kind === "void") updateOrder(action.targetId, "void_requested", "作废申请已提交");
-    if (action.kind === "review") updateOrder(action.targetId, "reviewed", "复核已完成");
+    if (action.kind === "review") {
+      const order = reviewDetailQuery.data;
+      const reviewerId = currentUserQuery.data?.user_id;
+      if (!order) throw new Error(reviewDetailQuery.error?.message ?? "复核明细尚未读取完成");
+      if (!reviewerId) throw new Error("当前登录用户信息不可用，无法提交复核");
+      const lines = (order.lines ?? []).map((line) => ({
+        line_no: line.line_no,
+        product_code: line.product_code,
+        reviewed_qty: line.picked_qty,
+      }));
+      if (lines.length === 0) throw new Error("复核订单没有可提交的明细");
+      const reviewed = await reviewOutboundOrderMutation.mutateAsync({
+        orderId: action.targetId,
+        request: {
+          reviewer_id: reviewerId,
+          review_mode: "packing_station",
+          second_reviewer_id: null,
+          lines,
+        },
+      });
+      setOrders((value) => value.map((item) => item.id === reviewed.id ? reviewed : item));
+      setSelectedId(reviewed.id);
+      setLastEvent(`${reviewed.wms_order_no} 已复核`);
+      return;
+    }
     if (action.kind === "print") setLastEvent("打印任务已提交");
     if (action.kind === "ship") updateOrder(action.targetId, "shipped", "发货交接已完成");
     if (action.kind === "release-wave") updateWave(action.targetId, "inventory_locked", "波次已下发");
-    if (action.kind === "cancel-wave") updateWave(action.targetId, "cancelled", "波次已取消");
     if (action.kind === "approve-return") updateReturn(action.targetId, "approved", "采购退货审批已通过");
     if (action.kind === "reject-return") updateReturn(action.targetId, "cancelled", "采购退货审批已驳回");
     if (action.kind === "pick-return") updateReturn(action.targetId, "picking", "采购退货拣货已完成");
@@ -442,6 +535,27 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
           role="status"
         >
           {lastEvent}
+        </div>
+      )}
+
+      {ordersQuery.error && (
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
+          {ordersQuery.error.message}
+        </div>
+      )}
+      {wavesQuery.error && (
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
+          {wavesQuery.error.message}
+        </div>
+      )}
+      {detailOpen && orderDetailQuery.error && (
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
+          {orderDetailQuery.error.message}
+        </div>
+      )}
+      {detailOpen && waveDetailQuery.error && (
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
+          {waveDetailQuery.error.message}
         </div>
       )}
 
@@ -566,12 +680,29 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
         />
       )}
 
-      <ActionDialog
+      <M4OutboundActionDialog
         action={activeAction}
         target={resolveActionTarget(activeAction)}
         createForm={createForm}
+        documentTypeOptions={documentTypeOptions}
+        reviewOrder={activeAction?.kind === "review" ? reviewDetailQuery.data ?? null : null}
+        reviewLoading={activeAction?.kind === "review" && reviewDetailQuery.isPending}
+        reviewError={activeAction?.kind === "review" ? reviewDetailQuery.error?.message ?? null : null}
         note={note}
-        actionError={actionError}
+        actionError={actionError ?? (
+          activeAction?.kind === "create-order"
+            ? createOutboundOrderMutation.error?.message ?? documentTypeOptionsQuery.error?.message ?? null
+            : activeAction?.kind === "create-wave" ? createOutboundWaveMutation.error?.message ?? null
+              : activeAction?.kind === "cancel-wave" ? cancelOutboundWaveMutation.error?.message ?? null
+                : activeAction?.kind === "review" ? reviewOutboundOrderMutation.error?.message ?? null : null
+        )}
+        pending={
+          (createOutboundOrderMutation.isPending && activeAction?.kind === "create-order")
+          || (createOutboundWaveMutation.isPending && activeAction?.kind === "create-wave")
+          || (cancelOutboundWaveMutation.isPending && activeAction?.kind === "cancel-wave")
+          || (reviewOutboundOrderMutation.isPending && activeAction?.kind === "review")
+          || (reviewDetailQuery.isPending && activeAction?.kind === "review")
+        }
         setCreateForm={setCreateForm}
         setNote={(value) => {
           setNote(value);
@@ -583,336 +714,16 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
         }}
         onSubmit={submitAction}
       />
-      <M4OutboundDetailDialog target={detailTarget} open={detailOpen} onOpenChange={setDetailOpen} />
+      <M4OutboundDetailDialog target={renderedDetailTarget} open={detailOpen} onOpenChange={setDetailOpen} />
     </section>
   );
-}
-
-function outboundPrivateActions(
-  mode: M4OutboundMode,
-  selectedOrder: OutboundOrder | null,
-  selectedWave: OutboundWave | null,
-  selectedReturn: PurchaseReturnOrder | null,
-  onAction: (kind: ActionKind, id: string) => void,
-): DataGridToolbarAction[] {
-  if (mode === "orders") {
-    const status = selectedOrder?.status;
-    return [
-      toolbarAction("validate", "校验", "重新校验", <CheckCircle2 className="size-4" aria-hidden />, selectedOrder?.id, onAction, canValidateOrder(status)),
-      toolbarAction("void", "作废", "作废申请", <ClipboardCheck className="size-4" aria-hidden />, selectedOrder?.id, onAction, canVoidOrder(status)),
-    ];
-  }
-
-  if (mode === "waves") {
-    const status = selectedWave?.status;
-    return [
-      toolbarAction("release-wave", "下发", "下发波次", <CheckCircle2 className="size-4" aria-hidden />, selectedWave?.id, onAction, canReleaseWave(status)),
-      toolbarAction("cancel-wave", "取消", "取消波次", <ClipboardCheck className="size-4" aria-hidden />, selectedWave?.id, onAction, canCancelWave(status)),
-    ];
-  }
-
-  if (mode === "review") {
-    const status = selectedOrder?.status;
-    return [
-      toolbarAction("review", "复核", "出库复核", <ClipboardCheck className="size-4" aria-hidden />, selectedOrder?.id, onAction, canReviewOrder(status)),
-      toolbarAction("ship", "交接", "发货交接", <Truck className="size-4" aria-hidden />, selectedOrder?.id, onAction, canShipOrder(status)),
-    ];
-  }
-
-  const status = selectedReturn?.status;
-  return [
-    toolbarAction("approve-return", "审批", "采购退货审批", <CheckCircle2 className="size-4" aria-hidden />, selectedReturn?.id, onAction, canApproveReturn(status)),
-    toolbarAction("reject-return", "驳回", "采购退货驳回", <XCircle className="size-4" aria-hidden />, selectedReturn?.id, onAction, canRejectReturn(status)),
-    toolbarAction("pick-return", "拣货", "采购退货拣货", <Truck className="size-4" aria-hidden />, selectedReturn?.id, onAction, canPickReturn(status)),
-    toolbarAction("review-return", "复核", "采购退货复核", <ClipboardCheck className="size-4" aria-hidden />, selectedReturn?.id, onAction, canReviewReturn(status)),
-    toolbarAction("ship-return", "出库", "采购退货出库交接", <CheckCircle2 className="size-4" aria-hidden />, selectedReturn?.id, onAction, canShipReturn(status)),
-  ];
-}
-
-/** 待校验 / 校验异常 / 已确认可校验；已发货禁校验 */
-function canValidateOrder(status: string | undefined) {
-  return status === "pending_validation" || status === "validation_exception" || status === "confirmed";
-}
-
-/** 未进波次可作废；已复核 / 已发货禁用作废 */
-function canVoidOrder(status: string | undefined) {
-  return status === "pending_validation" || status === "validation_exception" || status === "confirmed";
-}
-
-/** 草稿 / 待下发可下发 */
-function canReleaseWave(status: string | undefined) {
-  return status === "draft";
-}
-
-/** 未完成拣选可取消（draft / released）；已取消禁用 */
-function canCancelWave(status: string | undefined) {
-  return status === "draft" || status === "released";
-}
-
-/** 库存锁定 / 已复核可复核；已发货禁用 */
-function canReviewOrder(status: string | undefined) {
-  return status === "inventory_locked" || status === "reviewed";
-}
-
-/** 已复核可交接；已发货禁用 */
-function canShipOrder(status: string | undefined) {
-  return status === "reviewed";
-}
-
-/** 待审批可审批 / 驳回 */
-function canApproveReturn(status: string | undefined) {
-  return status === "pending_approval";
-}
-
-function canRejectReturn(status: string | undefined) {
-  return status === "pending_approval";
-}
-
-/** 已审批可拣货；禁止待审批可拣货 */
-function canPickReturn(status: string | undefined) {
-  return status === "approved";
-}
-
-/** 拣货中可复核 */
-function canReviewReturn(status: string | undefined) {
-  return status === "picking";
-}
-
-/** 已复核可出库；禁止待审批可复核 / 交接 */
-function canShipReturn(status: string | undefined) {
-  return status === "reviewed";
-}
-
-function toolbarAction(
-  kind: ActionKind,
-  label: string,
-  description: string,
-  icon: React.ReactNode,
-  targetId: string | undefined,
-  onAction: (kind: ActionKind, id: string) => void,
-  enabledByStatus = true,
-): DataGridToolbarAction {
-  return {
-    key: kind,
-    label,
-    description,
-    icon,
-    disabled: !targetId || !enabledByStatus,
-    onClick: () => {
-      if (targetId && enabledByStatus) onAction(kind, targetId);
-    },
-  };
-}
-
-function ActionDialog({ action, target, createForm, note, actionError, setCreateForm, setNote, onClose, onSubmit }: {
-  action: ActionState | null;
-  target: ActionTargetContext | null;
-  createForm: { wmsOrderNo: string; erpOrderNo: string; orderType: string; customerName: string; productCode: string; batchNo: string; plannedQty: string; requiredShipDate: string };
-  note: string;
-  actionError: string | null;
-  setCreateForm: React.Dispatch<React.SetStateAction<{ wmsOrderNo: string; erpOrderNo: string; orderType: string; customerName: string; productCode: string; batchNo: string; plannedQty: string; requiredShipDate: string }>>;
-  setNote: (value: string) => void;
-  onClose: () => void;
-  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
-}) {
-  if (!action) return null;
-  const meta = actionMeta(action.kind);
-  const isCreate = action.kind === "create-order" || action.kind === "create-wave" || action.kind === "create-return";
-  const noteRequired = action.kind === "reject-return";
-  const titleWithDocNo = !isCreate && target && (action.kind === "ship" || action.kind === "validate" || action.kind === "ship-return")
-    ? `${meta.title} · ${target.docNo}`
-    : meta.title;
-  return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-        <form className="grid gap-3 md:grid-cols-2" onSubmit={onSubmit}>
-          <DialogHeader className="md:col-span-2">
-            <DialogTitle>{titleWithDocNo}</DialogTitle>
-            <DialogDescription>
-              {meta.description}
-              {!isCreate && target ? ` 目标${target.kindLabel}：${target.docNo}（${target.statusText}）` : ""}
-            </DialogDescription>
-          </DialogHeader>
-          {!isCreate && target && (
-            <div className="md:col-span-2 rounded-md border bg-muted/30 px-3 py-2 text-sm" data-testid="action-target-context">
-              <div className="font-medium">{target.kindLabel} {target.docNo}</div>
-              <div className="text-xs text-muted-foreground">当前状态：{target.statusText}</div>
-            </div>
-          )}
-          {action.kind === "create-order" ? (
-            <>
-              <TextField label="WMS 单号" value={createForm.wmsOrderNo} onChange={(wmsOrderNo) => setCreateForm((value) => ({ ...value, wmsOrderNo }))} />
-              <TextField label="ERP 单号" value={createForm.erpOrderNo} onChange={(erpOrderNo) => setCreateForm((value) => ({ ...value, erpOrderNo }))} />
-              <TextField label="订单类型" value={createForm.orderType} onChange={(orderType) => setCreateForm((value) => ({ ...value, orderType }))} />
-              <TextField label="客户 / 门店" value={createForm.customerName} onChange={(customerName) => setCreateForm((value) => ({ ...value, customerName }))} />
-              <TextField label="商品编码" value={createForm.productCode} onChange={(productCode) => setCreateForm((value) => ({ ...value, productCode }))} />
-              <TextField label="批号" value={createForm.batchNo} onChange={(batchNo) => setCreateForm((value) => ({ ...value, batchNo }))} />
-              <TextField label="计划数量" type="number" value={createForm.plannedQty} onChange={(plannedQty) => setCreateForm((value) => ({ ...value, plannedQty }))} />
-              <TextField label="要求发货" type="date" value={createForm.requiredShipDate} onChange={(requiredShipDate) => setCreateForm((value) => ({ ...value, requiredShipDate }))} />
-            </>
-          ) : (
-            <>
-              <ActionExtraFields kind={action.kind} />
-              <TextField
-                className="md:col-span-2"
-                label={noteRequired ? "驳回备注（必填）" : "备注"}
-                value={note}
-                onChange={setNote}
-                placeholder={noteRequired ? "请填写驳回原因" : action.kind === "approve-return" ? "可选填写审批意见" : undefined}
-              />
-            </>
-          )}
-          {actionError && (
-            <p className="md:col-span-2 text-sm text-destructive" role="alert">{actionError}</p>
-          )}
-          <DialogFooter className="md:col-span-2">
-            <DialogClose asChild><Button type="button" variant="outline">取消</Button></DialogClose>
-            <Button type="submit" variant={action.kind === "reject-return" ? "destructive" : "default"}>{meta.submitLabel}</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function pageMeta(mode: M4OutboundMode) {
-  const map = {
-    orders: { title: "M4 出库订单管理", subtitle: "订单校验 · 双单号 · 作废申请", createAction: "create-order" as const, createLabel: "新建出库单" },
-    waves: { title: "M4 波次规划", subtitle: "波次合并 · 库存锁定 · 路径策略", createAction: "create-wave" as const, createLabel: "新建波次" },
-    review: { title: "M4 复核发货", subtitle: "包装站复核 · 打印 · 发货交接", createAction: null, createLabel: "" },
-    returns: { title: "M4 采购退货出库", subtitle: "退供应商申请 · 审批 · 拣货复核 · 出库交接", createAction: "create-return" as const, createLabel: "新建采购退货单" },
-  };
-  return map[mode];
-}
-
-function actionMeta(kind: ActionKind) {
-  const map: Record<ActionKind, { title: string; description: string; submitLabel: string }> = {
-    "create-order": { title: "新建出库单", description: "手工创建 PC Web 测试出库单。", submitLabel: "创建出库单" },
-    validate: { title: "重新校验", description: "重新执行库存和批号校验。", submitLabel: "确认校验" },
-    void: { title: "作废申请", description: "提交未进波次订单的作废申请。", submitLabel: "提交申请" },
-    "create-wave": { title: "新建波次", description: "把已确认订单合并为一个波次。", submitLabel: "创建波次" },
-    "release-wave": { title: "下发波次", description: "下发波次并进入库存锁定。", submitLabel: "确认下发" },
-    "cancel-wave": { title: "取消波次", description: "仅未开始拣选的波次可取消。", submitLabel: "确认取消" },
-    review: { title: "复核", description: "包装站复核完成后提交。", submitLabel: "提交复核" },
-    print: { title: "打印", description: "提交随货同行单或快递面单打印任务。", submitLabel: "提交打印" },
-    ship: { title: "发货交接", description: "记录交接对象并确认发货。", submitLabel: "确认发货" },
-    "create-return": { title: "新建采购退货单", description: "创建退供应商的出库申请。", submitLabel: "创建采购退货单" },
-    "approve-return": { title: "采购退货审批", description: "审批退供应商出库申请，备注可选。", submitLabel: "审批通过" },
-    "reject-return": { title: "采购退货驳回", description: "驳回退供应商出库申请，备注必填。", submitLabel: "确认驳回" },
-    "pick-return": { title: "采购退货拣货", description: "记录退供应商出库拣货结果。", submitLabel: "确认拣货" },
-    "review-return": { title: "采购退货复核", description: "复核退供应商商品和数量。", submitLabel: "提交复核" },
-    "ship-return": { title: "采购退货出库交接", description: "确认退供应商出库交接。", submitLabel: "确认出库" },
-  };
-  return map[kind];
-}
-
-function statusOptions(mode: M4OutboundMode) {
-  if (mode === "waves") return [["draft", "待下发"], ["released", "已下发"], ["inventory_locked", "库存锁定"], ["cancelled", "已取消"]];
-  if (mode === "returns") return [["pending_approval", "待审批"], ["approved", "已审批"], ["picking", "拣货中"], ["reviewed", "已复核"], ["shipped", "已发货"], ["cancelled", "已取消"]];
-  return [["pending_validation", "待校验"], ["validation_exception", "校验异常"], ["confirmed", "已确认"], ["inventory_locked", "库存锁定"], ["reviewed", "已复核"], ["shipped", "已发货"]];
-}
-
-function statusKey(status: string | null | undefined): StatusKey {
-  if (!status) return "pending";
-  if (status.includes("exception") || status === "cancelled") return "unqualified";
-  if (status === "completed" || status === "shipped" || status === "signed") return "completed";
-  if (status === "inventory_locked" || status === "reviewed" || status === "released" || status === "pickup" || status === "inspecting" || status === "picking") return "in_progress";
-  return "pending";
-}
-
-function defaultM4OutboundQueryValue(): QueryPanelValue {
-  return {
-    keyword: "",
-    statusFilter: [],
-    businessDate: { from: "", to: "" },
-  };
-}
-
-function normalizeM4OutboundQueryValue(value: QueryPanelValue): QueryPanelValue {
-  return {
-    keyword: queryString(value.keyword),
-    statusFilter: queryStringArray(value.statusFilter),
-    businessDate: queryRange(value.businessDate),
-  };
-}
-
-function filterOrders(orders: OutboundOrder[], query: QueryPanelValue, mode: M4OutboundMode) {
-  const allowed = mode === "review" ? new Set(["inventory_locked", "reviewed", "shipped"]) : null;
-  const keyword = queryString(query.keyword);
-  const statuses = new Set(queryStringArray(query.statusFilter));
-  const businessDate = queryRange(query.businessDate);
-  return orders.filter((order) => {
-    const lines = order.lines ?? [];
-    const searchable = [order.wms_order_no, order.erp_order_no ?? "", order.customer_id, order.status ?? "", ...lines.flatMap((line) => [line.product_code, line.batch_no])].join(" ").toLowerCase();
-    return (!allowed || allowed.has(order.status)) && matches(searchable, keyword) && matchesStatus(order.status, statuses) && dateInRange(order.required_ship_at, businessDate);
-  });
-}
-
-function filterWaves(waves: OutboundWave[], query: QueryPanelValue) {
-  const keyword = queryString(query.keyword);
-  const statuses = new Set(queryStringArray(query.statusFilter));
-  const businessDate = queryRange(query.businessDate);
-  return waves.filter((wave) => matches(`${wave.wave_no} ${wave.status}`.toLowerCase(), keyword) && matchesStatus(wave.status, statuses) && dateInRange(wave.created_at, businessDate));
-}
-
-function filterReturns(returns: PurchaseReturnOrder[], query: QueryPanelValue) {
-  const keyword = queryString(query.keyword);
-  const statuses = new Set(queryStringArray(query.statusFilter));
-  const businessDate = queryRange(query.businessDate);
-  return returns.filter((item) => matches(
-    [
-      item.return_no,
-      item.document_type,
-      purchaseReturnDocumentTypeLabel(item.document_type),
-      item.source_purchase_order_no,
-      item.supplier_name,
-      item.reason,
-      item.product_code,
-      item.approval_source,
-      purchaseReturnApprovalSourceLabel(item.approval_source),
-    ].join(" ").toLowerCase(),
-    keyword,
-  ) && matchesStatus(item.status, statuses) && dateInRange(item.created_at, businessDate));
-}
-
-function matches(searchable: string, keyword: string) {
-  const normalized = keyword.trim().toLowerCase();
-  return !normalized || searchable.includes(normalized);
-}
-
-function matchesStatus(status: string, statuses: Set<string>) {
-  return statuses.size === 0 || statuses.has(status);
-}
-
-function queryString(value: QueryPanelValue[string]) {
-  return typeof value === "string" ? value : "";
-}
-
-function queryStringArray(value: QueryPanelValue[string]) {
-  return Array.isArray(value) ? value.filter((item) => typeof item === "string") : [];
-}
-
-function queryRange(value: QueryPanelValue[string]): QueryPanelRangeValue {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return { from: "", to: "" };
-  return {
-    from: typeof value.from === "string" ? value.from : "",
-    to: typeof value.to === "string" ? value.to : "",
-  };
-}
-
-function queryValueFromUnknown(value: unknown): QueryPanelValue {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as QueryPanelValue) : {};
-}
-
-function dateInRange(value: string | null | undefined, range: QueryPanelRangeValue) {
-  const date = value?.slice(0, 10) ?? "";
-  return (!range.from || date >= range.from) && (!range.to || date <= range.to);
 }
 
 function makeOrder(id: string, wmsNo: string, erpNo: string, status: string, qty: number, shortPick: boolean, now = "2026-06-27T09:00:00.000Z"): OutboundOrder {
   return {
     id,
     owner_id: ownerId,
+    document_type: "sales_outbound",
     customer_id: customerId,
     warehouse_id: warehouseId,
     wms_order_no: wmsNo,
@@ -924,11 +735,6 @@ function makeOrder(id: string, wmsNo: string, erpNo: string, status: string, qty
     updated_at: now,
     lines: [{ line_no: 1, product_code: "P-M4-001", batch_no: "BATCH-OUT-202606", planned_qty: qty, picked_qty: shortPick ? qty - 2 : qty, reviewed_qty: status === "reviewed" || status === "shipped" ? qty : 0, shipped_qty: status === "shipped" ? qty : 0, short_pick_qty: shortPick ? 2 : 0 }],
   };
-}
-
-function makeWave(waveNo: string, orderIds: string[]): OutboundWave {
-  const now = new Date().toISOString();
-  return { id: crypto.randomUUID(), owner_id: ownerId, wave_no: waveNo, status: "draft", order_ids: orderIds, created_at: now, updated_at: now };
 }
 
 function makeReturn(returnNo: string): PurchaseReturnOrder {

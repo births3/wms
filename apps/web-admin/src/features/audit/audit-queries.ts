@@ -8,6 +8,10 @@ export type AuditEvent = components["schemas"]["AuditEvent"];
 
 export interface AuditEventQueryParams {
   resourceType?: string;
+  action?: string;
+  resourceId?: string;
+  productCode?: string;
+  batchNo?: string;
   actorId?: string;
   from?: string;
   to?: string;
@@ -22,7 +26,10 @@ export interface AuditEventRow {
   action: string;
   resourceType: string;
   resourceId: string;
+  ipAddress: string;
   objectLabel: string;
+  diffBefore: string;
+  diffAfter: string;
   traceId: string;
 }
 
@@ -40,6 +47,10 @@ async function listAuditEvents(params: AuditEventQueryParams): Promise<AuditEven
     params: {
       query: {
         resource_type: emptyToUndefined(params.resourceType),
+        action: emptyToUndefined(params.action),
+        resource_id: emptyToUndefined(params.resourceId),
+        product_code: emptyToUndefined(params.productCode),
+        batch_no: emptyToUndefined(params.batchNo),
         actor_id: emptyToUndefined(params.actorId),
         from: emptyToUndefined(params.from),
         to: emptyToUndefined(params.to),
@@ -63,9 +74,23 @@ function mapAuditEventRow(event: AuditEvent): AuditEventRow {
     action: event.action,
     resourceType: event.resource_type,
     resourceId: event.resource_id,
+    ipAddress: event.ip ?? "-",
     objectLabel,
+    diffBefore: formatDiffValue(event.diff, "before"),
+    diffAfter: formatDiffValue(event.diff, "after"),
     traceId: event.trace_id,
   };
+}
+
+function formatDiffValue(diff: AuditEvent["diff"], key: "before" | "after") {
+  if (!diff || typeof diff !== "object" || Array.isArray(diff)) return "-";
+  const record = diff as Record<string, unknown>;
+  const value = record[key] ?? Object.fromEntries(
+    Object.entries(record)
+      .filter(([, item]) => item && typeof item === "object" && key in (item as object))
+      .map(([field, item]) => [field, (item as Record<string, unknown>)[key]]),
+  );
+  return value === undefined ? "-" : JSON.stringify(value);
 }
 
 function emptyToUndefined(value?: string) {

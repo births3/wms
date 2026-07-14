@@ -20,6 +20,9 @@ import {
   type DevPrintTemplate,
 } from "./web-admin-dev-mock-model";
 
+const inventoryBatchOverrides = new Map<string, Partial<DevInventoryBatch>>();
+const inventoryRecallPreviousStatus = new Map<string, string>();
+
 export async function handlePrintInventoryDevMock(
   req: IncomingMessage,
   res: ServerResponse,
@@ -28,6 +31,90 @@ export async function handlePrintInventoryDevMock(
   if (req.method === "GET" && pathname === "/api/v1/inventory/batches") {
     const data = inventoryBatches();
     sendJson(res, 200, { data, page: { count: data.length, next_cursor: null } });
+    return true;
+  }
+  const trace = pathname.match(/^\/api\/v1\/inventory\/batches\/([^/]+)\/trace$/);
+  if (req.method === "GET" && trace) {
+    const batch = inventoryBatches().find((item) => item.id === decodeURIComponent(trace[1]));
+    if (!batch) {
+      sendJson(res, 404, { code: "M3_BATCH_NOT_FOUND", message: "库存批次不存在" });
+      return true;
+    }
+    sendJson(res, 200, {
+      batch,
+      movements: [{
+        id: `00000000-0000-0000-0000-0000000069${batch.id.slice(-2)}`,
+        owner_id: batch.owner_id,
+        batch_id: batch.id,
+        movement_type: "inbound_putaway",
+        qty_delta: batch.qty_on_hand,
+        source_document_type: "receiving_order",
+        source_document_id: "00000000-0000-0000-0000-000000001901",
+        occurred_at: batch.created_at,
+      }],
+      status_changes: batch.recall_flag ? [{
+        id: "00000000-0000-0000-0000-000000001902",
+        owner_id: batch.owner_id,
+        batch_id: batch.id,
+        from_status: "qualified",
+        to_status: "quarantined",
+        reason: "召回标记",
+        approval_source: "M-QL",
+        approval_id: "QL-DEV-001",
+        occurred_at: batch.updated_at,
+      }] : [],
+    });
+    return true;
+  }
+  if (req.method === "POST" && pathname === "/api/v1/inventory/batches/status") {
+    const body = await readJsonBody(req);
+    const batchId = asString(body.batch_id, "");
+    const targetStatus = asString(body.target_status, "");
+    const batch = inventoryBatches().find((item) => item.id === batchId);
+    if (!batch) {
+      sendJson(res, 404, { code: "M3_BATCH_NOT_FOUND", message: "库存批次不存在" });
+      return true;
+    }
+    inventoryBatchOverrides.set(batchId, { quality_status: targetStatus, updated_at: new Date().toISOString() });
+    sendJson(res, 200, { ...batch, quality_status: targetStatus, updated_at: new Date().toISOString() });
+    return true;
+  }
+  if (req.method === "POST" && pathname === "/api/v1/inventory/batches/recall") {
+    const body = await readJsonBody(req);
+    const batchId = asString(body.batch_id, "");
+    const batch = inventoryBatches().find((item) => item.id === batchId);
+    if (!batch) {
+      sendJson(res, 404, { code: "M3_BATCH_NOT_FOUND", message: "库存批次不存在" });
+      return true;
+    }
+    inventoryRecallPreviousStatus.set(batchId, batch.quality_status);
+    const updatedAt = new Date().toISOString();
+    inventoryBatchOverrides.set(batchId, { quality_status: "quarantined", recall_flag: true, updated_at: updatedAt });
+    sendJson(res, 200, { ...batch, quality_status: "quarantined", recall_flag: true, updated_at: updatedAt });
+    return true;
+  }
+  if (req.method === "POST" && pathname === "/api/v1/inventory/batches/recall/cancel") {
+    const body = await readJsonBody(req);
+    const batchId = asString(body.batch_id, "");
+    const secondApproverId = asString(body.second_approver_id, "");
+    const batch = inventoryBatches().find((item) => item.id === batchId);
+    if (!batch) {
+      sendJson(res, 404, { code: "M3_BATCH_NOT_FOUND", message: "库存批次不存在" });
+      return true;
+    }
+    if (!batch.recall_flag) {
+      sendJson(res, 409, { code: "M3_RECALL_NOT_ACTIVE", message: "该批次当前没有有效召回标记" });
+      return true;
+    }
+    if (!secondApproverId) {
+      sendJson(res, 422, { code: "M3_SECOND_APPROVER_REQUIRED", message: "必须提供质量审批人 ID" });
+      return true;
+    }
+    const updatedAt = new Date().toISOString();
+    const qualityStatus = inventoryRecallPreviousStatus.get(batchId) ?? batch.quality_status;
+    inventoryBatchOverrides.set(batchId, { quality_status: qualityStatus, recall_flag: false, updated_at: updatedAt });
+    inventoryRecallPreviousStatus.delete(batchId);
+    sendJson(res, 200, { ...batch, quality_status: qualityStatus, recall_flag: false, updated_at: updatedAt });
     return true;
   }
   if (req.method === "GET" && pathname === "/api/v1/print-templates/field-libraries") {
@@ -79,7 +166,7 @@ export async function handlePrintInventoryDevMock(
 
 function inventoryBatches(): DevInventoryBatch[] {
   const now = "2026-06-29T00:00:00.000Z";
-  return [
+  const rows = [
     {
       id: "00000000-0000-0000-0000-000000006001",
       owner_id: devOwnerId,
@@ -113,6 +200,7 @@ function inventoryBatches(): DevInventoryBatch[] {
       updated_at: now,
     },
   ];
+  return rows.map((row) => ({ ...row, ...inventoryBatchOverrides.get(row.id) }));
 }
 
 function fieldLibraries() {
@@ -302,8 +390,32 @@ function fieldPaths(libraryCode: string) {
   if (libraryCode === "m2_asn") {
     return [
       field("asn.code", "ASN 号", "order", "订单信息", "ASN-202607070001"),
+      field("supplier.name", "供应商", "order", "订单信息", "华东医药供应链"),
       field("product.name", "商品名称", "product", "商品信息", "冷藏胰岛素注射液"),
+      field("product.spec", "规格", "product", "商品信息", "3ml:300单位"),
       field("product.code", "商品编码", "product", "商品信息", "P-M1-001"),
+      field("products.0.expiry_date", "有效期至", "product", "商品信息", "2028-01-01"),
+      field("receiving.actual_qty", "实收数量", "receiving", "收货信息", "120"),
+      field("receiving.arrival_temperature_celsius", "到货温度", "receiving", "收货信息", "5"),
+      field("receiving.temperature_control_method", "温控方式", "receiving", "收货信息", "冷藏"),
+      field("receiving.transport_duration_minutes", "运输时长（分钟）", "receiving", "收货信息", "120"),
+      field("receiving.vehicle_no", "车牌号", "receiving", "收货信息", "沪A-12345"),
+      field("receiving.carrier", "承运商", "receiving", "收货信息", "华东冷链承运商"),
+      field("inspection.conclusion", "验收结论", "inspection", "验收信息", "合格"),
+      field("inspection.first_signer_id", "第一签字人", "inspection", "验收信息", "收货员0101"),
+      field("inspection.second_signer_id", "第二签字人", "inspection", "验收信息", "收货员0102"),
+    ];
+  }
+  if (libraryCode === "m2_acceptance_record") {
+    return [
+      field("asn.code", "ASN 号", "order", "订单信息", "ASN-202607070001"),
+      field("supplier.name", "供应商", "order", "订单信息", "华东医药供应链"),
+      field("products.0.batch_no", "批号", "product", "商品信息", "BATCH-202606"),
+      field("products.0.expiry_date", "有效期至", "product", "商品信息", "2028-01-01"),
+      field("receiving.actual_qty", "实收数量", "receiving", "收货信息", "120"),
+      field("inspection.conclusion", "验收结论", "inspection", "验收信息", "合格"),
+      field("inspection.first_signer_id", "第一签字人", "inspection", "验收信息", "收货员0101"),
+      field("inspection.second_signer_id", "第二签字人", "inspection", "验收信息", "收货员0102"),
     ];
   }
   if (libraryCode.includes("location")) {

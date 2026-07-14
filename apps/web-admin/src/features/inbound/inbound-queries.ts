@@ -5,17 +5,29 @@ import { ApiError } from "@/features/auth/auth-queries";
 import { api } from "@/lib/api";
 
 export type ReceivingOrder = components["schemas"]["ReceivingOrder"];
+export type ReceivingOrderPrintData = components["schemas"]["ReceivingOrderPrintData"];
 export type CreateReceivingOrderRequest = components["schemas"]["CreateReceivingOrderRequest"];
 export type ReceiveReceivingOrderRequest = components["schemas"]["ReceiveReceivingOrderRequest"];
 export type RejectReceivingOrderRequest = components["schemas"]["RejectReceivingOrderRequest"];
 export type InspectReceivingOrderRequest = components["schemas"]["InspectReceivingOrderRequest"];
 export type SignInspectionRequest = components["schemas"]["SignInspectionRequest"];
 export type PutawayRequest = components["schemas"]["PutawayRequest"];
+export type PutawayRecommendation = components["schemas"]["PutawayLocationRecommendation"];
+export type PutawayRecommendationResponse = components["schemas"]["PutawayRecommendationResponse"];
+export type ReceivingDashboard = components["schemas"]["ReceivingDashboardResponse"];
 
 export const receivingOrdersQueryKey = ["inbound", "receiving-orders"] as const;
 
 function receivingOrderQueryKey(id: string) {
   return [...receivingOrdersQueryKey, id] as const;
+}
+
+function receivingOrderPrintDataQueryKey(id: string) {
+  return [...receivingOrdersQueryKey, id, "print-data"] as const;
+}
+
+function putawayRecommendationsQueryKey(id: string, input: components["schemas"]["PutawayRecommendationQuery"]) {
+  return [...receivingOrdersQueryKey, id, "putaway-recommendations", input] as const;
 }
 
 function idempotencyKey(prefix: string) {
@@ -42,6 +54,28 @@ async function listReceivingOrders(): Promise<ReceivingOrder[]> {
   return result.data.data;
 }
 
+async function getReceivingDashboard(input: {
+  supplierId: string;
+  productCode: string;
+  from: string;
+  to: string;
+}): Promise<ReceivingDashboard> {
+  const result = await api.GET("/api/v1/inbound/receiving-dashboard", {
+    params: {
+      query: {
+        supplier_id: input.supplierId || undefined,
+        product_code: input.productCode || undefined,
+        from: input.from || undefined,
+        to: input.to || undefined,
+      },
+    },
+  });
+  if (!result.data) {
+    throw new ApiError(result.error, "读取入库进度看板失败", result.response.status);
+  }
+  return result.data;
+}
+
 async function getReceivingOrder(id: string): Promise<ReceivingOrder> {
   const result = await api.GET("/api/v1/inbound/receiving-orders/{id}", {
     params: { path: { id } },
@@ -59,8 +93,39 @@ async function getReceivingOrder(id: string): Promise<ReceivingOrder> {
   return result.data;
 }
 
+async function getReceivingOrderPrintData(id: string): Promise<ReceivingOrderPrintData> {
+  const result = await api.GET("/api/v1/inbound/receiving-orders/{id}/print-data", {
+    params: { path: { id } },
+  });
+  if (!result.data) {
+    if (isDevMockNotFound(result.error) || result.response.status === 404) {
+      throw new ApiError(
+        { code: "INBOUND_ORDER_NOT_FOUND", message: "未找到对应入库单，请刷新列表后重试", severity: "error", details: {}, trace_id: "web-admin" },
+        "未找到对应入库单，请刷新列表后重试",
+        result.response.status,
+      );
+    }
+    throw new ApiError(result.error, "读取入库打印数据失败", result.response.status);
+  }
+  return result.data;
+}
+
+async function getPutawayRecommendations(
+  id: string,
+  input: components["schemas"]["PutawayRecommendationQuery"],
+): Promise<PutawayRecommendationResponse> {
+  const result = await api.GET("/api/v1/inbound/receiving-orders/{id}/putaway-recommendations", {
+    params: { path: { id }, query: input },
+  });
+  if (!result.data) throw new ApiError(result.error, "读取推荐库位失败", result.response.status);
+  return result.data;
+}
+
 async function createReceivingOrder(request: CreateReceivingOrderRequest): Promise<ReceivingOrder> {
-  const result = await api.POST("/api/v1/inbound/receiving-orders", { body: request });
+  const result = await api.POST("/api/v1/inbound/receiving-orders", {
+    params: { header: { "Idempotency-Key": idempotencyKey("web-m2-create") } },
+    body: request,
+  });
   if (!result.data) {
     throw new ApiError(result.error, "创建 ASN 失败", result.response.status);
   }
@@ -161,11 +226,46 @@ export function useReceivingOrdersQuery() {
   });
 }
 
+export function useReceivingDashboardQuery(input: {
+  supplierId: string;
+  productCode: string;
+  from: string;
+  to: string;
+}, refreshIntervalMs: number | false = 30_000) {
+  return useQuery<ReceivingDashboard, ApiError>({
+    queryKey: ["inbound", "receiving-dashboard", input],
+    queryFn: () => getReceivingDashboard(input),
+    refetchInterval: refreshIntervalMs,
+  });
+}
+
 export function useReceivingOrderQuery(id: string | null) {
   return useQuery<ReceivingOrder, ApiError>({
     queryKey: id ? receivingOrderQueryKey(id) : receivingOrderQueryKey("none"),
     queryFn: () => getReceivingOrder(id ?? ""),
     enabled: id !== null,
+  });
+}
+
+export function useReceivingOrderPrintDataQuery(id: string | null) {
+  return useQuery<ReceivingOrderPrintData, ApiError>({
+    queryKey: id ? receivingOrderPrintDataQueryKey(id) : receivingOrderPrintDataQueryKey("none"),
+    queryFn: () => getReceivingOrderPrintData(id ?? ""),
+    enabled: id !== null,
+  });
+}
+
+export function usePutawayRecommendationsQuery(
+  id: string | null,
+  input: components["schemas"]["PutawayRecommendationQuery"],
+  enabled = true,
+) {
+  const inputReady = Boolean(input.product_code && input.batch_no && input.quality_status && input.qty > 0);
+  return useQuery<PutawayRecommendationResponse, ApiError>({
+    queryKey: id && inputReady ? putawayRecommendationsQueryKey(id, input) : [...receivingOrdersQueryKey, "putaway-recommendations", "none"],
+    queryFn: () => getPutawayRecommendations(id ?? "", input),
+    enabled: Boolean(id) && enabled && inputReady,
+    retry: false,
   });
 }
 
@@ -184,6 +284,7 @@ function useInvalidateReceivingOrders() {
   return (id: string) => {
     void queryClient.invalidateQueries({ queryKey: receivingOrdersQueryKey });
     void queryClient.invalidateQueries({ queryKey: receivingOrderQueryKey(id) });
+    void queryClient.invalidateQueries({ queryKey: receivingOrderPrintDataQueryKey(id) });
   };
 }
 

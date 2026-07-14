@@ -33,6 +33,7 @@ export function H9TemplatePreviewDialog({
   const [paperDirection, setPaperDirection] = React.useState<PaperDirection>("portrait");
   const [error, setError] = React.useState<string | null>(null);
   const [printing, setPrinting] = React.useState(false);
+  const [ready, setReady] = React.useState(false);
 
   React.useEffect(() => {
     if (open && preview) setPaperDirection(readPaperDirection(preview.hiprint_json));
@@ -44,6 +45,7 @@ export function H9TemplatePreviewDialog({
     let disposed = false;
     async function renderPreview() {
       setError(null);
+      setReady(false);
       try {
         const jqueryModule = await import("jquery");
         const win = window as unknown as { jQuery?: unknown; $?: unknown };
@@ -63,6 +65,7 @@ export function H9TemplatePreviewDialog({
         const html = template.getHtml(currentPreview.data);
         const node = html.get(0);
         if (node) container.appendChild(node);
+        setReady(Boolean(node));
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "hiprint 预览失败");
       }
@@ -80,6 +83,8 @@ export function H9TemplatePreviewDialog({
     try {
       templateRef.current?.print(preview.data);
       await onPrint();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "打印记录写入失败");
     } finally {
       setPrinting(false);
     }
@@ -111,7 +116,7 @@ export function H9TemplatePreviewDialog({
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             关闭
           </Button>
-          <Button type="button" disabled={!preview || printing} onClick={() => void print()}>
+          <Button type="button" disabled={!preview || !ready || printing} onClick={() => void print()}>
             <Printer className="size-4" aria-hidden />
             打印
           </Button>

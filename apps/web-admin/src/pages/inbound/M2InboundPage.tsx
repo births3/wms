@@ -1,5 +1,6 @@
 import * as React from "react";
 import {
+  Button,
   PageHeader,
   QueryPanel,
   buildQueryPanelSummaryItems,
@@ -9,6 +10,7 @@ import {
 } from "@wms/ui";
 
 import { useCurrentUserQuery } from "@/features/auth/auth-queries";
+import { useMasterDataRowsQuery } from "@/features/master-data/master-data-queries";
 import {
   useCreateReceivingOrderMutation,
   useInspectReceivingOrderMutation,
@@ -34,12 +36,14 @@ import {
   type SignFormState,
 } from "./M2InboundDialogs";
 import { M2InboundDetailDialog } from "./M2InboundDetailDialog";
+import { M2InboundPrintDialog } from "./M2InboundPrintDialog";
 import {
   createAsnBatchNo,
   type InboundDocumentTypeFilter,
 } from "./m2-inbound-document-type";
 import {
   dateToIso,
+  dateTimeToIso,
   defaultCreatedDateRange,
   defaultStatusFilter,
   detailStageFromMode,
@@ -59,6 +63,7 @@ import {
   type StatusFilter,
 } from "./m2-inbound-page-helpers";
 import { M2InboundOrderTable } from "./M2InboundOrderTable";
+import { M2InboundDashboardPage } from "./M2InboundDashboardPage";
 
 export type { M2InboundMode } from "./m2-inbound-page-helpers";
 
@@ -70,8 +75,6 @@ interface M2InboundPageProps {
 
 /** 可读示例账号（placeholder / 第二收货员默认提示），勿用 UUID 样例。 */
 const secondSignerExample = "00000000-0000-0000-0000-000000000102";
-const defaultLocationId = "00000000-0000-0000-0000-000000000201";
-const defaultLocationCode = "A-01-01";
 const emptyCreateForm: CreateFormState = {
   receiptNo: "",
   documentType: "",
@@ -164,8 +167,11 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
     defaultM2InboundQueryValue(mode, currentOwner),
   );
   const [activeDialog, setActiveDialog] = React.useState<InboundDialog | null>(null);
+  const [showDashboard, setShowDashboard] = React.useState(false);
   const [detailOpen, setDetailOpen] = React.useState(false);
+  const [printOpen, setPrintOpen] = React.useState(false);
   const [lastEvent, setLastEvent] = React.useState<string | null>(null);
+  const [putawayValidationError, setPutawayValidationError] = React.useState<string | null>(null);
   const [createForm, setCreateForm] = React.useState<CreateFormState>(emptyCreateForm);
   const [receiveForm, setReceiveForm] = React.useState<ReceiveFormState>({
     actualQty: "",
@@ -198,15 +204,13 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
     createSignFormForCurrentUser(undefined),
   );
   const [putawayForm, setPutawayForm] = React.useState<PutawayFormState>({
-    lpn: "LPN-M2-PC-0001",
+    lpn: "",
     productCode: "",
     batchNo: "",
     qty: "0",
-    recommendedLocation: "A-01-01 / A-01-02 / A-02-01",
-    locationId: defaultLocationId,
-    locationCode: defaultLocationCode,
+    locationId: "",
+    locationCode: "",
     qualityStatus: "qualified",
-    validationResult: "温区/色标/容量校验通过",
     note: "",
   });
 
@@ -217,6 +221,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
   const inspectMutation = useInspectReceivingOrderMutation();
   const signMutation = useSignReceivingOrderMutation();
   const putawayMutation = usePutawayReceivingOrderMutation();
+  const locationsQuery = useMasterDataRowsQuery("m1-locations", mode === "putaway");
 
   const orders = React.useMemo(
     () =>
@@ -290,7 +295,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
     rejectMutation.isPending ||
     inspectMutation.isPending ||
     signMutation.isPending ||
-    putawayMutation.isPending;
+    putawayMutation.isPending || (mode === "putaway" && locationsQuery.isPending);
   const error =
     createMutation.error ??
     releaseMutation.error ??
@@ -299,9 +304,10 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
     inspectMutation.error ??
     signMutation.error ??
     putawayMutation.error ??
+    locationsQuery.error ??
     ordersQuery.error ??
     detailQuery.error;
-
+  const errorMessage = putawayValidationError ?? (error ? inboundErrorMessage(error) : undefined);
   React.useEffect(() => {
     if (!order) return;
     const qty = String(totalExpectedQty(order));
@@ -327,8 +333,10 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
     setPutawayForm((value) => ({
       ...value,
       productCode: firstLine?.product_code ?? "",
-      batchNo: batchNo || "BATCH-202606",
+      batchNo,
       qty,
+      locationId: "",
+      locationCode: "",
     }));
   }, [order?.id, currentUser?.user_id, currentUser?.username, currentUser?.display_name]);
 
@@ -343,8 +351,14 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
     setDetailOpen(true);
   }
 
+  function openRowPrint(id: string) {
+    selectOrder(id);
+    setPrintOpen(true);
+  }
+
   function openRowDialog(id: string, dialog: InboundDialog) {
     selectOrder(id);
+    if (dialog === "putaway") setPutawayValidationError(null);
     if (dialog === "inspect") {
       setInspectForm(emptyInspectForm);
       setSignForm(createSignFormForCurrentUser(currentUser));
@@ -395,6 +409,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
       ],
     };
     const created = await createMutation.mutateAsync(request);
+    await ordersQuery.refetch();
     selectOrder(created.id);
     setActiveDialog(null);
     setLastEvent(`${created.receipt_no} 已创建`);
@@ -412,6 +427,21 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
         rejected_qty: toInteger(receiveForm.rejectedQty),
         arrival_temperature_celsius: coldChain && receiveForm.temperature !== "" ? Number(receiveForm.temperature) : null,
         exception_note: receiveForm.note.trim() || null,
+        details: {
+          temperature_control_method: coldChain ? receiveForm.temperatureControl.trim() || currentTemperatureControl : null,
+          vehicle_no: receiveForm.vehicleNo.trim() || null,
+          origin: receiveForm.origin.trim() || null,
+          departure_at: coldChain ? dateTimeToIso(receiveForm.departureTime) : null,
+          arrival_at: coldChain ? dateTimeToIso(receiveForm.arrivalTime) : null,
+          storage_at: dateTimeToIso(receiveForm.storageTime),
+          transport_mode: receiveForm.transportMode.trim() || null,
+          carrier: receiveForm.carrier.trim() || null,
+          contact_name: receiveForm.contactName.trim() || null,
+          contact_phone: receiveForm.contactPhone.trim() || null,
+          contact_id_no: receiveForm.contactIdNo.trim() || null,
+          seal_checked: receiveForm.sealChecked.trim() || null,
+          filing_checked: receiveForm.filingChecked.trim() || null,
+        },
       },
     });
     setActiveDialog(null);
@@ -482,21 +512,34 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
   async function submitPutaway(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!order) return;
+    const qty = toInteger(putawayForm.qty);
+    if (qty <= 0) {
+      setPutawayValidationError("上架数量必须大于 0");
+      return;
+    }
+    const locationCode = putawayForm.locationCode.trim();
+    const location = locationsQuery.data?.find(
+      (row) => row.code === locationCode && row.locationFields?.warehouseId === order.warehouse_id,
+    ) ?? (putawayForm.locationId && locationCode ? { id: putawayForm.locationId } : null);
+    if (!location) {
+      setPutawayValidationError(`库位 ${locationCode || "-"} 不存在，或不属于当前入库仓库`);
+      return;
+    }
+    setPutawayValidationError(null);
     await putawayMutation.mutateAsync({
       id: order.id,
       request: {
         product_code: putawayForm.productCode.trim(),
-        batch_no: putawayForm.batchNo.trim() || line?.batch_no || "BATCH-202606",
-        qty: toInteger(putawayForm.qty),
-        location_id: putawayForm.locationId.trim(),
-        location_code: putawayForm.locationCode.trim(),
+        batch_no: putawayForm.batchNo.trim(),
+        qty,
+        location_id: location.id,
+        location_code: locationCode,
         quality_status: putawayForm.qualityStatus.trim(),
       },
     });
     setActiveDialog(null);
     setLastEvent(`${order.receipt_no} 上架已提交`);
   }
-
   const pageMeta = inboundPageMeta(mode);
   const tableRefreshAction = {
     label: "刷新",
@@ -513,6 +556,10 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
         }
       : undefined;
 
+  if (showDashboard && mode === "receiving") {
+    return <M2InboundDashboardPage currentOwner={currentOwner} onBack={() => setShowDashboard(false)} />;
+  }
+
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
         <PageHeader
@@ -524,6 +571,9 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
                 <span className="self-center text-sm text-muted-foreground" role="status">
                   {lastEvent}
                 </span>
+              )}
+              {mode === "receiving" && (
+                <Button variant="outline" onClick={() => setShowDashboard(true)}>进度看板</Button>
               )}
             </div>
           }
@@ -549,9 +599,9 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
           }}
         />
 
-        {error && (
+        {errorMessage && (
           <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            {inboundErrorMessage(error)}
+            {errorMessage}
           </div>
         )}
 
@@ -566,6 +616,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
           onSelectOrder={selectOrder}
           onSelectOrderKeys={selectOrderKeys}
           onOpenDetail={openRowDetail}
+          onOpenPrint={openRowPrint}
           onOpenDialog={openRowDialog}
           onRelease={(id) => void releaseOrder(id)}
           refreshAction={tableRefreshAction}
@@ -592,10 +643,11 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
 
         <M2InboundDialogs
           activeDialog={activeDialog}
+          orderId={order?.id ?? null}
           orderReceiptNo={order?.receipt_no ?? null}
           hasOrder={Boolean(order)}
           pending={pending}
-          errorMessage={error ? inboundErrorMessage(error) : undefined}
+          errorMessage={errorMessage}
           productTemperatureAttribute={currentProductTemperatureAttribute}
           derivedTemperatureControl={currentTemperatureControl}
           createForm={createForm}
@@ -612,6 +664,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
           setInspectForm={setInspectForm}
           setSignForm={setSignForm}
           setPutawayForm={setPutawayForm}
+          clearPutawayValidationError={() => setPutawayValidationError(null)}
           submitCreate={submitCreate}
           submitReceive={submitReceive}
           submitReject={submitReject}
@@ -624,6 +677,14 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
           defaultStage={detailStageFromMode(mode)}
           open={detailOpen}
           onOpenChange={setDetailOpen}
+        />
+        <M2InboundPrintDialog
+          currentOwner={currentOwner}
+          mode={mode}
+          onOpenChange={setPrintOpen}
+          onPrinted={(receiptNo) => setLastEvent(`${receiptNo} 打印记录已写入`)}
+          open={printOpen}
+          order={order}
         />
     </section>
   );

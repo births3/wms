@@ -79,7 +79,7 @@ function OrderDetail({ order }: { order: OutboundOrder }) {
           rows={[
             ["WMS 单号", order.wms_order_no],
             ["ERP 单号", order.erp_order_no ?? "-"],
-            ["订单类型", "销售出库"],
+            ["订单类型", documentTypeLabel(order.document_type)],
             ["客户 / 门店", `${shortId(order.customer_id)} / 门店A`],
             ["要求发货", formatDateTime(order.required_ship_at)],
           ]}
@@ -118,6 +118,10 @@ function OrderDetail({ order }: { order: OutboundOrder }) {
       }))} />
     </section>
   );
+}
+
+function documentTypeLabel(value: string) {
+  return value === "purchase_return_outbound" ? "采购退货出库" : "销售出库";
 }
 
 function WaveDetail({ wave, orders }: { wave: OutboundWave; orders: OutboundOrder[] }) {

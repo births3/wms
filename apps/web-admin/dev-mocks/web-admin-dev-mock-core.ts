@@ -2,10 +2,14 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin } from "vite";
 
 import { handleAdminMenuDevMock } from "./admin-menu-dev-mock";
+import { handleRolePermissionDevMock } from "./auth-role-permission-dev-mock";
 import { handleAuditDevMock } from "./audit-dev-mock";
 import { handleH4WechatNotifyDevMock } from "./wechat-notify-dev-mock";
 import { handleH5ExpressDevMock } from "./express-dev-mock";
 import { handlePrintInventoryDevMock } from "./web-admin-dev-mock-print-inventory";
+import { handleDocumentNumberingDevMock } from "./document-numbering-dev-mock";
+import { handleOutboundDevMock } from "./outbound-dev-mock";
+import { handleDockDevMock } from "./dock-dev-mock";
 
 import {
   asNullableString,
@@ -22,6 +26,7 @@ import {
   handleSystemDictionaryUpsert,
   devOrderExpectedQty,
   devOrderFromCreateRequest,
+  getDevOrderPrintData,
   handleSupplierUpdate,
   handleWarehouseUpdate,
   readJsonBody,
@@ -40,6 +45,7 @@ import type {
 
 const {
   devCreatedCustomers,
+  devAuthSessions,
   devCreatedLocations,
   devCreatedOrders,
   devCreatedProducts,
@@ -104,8 +110,20 @@ async function tryHandleDevMockRoute(
     await handleAdminMenuDevMock(req, res, pathname);
     return true;
   }
+  if (pathname.startsWith("/api/v1/auth/roles") || pathname === "/api/v1/auth/permissions" || pathname === "/api/v1/auth/users" || pathname === "/api/v1/auth/user-roles/batch") {
+    await handleRolePermissionDevMock(req, res, pathname);
+    return true;
+  }
   if (pathname.startsWith("/api/v1/express")) {
     await handleH5ExpressDevMock(req, res, pathname);
+    return true;
+  }
+  if (pathname.startsWith("/api/v1/docks")) {
+    await handleDockDevMock(req, res, pathname);
+    return true;
+  }
+  if (pathname.startsWith("/api/v1/dock-appointments")) {
+    await handleDockDevMock(req, res, pathname);
     return true;
   }
   if (pathname.startsWith("/api/v1/wechat-notify")) {
@@ -114,6 +132,12 @@ async function tryHandleDevMockRoute(
   }
   if (pathname.startsWith("/api/v1/audit")) {
     if (await handleAuditDevMock(req, res, pathname)) return true;
+  }
+  if (pathname.startsWith("/api/v1/code-generator")) {
+    if (await handleDocumentNumberingDevMock(req, res, pathname)) return true;
+  }
+  if (pathname.startsWith("/api/v1/outbound")) {
+    if (await handleOutboundDevMock(req, res, pathname)) return true;
   }
 
   if (req.method === "POST" && pathname === "/api/v1/auth/login") {
@@ -126,12 +150,70 @@ async function tryHandleDevMockRoute(
       sendError(res, 401, "AUTH_INVALID_CREDENTIALS", "Login failed");
       return true;
     }
+    const accessToken = `local-dev-${crypto.randomUUID()}`;
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 60 * 60 * 1000);
+    devAuthSessions.unshift({
+      session_id: accessToken,
+      user_id: devUser.user_id,
+      device_name: req.headers["user-agent"] ?? "Web Admin Dev",
+      ip: typeof req.headers["x-forwarded-for"] === "string" ? req.headers["x-forwarded-for"] : null,
+      logged_in_at: now.toISOString(),
+      expires_at: expiresAt.toISOString(),
+      is_current: true,
+    });
     sendJson(res, 200, {
-      access_token: `local-dev-${Date.now()}`,
+      access_token: accessToken,
       token_type: "Bearer",
-      expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      expires_at: expiresAt.toISOString(),
       user: devUser,
     });
+    return true;
+  }
+
+  if (req.method === "POST" && pathname === "/api/v1/auth/logout") {
+    const token = authToken(req);
+    removeDevSessions((session) => session.session_id === token);
+    sendJson(res, 200, { revoked_jti: token ?? "local-dev-unknown", revocation_degraded: false });
+    return true;
+  }
+
+  if (req.method === "GET" && pathname === "/api/v1/auth/sessions") {
+    const userId = new URL(req.url ?? pathname, "http://wms.local").searchParams.get("user_id") ?? devUser.user_id;
+    const currentToken = authToken(req);
+    const data = devAuthSessions
+      .filter((session) => session.user_id === userId)
+      .map((session) => ({ ...session, is_current: session.session_id === currentToken }));
+    sendJson(res, 200, { data, count: data.length });
+    return true;
+  }
+
+  if (req.method === "POST" && pathname === "/api/v1/auth/sessions/revoke-others") {
+    const currentToken = authToken(req);
+    const before = devAuthSessions.length;
+    removeDevSessions((session) => session.user_id === devUser.user_id && session.session_id !== currentToken);
+    sendJson(res, 200, {
+      user_id: devUser.user_id,
+      revoked_sessions: before - devAuthSessions.length,
+      revocation_degraded: false,
+    });
+    return true;
+  }
+
+  const revokeSessionMatch = pathname.match(/^\/api\/v1\/auth\/sessions\/([^/]+)\/revoke$/);
+  if (req.method === "POST" && revokeSessionMatch) {
+    const sessionId = decodeURIComponent(revokeSessionMatch[1]);
+    removeDevSessions((session) => session.session_id === sessionId);
+    sendJson(res, 200, { revoked_jti: sessionId, revocation_degraded: false });
+    return true;
+  }
+
+  const kickUserMatch = pathname.match(/^\/api\/v1\/auth\/users\/([^/]+)\/kick$/);
+  if (req.method === "POST" && kickUserMatch) {
+    const userId = decodeURIComponent(kickUserMatch[1]);
+    const before = devAuthSessions.length;
+    removeDevSessions((session) => session.user_id === userId);
+    sendJson(res, 200, { user_id: userId, revoked_sessions: before - devAuthSessions.length, revocation_degraded: false });
     return true;
   }
 
@@ -219,7 +301,7 @@ async function tryHandleDevMockRoute(
   if (pathname === "/api/v1/master-data/locations/batch-create" && req.method === "POST") {
     const idempotencyKey = getIdempotencyKey(req);
     if (!idempotencyKey) {
-      sendError(res, 400, "M1_LOCATION_IDEMPOTENCY_REQUIRED", "缺少 Idempotency-Key");
+      sendError(res, 400, "M1_IDEMPOTENCY_REQUIRED", "缺少 Idempotency-Key");
       return true;
     }
     const body = await readJsonBody(req);
@@ -227,7 +309,7 @@ async function tryHandleDevMockRoute(
     const replay = devLocationBatchIdempotency.get(idempotencyKey);
     if (replay) {
       if (replay.requestBody !== requestBody) {
-        sendError(res, 409, "M1_LOCATION_IDEMPOTENCY_CONFLICT", "Idempotency-Key 已用于其他请求");
+        sendError(res, 409, "M1_IDEMPOTENCY_CONFLICT", "Idempotency-Key 已用于其他请求");
       } else {
         sendJson(res, 200, replay.responseBody);
       }
@@ -283,6 +365,35 @@ async function tryHandleDevMockRoute(
     // 列表始终 200；未知/空关键字查询由前端或此处按空结果处理，不暴露 DEV_MOCK_NOT_FOUND
     const data = allDevOrders();
     sendJson(res, 200, { data, page: { count: data.length, next_cursor: null } });
+    return true;
+  }
+
+  if (req.method === "GET" && pathname === "/api/v1/inbound/receiving-dashboard") {
+    const grouped = new Map<string, { order_count: number; expected_qty: number }>();
+    for (const order of allDevOrders()) {
+      const current = grouped.get(order.status) ?? { order_count: 0, expected_qty: 0 };
+      current.order_count += 1;
+      current.expected_qty += order.lines.reduce((total, line) => total + line.expected_qty, 0);
+      grouped.set(order.status, current);
+    }
+    const data = [...grouped.entries()].map(([status, values]) => ({
+      status,
+      created_at: new Date().toISOString(),
+      ...values,
+      abnormal: status === "closed_rejected" || status === "exception",
+    }));
+    sendJson(res, 200, { data, refreshed_at: new Date().toISOString() });
+    return true;
+  }
+
+  const receivingOrderPrintDataMatch = pathname.match(/^\/api\/v1\/inbound\/receiving-orders\/([^/]+)\/print-data$/);
+  if (req.method === "GET" && receivingOrderPrintDataMatch) {
+    const data = getDevOrderPrintData(decodeURIComponent(receivingOrderPrintDataMatch[1]));
+    if (!data) {
+      sendError(res, 404, "DEV_MOCK_NOT_FOUND", "Receiving order not found");
+      return true;
+    }
+    sendJson(res, 200, data);
     return true;
   }
 
@@ -427,6 +538,7 @@ function devWarehouseFromCreateRequest(body: Record<string, unknown>): DevWareho
     owner_id: devOwnerId,
     warehouse_code: asString(body.warehouse_code, "WH-M1-NEW"),
     warehouse_name: asString(body.warehouse_name, "新建仓库"),
+    warehouse_type: asString(body.warehouse_type, "physical"),
     status: "active",
     created_at: now,
     updated_at: now,
@@ -541,4 +653,14 @@ function getIdempotencyKey(req: IncomingMessage) {
 
 function isUuid(value: string) {
   return /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value);
+}
+function authToken(req: IncomingMessage) {
+  const value = req.headers.authorization;
+  return typeof value === "string" && value.startsWith("Bearer ") ? value.slice(7) : null;
+}
+
+function removeDevSessions(predicate: (session: model.DevAuthSession) => boolean) {
+  for (let index = devAuthSessions.length - 1; index >= 0; index -= 1) {
+    if (predicate(devAuthSessions[index])) devAuthSessions.splice(index, 1);
+  }
 }

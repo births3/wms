@@ -5,7 +5,9 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
-const page = readFileSync(resolve(root, "src/pages/outbound/M4OutboundPage.tsx"), "utf8");
+const pageFile = readFileSync(resolve(root, "src/pages/outbound/M4OutboundPage.tsx"), "utf8");
+const actionDialog = readFileSync(resolve(root, "src/pages/outbound/M4OutboundActionDialog.tsx"), "utf8");
+const page = `${pageFile}\n${actionDialog}`;
 const parts = readFileSync(resolve(root, "src/pages/outbound/M4OutboundPageParts.tsx"), "utf8");
 const detail = readFileSync(resolve(root, "src/pages/outbound/M4OutboundDetailDialog.tsx"), "utf8");
 
@@ -79,9 +81,9 @@ assert.doesNotMatch(canReleaseWaveBody(), /released/, "已下发波次不得再�
 assert.match(canCancelWaveBody(), /draft/, "取消应允许 draft");
 assert.match(canCancelWaveBody(), /released/, "取消应允许 released");
 assert.doesNotMatch(canCancelWaveBody(), /cancelled/, "已取消波次不得再取消");
-assert.match(canReviewOrderBody(), /inventory_locked/, "复核应允许 inventory_locked");
-assert.match(canReviewOrderBody(), /reviewed/, "复核应允许 reviewed");
-assert.doesNotMatch(canReviewOrderBody(), /shipped/, "已发货不得复核");
+assert.match(canReviewOrderBody(), /picked/, "复核应允许 picked");
+assert.match(canReviewOrderBody(), /picked_short/, "复核应允许 picked_short");
+assert.doesNotMatch(canReviewOrderBody(), /inventory_locked|reviewed|shipped/, "未拣选完成、已复核或已发货订单不得复核");
 assert.match(canShipOrderBody(), /reviewed/, "交接应允许 reviewed");
 assert.doesNotMatch(canShipOrderBody(), /inventory_locked|shipped/, "未复核/已发货不得交接");
 assert.match(canApproveReturnBody(), /pending_approval/, "审批仅待审批");

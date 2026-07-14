@@ -13,6 +13,7 @@ import {
   type DataGridColumn,
   type DataGridCreateAction,
   type DataGridDetailAction,
+  type DataGridPrintAction,
   type DataGridQuerySummaryItem,
   type DataGridRefreshAction,
   type DataGridToolbarAction,
@@ -52,6 +53,7 @@ interface M2InboundOrderTableProps {
   onSelectOrderKeys: (keys: string[]) => void;
   onOpenDetail: (id: string) => void;
   onOpenDialog: (id: string, dialog: InboundDialog) => void;
+  onOpenPrint: (id: string) => void;
   onRelease: (id: string) => void;
   refreshAction?: DataGridRefreshAction;
   createAction?: DataGridCreateAction;
@@ -73,6 +75,7 @@ export function M2InboundOrderTable({
   onSelectOrderKeys,
   onOpenDetail,
   onOpenDialog,
+  onOpenPrint,
   onRelease,
   refreshAction,
   createAction,
@@ -90,6 +93,14 @@ export function M2InboundOrderTable({
     },
   };
   const privateActions = inboundPrivateActions(mode, selectedOrder, onOpenDialog, onRelease);
+  const printAction: DataGridPrintAction = {
+    label: "打印",
+    description: mode === "receiving" ? "打印 ASN 单" : "打印验收记录单",
+    disabled: (context) => context.selectedRowKeys.length !== 1 || !selectedOrder,
+    onClick: () => {
+      if (selectedOrder) onOpenPrint(selectedOrder.id);
+    },
+  };
   const orderColumns: DataGridColumn<ReceivingOrder>[] = [
     {
       key: "receipt_no",
@@ -226,6 +237,7 @@ export function M2InboundOrderTable({
       refreshAction={refreshAction}
       createAction={createAction}
       detailAction={detailAction}
+      printAction={printAction}
       toolbarActions={privateActions}
       queryState={queryState}
       querySummaryItems={querySummaryItems}

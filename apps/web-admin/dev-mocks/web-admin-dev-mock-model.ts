@@ -49,6 +49,53 @@ export interface DevOrder {
   lines: DevOrderLine[];
 }
 
+export interface DevReceivingPrintData {
+  receipts: Array<{
+    id: string;
+    receiving_order_id: string;
+    owner_id: string;
+    actual_qty: number;
+    shortage_qty: number;
+    rejected_qty: number;
+    arrival_temperature_celsius: number | null;
+    exception_note: string | null;
+    details: {
+      temperature_control_method: string | null;
+      vehicle_no: string | null;
+      origin: string | null;
+      departure_at: string | null;
+      arrival_at: string | null;
+      storage_at: string | null;
+      transport_mode: string | null;
+      carrier: string | null;
+      contact_name: string | null;
+      contact_phone: string | null;
+      contact_id_no: string | null;
+      seal_checked: string | null;
+      filing_checked: string | null;
+    } | null;
+    occurred_at: string;
+  }>;
+  inspections: Array<{
+    id: string;
+    receiving_order_id: string;
+    owner_id: string;
+    batch_no: string;
+    accepted_qty: number;
+    rejected_qty: number;
+    quality_status: string;
+    occurred_at: string;
+  }>;
+  signatures: Array<{
+    id: string;
+    receiving_order_id: string;
+    owner_id: string;
+    first_signer_id: string;
+    second_signer_id: string | null;
+    signed_at: string;
+  }>;
+}
+
 export interface DevProduct {
   id: string;
   owner_id: string;
@@ -95,6 +142,7 @@ export interface DevWarehouse {
   owner_id: string;
   warehouse_code: string;
   warehouse_name: string;
+  warehouse_type: string;
   status: string;
   created_at: string;
   updated_at: string;
@@ -184,6 +232,15 @@ export interface DevFeatureFlagConfig {
   source: string;
 }
 
+export interface DevAuthSession {
+  session_id: string;
+  user_id: string;
+  device_name: string;
+  ip: string | null;
+  logged_in_at: string;
+  expires_at: string;
+  is_current: boolean;
+}
 function devSystemDictionaryItem(
   id: string,
   dictCode: string,
@@ -209,11 +266,13 @@ function devSystemDictionaryItem(
 }
 
 export const devCreatedOrders: DevOrder[] = [];
+export const devReceivingPrintData = new Map<string, DevReceivingPrintData>();
 export const devCreatedProducts: DevProduct[] = [];
 export const devCreatedSuppliers: DevSupplier[] = [];
 export const devCreatedCustomers: DevCustomer[] = [];
 export const devCreatedWarehouses: DevWarehouse[] = [];
 export const devCreatedLocations: DevLocation[] = [];
+export const devAuthSessions: DevAuthSession[] = [];
 export const devCreatedPrintTemplates: DevPrintTemplate[] = [];
 export const devPrintTemplateVersions = new Map<string, DevPrintTemplate[]>();
 export const devSeedOrderStatusOverrides = new Map<string, string>();
@@ -227,6 +286,8 @@ export const devUser = {
   roles: ["admin", "receiving"],
   permissions: [
     "h1.auth.me",
+    "h1.roles.manage",
+    "h1.sessions.manage",
     "h1.menu.read",
     "h1.menu.write",
     "h1.menu.publish",
@@ -240,6 +301,8 @@ export const devUser = {
     "h9.print_template.write",
     "h9.print_template.publish",
     "h9.print_template.print",
+    "mcg.document_numbering.read",
+    "mcg.document_numbering.write",
     "m2.receive",
     "m2.inspect",
     "m2.sign",
@@ -357,6 +420,7 @@ export let devWarehouse: DevWarehouse = {
   owner_id: devOwnerId,
   warehouse_code: "WH-M1-001",
   warehouse_name: "鹏鹞冷链仓",
+  warehouse_type: "physical",
   status: "active",
   created_at: "2026-06-29T00:00:00.000Z",
   updated_at: "2026-06-29T00:00:00.000Z",
@@ -382,6 +446,22 @@ export let devLocation: DevLocation = {
 };
 
 export const devSystemDictionaryItemsByCode: Record<string, DevSystemDictionaryItem[]> = {
+  inventory_quality_status: [
+    devSystemDictionaryItem("00000000-0000-0000-0000-000000001841", "inventory_quality_status", "qualified", "合格", {}),
+    devSystemDictionaryItem("00000000-0000-0000-0000-000000001842", "inventory_quality_status", "quarantined", "隔离", {}),
+    devSystemDictionaryItem("00000000-0000-0000-0000-000000001843", "inventory_quality_status", "unqualified", "不合格", {}),
+    devSystemDictionaryItem("00000000-0000-0000-0000-000000001844", "inventory_quality_status", "pending_destruction", "待销毁", {}),
+    devSystemDictionaryItem("00000000-0000-0000-0000-000000001846", "inventory_quality_status", "loss_deducted", "报损扣减", {}),
+  ],
+  inventory_policy: [
+    devSystemDictionaryItem(
+      "00000000-0000-0000-0000-000000001845",
+      "inventory_policy",
+      "expiry_warning_days",
+      "近效期预警天数",
+      { warning_days: 180 },
+    ),
+  ],
   document_type: [
     devSystemDictionaryItem("00000000-0000-0000-0000-000000001501", "document_type", "purchase_inbound", "采购入库", {
       batch_policy: "standard_batch",

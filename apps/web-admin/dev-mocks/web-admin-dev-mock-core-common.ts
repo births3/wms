@@ -7,6 +7,7 @@ import type {
   DevOrder,
   DevProduct,
   DevPrintTemplate,
+  DevReceivingPrintData,
   DevSupplier,
   DevSystemDictionaryItem,
   DevWarehouse,
@@ -261,6 +262,7 @@ export async function handleWarehouseUpdate(req: IncomingMessage, res: ServerRes
   const updated: DevWarehouse = {
     ...warehouse,
     warehouse_name: asString(body.warehouse_name, warehouse.warehouse_name),
+    warehouse_type: asString(body.warehouse_type, warehouse.warehouse_type),
     status: asString(body.status, warehouse.status),
     updated_at: new Date().toISOString(),
   };
@@ -323,34 +325,54 @@ export async function handleInboundAction(
 
   if (action === "receive") {
     setDevOrderStatus(orderId, "inspecting");
-    sendJson(res, 200, {
+    const receipt = {
       id: "00000000-0000-0000-0000-000000004001",
       receiving_order_id: orderId,
       owner_id: devOwnerId,
       actual_qty: asNumber(body.actual_qty, 120),
       shortage_qty: asNumber(body.shortage_qty, 0),
       rejected_qty: asNumber(body.rejected_qty, 0),
+      arrival_temperature_celsius: typeof body.arrival_temperature_celsius === "number" ? body.arrival_temperature_celsius : null,
+      exception_note: asNullableString(body.exception_note),
+      details: receivingDetails(body.details),
       occurred_at: occurredAt,
+    } satisfies DevReceivingPrintData["receipts"][number];
+    const previous = model.devReceivingPrintData.get(orderId);
+    model.devReceivingPrintData.set(orderId, {
+      receipts: [receipt],
+      inspections: previous?.inspections ?? [],
+      signatures: previous?.signatures ?? [],
     });
+    sendJson(res, 200, receipt);
     return;
   }
 
   if (action === "reject") {
     setDevOrderStatus(orderId, "closed_rejected");
-    sendJson(res, 200, {
+    const receipt = {
       id: "00000000-0000-0000-0000-000000004005",
       receiving_order_id: orderId,
       owner_id: devOwnerId,
       actual_qty: 0,
       shortage_qty: 0,
       rejected_qty: devOrderExpectedQty(orderId),
+      arrival_temperature_celsius: null,
+      exception_note: asNullableString(body.reason),
+      details: null,
       occurred_at: occurredAt,
+    } satisfies DevReceivingPrintData["receipts"][number];
+    const previous = model.devReceivingPrintData.get(orderId);
+    model.devReceivingPrintData.set(orderId, {
+      receipts: [receipt],
+      inspections: previous?.inspections ?? [],
+      signatures: previous?.signatures ?? [],
     });
+    sendJson(res, 200, receipt);
     return;
   }
 
   if (action === "inspect") {
-    sendJson(res, 200, {
+    const inspection = {
       id: "00000000-0000-0000-0000-000000004002",
       receiving_order_id: orderId,
       owner_id: devOwnerId,
@@ -359,20 +381,34 @@ export async function handleInboundAction(
       rejected_qty: asNumber(body.rejected_qty, 0),
       quality_status: asString(body.quality_status, "qualified"),
       occurred_at: occurredAt,
+    } satisfies DevReceivingPrintData["inspections"][number];
+    const previous = model.devReceivingPrintData.get(orderId);
+    model.devReceivingPrintData.set(orderId, {
+      receipts: previous?.receipts ?? [],
+      inspections: [...(previous?.inspections ?? []), inspection],
+      signatures: previous?.signatures ?? [],
     });
+    sendJson(res, 200, inspection);
     return;
   }
 
   if (action === "sign") {
     setDevOrderStatus(orderId, "putaway");
-    sendJson(res, 200, {
+    const signature = {
       id: "00000000-0000-0000-0000-000000004003",
       receiving_order_id: orderId,
       owner_id: devOwnerId,
       first_signer_id: asString(body.first_signer_id, devUserId),
       second_signer_id: asNullableString(body.second_signer_id),
       signed_at: occurredAt,
+    } satisfies DevReceivingPrintData["signatures"][number];
+    const previous = model.devReceivingPrintData.get(orderId);
+    model.devReceivingPrintData.set(orderId, {
+      receipts: previous?.receipts ?? [],
+      inspections: previous?.inspections ?? [],
+      signatures: [...(previous?.signatures ?? []), signature],
     });
+    sendJson(res, 200, signature);
     return;
   }
 
@@ -397,6 +433,37 @@ export async function handleInboundAction(
 
 export function allDevOrders(): DevOrder[] {
   return [...seedOrders(), ...devCreatedOrders];
+}
+
+export function getDevOrderPrintData(orderId: string) {
+  const order = findOrder(orderId);
+  if (!order) return null;
+  const data = model.devReceivingPrintData.get(orderId);
+  return {
+    order,
+    receipts: data?.receipts ?? [],
+    inspections: data?.inspections ?? [],
+    signatures: data?.signatures ?? [],
+  };
+}
+
+function receivingDetails(value: unknown) {
+  const details = asRecord(value);
+  return {
+    temperature_control_method: asNullableString(details.temperature_control_method),
+    vehicle_no: asNullableString(details.vehicle_no),
+    origin: asNullableString(details.origin),
+    departure_at: asNullableString(details.departure_at),
+    arrival_at: asNullableString(details.arrival_at),
+    storage_at: asNullableString(details.storage_at),
+    transport_mode: asNullableString(details.transport_mode),
+    carrier: asNullableString(details.carrier),
+    contact_name: asNullableString(details.contact_name),
+    contact_phone: asNullableString(details.contact_phone),
+    contact_id_no: asNullableString(details.contact_id_no),
+    seal_checked: asNullableString(details.seal_checked),
+    filing_checked: asNullableString(details.filing_checked),
+  };
 }
 
 export function devOrderFromCreateRequest(body: Record<string, unknown>): DevOrder {
