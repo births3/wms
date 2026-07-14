@@ -124,6 +124,8 @@ nav:
     - H-Store 门店用户端 (W4.E): domain/user-stories-h-store.md
     - H1 权限与多租户 (W1.A): domain/user-stories-h1-auth-tenant.md
     - H1 菜单管理设计: h1-menu-management-design.md
+    - H1-006 API Key 生命周期切片: h1-006-api-key-lifecycle-slice.md
+    - H1-006 API Key 管理端页面设计: h1-006-api-key-lifecycle-web-design-plan.md
     - H2 审计追踪 + 事件总线 (W1.B): domain/user-stories-h2-audit-trail.md
     - H3 跨端契约 OpenAPI (W1.C): domain/user-stories-h3-contract.md
     - H3 API 文档与对接说明: api/h3-api-access.md
@@ -165,6 +167,7 @@ nav:
     - ADR-0034 Wave 3 业务表 PG 模型: adr/0034-wave-3-operational-postgres-schema.md
     - ADR-0035 Wave 6 证据收口: adr/0035-wave-6-pre-release-evidence-closeout.md
     - ADR-0036 打印模板引擎: adr/0036-print-template-engine.md
+    - ADR-0037 轻量治理控制链: adr/0037-lightweight-governance-control-chain.md
     - 技术 Spike:
       - Spike 索引: spikes/README.md
       - SPIKE-001 Axum + JWT: spikes/spike-001-axum-jwt.md

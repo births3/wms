@@ -3,8 +3,8 @@
 > 本文档是 wms 项目的"宪法"。所有规范、流程、决策机制都在此声明。
 > 修改本文档必须经过 PR，并在文末"变更记录"中追加条目。
 
-- 版本：v0.6（统一行数治理阈值）
-- 日期：2026-06-26
+- 版本：v0.7（轻量治理控制链）
+- 日期：2026-07-14
 - 适用范围：整个 wms 仓库（backend、apps/*、packages/*、scripts/*、docs/*）
 
 ---
@@ -24,12 +24,13 @@ wms 是一个**医药冷链 GSP 合规仓储管理系统**，目标是支撑：
 
 ## 1. 治理理念
 
-四条核心理念，凌驾于具体规则之上：
+五条核心理念，凌驾于具体规则之上：
 
 1. **治理即可执行脚本**，不是 PDF 文档。规则必须落到 `just` 命令、git hooks、CI 卡点。
 2. **分层执行**，按场景给不同时长预算（T1 < 10s / T2 < 120s / T3 < 5min / T4 < 30min）。**速度即采纳率**。
 3. **Baseline 机制**——锁定历史债务、新增必须修复、已修复自动收缩。**渐进式治理**。
 4. **diff 触发**——改什么查什么。无差别全量扫描不可持续。
+5. **风险与重量匹配**——高风险规则强制执行，低风险建议只进入报告；治理不能比被治理的问题更重。
 
 > **理念 4 落地说明**：diff 触发由 `task_check.py` 实现（基于 `governance/gate-rules.toml`），仅在 **T2 及以上** Tier 启用；**T1 仍为全量扫描**（因 T1 必须无脑可跑、不依赖 git history）。在 Wave 0 阶段 T2/T3/T4 仅累积 T1，diff 触发的真正价值会在 Wave 1+ 才显现（届时 backend / frontend 文件量大，全量扫描不可持续）。
 
@@ -37,26 +38,59 @@ wms 是一个**医药冷链 GSP 合规仓储管理系统**，目标是支撑：
 
 ## 2. 治理体系全景
 
+### 2.0 轻量治理控制链（G1-G4）
+
+G1-G4 回答“规则如何从决策走到证据”，是逻辑控制链，不新增四套目录、服务或审批流程。
+详细决策见 ADR-0037。
+
+```text
+G1 决策层（法规 / 合同 / 业务与合规确认 / ADR）
+  → G2 规则层（可判定的 pass/fail 规则）
+  → G3 门禁层（脚本 / Tier / context / Hook / CI）
+  → G4 证据层（结果 / Baseline / CI / 真实环境证据）
+  → 反馈到 G1/G2，修正规则或退役低价值门禁
+```
+
+| 层 | 职责 | 现有事实源 |
+|---|---|---|
+| G1 决策 | 说明为什么必须治理及最终确认边界 | 法规引用、合同引用、`docs/domain/clarifications.md`、ADR、本文档 |
+| G2 规则 | 把决策转成稳定、可自动判断的规则 | `governance/gate-rules.toml` 的 rule/source 元数据 |
+| G3 门禁 | 决定检查器、路径、Tier 和执行场景 | `gate-rules.toml`、治理脚本、justfile、lefthook、Gitea CI |
+| G4 证据 | 证明规则被执行并满足真实环境要求 | JSON、CI 结果、validator、哈希和外部不可变引用 |
+
+权威冲突按“适用法规/监管要求 > 客户合同 > 人工确认的合规与业务决策 > ADR/工程规范
+> 代码实现”处理。法规是否适用由业务或合规人员确认，AI 不作最终裁定。
+
+现有维度继续保留，但不得再混称为同一套“层”：
+
+- 5 类治理回答“管什么”。
+- T1-T4 回答“成本预算和何时运行”。
+- context 回答“在哪里运行”。
+- ADR-0006 L1-L11 回答“验证什么质量维度”。
+- 文档 L1-L4 回答“稳定性和变更流程”。
+
 ### 2.1 五大治理类别
 
-| 类别 | 目标 | wms 起步状态 |
+| 类别 | 目标 | 当前状态 |
 |------|------|--------------|
-| 1. 文档治理 | 设计一致性 | 🚧 骨架 |
-| 2. 代码治理 | 实现正确性 | 🚧 骨架 |
-| 3. 质量治理 | 行为可靠性 | 🚧 待业务 |
-| 4. 流程治理 | 协作高效性 | 🚧 骨架 |
-| 5. 运行治理 | 系统稳定性 | 🚧 骨架 |
+| 1. 文档治理 | 设计一致性 | ✅ 已执行 |
+| 2. 代码治理 | 实现正确性 | ✅ 已执行 |
+| 3. 质量治理 | 行为可靠性 | ✅ 已执行 |
+| 4. 流程治理 | 协作高效性 | ✅ 已执行 |
+| 5. 运行治理 | 系统稳定性 | 🚧 真实环境证据收口中 |
 
 ### 2.2 四个执行 Tier
 
 > Tier T1-T4 是"什么时候跑"（时间维度），与 ADR-0006 的"测试层 L1-L11"（覆盖维度）正交。
 
-| Tier | 时间预算 | 命令 | 触发时机 |
-|------|---------|------|---------|
-| T1 | < 10s | `just quick-check` | 写代码时随手跑、pre-commit |
-| T2 | < 120s | `just task-check` | 任务结束、commit 前 |
-| T3 | < 5min | `just preflight` | 推送前、pre-push、PR 创建前 |
-| T4 | < 30min | `just verify` | 合并前、CI、发版前 |
+| Tier | 时间预算 | 命令 | 执行 context | 触发时机 |
+|------|---------|------|-----------------|---------|
+| T1 | < 10s | `just quick-check` | local / pr / main / release / runtime | 写代码、pre-commit、PR 快速红线 |
+| T2 | < 120s | `just task-check` | local / pr / main / release / runtime | 任务结束、commit 前、PR 必跑 |
+| T3 | < 5min | `just preflight` | pr / main / release / runtime | 风险或路径命中的 PR、pre-push、main |
+| T4 | < 30min | `just verify` | main / release / runtime | 定时、预发布和完整验证 |
+
+高 Tier 入口会累积低 Tier 门禁，因此 main/release/runtime 场景不得过滤掉 T1-T3。
 
 各 Tier 包含的测试层（L1-L11）见 ADR-0006 §3。
 
@@ -68,6 +102,10 @@ wms 是一个**医药冷链 GSP 合规仓储管理系统**，目标是支撑：
 - 必须支持 `--help` 和 `--json` 输出
 - 公共逻辑放 `_baseline.py` / `_diff.py`，不重复实现
 - 退出码语义：`0` 通过，`1` 发现违规，`2` 脚本自身错误
+- G2 规则 verdict 只有 `pass` / `fail`；warning/info 只能作为非阻塞报告。
+- G3 执行状态使用 `passed` / `failed` / `error` / `blocked`；`error` 和 `blocked` 不得关闭 gate。
+- Tier 与 context 正交；`gate-rules.toml` 省略 context 时使用 Tier 默认场景。
+- 一个脚本可以覆盖多条稳定 rule_id；脚本重命名或合并时不得改变既有规则身份。
 
 ---
 
@@ -236,6 +274,8 @@ wms 是一个**医药冷链 GSP 合规仓储管理系统**，目标是支撑：
 - 如果下层需要违反上层 → **必须先修改上层**（走对应变更流程）
 - 上层越稳定、变更成本越高；下层越灵活、变更成本越低
 - 改了行为不改文档 = 撒谎；文档过时比没文档更糟
+- L1-L4 只表示文档稳定性和变更流程，不改变 §2.0 的法规、合同、业务/合规、技术权威顺序。
+- 技术 ADR 不得以“L1 文档”为由覆盖适用法规或已确认合同要求。
 
 **文档治理脚本覆盖**：
 
@@ -409,16 +449,17 @@ Wave 1 起，涉及一线操作或复杂业务流程的前端页面采用"前端
 - 任何 PR 必须 CI 绿
 - GSP 关键功能必须有测试
 
-### 4.5 起步阶段简化
+### 4.5 轻量治理强度
 
-| 项 | 完整版 | 起步版 |
+| 对象 | 强制策略 | 轻量边界 |
 |----|--------|--------|
-| ADR | 多人评审 24h | 自审即生效，**必须写** |
-| PR | 多人 review | 自审 + 走流程 |
-| CI | GitHub Actions 全套 | 先本地 hook，第一版跑通后上 CI |
-| 覆盖率 | 卡门槛 | 不卡，每周看趋势 |
+| 红线/GSP/安全 | 必须阻塞且留证据 | 不允许 Baseline 或 AI 自批豁免 |
+| 普通确定性规则 | 按风险放入 T1-T3 | 必须满足对应时间预算并保持低误报 |
+| warning/info | 进入报告或趋势 | 不作为 G2 阻塞规则 |
+| 真实环境/硬件 | release/runtime context 验证 | 缺条件记 blocked，不阻塞普通 PR，也不伪造通过 |
+| 治理工具 | 优先复用脚本、TOML、just、Hook、CI | 无真实需求不建设平台、数据库或仪表盘 |
 
-**核心：流程一个不少，严格度可调。**
+**核心：高风险不减配，低风险不设卡。**
 
 ### 4.6 Tier 启动 SOP（v0.4 加入）
 
@@ -433,8 +474,8 @@ Wave 1 起，涉及一线操作或复杂业务流程的前端页面采用"前端
 | Wave 1 | `check_openapi_in_sync.py` / `validate_openapi_artifacts.py` / `check_openapi_contract.py` | T2 | `shared/openapi/openapi.json` + `backend/crates/api/**` + `backend/crates/domain/**` + `packages/api-client/src/schema.ts` |
 | Wave 3 | `check_audit_trail_coverage.py` / `check_idempotency_test.py` | T3 | `backend/crates/api/src/**` |
 | Wave 3 | `check_cold_chain_data_freshness.py` | T3 | `backend/crates/domain/src/cold_chain/**` |
-| Wave 4 | `check_perf_baseline.py` / `check_api_compat.py` | T4 | （CI 全量，非 diff 触发）|
-| Wave 4 | `check_observability_signals.py`（L10 可观测）| T4 | （CI 全量，非 diff 触发）|
+| Wave 4-6 | `report_wave6_pre_release.py`（L7 / runtime evidence）/ `check_api_compat.py` | T4 | （CI 全量，非 diff 触发）|
+| Wave 4 | `check_observability.py`（L10 可观测）| T4 | （CI 全量，非 diff 触发）|
 | Wave 5 | `check_changelog_freshness.py` | T1 | `*.md`（变更前必跑）|
 
 > **事实之源约定**：本表与 `governance/gate-rules.toml` 中的占位规则**必须保持一致**；以本表为权威源，gate-rules.toml 仅作为脚本侧实现承接。`task_check.py --strict` 模式（当前为 Wave 1+ 准备中）会强制检查未实现脚本。
@@ -443,6 +484,31 @@ Wave 1 起，涉及一线操作或复杂业务流程的前端页面采用"前端
 - `just wave-N-ready` 必须列出"应当新增的脚本"清单
 - 以及在 `task_check.py --strict` 模式下，gate-rules.toml 中引用但未实现的脚本视为失败（CI 启用 --strict）
 - 每 Wave 第一周完成补齐前，Wave 演进不通过
+
+### 4.7 规则准入、例外与退役
+
+新增阻塞规则必须至少满足一项：
+
+1. 守护法规、GSP、审计、权限、数据一致性、密钥或分层红线。
+2. 有真实事故、漏检或回归证据。
+3. 同类问题已在 3 个以上位置重复出现，人工 review 不再可靠。
+
+规则进入门禁前必须有决策来源、稳定 rule_id、适用路径、Tier、context 和最小测试。没有
+确定性判据的建议只进入报告。相同输入或同领域的检查优先合并；重复、不可达、长期无独立
+检测价值或持续超预算的脚本应退役，不以固定脚本数量作为目标。
+
+存量且未触碰的规则允许继续使用模型默认 source 和兼容 ID；新增规则，以及涉及红线、真实
+运行证据、Tier/context 调整或脚本重命名的规则，必须在 `gate-rules.toml` 显式登记
+`rule_ids` 与 `source`。这样逐步收紧追溯，不为 100 多条存量规则复制低价值元数据。
+
+例外分为四类：
+
+| 类型 | 用途 | 约束 |
+|---|---|---|
+| Baseline | 已有非红线技术债 | 入库、单调下降、可到期；红线禁止使用 |
+| Waiver | 临时人工批准的规则例外 | 必须有 rule_id、理由、批准引用和到期时间；首次真实需要时再建存储 |
+| External pending | 外部系统、硬件或环境未到位 | 状态保持 blocked，不能转为 pass |
+| Not applicable | 有明确范围依据的不适用项 | 必须记录依据，不得用来掩盖缺证据 |
 
 ---
 
@@ -454,6 +520,7 @@ Wave 1 起，涉及一线操作或复杂业务流程的前端页面采用"前端
 | 代码 lint | clippy + ESLint |
 | 提交信息 | commitlint（或本仓自研脚本） |
 | Git hooks | **lefthook** |
+| PR / main / release 编排 | **Gitea Actions**（`.gitea/workflows/governance.yml`）|
 | 任务编排 | **just** |
 | Secret 扫描 | gitleaks |
 | 依赖漏洞 | cargo-audit + pnpm audit |
@@ -472,6 +539,7 @@ docs/governance.md（本文档，规则源头）
   ├─→ docs/adr/0003-governance-model.md     （治理模型决策）
   ├─→ docs/adr/0004-phase-roadmap.md        （波次路线决策）
   ├─→ docs/adr/0006-tdd-and-test-layers.md  （TDD + 11 层测试）
+  ├─→ docs/adr/0037-lightweight-governance-control-chain.md（G1-G4 轻量控制链）
   ├─→ docs/architecture-dependencies.md     （模块依赖图）
   ├─→ justfile                              （T1-T4 执行入口）
   ├─→ lefthook.yml                          （Git hooks 落地）
@@ -479,6 +547,11 @@ docs/governance.md（本文档，规则源头）
   ├─→ governance/gate-rules.toml            （门禁触发规则）
   └─→ governance/baselines/*.json           （历史债务锁定）
 ```
+
+Gitea CI 采用最小编排：PR 必跑 T1/T2 并按 diff 追加 T3，main 跑 preflight，人工
+`workflow_dispatch` 才运行完整 T4 和预发布证据。CI 不复制规则定义，所有规则仍由仓库内
+配置和脚本解释。工作流文件及本地测试只证明配置已就绪；首次 Gitea 运行 URL 才是远端
+G4 证据，在提交和推送发生前状态必须保持 `blocked`。
 
 ---
 
@@ -496,3 +569,4 @@ docs/governance.md（本文档，规则源头）
 | 2026-06-26 | v0.6 | 放宽行数治理阈值：PR 规模与文件规模统一为 ≥ 600 行 warning、≥ 800 行门禁 / 必须拆分；同步 AGENTS.md 速查约束和前端页面脚本阈值 |
 | 2026-06-28 | v0.6.1 | 新增项目级 RTM 缺口说明约束与仓储层 SQL 货主隔离静态门禁；同步 T1、gate-rules 和 smoke 覆盖 |
 | 2026-06-28 | v0.6.2 | 新增 US-M1-011 系统字典中心静态对齐门禁 `check_system_dictionary_alignment.py`；覆盖 M2/M4 单据类型 RTM、项目级 RTM、T1、gate-rules 和 smoke |
+| 2026-07-14 | v0.7 | 接受 ADR-0037：增加 G1-G4 轻量治理控制链、权威顺序、Tier×context、二值规则与四态执行结果；Gitea CI 分场景编排；`check_page_size` 后移 T2 以恢复 T1 `<10s` 预算 |

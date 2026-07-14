@@ -11,6 +11,13 @@ from typing import Callable
 PayloadValidator = Callable[..., tuple[bool, str]]
 
 
+def evidence_execution_status(ok: bool, message: str) -> str:
+    """缺失外部证据是 blocked；已提供但不合规则是 failed。"""
+    if ok:
+        return "passed"
+    return "blocked" if message.startswith("missing file:") else "failed"
+
+
 def read_json(path: Path) -> tuple[object | None, str | None]:
     if not path.exists():
         return None, f"missing file: {path}"

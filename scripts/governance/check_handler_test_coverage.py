@@ -43,6 +43,9 @@ REQUEST_BUILDER_RE = re.compile(
 REQUEST_METHOD_RE = re.compile(
     r'\.method\(\s*(?:(?:Method::)?(GET|POST|PUT|PATCH|DELETE)\b|"(GET|POST|PUT|PATCH|DELETE)")'
 )
+TEST_PATH_LITERAL_RE = re.compile(
+    r'"((?:/api/v1|/openapi\.json|/api-docs|/redoc|/metrics)[^"\n]*)"'
+)
 SUCCESS_STATUS_RE_TEMPLATE = (
     r"assert_eq!\(\s*{variable}\.status\(\)\s*,\s*"
     r"StatusCode::(?:OK|CREATED|ACCEPTED|NO_CONTENT|PARTIAL_CONTENT)\s*\)"
@@ -74,6 +77,15 @@ def extract_http_requests(text: str) -> list[tuple[str, str]]:
         end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
         requests.append((_request_method(match, text, end), match.group("uri")))
     return requests
+
+
+def extract_test_path_literals(text: str) -> list[str]:
+    """提取测试辅助函数和 format! 中的路由模板。
+
+    不要求测试必须直接调用 `Request::builder()`；项目中的 `request_json`
+    等测试 helper 同样是真实 HTTP 路由测试。
+    """
+    return list(dict.fromkeys(TEST_PATH_LITERAL_RE.findall(text)))
 
 
 def _request_method(match: re.Match[str], text: str, end: int) -> str:
@@ -172,11 +184,15 @@ def check_handler_test_coverage(
     declared_paths = extract_utoipa_paths("\n".join(declaration_texts))
     declared_operations = extract_utoipa_operations("\n".join(declaration_texts))
     test_sources = collect_test_sources(api_crate)
+    test_path_literals = [
+        literal
+        for source_path, text in test_sources
+        for literal in extract_test_path_literals(extract_test_text(source_path, text))
+    ]
     covered_paths = sorted({
         path
         for path in declared_paths
-        for source_path, text in test_sources
-        if path in extract_test_text(source_path, text)
+        if any(_route_matches(path, literal) for literal in test_path_literals)
     })
     missing_paths = [path for path in declared_paths if path not in covered_paths]
     exercised_operations = sorted({

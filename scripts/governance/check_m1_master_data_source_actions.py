@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -170,6 +171,14 @@ def read_source(path: Path) -> str:
     )
 
 
+def contains_token(source: str, token: str) -> bool:
+    if token in source:
+        return True
+    compact_source = re.sub(r"\s+", "", source)
+    compact_token = re.sub(r"\s+", "", token)
+    return compact_token in compact_source
+
+
 def scan() -> list[Issue]:
     issues: list[Issue] = []
     cache: dict[Path, str] = {}
@@ -178,7 +187,7 @@ def scan() -> list[Issue]:
             issues.append(Issue(rel(spec.path), "必需文件不存在"))
             continue
         text = cache.setdefault(spec.path, read_source(spec.path))
-        if spec.token not in text:
+        if not contains_token(text, spec.token):
             issues.append(Issue(rel(spec.path), spec.message))
     return issues
 

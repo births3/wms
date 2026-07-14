@@ -10,10 +10,26 @@
 #   match   — glob 模式（支持 ** 递归通配）
 #   checks  — 触发的脚本名（不含 .py 后缀）
 #   tier    — 所属 Tier（T1/T2/T3/T4）
+#   rule_ids / source / contexts — 可选；省略时由轻量模型给出稳定默认值
 #
 # 兜底原则：
 #   - 没匹配到任何规则的变更 → 默认跑 T1 全套（在 task_check.py 内部处理）
 #   - T4 不受 diff 触发约束（合并前必须全量）
+
+[governance_model]
+version = 1
+layers = ["G1", "G2", "G3", "G4"]
+decision_precedence = ["regulation", "contract", "confirmed_business_compliance", "architecture_governance", "implementation"]
+rule_verdicts = ["pass", "fail"]
+execution_statuses = ["passed", "failed", "error", "blocked"]
+allowed_contexts = ["local", "pr", "main", "release", "runtime"]
+default_source = "docs/adr/0037-lightweight-governance-control-chain.md"
+
+[governance_model.tier_contexts]
+T1 = ["local", "pr", "main", "release", "runtime"]
+T2 = ["local", "pr", "main", "release", "runtime"]
+T3 = ["pr", "main", "release", "runtime"]
+T4 = ["main", "release", "runtime"]
 
 # ============================================================
 # 故事文件拆分阈值（Tier 1 校验）
@@ -22,7 +38,9 @@
 [[rules]]
 match = "governance/source-size-baseline.toml"
 checks = ["check_page_size"]
-tier = "T1"
+tier = "T2"
+rule_ids = ["GOV-SOURCE-PAGE-SIZE"]
+source = "AGENTS.md#数字门禁"
 
 [story_split_thresholds]
 max_file_kb = 20           # 单文件超过 20KB 触发 warning
@@ -160,6 +178,11 @@ checks = ["check_quality_matrix", "check_scope_gap_discovery"]
 tier = "T1"
 
 [[rules]]
+match = "governance/quality-matrix.toml"
+checks = ["check_deferred_story_evidence"]
+tier = "T2"
+
+[[rules]]
 match = "docs/governance/quality-matrix*.md"
 checks = ["check_quality_matrix", "check_scope_gap_discovery", "check_doc_links"]
 tier = "T1"
@@ -211,43 +234,75 @@ tier = "T1"
 
 [[rules]]
 match = "docs/retros/wave-3-pda-runtime-evidence.json"
-checks = ["check_pda_production_gate", "validate_wave3_pda_runtime_evidence"]
+checks = ["check_pda_production_gate"]
 tier = "T1"
+contexts = ["release", "runtime"]
+rule_ids = ["GOV-PDA-PRODUCTION-GATE"]
+source = "docs/adr/0027-pda-offline-model.md"
+
+[[rules]]
+match = "docs/retros/wave-3-pda-runtime-evidence.json"
+checks = ["validate_wave3_pda_runtime_evidence"]
+tier = "T1"
+contexts = ["release", "runtime"]
+rule_ids = ["GOV-EVIDENCE-WAVE3-PDA"]
+source = "docs/adr/0035-wave-6-pre-release-evidence-closeout.md"
 
 [[rules]]
 match = "docs/retros/wave-1-h2-runtime-evidence.json"
 checks = ["validate_wave1_runtime_evidence"]
 tier = "T1"
+contexts = ["release", "runtime"]
+rule_ids = ["GOV-EVIDENCE-WAVE1-H2"]
+source = "docs/adr/0035-wave-6-pre-release-evidence-closeout.md"
 
 [[rules]]
 match = "docs/retros/wave-1-runtime-evidence.json"
 checks = ["validate_wave1_runtime_evidence"]
 tier = "T1"
+contexts = ["release", "runtime"]
+rule_ids = ["GOV-EVIDENCE-WAVE1-ROLLBACK"]
+source = "docs/adr/0035-wave-6-pre-release-evidence-closeout.md"
 
 [[rules]]
 match = "docs/retros/wave-2-runtime-evidence.json"
 checks = ["report_wave2_completion"]
 tier = "T1"
+contexts = ["release", "runtime"]
+rule_ids = ["GOV-EVIDENCE-WAVE2-RUNTIME"]
+source = "docs/adr/0035-wave-6-pre-release-evidence-closeout.md"
 
 [[rules]]
 match = "docs/retros/wave-4-external-dependencies.json"
 checks = ["validate_wave4_external_dependencies"]
 tier = "T1"
+contexts = ["release", "runtime"]
+rule_ids = ["GOV-EVIDENCE-WAVE4-EXTERNAL"]
+source = "docs/adr/0035-wave-6-pre-release-evidence-closeout.md"
 
 [[rules]]
 match = "docs/retros/wave-5-hardware-evidence.json"
 checks = ["validate_wave5_hardware_evidence"]
 tier = "T1"
+contexts = ["release", "runtime"]
+rule_ids = ["GOV-EVIDENCE-WAVE5-HARDWARE"]
+source = "docs/adr/0035-wave-6-pre-release-evidence-closeout.md"
 
 [[rules]]
 match = "docs/retros/wave-5-tms-evidence.json"
 checks = ["validate_wave5_tms_evidence"]
 tier = "T1"
+contexts = ["release", "runtime"]
+rule_ids = ["GOV-EVIDENCE-WAVE5-TMS"]
+source = "docs/adr/0035-wave-6-pre-release-evidence-closeout.md"
 
 [[rules]]
 match = "docs/retros/wave-6-deploy-evidence.json"
 checks = ["validate_wave6_deploy_evidence"]
 tier = "T1"
+contexts = ["release", "runtime"]
+rule_ids = ["GOV-EVIDENCE-WAVE6-DEPLOY"]
+source = "docs/adr/0035-wave-6-pre-release-evidence-closeout.md"
 
 [[rules]]
 match = "scripts/governance/check_pda_production_gate.py"
@@ -441,8 +496,15 @@ tier = "T1"
 
 [[rules]]
 match = "backend/**"
-checks = ["check_secrets", "check_page_size"]
+checks = ["check_secrets"]
 tier = "T1"
+
+[[rules]]
+match = "backend/**"
+checks = ["check_page_size"]
+tier = "T2"
+rule_ids = ["GOV-SOURCE-PAGE-SIZE"]
+source = "AGENTS.md#数字门禁"
 
 [[rules]]
 match = "backend/crates/api/src/*repository.rs"
@@ -451,18 +513,29 @@ tier = "T1"
 
 [[rules]]
 match = "apps/**"
-checks = ["check_secrets", "check_page_size"]
+checks = ["check_secrets"]
 tier = "T1"
+
+[[rules]]
+match = "apps/**"
+checks = ["check_page_size"]
+tier = "T2"
+rule_ids = ["GOV-SOURCE-PAGE-SIZE"]
+source = "AGENTS.md#数字门禁"
 
 [[rules]]
 match = "packages/**"
 checks = ["check_page_size"]
-tier = "T1"
+tier = "T2"
+rule_ids = ["GOV-SOURCE-PAGE-SIZE"]
+source = "AGENTS.md#数字门禁"
 
 [[rules]]
 match = "scripts/**"
 checks = ["check_page_size"]
-tier = "T1"
+tier = "T2"
+rule_ids = ["GOV-SOURCE-PAGE-SIZE"]
+source = "AGENTS.md#数字门禁"
 
 [[rules]]
 match = "apps/web-admin/src/App.tsx"
@@ -480,14 +553,28 @@ tier = "T1"
 
 [[rules]]
 match = "prototypes/**"
-checks = ["check_prototype_index_consistency", "check_prototype_story_sync", "check_prototype_fidelity", "check_prototype_navigation", "check_page_size"]
+checks = ["check_prototype_index_consistency", "check_prototype_story_sync", "check_prototype_fidelity", "check_prototype_navigation"]
 tier = "T1"
+
+[[rules]]
+match = "prototypes/**"
+checks = ["check_page_size"]
+tier = "T2"
+rule_ids = ["GOV-SOURCE-PAGE-SIZE"]
+source = "AGENTS.md#数字门禁"
 
 # Layer 2 业务复合组件 + 页面级文件触发组件治理
 [[rules]]
 match = "packages/ui/src/business/**"
-checks = ["check_component_doc_header", "check_component_no_inline_style", "check_component_props_classname", "check_component_registry_consistency", "check_datagrid_popover_portal", "check_page_size"]
+checks = ["check_component_doc_header", "check_component_no_inline_style", "check_component_props_classname", "check_component_registry_consistency", "check_datagrid_popover_portal"]
 tier = "T1"
+
+[[rules]]
+match = "packages/ui/src/business/**"
+checks = ["check_page_size"]
+tier = "T2"
+rule_ids = ["GOV-SOURCE-PAGE-SIZE"]
+source = "AGENTS.md#数字门禁"
 
 [[rules]]
 match = "packages/ui/src/ui/**"
@@ -501,18 +588,39 @@ tier = "T1"
 
 [[rules]]
 match = "prototypes/src/pages/**"
-checks = ["check_component_doc_header", "check_page_size", "check_baseline_completeness"]
+checks = ["check_component_doc_header", "check_baseline_completeness"]
+tier = "T1"
+
+[[rules]]
+match = "prototypes/src/pages/**"
+checks = ["check_page_size"]
+tier = "T2"
+rule_ids = ["GOV-SOURCE-PAGE-SIZE"]
+source = "AGENTS.md#数字门禁"
+
+[[rules]]
+match = "prototypes/src/prototype-kit/**"
+checks = ["check_prototype_fidelity", "check_baseline_completeness"]
 tier = "T1"
 
 [[rules]]
 match = "prototypes/src/prototype-kit/**"
-checks = ["check_page_size", "check_prototype_fidelity", "check_baseline_completeness"]
+checks = ["check_page_size"]
+tier = "T2"
+rule_ids = ["GOV-SOURCE-PAGE-SIZE"]
+source = "AGENTS.md#数字门禁"
+
+[[rules]]
+match = "apps/web-admin/src/pages/**"
+checks = ["check_admin_page_query_panel", "check_admin_page_design_contract", "check_scope_gap_discovery"]
 tier = "T1"
 
 [[rules]]
 match = "apps/web-admin/src/pages/**"
-checks = ["check_page_size", "check_admin_page_query_panel", "check_admin_page_design_contract", "check_scope_gap_discovery"]
-tier = "T1"
+checks = ["check_page_size"]
+tier = "T2"
+rule_ids = ["GOV-SOURCE-PAGE-SIZE"]
+source = "AGENTS.md#数字门禁"
 
 [[rules]]
 match = "apps/web-admin/src/pages/master-data/**"
@@ -537,7 +645,9 @@ tier = "T1"
 [[rules]]
 match = "apps/pda-mobile/src/pages/**"
 checks = ["check_page_size"]
-tier = "T1"
+tier = "T2"
+rule_ids = ["GOV-SOURCE-PAGE-SIZE"]
+source = "AGENTS.md#数字门禁"
 
 # baseline 完整性：Tabs.tsx ↔ manifest.toml ↔ baseline PNG 三者一致
 [[rules]]

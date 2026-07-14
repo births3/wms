@@ -73,3 +73,17 @@ def test_page_query_suggestion_requires_confirmation_for_unknown_page():
 
     assert suggestion["required"] is False
     assert "待确认" in suggestion["reason"]
+
+
+def test_page_query_supports_dynamic_field_builder():
+    """动态字典字段也必须能被治理脚本解析。"""
+    from check_admin_page_query_panel import field_keys
+
+    source = """
+    function buildFields(options) {
+        return [{ key: "documentType", label: "单据类型", options }];
+    }
+    const queryFields = React.useMemo(() => buildFields(options), [options]);
+    """
+
+    assert field_keys(source, "queryFields") == {"documentType"}

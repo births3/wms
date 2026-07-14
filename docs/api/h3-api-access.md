@@ -25,7 +25,7 @@ PC / PDA 调用普通业务 API：
 1. 由 H1 API Key 生命周期管理发放 API Key。
 2. 外部系统在请求头携带 `X-WMS-API-Key`。
 3. 写接口同时携带 `Idempotency-Key`。
-4. 运行时按 API Key 维度限流，限流和熔断事件写 H2 审计；服务启动时若设置了 `WMS_H3_API_KEY_AUDIT_OWNER_ID`，审计 actor 使用 `api-key:<hash>`。
+4. 运行时按 API Key 维度限流，限流和熔断事件写入 H2 append-only 审计。生产路由由 H1 API Key 中间件注入真实 `key_id`、货主、调用方、JTI、请求路径、状态码、IP 和 User-Agent，H3 不从环境变量猜测货主；仅直接测试 H3 中间件时才允许使用兼容性的哈希回退。
 
 ## 韧性保护
 

@@ -241,9 +241,9 @@ apps/pda-mobile/src/features/<context>/__tests__/
 | `check_permission_test_matrix.py` | L8 | Wave 3 | ✅ |
 | `check_data_consistency_test.py` | L5 | Wave 3 | ✅ |
 | `check_api_compat.py` | L9 | Wave 3 | ❌（必须当下解决，不允许 baseline）|
-| `check_observability_test.py` | L10 | Wave 4 | ✅ |
+| `check_observability.py` | L10 | Wave 4 | ✅ |
 | `check_concurrency_test.py` | L6 | Wave 4 | ✅ |
-| `check_perf_baseline.py` | L7 | Wave 4 | ✅（基线本身就是 baseline）|
+| `report_wave6_pre_release.py` | L7 预发布性能证据汇总 | Wave 6 | ❌（必须引用真实运行证据）|
 | `check_test_org_layout.py` | 测试目录约定 | Wave 2 | ❌（结构性强约束）|
 
 ### 4.2 第 0 周仅做的事

@@ -60,7 +60,8 @@
 | [ADR-0034](0034-wave-3-operational-postgres-schema.md) | Accepted | Wave 3 第一批 M2/M3/M5/M9 PostgreSQL 业务表、共享幂等表与 repository 事务边界；供应商资质有效期来源冻结为 M1 本地资质档案 + M-VR |
 | [ADR-0035](0035-wave-6-pre-release-evidence-closeout.md) | Wave 6 预发布证据与外部依赖收口 | Accepted | Wave 6 不新增业务模块，集中关闭 Wave 1-5 真实 dev/staging、硬件、TMS、码上放心、灰度发布 runtime evidence gate |
 | [ADR-0036](0036-print-template-engine.md) | H9 打印模板引擎方案 | Accepted | H9 从 M2 拆出为横向能力；首期 hiprint WebComponent + OpenAPI 字段库 + 数据库字段元数据 + 浏览器预览打印 |
-| ADR-0037+ | 未分配 | 后续按需新建 |
+| [ADR-0037](0037-lightweight-governance-control-chain.md) | 轻量治理控制链（G1-G4） | Accepted | 在 ADR-0003 上增加决策→规则→门禁→证据控制链；复用现有资产，Tier 与 context 正交，治理强度跟随风险 |
+| ADR-0038+ | 未分配 | 后续按需新建 |
 
 > 编号永不复用。空缺编号必须在此表登记原因。
 

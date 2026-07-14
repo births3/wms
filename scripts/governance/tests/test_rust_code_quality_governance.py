@@ -65,6 +65,18 @@ def test_unsafe_and_unwrap_treats_cfg_test_module_file_as_test_code():
     assert issues == []
 
 
+def test_unsafe_and_unwrap_treats_cfg_test_include_as_test_code():
+    from check_unsafe_and_unwrap import find_unsafe_unwrap_issues
+
+    issues = find_unsafe_unwrap_issues(
+        'let value = result.expect("included fixture should exist");',
+        path="backend/crates/api/src/wave3_handlers_part1.rs",
+        test_only=True,
+    )
+
+    assert issues == []
+
+
 def test_unsafe_and_unwrap_detects_real_production_usage():
     """生产路径 unsafe / unwrap / expect / panic 必须报错。"""
     from check_unsafe_and_unwrap import find_unsafe_unwrap_issues
@@ -95,6 +107,14 @@ def test_handler_test_coverage_extracts_unique_paths():
     )
 
     assert paths == ["/api/v1/healthz", "/api/v1/auth/login"]
+
+
+def test_handler_test_coverage_extracts_helper_format_paths():
+    from check_handler_test_coverage import extract_test_path_literals
+
+    assert extract_test_path_literals(
+        'request_json("PATCH", &format!("/api/v1/master-data/warehouse-zones/{}", id));'
+    ) == ["/api/v1/master-data/warehouse-zones/{}"]
 
 
 def test_handler_test_coverage_requires_path_literals(tmp_path):

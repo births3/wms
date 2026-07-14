@@ -11,6 +11,7 @@ from _wave_evidence_validator import (
     bad_ref,
     blocked_ref_fields,
     blocked_ref_message,
+    evidence_execution_status,
     has_environment_token as _has_environment_token,
     placeholder_fields,
     positive_int as _positive_int,
@@ -151,6 +152,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.json:
         print(json.dumps({
             "ok": ok,
+            "status": evidence_execution_status(ok, message),
             "path": str(args.evidence_file),
             "message": message,
         }, ensure_ascii=False, indent=2))

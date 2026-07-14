@@ -513,7 +513,7 @@ DataGrid 表头和表格内触发的弹窗 / 浮层，例如字段筛选、字�
 | `check_component_registry_consistency.py` | T1 | 业务复合目录 ↔ component-registry.md §3.1 一一对应 | `[[component_exemptions]]` |
 | `check_dialog_overlay_pointer_events.py` | T1 | 共享 Dialog 遮罩不抢占弹窗内字段点击 | 无 |
 | `check_datagrid_popover_portal.py` | T1 | DataGrid 弹窗浮层使用 `createPortal + fixed`，并支持点击外部 / `Escape` 关闭 | 无 |
-| `check_page_size.py` | T1 | 页面 < 600 通过 / 600-799 警告 / ≥ 800 门禁 | `@governance: skip-page-size` |
+| `check_page_size.py` | T2 | 页面 < 600 通过 / 600-799 警告 / ≥ 800 门禁 | `@governance: skip-page-size` |
 
 ---
 

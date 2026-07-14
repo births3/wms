@@ -213,7 +213,7 @@ def load_story_ids() -> set[str]:
     ids: set[str] = set()
     for f in sorted(DOMAIN_DIR.glob("user-stories-*.md")):
         text = f.read_text(encoding="utf-8")
-        for m in re.finditer(r"^##\s+(US-[A-Z][A-Z0-9-]+\d+\b)", text, re.M):
+        for m in re.finditer(r"^##\s+(?:~~)?(US-[A-Z][A-Z0-9-]+\d+\b)(?:~~)?", text, re.M):
             ids.add(m.group(1))
     return ids
 

@@ -8,7 +8,11 @@ import re
 import sys
 from pathlib import Path
 
-from _wave_evidence_validator import blocked_ref_fields, blocked_ref_message
+from _wave_evidence_validator import (
+    blocked_ref_fields,
+    blocked_ref_message,
+    evidence_execution_status,
+)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 DEFAULT_EVIDENCE = REPO_ROOT / "docs/retros/wave-3-pda-runtime-evidence.json"
@@ -362,6 +366,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.json:
         print(json.dumps({
             "ok": ok,
+            "status": evidence_execution_status(ok, message),
             "path": str(args.evidence_file),
             "evidence_file": str(args.evidence_file),
             "writes_runtime_evidence": False,

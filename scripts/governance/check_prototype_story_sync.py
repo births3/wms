@@ -25,7 +25,7 @@ REPO_ROOT = _THIS.parent.parent.parent
 INDEX_TOML = REPO_ROOT / "docs" / "prototypes" / "index.toml"
 DOMAIN_DIR = REPO_ROOT / "docs" / "domain"
 
-STORY_ID_RE = re.compile(r"^## (US-[A-Z0-9]+-\d{3}[a-z]?)")
+STORY_ID_RE = re.compile(r"^## (?:~~)?(US-[A-Z0-9]+-\d{3}[a-z]?)(?:~~)?")
 
 
 def _load_toml(path: Path) -> dict:
@@ -43,7 +43,7 @@ def _story_id_to_file() -> dict[str, Path]:
     mapping: dict[str, Path] = {}
     for f in DOMAIN_DIR.glob("user-stories-*.md"):
         for line in f.read_text(encoding="utf-8").splitlines():
-            if line.startswith("## ") and "~~" not in line:
+            if line.startswith("## "):
                 m = STORY_ID_RE.match(line)
                 if m:
                     mapping[m.group(1)] = f

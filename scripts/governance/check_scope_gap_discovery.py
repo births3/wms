@@ -29,6 +29,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 STORY_DIR = REPO_ROOT / "docs" / "domain"
 MATRIX = REPO_ROOT / "governance" / "quality-matrix.toml"
 APP_TSX = REPO_ROOT / "apps" / "web-admin" / "src" / "App.tsx"
+ADMIN_VIEW_RENDERER_TSX = REPO_ROOT / "apps" / "web-admin" / "src" / "app-shell" / "AdminViewRenderer.tsx"
 ADMIN_MENU_DEV_MOCK_TS = REPO_ROOT / "apps" / "web-admin" / "dev-mocks" / "admin-menu-dev-mock.ts"
 
 STORY_HEADING_RE = re.compile(r"^##\s+(US-[A-Z0-9]+-\d{3})[：:]\s*(.+?)\s*$", re.MULTILINE)
@@ -123,9 +124,8 @@ def read_admin_navigation() -> AdminNavigation:
     tree_end = text.index("const adminMenuIconByKey", tree_start)
     default_menu_tree = set(MENU_TREE_ITEM_RE.findall(text[tree_start:tree_end]))
 
-    route_start = text.index("function renderAdminView")
-    route_end = text.index("function LoadingShell", route_start)
-    routed_views = set(VIEW_LITERAL_RE.findall(text[route_start:route_end]))
+    route_text = ADMIN_VIEW_RENDERER_TSX.read_text(encoding="utf-8")
+    routed_views = set(VIEW_LITERAL_RE.findall(route_text))
 
     return AdminNavigation(
         menu_sections=menu_sections,

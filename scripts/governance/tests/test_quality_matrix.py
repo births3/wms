@@ -191,7 +191,7 @@ def test_quality_matrix_markdown_lists_deferred_stories():
         }
     )
 
-    assert "## 明确延期范围" in markdown
+    assert "## 未完成 / 延期故事" in markdown
     assert "| US-H9-003 模板设计与版本管理 | H9 | 后续切片实现模板设计器。 |" in markdown
 
 

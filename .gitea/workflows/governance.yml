@@ -1,0 +1,64 @@
+name: governance
+
+"on":
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  governance:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: taiki-e/install-action@just
+      - name: Install gitleaks
+        run: |
+          curl -fsSLO https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz
+          curl -fsSLO https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_checksums.txt
+          grep 'gitleaks_8.21.2_linux_x64.tar.gz' gitleaks_8.21.2_checksums.txt | sha256sum --check --strict
+          tar -xzf gitleaks_8.21.2_linux_x64.tar.gz gitleaks
+          mkdir -p "$HOME/.local/bin"
+          mv gitleaks "$HOME/.local/bin/gitleaks"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Install governance dependencies
+        run: python3 -m pip install -r requirements-governance.txt
+      - name: Install workspace dependencies
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.5.2 --activate
+          pnpm install --frozen-lockfile
+      - name: Secret scan
+        run: gitleaks detect --redact --no-banner
+      - name: T1/T2 task gate
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          WMS_GOV_CONTEXT: pr
+          WMS_GOV_BASE: origin/main
+        run: just task-check
+      - name: Risk-triggered T3 governance
+        if: ${{ github.event_name == 'pull_request' }}
+        run: python3 scripts/governance/task_check.py --tier T3 --context pr --base origin/main --strict
+      - name: Main preflight
+        if: ${{ github.event_name == 'push' }}
+        env:
+          WMS_GOV_CONTEXT: main
+        run: just preflight
+      - name: T4 and release evidence
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          WMS_GOV_CONTEXT: release
+        run: just verify

@@ -321,8 +321,13 @@ def test_wave1_h2_dev_runbook_documents_dry_run_readiness_status_report():
 
 def test_wave1_h2_baseline_loader_and_seal_share_day_lock():
     """baseline loader 与 seal 必须共享日维度锁，避免封档并发追加。"""
-    loader = Path("backend/crates/api/src/bin/wms_audit_baseline_load.rs").read_text(
-        encoding="utf-8",
+    loader_root = Path("backend/crates/api/src/bin/wms_audit_baseline_load.rs")
+    loader = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in [
+            loader_root,
+            *sorted(loader_root.with_suffix("").glob("*.rs")),
+        ]
     )
     audit = Path("backend/crates/api/src/audit/db.rs").read_text(encoding="utf-8")
 

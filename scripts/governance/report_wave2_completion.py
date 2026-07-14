@@ -61,6 +61,9 @@ BLOCKED_RUNTIME_REF_RE = re.compile(
 BUSINESS_SMOKE_PATH = "/api/v1/inventory/batches"
 BUSINESS_SMOKE_FLAG = "m3_inventory_batches_config_center_smoke"
 BUSINESS_SMOKE_FAIL_CLOSED_CODE = "M1_CONFIG_FLAG_MISSING"
+MISSING_RUNTIME_EVIDENCE = (
+    "缺少 docs/retros/wave-2-runtime-evidence.json 真实 dev/staging 配置中心灰度证据"
+)
 
 
 def contains_environment_token(value: str, environment: str) -> bool:
@@ -99,7 +102,23 @@ class EvidenceItem:
 
 def read_text(path: str) -> str:
     target = REPO_ROOT / path
-    return target.read_text(encoding="utf-8") if target.exists() else ""
+    if not target.is_file():
+        return ""
+    family = [target]
+    if target.suffix:
+        family.extend(sorted(target.parent.glob(f"{target.stem}_part*{target.suffix}")))
+        split_dir = target.parent / target.stem
+        if split_dir.is_dir():
+            family.extend(sorted(split_dir.rglob(f"*{target.suffix}")))
+    for source in family:
+        for include_path in re.findall(
+            r'include!\s*\(\s*"([^"]+)"\s*\)',
+            source.read_text(encoding="utf-8"),
+        ):
+            included = source.parent / include_path
+            if included.is_file() and included not in family:
+                family.append(included)
+    return "\n".join(item.read_text(encoding="utf-8") for item in family)
 
 
 def file_exists(path: str) -> bool:
@@ -203,7 +222,7 @@ def validate_wave2_runtime_payload(data: object) -> tuple[bool, str]:
 def valid_wave2_runtime_evidence() -> tuple[bool, str]:
     path = DEFAULT_RUNTIME_EVIDENCE
     if not path.exists():
-        return False, "缺少 docs/retros/wave-2-runtime-evidence.json 真实 dev/staging 配置中心灰度证据"
+        return False, MISSING_RUNTIME_EVIDENCE
 
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -370,6 +389,16 @@ def main(argv: list[str] | None = None) -> int:
     pre_release = [item for item in items if not item.strict_blocking and not item.complete]
     runtime_blocking = pre_release if args.require_runtime_evidence else []
     ok = not ((args.strict and blocking) or runtime_blocking)
+    runtime_missing = bool(runtime_blocking) and all(
+        MISSING_RUNTIME_EVIDENCE in item.gaps for item in runtime_blocking
+    )
+    status = (
+        "passed"
+        if ok
+        else "blocked"
+        if runtime_missing and not (args.strict and blocking)
+        else "failed"
+    )
 
     if args.json:
         print(json.dumps({
@@ -380,6 +409,7 @@ def main(argv: list[str] | None = None) -> int:
             "blocking_gaps": [asdict(item) for item in blocking],
             "pre_release_gates": [asdict(item) for item in pre_release],
             "runtime_blocking_gaps": [asdict(item) for item in runtime_blocking],
+            "status": status,
             "ok": ok,
         }, ensure_ascii=False, indent=2))
     else:

@@ -34,6 +34,7 @@ EXPECT_RE = re.compile(r"\.expect\s*\(")
 PANIC_RE = re.compile(r"\bpanic!\s*\(")
 TEST_ATTR_RE = re.compile(r"#\s*\[\s*(?:test|tokio::test|sqlx::test)\b")
 CFG_TEST_RE = re.compile(r"#\s*\[\s*cfg\s*\(\s*test\s*\)\s*\]")
+INCLUDE_RE = re.compile(r'include!\s*\(\s*"([^"]+)"\s*\)')
 
 
 @dataclass
@@ -141,9 +142,26 @@ def _is_test_file(path: str) -> bool:
     )
 
 
-def test_code_lines(text: str, *, path: str) -> set[int]:
+def _test_only_include_files(root: Path) -> set[Path]:
+    """识别只被 `#[cfg(test)] mod` 引入的拆分测试文件。"""
+    test_only: set[Path] = set()
+    test_module_re = re.compile(
+        r"#\s*\[\s*cfg\s*\(\s*test\s*\)\s*\]\s*"
+        r"mod\s+[A-Za-z_][A-Za-z0-9_]*\s*\{(?P<body>[\s\S]*?)\n\s*\}",
+    )
+    for source in sorted(root.rglob("*.rs")):
+        text = source.read_text(encoding="utf-8")
+        for module in test_module_re.finditer(text):
+            for include_path in INCLUDE_RE.findall(module.group("body")):
+                candidate = (source.parent / include_path).resolve()
+                if candidate.is_file():
+                    test_only.add(candidate)
+    return test_only
+
+
+def test_code_lines(text: str, *, path: str, test_only: bool = False) -> set[int]:
     lines = text.splitlines()
-    if _is_test_file(path):
+    if test_only or _is_test_file(path):
         return set(range(1, len(lines) + 1))
 
     test_lines: set[int] = set()
@@ -175,9 +193,11 @@ def test_code_lines(text: str, *, path: str) -> set[int]:
     return test_lines
 
 
-def find_unsafe_unwrap_issues(text: str, *, path: str) -> list[Issue]:
+def find_unsafe_unwrap_issues(
+    text: str, *, path: str, test_only: bool = False
+) -> list[Issue]:
     sanitized = strip_rust_comments_and_strings(text)
-    test_lines = test_code_lines(text, path=path)
+    test_lines = test_code_lines(text, path=path, test_only=test_only)
     issues: list[Issue] = []
     for lineno, line in enumerate(sanitized.splitlines(), start=1):
         if not line.strip():
@@ -217,11 +237,13 @@ def find_unsafe_unwrap_issues(text: str, *, path: str) -> list[Issue]:
 
 def scan_backend_crates(root: Path = BACKEND_CRATES) -> tuple[list[Issue], int]:
     issues: list[Issue] = []
+    test_only_files = _test_only_include_files(root)
     files = sorted(root.rglob("*.rs")) if root.exists() else []
     for rust_file in files:
         issues.extend(find_unsafe_unwrap_issues(
             rust_file.read_text(encoding="utf-8"),
             path=str(rust_file.relative_to(REPO_ROOT)),
+            test_only=rust_file.resolve() in test_only_files,
         ))
     return issues, len(files)
 

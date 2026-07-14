@@ -122,6 +122,31 @@ def suggest_page_config(page_id: str, title: str) -> dict[str, Any]:
             "core": ["keyword", "qualityStatus"],
             "more": ["recallFlag", "productionDate", "expiryDate", "createdAt"],
         }
+    if page_id == "mcg-numbering":
+        return {
+            "id": page_id,
+            "title": title,
+            "required": True,
+            "source": "apps/web-admin/src/pages/document-numbering/MCGDocumentNumberingPage.tsx",
+            "fieldConstant": "mcgDocumentNumberQueryFields",
+            "coreConstant": "mcgDocumentNumberCoreQueryFieldKeys",
+            "core": ["documentType"],
+            "more": [],
+        }
+    if page_id == "m9-billing-rules":
+        return {
+            "id": page_id,
+            "title": title,
+            "required": False,
+            "reason": "当前页面是新增计费规则配置表单，仅展示本次创建结果；真实历史查询接口完成后再升级为页面级 QueryPanel",
+        }
+    if page_id == "m10-route-plans":
+        return {
+            "id": page_id,
+            "title": title,
+            "required": False,
+            "reason": "当前页面是接收外部 TMS 路径规划结果的写入表单，不承担历史列表查询",
+        }
     if page_id.startswith("m4-"):
         return {
             "id": page_id,
@@ -191,9 +216,28 @@ def string_values(array_literal: str | None) -> set[str]:
 
 def field_keys(text: str, const_name: str) -> set[str]:
     block = extract_array_literal(text, const_name)
-    if not block:
+    keys = set(re.findall(r'key:\s*["\']([^"\']+)["\']', block or ""))
+    if keys:
+        return keys
+
+    # 页面字段可能由 useMemo 调用 builder 动态生成，例如单据类型来自 M1 字典。
+    # 继续解析 builder 的返回字段，避免治理脚本迫使页面退回硬编码数组。
+    declaration = re.search(
+        rf"\bconst\s+{re.escape(const_name)}\b(?P<body>.{{0,800}}?)=>\s*(?P<builder>[A-Za-z_$][\w$]*)\s*\(",
+        text,
+        re.DOTALL,
+    )
+    if not declaration:
         return set()
-    return set(re.findall(r'key:\s*["\']([^"\']+)["\']', block))
+    builder = declaration.group("builder")
+    builder_match = re.search(
+        rf"(?:export\s+)?function\s+{re.escape(builder)}\b.*?return\s*\[(?P<fields>.*?)\]\s*;",
+        text,
+        re.DOTALL,
+    )
+    if not builder_match:
+        return set()
+    return set(re.findall(r'key:\s*["\']([^"\']+)["\']', builder_match.group("fields")))
 
 
 def m2_status_scope_issues(page_text: str, table_text: str) -> list[str]:

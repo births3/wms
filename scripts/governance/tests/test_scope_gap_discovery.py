@@ -218,6 +218,17 @@ def test_scope_gap_module_filter_scans_requested_module_without_existing_matrix_
     assert result.gaps[0].kind == "unregistered_story_in_active_module"
 
 
+def test_scope_gap_navigation_reader_supports_split_app_shell_renderer():
+    from check_scope_gap_discovery import read_admin_navigation
+
+    navigation = read_admin_navigation()
+
+    assert "m1-products" in navigation.menu_sections
+    assert "m3-batches" in navigation.default_menu_tree
+    assert "m1-products" in navigation.routed_views
+    assert "m3-batches" in navigation.routed_views
+
+
 def test_scope_gap_accepts_deferred_story_with_reason():
     from check_scope_gap_discovery import scan_scope_gaps
 

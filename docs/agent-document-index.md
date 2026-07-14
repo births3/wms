@@ -34,6 +34,8 @@
 | [domain/user-stories-mdi-drug-inspection.md](domain/user-stories-mdi-drug-inspection.md) | M-DI 药检单 |
 | [domain/user-stories-mpm-parameter-mapping.md](domain/user-stories-mpm-parameter-mapping.md) | M-PM 参数映射 |
 | [domain/user-stories-h1-auth-tenant.md](domain/user-stories-h1-auth-tenant.md) | H1 权限与多租户 |
+| [h1-006-api-key-lifecycle-slice.md](h1-006-api-key-lifecycle-slice.md) | H1-006 API Key 生命周期实现与验收切片 |
+| [h1-006-api-key-lifecycle-web-design-plan.md](h1-006-api-key-lifecycle-web-design-plan.md) | H1-006 管理端页面字段、动作与证据设计 |
 | [domain/user-stories-h2-audit-trail.md](domain/user-stories-h2-audit-trail.md) | H2 审计追踪与事件总线 |
 | [domain/user-stories-h3-contract.md](domain/user-stories-h3-contract.md) | H3 跨端契约 |
 | [domain/user-stories-h4-wechat-notify.md](domain/user-stories-h4-wechat-notify.md) | H4 企业微信 |

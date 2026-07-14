@@ -109,8 +109,8 @@ PC Web 端按管理型后台方案承载 M4 出库作业：左侧全局菜单、
 
 | 页面 | 已对齐到页面的需求字段 | 当前接口限制 |
 |---|---|---|
-| M4 出库订单管理 | WMS 单号、ERP 单号、订单类型、客户 / 门店、要求交货日期、商品、批号、明细行数、计划数量、校验结果、状态、作废审批入口。 | 当前 PC 页使用本地页面状态；后续需补 M4 列表 / 详情 / 写操作 OpenAPI。 |
-| M4 波次规划 | 波次号、订单数、明细行数、件数、温区、路径策略、容量上限、库存锁定状态、下发 / 取消入口。 | 当前 PC 页使用本地页面状态；容量、路径和任务明细后续接波次算法接口。 |
+| M4 出库订单管理 | WMS 单号、ERP 单号、订单类型、客户 / 门店、要求交货日期、商品、批号、明细行数、计划数量、校验结果、状态、作废审批入口。 | 列表、刷新、新建、详情已接真实 API；校验、修改、作废和其他动作仍需后续接口。 |
+| M4 波次规划 | 波次号、订单数、明细行数、件数、温区、路径策略、容量上限、库存锁定状态、下发 / 取消入口。 | 列表、详情、刷新、新建波次已接真实 API，并在同一事务内锁定合格库存；容量路径规则、下发取消和任务明细仍需后续接口。 |
 | M4 复核发货 | 出库单号、客户 / 门店、复核模式、计划数量、短拣标识、配送方、包裹数量、车牌号、装车温度、签字、打印和发货交接入口。 | 当前 PC 页使用本地页面状态；复核扫码、打印、交接需后续补接口。 |
 | M4 采购退货出库 | 采购退货单号、原采购入库单、供应商、退货原因、商品、数量、审批记录、拣货记录、复核记录、出库交接。 | 当前 PC 页使用本地页面状态；采购退货出库已有 US-M4-012，仍需补接口契约。 |
 
@@ -130,10 +130,10 @@ PC Web 端按管理型后台方案承载 M4 出库作业：左侧全局菜单、
 | M4 出库订单管理 | 校验结果 | US-M4-001 | 已覆盖 | 已覆盖 | 重新校验已覆盖 | 待补校验接口 |
 | M4 出库订单管理 | 状态 | US-M4-001 | 已覆盖 | 已覆盖 | 不适用 | 待补 M4 API |
 | M4 出库订单管理 | 作废审批入口 | US-M4-001 | 已覆盖 | 已覆盖 | 已覆盖 | 待补审批接口 |
-| M4 波次规划 | 波次号 | US-M4-002 | 已覆盖 | 已覆盖 | 新建已覆盖 | 待补波次 API |
-| M4 波次规划 | 订单数 | US-M4-002 | 已覆盖 | 已覆盖 | 不适用 | 待补波次 API |
-| M4 波次规划 | 明细行数 | US-M4-002 | 已覆盖 | 已覆盖 | 不适用 | 待补波次 API |
-| M4 波次规划 | 件数 | US-M4-002 | 已覆盖 | 波次订单中覆盖 | 不适用 | 待补波次 API |
+| M4 波次规划 | 波次号 | US-M4-002 | 已覆盖 | 已覆盖 | 新建已覆盖 | `POST /api/v1/outbound/waves` 已覆盖 |
+| M4 波次规划 | 订单数 | US-M4-002 | 已覆盖 | 已覆盖 | 不适用 | `GET /api/v1/outbound/waves` 已覆盖 |
+| M4 波次规划 | 明细行数 | US-M4-002 | 已覆盖 | 波次订单中覆盖 | 不适用 | `GET /api/v1/outbound/waves/{wave_id}` 已覆盖 |
+| M4 波次规划 | 件数 | US-M4-002 | 已覆盖 | 波次订单中覆盖 | 不适用 | 列表/详情已覆盖；库存分配事务已覆盖 |
 | M4 波次规划 | 温区 | US-M4-002 | 已覆盖 | 已覆盖 | 已覆盖 | 待补波次规则接口 |
 | M4 波次规划 | 路径策略 | US-M4-002 / US-M4-010 | 已覆盖 | 已覆盖 | 已覆盖 | 待补路径策略接口 |
 | M4 波次规划 | 容量上限 | US-M4-002 | 已覆盖 | 已覆盖 | 已覆盖 | 待补容量规则接口 |
@@ -167,10 +167,10 @@ PC Web 端按管理型后台方案承载 M4 出库作业：左侧全局菜单、
 
 | 动作 | 需求来源 | 前端入口 | 弹窗 / 页面 | API / 契约 | 后端闭环 | 当前结论 |
 |---|---|---|---|---|---|---|
-| 新建出库单 | US-M4-001 | 已覆盖：订单页页头按钮 | 已覆盖：新建出库单弹窗 | 待补 M4 API | 缺失 | 前端可演示，待接后端 |
+| 新建出库单 | US-M4-001 | 已覆盖：订单页页头按钮 | 已覆盖：新建出库单弹窗 | `POST /api/v1/outbound/orders` | 已覆盖：单据类型校验、自动编号、幂等、审计 | 临时 PostgreSQL 浏览器 E2E 已验证并保存截图 |
 | 重新校验订单 | US-M4-001 | 已覆盖：订单行内按钮 | 已覆盖：重新校验弹窗 | 待补校验接口 | 缺失 | 前端可演示，待接后端 |
 | 作废申请 | US-M4-001 | 已覆盖：订单行内按钮 | 已覆盖：作废申请弹窗 | 待补审批接口 | 缺失 | 前端可演示，待接后端 |
-| 新建波次 | US-M4-002 | 已覆盖：波次页页头按钮 | 已覆盖：新建波次弹窗 | 待补波次 API | 缺失 | 前端可演示，待接后端 |
+| 新建波次 | US-M4-002 | 已覆盖：波次页页头按钮 | 已覆盖：新建波次弹窗 | `POST /api/v1/outbound/waves` | 已覆盖：确认订单校验、库存分配、入波次、幂等、审计 | 临时 PostgreSQL 浏览器 E2E 已验证并保存 `outbound-wave-created.png`；完整波次故事仍未关闭 |
 | 下发波次 | US-M4-002 | 已覆盖：波次行内按钮 | 已覆盖：下发弹窗 | 待补波次写接口 | 缺失 | 前端可演示，待接后端 |
 | 取消波次 | US-M4-002 | 已覆盖：波次行内按钮 | 已覆盖：取消弹窗 | 待补波次写接口 | 缺失 | 前端可演示，待接后端 |
 | 包装站复核 | US-M4-004 | 已覆盖：复核页行内按钮 | 已覆盖：复核弹窗 | 待补复核接口 | 缺失 | 前端可演示，待接后端 |
@@ -202,11 +202,11 @@ PC Web 端按管理型后台方案承载 M4 出库作业：左侧全局菜单、
 | 证据对象 | 需求来源 | 真实截图 | 动作验证 | 当前结论 |
 |---|---|---|---|---|
 | 出库订单首屏 | US-M4-001 | `artifacts/screenshot-portal/real-web/m4-outbound/m4-order-current.png` | 已有页面可达性验证 | 已覆盖 |
-| 出库订单详情弹窗 | US-M4-001 | `artifacts/screenshot-portal/real-web/m4-outbound/m4-order-detail-current.png` | 已有详情弹窗验证 | 已覆盖 |
-| 出库订单写操作弹窗 | US-M4-001 | 缺失 | 缺失 | 必须补 |
+| 出库订单详情弹窗 | US-M4-001 | `apps/web-admin/.e2e-artifacts/m4-real/screenshots/outbound-order-detail.png`；`artifacts/screenshot-portal/real-web/m4-outbound/m4-order-detail-current.png` | `prototypes/e2e/web-admin-m4-real.spec.ts` 已验证真实详情 API 与弹窗 | 已覆盖真实首个切片 |
+| 出库订单写操作弹窗 | US-M4-001 | `apps/web-admin/.e2e-artifacts/m4-real/screenshots/outbound-order-created.png` | `prototypes/e2e/web-admin-m4-real.spec.ts` 已验证真实 API 创建、单据类型和自动单号 | 已覆盖首个创建切片；其他写操作仍待补 |
 | 波次规划首屏 | US-M4-002 | `artifacts/screenshot-portal/real-web/m4-outbound/m4-wave-current.png` | 已有页面可达性验证 | 已覆盖 |
 | 波次详情弹窗 | US-M4-002 | `artifacts/screenshot-portal/real-web/m4-outbound/m4-wave-detail-current.png` | 已有详情弹窗验证 | 已覆盖 |
-| 波次写操作弹窗 | US-M4-002 | 缺失 | 缺失 | 必须补 |
+| 波次写操作弹窗 | US-M4-002 | `outbound-wave-created.png` | `prototypes/e2e/web-admin-m4-real.spec.ts` 已验证真实创建 API | 已覆盖新建波次首个切片；下发/取消仍待补 |
 | 复核发货首屏 | US-M4-004 / US-M4-006 | `artifacts/screenshot-portal/real-web/m4-outbound/m4-review-shipping-current.png` | 已有页面可达性验证 | 已覆盖 |
 | 复核发货弹窗 | US-M4-004 / US-M4-006 | `artifacts/screenshot-portal/real-web/m4-outbound/m4-review-shipping-dialog-current.png` | 已有基础验证 | 部分覆盖 |
 | 采购退货出库首屏 | US-M4-012 / C8 | `artifacts/screenshot-portal/real-web/m4-outbound/m4-purchase-return-current.png` | 已有页面可达性验证 | 已覆盖 |
@@ -220,6 +220,9 @@ M4 页面落地后，截图来源必须是 9002 端口运行的真实 `apps/web-
 |---|---|
 | 出库订单首屏 | `artifacts/screenshot-portal/real-web/m4-outbound/m4-order-current.png` |
 | 出库订单详情弹窗 | `artifacts/screenshot-portal/real-web/m4-outbound/m4-order-detail-current.png` |
+| 出库订单真实 API 详情弹窗 | `apps/web-admin/.e2e-artifacts/m4-real/screenshots/outbound-order-detail.png` |
+| 波次真实 API 创建列表 | `apps/web-admin/.e2e-artifacts/m4-real/screenshots/outbound-wave-created.png` |
+| 波次真实 API 详情弹窗 | `apps/web-admin/.e2e-artifacts/m4-real/screenshots/outbound-wave-detail.png` |
 | 波次规划首屏 | `artifacts/screenshot-portal/real-web/m4-outbound/m4-wave-current.png` |
 | 波次详情弹窗 | `artifacts/screenshot-portal/real-web/m4-outbound/m4-wave-detail-current.png` |
 | 复核发货首屏 | `artifacts/screenshot-portal/real-web/m4-outbound/m4-review-shipping-current.png` |

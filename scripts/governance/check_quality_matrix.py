@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections import Counter
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -32,6 +33,18 @@ STORY_GLOB = "docs/domain/user-stories-*.md"
 NAVIGATION_CHECK_SOURCES = {
     "pnpm --dir apps/web-admin run test:e2e:shell-dev": REPO_ROOT
     / "prototypes/e2e/web-admin-shell.spec.ts",
+    "node apps/web-admin/self-checks/h1-api-key-slice-self-check.mjs": REPO_ROOT
+    / "apps/web-admin/self-checks/h1-api-key-slice-self-check.mjs",
+    "node apps/web-admin/self-checks/m3-batch-management-slice-self-check.mjs": REPO_ROOT
+    / "apps/web-admin/self-checks/m3-batch-management-slice-self-check.mjs",
+    "node apps/web-admin/self-checks/m1-product-source-actions-self-check.mjs": REPO_ROOT
+    / "apps/web-admin/self-checks/m1-product-source-actions-self-check.mjs",
+    "node apps/web-admin/self-checks/m1-zone-real-api-self-check.mjs": REPO_ROOT
+    / "apps/web-admin/self-checks/m1-zone-real-api-self-check.mjs",
+    "node apps/web-admin/self-checks/m1-location-contract-self-check.mjs": REPO_ROOT
+    / "apps/web-admin/self-checks/m1-location-contract-self-check.mjs",
+    "node apps/web-admin/self-checks/m1-dock-management-navigation-self-check.mjs": REPO_ROOT
+    / "apps/web-admin/self-checks/m1-dock-management-navigation-self-check.mjs",
 }
 
 DIMENSIONS = (
@@ -54,6 +67,7 @@ ALLOWED_MODULES = {
     "M2",
     "M3",
     "M4",
+    "DOCK",
     "H1",
     "H2",
     "H3",
@@ -220,22 +234,28 @@ def check_story(story: dict[str, Any], *, story_files: set[str], openapi_paths: 
         if openapi_paths and operation not in openapi_paths:
             issues.append(Issue(story_id, "api", f"OpenAPI 缺少 operation: {operation}"))
 
-    navigation_checks = story.get("navigation_checks", [])
+    navigation_checks = story.get("navigation_checks")
+    if navigation_checks is None:
+        return issues
     if not isinstance(navigation_checks, list) or not all(
         isinstance(item, str) for item in navigation_checks
     ):
         issues.append(Issue(story_id, "evidence", "navigation_checks 必须是字符串数组"))
     else:
         frontend_pages = story.get("frontend_pages", [])
+        navigation_sources: list[str] = []
         for command in navigation_checks:
             source = NAVIGATION_CHECK_SOURCES.get(command)
             if source is None:
                 issues.append(Issue(story_id, "evidence", f"未登记的导航检查命令: {command}"))
                 continue
-            source_text = source.read_text(encoding="utf-8") if source.exists() else ""
-            for page in frontend_pages if isinstance(frontend_pages, list) else []:
-                if isinstance(page, str) and f'"{page}"' not in source_text:
-                    issues.append(Issue(story_id, "evidence", f"导航检查未覆盖页面: {page}"))
+            navigation_sources.append(source.read_text(encoding="utf-8") if source.exists() else "")
+        for page in frontend_pages if isinstance(frontend_pages, list) else []:
+            if isinstance(page, str) and not any(
+                f'"{page}"' in source_text or f"'{page}'" in source_text
+                for source_text in navigation_sources
+            ):
+                issues.append(Issue(story_id, "evidence", f"导航检查未覆盖页面: {page}"))
 
     return issues
 
@@ -306,7 +326,13 @@ def scan(*, complete_module: str | None = None) -> list[Issue]:
 
 
 def build_markdown(matrix: dict[str, Any]) -> str:
-    stories = matrix.get("stories", [])
+    stories = [story for story in matrix.get("stories", []) if isinstance(story, dict)]
+    deferred = [story for story in matrix.get("deferred_stories", []) if isinstance(story, dict)]
+    total = len(stories) + len(deferred)
+    completion_rate = (len(stories) / total * 100) if total else 0
+    module_counts = Counter(story.get("module", "-") for story in [*stories, *deferred])
+    completed_by_module = Counter(story.get("module", "-") for story in stories)
+    deferred_by_module = Counter(story.get("module", "-") for story in deferred)
     lines = [
         "# 全链路质量矩阵",
         "",
@@ -319,14 +345,70 @@ def build_markdown(matrix: dict[str, Any]) -> str:
         "- S2 测试层由故事类型自动推导。",
         "- 验收深度由故事类型自动推导：S1 查询/展示，S2 普通写操作，S3 库存/并发/关键路径/GSP，S4 PDA/硬件/外部系统/发布。",
         "",
-        "## 矩阵",
+        "## 状态摘要",
         "",
-        "| 故事 | 模块 | 验收层级 | 类型 | 测试层 | 前端 | API | 状态 |",
-        "|---|---|---|---|---|---|---|---|",
+        "| 指标 | 数量 |",
+        "|---|---:|",
+        f"| 故事总数 | {total} |",
+        f"| 已完成（已验证） | {len(stories)} |",
+        f"| 未完成 / 延期 | {len(deferred)} |",
+        f"| 完成率 | {completion_rate:.1f}% |",
+        "",
+        "> “已完成”表示故事已进入 `stories` 并通过矩阵维度门禁；延期故事中的局部代码、页面或测试切片不计入完成。",
+        "",
+        "## 模块进度",
+        "",
+        "| 模块 | 已完成 | 未完成 / 延期 | 总数 |",
+        "|---|---:|---:|---:|",
     ]
-    for story in stories if isinstance(stories, list) else []:
-        if not isinstance(story, dict):
-            continue
+    for module in sorted(module_counts):
+        lines.append(
+            f"| {module} | {completed_by_module[module]} | {deferred_by_module[module]} | {module_counts[module]} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## 已完成故事",
+            "",
+            "| 故事 | 模块 | 验收层级 |",
+            "|---|---|---|",
+        ]
+    )
+    for story in stories:
+        types = story.get("types", [])
+        lines.append(
+            f"| {story.get('id', '-')} {story.get('title', '-')} | {story.get('module', '-')} | "
+            f"{derive_acceptance_level(types) if isinstance(types, list) else '-'} |"
+        )
+    if deferred:
+        lines.extend(
+            [
+                "",
+                "## 未完成 / 延期故事",
+                "",
+                "| 故事 | 模块 | 当前原因 |",
+                "|---|---|---|",
+            ]
+        )
+        for story in deferred:
+            lines.append(
+                "| {id} {title} | {module} | {reason} |".format(
+                    id=story.get("id", "-"),
+                    title=story.get("title", "-"),
+                    module=story.get("module", "-"),
+                    reason=story.get("reason", "-"),
+                )
+            )
+    lines.extend(
+        [
+            "",
+            "## 验证故事详细矩阵",
+            "",
+            "| 故事 | 模块 | 验收层级 | 类型 | 测试层 | 前端 | API | 状态 |",
+            "|---|---|---|---|---|---|---|---|",
+        ]
+    )
+    for story in stories:
         types = story.get("types", [])
         layers = derive_required_layers(types) if isinstance(types, list) else []
         frontend_pages = "、".join(story.get("frontend_pages", [])) or "-"
@@ -348,26 +430,6 @@ def build_markdown(matrix: dict[str, Any]) -> str:
                 status="<br>".join(statuses),
             ),
         )
-    deferred = [story for story in matrix.get("deferred_stories", []) if isinstance(story, dict)]
-    if deferred:
-        lines.extend(
-            [
-                "",
-                "## 明确延期范围",
-                "",
-                "| 故事 | 模块 | 原因 |",
-                "|---|---|---|",
-            ]
-        )
-        for story in deferred:
-            lines.append(
-                "| {id} {title} | {module} | {reason} |".format(
-                    id=story.get("id", "-"),
-                    title=story.get("title", "-"),
-                    module=story.get("module", "-"),
-                    reason=story.get("reason", "-"),
-                )
-            )
     lines.append("")
     return "\n".join(lines)
 

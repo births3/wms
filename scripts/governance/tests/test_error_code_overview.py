@@ -20,7 +20,10 @@ def test_error_code_overview_matches_dictionary():
 def test_error_code_overview_drift_is_reported():
     entries, parse_errors = MODULE["parse_error_codes"]()
     text = Path("docs/error-codes.md").read_text(encoding="utf-8")
-    drifted = text.replace("| **合计** | **75** |", "| **合计** | **999** |")
+    drifted = text.replace(
+        f"| **合计** | **{len(entries)}** |",
+        "| **合计** | **999** |",
+    )
 
     assert not parse_errors
     assert MODULE["check_overview_counts"](entries, drifted)

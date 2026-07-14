@@ -8,6 +8,7 @@ import re
 import sys
 from pathlib import Path
 
+from _wave_evidence_validator import evidence_execution_status
 from report_wave1_completion import (
     REPO_ROOT,
     validate_h2_runtime_payload,
@@ -97,11 +98,23 @@ def main(argv: list[str] | None = None) -> int:
     results = []
     for kind, path in checks:
         ok, message = validate_one(kind, path, allow_example_refs=args.allow_example_refs)
-        results.append({"kind": kind, "path": str(path), "ok": ok, "message": message})
+        results.append({
+            "kind": kind,
+            "path": str(path),
+            "ok": ok,
+            "status": evidence_execution_status(ok, message),
+            "message": message,
+        })
 
     all_ok = all(result["ok"] for result in results)
+    statuses = {result["status"] for result in results}
+    status = "passed" if all_ok else ("failed" if "failed" in statuses else "blocked")
     if args.json:
-        print(json.dumps({"ok": all_ok, "results": results}, ensure_ascii=False, indent=2))
+        print(json.dumps({
+            "ok": all_ok,
+            "status": status,
+            "results": results,
+        }, ensure_ascii=False, indent=2))
     else:
         for result in results:
             mark = "✓" if result["ok"] else "✘"

@@ -1,37 +1,34 @@
 #!/usr/bin/env python3
-"""task_check.py — diff 触发的最小检查集调度（骨架）
+"""task_check.py — diff 触发的最小检查集调度
 
 类别：4. 流程治理
 Tier：作为入口，根据 git diff 与 governance/gate-rules.toml 决定跑哪些脚本
 
-详细规则：见 docs/adr/0003-governance-model.md §机制 4
+详细规则：见 ADR-0003 与 ADR-0037
 
 用法：
   python3 scripts/governance/task_check.py --tier T2
   python3 scripts/governance/task_check.py --tier T2 --base main
+  WMS_GOV_CONTEXT=pr WMS_GOV_BASE=origin/main python3 scripts/governance/task_check.py --tier T2
 
 退出码：
   0  通过
   1  有脚本失败
   2  脚本自身错误
 
-第 0 周阶段：
-- gate-rules.toml 是骨架（仅几条示例规则）
-- 大部分 check_* 脚本尚未实现，会跳过并提示
-- 只有依赖图引用的脚本才实际跑
-
 模式：
-- 默认（非 --strict）：未实现的脚本仅 print warning，exit_code=0（Wave 0 阶段需要）
-- --strict：未实现的脚本视为失败（Wave 1+ 进入 CI 时启用，强制脚本补齐）
-- 启用时机：进入 Wave 1 后在 lefthook pre-push / CI 中加 --strict 标志
+- 本地兼容模式下，未实现的脚本仅提示并跳过。
+- `--strict` 下未实现脚本记为 `error` 并阻塞，CI 必须使用该模式。
+- `--context` 与 Tier 正交；CI 可通过 `WMS_GOV_CONTEXT` 提供默认场景。
 """
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 
@@ -41,7 +38,13 @@ REPO_ROOT = SCRIPTS_DIR.parent.parent
 
 # 复用公共库
 sys.path.insert(0, str(SCRIPTS_DIR))
-from _diff import get_changed_files, load_gate_rules, match_rules  # noqa: E402
+from _diff import (  # noqa: E402
+    get_changed_files,
+    load_gate_rules,
+    match_rules,
+    metadata_for_check,
+    rules_for_execution,
+)
 
 
 @dataclass
@@ -50,6 +53,34 @@ class ScriptResult:
     matched_files: int
     exit_code: int
     duration_ms: int
+    rule_ids: list[str] = field(default_factory=list)
+    sources: list[str] = field(default_factory=list)
+    contexts: list[str] = field(default_factory=list)
+    status: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.status:
+            self.status = execution_status(self.exit_code)
+
+    def set_exit_code(self, exit_code: int) -> None:
+        self.exit_code = exit_code
+        self.status = execution_status(exit_code)
+
+
+def execution_status(exit_code: int, child_output: str = "") -> str:
+    """把通用脚本退出码映射到 G3 执行状态。"""
+    if exit_code == 0:
+        return "passed"
+    if child_output:
+        try:
+            reported = json.loads(child_output).get("status")
+        except (json.JSONDecodeError, AttributeError):
+            reported = None
+        if reported in {"failed", "error", "blocked"}:
+            return reported
+    if exit_code == 1:
+        return "failed"
+    return "error"
 
 
 # task_check --strict 时，这些脚本自身也必须以严格语义执行。
@@ -81,7 +112,11 @@ def run_one(check_name: str, json_mode: bool, *, strict_mode: bool = False) -> S
     )
     dur = int((time.perf_counter() - start) * 1000)
     return ScriptResult(
-        name=check_name, matched_files=0, exit_code=p.returncode, duration_ms=dur
+        name=check_name,
+        matched_files=0,
+        exit_code=p.returncode,
+        duration_ms=dur,
+        status=execution_status(p.returncode, p.stdout if json_mode else ""),
     )
 
 
@@ -109,7 +144,17 @@ def run_t1_fallback(json_mode: bool) -> ScriptResult:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--tier", default="T2", choices=["T1", "T2", "T3", "T4"])
-    parser.add_argument("--base", default="main", help="diff base ref，默认 main")
+    parser.add_argument(
+        "--base",
+        default=os.environ.get("WMS_GOV_BASE", "main"),
+        help="diff base ref；默认 main，可由 WMS_GOV_BASE 覆盖",
+    )
+    parser.add_argument(
+        "--context",
+        choices=["local", "pr", "main", "release", "runtime"],
+        default=os.environ.get("WMS_GOV_CONTEXT"),
+        help="执行场景；省略时保持兼容，不按场景过滤",
+    )
     parser.add_argument("--strict", action="store_true",
                         help="--strict 模式下，gate-rules.toml 引用的占位脚本视为失败（Wave 1+ 推荐启用）")
     parser.add_argument("--json", action="store_true")
@@ -119,8 +164,12 @@ def main(argv: list[str] | None = None) -> int:
     rules = load_gate_rules()
     changed = get_changed_files(base_ref=args.base, include_untracked=True)
 
-    # 按 Tier 过滤规则
-    rules_for_tier = [r for r in rules if r.tier == args.tier or r.tier == "any"]
+    # Tier 是成本预算，context 是执行场景；两者正交。
+    rules_for_tier = rules_for_execution(
+        rules,
+        tier=args.tier,
+        context=args.context,
+    )
     triggered = match_rules(changed, rules_for_tier)
     specific_rules = [rule for rule in rules_for_tier if rule.match != "**"]
     specifically_matched = {
@@ -143,6 +192,7 @@ def main(argv: list[str] | None = None) -> int:
             fallback = fallback_result
             payload = {
                 "tier": args.tier,
+                "context": args.context,
                 "base": args.base,
                 "changed": len(changed),
                 "triggered": [asdict(fallback)],
@@ -164,6 +214,7 @@ def main(argv: list[str] | None = None) -> int:
             fallback.matched_files = len(changed)
             payload = {
                 "tier": args.tier,
+                "context": args.context,
                 "base": args.base,
                 "changed": len(changed),
                 "triggered": [asdict(fallback)],
@@ -181,6 +232,7 @@ def main(argv: list[str] | None = None) -> int:
         if machine_output:
             print(json.dumps({
                 "tier": args.tier,
+                "context": args.context,
                 "base": args.base,
                 "changed": len(changed),
                 "triggered": [],
@@ -200,16 +252,21 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  · running {check_name}  (matched {len(files)} files)")
         r = run_one(check_name, json_mode=machine_output, strict_mode=args.strict)
         r.matched_files = len(files)
+        r.rule_ids, r.sources, r.contexts = metadata_for_check(
+            check_name,
+            files,
+            rules_for_tier,
+        )
         if r.exit_code == -1:
             # 脚本未实现：根据 --strict 决定是阻塞还是降级
             if args.strict:
                 if not machine_output:
                     print(f"    ✘ script not implemented yet: {check_name} (--strict 模式下视为失败)")
-                r.exit_code = 2
+                r.set_exit_code(2)
             else:
                 if not machine_output:
                     print(f"    ⚠ script not implemented yet: {check_name} (placeholder, 加 --strict 视为失败)")
-                r.exit_code = 0  # 默认降级（不阻塞 Wave 演进）
+                r.set_exit_code(0)  # 本地兼容模式降级，不用于 CI
         results.append(r)
 
     failed = [r for r in results if r.exit_code != 0]
@@ -217,6 +274,7 @@ def main(argv: list[str] | None = None) -> int:
     if machine_output:
         print(json.dumps({
             "tier": args.tier,
+            "context": args.context,
             "base": args.base,
             "changed": len(changed),
             "triggered": [asdict(r) for r in results],

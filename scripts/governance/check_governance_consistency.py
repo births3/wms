@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""check_governance_consistency.py — 治理文档与配置一致性元检查
+"""check_governance_consistency.py — 治理模型、文档与配置一致性元检查
 
 类别：1. 文档治理
 Tier：T1（< 10s）
-输入：docs/governance.md §4.6 表格 + governance/gate-rules.toml + justfile
+输入：docs/governance.md §4.6 + governance/gate-rules.toml + justfile
 输出：人类可读 + --json
 退出码：
   0  通过（§4.6 与 gate-rules.toml 中 Wave 计划脚本一致）
@@ -16,6 +16,7 @@ Tier：T1（< 10s）
   两处必须保持一致 — 此脚本守护这一约束。
 
 校验项：
+  0. ADR-0037 的 G1-G4、verdict、执行状态、context 和规则元数据完整
   1. §4.6 中提到的每个脚本，应在 gate-rules.toml 中出现
   2. gate-rules.toml 中的占位规则脚本，应在 §4.6 中出现
   3. 同一脚本在两处的 Tier 标注一致
@@ -32,6 +33,8 @@ import re
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
+
+from _diff import GateConfig, load_gate_config
 
 _THIS = Path(__file__).resolve()
 REPO_ROOT = _THIS.parent.parent.parent
@@ -58,6 +61,81 @@ class Issue:
 class RuleSpec:
     tier: str
     patterns: set[str]
+
+
+EXPECTED_LAYERS = ["G1", "G2", "G3", "G4"]
+EXPECTED_PRECEDENCE = [
+    "regulation",
+    "contract",
+    "confirmed_business_compliance",
+    "architecture_governance",
+    "implementation",
+]
+EXPECTED_VERDICTS = ["pass", "fail"]
+EXPECTED_EXECUTION_STATUSES = ["passed", "failed", "error", "blocked"]
+EXPECTED_CONTEXTS = ["local", "pr", "main", "release", "runtime"]
+EXPECTED_TIERS = {"T1", "T2", "T3", "T4"}
+RULE_ID_RE = re.compile(r"^GOV-[A-Z0-9-]+$")
+
+
+def governance_model_issues(config: GateConfig) -> list[Issue]:
+    """校验轻量控制链元数据，不重复校验具体业务规则。"""
+    model = config.model
+    issues: list[Issue] = []
+
+    if model.version != 1:
+        issues.append(Issue("model_version", "governance_model", "version 必须为 1"))
+
+    expected = [
+        ("model_layers", model.layers, EXPECTED_LAYERS),
+        ("model_precedence", model.decision_precedence, EXPECTED_PRECEDENCE),
+        ("model_verdicts", model.rule_verdicts, EXPECTED_VERDICTS),
+        (
+            "model_execution_statuses",
+            model.execution_statuses,
+            EXPECTED_EXECUTION_STATUSES,
+        ),
+        ("model_contexts", model.allowed_contexts, EXPECTED_CONTEXTS),
+    ]
+    for kind, actual, wanted in expected:
+        if actual != wanted:
+            issues.append(Issue(kind, "governance_model", f"期望 {wanted}，实际 {actual}"))
+
+    if set(model.tier_contexts) != EXPECTED_TIERS:
+        issues.append(Issue(
+            "model_tier_contexts",
+            "governance_model",
+            f"Tier 场景映射必须覆盖 {sorted(EXPECTED_TIERS)}",
+        ))
+    invalid_tier_contexts = {
+        context
+        for contexts in model.tier_contexts.values()
+        for context in contexts
+        if context not in model.allowed_contexts
+    }
+    if invalid_tier_contexts:
+        issues.append(Issue(
+            "model_tier_contexts",
+            "governance_model",
+            f"存在未知执行场景: {sorted(invalid_tier_contexts)}",
+        ))
+
+    if not model.default_source:
+        issues.append(Issue("model_source", "governance_model", "缺少默认决策来源"))
+    elif not (REPO_ROOT / model.default_source).is_file():
+        issues.append(Issue("model_source", "governance_model", "默认决策来源文件不存在"))
+
+    for rule in config.rules:
+        label = f"{rule.match}:{','.join(rule.checks)}"
+        if not rule.rule_ids or any(not RULE_ID_RE.fullmatch(item) for item in rule.rule_ids):
+            issues.append(Issue("rule_id", label, "rule_id 缺失或格式非法"))
+        if not rule.source:
+            issues.append(Issue("rule_source", label, "规则缺少决策来源"))
+        if not rule.contexts:
+            issues.append(Issue("rule_context", label, "规则缺少执行场景"))
+        elif any(context not in model.allowed_contexts for context in rule.contexts):
+            issues.append(Issue("rule_context", label, "规则使用未知执行场景"))
+    return issues
 
 
 TIER_ENTRYPOINT_RECIPES = {
@@ -156,6 +234,24 @@ def parse_doc_section() -> dict[str, str]:
     return {script: spec.tier for script, spec in parse_doc_rule_specs().items()}
 
 
+def non_diff_doc_script_issues(doc_text: str, just_text: str) -> list[Issue]:
+    """非 diff 的 T4 脚本不进 gate-rules，但必须真实存在且由 justfile 编排。"""
+    start = doc_text.find("### 4.6 Tier 启动 SOP")
+    end = doc_text.find("\n---", start)
+    section = doc_text[start:end] if start != -1 and end != -1 else ""
+    issues: list[Issue] = []
+    for line in section.splitlines():
+        if not TABLE_ROW_RE.match(line) or "非 diff 触发" not in line:
+            continue
+        for script in SCRIPT_RE.findall(line):
+            filename = f"{script}.py"
+            if not (REPO_ROOT / "scripts" / "governance" / filename).is_file():
+                issues.append(Issue("non_diff_script_missing", script, "§4.6 引用的 T4 脚本不存在"))
+            elif f"scripts/governance/{filename}" not in just_text:
+                issues.append(Issue("non_diff_script_unreachable", script, "T4 脚本未由 justfile 编排"))
+    return issues
+
+
 def parse_gate_rule_specs() -> dict[str, RuleSpec]:
     """从 gate-rules.toml 的 Wave 计划段解析 {check_name: RuleSpec}。"""
     if not GATE_RULES.exists():
@@ -200,7 +296,12 @@ def main(argv: list[str] | None = None) -> int:
     gate_scripts = {script: spec.tier for script, spec in gate_specs.items()}
 
     issues: list[Issue] = []
-    issues.extend(tier_entrypoint_issues(JUSTFILE.read_text(encoding="utf-8")))
+    just_text = JUSTFILE.read_text(encoding="utf-8")
+    governance_text = GOVERNANCE_MD.read_text(encoding="utf-8")
+    issues.extend(tier_entrypoint_issues(just_text))
+    issues.extend(non_diff_doc_script_issues(governance_text, just_text))
+    gate_config = load_gate_config(GATE_RULES)
+    issues.extend(governance_model_issues(gate_config))
 
     # 1. doc 中提到但 gate-rules 中没有
     for script, tier in doc_scripts.items():
@@ -244,6 +345,7 @@ def main(argv: list[str] | None = None) -> int:
             "check": "check_governance_consistency",
             "tier": "T1",
             "category": "文档治理",
+            "governance_model_version": gate_config.model.version,
             "doc_scripts": doc_scripts,
             "gate_rules_scripts": gate_scripts,
             "issues": [asdict(i) for i in issues],
@@ -251,7 +353,8 @@ def main(argv: list[str] | None = None) -> int:
         }
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
-        print(f"check_governance_consistency (T1, 文档治理)")
+        print("check_governance_consistency (T1, 文档治理)")
+        print(f"  · 轻量控制链模型: v{gate_config.model.version} / G1-G4")
         print(f"  · §4.6 列 {len(doc_scripts)} 个 diff-触发脚本")
         print(f"  · gate-rules.toml 列 {len(gate_scripts)} 个占位脚本")
         if not issues:

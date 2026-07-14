@@ -90,15 +90,16 @@ TIER_SCRIPTS: dict[str, list[str]] = {
         "check_prototype_navigation.py",
         "check_baseline_completeness.py",
         "check_e2e_matrix_completeness.py",
-        "check_page_size.py",
     ],
     "T2": [
         # T1 + diff 驱动（task_check.py）之外，T2 全量入口也要跑
         # 影响跨端契约的同步检查，避免非 diff 场景漏掉生成物漂移。
+        "check_deferred_story_evidence.py",
         "check_openapi_in_sync.py",
         "validate_openapi_artifacts.py",
         "check_openapi_contract.py",
         "check_prototype_review_signoff.py",
+        "check_page_size.py",
     ],
     "T3": [
         # Wave 3+ handler test coverage / idempotency / permission matrix

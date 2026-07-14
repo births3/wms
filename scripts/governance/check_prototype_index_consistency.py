@@ -33,7 +33,7 @@ FULL_MATRIX_SPECS_FILE = PROTO_DIR / "src" / "prototype-kit" / "full-matrix-spec
 
 VALID_PRIORITIES = {"P0", "P1", "P2", "P3", "P4"}
 VALID_ENDS = {"pda", "pc", "pad", "h5"}
-STORY_ID_RE = re.compile(r"^## (US-[A-Z0-9]+-\d{3}[a-z]?)")
+STORY_ID_RE = re.compile(r"^## (?:~~)?(US-[A-Z0-9]+-\d{3}[a-z]?)(?:~~)?")
 TAB_VALUE_RE = re.compile(r'\{\s*value:\s*"([a-z0-9-]+)"', re.MULTILINE)
 SPEC_SLUG_RE = re.compile(r'^\s*slug:\s*"([a-z0-9-]+)"', re.MULTILINE)
 MATRIX_ROW_RE = re.compile(r"^\|\s*(\d+)\s*\|\s*(US-[A-Z0-9]+-\d{3}[a-z]?)\s*\|")
@@ -61,7 +61,7 @@ def _collect_story_ids() -> set[str]:
     ids: set[str] = set()
     for f in DOMAIN_DIR.glob("user-stories-*.md"):
         for line in f.read_text(encoding="utf-8").splitlines():
-            if line.startswith("## ") and "~~" not in line:
+            if line.startswith("## "):
                 m = STORY_ID_RE.match(line)
                 if m:
                     ids.add(m.group(1))

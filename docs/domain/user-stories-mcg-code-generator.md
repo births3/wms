@@ -111,7 +111,14 @@
 - 已落 `document_number_rules`、`document_number_counters`、`document_number_allocations` 三张表。
 - 已提供内部 `PgDocumentNumberingService::generate_in_tx`，供业务模块在自身创建单据事务内申请单据号。
 - 已提供 `code-generator` 公开 API：规则列表、规则 upsert、规则启停、生成记录查询，并同步 OpenAPI / api-client。
-- PC 规则管理页、规则预览、审计展示、9002 真实截图、配置审批和 M2/M3/M4 创建单据接入仍按后续切片补齐。
+- 已补 PC 规则管理页、规则预览、生成记录列表、M-CG 三层菜单和 9002 开发 mock；单据类型由 M1 `document_type` 字典提供，真实 PostgreSQL API 和浏览器动作已产生截图证据。
+- M2 ASN 已在创建事务内自动取号；M4 出库订单已增加独立 `document_type` 字段，按 M1 字典校验并在同一事务内自动取号，已有 PostgreSQL 证据。
+- 已补 M4 PC 新建出库单真实 API 接入：空 WMS 单号由后端同事务生成，单据类型由 M1 字典校验，临时 PostgreSQL 数据库浏览器 E2E 已验证并保存截图。
+- 已补 M4 PC 出库订单列表和刷新真实 API，查询结果与创建后的自动单号可在同一真实页面回显。
+- 已补 M4 PC 出库订单详情真实 API，详情弹窗优先展示后端返回的完整单据数据，并保存真实截图。
+- 已补 M4 PC 新建波次真实 API：后端在同一事务内校验已确认订单、分配并锁定合格库存、更新订单入波次，同时写入幂等和审计；临时 PostgreSQL 浏览器 E2E 已验证并保存真实波次截图。
+- 已补 M4 PC 波次列表、刷新和详情真实 API，浏览器 E2E 已验证列表首次读取、刷新回显、详情响应并保存详情截图。
+- 配置审批、规则变更审计展示、M4 其他动作真实 API、M3/其他创建方接入及正式版全链路证据仍按后续切片补齐；这些缺口未完成前，不得将 US-CG-001 或 US-CG-002 作为正式版整体能力关闭。
 
 ### PDA 弹性
 
