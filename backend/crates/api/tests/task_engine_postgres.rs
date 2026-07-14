@@ -15,14 +15,23 @@ use wms_api::{
     },
     task_engine::{PgTaskEngineRepository, TaskEngineError},
     task_engine_handlers::{task_engine_router, TaskEngineAppState},
+    task_release_job,
+    task_type::PgTaskTypeRepository,
 };
 use wms_domain::{
-    CreateWarehouseTaskRequest, TaskGroupMemberQualification, TaskListQuery, TaskTransitionAction,
-    TransitionWarehouseTaskRequest, UpsertTaskGroupRequest, UpsertTaskPriorityRuleRequest,
+    CreateWarehouseTaskRequest, TaskGroupMemberQualification, TaskListQuery, TaskReleaseStrategy,
+    TaskTransitionAction, TransitionWarehouseTaskRequest, UpsertTaskGroupRequest,
+    UpsertTaskPriorityRuleRequest, UpsertTaskTypeRequest,
 };
 
 #[path = "task_engine_postgres/priority.rs"]
 mod priority;
+#[path = "task_engine_postgres/release.rs"]
+mod release;
+#[path = "task_engine_postgres/release_capacity.rs"]
+mod release_capacity;
+#[path = "task_engine_postgres/release_rule_change.rs"]
+mod release_rule_change;
 #[path = "task_engine_postgres/routes.rs"]
 mod routes;
 
@@ -156,6 +165,7 @@ fn create_request(warehouse_id: Uuid) -> CreateWarehouseTaskRequest {
         target_location_code: Some("PACK-01".to_string()),
         priority: None,
         urgent_order: false,
+        predecessor_task_id: None,
     }
 }
 
