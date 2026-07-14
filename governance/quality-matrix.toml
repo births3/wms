@@ -68,10 +68,10 @@ test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test 
 evidence_refs = ["backend/crates/api/tests/wave4_postgres.rs", "prototypes/e2e/web-admin-shell.spec.ts"]
 
 [evidence_profiles.SA]
-backend_files = ["backend/crates/api/src/stock_adjustment_handlers.rs", "backend/crates/api/src/stock_adjustment.rs"]
+backend_files = ["backend/crates/api/src/stock_adjustment_handlers.rs", "backend/crates/api/src/stock_adjustment.rs", "backend/crates/api/src/stock_adjustment/surplus.rs"]
 database_objects = ["stock_adjustment_orders", "stock_adjustment_execution_records", "stock_adjustment_erp_feedback_outbox", "inventory_batches", "inventory_movements", "audit_event", "idempotency_request"]
 test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test stock_adjustment_postgres -- --test-threads=1"]
-evidence_refs = ["backend/crates/api/tests/stock_adjustment_postgres.rs", "backend/migrations/202607150008_msa_stock_loss.sql", "shared/openapi/openapi.json"]
+evidence_refs = ["backend/crates/api/tests/stock_adjustment_postgres.rs", "backend/crates/api/tests/stock_adjustment_postgres/surplus.rs", "backend/migrations/202607150008_msa_stock_loss.sql", "backend/migrations/202607150009_msa_stock_surplus.sql", "shared/openapi/openapi.json"]
 
 [evidence_profiles.DOCK]
 backend_files = ["backend/crates/api/src/dock_handlers.rs", "backend/crates/api/src/dock_repository.rs"]
@@ -3145,7 +3145,7 @@ id = "US-SA-001"
 title = "报损单管理"
 module = "SA"
 story_file = "docs/domain/user-stories-msa-stock-adjustment.md"
-types = ["write", "api_change", "integration", "runtime_guard", "audit_compliance"]
+types = ["write", "api_change", "integration", "inventory_change", "concurrent_resource", "runtime_guard", "audit_compliance", "pda_runtime", "external_runtime"]
 api_paths = ["POST /api/v1/stock-adjustments/loss-orders", "GET /api/v1/stock-adjustments/loss-orders/{id}", "POST /api/v1/stock-adjustments/loss-orders/{id}/quality-approval", "POST /api/v1/stock-adjustments/loss-orders/{id}/start", "POST /api/v1/stock-adjustments/loss-orders/{id}/execute"]
 database_objects = ["stock_adjustment_orders", "stock_adjustment_execution_records", "stock_adjustment_erp_feedback_outbox", "inventory_batches", "inventory_movements", "dual_person_policy_rules", "h4_approval_records", "audit_event", "idempotency_request"]
 test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test stock_adjustment_postgres -- --test-threads=1", "just openapi-check"]
@@ -3167,9 +3167,25 @@ resume_when = "补齐 M-QL 审批实体与真实回调、ERP outbox worker/回�
 id = "US-SA-002"
 title = "报溢单管理"
 module = "SA"
-reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+story_file = "docs/domain/user-stories-msa-stock-adjustment.md"
+types = ["write", "api_change", "integration", "inventory_change", "concurrent_resource", "runtime_guard", "audit_compliance", "pda_runtime", "external_runtime"]
+api_paths = ["POST /api/v1/stock-adjustments/surplus-orders", "GET /api/v1/stock-adjustments/surplus-orders/{id}", "POST /api/v1/stock-adjustments/surplus-orders/{id}/quality-approval", "POST /api/v1/stock-adjustments/surplus-orders/{id}/start", "POST /api/v1/stock-adjustments/surplus-orders/{id}/execute"]
+database_objects = ["stock_adjustment_orders", "stock_adjustment_execution_records", "stock_adjustment_erp_feedback_outbox", "inventory_batches", "inventory_movements", "warehouse_locations", "warehouse_zones", "dual_person_policy_rules", "h4_approval_records", "audit_event", "idempotency_request"]
+test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test stock_adjustment_postgres -- --test-threads=1", "just openapi-check"]
+evidence_refs = [
+  "backend/migrations/202607150009_msa_stock_surplus.sql",
+  "backend/crates/domain/src/stock_adjustment.rs",
+  "backend/crates/api/src/stock_adjustment/surplus.rs",
+  "backend/crates/api/src/stock_adjustment/surplus/persistence.rs",
+  "backend/crates/api/src/inventory/stock_adjustment.rs",
+  "backend/crates/api/src/stock_adjustment_handlers.rs",
+  "backend/crates/api/tests/stock_adjustment_postgres/surplus.rs",
+  "shared/openapi/openapi.json",
+  "packages/api-client/src/schema.ts",
+]
+reason = "已完成报溢单手工/ERP 创建、M-CG 发号、ERP 外部单号并发去重、待审批/待执行/执行中/已完成主状态、质量联系单审批回写入口、报溢节点 M-VR 三档双人策略、两名保管员资格与 H4 主管审批门禁、M2 温区/色标/容量校验、M3 库存与库位容量原子增加、审计、幂等、权限、状态查询及 ERP 反馈 outbox，并通过 PostgreSQL 测试。仍缺 M-QL 联系单实体及企业微信真实审批回调、ERP outbox 投递/失败重试 worker 与真实 ERP 回执、PDA 扫码/离线同步和真机证据，故不得整体关闭。"
 owner = "SA 模块负责人"
-resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+resume_when = "补齐 M-QL 审批实体与真实回调、ERP outbox worker/回执、PDA 扫码离线链和真机证据后重新执行完整验收。"
 
 [[deferred_stories]]
 id = "US-SA-003"
@@ -3648,9 +3664,9 @@ id = "US-VR-006"
 title = "双人策略矩阵规则"
 module = "VR"
 story_file = "docs/domain/user-stories-mvr-validation-rules.md"
-types = ["read_only", "write", "api_change", "integration", "runtime_guard", "audit_compliance"]
+types = ["read_only", "write", "api_change", "integration", "runtime_guard", "audit_compliance", "pda_runtime"]
 frontend_pages = ["m1-system-dictionary"]
-api_paths = ["GET /api/v1/m-vr/dual-person-policy", "GET /api/v1/m-vr/dual-person-policy/rules", "PUT /api/v1/m-vr/dual-person-policy/rules", "POST /api/v1/stock-adjustments/loss-orders/{id}/execute"]
+api_paths = ["GET /api/v1/m-vr/dual-person-policy", "GET /api/v1/m-vr/dual-person-policy/rules", "PUT /api/v1/m-vr/dual-person-policy/rules", "POST /api/v1/stock-adjustments/loss-orders/{id}/execute", "POST /api/v1/stock-adjustments/surplus-orders/{id}/execute"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:mvr-real", "pnpm --dir apps/web-admin run test:e2e:m2-real", "pnpm --dir apps/web-admin run test:e2e:m4-real"]
 database_objects = ["system_dictionary_items", "dual_person_policy_rules", "receiving_inspection_signatures", "outbound_review_records", "stock_adjustment_execution_records", "h4_approval_records", "audit_event", "idempotency_request"]
 test_checks = [
@@ -3671,7 +3687,9 @@ evidence_refs = [
   "backend/crates/api/tests/m2_deferred_closeout_postgres.rs",
   "backend/crates/api/tests/wave4_postgres/review.rs",
   "backend/migrations/202607150008_msa_stock_loss.sql",
+  "backend/migrations/202607150009_msa_stock_surplus.sql",
   "backend/crates/api/src/stock_adjustment.rs",
+  "backend/crates/api/src/stock_adjustment/surplus.rs",
   "backend/crates/api/tests/stock_adjustment_postgres.rs",
   "apps/web-admin/src/pages/master-data/DualPersonPolicyMatrix.tsx",
   "apps/web-admin/src/features/validation-rules/dual-person-policy-queries.ts",
@@ -3683,6 +3701,6 @@ evidence_refs = [
   "apps/web-admin/.e2e-artifacts/m2-real/screenshots/inspection.png",
   "apps/web-admin/.e2e-artifacts/m4-real/screenshots/outbound-review-submitted.png",
 ]
-reason = "已完成 6 流程 12 节点、8 类默认模板、全局/货主/仓库优先级、双人确认、M1 字典双向同步、幂等、审计、权限、查询缓存与变更失效；PC 矩阵、M2 验收、M4 复核及 M-SA 报损/销毁执行已接入三档策略，规则/第二人/H4 审批证据可回查，并通过 PostgreSQL 与既有真实浏览器验证。仍缺 M-SA 报溢、M-QL 联动执行、正式环境 P95 指标，以及 ADR-0027 解禁后的 PDA 离线 24 小时缓存/恢复校验和真实 PDA 证据，故不得整体关闭。"
+reason = "已完成 6 流程 12 节点、8 类默认模板、全局/货主/仓库优先级、双人确认、M1 字典双向同步、幂等、审计、权限、查询缓存与变更失效；PC 矩阵、M2 验收、M4 复核及 M-SA 报损/报溢/销毁执行均已接入三档策略，规则/第二人/H4 审批证据可回查，并通过 PostgreSQL 与既有真实浏览器验证。仍缺 M-QL 联动执行、正式环境 P95 指标，以及 ADR-0027 解禁后的 PDA 离线 24 小时缓存/恢复校验和真实 PDA 证据，故不得整体关闭。"
 owner = "VR 模块负责人"
-resume_when = "补齐 M-SA 报溢与 M-QL 联动接线、正式环境 P95 证据，并在 ADR-0027 解禁后完成 PDA 离线缓存、恢复校验与真机证据。"
+resume_when = "补齐 M-QL 联动接线、正式环境 P95 证据，并在 ADR-0027 解禁后完成 PDA 离线缓存、恢复校验与真机证据。"

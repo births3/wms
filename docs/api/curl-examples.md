@@ -2451,6 +2451,72 @@ curl -sS \
   '{}'
 ```
 
+## POST /api/v1/stock-adjustments/surplus-orders
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/stock-adjustments/surplus-orders" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/stock-adjustments/surplus-orders/{id}
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/stock-adjustments/surplus-orders/<id>" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/stock-adjustments/surplus-orders/{id}/execute
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/stock-adjustments/surplus-orders/<id>/execute" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/stock-adjustments/surplus-orders/{id}/quality-approval
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/stock-adjustments/surplus-orders/<id>/quality-approval" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/stock-adjustments/surplus-orders/{id}/start
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/stock-adjustments/surplus-orders/<id>/start" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
 ## GET /api/v1/store/dashboard
 
 ```bash
