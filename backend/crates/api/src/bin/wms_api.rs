@@ -33,6 +33,7 @@ use wms_api::{
     master_data_handlers::{master_data_router, MasterDataAppState},
     parameter_mapping::{parameter_mapping_router, ParameterMappingAppState},
     print_template_handlers::{print_template_router, PrintTemplateAppState},
+    quality_liaison_handlers::{quality_liaison_router, QualityLiaisonAppState},
     reports_handlers::mount_reports,
     resilience::{resilience_middleware, resilience_status, ResilienceState},
     role_management::{role_management_router, RoleManagementState},
@@ -300,6 +301,9 @@ fn app(
         .merge(state_machine_router())
         .merge(stock_adjustment_router(
             StockAdjustmentAppState::with_postgres(shared_pool.clone()),
+        ))
+        .merge(quality_liaison_router(
+            QualityLiaisonAppState::with_postgres(shared_pool.clone()),
         ))
         .merge(document_numbering_router(document_numbering_state))
         .merge(print_template_router(print_template_state))

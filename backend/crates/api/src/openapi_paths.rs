@@ -99,6 +99,10 @@ pub use wms_domain::{
     UpdateDockAppointmentRequest, UpdateDockRequest,
 };
 pub use wms_domain::{
+    CreateQualityLiaisonRequest, QualityLiaisonApprovalCallbackRequest, QualityLiaisonOrder,
+    QualityLiaisonTypeConfig, UpsertQualityLiaisonTypeRequest,
+};
+pub use wms_domain::{
     CreateStockLossOrderRequest, CreateStockSurplusOrderRequest, ExecuteStockLossOrderRequest,
     ExecuteStockSurplusOrderRequest, StockAdjustmentSource, StockAdjustmentStatus, StockLossOrder,
     StockLossQualityApprovalRequest, StockLossReason, StockSurplusOrder,
@@ -152,6 +156,7 @@ mod dual_person_policy;
 mod extensions;
 mod inventory_count;
 mod maintenance;
+mod quality_liaison;
 mod stock_adjustment;
 mod task_engine;
 mod task_type;
@@ -166,6 +171,7 @@ pub(crate) use dual_person_policy::*;
 pub(crate) use extensions::*;
 pub(crate) use inventory_count::*;
 pub(crate) use maintenance::*;
+pub(crate) use quality_liaison::*;
 pub(crate) use stock_adjustment::*;
 pub(crate) use task_engine::*;
 pub(crate) use task_type::*;

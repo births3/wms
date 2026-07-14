@@ -49,6 +49,8 @@ pub mod packing_station;
 pub mod parameter_mapping;
 pub mod print_template;
 pub mod print_template_handlers;
+pub mod quality_liaison;
+pub mod quality_liaison_handlers;
 pub mod reports;
 pub mod reports_handlers;
 pub mod resilience;
