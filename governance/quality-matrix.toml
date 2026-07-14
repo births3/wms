@@ -3032,33 +3032,82 @@ resume_when = "该故事进入已批准实施波次，并具备前端、API、�
 id = "US-QL-001"
 title = "质量联系单类型与审批模板配置"
 module = "QL"
-reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+story_file = "docs/domain/user-stories-mql-quality-liaison.md"
+types = ["write", "api_change", "audit_compliance"]
+api_paths = ["PUT /api/v1/quality-liaisons/types/{type_code}"]
+database_objects = ["quality_liaison_types", "idempotency_request", "audit_event"]
+test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test quality_liaison_postgres -- --test-threads=1"]
+evidence_refs = [
+  "backend/crates/domain/src/quality_liaison.rs",
+  "backend/crates/api/src/quality_liaison.rs",
+  "backend/crates/api/src/quality_liaison_handlers.rs",
+  "backend/crates/api/tests/quality_liaison_postgres.rs",
+  "backend/migrations/202607150010_mql_quality_liaison.sql",
+]
+reason = "已实现货主级类型、指定审批人、H4 模板、超时时长、启停、权限、审计与幂等配置后端；仍缺预置类型及默认时长、按角色/按货主审批人规则、PC 配置页和超时提醒执行器，故不得整体关闭。"
 owner = "QL 模块负责人"
-resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+resume_when = "补齐预置类型、角色/货主审批规则、PC 配置页、超时提醒执行器及对应 E2E 证据。"
 
 [[deferred_stories]]
 id = "US-QL-002"
 title = "创建质量联系单"
 module = "QL"
-reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+story_file = "docs/domain/user-stories-mql-quality-liaison.md"
+types = ["read_only", "write", "api_change", "integration", "audit_compliance"]
+api_paths = ["POST /api/v1/quality-liaisons", "GET /api/v1/quality-liaisons/{id}"]
+database_objects = ["quality_liaison_orders", "quality_liaison_types", "h4_approval_records", "document_number_allocations", "idempotency_request", "audit_event"]
+test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test quality_liaison_postgres -- --test-threads=1"]
+evidence_refs = [
+  "backend/crates/domain/src/quality_liaison.rs",
+  "backend/crates/api/src/quality_liaison.rs",
+  "backend/crates/api/src/quality_liaison_handlers.rs",
+  "backend/crates/api/tests/quality_liaison_postgres.rs",
+  "backend/migrations/202607150010_mql_quality_liaison.sql",
+]
+reason = "已实现手工创建、M-CG 发号、H4 审批记录同事务创建、详情查询、货主隔离、权限、审计与幂等；仍缺 M-VR/M2/M3 自动触发、档案补录与召回专用字段校验、PC/PDA 入口及真实企业微信推送。"
 owner = "QL 模块负责人"
-resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+resume_when = "补齐各业务模块自动触发、特殊类型字段模型、PC/PDA 入口和企业微信真实推送证据。"
 
 [[deferred_stories]]
 id = "US-QL-003"
 title = "质量联系单审批"
 module = "QL"
-reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+story_file = "docs/domain/user-stories-mql-quality-liaison.md"
+types = ["write", "api_change", "integration", "audit_compliance"]
+api_paths = ["POST /api/v1/quality-liaisons/{id}/approval-callback"]
+database_objects = ["quality_liaison_orders", "h4_approval_records", "idempotency_request", "audit_event"]
+test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test quality_liaison_postgres -- --test-threads=1"]
+evidence_refs = [
+  "backend/crates/api/src/quality_liaison.rs",
+  "backend/crates/api/src/quality_liaison_handlers.rs",
+  "backend/crates/api/tests/quality_liaison_postgres.rs",
+]
+reason = "已实现指定审批人、同意/拒绝、必填意见、H4 与 M-QL 状态原子回写、审计和幂等；仍缺企业微信外部回调签名验真、真实通知送达、审批超时提醒、档案补录 ERP 子状态及外部联调证据。"
 owner = "QL 模块负责人"
-resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+resume_when = "补齐企业微信签名回调与真实送达、超时提醒、档案补录 ERP 子状态和外部联调证据。"
 
 [[deferred_stories]]
 id = "US-QL-004"
 title = "质量联系单与业务流程联动"
 module = "QL"
-reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+story_file = "docs/domain/user-stories-mql-quality-liaison.md"
+types = ["write", "api_change", "integration", "runtime_guard", "audit_compliance"]
+api_paths = ["POST /api/v1/quality-liaisons/{id}/approval-callback", "POST /api/v1/stock-adjustments/loss-orders/{id}/execute"]
+database_objects = ["quality_liaison_orders", "h4_approval_records", "stock_adjustment_orders", "stock_adjustment_execution_records", "audit_event", "idempotency_request"]
+test_checks = [
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test quality_liaison_postgres -- --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test stock_adjustment_postgres -- --test-threads=1",
+]
+evidence_refs = [
+  "backend/crates/api/src/quality_liaison/actions.rs",
+  "backend/crates/api/src/stock_adjustment/quality_liaison.rs",
+  "backend/crates/api/src/stock_adjustment.rs",
+  "backend/crates/api/tests/quality_liaison_postgres.rs",
+  "backend/crates/api/tests/stock_adjustment_postgres.rs",
+]
+reason = "已实现审批通过后同事务创建 M-SA 销毁报损单，并由 M-SA 执行链调用 M-VR 销毁节点双人/H4 策略；联动失败会回滚 H4 与 M-QL 状态。仍缺校验放行、验收不合格其他处置、养护异常、库存状态调整、档案补录 ERP 闭环和召回完整状态联动。"
 owner = "QL 模块负责人"
-resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+resume_when = "补齐其余处置动作、ERP 异步重试/回执、召回状态联动及对应端到端证据。"
 
 [[deferred_stories]]
 id = "US-QL-005"
@@ -3666,7 +3715,7 @@ module = "VR"
 story_file = "docs/domain/user-stories-mvr-validation-rules.md"
 types = ["read_only", "write", "api_change", "integration", "runtime_guard", "audit_compliance", "pda_runtime"]
 frontend_pages = ["m1-system-dictionary"]
-api_paths = ["GET /api/v1/m-vr/dual-person-policy", "GET /api/v1/m-vr/dual-person-policy/rules", "PUT /api/v1/m-vr/dual-person-policy/rules", "POST /api/v1/stock-adjustments/loss-orders/{id}/execute", "POST /api/v1/stock-adjustments/surplus-orders/{id}/execute"]
+api_paths = ["GET /api/v1/m-vr/dual-person-policy", "GET /api/v1/m-vr/dual-person-policy/rules", "PUT /api/v1/m-vr/dual-person-policy/rules", "POST /api/v1/quality-liaisons/{id}/approval-callback", "POST /api/v1/stock-adjustments/loss-orders/{id}/execute", "POST /api/v1/stock-adjustments/surplus-orders/{id}/execute"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:mvr-real", "pnpm --dir apps/web-admin run test:e2e:m2-real", "pnpm --dir apps/web-admin run test:e2e:m4-real"]
 database_objects = ["system_dictionary_items", "dual_person_policy_rules", "receiving_inspection_signatures", "outbound_review_records", "stock_adjustment_execution_records", "h4_approval_records", "audit_event", "idempotency_request"]
 test_checks = [
@@ -3691,6 +3740,10 @@ evidence_refs = [
   "backend/crates/api/src/stock_adjustment.rs",
   "backend/crates/api/src/stock_adjustment/surplus.rs",
   "backend/crates/api/tests/stock_adjustment_postgres.rs",
+  "backend/migrations/202607150010_mql_quality_liaison.sql",
+  "backend/crates/api/src/quality_liaison/actions.rs",
+  "backend/crates/api/src/stock_adjustment/quality_liaison.rs",
+  "backend/crates/api/tests/quality_liaison_postgres.rs",
   "apps/web-admin/src/pages/master-data/DualPersonPolicyMatrix.tsx",
   "apps/web-admin/src/features/validation-rules/dual-person-policy-queries.ts",
   "apps/web-admin/self-checks/mvr-dual-person-matrix-self-check.mjs",
@@ -3701,6 +3754,6 @@ evidence_refs = [
   "apps/web-admin/.e2e-artifacts/m2-real/screenshots/inspection.png",
   "apps/web-admin/.e2e-artifacts/m4-real/screenshots/outbound-review-submitted.png",
 ]
-reason = "已完成 6 流程 12 节点、8 类默认模板、全局/货主/仓库优先级、双人确认、M1 字典双向同步、幂等、审计、权限、查询缓存与变更失效；PC 矩阵、M2 验收、M4 复核及 M-SA 报损/报溢/销毁执行均已接入三档策略，规则/第二人/H4 审批证据可回查，并通过 PostgreSQL 与既有真实浏览器验证。仍缺 M-QL 联动执行、正式环境 P95 指标，以及 ADR-0027 解禁后的 PDA 离线 24 小时缓存/恢复校验和真实 PDA 证据，故不得整体关闭。"
+reason = "已完成 6 流程 12 节点、8 类默认模板、全局/货主/仓库优先级、双人确认、M1 字典双向同步、幂等、审计、权限、查询缓存与变更失效；PC 矩阵、M2 验收、M4 复核及 M-SA 报损/报溢/销毁执行均已接入三档策略，M-QL 审批通过可同事务创建销毁报损单并进入该执行链，规则/第二人/H4 审批证据可回查。仍缺正式环境 P95 指标，以及 ADR-0027 解禁后的 PDA 离线 24 小时缓存/恢复校验和真实 PDA 证据，故不得整体关闭。"
 owner = "VR 模块负责人"
-resume_when = "补齐 M-QL 联动接线、正式环境 P95 证据，并在 ADR-0027 解禁后完成 PDA 离线缓存、恢复校验与真机证据。"
+resume_when = "补齐正式环境 P95 证据，并在 ADR-0027 解禁后完成 PDA 离线缓存、恢复校验与真机证据。"

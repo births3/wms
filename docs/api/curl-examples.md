@@ -2263,6 +2263,58 @@ curl -sS \
   "Authorization: Bearer $WMS_TOKEN"
 ```
 
+## POST /api/v1/quality-liaisons
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/quality-liaisons" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## PUT /api/v1/quality-liaisons/types/{type_code}
+
+```bash
+curl -sS \
+  -X PUT \
+  "$WMS_API_BASE/api/v1/quality-liaisons/types/<type_code>" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/quality-liaisons/{id}
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/quality-liaisons/<id>" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/quality-liaisons/{id}/approval-callback
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/quality-liaisons/<id>/approval-callback" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
 ## POST /api/v1/reports/gsp/inbound-ledger
 
 ```bash
