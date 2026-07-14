@@ -12,6 +12,7 @@ use crate::{
 };
 
 mod persistence;
+pub(crate) mod quality_liaison;
 mod surplus;
 mod validation;
 
