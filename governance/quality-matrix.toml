@@ -3274,21 +3274,24 @@ governance = "verified"
 required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
 covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
 
-[[deferred_stories]]
+[[stories]]
 id = "US-TE-002"
 title = "任务组与人员资格"
 module = "TE"
+story_file = "docs/domain/user-stories-mte-task-engine.md"
 types = ["write", "config_rule", "frontend_interaction", "audit_compliance"]
 frontend_pages = ["mte-task-groups"]
 navigation_checks = ["node apps/web-admin/self-checks/mte-task-execution-slice-self-check.mjs"]
-e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:mte-real -- --grep '任务组和调度'"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:mte-real --grep '任务组和调度'"]
 api_paths = ["GET /api/v1/task-engine/task-groups", "GET /api/v1/task-engine/workers", "PUT /api/v1/task-engine/task-groups/{task_group_code}"]
 database_objects = ["task_groups", "task_group_memberships", "auth_user_owner_bindings", "audit_event", "idempotency_request"]
 test_checks = [
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test task_engine_postgres -- --test-threads=1",
+  "just openapi-check",
+  "python3 scripts/governance/check_error_codes.py",
   "node apps/web-admin/self-checks/mte-task-execution-slice-self-check.mjs",
   "pnpm --dir apps/web-admin exec tsc --noEmit",
-  "pnpm --dir apps/web-admin run test:e2e:mte-real -- --grep '任务组和调度'",
+  "pnpm --dir apps/web-admin run test:e2e:mte-real --grep '任务组和调度'",
 ]
 evidence_refs = [
   "backend/crates/domain/src/task_engine.rs",
@@ -3296,16 +3299,35 @@ evidence_refs = [
   "backend/crates/api/src/task_engine_handlers.rs",
   "backend/crates/api/tests/task_engine_postgres.rs",
   "backend/migrations/202607150003_mte_task_execution.sql",
+  "backend/migrations/202607150005_mte_worker_qualifications.sql",
   "apps/web-admin/src/pages/task-engine/TaskGroupConfigPage.tsx",
   "apps/web-admin/src/features/task-engine/task-engine-queries.ts",
   "apps/web-admin/self-checks/mte-task-execution-slice-self-check.mjs",
   "prototypes/e2e/web-admin-te-real.spec.ts",
   "prototypes/playwright-web-admin-mte-real-config.ts",
   "artifacts/screenshot-portal/real-web/m-te-task-execution/task-dispatched.png",
+  "shared/openapi/openapi.json",
+  "packages/api-client/src/schema.ts",
+  "docs/error-codes.md",
 ]
-reason = "已实现按仓库、库区、任务类型配置任务组和多成员资格，分派时强制同货主有效成员校验，配置写入审计且支持幂等，并以一次性 PostgreSQL 完成真实 PC 浏览器 E2E 与截图。仍缺资格证书有效期和到期自动移出，暂不标记完成。"
-owner = "TE 模块负责人"
-resume_when = "补资格证书有效期模型与到期移出任务组，并完成正式发布证据后复核。"
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
 
 [[deferred_stories]]
 id = "US-TE-003"
@@ -3347,14 +3369,14 @@ module = "TE"
 types = ["write", "frontend_interaction", "runtime_guard", "audit_compliance"]
 frontend_pages = ["mte-task-dispatch"]
 navigation_checks = ["node apps/web-admin/self-checks/mte-task-execution-slice-self-check.mjs"]
-e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:mte-real -- --grep '任务组和调度'"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:mte-real --grep '任务组和调度'"]
 api_paths = ["POST /api/v1/task-engine/tasks/{task_id}/transitions", "GET /api/v1/task-engine/tasks"]
 database_objects = ["warehouse_tasks", "task_groups", "task_group_memberships", "task_execution_events", "audit_event", "idempotency_request"]
 test_checks = [
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test task_engine_postgres -- --test-threads=1",
   "node apps/web-admin/self-checks/mte-task-execution-slice-self-check.mjs",
   "pnpm --dir apps/web-admin exec tsc --noEmit",
-  "pnpm --dir apps/web-admin run test:e2e:mte-real -- --grep '任务组和调度'",
+  "pnpm --dir apps/web-admin run test:e2e:mte-real --grep '任务组和调度'",
 ]
 evidence_refs = [
   "backend/crates/api/src/task_engine.rs",
@@ -3365,9 +3387,9 @@ evidence_refs = [
   "prototypes/e2e/web-admin-te-real.spec.ts",
   "artifacts/screenshot-portal/real-web/m-te-task-execution/task-dispatched.png",
 ]
-reason = "已实现手工分派、按资格与当前活跃负荷自动分派、改派、下发、召回，状态与分配事件原子写入，PC 调度页已通过一次性 PostgreSQL 真实浏览器 E2E，PDA 仅能查询本人任务。仍缺就近定位、最大并发容量、冷库证书等扩展权重与真实 PDA 推送证据。"
+reason = "已实现手工分派、按资格有效期、当前活跃负荷和最大并发容量自动分派，以及改派、下发、召回；状态与分配事件原子写入，PC 调度页已通过一次性 PostgreSQL 真实浏览器 E2E。仍缺就近定位、冷库技能匹配和真实 PDA 推送证据。"
 owner = "TE 模块负责人"
-resume_when = "定位、人员容量和证书模型可用后补齐自动分派权重，并完成真 PDA 推送与全链路发布证据。"
+resume_when = "定位和冷库技能模型可用后补齐自动分派权重，并完成真 PDA 推送与全链路发布证据。"
 
 [[deferred_stories]]
 id = "US-TE-006"
@@ -3411,14 +3433,14 @@ module = "TE"
 types = ["read_only", "frontend_interaction", "monitoring"]
 frontend_pages = ["mte-task-dispatch"]
 navigation_checks = ["node apps/web-admin/self-checks/mte-task-execution-slice-self-check.mjs"]
-e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:mte-real -- --grep '任务组和调度'"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:mte-real --grep '任务组和调度'"]
 api_paths = ["GET /api/v1/task-engine/tasks"]
 database_objects = ["warehouse_tasks"]
 test_checks = [
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test task_engine_postgres -- --test-threads=1",
   "node apps/web-admin/self-checks/mte-task-execution-slice-self-check.mjs",
   "pnpm --dir apps/web-admin exec tsc --noEmit",
-  "pnpm --dir apps/web-admin run test:e2e:mte-real -- --grep '任务组和调度'",
+  "pnpm --dir apps/web-admin run test:e2e:mte-real --grep '任务组和调度'",
 ]
 evidence_refs = [
   "apps/web-admin/src/pages/task-engine/TaskDispatchPage.tsx",
