@@ -1280,8 +1280,8 @@
           }
         },
         "security": [],
-        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。",
-        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。"
+        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。",
+        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。"
       }
     },
     "/api/v1/auth/logout": {
@@ -12280,6 +12280,370 @@
         }
       }
     },
+    "/api/v1/quality-liaisons": {
+      "post": {
+        "tags": [
+          "quality-liaison"
+        ],
+        "operationId": "create_quality_liaison",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateQualityLiaisonRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "质量联系单与 H4 审批记录已原子创建",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QualityLiaisonOrder"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "类型未启用或必填字段缺失",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/quality-liaisons/types/{type_code}": {
+      "put": {
+        "tags": [
+          "quality-liaison"
+        ],
+        "operationId": "upsert_quality_liaison_type",
+        "parameters": [
+          {
+            "name": "type_code",
+            "in": "path",
+            "description": "质量联系单类型编码",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertQualityLiaisonTypeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "类型与 H4 审批模板配置已保存",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QualityLiaisonTypeConfig"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "类型、审批人或超时时长非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/quality-liaisons/{id}": {
+      "get": {
+        "tags": [
+          "quality-liaison"
+        ],
+        "operationId": "get_quality_liaison",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "质量联系单 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "质量联系单详情与审批链路",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QualityLiaisonOrder"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "联系单不存在或不属于当前货主",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/quality-liaisons/{id}/approval-callback": {
+      "post": {
+        "tags": [
+          "quality-liaison"
+        ],
+        "operationId": "apply_quality_liaison_approval",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "质量联系单 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "企业微信审批回调幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QualityLiaisonApprovalCallbackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "H4 与质量联系单审批状态已原子回写",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QualityLiaisonOrder"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "非指定审批人",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "联系单不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "联系单已审批或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "审批结论或意见非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/reports/gsp/inbound-ledger": {
       "post": {
         "tags": [
@@ -18682,6 +19046,43 @@
           }
         }
       },
+      "CreateQualityLiaisonRequest": {
+        "type": "object",
+        "required": [
+          "type_code",
+          "related_document_type",
+          "related_document_no",
+          "problem_description",
+          "disposition_suggestion",
+          "trigger_source",
+          "business_payload"
+        ],
+        "properties": {
+          "business_payload": {
+            "type": "object",
+            "description": "自由结构 JSON 对象。",
+            "additionalProperties": true
+          },
+          "disposition_suggestion": {
+            "type": "string"
+          },
+          "problem_description": {
+            "type": "string"
+          },
+          "related_document_no": {
+            "type": "string"
+          },
+          "related_document_type": {
+            "type": "string"
+          },
+          "trigger_source": {
+            "type": "string"
+          },
+          "type_code": {
+            "type": "string"
+          }
+        }
+      },
       "CreateReceivingOrderRequest": {
         "type": "object",
         "required": [
@@ -23699,6 +24100,177 @@
           }
         }
       },
+      "QualityLiaisonApprovalCallbackRequest": {
+        "type": "object",
+        "required": [
+          "conclusion",
+          "opinion",
+          "external_approval_id"
+        ],
+        "properties": {
+          "conclusion": {
+            "type": "string"
+          },
+          "external_approval_id": {
+            "type": "string"
+          },
+          "opinion": {
+            "type": "string"
+          }
+        }
+      },
+      "QualityLiaisonOrder": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "liaison_no",
+          "type_code",
+          "related_document_type",
+          "related_document_no",
+          "problem_description",
+          "disposition_suggestion",
+          "trigger_source",
+          "business_payload",
+          "status",
+          "created_by",
+          "created_at",
+          "updated_at",
+          "version"
+        ],
+        "properties": {
+          "approval_opinion": {
+            "type": "string",
+            "nullable": true
+          },
+          "approval_record_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "approved_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "approved_by": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "business_payload": {
+            "type": "object",
+            "description": "自由结构 JSON 对象。",
+            "additionalProperties": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "created_by": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "disposition_suggestion": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "liaison_no": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "problem_description": {
+            "type": "string"
+          },
+          "related_document_no": {
+            "type": "string"
+          },
+          "related_document_type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "trigger_source": {
+            "type": "string"
+          },
+          "type_code": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "QualityLiaisonTypeConfig": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "type_code",
+          "type_name",
+          "approval_template_id",
+          "approver_user_id",
+          "timeout_seconds",
+          "enabled",
+          "created_at",
+          "updated_at",
+          "version"
+        ],
+        "properties": {
+          "approval_template_id": {
+            "type": "string"
+          },
+          "approver_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "type_code": {
+            "type": "string"
+          },
+          "type_name": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "ReceiveReceivingOrderRequest": {
         "type": "object",
         "required": [
@@ -27279,6 +27851,39 @@
           }
         }
       },
+      "UpsertQualityLiaisonTypeRequest": {
+        "type": "object",
+        "required": [
+          "type_code",
+          "type_name",
+          "approval_template_id",
+          "approver_user_id",
+          "timeout_seconds",
+          "enabled"
+        ],
+        "properties": {
+          "approval_template_id": {
+            "type": "string"
+          },
+          "approver_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "type_code": {
+            "type": "string"
+          },
+          "type_name": {
+            "type": "string"
+          }
+        }
+      },
       "UpsertSystemDictionaryItemRequest": {
         "type": "object",
         "required": [
@@ -27939,6 +28544,10 @@
     {
       "name": "stock-adjustment",
       "description": "M-SA 报损报溢"
+    },
+    {
+      "name": "quality-liaison",
+      "description": "M-QL 质量联系单与审批联动"
     },
     {
       "name": "express",

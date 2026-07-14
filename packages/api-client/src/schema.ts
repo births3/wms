@@ -2324,6 +2324,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/quality-liaisons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create_quality_liaison"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/quality-liaisons/types/{type_code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["upsert_quality_liaison_type"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/quality-liaisons/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_quality_liaison"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/quality-liaisons/{id}/approval-callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["apply_quality_liaison_approval"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/gsp/inbound-ledger": {
         parameters: {
             query?: never;
@@ -3862,6 +3926,18 @@ export interface components {
             product_name: string;
             spec?: string | null;
             special_drug_category_code?: string | null;
+        };
+        CreateQualityLiaisonRequest: {
+            /** @description 自由结构 JSON 对象。 */
+            business_payload: {
+                [key: string]: unknown;
+            };
+            disposition_suggestion: string;
+            problem_description: string;
+            related_document_no: string;
+            related_document_type: string;
+            trigger_source: string;
+            type_code: string;
         };
         CreateReceivingOrderRequest: {
             document_type: string;
@@ -5462,6 +5538,64 @@ export interface components {
             qty: number;
             quality_status: string;
         };
+        QualityLiaisonApprovalCallbackRequest: {
+            conclusion: string;
+            external_approval_id: string;
+            opinion: string;
+        };
+        QualityLiaisonOrder: {
+            approval_opinion?: string | null;
+            /** Format: uuid */
+            approval_record_id?: string | null;
+            /** Format: date-time */
+            approved_at?: string | null;
+            /** Format: uuid */
+            approved_by?: string | null;
+            /** @description 自由结构 JSON 对象。 */
+            business_payload: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            created_by: string;
+            disposition_suggestion: string;
+            /** Format: uuid */
+            id: string;
+            liaison_no: string;
+            /** Format: uuid */
+            owner_id: string;
+            problem_description: string;
+            related_document_no: string;
+            related_document_type: string;
+            status: string;
+            trigger_source: string;
+            type_code: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: int64 */
+            version: number;
+        };
+        QualityLiaisonTypeConfig: {
+            approval_template_id: string;
+            /** Format: uuid */
+            approver_user_id: string;
+            /** Format: date-time */
+            created_at: string;
+            enabled: boolean;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: int32 */
+            timeout_seconds: number;
+            type_code: string;
+            type_name: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: int64 */
+            version: number;
+        };
         ReceiveReceivingOrderRequest: {
             /** Format: int64 */
             actual_qty: number;
@@ -6573,6 +6707,16 @@ export interface components {
             enabled: boolean;
             /** Format: uuid */
             owner_id?: string | null;
+        };
+        UpsertQualityLiaisonTypeRequest: {
+            approval_template_id: string;
+            /** Format: uuid */
+            approver_user_id: string;
+            enabled: boolean;
+            /** Format: int32 */
+            timeout_seconds: number;
+            type_code: string;
+            type_name: string;
         };
         UpsertSystemDictionaryItemRequest: {
             /** Format: date-time */
@@ -15805,6 +15949,287 @@ export interface operations {
             };
             /** @description 权限不足 */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_quality_liaison: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateQualityLiaisonRequest"];
+            };
+        };
+        responses: {
+            /** @description 质量联系单与 H4 审批记录已原子创建 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QualityLiaisonOrder"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 类型未启用或必填字段缺失 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    upsert_quality_liaison_type: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 质量联系单类型编码 */
+                type_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertQualityLiaisonTypeRequest"];
+            };
+        };
+        responses: {
+            /** @description 类型与 H4 审批模板配置已保存 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QualityLiaisonTypeConfig"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 类型、审批人或超时时长非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_quality_liaison: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 质量联系单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 质量联系单详情与审批链路 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QualityLiaisonOrder"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 联系单不存在或不属于当前货主 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    apply_quality_liaison_approval: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 企业微信审批回调幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 质量联系单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QualityLiaisonApprovalCallbackRequest"];
+            };
+        };
+        responses: {
+            /** @description H4 与质量联系单审批状态已原子回写 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QualityLiaisonOrder"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 非指定审批人 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 联系单不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 联系单已审批或幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 审批结论或意见非法 */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
