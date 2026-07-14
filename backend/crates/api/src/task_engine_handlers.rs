@@ -105,6 +105,16 @@ impl IntoResponse for TaskEngineHandlerError {
                 "M_TE_WORKER_NOT_QUALIFIED",
                 "人员不具备该任务组资格",
             ),
+            Self::TaskEngine(TaskEngineError::WorkerQualificationExpired) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M_TE_CERT_EXPIRED",
+                "人员任务资格已过期",
+            ),
+            Self::TaskEngine(TaskEngineError::WorkerAtCapacity) => (
+                StatusCode::CONFLICT,
+                "M_TE_WORKER_AT_CAPACITY",
+                "人员同时在手任务已达上限",
+            ),
             Self::TaskEngine(TaskEngineError::NoAvailableWorker) => (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "M_TE_NO_AVAILABLE_WORKER",

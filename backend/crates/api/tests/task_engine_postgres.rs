@@ -4,7 +4,7 @@ use axum::{
     body::{to_bytes, Body},
     http::{header::AUTHORIZATION, Request, StatusCode},
 };
-use chrono::Utc;
+use chrono::{Duration, Utc};
 use sqlx::PgPool;
 use tower::ServiceExt;
 use uuid::Uuid;
@@ -17,7 +17,7 @@ use wms_api::{
     task_engine_handlers::{task_engine_router, TaskEngineAppState},
 };
 use wms_domain::{
-    CreateWarehouseTaskRequest, TaskListQuery, TaskTransitionAction,
+    CreateWarehouseTaskRequest, TaskGroupMemberQualification, TaskListQuery, TaskTransitionAction,
     TransitionWarehouseTaskRequest, UpsertTaskGroupRequest,
 };
 
@@ -199,6 +199,7 @@ async fn task_main_chain_enforces_qualification_state_machine_and_idempotency(po
                 zone_ids: vec![],
                 task_type_codes: vec!["pick".to_string()],
                 member_user_ids: vec![worker_id],
+                member_qualifications: vec![],
                 enabled: true,
             },
             now,
@@ -421,6 +422,7 @@ async fn automatic_assignment_uses_qualified_least_loaded_worker(pool: PgPool) {
                 zone_ids: vec![],
                 task_type_codes: vec!["pick".to_string()],
                 member_user_ids: vec![busy_worker_id, idle_worker_id],
+                member_qualifications: vec![],
                 enabled: true,
             },
             Utc::now(),
@@ -478,6 +480,149 @@ async fn automatic_assignment_uses_qualified_least_loaded_worker(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn assignment_rejects_expired_or_full_worker_qualification(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    seed_owner(&pool, owner_id).await;
+    let warehouse_id = seed_warehouse(&pool, owner_id).await;
+    let manager_id = Uuid::new_v4();
+    let expired_worker_id = Uuid::new_v4();
+    let full_worker_id = Uuid::new_v4();
+    seed_user(&pool, owner_id, manager_id, "资格主管").await;
+    seed_user(&pool, owner_id, expired_worker_id, "资格过期人员").await;
+    seed_user(&pool, owner_id, full_worker_id, "满负荷人员").await;
+    let repository = PgTaskEngineRepository::new(pool);
+    let manager = ctx(owner_id, manager_id);
+    let now = Utc::now();
+
+    repository
+        .upsert_task_group(
+            &manager,
+            "pick-a",
+            UpsertTaskGroupRequest {
+                task_group_name: "资格与容量组".to_string(),
+                warehouse_id,
+                zone_ids: vec![],
+                task_type_codes: vec!["pick".to_string()],
+                member_user_ids: vec![expired_worker_id, full_worker_id],
+                member_qualifications: vec![
+                    TaskGroupMemberQualification {
+                        user_id: expired_worker_id,
+                        valid_until: Some(now - Duration::minutes(1)),
+                        max_active_tasks: None,
+                    },
+                    TaskGroupMemberQualification {
+                        user_id: full_worker_id,
+                        valid_until: Some(now + Duration::hours(1)),
+                        max_active_tasks: Some(1),
+                    },
+                ],
+                enabled: true,
+            },
+            now,
+            "mte-qualified-capacity-group",
+        )
+        .await
+        .expect("qualification settings should persist");
+
+    let first = repository
+        .create_task(
+            &manager,
+            create_request(warehouse_id),
+            now,
+            "mte-qualified-capacity-first",
+        )
+        .await
+        .expect("first task should create")
+        .value;
+    let expired = repository
+        .transition_task(
+            &manager,
+            first.id,
+            TransitionWarehouseTaskRequest {
+                assignee_user_id: Some(expired_worker_id),
+                ..transition(TaskTransitionAction::Assign)
+            },
+            now,
+            "mte-qualified-capacity-expired",
+        )
+        .await
+        .expect_err("expired qualification must be rejected");
+    assert_eq!(expired, TaskEngineError::WorkerQualificationExpired);
+    let mut second_request = create_request(warehouse_id);
+    second_request.source_doc_id = Some(Uuid::new_v4());
+    second_request.source_doc_no = "SO-MTE-CAPACITY-002".to_string();
+    second_request.source_task_key = "M4:SO-MTE-CAPACITY-002:1:pick".to_string();
+    let second = repository
+        .create_task(
+            &manager,
+            second_request,
+            now,
+            "mte-qualified-capacity-second",
+        )
+        .await
+        .expect("second task should create")
+        .value;
+    let assign_first = repository.transition_task(
+        &manager,
+        first.id,
+        TransitionWarehouseTaskRequest {
+            assignee_user_id: Some(full_worker_id),
+            ..transition(TaskTransitionAction::Assign)
+        },
+        now,
+        "mte-qualified-capacity-fill-first",
+    );
+    let assign_second = repository.transition_task(
+        &manager,
+        second.id,
+        TransitionWarehouseTaskRequest {
+            assignee_user_id: Some(full_worker_id),
+            ..transition(TaskTransitionAction::Assign)
+        },
+        now,
+        "mte-qualified-capacity-fill-second",
+    );
+    let (first_result, second_result) = tokio::join!(assign_first, assign_second);
+    let results = [first_result, second_result];
+    assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 1);
+    assert_eq!(
+        results
+            .iter()
+            .filter(|result| matches!(result, Err(TaskEngineError::WorkerAtCapacity)))
+            .count(),
+        1,
+        "concurrent assignments must not exceed worker capacity"
+    );
+
+    let mut third_request = create_request(warehouse_id);
+    third_request.source_doc_id = Some(Uuid::new_v4());
+    third_request.source_doc_no = "SO-MTE-CAPACITY-003".to_string();
+    third_request.source_task_key = "M4:SO-MTE-CAPACITY-003:1:pick".to_string();
+    let third = repository
+        .create_task(&manager, third_request, now, "mte-qualified-capacity-third")
+        .await
+        .expect("third task should create")
+        .value;
+    let unavailable = repository
+        .transition_task(
+            &manager,
+            third.id,
+            transition(TaskTransitionAction::Assign),
+            now,
+            "mte-qualified-capacity-auto",
+        )
+        .await
+        .expect_err("expired and full workers must not be auto-assigned");
+    assert_eq!(unavailable, TaskEngineError::NoAvailableWorker);
+
+    let visible_groups = repository
+        .list_task_groups(&manager)
+        .await
+        .expect("task groups should query");
+    assert_eq!(visible_groups[0].member_user_ids, vec![full_worker_id]);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn task_routes_require_idempotency_and_expose_worker_queue(pool: PgPool) {
     let owner_id = Uuid::new_v4();
     seed_owner(&pool, owner_id).await;
@@ -497,6 +642,7 @@ async fn task_routes_require_idempotency_and_expose_worker_queue(pool: PgPool) {
                 zone_ids: vec![],
                 task_type_codes: vec!["pick".to_string()],
                 member_user_ids: vec![worker_id],
+                member_qualifications: vec![],
                 enabled: true,
             },
             Utc::now(),

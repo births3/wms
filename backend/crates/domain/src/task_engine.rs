@@ -24,10 +24,18 @@ pub struct TaskGroup {
     pub zone_ids: Vec<Uuid>,
     pub task_type_codes: Vec<String>,
     pub member_user_ids: Vec<Uuid>,
+    pub member_qualifications: Vec<TaskGroupMemberQualification>,
     pub enabled: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub version: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+pub struct TaskGroupMemberQualification {
+    pub user_id: Uuid,
+    pub valid_until: Option<DateTime<Utc>>,
+    pub max_active_tasks: Option<i32>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
@@ -39,6 +47,8 @@ pub struct UpsertTaskGroupRequest {
     pub task_type_codes: Vec<String>,
     #[serde(default)]
     pub member_user_ids: Vec<Uuid>,
+    #[serde(default)]
+    pub member_qualifications: Vec<TaskGroupMemberQualification>,
     pub enabled: bool,
 }
 

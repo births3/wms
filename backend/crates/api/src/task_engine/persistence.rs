@@ -21,6 +21,22 @@ fn normalize_group_request(
     request.zone_ids.dedup();
     request.member_user_ids.sort();
     request.member_user_ids.dedup();
+    request
+        .member_qualifications
+        .sort_by_key(|qualification| qualification.user_id);
+    if request
+        .member_qualifications
+        .windows(2)
+        .any(|pair| pair[0].user_id == pair[1].user_id)
+        || request.member_qualifications.iter().any(|qualification| {
+            !request.member_user_ids.contains(&qualification.user_id)
+                || qualification.max_active_tasks.is_some_and(|value| value <= 0)
+        })
+    {
+        return Err(TaskEngineError::Validation(
+            "member qualification is invalid".to_string(),
+        ));
+    }
     Ok(request)
 }
 
@@ -124,7 +140,19 @@ async fn load_task_group_for_update(
                task_group.task_group_name, task_group.warehouse_id, task_group.zone_ids,
                task_group.task_type_codes,
                COALESCE(array_agg(membership.user_id ORDER BY membership.user_id)
-                   FILTER (WHERE membership.user_id IS NOT NULL), '{}') AS member_user_ids,
+                   FILTER (WHERE membership.user_id IS NOT NULL AND
+                       (membership.qualification_valid_until IS NULL OR
+                        membership.qualification_valid_until > now())), '{}') AS member_user_ids,
+               COALESCE(array_agg(membership.qualification_valid_until ORDER BY membership.user_id)
+                   FILTER (WHERE membership.user_id IS NOT NULL AND
+                       (membership.qualification_valid_until IS NULL OR
+                        membership.qualification_valid_until > now())), '{}')
+                   AS member_qualification_valid_until,
+               COALESCE(array_agg(membership.max_active_tasks ORDER BY membership.user_id)
+                   FILTER (WHERE membership.user_id IS NOT NULL AND
+                       (membership.qualification_valid_until IS NULL OR
+                        membership.qualification_valid_until > now())), '{}')
+                   AS member_max_active_tasks,
                task_group.enabled, task_group.created_at, task_group.updated_at, task_group.version
           FROM task_groups task_group
           LEFT JOIN task_group_memberships membership ON membership.task_group_id = task_group.id
@@ -150,7 +178,19 @@ async fn load_task_group(
                task_group.task_group_name, task_group.warehouse_id, task_group.zone_ids,
                task_group.task_type_codes,
                COALESCE(array_agg(membership.user_id ORDER BY membership.user_id)
-                   FILTER (WHERE membership.user_id IS NOT NULL), '{}') AS member_user_ids,
+                   FILTER (WHERE membership.user_id IS NOT NULL AND
+                       (membership.qualification_valid_until IS NULL OR
+                        membership.qualification_valid_until > now())), '{}') AS member_user_ids,
+               COALESCE(array_agg(membership.qualification_valid_until ORDER BY membership.user_id)
+                   FILTER (WHERE membership.user_id IS NOT NULL AND
+                       (membership.qualification_valid_until IS NULL OR
+                        membership.qualification_valid_until > now())), '{}')
+                   AS member_qualification_valid_until,
+               COALESCE(array_agg(membership.max_active_tasks ORDER BY membership.user_id)
+                   FILTER (WHERE membership.user_id IS NOT NULL AND
+                       (membership.qualification_valid_until IS NULL OR
+                        membership.qualification_valid_until > now())), '{}')
+                   AS member_max_active_tasks,
                task_group.enabled, task_group.created_at, task_group.updated_at, task_group.version
           FROM task_groups task_group
           LEFT JOIN task_group_memberships membership ON membership.task_group_id = task_group.id

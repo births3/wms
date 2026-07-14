@@ -529,6 +529,7 @@ use wms_domain::{
         UpsertTaskTypeRequest,
         TaskGroup,
         TaskGroupListResponse,
+        TaskGroupMemberQualification,
         TaskWorker,
         TaskWorkerListResponse,
         UpsertTaskGroupRequest,

@@ -241,6 +241,7 @@ async fn resolve_transition(
     ctx: &AuthContext,
     task: &WarehouseTaskRow,
     request: &TransitionWarehouseTaskRequest,
+    now: DateTime<Utc>,
 ) -> Result<ResolvedTransition, TaskEngineError> {
     let unchanged = || ResolvedTransition {
         status: TASK_STATUS_PENDING_ASSIGNMENT,
@@ -264,11 +265,18 @@ async fn resolve_transition(
             if !valid_status {
                 return Err(TaskEngineError::InvalidTransition);
             }
+            lock_key(
+                tx,
+                "mte-task-group-assignment",
+                task.owner_id,
+                &task.task_group_code,
+            )
+            .await?;
             let assignee = if let Some(assignee) = request.assignee_user_id {
-                validate_worker_qualification(tx, task, assignee).await?;
+                validate_worker_qualification(tx, task, assignee, now).await?;
                 assignee
             } else {
-                select_least_loaded_worker(tx, task).await?
+                select_least_loaded_worker(tx, task, now).await?
             };
             Ok(ResolvedTransition {
                 status: TASK_STATUS_ASSIGNED,
@@ -366,28 +374,35 @@ async fn validate_worker_qualification(
     tx: &mut Transaction<'_, Postgres>,
     task: &WarehouseTaskRow,
     user_id: Uuid,
+    now: DateTime<Utc>,
 ) -> Result<(), TaskEngineError> {
-    let qualified: bool = sqlx::query_scalar(
+    let qualification: Option<(Option<DateTime<Utc>>, Option<i32>, i64)> = sqlx::query_as(
         r#"
-        SELECT EXISTS (
-            SELECT 1
-              FROM task_groups task_group
-              JOIN task_group_memberships membership
-                ON membership.task_group_id = task_group.id
-               AND membership.owner_id = task_group.owner_id
-              JOIN auth_users auth_user ON auth_user.id = membership.user_id
-              JOIN auth_user_owner_bindings binding
-                ON binding.user_id = membership.user_id
-               AND binding.owner_id = membership.owner_id
-             WHERE task_group.owner_id = $1
-               AND task_group.task_group_code = $2
-               AND task_group.warehouse_id = $3
-               AND task_group.enabled
-               AND $4 = ANY(task_group.task_type_codes)
-               AND membership.user_id = $5
-               AND auth_user.status = 'active'
-               AND binding.is_active
-        )
+        SELECT membership.qualification_valid_until,
+               membership.max_active_tasks,
+               count(active_task.id)
+          FROM task_groups task_group
+          JOIN task_group_memberships membership
+            ON membership.task_group_id = task_group.id
+           AND membership.owner_id = task_group.owner_id
+          JOIN auth_users auth_user ON auth_user.id = membership.user_id
+          JOIN auth_user_owner_bindings binding
+            ON binding.user_id = membership.user_id
+           AND binding.owner_id = membership.owner_id
+          LEFT JOIN warehouse_tasks active_task
+            ON active_task.owner_id = membership.owner_id
+           AND active_task.assignee_user_id = membership.user_id
+           AND active_task.id <> $6
+           AND active_task.status IN ('assigned', 'dispatched', 'in_progress')
+         WHERE task_group.owner_id = $1
+           AND task_group.task_group_code = $2
+           AND task_group.warehouse_id = $3
+           AND task_group.enabled
+           AND $4 = ANY(task_group.task_type_codes)
+           AND membership.user_id = $5
+           AND auth_user.status = 'active'
+           AND binding.is_active
+         GROUP BY membership.qualification_valid_until, membership.max_active_tasks
         "#,
     )
     .bind(task.owner_id)
@@ -395,19 +410,26 @@ async fn validate_worker_qualification(
     .bind(task.warehouse_id)
     .bind(&task.task_type_code)
     .bind(user_id)
-    .fetch_one(&mut **tx)
+    .bind(task.id)
+    .fetch_optional(&mut **tx)
     .await
     .map_err(map_database_error)?;
-    if qualified {
-        Ok(())
-    } else {
-        Err(TaskEngineError::WorkerNotQualified)
+    let Some((valid_until, max_active_tasks, active_tasks)) = qualification else {
+        return Err(TaskEngineError::WorkerNotQualified);
+    };
+    if valid_until.is_some_and(|value| value <= now) {
+        return Err(TaskEngineError::WorkerQualificationExpired);
     }
+    if max_active_tasks.is_some_and(|value| active_tasks >= i64::from(value)) {
+        return Err(TaskEngineError::WorkerAtCapacity);
+    }
+    Ok(())
 }
 
 async fn select_least_loaded_worker(
     tx: &mut Transaction<'_, Postgres>,
     task: &WarehouseTaskRow,
+    now: DateTime<Utc>,
 ) -> Result<Uuid, TaskEngineError> {
     sqlx::query_scalar(
         r#"
@@ -423,6 +445,7 @@ async fn select_least_loaded_worker(
           LEFT JOIN warehouse_tasks active_task
             ON active_task.owner_id = membership.owner_id
            AND active_task.assignee_user_id = membership.user_id
+           AND active_task.id <> $6
            AND active_task.status IN ('assigned', 'dispatched', 'in_progress')
          WHERE task_group.owner_id = $1
            AND task_group.task_group_code = $2
@@ -431,7 +454,10 @@ async fn select_least_loaded_worker(
            AND $4 = ANY(task_group.task_type_codes)
            AND auth_user.status = 'active'
            AND binding.is_active
-         GROUP BY membership.user_id
+           AND (membership.qualification_valid_until IS NULL OR
+                membership.qualification_valid_until > $5)
+         GROUP BY membership.user_id, membership.max_active_tasks
+        HAVING count(active_task.id) < COALESCE(membership.max_active_tasks, 2147483647)
          ORDER BY count(active_task.id), membership.user_id
          LIMIT 1
         "#,
@@ -440,6 +466,8 @@ async fn select_least_loaded_worker(
     .bind(&task.task_group_code)
     .bind(task.warehouse_id)
     .bind(&task.task_type_code)
+    .bind(now)
+    .bind(task.id)
     .fetch_optional(&mut **tx)
     .await
     .map_err(map_database_error)?

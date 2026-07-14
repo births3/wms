@@ -99,9 +99,10 @@ pub use wms_domain::{
     UpdateDockAppointmentRequest, UpdateDockRequest,
 };
 pub use wms_domain::{
-    CreateWarehouseTaskRequest, TaskGroup, TaskGroupListResponse, TaskListQuery,
-    TaskTransitionAction, TaskWorker, TaskWorkerListResponse, TransitionWarehouseTaskRequest,
-    UpsertTaskGroupRequest, WarehouseTask, WarehouseTaskListResponse,
+    CreateWarehouseTaskRequest, TaskGroup, TaskGroupListResponse, TaskGroupMemberQualification,
+    TaskListQuery, TaskTransitionAction, TaskWorker, TaskWorkerListResponse,
+    TransitionWarehouseTaskRequest, UpsertTaskGroupRequest, WarehouseTask,
+    WarehouseTaskListResponse,
 };
 pub use wms_domain::{
     SetTaskTypeEnabledRequest, TaskType, TaskTypeListResponse, UpsertTaskTypeRequest,

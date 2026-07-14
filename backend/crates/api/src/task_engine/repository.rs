@@ -43,7 +43,19 @@ impl PgTaskEngineRepository {
                    task_group.task_group_name, task_group.warehouse_id, task_group.zone_ids,
                    task_group.task_type_codes,
                    COALESCE(array_agg(membership.user_id ORDER BY membership.user_id)
-                       FILTER (WHERE membership.user_id IS NOT NULL), '{}') AS member_user_ids,
+                       FILTER (WHERE membership.user_id IS NOT NULL AND
+                           (membership.qualification_valid_until IS NULL OR
+                            membership.qualification_valid_until > now())), '{}') AS member_user_ids,
+                   COALESCE(array_agg(membership.qualification_valid_until ORDER BY membership.user_id)
+                       FILTER (WHERE membership.user_id IS NOT NULL AND
+                           (membership.qualification_valid_until IS NULL OR
+                            membership.qualification_valid_until > now())), '{}')
+                       AS member_qualification_valid_until,
+                   COALESCE(array_agg(membership.max_active_tasks ORDER BY membership.user_id)
+                       FILTER (WHERE membership.user_id IS NOT NULL AND
+                           (membership.qualification_valid_until IS NULL OR
+                            membership.qualification_valid_until > now())), '{}')
+                       AS member_max_active_tasks,
                    task_group.enabled, task_group.created_at, task_group.updated_at, task_group.version
               FROM task_groups task_group
               LEFT JOIN task_group_memberships membership ON membership.task_group_id = task_group.id
@@ -54,6 +66,8 @@ impl PgTaskEngineRepository {
                      WHERE own_membership.task_group_id = task_group.id
                        AND own_membership.owner_id = task_group.owner_id
                        AND own_membership.user_id = $3
+                       AND (own_membership.qualification_valid_until IS NULL OR
+                            own_membership.qualification_valid_until > now())
                ))
              GROUP BY task_group.id
              ORDER BY task_group.task_group_code
@@ -137,12 +151,23 @@ impl PgTaskEngineRepository {
             .await
             .map_err(map_database_error)?;
         for user_id in &request.member_user_ids {
+            let qualification = request
+                .member_qualifications
+                .iter()
+                .find(|qualification| qualification.user_id == *user_id);
             sqlx::query(
-                "INSERT INTO task_group_memberships (task_group_id, owner_id, user_id, created_at) VALUES ($1, $2, $3, $4)",
+                r#"
+                INSERT INTO task_group_memberships (
+                    task_group_id, owner_id, user_id, qualification_valid_until,
+                    max_active_tasks, created_at
+                ) VALUES ($1, $2, $3, $4, $5, $6)
+                "#,
             )
             .bind(id)
             .bind(ctx.owner_id)
             .bind(user_id)
+            .bind(qualification.and_then(|value| value.valid_until))
+            .bind(qualification.and_then(|value| value.max_active_tasks))
             .bind(now)
             .execute(&mut *tx)
             .await
@@ -303,7 +328,7 @@ impl PgTaskEngineRepository {
         let before = load_task_for_update(&mut tx, ctx.owner_id, task_id)
             .await?
             .ok_or(TaskEngineError::TaskNotFound)?;
-        let transition = resolve_transition(&mut tx, ctx, &before, &request).await?;
+        let transition = resolve_transition(&mut tx, ctx, &before, &request, now).await?;
         let row = sqlx::query_as::<_, WarehouseTaskRow>(
             r#"
             UPDATE warehouse_tasks

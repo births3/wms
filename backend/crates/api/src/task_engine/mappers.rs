@@ -1,5 +1,19 @@
 impl From<TaskGroupRow> for TaskGroup {
     fn from(row: TaskGroupRow) -> Self {
+        let member_qualifications = row
+            .member_user_ids
+            .iter()
+            .copied()
+            .zip(row.member_qualification_valid_until.iter().copied())
+            .zip(row.member_max_active_tasks.iter().copied())
+            .map(
+                |((user_id, valid_until), max_active_tasks)| TaskGroupMemberQualification {
+                    user_id,
+                    valid_until,
+                    max_active_tasks,
+                },
+            )
+            .collect();
         Self {
             id: row.id,
             owner_id: row.owner_id,
@@ -9,6 +23,7 @@ impl From<TaskGroupRow> for TaskGroup {
             zone_ids: row.zone_ids,
             task_type_codes: row.task_type_codes,
             member_user_ids: row.member_user_ids,
+            member_qualifications,
             enabled: row.enabled,
             created_at: row.created_at,
             updated_at: row.updated_at,

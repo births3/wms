@@ -24138,6 +24138,7 @@
           "zone_ids",
           "task_type_codes",
           "member_user_ids",
+          "member_qualifications",
           "enabled",
           "created_at",
           "updated_at",
@@ -24154,6 +24155,12 @@
           "id": {
             "type": "string",
             "format": "uuid"
+          },
+          "member_qualifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskGroupMemberQualification"
+            }
           },
           "member_user_ids": {
             "type": "array",
@@ -24214,6 +24221,28 @@
           },
           "page": {
             "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "TaskGroupMemberQualification": {
+        "type": "object",
+        "required": [
+          "user_id"
+        ],
+        "properties": {
+          "max_active_tasks": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "valid_until": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         }
       },
@@ -25705,6 +25734,12 @@
         "properties": {
           "enabled": {
             "type": "boolean"
+          },
+          "member_qualifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskGroupMemberQualification"
+            }
           },
           "member_user_ids": {
             "type": "array",

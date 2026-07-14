@@ -5779,6 +5779,7 @@ export interface components {
             enabled: boolean;
             /** Format: uuid */
             id: string;
+            member_qualifications: components["schemas"]["TaskGroupMemberQualification"][];
             member_user_ids: string[];
             /** Format: uuid */
             owner_id: string;
@@ -5796,6 +5797,14 @@ export interface components {
         TaskGroupListResponse: {
             data: components["schemas"]["TaskGroup"][];
             page: components["schemas"]["PageMeta"];
+        };
+        TaskGroupMemberQualification: {
+            /** Format: int32 */
+            max_active_tasks?: number | null;
+            /** Format: uuid */
+            user_id: string;
+            /** Format: date-time */
+            valid_until?: string | null;
         };
         /** @enum {string} */
         TaskTransitionAction: "assign" | "dispatch" | "reassign" | "recall" | "start" | "complete" | "report_exception" | "resolve_complete" | "cancel";
@@ -6249,6 +6258,7 @@ export interface components {
         };
         UpsertTaskGroupRequest: {
             enabled: boolean;
+            member_qualifications?: components["schemas"]["TaskGroupMemberQualification"][];
             member_user_ids?: string[];
             task_group_name: string;
             task_type_codes: string[];

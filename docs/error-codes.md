@@ -1,7 +1,7 @@
 # 错误码字典（Error Codes Dictionary）
 
 > 时间：2026-07-15
-> 版本：v3.7（当前 144 项）
+> 版本：v3.7（当前 146 项）
 > 文档层级：L2 规范（必须遵守）
 > 关联：[ADR-0010](adr/0010-error-codes.md) / [coding-standards.md §4](coding-standards.md)
 
@@ -77,9 +77,9 @@
 |---|---|---|
 | info | 1 | 状态变更通知 / 数据已存在等正常路径 |
 | warning | 39 | 业务规则拦截（库存不足 / 资质过期等）|
-| error | 96 | 业务异常（数据冲突 / 校验失败）|
+| error | 98 | 业务异常（数据冲突 / 校验失败）|
 | critical | 8 | 合规/安全异常（跨货主访问 / 篡改尝试）|
-| **合计** | **144** | — |
+| **合计** | **146** | — |
 
 ---
 
@@ -103,7 +103,7 @@
 | M_TC | 2 | 追溯码 |
 | M_PM | 1 | 参数对照 |
 | M_DI | 12 | 药检平台配置 |
-| M_TE | 20 | 任务类型、任务组与执行主链 |
+| M_TE | 22 | 任务类型、任务组与执行主链 |
 
 ---
 
@@ -1802,6 +1802,30 @@ error_codes:
     message_en: 'Worker is not qualified for the task group'
     related_fields: []
     related_stories: [US-TE-002, US-TE-005]
+    introduced_in: v3.6
+
+  - code: M_TE_CERT_EXPIRED
+    module: M_TE
+    category: ASSIGNMENT
+    detail: CERT_EXPIRED
+    http_status: 422
+    severity: error
+    message_zh: '人员任务资格已过期'
+    message_en: 'Worker task qualification has expired'
+    related_fields: []
+    related_stories: [US-TE-002, US-TE-005]
+    introduced_in: v3.6
+
+  - code: M_TE_WORKER_AT_CAPACITY
+    module: M_TE
+    category: ASSIGNMENT
+    detail: WORKER_AT_CAPACITY
+    http_status: 409
+    severity: error
+    message_zh: '人员同时在手任务已达上限'
+    message_en: 'Worker has reached the active task capacity limit'
+    related_fields: []
+    related_stories: [US-TE-005, US-TE-006]
     introduced_in: v3.6
 
   - code: M_TE_NO_AVAILABLE_WORKER

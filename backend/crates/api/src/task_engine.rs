@@ -5,10 +5,11 @@ use sha2::{Digest, Sha256};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{
-    normalize_task_type_code, CreateWarehouseTaskRequest, TaskGroup, TaskListQuery,
-    TaskTransitionAction, TransitionWarehouseTaskRequest, UpsertTaskGroupRequest, WarehouseTask,
-    TASK_STATUS_ASSIGNED, TASK_STATUS_CANCELLED, TASK_STATUS_COMPLETED, TASK_STATUS_DISPATCHED,
-    TASK_STATUS_EXCEPTION, TASK_STATUS_IN_PROGRESS, TASK_STATUS_PENDING_ASSIGNMENT,
+    normalize_task_type_code, CreateWarehouseTaskRequest, TaskGroup, TaskGroupMemberQualification,
+    TaskListQuery, TaskTransitionAction, TransitionWarehouseTaskRequest, UpsertTaskGroupRequest,
+    WarehouseTask, TASK_STATUS_ASSIGNED, TASK_STATUS_CANCELLED, TASK_STATUS_COMPLETED,
+    TASK_STATUS_DISPATCHED, TASK_STATUS_EXCEPTION, TASK_STATUS_IN_PROGRESS,
+    TASK_STATUS_PENDING_ASSIGNMENT,
 };
 
 use crate::{
@@ -40,6 +41,8 @@ pub enum TaskEngineError {
     ZoneNotFound,
     UserNotFound,
     WorkerNotQualified,
+    WorkerQualificationExpired,
+    WorkerAtCapacity,
     NoAvailableWorker,
     TaskNotFound,
     NotAssignee,
@@ -62,6 +65,8 @@ struct TaskGroupRow {
     zone_ids: Vec<Uuid>,
     task_type_codes: Vec<String>,
     member_user_ids: Vec<Uuid>,
+    member_qualification_valid_until: Vec<Option<DateTime<Utc>>>,
+    member_max_active_tasks: Vec<Option<i32>>,
     enabled: bool,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
