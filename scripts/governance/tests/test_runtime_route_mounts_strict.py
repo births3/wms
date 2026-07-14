@@ -38,3 +38,13 @@ def test_runtime_operation_parser_tracks_method_and_normalizes_path_parameter():
         "GET /api/v1/items/{id}",
         "PATCH /api/v1/items/{id}",
     }
+
+
+def test_axum_07_runtime_parser_rejects_openapi_brace_parameter_syntax():
+    source = '''
+        Router::new()
+            .route("/api/v1/items/{id}", get(read_item))
+            .route("/api/v1/items/:id/confirm", post(confirm_item))
+    '''
+
+    assert check.invalid_axum_route_paths(source) == {"/api/v1/items/{id}"}

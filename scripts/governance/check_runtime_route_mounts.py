@@ -144,17 +144,30 @@ def operations_from_sources(sources: list[str]) -> set[str]:
     return operations
 
 
-def runtime_operations() -> set[str]:
+def invalid_axum_route_paths(source: str) -> set[str]:
+    invalid: set[str] = set()
+    for call in _route_calls(source):
+        path_match = re.match(r'\s*"([^"]+)"\s*,', call)
+        if path_match and re.search(r"\{[A-Za-z_][A-Za-z0-9_]*\}", path_match.group(1)):
+            invalid.add(path_match.group(1))
+    return invalid
+
+
+def mounted_runtime_sources() -> list[tuple[Path, str]]:
     entry = WMS_API_RS.read_text(encoding="utf-8").split("#[cfg(test)]", 1)[0]
     mounted_routers = set(re.findall(r"\.merge\(\s*([a-zA-Z0-9_]+_router)\s*\(", entry))
-    sources = [entry]
+    sources = [(WMS_API_RS, entry)]
     for path in API_SRC.glob("*.rs"):
         if path == WMS_API_RS:
             continue
         source = path.read_text(encoding="utf-8").split("#[cfg(test)]", 1)[0]
         if any(re.search(rf"pub\s+fn\s+{re.escape(router)}\b", source) for router in mounted_routers):
-            sources.append(source)
-    return operations_from_sources(sources)
+            sources.append((path, source))
+    return sources
+
+
+def runtime_operations() -> set[str]:
+    return operations_from_sources([source for _, source in mounted_runtime_sources()])
 
 
 def scan(*, strict: bool = False) -> list[Issue]:
@@ -180,6 +193,15 @@ def scan(*, strict: bool = False) -> list[Issue]:
         for path in spec.files:
             if not path.exists():
                 issues.append(Issue(rel(path), f"{spec.name} OpenAPI 已声明但缺少运行时 handler 文件"))
+
+    for path, source in mounted_runtime_sources():
+        issues.extend(
+            Issue(
+                rel(path),
+                f"Axum 0.7 动态路由必须使用 :param，不能使用 OpenAPI {{param}} 语法: {route}",
+            )
+            for route in sorted(invalid_axum_route_paths(source))
+        )
 
     if strict:
         missing_operations = sorted(load_openapi_operations() - runtime_operations())
