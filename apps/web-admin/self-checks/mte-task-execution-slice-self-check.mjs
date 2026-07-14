@@ -17,9 +17,9 @@ for (const page of [dispatch, groups]) {
   assert.match(page, /<QueryPanel/);
   assert.match(page, /<DataGrid/);
 }
-for (const token of ["mte.task-dispatch", "分派", "下发", "召回", "处置完成", "手动加急", "priority_factors"]) assert.match(dispatch, new RegExp(token));
+for (const token of ["mte.task-dispatch", "释放", "分派", "下发", "召回", "处置完成", "手动加急", "priority_factors", "release_due_at"]) assert.match(dispatch, new RegExp(token));
 assert.match(dispatch, /确认任务操作/);
-for (const token of ["任务优先级规则", "订单加急加分", "等待多少分钟加 1 分", "冷链任务加分", "手动加急加分"]) assert.match(taskTypes, new RegExp(token));
+for (const token of ["任务优先级规则", "订单加急加分", "等待多少分钟加 1 分", "冷链任务加分", "手动加急加分", "释放策略", "释放间隔", "每批任务数", "conditional", "capacity"]) assert.match(taskTypes, new RegExp(token));
 for (const token of [
   "mte.task-groups", "任务类型", "适用库区", "任务组成员", "资格有效期",
   "同时在手上限", "zoneIds", "memberUserIds", "memberQualifications",

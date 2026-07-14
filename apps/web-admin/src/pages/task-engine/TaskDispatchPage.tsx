@@ -53,6 +53,7 @@ export function TaskDispatchPage() {
   const busy = transition.isPending;
   const refreshAction: DataGridRefreshAction = { label: "刷新", description: "刷新统一任务队列", disabled: tasksQuery.isFetching, onClick: () => void tasksQuery.refetch() };
   const toolbarActions: DataGridToolbarAction[] = [
+    { key: "release", label: "释放", description: "按任务类型释放条件放入待分配池", icon: <Send className="size-4" aria-hidden />, disabled: () => !selectedTask || selectedTask.status !== "pending_release" || busy, onClick: () => { if (selectedTask) { setConfirmAction({ task: selectedTask, action: "release" }); setConfirmOpen(true); } } },
     { key: "auto-assign", label: "自动分派", description: "按任务组资格和当前负荷选择执行人", icon: <UserPlus className="size-4" aria-hidden />, disabled: () => !selectedTask || selectedTask.status !== "pending_assignment" || busy, onClick: () => { if (selectedTask) { setConfirmAction({ task: selectedTask, action: "assign" }); setConfirmOpen(true); } } },
     { key: "assign", label: "分派", description: "把待分配任务指派给合格成员", icon: <UserPlus className="size-4" aria-hidden />, disabled: () => !selectedTask || selectedTask.status !== "pending_assignment" || busy, onClick: () => openAssign("assign") },
     { key: "reassign", label: "改派", description: "重新指派已分配或已下发任务", icon: <RotateCcw className="size-4" aria-hidden />, disabled: () => !selectedTask || !["assigned", "dispatched"].includes(selectedTask.status) || busy, onClick: () => openAssign("reassign") },
@@ -60,7 +61,7 @@ export function TaskDispatchPage() {
     { key: "recall", label: "召回", description: "从已分配或已下发状态召回待分配池", icon: <RotateCcw className="size-4" aria-hidden />, disabled: () => !selectedTask || !["assigned", "dispatched"].includes(selectedTask.status) || busy, onClick: () => { if (selectedTask) { setConfirmAction({ task: selectedTask, action: "recall" }); setConfirmOpen(true); } } },
     { key: "expedite", label: "手动加急", description: "按优先级规则一次性提升任务优先级", icon: <Zap className="size-4" aria-hidden />, disabled: () => !selectedTask || selectedTask.manually_expedited || ["completed", "cancelled"].includes(selectedTask.status) || busy, onClick: () => { if (selectedTask) { setConfirmAction({ task: selectedTask, action: "expedite" }); setConfirmOpen(true); } } },
     { key: "resolve", label: "处置完成", description: "主管确认异常任务完成", icon: <CheckCircle2 className="size-4" aria-hidden />, disabled: () => !selectedTask || selectedTask.status !== "exception" || busy, onClick: () => { if (selectedTask) { setConfirmAction({ task: selectedTask, action: "resolve_complete" }); setConfirmOpen(true); } } },
-    { key: "cancel", label: "取消", description: "取消待分配或异常任务", icon: <XCircle className="size-4" aria-hidden />, variant: "destructive", disabled: () => !selectedTask || !["pending_assignment", "exception"].includes(selectedTask.status) || busy, onClick: () => { if (selectedTask) { setConfirmAction({ task: selectedTask, action: "cancel" }); setConfirmOpen(true); } } },
+    { key: "cancel", label: "取消", description: "取消待释放、待分配或异常任务", icon: <XCircle className="size-4" aria-hidden />, variant: "destructive", disabled: () => !selectedTask || !["pending_release", "pending_assignment", "exception"].includes(selectedTask.status) || busy, onClick: () => { if (selectedTask) { setConfirmAction({ task: selectedTask, action: "cancel" }); setConfirmOpen(true); } } },
   ];
 
   return <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
@@ -82,7 +83,7 @@ export function TaskDispatchPage() {
   }
 }
 
-const actionLabels: Record<TaskTransitionAction, string> = { assign: "自动分派", dispatch: "下发", reassign: "改派", recall: "召回", start: "开始", complete: "完成", report_exception: "上报异常", resolve_complete: "处置完成", cancel: "取消", expedite: "手动加急" };
+const actionLabels: Record<TaskTransitionAction, string> = { release: "释放", assign: "自动分派", dispatch: "下发", reassign: "改派", recall: "召回", start: "开始", complete: "完成", report_exception: "上报异常", resolve_complete: "处置完成", cancel: "取消", expedite: "手动加急" };
 
 function taskColumns(workerNames: ReadonlyMap<string, string>): DataGridColumn<WarehouseTask>[] { return [
   { key: "task_no", header: "任务号", width: 190, minWidth: 160, mono: true, sortable: true, sortValue: (row) => row.task_no, filterValue: (row) => row.task_no, copyValue: (row) => row.task_no, filter: { type: "text" } },
@@ -90,6 +91,7 @@ function taskColumns(workerNames: ReadonlyMap<string, string>): DataGridColumn<W
   { key: "task_type_code", header: "任务类型", width: 120, minWidth: 100, mono: true, sortable: true, sortValue: (row) => row.task_type_code, filterValue: (row) => row.task_type_code, copyValue: (row) => row.task_type_code, filter: { type: "text" } },
   { key: "priority", header: "优先级", width: 95, minWidth: 80, sortable: true, sortValue: (row) => row.priority, render: (row) => String(row.priority) },
   { key: "priority_factors", header: "优先因素", width: 150, minWidth: 120, render: (row) => [row.urgent_order && "订单加急", row.cold_chain && "冷链", row.manually_expedited && "手动加急"].filter(Boolean).join(" / ") || "默认" },
+  { key: "release_due_at", header: "计划释放", width: 180, minWidth: 150, sortable: true, sortValue: (row) => row.release_due_at ?? "", render: (row) => row.release_due_at ? formatDateTime(row.release_due_at) : row.released_at ? "已释放" : "按条件" },
   { key: "source_doc_no", header: "来源单号", width: 180, minWidth: 140, mono: true, filterValue: (row) => row.source_doc_no, copyValue: (row) => row.source_doc_no, filter: { type: "text" } },
   { key: "product_code", header: "商品编码", width: 150, minWidth: 120, mono: true, filterValue: (row) => row.product_code, copyValue: (row) => row.product_code, filter: { type: "text" } },
   { key: "planned_qty", header: "计划数量", width: 105, minWidth: 90, sortable: true, sortValue: (row) => row.planned_qty, render: (row) => String(row.planned_qty) },

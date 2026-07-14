@@ -19,7 +19,7 @@ const queryFields: QueryPanelField[] = [
 const mteTaskTypeCoreQueryFieldKeys = ["keyword", "status"];
 const statusOptions = [{ label: "启用", value: "enabled" }, { label: "停用", value: "disabled" }];
 
-type Form = { code: string; name: string; priority: string; minutes: string; mergeable: boolean; insertable: boolean; enabled: boolean };
+type Form = { code: string; name: string; priority: string; minutes: string; mergeable: boolean; insertable: boolean; releaseStrategy: TaskType["release_strategy"]; releaseInterval: string; releaseBatch: string; enabled: boolean };
 type Notice = { kind: "success" | "error"; text: string } | null;
 
 const columns: DataGridColumn<TaskType>[] = [
@@ -29,6 +29,7 @@ const columns: DataGridColumn<TaskType>[] = [
   { key: "estimated_minutes", header: "预计耗时（分）", width: 140, minWidth: 120, sortable: true, sortValue: (r) => r.estimated_minutes, filterValue: (r) => r.estimated_minutes, copyValue: (r) => String(r.estimated_minutes), filter: { type: "numberRange" } },
   { key: "mergeable", header: "可合并", width: 100, minWidth: 90, render: (r) => r.mergeable ? "是" : "否" },
   { key: "insertable", header: "可插单", width: 100, minWidth: 90, render: (r) => r.insertable ? "是" : "否" },
+  { key: "release_strategy", header: "释放策略", width: 140, minWidth: 110, render: (r) => releaseStrategyLabels[r.release_strategy] },
   { key: "enabled", header: "状态", width: 110, minWidth: 90, render: (r) => <StatusBadge status={r.enabled ? "completed" : "isolated"} label={r.enabled ? "启用" : "停用"} size="sm" /> },
   { key: "created_at", header: "创建时间", width: 175, minWidth: 145, sortable: true, sortValue: (r) => r.created_at, filterValue: (r) => r.created_at, copyValue: (r) => r.created_at, filter: { type: "dateRange" }, render: (r) => formatDateTime(r.created_at) },
 ];
@@ -74,7 +75,8 @@ export function TaskTypeConfigPage() {
     event.preventDefault();
     const error = validate(form, Boolean(editing));
     if (error) { setNotice({ kind: "error", text: error }); return; }
-    const body: UpsertTaskTypeRequest = { task_type_name: form.name.trim(), default_priority: Number(form.priority), estimated_minutes: Number(form.minutes), mergeable: form.mergeable, insertable: form.insertable, enabled: form.enabled };
+    const scheduled = form.releaseStrategy === "scheduled";
+    const body: UpsertTaskTypeRequest = { task_type_name: form.name.trim(), default_priority: Number(form.priority), estimated_minutes: Number(form.minutes), mergeable: form.mergeable, insertable: form.insertable, release_strategy: form.releaseStrategy, release_interval_minutes: scheduled ? Number(form.releaseInterval) : null, release_batch_size: scheduled ? Number(form.releaseBatch) : null, enabled: form.enabled };
     try { await save.mutateAsync({ code: form.code.trim().toLowerCase(), body }); setDialogOpen(false); setSelected([]); setNotice({ kind: "success", text: `任务类型 ${form.code.trim().toLowerCase()} 已保存` }); } catch { /* 弹窗保留，允许重试。 */ }
   }
   async function setEnabled(row: TaskType) { setNotice(null); try { await toggle.mutateAsync({ code: row.task_type_code, enabled: !row.enabled }); setSelected([]); setNotice({ kind: "success", text: `${row.task_type_name} 已${row.enabled ? "停用" : "启用"}` }); } catch (error) { setNotice({ kind: "error", text: errorText(error, "更新任务类型状态失败") }); } }
@@ -87,18 +89,22 @@ function TaskTypeDialog({ open, editing, form, pending, errorMessage, onOpenChan
     <label className="grid gap-1 text-sm">类型编码<Input required pattern="[A-Za-z0-9][A-Za-z0-9_.-]{0,63}" maxLength={64} readOnly={Boolean(editing)} value={form.code} onChange={(e) => set("code", e.target.value)} /></label>
     <label className="grid gap-1 text-sm">类型名称<Input required maxLength={128} value={form.name} onChange={(e) => set("name", e.target.value)} /></label>
     <div className="grid grid-cols-2 gap-3"><label className="grid gap-1 text-sm">默认优先级<Input required type="number" min="0" max="1000" step="1" value={form.priority} onChange={(e) => set("priority", e.target.value)} /></label><label className="grid gap-1 text-sm">预计耗时（分）<Input required type="number" min="1" max="10080" step="1" value={form.minutes} onChange={(e) => set("minutes", e.target.value)} /></label></div>
+    <label className="grid gap-1 text-sm">释放策略<select aria-label="释放策略" className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={form.releaseStrategy} onChange={(event) => set("releaseStrategy", event.target.value as TaskType["release_strategy"])}>{Object.entries(releaseStrategyLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+    {form.releaseStrategy === "scheduled" && <div className="grid grid-cols-2 gap-3"><label className="grid gap-1 text-sm">释放间隔（分）<Input required type="number" min="1" max="1440" step="1" value={form.releaseInterval} onChange={(event) => set("releaseInterval", event.target.value)} /></label><label className="grid gap-1 text-sm">每批任务数<Input required type="number" min="1" max="1000" step="1" value={form.releaseBatch} onChange={(event) => set("releaseBatch", event.target.value)} /></label></div>}
     <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.mergeable} onChange={(e) => set("mergeable", e.target.checked)} />可合并</label><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.insertable} onChange={(e) => set("insertable", e.target.checked)} />可插单</label><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.enabled} onChange={(e) => set("enabled", e.target.checked)} />启用</label>
     {errorMessage && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">{errorMessage}</div>}<DialogFooter><DialogClose asChild><Button type="button" variant="outline" disabled={pending}>取消</Button></DialogClose><Button type="submit" disabled={pending}>{pending ? "保存中..." : "保存"}</Button></DialogFooter></form></DialogContent></Dialog>;
 }
 
-function emptyForm(): Form { return { code: "", name: "", priority: "100", minutes: "15", mergeable: true, insertable: true, enabled: true }; }
-function formFor(row: TaskType): Form { return { code: row.task_type_code, name: row.task_type_name, priority: String(row.default_priority), minutes: String(row.estimated_minutes), mergeable: row.mergeable, insertable: row.insertable, enabled: row.enabled }; }
-function validate(form: Form, editing: boolean) { if (!editing && !/^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/.test(form.code.trim())) return "类型编码必须以字母或数字开头，且只允许字母、数字、下划线、连字符或点号"; if (!form.name.trim()) return "类型名称不能为空"; const priority = Number(form.priority); if (!Number.isInteger(priority) || priority < 0 || priority > 1000) return "默认优先级必须是 0 到 1000 的整数"; const minutes = Number(form.minutes); if (!Number.isInteger(minutes) || minutes < 1 || minutes > 10080) return "预计耗时必须是 1 到 10080 分钟的整数"; return null; }
+function emptyForm(): Form { return { code: "", name: "", priority: "100", minutes: "15", mergeable: true, insertable: true, releaseStrategy: "immediate", releaseInterval: "10", releaseBatch: "50", enabled: true }; }
+function formFor(row: TaskType): Form { return { code: row.task_type_code, name: row.task_type_name, priority: String(row.default_priority), minutes: String(row.estimated_minutes), mergeable: row.mergeable, insertable: row.insertable, releaseStrategy: row.release_strategy, releaseInterval: String(row.release_interval_minutes ?? 10), releaseBatch: String(row.release_batch_size ?? 50), enabled: row.enabled }; }
+function validate(form: Form, editing: boolean) { if (!editing && !/^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/.test(form.code.trim())) return "类型编码必须以字母或数字开头，且只允许字母、数字、下划线、连字符或点号"; if (!form.name.trim()) return "类型名称不能为空"; const priority = Number(form.priority); if (!Number.isInteger(priority) || priority < 0 || priority > 1000) return "默认优先级必须是 0 到 1000 的整数"; const minutes = Number(form.minutes); if (!Number.isInteger(minutes) || minutes < 1 || minutes > 10080) return "预计耗时必须是 1 到 10080 分钟的整数"; if (form.releaseStrategy === "scheduled") { const interval = Number(form.releaseInterval); const batch = Number(form.releaseBatch); if (!Number.isInteger(interval) || interval < 1 || interval > 1440 || !Number.isInteger(batch) || batch < 1 || batch > 1000) return "定时释放间隔必须是 1 到 1440 分钟，每批任务数必须是 1 到 1000"; } return null; }
 function defaultQuery(): QueryPanelValue { return { keyword: "", status: "" }; }
 function stringValue(value: unknown) { return typeof value === "string" ? value : ""; }
 function normalizeQuery(value: unknown): QueryPanelValue { const record = value && typeof value === "object" ? value as Record<string, unknown> : {}; return { keyword: stringValue(record.keyword), status: stringValue(record.status) }; }
 function errorText(error: unknown, fallback: string) { return error instanceof Error ? error.message : fallback; }
 function formatDateTime(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { hour12: false }); }
+
+const releaseStrategyLabels: Record<TaskType["release_strategy"], string> = { immediate: "立即释放", scheduled: "定时释放", conditional: "条件释放", capacity: "容量释放" };
 
 type PriorityRuleForm = { urgent: string; waiting: string; cold: string; expedite: string };
 

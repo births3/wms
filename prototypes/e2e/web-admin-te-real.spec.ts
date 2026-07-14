@@ -13,9 +13,13 @@ test("M-TE 任务类型配置使用真实 API 展示预置类型并保存自定�
   const dialog = page.getByRole("dialog", { name: "新增任务类型" });
   await dialog.getByLabel("类型编码").fill(code);
   await dialog.getByLabel("类型名称").fill("E2E 自定义任务");
+  await dialog.getByLabel("释放策略").selectOption("scheduled");
+  await dialog.getByLabel("释放间隔（分）").fill("10");
+  await dialog.getByLabel("每批任务数").fill("5");
   await dialog.getByRole("button", { name: "保存", exact: true }).click();
   await expect(page.getByText("E2E 自定义任务")).toBeVisible();
   const row = page.locator("tbody tr").filter({ hasText: code });
+  await expect(row).toContainText("定时释放");
   await row.getByRole("checkbox", { name: "选择此行" }).check();
   await page.getByRole("button", { name: "停用", exact: true }).click();
   await page.getByRole("dialog", { name: "停用任务类型" }).getByRole("button", { name: "确认", exact: true }).click();
@@ -37,6 +41,7 @@ test("M-TE 任务类型配置使用真实 API 展示预置类型并保存自定�
 test("M-TE 任务组和调度使用真实 API 完成创建、自动分派与下发", async ({ page }) => {
   await login(page);
   await configurePriorityRule(page);
+  await configurePutawayRelease(page, "scheduled");
   await assertTaskEngineReads(page);
   await openTaskGroupPage(page);
   await expect(page.getByRole("heading", { name: "M-TE 任务组与人员资格" })).toBeVisible();
@@ -93,10 +98,15 @@ test("M-TE 任务组和调度使用真实 API 完成创建、自动分派与下�
     if (!response.ok) throw new Error(`create task failed: ${response.status} ${await response.text()}`);
     return response.json() as Promise<{ task_no: string; source_doc_no: string }>;
   }, { taskGroupCode: groupCode, sourceKey: String(suffix) });
+  await configurePutawayRelease(page, "immediate");
 
   await openTaskDispatchPage(page);
   await expect(page.getByRole("heading", { name: "M-TE 任务调度" })).toBeVisible();
   const row = page.locator("tbody tr").filter({ hasText: task.source_doc_no });
+  await expect(row).toContainText("待释放");
+  await row.getByRole("checkbox", { name: "选择此行" }).check();
+  await page.getByRole("button", { name: "释放", exact: true }).click();
+  await page.getByRole("dialog", { name: "确认任务操作" }).getByRole("button", { name: "确认执行" }).click();
   await expect(row).toContainText("待分配");
   await row.getByRole("checkbox", { name: "选择此行" }).check();
   await expect(row.getByText("110", { exact: true })).toBeVisible();
@@ -142,6 +152,38 @@ async function configurePriorityRule(page: import("@playwright/test").Page) {
     });
     return response.ok ? null : `${response.status} ${await response.text()}`;
   });
+  expect(failure).toBeNull();
+}
+async function configurePutawayRelease(page: import("@playwright/test").Page, strategy: "immediate" | "scheduled") {
+  const failure = await page.evaluate(async (releaseStrategy) => {
+    const raw = window.localStorage.getItem("wms.web-admin.auth-session");
+    const token = raw ? (JSON.parse(raw) as { accessToken: string }).accessToken : "";
+    const listResponse = await fetch("/api/v1/task-engine/task-types", { headers: { Authorization: `Bearer ${token}` } });
+    if (!listResponse.ok) return `list task types failed: ${listResponse.status} ${await listResponse.text()}`;
+    const list = await listResponse.json() as { data: Array<Record<string, unknown>> };
+    const taskType = list.data.find((item) => item.task_type_code === "putaway");
+    if (!taskType) return "putaway task type not found";
+    const response = await fetch("/api/v1/task-engine/task-types/putaway", {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        "Idempotency-Key": `e2e-putaway-release-${Date.now()}`,
+      },
+      body: JSON.stringify({
+        task_type_name: taskType.task_type_name,
+        default_priority: taskType.default_priority,
+        estimated_minutes: taskType.estimated_minutes,
+        mergeable: taskType.mergeable,
+        insertable: taskType.insertable,
+        enabled: taskType.enabled,
+        release_strategy: releaseStrategy,
+        release_interval_minutes: releaseStrategy === "scheduled" ? 10 : null,
+        release_batch_size: releaseStrategy === "scheduled" ? 5 : null,
+      }),
+    });
+    return response.ok ? null : `configure release failed: ${response.status} ${await response.text()}`;
+  }, strategy);
   expect(failure).toBeNull();
 }
 async function openTaskTypePage(page: import("@playwright/test").Page) {
