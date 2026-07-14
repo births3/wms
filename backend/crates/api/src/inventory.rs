@@ -12,6 +12,10 @@ use wms_domain::{
 
 use crate::auth::AuthContext;
 
+mod stock_adjustment;
+
+pub(crate) use stock_adjustment::add_for_stock_surplus_in_tx;
+
 pub const STATUS_QUALIFIED: &str = "qualified";
 pub const STATUS_QUARANTINED: &str = "quarantined";
 pub const STATUS_UNQUALIFIED: &str = "unqualified";

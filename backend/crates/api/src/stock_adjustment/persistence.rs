@@ -45,7 +45,7 @@ pub(super) async fn load_order_from_pool(
     order_id: Uuid,
 ) -> Result<StockLossOrder, StockAdjustmentError> {
     let row = sqlx::query_as::<_, StockLossOrderRow>(&format!(
-        "SELECT {} FROM stock_adjustment_orders WHERE owner_id = $1 AND id = $2",
+        "SELECT {} FROM stock_adjustment_orders WHERE owner_id = $1 AND id = $2 AND adjustment_type = 'loss'",
         order_columns()
     ))
     .bind(owner_id)
@@ -57,7 +57,7 @@ pub(super) async fn load_order_from_pool(
         Some(row) => row,
         None => {
             let exists: bool = sqlx::query_scalar(
-                "SELECT EXISTS(SELECT 1 FROM stock_adjustment_orders WHERE id = $1)",
+                "SELECT EXISTS(SELECT 1 FROM stock_adjustment_orders WHERE id = $1 AND adjustment_type = 'loss')",
             )
             .bind(order_id)
             .fetch_one(pool)
@@ -79,7 +79,7 @@ pub(super) async fn load_order_for_update(
     order_id: Uuid,
 ) -> Result<StockLossOrder, StockAdjustmentError> {
     let row = sqlx::query_as::<_, StockLossOrderRow>(&format!(
-        "SELECT {} FROM stock_adjustment_orders WHERE owner_id = $1 AND id = $2 FOR UPDATE",
+        "SELECT {} FROM stock_adjustment_orders WHERE owner_id = $1 AND id = $2 AND adjustment_type = 'loss' FOR UPDATE",
         order_columns()
     ))
     .bind(owner_id)
@@ -91,7 +91,7 @@ pub(super) async fn load_order_for_update(
         Some(row) => row,
         None => {
             let exists: bool = sqlx::query_scalar(
-                "SELECT EXISTS(SELECT 1 FROM stock_adjustment_orders WHERE id = $1)",
+                "SELECT EXISTS(SELECT 1 FROM stock_adjustment_orders WHERE id = $1 AND adjustment_type = 'loss')",
             )
             .bind(order_id)
             .fetch_one(&mut **tx)
@@ -108,12 +108,15 @@ pub(super) async fn load_order_for_update(
 }
 
 pub(super) fn order_columns() -> &'static str {
-    "id, owner_id, warehouse_id, order_no, batch_id, product_code, batch_no, quantity, reason_code, recall_id, source, external_ref, status, requires_quality_approval, quality_liaison_id, policy, source_rule_id, first_operator_id, second_operator_id, approval_record_id, started_at, completed_at, created_at, updated_at"
+    "id, owner_id, warehouse_id, order_no, adjustment_type, batch_id, product_code, batch_no, quantity, reason_code, recall_id, source, external_ref, status, requires_quality_approval, quality_liaison_id, policy, source_rule_id, first_operator_id, second_operator_id, approval_record_id, started_at, completed_at, created_at, updated_at"
 }
 
 pub(super) fn row_to_domain(
     row: StockLossOrderRow,
 ) -> Result<StockLossOrder, StockAdjustmentError> {
+    if row.adjustment_type != "loss" {
+        return Err(StockAdjustmentError::NotFound);
+    }
     Ok(StockLossOrder {
         id: row.id,
         owner_id: row.owner_id,
@@ -150,12 +153,13 @@ pub(super) fn row_to_domain(
     })
 }
 
-pub(super) async fn append_order_audit(
+pub(super) async fn append_order_audit<T: Serialize>(
     tx: &mut Transaction<'_, Postgres>,
     ctx: &AuthContext,
     action: &str,
-    before: Option<&StockLossOrder>,
-    after: &StockLossOrder,
+    resource_id: Uuid,
+    before: Option<&T>,
+    after: &T,
     now: DateTime<Utc>,
 ) -> Result<(), StockAdjustmentError> {
     let before_value = before
@@ -167,7 +171,7 @@ pub(super) async fn append_order_audit(
         action,
         "M-SA",
         "stock_adjustment_order",
-        after.id.to_string(),
+        resource_id.to_string(),
         Some(AuditDiff::compute(before_value, json_value(after)?)),
     );
     audit.occurred_at = now;

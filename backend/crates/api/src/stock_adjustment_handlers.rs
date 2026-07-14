@@ -9,8 +9,9 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 use wms_domain::{
-    CreateStockLossOrderRequest, ErrorResponse, ExecuteStockLossOrderRequest, StockLossOrder,
-    StockLossQualityApprovalRequest,
+    CreateStockLossOrderRequest, CreateStockSurplusOrderRequest, ErrorResponse,
+    ExecuteStockLossOrderRequest, ExecuteStockSurplusOrderRequest, StockLossOrder,
+    StockLossQualityApprovalRequest, StockSurplusOrder, StockSurplusQualityApprovalRequest,
 };
 
 use crate::{
@@ -69,27 +70,32 @@ impl IntoResponse for StockAdjustmentHandlerError {
             Self::StockAdjustment(StockAdjustmentError::NotFound) => (
                 StatusCode::NOT_FOUND,
                 "SA_ORDER_NOT_FOUND",
-                "报损单、仓库或库存批次不存在",
+                "库存调整单、仓库、商品或库存批次不存在",
             ),
             Self::StockAdjustment(StockAdjustmentError::CrossOwner) => (
                 StatusCode::FORBIDDEN,
                 "SA_CROSS_OWNER",
-                "禁止跨货主访问报损单",
+                "禁止跨货主访问库存调整单",
             ),
             Self::StockAdjustment(StockAdjustmentError::InvalidRequest) => (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "SA_REQUEST_INVALID",
-                "报损请求参数不完整",
+                "库存调整请求参数不完整",
             ),
             Self::StockAdjustment(StockAdjustmentError::InvalidStatus { .. }) => (
                 StatusCode::CONFLICT,
                 "SA_STATUS_CONFLICT",
-                "报损单当前状态不允许执行该操作",
+                "库存调整单当前状态不允许执行该操作",
             ),
             Self::StockAdjustment(StockAdjustmentError::QuantityExceeded) => (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "SA_QTY_EXCEEDED",
                 "报损数量超过可用库存",
+            ),
+            Self::StockAdjustment(StockAdjustmentError::InvalidPutawayTarget) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "SA_PUTAWAY_TARGET_INVALID",
+                "报溢目标库位不符合温区、色标或容量规则",
             ),
             Self::StockAdjustment(StockAdjustmentError::MissingSecondOperator) => (
                 StatusCode::UNPROCESSABLE_ENTITY,
@@ -109,7 +115,7 @@ impl IntoResponse for StockAdjustmentHandlerError {
             Self::StockAdjustment(StockAdjustmentError::DifferentFirstOperator) => (
                 StatusCode::CONFLICT,
                 "SA_FIRST_OPERATOR_CHANGED",
-                "开始与完成报损的第一操作人必须一致",
+                "开始与完成库存调整的第一操作人必须一致",
             ),
             Self::StockAdjustment(StockAdjustmentError::DualPersonApprovalRequired) => (
                 StatusCode::CONFLICT,
@@ -129,7 +135,7 @@ impl IntoResponse for StockAdjustmentHandlerError {
             ) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "SA_INTERNAL",
-                "报损操作处理失败",
+                "库存调整操作处理失败",
             ),
             Self::Auth(_) => unreachable!("auth error returned above"),
         };
@@ -155,20 +161,40 @@ pub fn stock_adjustment_router(state: StockAdjustmentAppState) -> Router {
             post(create_loss_order_handler),
         )
         .route(
-            "/api/v1/stock-adjustments/loss-orders/{id}",
+            "/api/v1/stock-adjustments/loss-orders/:id",
             get(get_loss_order_handler),
         )
         .route(
-            "/api/v1/stock-adjustments/loss-orders/{id}/quality-approval",
+            "/api/v1/stock-adjustments/loss-orders/:id/quality-approval",
             post(record_quality_approval_handler),
         )
         .route(
-            "/api/v1/stock-adjustments/loss-orders/{id}/start",
+            "/api/v1/stock-adjustments/loss-orders/:id/start",
             post(start_loss_order_handler),
         )
         .route(
-            "/api/v1/stock-adjustments/loss-orders/{id}/execute",
+            "/api/v1/stock-adjustments/loss-orders/:id/execute",
             post(execute_loss_order_handler),
+        )
+        .route(
+            "/api/v1/stock-adjustments/surplus-orders",
+            post(create_surplus_order_handler),
+        )
+        .route(
+            "/api/v1/stock-adjustments/surplus-orders/:id",
+            get(get_surplus_order_handler),
+        )
+        .route(
+            "/api/v1/stock-adjustments/surplus-orders/:id/quality-approval",
+            post(record_surplus_quality_approval_handler),
+        )
+        .route(
+            "/api/v1/stock-adjustments/surplus-orders/:id/start",
+            post(start_surplus_order_handler),
+        )
+        .route(
+            "/api/v1/stock-adjustments/surplus-orders/:id/execute",
+            post(execute_surplus_order_handler),
         )
         .with_state(state)
 }
@@ -252,6 +278,92 @@ async fn execute_loss_order_handler(
         state
             .repository
             .execute_loss_order(&ctx, order_id, request.second_operator_id, Utc::now(), key)
+            .await?
+            .value,
+    ))
+}
+
+async fn create_surplus_order_handler(
+    ctx: AuthContext,
+    State(state): State<StockAdjustmentAppState>,
+    headers: HeaderMap,
+    Json(request): Json<CreateStockSurplusOrderRequest>,
+) -> Result<(StatusCode, Json<StockSurplusOrder>), StockAdjustmentHandlerError> {
+    ctx.require_permission(WRITE_PERMISSION)?;
+    let key = idempotency_key(&headers)?;
+    let result = state
+        .repository
+        .create_surplus_order(&ctx, request, Utc::now(), key)
+        .await?;
+    Ok((StatusCode::CREATED, Json(result.value)))
+}
+
+async fn get_surplus_order_handler(
+    ctx: AuthContext,
+    State(state): State<StockAdjustmentAppState>,
+    Path(order_id): Path<Uuid>,
+) -> Result<Json<StockSurplusOrder>, StockAdjustmentHandlerError> {
+    ctx.require_permission(READ_PERMISSION)?;
+    Ok(Json(
+        state.repository.get_surplus_order(&ctx, order_id).await?,
+    ))
+}
+
+async fn record_surplus_quality_approval_handler(
+    ctx: AuthContext,
+    State(state): State<StockAdjustmentAppState>,
+    Path(order_id): Path<Uuid>,
+    headers: HeaderMap,
+    Json(request): Json<StockSurplusQualityApprovalRequest>,
+) -> Result<Json<StockSurplusOrder>, StockAdjustmentHandlerError> {
+    ctx.require_permission(QUALITY_APPROVE_PERMISSION)?;
+    let key = idempotency_key(&headers)?;
+    Ok(Json(
+        state
+            .repository
+            .record_surplus_quality_approval(
+                &ctx,
+                order_id,
+                &request.quality_liaison_id,
+                request.approved,
+                Utc::now(),
+                key,
+            )
+            .await?
+            .value,
+    ))
+}
+
+async fn start_surplus_order_handler(
+    ctx: AuthContext,
+    State(state): State<StockAdjustmentAppState>,
+    Path(order_id): Path<Uuid>,
+    headers: HeaderMap,
+) -> Result<Json<StockSurplusOrder>, StockAdjustmentHandlerError> {
+    ctx.require_permission(EXECUTE_PERMISSION)?;
+    let key = idempotency_key(&headers)?;
+    Ok(Json(
+        state
+            .repository
+            .start_surplus_order(&ctx, order_id, Utc::now(), key)
+            .await?
+            .value,
+    ))
+}
+
+async fn execute_surplus_order_handler(
+    ctx: AuthContext,
+    State(state): State<StockAdjustmentAppState>,
+    Path(order_id): Path<Uuid>,
+    headers: HeaderMap,
+    Json(request): Json<ExecuteStockSurplusOrderRequest>,
+) -> Result<Json<StockSurplusOrder>, StockAdjustmentHandlerError> {
+    ctx.require_permission(EXECUTE_PERMISSION)?;
+    let key = idempotency_key(&headers)?;
+    Ok(Json(
+        state
+            .repository
+            .execute_surplus_order(&ctx, order_id, request.second_operator_id, Utc::now(), key)
             .await?
             .value,
     ))

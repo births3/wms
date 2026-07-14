@@ -82,6 +82,40 @@ impl TryFrom<&str> for StockLossReason {
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
+pub enum StockSurplusReason {
+    InventorySurplus,
+    ReturnInbound,
+    SystemDifferenceCorrection,
+    Other,
+}
+
+impl StockSurplusReason {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::InventorySurplus => "inventory_surplus",
+            Self::ReturnInbound => "return_inbound",
+            Self::SystemDifferenceCorrection => "system_difference_correction",
+            Self::Other => "other",
+        }
+    }
+}
+
+impl TryFrom<&str> for StockSurplusReason {
+    type Error = ();
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "inventory_surplus" => Ok(Self::InventorySurplus),
+            "return_inbound" => Ok(Self::ReturnInbound),
+            "system_difference_correction" => Ok(Self::SystemDifferenceCorrection),
+            "other" => Ok(Self::Other),
+            _ => Err(()),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum StockAdjustmentStatus {
     PendingApproval,
     PendingExecution,
@@ -136,13 +170,35 @@ pub struct CreateStockLossOrderRequest {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CreateStockSurplusOrderRequest {
+    pub warehouse_id: Uuid,
+    pub batch_id: Uuid,
+    pub quantity: i64,
+    pub reason: StockSurplusReason,
+    pub source: StockAdjustmentSource,
+    pub external_ref: Option<String>,
+    pub requires_quality_approval: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct StockLossQualityApprovalRequest {
+    pub quality_liaison_id: String,
+    pub approved: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct StockSurplusQualityApprovalRequest {
     pub quality_liaison_id: String,
     pub approved: bool,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
 pub struct ExecuteStockLossOrderRequest {
+    pub second_operator_id: Option<Uuid>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
+pub struct ExecuteStockSurplusOrderRequest {
     pub second_operator_id: Option<Uuid>,
 }
 
@@ -158,6 +214,33 @@ pub struct StockLossOrder {
     pub quantity: i64,
     pub reason: StockLossReason,
     pub recall_id: Option<String>,
+    pub source: StockAdjustmentSource,
+    pub external_ref: Option<String>,
+    pub status: StockAdjustmentStatus,
+    pub requires_quality_approval: bool,
+    pub quality_liaison_id: Option<String>,
+    pub policy: Option<DualPersonPolicy>,
+    pub source_rule_id: Option<Uuid>,
+    pub first_operator_id: Option<Uuid>,
+    pub second_operator_id: Option<Uuid>,
+    pub approval_record_id: Option<Uuid>,
+    pub started_at: Option<DateTime<Utc>>,
+    pub completed_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize, ToSchema)]
+pub struct StockSurplusOrder {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub warehouse_id: Uuid,
+    pub order_no: String,
+    pub batch_id: Uuid,
+    pub product_code: String,
+    pub batch_no: String,
+    pub quantity: i64,
+    pub reason: StockSurplusReason,
     pub source: StockAdjustmentSource,
     pub external_ref: Option<String>,
     pub status: StockAdjustmentStatus,

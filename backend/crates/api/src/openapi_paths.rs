@@ -99,8 +99,10 @@ pub use wms_domain::{
     UpdateDockAppointmentRequest, UpdateDockRequest,
 };
 pub use wms_domain::{
-    CreateStockLossOrderRequest, ExecuteStockLossOrderRequest, StockAdjustmentSource,
-    StockAdjustmentStatus, StockLossOrder, StockLossQualityApprovalRequest, StockLossReason,
+    CreateStockLossOrderRequest, CreateStockSurplusOrderRequest, ExecuteStockLossOrderRequest,
+    ExecuteStockSurplusOrderRequest, StockAdjustmentSource, StockAdjustmentStatus, StockLossOrder,
+    StockLossQualityApprovalRequest, StockLossReason, StockSurplusOrder,
+    StockSurplusQualityApprovalRequest, StockSurplusReason,
 };
 pub use wms_domain::{
     CreateWarehouseTaskRequest, TaskGroup, TaskGroupListResponse, TaskGroupMemberQualification,
