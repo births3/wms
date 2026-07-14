@@ -3354,13 +3354,63 @@ reason = "已实现统一任务模型、业务源幂等、待分配初态和审�
 owner = "TE 模块负责人"
 resume_when = "M-RP/M3/M4 退货故事实现后逐项接入剩余触发源，并完成真实跨模块 E2E 与发布证据。"
 
-[[deferred_stories]]
+[[stories]]
 id = "US-TE-004"
 title = "任务优先级规则"
 module = "TE"
-reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
-owner = "TE 模块负责人"
-resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+story_file = "docs/domain/user-stories-mte-task-engine.md"
+types = ["write", "config_rule", "frontend_interaction", "api_change", "audit_compliance"]
+frontend_pages = ["mte-task-types", "mte-task-dispatch"]
+navigation_checks = ["node apps/web-admin/self-checks/mte-task-execution-slice-self-check.mjs"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:mte-real"]
+api_paths = ["GET /api/v1/task-engine/priority-rule", "PUT /api/v1/task-engine/priority-rule", "GET /api/v1/task-engine/tasks", "POST /api/v1/task-engine/tasks/{task_id}/transitions"]
+database_objects = ["task_priority_rules", "warehouse_tasks", "task_execution_events", "audit_event", "idempotency_request"]
+test_checks = [
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test task_engine_postgres -- --test-threads=1",
+  "just openapi-check",
+  "python3 scripts/governance/check_error_codes.py",
+  "node apps/web-admin/self-checks/mte-task-execution-slice-self-check.mjs",
+  "pnpm --dir apps/web-admin exec tsc --noEmit",
+  "pnpm --dir apps/web-admin run test:e2e:mte-real",
+]
+evidence_refs = [
+  "backend/crates/domain/src/task_engine.rs",
+  "backend/crates/api/src/task_engine.rs",
+  "backend/crates/api/src/task_engine_handlers.rs",
+  "backend/crates/api/tests/task_engine_postgres.rs",
+  "backend/crates/api/tests/task_engine_postgres/priority.rs",
+  "backend/crates/api/tests/task_engine_postgres/routes.rs",
+  "backend/migrations/202607150006_mte_task_priority_rules.sql",
+  "apps/web-admin/src/pages/task-engine/TaskTypeConfigPage.tsx",
+  "apps/web-admin/src/pages/task-engine/TaskDispatchPage.tsx",
+  "apps/web-admin/src/features/task-engine/task-type-queries.ts",
+  "apps/web-admin/self-checks/mte-task-execution-slice-self-check.mjs",
+  "prototypes/e2e/web-admin-te-real.spec.ts",
+  "prototypes/playwright-web-admin-mte-real-config.ts",
+  "artifacts/screenshot-portal/real-web/m-te-task-types/task-type-config.png",
+  "artifacts/screenshot-portal/real-web/m-te-task-execution/task-dispatched.png",
+  "shared/openapi/openapi.json",
+  "packages/api-client/src/schema.ts",
+  "docs/error-codes.md",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
 
 [[deferred_stories]]
 id = "US-TE-005"
