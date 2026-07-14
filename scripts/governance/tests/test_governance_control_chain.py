@@ -301,6 +301,29 @@ def test_gitea_workflow_uses_lightweight_pr_gates():
     assert "pnpm install --frozen-lockfile" in text
     assert "gitleaks_8.21.2_linux_x64.tar.gz" in text
     assert "gitleaks detect --redact --no-banner" in text
+    assert "Start PostgreSQL for T3/T4" in text
+    assert "postgres:16" in text
+    assert "openssl rand -hex 24" in text
+    assert 'echo "DATABASE_URL=' in text
+    assert '>> "$GITHUB_ENV"' in text
+    assert "playwright install --with-deps chromium" in text
+
+
+def test_governance_scope_web_admin_self_checks_are_in_task_gate():
+    package = json.loads(
+        (REPO_ROOT / "apps" / "web-admin" / "package.json").read_text(encoding="utf-8")
+    )
+    command = package["scripts"]["test:self-checks"]
+    expected = [
+        "di-drug-inspection-slice-self-check.mjs",
+        "h1-dock-appointment-change-self-check.mjs",
+        "m10-tms-route-plan-page-self-check.mjs",
+        "m3-inventory-status-config-self-check.mjs",
+        "m9-billing-rule-page-self-check.mjs",
+        "te-task-type-slice-self-check.mjs",
+    ]
+
+    assert all(f"node self-checks/{name}" in command for name in expected)
 
 
 def test_governance_docs_only_name_existing_t4_checks():
