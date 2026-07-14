@@ -28,6 +28,7 @@ type FormState = {
   zoneIds: string[];
   taskTypeCodes: string[];
   memberUserIds: string[];
+  memberQualifications: Array<{ userId: string; validUntil: string; maxActiveTasks: string }>;
   enabled: boolean;
 };
 type Notice = { kind: "success" | "error"; text: string } | null;
@@ -90,7 +91,16 @@ export function TaskGroupConfigPage() {
     event.preventDefault();
     const error = validate(form, Boolean(editing));
     if (error) { setNotice({ kind: "error", text: error }); return; }
-    const body: UpsertTaskGroupRequest = { task_group_name: form.name.trim(), warehouse_id: form.warehouseId, zone_ids: form.zoneIds, task_type_codes: form.taskTypeCodes, member_user_ids: form.memberUserIds, enabled: form.enabled };
+    const body: UpsertTaskGroupRequest = {
+      task_group_name: form.name.trim(), warehouse_id: form.warehouseId, zone_ids: form.zoneIds,
+      task_type_codes: form.taskTypeCodes, member_user_ids: form.memberUserIds,
+      member_qualifications: form.memberQualifications.map((item) => ({
+        user_id: item.userId,
+        valid_until: item.validUntil ? new Date(item.validUntil).toISOString() : null,
+        max_active_tasks: item.maxActiveTasks ? Number(item.maxActiveTasks) : null,
+      })),
+      enabled: form.enabled,
+    };
     try {
       await save.mutateAsync({ code: form.code.trim().toLowerCase(), body });
       setDialogOpen(false); setSelected([]); setNotice({ kind: "success", text: `任务组 ${form.code.trim().toLowerCase()} 已保存` });
@@ -107,24 +117,41 @@ function TaskGroupDialog({ open, editing, form, pending, errorMessage, warehouse
   onOpenChange: (open: boolean) => void; onFormChange: (form: FormState) => void; onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 }) {
   const patch = (value: Partial<FormState>) => onFormChange({ ...form, ...value });
-  const toggle = (key: "zoneIds" | "taskTypeCodes" | "memberUserIds", value: string, checked: boolean) => patch({ [key]: checked ? [...form[key], value] : form[key].filter((item) => item !== value) });
+  const toggle = (key: "zoneIds" | "taskTypeCodes", value: string, checked: boolean) => patch({ [key]: checked ? [...form[key], value] : form[key].filter((item) => item !== value) });
+  const toggleMember = (userId: string, checked: boolean) => patch(checked ? {
+    memberUserIds: [...form.memberUserIds, userId],
+    memberQualifications: [...form.memberQualifications, { userId, validUntil: "", maxActiveTasks: "" }],
+  } : {
+    memberUserIds: form.memberUserIds.filter((item) => item !== userId),
+    memberQualifications: form.memberQualifications.filter((item) => item.userId !== userId),
+  });
+  const patchQualification = (userId: string, value: Partial<{ validUntil: string; maxActiveTasks: string }>) => patch({
+    memberQualifications: form.memberQualifications.map((item) => item.userId === userId ? { ...item, ...value } : item),
+  });
   const warehouseZones = zones.filter((zone) => zone.warehouse_id === form.warehouseId && (zone.status === "active" || form.zoneIds.includes(zone.id)));
   return <Dialog open={open} onOpenChange={(value) => !pending && onOpenChange(value)}><DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl"><form className="grid gap-4" onSubmit={onSubmit}><DialogHeader><DialogTitle>{editing ? "编辑任务组资格" : "新增任务组"}</DialogTitle><DialogDescription>分派时同时校验货主、仓库、任务类型和成员资格。</DialogDescription></DialogHeader>
     <div className="grid gap-3 sm:grid-cols-2"><label className="grid gap-1 text-sm">任务组编码<Input required readOnly={Boolean(editing)} pattern="[A-Za-z0-9][A-Za-z0-9_.-]{0,63}" value={form.code} onChange={(event) => patch({ code: event.target.value })} /></label><label className="grid gap-1 text-sm">任务组名称<Input required maxLength={128} value={form.name} onChange={(event) => patch({ name: event.target.value })} /></label></div>
     <label className="grid gap-1 text-sm">适用仓库<Select value={form.warehouseId} onValueChange={(warehouseId) => patch({ warehouseId, zoneIds: [] })} disabled={Boolean(editing)}><SelectTrigger><SelectValue placeholder="请选择仓库" /></SelectTrigger><SelectContent>{warehouses.map((warehouse) => <SelectItem key={warehouse.id} value={warehouse.id}>{warehouse.warehouse_code} · {warehouse.warehouse_name}</SelectItem>)}</SelectContent></Select></label>
     <fieldset className="grid gap-2 rounded-md border p-3"><legend className="px-1 text-sm font-medium">适用库区</legend><div className="grid gap-2 sm:grid-cols-2">{warehouseZones.map((zone) => <label key={zone.id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.zoneIds.includes(zone.id)} onChange={(event) => toggle("zoneIds", zone.id, event.target.checked)} />{zone.zone_code} · {zone.zone_name}</label>)}</div>{warehouseZones.length === 0 && <div className="text-sm text-muted-foreground">未选择表示全仓适用。</div>}</fieldset>
     <fieldset className="grid gap-2 rounded-md border p-3"><legend className="px-1 text-sm font-medium">适用任务类型</legend><div className="grid gap-2 sm:grid-cols-2">{taskTypes.filter((item) => item.enabled || form.taskTypeCodes.includes(item.task_type_code)).map((item) => <label key={item.task_type_code} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.taskTypeCodes.includes(item.task_type_code)} onChange={(event) => toggle("taskTypeCodes", item.task_type_code, event.target.checked)} />{item.task_type_name}（{item.task_type_code}）</label>)}</div></fieldset>
-    <fieldset className="grid gap-2 rounded-md border p-3"><legend className="px-1 text-sm font-medium">任务组成员</legend><div className="grid max-h-48 gap-2 overflow-y-auto sm:grid-cols-2">{users.map((user) => <label key={user.user_id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.memberUserIds.includes(user.user_id)} onChange={(event) => toggle("memberUserIds", user.user_id, event.target.checked)} />{user.display_name}（{user.username}）</label>)}</div></fieldset>
+    <fieldset className="grid gap-3 rounded-md border p-3"><legend className="px-1 text-sm font-medium">任务组成员</legend><div className="grid max-h-48 gap-2 overflow-y-auto sm:grid-cols-2">{users.map((user) => <label key={user.user_id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.memberUserIds.includes(user.user_id)} onChange={(event) => toggleMember(user.user_id, event.target.checked)} />{user.display_name}（{user.username}）</label>)}</div>
+      {form.memberQualifications.length > 0 && <div className="grid gap-3 border-t pt-3">{form.memberQualifications.map((qualification) => {
+        const user = users.find((item) => item.user_id === qualification.userId);
+        const name = user?.display_name ?? qualification.userId;
+        return <div key={qualification.userId} className="grid gap-2 rounded-md bg-muted/30 p-3 sm:grid-cols-2"><div className="text-sm font-medium sm:col-span-2">{name}</div><label className="grid gap-1 text-sm">{name} 资格有效期<Input type="datetime-local" value={qualification.validUntil} onChange={(event) => patchQualification(qualification.userId, { validUntil: event.target.value })} /></label><label className="grid gap-1 text-sm">{name} 同时在手上限<Input type="number" min={1} step={1} placeholder="不限" value={qualification.maxActiveTasks} onChange={(event) => patchQualification(qualification.userId, { maxActiveTasks: event.target.value })} /></label></div>;
+      })}</div>}
+    </fieldset>
     <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.enabled} onChange={(event) => patch({ enabled: event.target.checked })} />启用任务组</label>
     {errorMessage && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">{errorMessage}</div>}<DialogFooter><DialogClose asChild><Button type="button" variant="outline" disabled={pending}>取消</Button></DialogClose><Button type="submit" disabled={pending || !form.warehouseId || form.taskTypeCodes.length === 0}>{pending ? "保存中..." : "保存"}</Button></DialogFooter>
   </form></DialogContent></Dialog>;
 }
 
-function emptyForm(): FormState { return { code: "", name: "", warehouseId: "", zoneIds: [], taskTypeCodes: [], memberUserIds: [], enabled: true }; }
-function formFor(row: TaskGroup): FormState { return { code: row.task_group_code, name: row.task_group_name, warehouseId: row.warehouse_id, zoneIds: row.zone_ids, taskTypeCodes: row.task_type_codes, memberUserIds: row.member_user_ids, enabled: row.enabled }; }
-function validate(form: FormState, editing: boolean) { if (!editing && !/^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/.test(form.code.trim())) return "任务组编码非法"; if (!form.name.trim() || !form.warehouseId || form.taskTypeCodes.length === 0) return "请填写名称、仓库并至少选择一个任务类型"; return null; }
+function emptyForm(): FormState { return { code: "", name: "", warehouseId: "", zoneIds: [], taskTypeCodes: [], memberUserIds: [], memberQualifications: [], enabled: true }; }
+function formFor(row: TaskGroup): FormState { return { code: row.task_group_code, name: row.task_group_name, warehouseId: row.warehouse_id, zoneIds: row.zone_ids, taskTypeCodes: row.task_type_codes, memberUserIds: row.member_user_ids, memberQualifications: row.member_qualifications.map((item) => ({ userId: item.user_id, validUntil: toDateTimeLocal(item.valid_until), maxActiveTasks: item.max_active_tasks?.toString() ?? "" })), enabled: row.enabled }; }
+function validate(form: FormState, editing: boolean) { if (!editing && !/^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/.test(form.code.trim())) return "任务组编码非法"; if (!form.name.trim() || !form.warehouseId || form.taskTypeCodes.length === 0) return "请填写名称、仓库并至少选择一个任务类型"; if (form.memberQualifications.some((item) => item.maxActiveTasks && (!Number.isInteger(Number(item.maxActiveTasks)) || Number(item.maxActiveTasks) <= 0))) return "同时在手上限必须为正整数"; return null; }
 function defaultQuery(): QueryPanelValue { return { keyword: "", status: "", warehouseId: "" }; }
 function text(value: unknown) { return typeof value === "string" ? value : ""; }
 function normalizeQuery(value: unknown): QueryPanelValue { const row = value && typeof value === "object" ? value as Record<string, unknown> : {}; return { keyword: text(row.keyword), status: text(row.status), warehouseId: text(row.warehouseId) }; }
 function errorText(error: unknown, fallback: string) { return error instanceof Error ? error.message : fallback; }
 function formatDateTime(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { hour12: false }); }
+function toDateTimeLocal(value?: string | null) { if (!value) return ""; const date = new Date(value); const offset = date.getTimezoneOffset() * 60_000; return new Date(date.getTime() - offset).toISOString().slice(0, 16); }

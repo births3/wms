@@ -42,6 +42,9 @@ test("M-TE 任务组和调度使用真实 API 完成创建、自动分派与下�
   await page.getByRole("option", { name: /WH-M1-E2E-001/ }).click();
   await dialog.getByRole("checkbox", { name: "上架（putaway）" }).check();
   await dialog.getByRole("checkbox", { name: "系统管理员（admin）" }).check();
+  const validUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16);
+  await dialog.getByLabel("系统管理员 资格有效期").fill(validUntil);
+  await dialog.getByLabel("系统管理员 同时在手上限").fill("2");
   await dialog.getByRole("button", { name: "保存", exact: true }).click();
   await expect(page.getByText(`任务组 ${groupCode} 已保存`)).toBeVisible();
 
