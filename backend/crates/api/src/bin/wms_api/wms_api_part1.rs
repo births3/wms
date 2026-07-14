@@ -178,6 +178,7 @@ async fn audit_events_route_requires_auth_and_permission() {
         AuditQueryState { pool: pool.clone() },
         MasterDataAppState::default(),
         SystemDictionaryAppState::with_postgres(pool),
+        None,
     )
     .layer(auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(
         AllowAllRevocationStore,
@@ -230,6 +231,7 @@ async fn h2_lifecycle_routes_require_auth_context() {
         AuditQueryState { pool: pool.clone() },
         MasterDataAppState::default(),
         SystemDictionaryAppState::with_postgres(pool),
+        None,
     )
     .layer(auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(
         AllowAllRevocationStore,
@@ -269,6 +271,7 @@ async fn master_data_route_is_mounted_under_auth_context() {
         AuditQueryState { pool: pool.clone() },
         MasterDataAppState::default(),
         SystemDictionaryAppState::with_postgres(pool),
+        None,
     )
     .layer(auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(
         AllowAllRevocationStore,
@@ -301,6 +304,7 @@ async fn runtime_mounts_wave4_and_wave5_routes() {
         AuditQueryState { pool: pool.clone() },
         MasterDataAppState::default(),
         SystemDictionaryAppState::with_postgres(pool),
+        None,
     );
 
     for uri in ["/api/v1/outbound/orders", "/api/v1/packing/stations"] {
@@ -348,6 +352,7 @@ async fn h3_docs_routes_are_public() {
             AuditQueryState { pool: pool.clone() },
             MasterDataAppState::default(),
             SystemDictionaryAppState::with_postgres(pool),
+            None,
         )
     });
 

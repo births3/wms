@@ -22,11 +22,13 @@ use wms_api::{
     dock_handlers::{dock_router, DockAppState},
     document_numbering_handlers::{document_numbering_router, DocumentNumberingAppState},
     drug_inspection_handlers::{drug_inspection_router, DrugInspectionAppState},
+    dual_person_policy_handlers::{dual_person_policy_router, DualPersonPolicyAppState},
     feature_flags::FeatureFlagRegistry,
     master_data_handlers::{master_data_router, MasterDataAppState},
     print_template_handlers::{print_template_router, PrintTemplateAppState},
     role_management::{role_management_router, RoleManagementState},
     system_dictionary_handlers::{system_dictionary_router, SystemDictionaryAppState},
+    task_engine_handlers::{task_engine_router, TaskEngineAppState},
     task_type_handlers::{task_type_router, TaskTypeAppState},
     wave3_handlers::{wave3_router, Wave3AppState},
     wave4_handlers::postgres_outbound,
@@ -118,6 +120,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .merge(task_type_router(TaskTypeAppState::with_postgres(
             pool.clone(),
         )))
+        .merge(task_engine_router(TaskEngineAppState::with_postgres(
+            pool.clone(),
+        )))
+        .merge(dual_person_policy_router(
+            DualPersonPolicyAppState::with_postgres(pool.clone()),
+        ))
         .merge(print_template_router(PrintTemplateAppState::with_postgres(
             pool.clone(),
         )))
@@ -336,6 +344,11 @@ async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
             "mcg.document_numbering.write",
             "M-CG 单据号规则维护",
         ),
+        (
+            "00000000-0000-0000-0000-000000000128",
+            "m1.config.write",
+            "M1 配置中心维护",
+        ),
     ] {
         let permission_id: Uuid = sqlx::query_scalar(
             r#"
@@ -374,6 +387,7 @@ async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
     .execute(pool)
     .await?;
 
+    wms_api_e2e_seed::seed_mvr_matrix_approver(pool, &password_hash, system_admin_role_id).await?;
     wms_api_e2e_seed::seed_quality_approver(pool, &password_hash).await?;
     wms_api_e2e_seed::seed_m9_m10_capabilities(pool).await?;
     wms_api_e2e_seed::seed_m4_review_data(pool).await?;

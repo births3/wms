@@ -83,7 +83,17 @@ async fn postgres_inspect_and_sign_handlers_write_idempotency_and_audit(pool: Pg
         .as_ref()
         .expect("postgres repository");
     let supplier_id = Uuid::new_v4();
+    let warehouse_id = Uuid::new_v4();
     seed_active_supplier_and_product(&pool, owner_id, supplier_id, "P-001").await;
+    sqlx::query(
+        "INSERT INTO warehouses (id, owner_id, warehouse_code, warehouse_name, warehouse_type, status) VALUES ($1, $2, $3, '收货处理器测试仓', 'normal', 'active')",
+    )
+    .bind(warehouse_id)
+    .bind(owner_id)
+    .bind(format!("M2-HANDLER-WH-{}", &warehouse_id.to_string()[..8]))
+    .execute(&pool)
+    .await
+    .expect("seed handler warehouse");
     let order = repository
         .create_receiving_order(
             &authorized,
@@ -91,7 +101,7 @@ async fn postgres_inspect_and_sign_handlers_write_idempotency_and_audit(pool: Pg
                 receipt_no: "ASN-HANDLER-PG-003".to_string(),
                 document_type: "purchase_inbound".to_string(),
                 supplier_id: Some(supplier_id),
-                warehouse_id: Uuid::new_v4(),
+                warehouse_id,
                 external_ref: None,
                 expected_arrival_at: Some(now + chrono::Duration::days(1)),
                 lines: vec![receiving_line()],

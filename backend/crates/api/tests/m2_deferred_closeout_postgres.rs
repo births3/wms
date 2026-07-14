@@ -61,6 +61,15 @@ async fn seed_asn_references(
     owner_id: Uuid,
     request: &mut CreateReceivingOrderRequest,
 ) {
+    sqlx::query(
+        "INSERT INTO warehouses (id, owner_id, warehouse_code, warehouse_name, warehouse_type, status) VALUES ($1, $2, $3, 'M2 ASN 测试仓', 'normal', 'active') ON CONFLICT (owner_id, warehouse_code) DO NOTHING",
+    )
+    .bind(request.warehouse_id)
+    .bind(owner_id)
+    .bind(format!("M2-ASN-WH-{}", &request.warehouse_id.to_string()[..8]))
+    .execute(pool)
+    .await
+    .expect("seed ASN warehouse");
     let supplier_id = request.supplier_id.expect("request supplier");
     let suffix = &supplier_id.to_string()[..8];
     sqlx::query(
@@ -324,6 +333,73 @@ async fn inspection_uses_actual_receipt_quantity_and_blocks_early_signature(pool
         )
         .await
         .expect("inspect second half");
+
+    let client_downgrade = repository
+        .sign_receiving_order_with_audit(
+            &ctx,
+            order.id,
+            SignInspectionRequest {
+                first_signer_id,
+                second_signer_id: None,
+                dual_required: false,
+            },
+            chrono::Utc::now(),
+            "sign-client-downgrade",
+            None,
+        )
+        .await;
+    assert!(matches!(
+        client_downgrade,
+        Err(Wave3RepositoryError::MissingSecondSigner)
+    ));
+
+    sqlx::query(
+        "UPDATE products SET special_drug_category = 'narcotic' WHERE owner_id = $1 AND product_code = 'P-M2-001'",
+    )
+    .bind(owner_id)
+    .execute(&pool)
+    .await
+    .expect("switch inbound product to approval-required category");
+    let missing_approval = repository
+        .sign_receiving_order_with_audit(
+            &ctx,
+            order.id,
+            SignInspectionRequest {
+                first_signer_id,
+                second_signer_id: Some(second_signer_id),
+                dual_required: false,
+            },
+            chrono::Utc::now(),
+            "sign-missing-approval",
+            None,
+        )
+        .await;
+    assert!(matches!(
+        missing_approval,
+        Err(Wave3RepositoryError::DualPersonApprovalRequired)
+    ));
+    let approval_id = Uuid::new_v4();
+    let approval_time = chrono::Utc::now();
+    sqlx::query(
+        r#"
+        INSERT INTO h4_approval_records (
+            id, owner_id, scenario, business_ref, dedupe_key, approver_user,
+            process_id, callback_path, summary, status, external_approval_id,
+            approved_by, approved_at, created_at, updated_at
+        )
+        VALUES ($1, $2, 'mvr.dual_person', $3, 'm2-inspection-approval', $4,
+                'mvr-dual-person', '/api/v1/wechat-notify/approvals/callback',
+                '特殊药品入库验收', 'approved', 'WX-M2-APPROVED', $4, $5, $5, $5)
+        "#,
+    )
+    .bind(approval_id)
+    .bind(owner_id)
+    .bind(order.id.to_string())
+    .bind(second_signer_id.to_string())
+    .bind(approval_time)
+    .execute(&pool)
+    .await
+    .expect("seed approved H4 dual-person approval");
     repository
         .sign_receiving_order_with_audit(
             &ctx,
@@ -339,6 +415,38 @@ async fn inspection_uses_actual_receipt_quantity_and_blocks_early_signature(pool
         )
         .await
         .expect("sign after complete inspection");
+    let execution_evidence: (Uuid, Uuid) = sqlx::query_as(
+        "SELECT strategy_rule_id, approval_record_id FROM receiving_inspection_signatures WHERE receiving_order_id = $1",
+    )
+    .bind(order.id)
+    .fetch_one(&pool)
+    .await
+        .expect("inspection signature strategy should query");
+    assert_eq!(execution_evidence.1, approval_id);
+    let putaway_task: (String, String, String, i64, Uuid) = sqlx::query_as(
+        r#"
+        SELECT task_type_code, status, product_code, planned_qty, source_doc_id
+          FROM warehouse_tasks
+         WHERE owner_id = $1
+           AND source_doc_type = 'receiving_order'
+           AND source_doc_id = $2
+        "#,
+    )
+    .bind(owner_id)
+    .bind(order.id)
+    .fetch_one(&pool)
+    .await
+    .expect("inspection signature should create a putaway task");
+    assert_eq!(
+        putaway_task,
+        (
+            "putaway".to_string(),
+            "pending_assignment".to_string(),
+            "P-M2-001".to_string(),
+            8,
+            order.id,
+        )
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -659,125 +767,4 @@ async fn dashboard_groups_real_postgres_receiving_statuses(pool: PgPool) {
     assert_ne!(first.id, second.id);
 }
 
-#[sqlx::test(migrations = "../../migrations")]
-async fn print_data_reads_receipt_inspection_and_dual_signature(pool: PgPool) {
-    let owner_id = Uuid::new_v4();
-    let ctx = context(owner_id);
-    let first_signer_id = ctx.user_id;
-    let second_signer_id = Uuid::new_v4();
-    auth_support::seed_receiving_verifiers(&pool, owner_id, &[first_signer_id, second_signer_id])
-        .await;
-    let repository = PgWave3Repository::new(pool.clone());
-    let mut create_request = request(RECEIVING_DOCUMENT_TYPE_PURCHASE_INBOUND, None);
-    seed_asn_references(&pool, owner_id, &mut create_request).await;
-    let order = repository
-        .create_receiving_order(&ctx, create_request, chrono::Utc::now())
-        .await
-        .expect("create print-data order");
-    sqlx::query("UPDATE receiving_orders SET status = 'released' WHERE id = $1")
-        .bind(order.id)
-        .execute(&pool)
-        .await
-        .expect("prepare released state");
-
-    let receipt = repository
-        .receive_receiving_order_with_audit(
-            &ctx,
-            order.id,
-            ReceiveReceivingOrderRequest {
-                actual_qty: 8,
-                shortage_qty: 1,
-                rejected_qty: 1,
-                arrival_temperature_celsius: Some(4.5),
-                exception_note: Some("外包装轻微破损".to_string()),
-                details: Some(ReceivingReceiptDetails {
-                    temperature_control_method: Some("冷藏".to_string()),
-                    vehicle_no: Some("沪A-12345".to_string()),
-                    origin: Some("上海配送中心".to_string()),
-                    departure_at: Some("2026-06-04T08:00:00Z".parse().expect("departure")),
-                    arrival_at: Some("2026-06-04T10:00:00Z".parse().expect("arrival")),
-                    storage_at: Some("2026-06-04T10:15:00Z".parse().expect("storage")),
-                    transport_mode: Some("冷藏车".to_string()),
-                    carrier: Some("华东冷链承运商".to_string()),
-                    contact_name: Some("张三".to_string()),
-                    contact_phone: Some("13800000000".to_string()),
-                    contact_id_no: Some("310101199001010000".to_string()),
-                    seal_checked: Some("已核对".to_string()),
-                    filing_checked: Some("已核对".to_string()),
-                }),
-            },
-            chrono::Utc::now(),
-            "print-data-receive",
-            None,
-        )
-        .await
-        .expect("receive print-data order")
-        .value;
-    assert_eq!(receipt.arrival_temperature_celsius, Some(4.5));
-    assert_eq!(receipt.exception_note.as_deref(), Some("外包装轻微破损"));
-
-    repository
-        .inspect_receiving_order_with_audit(
-            &ctx,
-            order.id,
-            InspectReceivingOrderRequest {
-                batch_no: "B-PRINT-001".to_string(),
-                accepted_qty: 7,
-                rejected_qty: 1,
-                production_date: "2026-01-01".to_string(),
-                expiry_date: "2028-01-01".to_string(),
-                quality_status: STATUS_QUALIFIED.to_string(),
-                trace_codes: vec!["TRACE-PRINT-001".to_string()],
-            },
-            chrono::NaiveDate::from_ymd_opt(2026, 7, 12).expect("valid date"),
-            chrono::Utc::now(),
-            "print-data-inspect",
-            None,
-        )
-        .await
-        .expect("inspect print-data order");
-    repository
-        .sign_receiving_order_with_audit(
-            &ctx,
-            order.id,
-            SignInspectionRequest {
-                first_signer_id,
-                second_signer_id: Some(second_signer_id),
-                dual_required: true,
-            },
-            chrono::Utc::now(),
-            "print-data-sign",
-            None,
-        )
-        .await
-        .expect("sign print-data order");
-
-    let print_data = repository
-        .get_receiving_order_print_data(&ctx, order.id)
-        .await
-        .expect("read print data");
-    assert_eq!(print_data.order.id, order.id);
-    assert_eq!(print_data.receipts.len(), 1);
-    let details = print_data.receipts[0]
-        .details
-        .as_ref()
-        .expect("receipt details");
-    assert_eq!(details.temperature_control_method.as_deref(), Some("冷藏"));
-    assert_eq!(details.vehicle_no.as_deref(), Some("沪A-12345"));
-    assert_eq!(details.carrier.as_deref(), Some("华东冷链承运商"));
-    assert_eq!(
-        details.departure_at.expect("departure").to_rfc3339(),
-        "2026-06-04T08:00:00+00:00"
-    );
-    assert_eq!(
-        details.arrival_at.expect("arrival").to_rfc3339(),
-        "2026-06-04T10:00:00+00:00"
-    );
-    assert_eq!(print_data.receipts[0].actual_qty, 8);
-    assert_eq!(print_data.inspections[0].batch_no, "B-PRINT-001");
-    assert_eq!(print_data.signatures[0].first_signer_id, first_signer_id);
-    assert_eq!(
-        print_data.signatures[0].second_signer_id,
-        Some(second_signer_id)
-    );
-}
+include!("m2_deferred_closeout/print_data.rs");

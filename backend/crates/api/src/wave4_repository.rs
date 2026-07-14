@@ -32,6 +32,8 @@ use crate::{
 
 pub const APPROVAL_SOURCE_TEMPERATURE_EXCURSION: &str = "M5-TEMP_EXCURSION";
 
+mod integrations;
+
 #[derive(Clone, Debug)]
 pub struct PgWave4Repository {
     pool: PgPool,
@@ -72,6 +74,9 @@ pub enum Wave4RepositoryError {
     IdempotencyConflict,
     OrderAlreadyInWave,
     ShortPickNotReplenished,
+    MissingSecondReviewer,
+    UnqualifiedSecondReviewer,
+    DualPersonApprovalRequired,
     Audit(String),
     Database(String),
     Serialize(String),
@@ -151,6 +156,8 @@ struct OutboundWaveRow {
 
 struct PickTaskDraft {
     order_id: Uuid,
+    order_no: String,
+    warehouse_id: Uuid,
     line_no: i32,
     batch_id: Uuid,
     product_code: String,

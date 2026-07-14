@@ -23,6 +23,7 @@ use wms_api::{
     dock_handlers::{dock_router, DockAppState},
     document_numbering_handlers::{document_numbering_router, DocumentNumberingAppState},
     drug_inspection_handlers::{drug_inspection_router, DrugInspectionAppState},
+    dual_person_policy_handlers::{dual_person_policy_router, DualPersonPolicyAppState},
     express::{express_router, ExpressAppState},
     feature_flags::FeatureFlagRegistry,
     h2_lifecycle_handlers::{h2_lifecycle_router, H2LifecycleAppState},
@@ -37,6 +38,7 @@ use wms_api::{
     role_management::{role_management_router, RoleManagementState},
     state_machine::state_machine_router,
     system_dictionary_handlers::{system_dictionary_router, SystemDictionaryAppState},
+    task_engine_handlers::{task_engine_router, TaskEngineAppState},
     task_type_handlers::{task_type_router, TaskTypeAppState},
     wave3_handlers::{wave3_router, Wave3AppState},
     wave4_handlers::{wave4_router, Wave4AppState},
@@ -95,16 +97,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
             ),
         )
     })?;
-    let revocation_store = Arc::new(
-        RedisAuthRevocationStore::from_url(&redis_url)
-            .await
-            .map_err(|error| {
-                io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!("failed to configure Redis auth revocation store: {error:?}"),
-                )
-            })?,
-    );
+    let redis_auth_store = RedisAuthRevocationStore::from_url(&redis_url)
+        .await
+        .map_err(|error| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("failed to configure Redis auth revocation store: {error:?}"),
+            )
+        })?;
+    let dual_person_policy_cache = redis_auth_store.multiplexed_connection();
+    let revocation_store = Arc::new(redis_auth_store);
     let pool = PgPoolOptions::new()
         .max_connections(database_max_connections()?)
         .after_connect(|connection, _metadata| {
@@ -123,7 +125,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let role_management_state = RoleManagementState::new(pool.clone(), revocation_store.clone());
     let audit_query_state = AuditQueryState { pool: pool.clone() };
     let master_data_state = MasterDataAppState::with_postgres(pool.clone());
-    let system_dictionary_state = SystemDictionaryAppState::with_postgres(pool.clone());
+    let system_dictionary_state = SystemDictionaryAppState::with_postgres_and_redis(
+        pool.clone(),
+        dual_person_policy_cache.clone(),
+    );
     let wave3_state =
         Wave3AppState::with_postgres(pool.clone()).with_config_center(config_center_state.clone());
     let wave4_state = Wave4AppState::with_postgres(pool.clone());
@@ -139,6 +144,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         audit_query_state,
         master_data_state,
         system_dictionary_state,
+        Some(dual_person_policy_cache),
     )
     .merge(role_management_router(role_management_state))
     .layer(auth_runtime_layer(AuthRuntimePolicy::new(revocation_store)));
@@ -225,6 +231,7 @@ fn app(
     audit_query_state: AuditQueryState,
     master_data_state: MasterDataAppState,
     system_dictionary_state: SystemDictionaryAppState,
+    dual_person_policy_cache: Option<redis::aio::MultiplexedConnection>,
 ) -> Router {
     let document_numbering_state =
         DocumentNumberingAppState::with_postgres(audit_query_state.pool.clone());
@@ -238,6 +245,12 @@ fn app(
         ResilienceState::from_env().with_audit_pool(audit_query_state.pool.clone());
     let api_key_auth_state = ApiKeyAuthState::new(audit_query_state.pool.clone());
     let shared_pool = audit_query_state.pool.clone();
+    let dual_person_policy_state = match dual_person_policy_cache {
+        Some(cache) => {
+            DualPersonPolicyAppState::with_postgres_and_redis(shared_pool.clone(), cache)
+        }
+        None => DualPersonPolicyAppState::with_postgres(shared_pool.clone()),
+    };
     Router::new()
         .route("/healthz", get(healthz))
         .route("/readyz", get(healthz))
@@ -275,6 +288,10 @@ fn app(
         .merge(task_type_router(TaskTypeAppState::with_postgres(
             shared_pool.clone(),
         )))
+        .merge(task_engine_router(TaskEngineAppState::with_postgres(
+            shared_pool.clone(),
+        )))
+        .merge(dual_person_policy_router(dual_person_policy_state))
         .merge(inventory_status_config_router(
             InventoryStatusConfigAppState::with_postgres(shared_pool.clone()),
         ))

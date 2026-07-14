@@ -67,7 +67,7 @@ impl PgWave3Repository {
         let signatures = sqlx::query_as::<_, InspectionSignatureRow>(
             r#"
             SELECT id, receiving_order_id, owner_id, first_signer_id,
-                   second_signer_id, signed_at
+                   second_signer_id, strategy_rule_id, approval_record_id, signed_at
               FROM receiving_inspection_signatures
              WHERE receiving_order_id = $1 AND owner_id = $2
              ORDER BY signed_at, id

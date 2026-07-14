@@ -97,6 +97,7 @@ async fn audit_events_query_filters_by_auth_owner(pool: PgPool) {
         AuditQueryState { pool: pool.clone() },
         MasterDataAppState::default(),
         SystemDictionaryAppState::with_postgres(pool.clone()),
+        None,
     )
     .layer(auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(
         AllowAllRevocationStore,
@@ -199,6 +200,7 @@ async fn auth_login_issues_token_and_me_returns_current_user(pool: PgPool) {
         AuditQueryState { pool: pool.clone() },
         MasterDataAppState::default(),
         SystemDictionaryAppState::with_postgres(pool),
+        None,
     )
     .layer(auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(
         AllowAllRevocationStore,

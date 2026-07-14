@@ -8,6 +8,7 @@ mod cold_chain;
 mod common;
 mod dock;
 mod drug_inspection;
+mod dual_person_policy;
 mod h4;
 mod inventory_count;
 mod logistics;
@@ -17,6 +18,7 @@ mod menu;
 mod operations;
 mod receiving_outbound;
 mod reporting;
+mod task_engine;
 mod task_type;
 
 pub use alert_definition::*;
@@ -31,6 +33,7 @@ pub use common::{
 };
 pub use dock::*;
 pub use drug_inspection::*;
+pub use dual_person_policy::*;
 pub use h4::*;
 pub use inventory_count::*;
 pub use logistics::*;
@@ -40,6 +43,7 @@ pub use menu::*;
 pub use operations::*;
 pub use receiving_outbound::*;
 pub use reporting::*;
+pub use task_engine::*;
 pub use task_type::*;
 
 // Schema helper fns are re-exported from common for module-level attributes.

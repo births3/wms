@@ -106,6 +106,8 @@ pub struct InspectionSignatureRecord {
     pub owner_id: Uuid,
     pub first_signer_id: Uuid,
     pub second_signer_id: Option<Uuid>,
+    pub strategy_rule_id: Option<Uuid>,
+    pub approval_record_id: Option<Uuid>,
     pub signed_at: DateTime<Utc>,
 }
 

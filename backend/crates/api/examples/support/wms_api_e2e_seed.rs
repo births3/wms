@@ -1,6 +1,54 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
+pub async fn seed_mvr_matrix_approver(
+    pool: &PgPool,
+    password_hash: &str,
+    system_admin_role_id: Uuid,
+) -> Result<(), sqlx::Error> {
+    let owner_id = Uuid::from_u128(1);
+    let user_id = Uuid::from_u128(0x103);
+    sqlx::query(
+        r#"
+        INSERT INTO auth_users (id, username, display_name, password_hash, status)
+        VALUES ($1, 'mvr-matrix-approver', 'M-VR 矩阵确认人', $2, 'active')
+        ON CONFLICT (id) DO UPDATE
+        SET display_name = EXCLUDED.display_name,
+            password_hash = EXCLUDED.password_hash,
+            status = 'active',
+            updated_at = now()
+        "#,
+    )
+    .bind(user_id)
+    .bind(password_hash)
+    .execute(pool)
+    .await?;
+    sqlx::query(
+        r#"
+        INSERT INTO auth_user_owner_bindings (user_id, owner_id, is_active, is_primary)
+        VALUES ($1, $2, TRUE, FALSE)
+        ON CONFLICT (user_id, owner_id) DO UPDATE SET is_active = TRUE
+        "#,
+    )
+    .bind(user_id)
+    .bind(owner_id)
+    .execute(pool)
+    .await?;
+    sqlx::query(
+        r#"
+        INSERT INTO auth_user_roles (user_id, owner_id, role_id)
+        VALUES ($1, $2, $3)
+        ON CONFLICT DO NOTHING
+        "#,
+    )
+    .bind(user_id)
+    .bind(owner_id)
+    .bind(system_admin_role_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 pub async fn seed_quality_approver(pool: &PgPool, password_hash: &str) -> Result<(), sqlx::Error> {
     let owner_id = Uuid::from_u128(1);
     let user_id = Uuid::from_u128(0x201);
@@ -104,6 +152,55 @@ pub async fn seed_m9_m10_capabilities(pool: &PgPool) -> Result<(), sqlx::Error> 
 /// 为真实管理端 E2E 提供一条可复核的已拣货出库单。
 pub async fn seed_m4_review_data(pool: &PgPool) -> Result<(), sqlx::Error> {
     let owner_id = Uuid::from_u128(1);
+    sqlx::query(
+        r#"
+        INSERT INTO products (
+            id, owner_id, product_code, product_name, specification,
+            storage_condition, special_drug_category, status
+        )
+        VALUES (
+            '00000000-0000-0000-0000-000000001704', $1,
+            'P-M4-REVIEW-E2E-001', 'M4 复核策略 E2E 商品', '1 unit',
+            'normal', 'none', 'active'
+        )
+        ON CONFLICT (owner_id, product_code) DO UPDATE
+        SET special_drug_category = 'none', status = 'active', updated_at = now()
+        "#,
+    )
+    .bind(owner_id)
+    .execute(pool)
+    .await?;
+    sqlx::query(
+        r#"
+        INSERT INTO auth_users (id, username, display_name, password_hash, status)
+        VALUES ('00000000-0000-4000-8000-000000000104', 'm4-review-second', 'M4 第二复核员', 'test-hash', 'active')
+        ON CONFLICT (id) DO UPDATE SET status = 'active', updated_at = now()
+        "#,
+    )
+    .execute(pool)
+    .await?;
+    sqlx::query(
+        r#"
+        INSERT INTO auth_user_owner_bindings (user_id, owner_id, is_active, is_primary)
+        VALUES ('00000000-0000-4000-8000-000000000104', $1, TRUE, FALSE)
+        ON CONFLICT (user_id, owner_id) DO UPDATE SET is_active = TRUE
+        "#,
+    )
+    .bind(owner_id)
+    .execute(pool)
+    .await?;
+    sqlx::query(
+        r#"
+        INSERT INTO auth_user_roles (user_id, owner_id, role_id)
+        SELECT '00000000-0000-4000-8000-000000000104', $1, id
+          FROM auth_roles
+         WHERE owner_id = $1 AND role_code = 'custodian'
+        ON CONFLICT DO NOTHING
+        "#,
+    )
+    .bind(owner_id)
+    .execute(pool)
+    .await?;
     sqlx::query(
         r#"
         INSERT INTO outbound_orders (

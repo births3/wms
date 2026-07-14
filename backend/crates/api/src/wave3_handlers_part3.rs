@@ -254,6 +254,23 @@ impl IntoResponse for Wave3HandlerError {
                 "M2_VERIFIER_UNAUTHORIZED",
                 "签字人不是当前货主的有效验收岗用户",
             ),
+            Wave3HandlerError::Receiving(ReceivingOrderError::MissingSecondSigner)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::MissingSecondSigner) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M2_DUAL_PERSON_REQUIRED",
+                "M-VR 策略要求第二验收签字人",
+            ),
+            Wave3HandlerError::Receiving(ReceivingOrderError::SameSigner)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::SameSigner) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M2_DUAL_PERSON_SAME_USER",
+                "双人验收的两名签字人不能相同",
+            ),
+            Wave3HandlerError::Repository(Wave3RepositoryError::DualPersonApprovalRequired) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M2_DUAL_PERSON_APPROVAL_REQUIRED",
+                "M-VR 策略要求先完成主管审批",
+            ),
             Wave3HandlerError::Receiving(ReceivingOrderError::EmptyLines)
             | Wave3HandlerError::Receiving(ReceivingOrderError::InvalidStatus { .. })
             | Wave3HandlerError::Receiving(ReceivingOrderError::QuantityClosureMismatch)
@@ -268,8 +285,6 @@ impl IntoResponse for Wave3HandlerError {
             | Wave3HandlerError::Receiving(ReceivingOrderError::InvalidDocumentType)
             | Wave3HandlerError::Receiving(ReceivingOrderError::InvalidBatchPolicy)
             | Wave3HandlerError::Receiving(ReceivingOrderError::BatchExpired)
-            | Wave3HandlerError::Receiving(ReceivingOrderError::SameSigner)
-            | Wave3HandlerError::Receiving(ReceivingOrderError::MissingSecondSigner)
             | Wave3HandlerError::Inventory(InventoryError::InvalidQuantity)
             | Wave3HandlerError::ColdChain(ColdChainError::InvalidDeviceType(_))
             | Wave3HandlerError::ColdChain(ColdChainError::ActiveMonitoring(_))
@@ -311,8 +326,6 @@ impl IntoResponse for Wave3HandlerError {
             | Wave3HandlerError::Repository(Wave3RepositoryError::BatchExpired)
             | Wave3HandlerError::Repository(Wave3RepositoryError::QuantityClosureMismatch)
             | Wave3HandlerError::Repository(Wave3RepositoryError::OverReceiptNotAllowed)
-            | Wave3HandlerError::Repository(Wave3RepositoryError::MissingSecondSigner)
-            | Wave3HandlerError::Repository(Wave3RepositoryError::SameSigner)
             | Wave3HandlerError::Repository(Wave3RepositoryError::DuplicateTraceCode)
             | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidReason)
             | Wave3HandlerError::Repository(Wave3RepositoryError::MissingApprovalSource)

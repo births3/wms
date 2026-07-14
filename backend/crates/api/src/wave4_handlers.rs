@@ -96,6 +96,21 @@ impl IntoResponse for Wave4HandlerError {
             Wave4HandlerError::Repository(Wave4RepositoryError::OrderAlreadyInWave) => {
                 (StatusCode::CONFLICT, "W4-409", "订单已加入其他波次")
             }
+            Wave4HandlerError::Repository(Wave4RepositoryError::MissingSecondReviewer) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M4_DUAL_PERSON_REQUIRED",
+                "M-VR 策略要求第二复核员",
+            ),
+            Wave4HandlerError::Repository(Wave4RepositoryError::UnqualifiedSecondReviewer) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M4_SECOND_REVIEWER_UNAUTHORIZED",
+                "第二复核员不是当前货主的有效保管员",
+            ),
+            Wave4HandlerError::Repository(Wave4RepositoryError::DualPersonApprovalRequired) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M4_DUAL_PERSON_APPROVAL_REQUIRED",
+                "M-VR 策略要求先完成主管审批",
+            ),
             Wave4HandlerError::Repository(Wave4RepositoryError::EmptySelection)
             | Wave4HandlerError::Repository(Wave4RepositoryError::BatchNotAffected(_))
             | Wave4HandlerError::Repository(Wave4RepositoryError::InvalidQuantity)

@@ -429,6 +429,7 @@ async fn h3_docs_routes_follow_environment_mode() {
             AuditQueryState { pool: pool.clone() },
             MasterDataAppState::default(),
             SystemDictionaryAppState::with_postgres(pool),
+            None,
         );
         std::env::remove_var("WMS_API_DOCS_MODE");
         app

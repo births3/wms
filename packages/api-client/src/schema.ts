@@ -1620,6 +1620,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/m-vr/dual-person-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["resolve_dual_person_policy"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/m-vr/dual-person-policy/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_dual_person_policy_rules"];
+        put: operations["upsert_dual_person_policy_rule"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/master-data/customers": {
         parameters: {
             query?: never;
@@ -2532,6 +2564,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/task-engine/task-groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_task_groups"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/task-engine/task-groups/{task_group_code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["upsert_task_group"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/task-engine/task-types": {
         parameters: {
             query?: never;
@@ -2578,6 +2642,54 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["set_task_type_enabled"];
+        trace?: never;
+    };
+    "/api/v1/task-engine/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_warehouse_tasks"];
+        put?: never;
+        post: operations["create_warehouse_task"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/task-engine/tasks/{task_id}/transitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["transition_warehouse_task"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/task-engine/workers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_task_workers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/tms/container-recoveries": {
@@ -3634,6 +3746,36 @@ export interface components {
             warehouse_name: string;
             warehouse_type?: string;
         };
+        CreateWarehouseTaskRequest: {
+            /** Format: uuid */
+            batch_id?: string | null;
+            batch_no?: string | null;
+            /** Format: int64 */
+            planned_qty: number;
+            /** Format: int32 */
+            priority?: number | null;
+            product_code: string;
+            /** Format: uuid */
+            product_id?: string | null;
+            /** Format: uuid */
+            source_doc_id?: string | null;
+            source_doc_no: string;
+            source_doc_type: string;
+            /** Format: int32 */
+            source_line_no?: number | null;
+            source_location_code?: string | null;
+            /** Format: uuid */
+            source_location_id?: string | null;
+            source_module: string;
+            source_task_key: string;
+            target_location_code?: string | null;
+            /** Format: uuid */
+            target_location_id?: string | null;
+            task_group_code: string;
+            task_type_code: string;
+            /** Format: uuid */
+            warehouse_id: string;
+        };
         CreateWarehouseZoneRequest: {
             quality_color: string;
             temperature_zone: string;
@@ -3901,6 +4043,44 @@ export interface components {
             data: components["schemas"]["DrugInspectionPlatform"][];
             page: components["schemas"]["PageMeta"];
         };
+        /** @enum {string} */
+        DualPersonPolicy: "single" | "dual_scan" | "dual_scan_with_approval";
+        DualPersonPolicyResponse: {
+            node: string;
+            policy: components["schemas"]["DualPersonPolicy"];
+            process: string;
+            /** Format: uuid */
+            source_rule_id?: string | null;
+        };
+        DualPersonPolicyRule: {
+            /** Format: uuid */
+            confirmed_by_user_id?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            enabled: boolean;
+            /** Format: uuid */
+            id: string;
+            node: string;
+            /** Format: uuid */
+            owner_id?: string | null;
+            policy: components["schemas"]["DualPersonPolicy"];
+            /** Format: int32 */
+            priority: number;
+            process: string;
+            special_drug_category: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: int64 */
+            version: number;
+            /** Format: uuid */
+            warehouse_id?: string | null;
+        };
+        DualPersonPolicyRuleListResponse: {
+            data: components["schemas"]["DualPersonPolicyRule"][];
+            page: components["schemas"]["PageMeta"];
+        };
+        /** @enum {string} */
+        DualPersonPolicyScope: "global" | "owner" | "warehouse";
         /** @description 统一错误响应。 */
         ErrorResponse: {
             /** @description 业务错误码。 */
@@ -4315,6 +4495,8 @@ export interface components {
         };
         InspectionSignatureRecord: {
             /** Format: uuid */
+            approval_record_id?: string | null;
+            /** Format: uuid */
             first_signer_id: string;
             /** Format: uuid */
             id: string;
@@ -4326,6 +4508,8 @@ export interface components {
             second_signer_id?: string | null;
             /** Format: date-time */
             signed_at: string;
+            /** Format: uuid */
+            strategy_rule_id?: string | null;
         };
         InventoryBatch: {
             batch_no: string;
@@ -5589,6 +5773,32 @@ export interface components {
             data: components["schemas"]["SystemDictionaryItem"][];
             page: components["schemas"]["PageMeta"];
         };
+        TaskGroup: {
+            /** Format: date-time */
+            created_at: string;
+            enabled: boolean;
+            /** Format: uuid */
+            id: string;
+            member_user_ids: string[];
+            /** Format: uuid */
+            owner_id: string;
+            task_group_code: string;
+            task_group_name: string;
+            task_type_codes: string[];
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: int64 */
+            version: number;
+            /** Format: uuid */
+            warehouse_id: string;
+            zone_ids: string[];
+        };
+        TaskGroupListResponse: {
+            data: components["schemas"]["TaskGroup"][];
+            page: components["schemas"]["PageMeta"];
+        };
+        /** @enum {string} */
+        TaskTransitionAction: "assign" | "dispatch" | "reassign" | "recall" | "start" | "complete" | "report_exception" | "resolve_complete" | "cancel";
         TaskType: {
             /** Format: date-time */
             created_at: string;
@@ -5612,6 +5822,16 @@ export interface components {
         };
         TaskTypeListResponse: {
             data: components["schemas"]["TaskType"][];
+            page: components["schemas"]["PageMeta"];
+        };
+        TaskWorker: {
+            display_name: string;
+            /** Format: uuid */
+            user_id: string;
+            username: string;
+        };
+        TaskWorkerListResponse: {
+            data: components["schemas"]["TaskWorker"][];
             page: components["schemas"]["PageMeta"];
         };
         TemperatureExcursionDispositionResponse: {
@@ -5767,6 +5987,15 @@ export interface components {
             plate_no: string;
             /** Format: double */
             temperature_celsius: number;
+        };
+        TransitionWarehouseTaskRequest: {
+            action: components["schemas"]["TaskTransitionAction"];
+            /** Format: int64 */
+            actual_qty?: number | null;
+            /** Format: uuid */
+            assignee_user_id?: string | null;
+            exception_code?: string | null;
+            exception_note?: string | null;
         };
         /** @description 更新 H1 菜单节点请求。 */
         UpdateAdminMenuNodeRequest: {
@@ -5933,6 +6162,20 @@ export interface components {
             timeout_seconds: number;
             username?: string | null;
         };
+        UpsertDualPersonPolicyRuleRequest: {
+            /** Format: uuid */
+            confirmed_by_user_id: string;
+            enabled: boolean;
+            node: string;
+            policy: components["schemas"]["DualPersonPolicy"];
+            /** Format: int32 */
+            priority: number;
+            process: string;
+            scope: components["schemas"]["DualPersonPolicyScope"];
+            special_drug_category: string;
+            /** Format: uuid */
+            warehouse_id?: string | null;
+        };
         UpsertExpressCarrierRequest: {
             account_no?: string | null;
             api_key_alias?: string | null;
@@ -6004,6 +6247,15 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        UpsertTaskGroupRequest: {
+            enabled: boolean;
+            member_user_ids?: string[];
+            task_group_name: string;
+            task_type_codes: string[];
+            /** Format: uuid */
+            warehouse_id: string;
+            zone_ids?: string[];
+        };
         UpsertTaskTypeRequest: {
             /** Format: int32 */
             default_priority: number;
@@ -6031,6 +6283,68 @@ export interface components {
         };
         WarehouseListResponse: {
             data: components["schemas"]["Warehouse"][];
+            page: components["schemas"]["PageMeta"];
+        };
+        WarehouseTask: {
+            /** Format: int64 */
+            actual_qty?: number | null;
+            /** Format: date-time */
+            assigned_at?: string | null;
+            /** Format: uuid */
+            assignee_user_id?: string | null;
+            /** Format: uuid */
+            batch_id?: string | null;
+            batch_no?: string | null;
+            /** Format: date-time */
+            completed_at?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            dispatched_at?: string | null;
+            /** Format: int32 */
+            estimated_minutes: number;
+            exception_code?: string | null;
+            exception_note?: string | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: int64 */
+            planned_qty: number;
+            /** Format: int32 */
+            priority: number;
+            product_code: string;
+            /** Format: uuid */
+            product_id?: string | null;
+            /** Format: uuid */
+            source_doc_id?: string | null;
+            source_doc_no: string;
+            source_doc_type: string;
+            /** Format: int32 */
+            source_line_no?: number | null;
+            source_location_code?: string | null;
+            /** Format: uuid */
+            source_location_id?: string | null;
+            source_module: string;
+            source_task_key: string;
+            /** Format: date-time */
+            started_at?: string | null;
+            status: string;
+            target_location_code?: string | null;
+            /** Format: uuid */
+            target_location_id?: string | null;
+            task_group_code: string;
+            task_no: string;
+            task_type_code: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: int64 */
+            version: number;
+            /** Format: uuid */
+            warehouse_id: string;
+        };
+        WarehouseTaskListResponse: {
+            data: components["schemas"]["WarehouseTask"][];
             page: components["schemas"]["PageMeta"];
         };
         /** @description 库区基础档案。 */
@@ -12095,6 +12409,198 @@ export interface operations {
             };
         };
     };
+    resolve_dual_person_policy: {
+        parameters: {
+            query: {
+                product_id: string;
+                process: string;
+                node: string;
+                owner_id: string;
+                warehouse_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前商品在指定流程节点的双人策略 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DualPersonPolicyResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足或跨货主 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 商品或仓库不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 流程与节点不匹配 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_dual_person_policy_rules: {
+        parameters: {
+            query?: {
+                warehouse_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前货主可见的双人策略规则 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DualPersonPolicyRuleListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 仓库不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    upsert_dual_person_policy_rule: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertDualPersonPolicyRuleRequest"];
+            };
+        };
+        responses: {
+            /** @description 双人确认后保存的矩阵规则 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DualPersonPolicyRule"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 分类或仓库不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 规则非法、确认人相同或无资格 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     list_customers: {
         parameters: {
             query?: never;
@@ -15685,6 +16191,119 @@ export interface operations {
             };
         };
     };
+    list_task_groups: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前货主任务组 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskGroupListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    upsert_task_group: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 任务组编码 */
+                task_group_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertTaskGroupRequest"];
+            };
+        };
+        responses: {
+            /** @description 保存任务组及成员资格 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskGroup"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 任务组参数或引用非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     list_task_types: {
         parameters: {
             query?: never;
@@ -15864,6 +16483,253 @@ export interface operations {
             };
             /** @description 幂等冲突 */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_warehouse_tasks: {
+        parameters: {
+            query?: {
+                mine_only?: boolean;
+                status?: string | null;
+                task_type_code?: string | null;
+                warehouse_id?: string | null;
+                limit?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 任务队列；mine_only=true 为 PDA 统一待办 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseTaskListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_warehouse_task: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateWarehouseTaskRequest"];
+            };
+        };
+        responses: {
+            /** @description 创建待分配任务 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseTask"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 任务类型不存在或未启用 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 业务触发源或幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 任务参数或引用非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    transition_warehouse_task: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 任务 ID */
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransitionWarehouseTaskRequest"];
+            };
+        };
+        responses: {
+            /** @description 任务状态迁移结果 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseTask"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足或非任务执行人 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 任务不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 状态或幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 资格或执行结果非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_task_workers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前货主可加入任务组的有效人员 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskWorkerListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

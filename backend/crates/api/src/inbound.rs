@@ -494,6 +494,8 @@ impl ReceivingOrderStore {
             owner_id: ctx.owner_id,
             first_signer_id: req.first_signer_id,
             second_signer_id: req.second_signer_id,
+            strategy_rule_id: None,
+            approval_record_id: None,
             signed_at: now,
         };
         order.status = "putaway".to_string();

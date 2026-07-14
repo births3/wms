@@ -8228,6 +8228,273 @@
         }
       }
     },
+    "/api/v1/m-vr/dual-person-policy": {
+      "get": {
+        "tags": [
+          "validation-rules"
+        ],
+        "operationId": "resolve_dual_person_policy",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "process",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "node",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "owner_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "warehouse_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "当前商品在指定流程节点的双人策略",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DualPersonPolicyResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足或跨货主",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "商品或仓库不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "流程与节点不匹配",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/m-vr/dual-person-policy/rules": {
+      "get": {
+        "tags": [
+          "validation-rules"
+        ],
+        "operationId": "list_dual_person_policy_rules",
+        "parameters": [
+          {
+            "name": "warehouse_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "当前货主可见的双人策略规则",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DualPersonPolicyRuleListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "仓库不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "validation-rules"
+        ],
+        "operationId": "upsert_dual_person_policy_rule",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertDualPersonPolicyRuleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "双人确认后保存的矩阵规则",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DualPersonPolicyRule"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "分类或仓库不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "规则非法、确认人相同或无资格",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/master-data/customers": {
       "get": {
         "tags": [
@@ -12993,6 +13260,146 @@
         }
       }
     },
+    "/api/v1/task-engine/task-groups": {
+      "get": {
+        "tags": [
+          "task-engine"
+        ],
+        "operationId": "list_task_groups",
+        "responses": {
+          "200": {
+            "description": "当前货主任务组",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskGroupListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/task-engine/task-groups/{task_group_code}": {
+      "put": {
+        "tags": [
+          "task-engine"
+        ],
+        "operationId": "upsert_task_group",
+        "parameters": [
+          {
+            "name": "task_group_code",
+            "in": "path",
+            "description": "任务组编码",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertTaskGroupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "保存任务组及成员资格",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskGroup"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "任务组参数或引用非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/task-engine/task-types": {
       "get": {
         "tags": [
@@ -13222,6 +13629,344 @@
           },
           "409": {
             "description": "幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/task-engine/tasks": {
+      "get": {
+        "tags": [
+          "task-engine"
+        ],
+        "operationId": "list_warehouse_tasks",
+        "parameters": [
+          {
+            "name": "mine_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "task_type_code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "warehouse_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "任务队列；mine_only=true 为 PDA 统一待办",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WarehouseTaskListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "task-engine"
+        ],
+        "operationId": "create_warehouse_task",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWarehouseTaskRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "创建待分配任务",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WarehouseTask"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "任务类型不存在或未启用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "业务触发源或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "任务参数或引用非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/task-engine/tasks/{task_id}/transitions": {
+      "post": {
+        "tags": [
+          "task-engine"
+        ],
+        "operationId": "transition_warehouse_task",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "description": "任务 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransitionWarehouseTaskRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "任务状态迁移结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WarehouseTask"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足或非任务执行人",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "任务不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "资格或执行结果非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/task-engine/workers": {
+      "get": {
+        "tags": [
+          "task-engine"
+        ],
+        "operationId": "list_task_workers",
+        "responses": {
+          "200": {
+            "description": "当前货主可加入任务组的有效人员",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskWorkerListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
             "content": {
               "application/json": {
                 "schema": {
@@ -17041,6 +17786,98 @@
           }
         }
       },
+      "CreateWarehouseTaskRequest": {
+        "type": "object",
+        "required": [
+          "task_type_code",
+          "source_module",
+          "source_doc_type",
+          "source_doc_no",
+          "source_task_key",
+          "warehouse_id",
+          "task_group_code",
+          "product_code",
+          "planned_qty"
+        ],
+        "properties": {
+          "batch_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "batch_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "planned_qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "priority": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "source_doc_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "source_doc_no": {
+            "type": "string"
+          },
+          "source_doc_type": {
+            "type": "string"
+          },
+          "source_line_no": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "source_location_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "source_location_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "source_module": {
+            "type": "string"
+          },
+          "source_task_key": {
+            "type": "string"
+          },
+          "target_location_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "target_location_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "task_group_code": {
+            "type": "string"
+          },
+          "task_type_code": {
+            "type": "string"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "CreateWarehouseZoneRequest": {
         "type": "object",
         "required": [
@@ -17883,6 +18720,131 @@
             "$ref": "#/components/schemas/PageMeta"
           }
         }
+      },
+      "DualPersonPolicy": {
+        "type": "string",
+        "enum": [
+          "single",
+          "dual_scan",
+          "dual_scan_with_approval"
+        ]
+      },
+      "DualPersonPolicyResponse": {
+        "type": "object",
+        "required": [
+          "policy",
+          "process",
+          "node"
+        ],
+        "properties": {
+          "node": {
+            "type": "string"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/DualPersonPolicy"
+          },
+          "process": {
+            "type": "string"
+          },
+          "source_rule_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        }
+      },
+      "DualPersonPolicyRule": {
+        "type": "object",
+        "required": [
+          "id",
+          "special_drug_category",
+          "process",
+          "node",
+          "policy",
+          "priority",
+          "enabled",
+          "created_at",
+          "updated_at",
+          "version"
+        ],
+        "properties": {
+          "confirmed_by_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "node": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "policy": {
+            "$ref": "#/components/schemas/DualPersonPolicy"
+          },
+          "priority": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "process": {
+            "type": "string"
+          },
+          "special_drug_category": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        }
+      },
+      "DualPersonPolicyRuleListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DualPersonPolicyRule"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "DualPersonPolicyScope": {
+        "type": "string",
+        "enum": [
+          "global",
+          "owner",
+          "warehouse"
+        ]
       },
       "ErrorResponse": {
         "type": "object",
@@ -19225,6 +20187,11 @@
           "signed_at"
         ],
         "properties": {
+          "approval_record_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
           "first_signer_id": {
             "type": "string",
             "format": "uuid"
@@ -19249,6 +20216,11 @@
           "signed_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "strategy_rule_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
           }
         }
       },
@@ -23155,6 +24127,110 @@
           }
         }
       },
+      "TaskGroup": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "task_group_code",
+          "task_group_name",
+          "warehouse_id",
+          "zone_ids",
+          "task_type_codes",
+          "member_user_ids",
+          "enabled",
+          "created_at",
+          "updated_at",
+          "version"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "member_user_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "task_group_code": {
+            "type": "string"
+          },
+          "task_group_name": {
+            "type": "string"
+          },
+          "task_type_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "zone_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
+      "TaskGroupListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskGroup"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "TaskTransitionAction": {
+        "type": "string",
+        "enum": [
+          "assign",
+          "dispatch",
+          "reassign",
+          "recall",
+          "start",
+          "complete",
+          "report_exception",
+          "resolve_complete",
+          "cancel"
+        ]
+      },
       "TaskType": {
         "type": "object",
         "required": [
@@ -23228,6 +24304,44 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/TaskType"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "TaskWorker": {
+        "type": "object",
+        "required": [
+          "user_id",
+          "username",
+          "display_name"
+        ],
+        "properties": {
+          "display_name": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "username": {
+            "type": "string"
+          }
+        }
+      },
+      "TaskWorkerListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskWorker"
             }
           },
           "page": {
@@ -23730,6 +24844,35 @@
           "temperature_celsius": {
             "type": "number",
             "format": "double"
+          }
+        }
+      },
+      "TransitionWarehouseTaskRequest": {
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/TaskTransitionAction"
+          },
+          "actual_qty": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "assignee_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "exception_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "exception_note": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -24275,6 +25418,52 @@
           }
         }
       },
+      "UpsertDualPersonPolicyRuleRequest": {
+        "type": "object",
+        "required": [
+          "special_drug_category",
+          "process",
+          "node",
+          "policy",
+          "scope",
+          "priority",
+          "enabled",
+          "confirmed_by_user_id"
+        ],
+        "properties": {
+          "confirmed_by_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "node": {
+            "type": "string"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/DualPersonPolicy"
+          },
+          "priority": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "process": {
+            "type": "string"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/DualPersonPolicyScope"
+          },
+          "special_drug_category": {
+            "type": "string"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        }
+      },
       "UpsertExpressCarrierRequest": {
         "type": "object",
         "required": [
@@ -24505,6 +25694,47 @@
           }
         }
       },
+      "UpsertTaskGroupRequest": {
+        "type": "object",
+        "required": [
+          "task_group_name",
+          "warehouse_id",
+          "task_type_codes",
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "member_user_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "task_group_name": {
+            "type": "string"
+          },
+          "task_type_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "zone_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
       "UpsertTaskTypeRequest": {
         "type": "object",
         "required": [
@@ -24593,6 +25823,192 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Warehouse"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "WarehouseTask": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "task_no",
+          "task_type_code",
+          "source_module",
+          "source_doc_type",
+          "source_doc_no",
+          "source_task_key",
+          "warehouse_id",
+          "task_group_code",
+          "product_code",
+          "planned_qty",
+          "priority",
+          "estimated_minutes",
+          "status",
+          "created_at",
+          "updated_at",
+          "version"
+        ],
+        "properties": {
+          "actual_qty": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "assigned_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "assignee_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "batch_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "batch_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "completed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "dispatched_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "estimated_minutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "exception_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "exception_note": {
+            "type": "string",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "planned_qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "priority": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "source_doc_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "source_doc_no": {
+            "type": "string"
+          },
+          "source_doc_type": {
+            "type": "string"
+          },
+          "source_line_no": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "source_location_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "source_location_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "source_module": {
+            "type": "string"
+          },
+          "source_task_key": {
+            "type": "string"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "target_location_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "target_location_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "task_group_code": {
+            "type": "string"
+          },
+          "task_no": {
+            "type": "string"
+          },
+          "task_type_code": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "WarehouseTaskListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WarehouseTask"
             }
           },
           "page": {
@@ -24820,7 +26236,11 @@
     },
     {
       "name": "task-engine",
-      "description": "M-TE 任务类型配置"
+      "description": "M-TE 任务类型、任务组与统一执行主链"
+    },
+    {
+      "name": "validation-rules",
+      "description": "M-VR 校验与双人策略"
     },
     {
       "name": "express",

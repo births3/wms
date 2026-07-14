@@ -31,8 +31,10 @@ use crate::{
 mod billing;
 mod cold_chain;
 mod expiry;
+mod integrations;
 mod inventory_count;
 mod maintenance;
+mod mappings;
 mod putaway;
 mod query;
 mod recall;
@@ -40,6 +42,11 @@ mod receiving_read;
 mod receiving_update;
 mod trace;
 
+use mappings::{
+    map_cold_chain_device, map_inspection_signature, map_inventory_batch, map_receiving_inspection,
+    map_receiving_order, map_receiving_order_line, map_receiving_order_receipt,
+    map_temperature_excursion, map_temperature_reading,
+};
 use query::parse_optional_date;
 
 #[derive(Clone, Debug)]
@@ -94,6 +101,7 @@ pub enum Wave3RepositoryError {
     QuantityClosureMismatch,
     OverReceiptNotAllowed,
     MissingSecondSigner,
+    DualPersonApprovalRequired,
     SameSigner,
     UnauthorizedSigner,
     InvalidReason,
@@ -190,6 +198,8 @@ struct InspectionSignatureRow {
     owner_id: Uuid,
     first_signer_id: Uuid,
     second_signer_id: Option<Uuid>,
+    strategy_rule_id: Option<Uuid>,
+    approval_record_id: Option<Uuid>,
     signed_at: DateTime<Utc>,
 }
 
@@ -563,7 +573,7 @@ async fn insert_receiving_order_lines(
 async fn insert_receiving_order_in_tx(
     tx: &mut Transaction<'_, Postgres>,
     ctx: &AuthContext,
-    req: CreateReceivingOrderRequest,
+    mut req: CreateReceivingOrderRequest,
     now: DateTime<Utc>,
 ) -> Result<ReceivingOrder, Wave3RepositoryError> {
     let id = Uuid::new_v4();
@@ -587,6 +597,18 @@ async fn insert_receiving_order_in_tx(
     } else {
         req.receipt_no.clone()
     };
+    for line in &mut req.lines {
+        if line.product_id.is_none() {
+            line.product_id = sqlx::query_scalar(
+                "SELECT id FROM products WHERE owner_id = $1 AND product_code = $2 AND status = 'active'",
+            )
+            .bind(ctx.owner_id)
+            .bind(&line.product_code)
+            .fetch_optional(&mut **tx)
+            .await
+            .map_err(map_db_error)?;
+        }
+    }
     sqlx::query(
         r#"
         INSERT INTO receiving_orders (
@@ -690,136 +712,6 @@ fn validate_receiving_order_lines(
 fn parse_date(value: &str) -> Result<NaiveDate, Wave3RepositoryError> {
     NaiveDate::parse_from_str(value, "%Y-%m-%d")
         .map_err(|_| Wave3RepositoryError::InvalidDate(value.to_string()))
-}
-
-fn map_receiving_order(row: ReceivingOrderRow, lines: Vec<ReceivingOrderLine>) -> ReceivingOrder {
-    ReceivingOrder {
-        id: row.id,
-        owner_id: row.owner_id,
-        receipt_no: row.receipt_no,
-        document_type: row.document_type,
-        supplier_id: row.supplier_id,
-        warehouse_id: row.warehouse_id,
-        external_ref: row.external_ref,
-        status: row.status,
-        expected_arrival_at: row.expected_arrival_at,
-        lines,
-        created_at: row.created_at,
-        updated_at: row.updated_at,
-    }
-}
-
-fn map_receiving_order_line(row: ReceivingOrderLineRow) -> ReceivingOrderLine {
-    ReceivingOrderLine {
-        line_no: row.line_no as u32,
-        product_id: row.product_id,
-        product_code: row.product_code,
-        expected_qty: row.expected_qty,
-        batch_no: row.batch_no,
-        production_date: row.production_date.map(|date| date.to_string()),
-        expiry_date: row.expiry_date.map(|date| date.to_string()),
-    }
-}
-
-fn map_receiving_order_receipt(row: ReceivingOrderReceiptRow) -> ReceivingOrderReceipt {
-    ReceivingOrderReceipt {
-        id: row.id,
-        receiving_order_id: row.receiving_order_id,
-        owner_id: row.owner_id,
-        actual_qty: row.actual_qty,
-        shortage_qty: row.shortage_qty,
-        rejected_qty: row.rejected_qty,
-        arrival_temperature_celsius: row.arrival_temperature_celsius,
-        exception_note: row.exception_note,
-        details: row.receiving_details.map(|value| value.0),
-        occurred_at: row.occurred_at,
-    }
-}
-
-fn map_receiving_inspection(row: ReceivingInspectionRow) -> ReceivingInspectionRecord {
-    ReceivingInspectionRecord {
-        id: row.id,
-        receiving_order_id: row.receiving_order_id,
-        owner_id: row.owner_id,
-        batch_no: row.batch_no,
-        accepted_qty: row.accepted_qty,
-        rejected_qty: row.rejected_qty,
-        quality_status: row.quality_status,
-        occurred_at: row.occurred_at,
-    }
-}
-
-fn map_inspection_signature(row: InspectionSignatureRow) -> InspectionSignatureRecord {
-    InspectionSignatureRecord {
-        id: row.id,
-        receiving_order_id: row.receiving_order_id,
-        owner_id: row.owner_id,
-        first_signer_id: row.first_signer_id,
-        second_signer_id: row.second_signer_id,
-        signed_at: row.signed_at,
-    }
-}
-
-fn map_inventory_batch(row: InventoryBatchRow) -> InventoryBatch {
-    InventoryBatch {
-        id: row.id,
-        owner_id: row.owner_id,
-        product_code: row.product_code,
-        batch_no: row.batch_no,
-        production_date: row.production_date.to_string(),
-        expiry_date: row.expiry_date.to_string(),
-        qty_on_hand: row.qty_on_hand,
-        qty_locked: row.qty_locked,
-        quality_status: row.quality_status,
-        location_id: row.location_id,
-        location_code: row.location_code,
-        recall_flag: row.recall_flag,
-        created_at: row.created_at,
-        updated_at: row.updated_at,
-    }
-}
-
-fn map_temperature_reading(row: TemperatureReadingRow) -> TemperatureReading {
-    TemperatureReading {
-        id: row.id,
-        owner_id: row.owner_id,
-        device_code: row.device_code,
-        temperature_celsius: row.temperature_celsius,
-        humidity_percent: row.humidity_percent,
-        captured_at: row.captured_at,
-        external_report_url: row.external_report_url,
-        out_of_range: row.out_of_range,
-    }
-}
-
-fn map_cold_chain_device(row: ColdChainDeviceRow) -> wms_domain::ColdChainDevice {
-    wms_domain::ColdChainDevice {
-        id: row.id,
-        owner_id: row.owner_id,
-        device_code: row.device_code,
-        device_type: row.device_type,
-        installed_at_location_code: row.installed_at_location_code,
-        calibration_due_at: row.calibration_due_at,
-        status: row.status,
-        created_at: row.created_at,
-    }
-}
-
-fn map_temperature_excursion(row: TemperatureExcursionEventRow) -> TemperatureExcursionEvent {
-    TemperatureExcursionEvent {
-        id: row.id,
-        owner_id: row.owner_id,
-        external_event_id: row.external_event_id,
-        device_code: row.device_code,
-        location_code: row.location_code,
-        started_at: row.started_at,
-        ended_at: row.ended_at,
-        min_temperature_celsius: row.min_temperature_celsius,
-        max_temperature_celsius: row.max_temperature_celsius,
-        affected_batch_ids: row.affected_batch_ids,
-        status: row.status,
-        created_at: row.created_at,
-    }
 }
 
 fn map_db_error(error: sqlx::Error) -> Wave3RepositoryError {

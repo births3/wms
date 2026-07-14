@@ -223,9 +223,6 @@ impl PgWave3Repository {
         idempotency_key: &str,
         audit: Option<AuditWriteRequest>,
     ) -> Result<IdempotentMutation<InspectionSignatureRecord>, Wave3RepositoryError> {
-        if req.dual_required && req.second_signer_id.is_none() {
-            return Err(Wave3RepositoryError::MissingSecondSigner);
-        }
         if let Some(second_signer_id) = req.second_signer_id {
             if second_signer_id == req.first_signer_id {
                 return Err(Wave3RepositoryError::SameSigner);
@@ -295,6 +292,45 @@ impl PgWave3Repository {
                 actual: order.status,
             });
         }
+        let product_codes: Vec<String> = sqlx::query_scalar(
+            "SELECT DISTINCT product_code FROM receiving_order_lines WHERE receiving_order_id = $1 AND owner_id = $2 ORDER BY product_code",
+        )
+        .bind(id)
+        .bind(ctx.owner_id)
+        .fetch_all(&mut *tx)
+        .await
+        .map_err(map_db_error)?;
+        let strategy = crate::dual_person_policy::resolve_for_product_codes_in_tx(
+            &mut tx,
+            ctx.owner_id,
+            order.warehouse_id,
+            &product_codes,
+            "入库",
+            "验收",
+        )
+        .await
+        .map_err(|error| Wave3RepositoryError::Database(format!("M-VR 双人策略解析失败: {error:?}")))?;
+        let dual_required = strategy.policy != wms_domain::DualPersonPolicy::Single;
+        if dual_required && req.second_signer_id.is_none() {
+            return Err(Wave3RepositoryError::MissingSecondSigner);
+        }
+        let approval_record_id = if strategy.policy
+            == wms_domain::DualPersonPolicy::DualScanWithApproval
+        {
+            crate::dual_person_policy::approved_dual_person_record_in_tx(
+                &mut tx,
+                ctx.owner_id,
+                &id.to_string(),
+            )
+            .await
+            .map_err(|error| {
+                Wave3RepositoryError::Database(format!("M-VR 审批记录查询失败: {error:?}"))
+            })?
+            .ok_or(Wave3RepositoryError::DualPersonApprovalRequired)?
+            .into()
+        } else {
+            None
+        };
 
         let received_qty: i64 = sqlx::query_scalar(
             "SELECT COALESCE(SUM(actual_qty), 0)::BIGINT FROM receiving_order_receipts WHERE receiving_order_id = $1 AND owner_id = $2",
@@ -345,23 +381,28 @@ impl PgWave3Repository {
             owner_id: ctx.owner_id,
             first_signer_id: req.first_signer_id,
             second_signer_id: req.second_signer_id,
+            strategy_rule_id: strategy.source_rule_id,
+            approval_record_id,
             signed_at: now,
         };
         sqlx::query(
             r#"
             INSERT INTO receiving_inspection_signatures (
                 id, receiving_order_id, owner_id, dual_required,
-                first_signer_id, second_signer_id, strategy_rule_id, signed_at
+                first_signer_id, second_signer_id, strategy_rule_id,
+                approval_record_id, signed_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, NULL, $7)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             "#,
         )
         .bind(signature.id)
         .bind(signature.receiving_order_id)
         .bind(signature.owner_id)
-        .bind(req.dual_required)
+        .bind(dual_required)
         .bind(signature.first_signer_id)
         .bind(signature.second_signer_id)
+        .bind(signature.strategy_rule_id)
+        .bind(signature.approval_record_id)
         .bind(signature.signed_at)
         .execute(&mut *tx)
         .await
@@ -377,6 +418,8 @@ impl PgWave3Repository {
         .await
         .map_err(map_db_error)?;
 
+        integrations::create_putaway_tasks_for_receiving_order(&mut tx, ctx, &order, now).await?;
+
         store_idempotency_success(
             &mut tx,
             ctx.owner_id,
@@ -390,7 +433,16 @@ impl PgWave3Repository {
             now,
         )
         .await?;
-        if let Some(audit) = audit {
+        if let Some(mut audit) = audit {
+            audit.diff = Some(AuditDiff::compute(
+                serde_json::json!({}),
+                serde_json::json!({
+                    "first_signer_id": signature.first_signer_id,
+                    "second_signer_id": signature.second_signer_id,
+                    "strategy_rule_id": signature.strategy_rule_id,
+                    "approval_record_id": signature.approval_record_id,
+                }),
+            ));
             append_event_in_tx(&mut tx, &audit)
                 .await
                 .map_err(|error| Wave3RepositoryError::Audit(format!("{error:?}")))?;

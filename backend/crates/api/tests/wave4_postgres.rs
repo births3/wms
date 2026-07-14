@@ -45,6 +45,46 @@ async fn seed_outbound_inventory(
     now: chrono::DateTime<Utc>,
 ) -> Uuid {
     let batch_id = Uuid::new_v4();
+    let warehouse_id = Uuid::new_v4();
+    let zone_id = Uuid::new_v4();
+    let location_id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO auth_owners (id, owner_code, owner_name) VALUES ($1, $2, 'M4 出库测试货主') ON CONFLICT (id) DO NOTHING",
+    )
+    .bind(owner_id)
+    .bind(format!("M4-{}", &owner_id.to_string()[..8]))
+    .execute(pool)
+    .await
+    .expect("seed outbound owner");
+    sqlx::query(
+        "INSERT INTO warehouses (id, owner_id, warehouse_code, warehouse_name, warehouse_type, status) VALUES ($1, $2, $3, 'M4 出库测试仓', 'normal', 'active')",
+    )
+    .bind(warehouse_id)
+    .bind(owner_id)
+    .bind(format!("M4-WH-{}", &warehouse_id.to_string()[..8]))
+    .execute(pool)
+    .await
+    .expect("seed outbound warehouse");
+    sqlx::query(
+        "INSERT INTO warehouse_zones (id, owner_id, warehouse_id, zone_code, zone_name, temperature_zone, quality_color, status) VALUES ($1, $2, $3, $4, 'M4 出库测试区', 'normal', 'qualified_green', 'active')",
+    )
+    .bind(zone_id)
+    .bind(owner_id)
+    .bind(warehouse_id)
+    .bind(format!("M4-ZONE-{}", &zone_id.to_string()[..8]))
+    .execute(pool)
+    .await
+    .expect("seed outbound zone");
+    sqlx::query(
+        "INSERT INTO warehouse_locations (id, owner_id, warehouse_id, zone_id, location_code, row_no, column_no, layer_no, max_volume_cm3, used_volume_cm3, max_sku_count, location_type, status) VALUES ($1, $2, $3, $4, 'OUT-A-01', 1, 1, 1, 100000, 0, 100, 'storage', 'available')",
+    )
+    .bind(location_id)
+    .bind(owner_id)
+    .bind(warehouse_id)
+    .bind(zone_id)
+    .execute(pool)
+    .await
+    .expect("seed outbound location");
     sqlx::query(
         r#"
         INSERT INTO inventory_batches (
@@ -63,7 +103,7 @@ async fn seed_outbound_inventory(
     .bind(NaiveDate::from_ymd_opt(2028, 1, 1).expect("valid date"))
     .bind(qty)
     .bind(STATUS_QUALIFIED)
-    .bind(Uuid::new_v4())
+    .bind(location_id)
     .bind(now)
     .execute(pool)
     .await

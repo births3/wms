@@ -254,7 +254,7 @@ pub fn new(pool: PgPool) -> Self {
             }
             let allocated_tasks = sqlx::query_as::<
                 _,
-                (Uuid, i32, Uuid, String, String, Uuid, String, i64),
+                (Uuid, i32, Uuid, String, String, Uuid, String, Uuid, i64),
             >(
                 r#"
                 SELECT allocation.batch_id,
@@ -264,11 +264,15 @@ pub fn new(pool: PgPool) -> Self {
                        batch.batch_no,
                        batch.location_id,
                        batch.location_code,
+                       location.warehouse_id,
                        allocation.allocated_qty
                   FROM inventory_allocations allocation
                   JOIN inventory_batches batch
                     ON batch.owner_id = allocation.owner_id
                    AND batch.id = allocation.batch_id
+                  JOIN warehouse_locations location
+                    ON location.owner_id = batch.owner_id
+                   AND location.id = batch.location_id
                  WHERE allocation.owner_id = $1
                    AND allocation.outbound_order_id = $2
                    AND allocation.status = 'locked'
@@ -289,9 +293,12 @@ pub fn new(pool: PgPool) -> Self {
                     batch_no,
                     location_id,
                     location_code,
+                    warehouse_id,
                     planned_qty,
                 )| PickTaskDraft {
                     order_id,
+                    order_no: order.wms_order_no.clone(),
+                    warehouse_id,
                     line_no,
                     batch_id,
                     product_code,
@@ -341,6 +348,7 @@ pub fn new(pool: PgPool) -> Self {
         for (index, task) in task_drafts.into_iter().enumerate() {
             let route_sequence =
                 i32::try_from(index + 1).map_err(|_| Wave4RepositoryError::InvalidQuantity)?;
+            let pick_task_id = Uuid::new_v4();
             sqlx::query(
                 r#"
                 INSERT INTO outbound_pick_tasks (
@@ -351,22 +359,57 @@ pub fn new(pool: PgPool) -> Self {
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending_assignment', $12, $13, $13)
                 "#,
             )
-            .bind(Uuid::new_v4())
+            .bind(pick_task_id)
             .bind(ctx.owner_id)
             .bind(wave_row.id)
             .bind(task.order_id)
             .bind(task.line_no)
             .bind(task.batch_id)
-            .bind(task.product_code)
-            .bind(task.batch_no)
+            .bind(&task.product_code)
+            .bind(&task.batch_no)
             .bind(task.location_id)
-            .bind(task.location_code)
+            .bind(&task.location_code)
             .bind(task.planned_qty)
             .bind(route_sequence)
             .bind(now)
             .execute(&mut *tx)
             .await
             .map_err(map_db_error)?;
+            crate::task_engine::create_task_in_tx(
+                &mut tx,
+                ctx,
+                &wms_domain::CreateWarehouseTaskRequest {
+                    task_type_code: wms_domain::TASK_TYPE_PICK.to_string(),
+                    source_module: "M4".to_string(),
+                    source_doc_type: "outbound_order".to_string(),
+                    source_doc_id: Some(task.order_id),
+                    source_doc_no: task.order_no,
+                    source_line_no: Some(task.line_no),
+                    source_task_key: format!(
+                        "M4:pick:{}:{}:{}:{}",
+                        wave_row.id, task.order_id, task.line_no, task.batch_id
+                    ),
+                    warehouse_id: task.warehouse_id,
+                    task_group_code: crate::task_engine::default_task_group_code(
+                        task.warehouse_id,
+                    ),
+                    product_id: None,
+                    product_code: task.product_code,
+                    batch_id: Some(task.batch_id),
+                    batch_no: Some(task.batch_no),
+                    planned_qty: task.planned_qty,
+                    source_location_id: Some(task.location_id),
+                    source_location_code: Some(task.location_code),
+                    target_location_id: None,
+                    target_location_code: None,
+                    priority: None,
+                },
+                now,
+            )
+            .await
+            .map_err(|error| {
+                Wave4RepositoryError::Database(format!("M-TE 拣选任务创建失败: {error:?}"))
+            })?;
         }
 
         let wave = map_outbound_wave(wave_row, req.order_ids);
@@ -545,6 +588,15 @@ pub fn new(pool: PgPool) -> Self {
         validate_review_submission(&order.lines, &req, ctx.user_id, &pick_operator_ids)
             .map_err(Wave4RepositoryError::ReviewValidation)?;
 
+        let (strategy, approval_record_id) = integrations::resolve_outbound_review_policy(
+            &mut tx,
+            ctx,
+            order_id,
+            &order,
+            req.second_reviewer_id,
+        )
+        .await?;
+
         for line in &req.lines {
             let affected = sqlx::query(
                 r#"
@@ -601,6 +653,8 @@ pub fn new(pool: PgPool) -> Self {
                     "reviewer_id": req.reviewer_id,
                     "review_mode": &req.review_mode,
                     "second_reviewer_id": &req.second_reviewer_id,
+                    "strategy_rule_id": strategy.source_rule_id,
+                    "approval_record_id": approval_record_id,
                     "lines": req.lines.iter().map(|line| {
                         serde_json::json!({
                             "line_no": line.line_no,
@@ -612,6 +666,100 @@ pub fn new(pool: PgPool) -> Self {
             ));
             audit
         });
+
+        sqlx::query(
+            r#"
+            INSERT INTO outbound_review_records (
+                id, owner_id, outbound_order_id, review_mode, first_reviewer_id,
+                second_reviewer_id, strategy_rule_id, approval_record_id,
+                reviewed_at, created_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(ctx.owner_id)
+        .bind(order_id)
+        .bind(&req.review_mode)
+        .bind(req.reviewer_id)
+        .bind(req.second_reviewer_id)
+        .bind(strategy.source_rule_id)
+        .bind(approval_record_id)
+        .bind(now)
+        .execute(&mut *tx)
+        .await
+        .map_err(map_db_error)?;
+
+        if updated.status == OUTBOUND_STATUS_REVIEWED {
+            let task_warehouse_id: Uuid = sqlx::query_scalar(
+                r#"
+                SELECT warehouse_id
+                  FROM (
+                        SELECT task.warehouse_id, 1 AS source_rank
+                          FROM warehouse_tasks task
+                         WHERE task.owner_id = $1
+                           AND task.source_doc_type = 'outbound_order'
+                           AND task.source_doc_id = $2
+                           AND task.task_type_code = 'pick'
+                        UNION ALL
+                        SELECT location.warehouse_id, 2 AS source_rank
+                          FROM inventory_allocations allocation
+                          JOIN inventory_batches batch
+                            ON batch.owner_id = allocation.owner_id
+                           AND batch.id = allocation.batch_id
+                          JOIN warehouse_locations location
+                            ON location.owner_id = batch.owner_id
+                           AND location.id = batch.location_id
+                         WHERE allocation.owner_id = $1
+                           AND allocation.outbound_order_id = $2
+                       ) candidate
+                 ORDER BY source_rank, warehouse_id
+                 LIMIT 1
+                "#,
+            )
+            .bind(ctx.owner_id)
+            .bind(order_id)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(map_db_error)?
+            .unwrap_or(order.warehouse_id);
+            for line in updated.lines.iter().filter(|line| line.reviewed_qty > 0) {
+                crate::task_engine::create_task_in_tx(
+                    &mut tx,
+                    ctx,
+                    &wms_domain::CreateWarehouseTaskRequest {
+                    task_type_code: wms_domain::TASK_TYPE_LOADING.to_string(),
+                    source_module: "M4".to_string(),
+                    source_doc_type: "outbound_order".to_string(),
+                    source_doc_id: Some(order_id),
+                    source_doc_no: updated.wms_order_no.clone(),
+                    source_line_no: Some(i32::try_from(line.line_no).map_err(|_| {
+                        Wave4RepositoryError::InvalidQuantity
+                    })?),
+                    source_task_key: format!("M4:loading:{order_id}:{}", line.line_no),
+                    warehouse_id: task_warehouse_id,
+                    task_group_code: crate::task_engine::default_task_group_code(
+                        task_warehouse_id,
+                    ),
+                    product_id: None,
+                    product_code: line.product_code.clone(),
+                    batch_id: None,
+                    batch_no: Some(line.batch_no.clone()),
+                    planned_qty: line.reviewed_qty,
+                    source_location_id: None,
+                    source_location_code: None,
+                    target_location_id: None,
+                    target_location_code: None,
+                    priority: None,
+                    },
+                    now,
+                )
+                .await
+                .map_err(|error| {
+                    Wave4RepositoryError::Database(format!("M-TE 装车任务创建失败: {error:?}"))
+                })?;
+            }
+        }
 
         store_idempotency_success(
             &mut tx,
