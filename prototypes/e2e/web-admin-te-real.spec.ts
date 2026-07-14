@@ -20,6 +20,14 @@ test("M-TE 任务类型配置使用真实 API 展示预置类型并保存自定�
   await page.getByRole("button", { name: "停用", exact: true }).click();
   await page.getByRole("dialog", { name: "停用任务类型" }).getByRole("button", { name: "确认", exact: true }).click();
   await expect(row).toContainText("停用");
+  await page.getByRole("button", { name: "配置优先级规则", exact: true }).click();
+  const priorityDialog = page.getByRole("dialog", { name: "配置任务优先级规则" });
+  await priorityDialog.getByLabel("订单加急加分").fill("30");
+  await priorityDialog.getByLabel("等待多少分钟加 1 分").fill("5");
+  await priorityDialog.getByLabel("冷链任务加分").fill("20");
+  await priorityDialog.getByLabel("手动加急加分").fill("40");
+  await priorityDialog.getByRole("button", { name: "保存规则", exact: true }).click();
+  await expect(page.getByText(/订单加急 \+30 · 每等待 5 分钟 \+1 · 冷链 \+20 · 手动加急 \+40/)).toBeVisible();
   const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
   const screenshotDir = path.join(repoRoot, "artifacts/screenshot-portal/real-web/m-te-task-types");
   fs.mkdirSync(screenshotDir, { recursive: true });
@@ -28,6 +36,7 @@ test("M-TE 任务类型配置使用真实 API 展示预置类型并保存自定�
 
 test("M-TE 任务组和调度使用真实 API 完成创建、自动分派与下发", async ({ page }) => {
   await login(page);
+  await configurePriorityRule(page);
   await assertTaskEngineReads(page);
   await openTaskGroupPage(page);
   await expect(page.getByRole("heading", { name: "M-TE 任务组与人员资格" })).toBeVisible();
@@ -78,6 +87,7 @@ test("M-TE 任务组和调度使用真实 API 完成创建、自动分派与下�
         target_location_id: null,
         target_location_code: "A01-01-01",
         priority: 80,
+        urgent_order: true,
       }),
     });
     if (!response.ok) throw new Error(`create task failed: ${response.status} ${await response.text()}`);
@@ -89,6 +99,11 @@ test("M-TE 任务组和调度使用真实 API 完成创建、自动分派与下�
   const row = page.locator("tbody tr").filter({ hasText: task.source_doc_no });
   await expect(row).toContainText("待分配");
   await row.getByRole("checkbox", { name: "选择此行" }).check();
+  await expect(row.getByText("110", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "手动加急", exact: true }).click();
+  await page.getByRole("dialog", { name: "确认任务操作" }).getByRole("button", { name: "确认执行" }).click();
+  await expect(page.getByText(/已手动加急/)).toBeVisible();
+  await expect(row.getByText("150", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "自动分派", exact: true }).click();
   await page.getByRole("dialog", { name: "确认任务操作" }).getByRole("button", { name: "确认执行" }).click();
   await expect(row).toContainText("已分配");
@@ -115,6 +130,19 @@ async function assertTaskEngineReads(page: import("@playwright/test").Page) {
     return responses.filter(Boolean);
   });
   expect(failures, failures.join("\n")).toEqual([]);
+}
+async function configurePriorityRule(page: import("@playwright/test").Page) {
+  const failure = await page.evaluate(async () => {
+    const raw = window.localStorage.getItem("wms.web-admin.auth-session");
+    const token = raw ? (JSON.parse(raw) as { accessToken: string }).accessToken : "";
+    const response = await fetch("/api/v1/task-engine/priority-rule", {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", "Idempotency-Key": `e2e-priority-${Date.now()}` },
+      body: JSON.stringify({ urgent_order_bonus: 30, waiting_minutes_per_point: 5, cold_chain_bonus: 20, manual_expedite_bonus: 40 }),
+    });
+    return response.ok ? null : `${response.status} ${await response.text()}`;
+  });
+  expect(failure).toBeNull();
 }
 async function openTaskTypePage(page: import("@playwright/test").Page) {
   await openInventoryPage(page, /M-TE 任务类型配置/);

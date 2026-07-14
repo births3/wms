@@ -7,7 +7,8 @@ import {
   type QueryPanelField, type QueryPanelValue,
 } from "@wms/ui";
 import {
-  useSetTaskTypeEnabledMutation, useTaskTypesQuery, useUpsertTaskTypeMutation,
+  useSetTaskTypeEnabledMutation, useTaskPriorityRuleQuery, useTaskTypesQuery,
+  useUpsertTaskPriorityRuleMutation, useUpsertTaskTypeMutation,
   type TaskType, type UpsertTaskTypeRequest,
 } from "@/features/task-engine/task-type-queries";
 
@@ -60,6 +61,7 @@ export function TaskTypeConfigPage() {
 
   return <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
     <PageHeader title="M-TE 任务类型配置" subtitle="维护预置与自定义任务类型的调度参数" />
+    <PriorityRuleCard />
     {notice && <div className={notice.kind === "error" ? "rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" : "rounded-md border border-wms-success/30 bg-wms-success/10 px-3 py-2 text-sm text-wms-success"} role={notice.kind === "error" ? "alert" : "status"}>{notice.text}</div>}
     <QueryPanel fields={queryFields} defaultVisibleFieldKeys={mteTaskTypeCoreQueryFieldKeys} value={draftQuery} onValueChange={setDraftQuery} onQuery={() => setAppliedQuery(draftQuery)} onReset={() => { const next = defaultQuery(); setDraftQuery(next); setAppliedQuery(next); }} />
     <Card><CardContent className="p-5"><DataGrid storageKey="mte.task-types" columns={columns} data={rows} rowKey={(r) => r.task_type_code} selectable selectedRowKeys={selected} onSelectedRowKeysChange={setSelected} caption={query.isPending ? "加载任务类型..." : undefined} emptyTitle={query.isError ? "读取任务类型失败" : "暂无任务类型"} emptyDescription={query.isError ? errorText(query.error, "请检查鉴权和 API 服务") : "暂无可用任务类型"} exportFileBaseName="M-TE-task-types" refreshAction={refreshAction} createAction={createAction} editAction={editAction} disableAction={disableAction} queryState={appliedQuery} querySummaryItems={buildQueryPanelSummaryItems(queryFields, appliedQuery)} onApplyQueryState={(value) => { const next = normalizeQuery(value); setDraftQuery(next); setAppliedQuery(next); }} onClearQueryState={() => { const next = defaultQuery(); setDraftQuery(next); setAppliedQuery(next); }} /></CardContent></Card>
@@ -97,3 +99,34 @@ function stringValue(value: unknown) { return typeof value === "string" ? value 
 function normalizeQuery(value: unknown): QueryPanelValue { const record = value && typeof value === "object" ? value as Record<string, unknown> : {}; return { keyword: stringValue(record.keyword), status: stringValue(record.status) }; }
 function errorText(error: unknown, fallback: string) { return error instanceof Error ? error.message : fallback; }
 function formatDateTime(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { hour12: false }); }
+
+type PriorityRuleForm = { urgent: string; waiting: string; cold: string; expedite: string };
+
+function PriorityRuleCard() {
+  const query = useTaskPriorityRuleQuery();
+  const save = useUpsertTaskPriorityRuleMutation();
+  const [open, setOpen] = React.useState(false);
+  const [form, setForm] = React.useState<PriorityRuleForm>({ urgent: "20", waiting: "30", cold: "20", expedite: "50" });
+  const [notice, setNotice] = React.useState<string | null>(null);
+  const rule = query.data;
+  const set = (key: keyof PriorityRuleForm, value: string) => setForm((current) => ({ ...current, [key]: value }));
+  const openDialog = () => {
+    if (rule) setForm({ urgent: String(rule.urgent_order_bonus), waiting: String(rule.waiting_minutes_per_point), cold: String(rule.cold_chain_bonus), expedite: String(rule.manual_expedite_bonus) });
+    setNotice(null);
+    setOpen(true);
+  };
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const values = [Number(form.urgent), Number(form.cold), Number(form.expedite)];
+    const waiting = Number(form.waiting);
+    if (values.some((value) => !Number.isInteger(value) || value < 0 || value > 1000) || !Number.isInteger(waiting) || waiting < 1 || waiting > 1440) {
+      setNotice("加分必须是 0 到 1000 的整数，等待间隔必须是 1 到 1440 分钟的整数");
+      return;
+    }
+    try {
+      await save.mutateAsync({ urgent_order_bonus: values[0], waiting_minutes_per_point: waiting, cold_chain_bonus: values[1], manual_expedite_bonus: values[2] });
+      setOpen(false);
+    } catch { /* mutation error is rendered in the dialog */ }
+  };
+  return <Card><CardContent className="flex flex-wrap items-center justify-between gap-4 p-5"><div><h2 className="font-semibold">任务优先级规则</h2><p className="mt-1 text-sm text-muted-foreground">{rule ? `订单加急 +${rule.urgent_order_bonus} · 每等待 ${rule.waiting_minutes_per_point} 分钟 +1 · 冷链 +${rule.cold_chain_bonus} · 手动加急 +${rule.manual_expedite_bonus}` : query.isError ? "读取规则失败" : "加载规则中..."}</p></div><Button type="button" variant="outline" disabled={!rule || save.isPending} onClick={openDialog}>配置优先级规则</Button><Dialog open={open} onOpenChange={(next) => !save.isPending && setOpen(next)}><DialogContent className="sm:max-w-lg"><form className="grid gap-4" onSubmit={submit}><DialogHeader><DialogTitle>配置任务优先级规则</DialogTitle><DialogDescription>任务类型默认优先级在下方逐项维护；这里只配置四类附加权重。单一结构化规则不会产生表达式冲突。</DialogDescription></DialogHeader><div className="grid grid-cols-2 gap-3"><label className="grid gap-1 text-sm">订单加急加分<Input aria-label="订单加急加分" required type="number" min="0" max="1000" step="1" value={form.urgent} onChange={(event) => set("urgent", event.target.value)} /></label><label className="grid gap-1 text-sm">等待多少分钟加 1 分<Input aria-label="等待多少分钟加 1 分" required type="number" min="1" max="1440" step="1" value={form.waiting} onChange={(event) => set("waiting", event.target.value)} /></label><label className="grid gap-1 text-sm">冷链任务加分<Input aria-label="冷链任务加分" required type="number" min="0" max="1000" step="1" value={form.cold} onChange={(event) => set("cold", event.target.value)} /></label><label className="grid gap-1 text-sm">手动加急加分<Input aria-label="手动加急加分" required type="number" min="0" max="1000" step="1" value={form.expedite} onChange={(event) => set("expedite", event.target.value)} /></label></div>{(notice || save.error) && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">{notice ?? save.error?.message}</div>}<DialogFooter><DialogClose asChild><Button type="button" variant="outline" disabled={save.isPending}>取消</Button></DialogClose><Button type="submit" disabled={save.isPending}>{save.isPending ? "保存中..." : "保存规则"}</Button></DialogFooter></form></DialogContent></Dialog></CardContent></Card>;
+}

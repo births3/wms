@@ -6,6 +6,8 @@ import { api } from "@/lib/api";
 
 export type TaskType = components["schemas"]["TaskType"];
 export type UpsertTaskTypeRequest = components["schemas"]["UpsertTaskTypeRequest"];
+export type TaskPriorityRule = components["schemas"]["TaskPriorityRule"];
+export type UpsertTaskPriorityRuleRequest = components["schemas"]["UpsertTaskPriorityRuleRequest"];
 
 export const taskTypeQueryKey = ["mte", "task-types"] as const;
 
@@ -18,6 +20,33 @@ export function useTaskTypesQuery() {
       return result.data;
     },
     retry: false,
+  });
+}
+
+export function useTaskPriorityRuleQuery() {
+  return useQuery<TaskPriorityRule, ApiError>({
+    queryKey: [...taskTypeQueryKey, "priority-rule"],
+    queryFn: async () => {
+      const result = await api.GET("/api/v1/task-engine/priority-rule");
+      if (!result.data) throw new ApiError(result.error, "读取任务优先级规则失败", result.response.status);
+      return result.data;
+    },
+    retry: false,
+  });
+}
+
+export function useUpsertTaskPriorityRuleMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<TaskPriorityRule, ApiError, UpsertTaskPriorityRuleRequest>({
+    mutationFn: async (body) => {
+      const result = await api.PUT("/api/v1/task-engine/priority-rule", {
+        params: { header: { "Idempotency-Key": idempotencyKey("web-mte-priority-rule") } },
+        body,
+      });
+      if (!result.data) throw new ApiError(result.error, "保存任务优先级规则失败", result.response.status);
+      return result.data;
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: taskTypeQueryKey }),
   });
 }
 
