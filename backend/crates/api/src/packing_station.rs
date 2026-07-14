@@ -30,7 +30,9 @@ impl PackingStationService {
     }
 
     pub fn validate_pack_job(&self, req: &CreatePackJobRequest) -> Result<(), PackingStationError> {
-        if req.job_no.trim().is_empty()
+        if req.outbound_order_id.is_nil()
+            || req.station_id.is_some_and(|station_id| station_id.is_nil())
+            || req.job_no.trim().is_empty()
             || req.pack_mode.trim().is_empty()
             || req.recommended_box_type.trim().is_empty()
             || req.actual_box_type.trim().is_empty()
@@ -76,6 +78,51 @@ mod tests {
     use wms_domain::{CreatePackJobRequest, PrintWaybillRequest, WeighPackJobRequest};
 
     use super::{PackingStationError, PackingStationService};
+
+    fn valid_pack_job_request() -> CreatePackJobRequest {
+        CreatePackJobRequest {
+            outbound_order_id: Uuid::new_v4(),
+            station_id: Some(Uuid::new_v4()),
+            job_no: "PK-001".to_string(),
+            pack_mode: "station".to_string(),
+            recommended_box_type: "M".to_string(),
+            actual_box_type: "M".to_string(),
+            adjustment_reason: None,
+            outbound_lpn: "LPN-001".to_string(),
+            trace_codes: vec!["TC-001".to_string()],
+        }
+    }
+
+    #[test]
+    fn pack_job_rejects_nil_outbound_order_id() {
+        let service = PackingStationService;
+        let mut req = valid_pack_job_request();
+        req.outbound_order_id = Uuid::nil();
+
+        assert_eq!(
+            service.validate_pack_job(&req),
+            Err(PackingStationError::InvalidPackJob)
+        );
+    }
+
+    #[test]
+    fn pack_job_rejects_nil_station_id() {
+        let service = PackingStationService;
+        let mut req = valid_pack_job_request();
+        req.station_id = Some(Uuid::nil());
+
+        assert_eq!(
+            service.validate_pack_job(&req),
+            Err(PackingStationError::InvalidPackJob)
+        );
+    }
+
+    #[test]
+    fn valid_pack_job_passes_uuid_validation() {
+        let service = PackingStationService;
+
+        assert_eq!(service.validate_pack_job(&valid_pack_job_request()), Ok(()));
+    }
 
     #[test]
     fn pack_job_requires_adjustment_reason_when_box_changes() {

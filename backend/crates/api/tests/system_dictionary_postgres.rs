@@ -71,6 +71,54 @@ async fn document_type_presets_are_queryable(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn special_drug_category_presets_expose_compliance_defaults(pool: PgPool) {
+    let repo = PgSystemDictionaryRepository::new(pool);
+    let owner_id = Uuid::new_v4();
+    let now = Utc
+        .with_ymd_and_hms(2026, 7, 12, 9, 0, 0)
+        .single()
+        .expect("valid time");
+
+    let items = repo
+        .list_effective_items(&ctx(owner_id), "special_drug_category", now)
+        .await
+        .expect("special drug category defaults should be queryable");
+
+    assert_eq!(items.len(), 8);
+    assert!(items.iter().all(|item| {
+        item.params
+            .get("requires_dual_person_matrix")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|matrix| matrix.len() == 12)
+            && item.params.get("requires_dedicated_ledger").is_some()
+            && item.params.get("requires_dedicated_storage").is_some()
+            && item.params.get("requires_qualification").is_some()
+            && item
+                .params
+                .get("regulation_basis")
+                .and_then(serde_json::Value::as_str)
+                .is_some()
+    }));
+    let narcotic = items
+        .iter()
+        .find(|item| item.item_code == "narcotic")
+        .expect("narcotic preset should exist");
+    assert_eq!(narcotic.params["requires_dedicated_ledger"], json!(true));
+    assert_eq!(narcotic.params["requires_dedicated_storage"], json!(true));
+    assert!(narcotic.params["requires_dual_person_matrix"]
+        .as_array()
+        .expect("narcotic matrix")
+        .iter()
+        .all(|entry| entry["policy"] == "dual_scan_with_approval"));
+    let ordinary = items
+        .iter()
+        .find(|item| item.item_code == "none")
+        .expect("ordinary category preset should exist");
+    assert_eq!(ordinary.params["requires_dedicated_ledger"], json!(false));
+    assert_eq!(ordinary.params["regulation_basis"], json!(""));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn print_template_type_presets_are_queryable_and_require_field_library(pool: PgPool) {
     let repo = PgSystemDictionaryRepository::new(pool);
     let owner_id = Uuid::new_v4();
@@ -188,8 +236,18 @@ async fn owner_dictionary_item_overrides_global_and_disable_hides_it(pool: PgPoo
     .fetch_one(&pool)
     .await
     .expect("dictionary audit count should query");
+    let audit_diff: serde_json::Value = sqlx::query_scalar(
+        "SELECT diff FROM audit_event WHERE owner_id = $1 AND action = 'upsert_system_dictionary_item' AND resource_id = $2",
+    )
+    .bind(owner_id)
+    .bind(created.value.id.to_string())
+    .fetch_one(&pool)
+    .await
+    .expect("dictionary audit diff should query");
     assert_eq!(item_rows, 1);
     assert_eq!(audit_rows, 1);
+    assert_eq!(audit_diff["before"], serde_json::Value::Null);
+    assert_eq!(audit_diff["after"]["item_name"], json!("货主采购入库"));
 
     let items = repo
         .list_effective_items(&ctx, SYSTEM_DICTIONARY_DOCUMENT_TYPE, now)

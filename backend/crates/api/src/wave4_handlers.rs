@@ -16,10 +16,10 @@ use uuid::Uuid;
 use wms_domain::{
     CompletePickTaskRequest, CreateOutboundOrderRequest, CreateOutboundWaveRequest,
     DisposeTemperatureExcursionRequest, DriverTaskListResponse, ErrorResponse, OutboundOrder,
-    OutboundOrderListResponse, OutboundWave, PageMeta, ReviewOutboundOrderRequest,
-    ShipOutboundOrderRequest, StoreDashboardResponse, TemperatureExcursionDispositionResponse,
-    TemperatureExcursionEventListResponse, TraceabilityOutboundReport,
-    TraceabilityOutboundReportRequest,
+    OutboundOrderListResponse, OutboundWave, OutboundWaveListResponse, PageMeta,
+    ReviewOutboundOrderRequest, ShipOutboundOrderRequest, StoreDashboardResponse,
+    TemperatureExcursionDispositionResponse, TemperatureExcursionEventListResponse,
+    TraceabilityOutboundReport, TraceabilityOutboundReportRequest,
 };
 
 use crate::{
@@ -93,11 +93,16 @@ impl IntoResponse for Wave4HandlerError {
             Wave4HandlerError::Repository(Wave4RepositoryError::DuplicateCode) => {
                 (StatusCode::CONFLICT, "W4-409", "业务单号重复")
             }
+            Wave4HandlerError::Repository(Wave4RepositoryError::OrderAlreadyInWave) => {
+                (StatusCode::CONFLICT, "W4-409", "订单已加入其他波次")
+            }
             Wave4HandlerError::Repository(Wave4RepositoryError::EmptySelection)
             | Wave4HandlerError::Repository(Wave4RepositoryError::BatchNotAffected(_))
             | Wave4HandlerError::Repository(Wave4RepositoryError::InvalidQuantity)
+            | Wave4HandlerError::Repository(Wave4RepositoryError::InvalidDocumentType)
             | Wave4HandlerError::Repository(Wave4RepositoryError::InvalidTraceabilityEvent)
             | Wave4HandlerError::Repository(Wave4RepositoryError::ShortPickNotReplenished)
+            | Wave4HandlerError::Repository(Wave4RepositoryError::ReviewValidation(_))
             | Wave4HandlerError::Repository(Wave4RepositoryError::InvalidStatus { .. })
             | Wave4HandlerError::Repository(Wave4RepositoryError::InvalidStateTransition {
                 ..
@@ -107,6 +112,7 @@ impl IntoResponse for Wave4HandlerError {
                 "业务规则校验失败",
             ),
             Wave4HandlerError::Repository(Wave4RepositoryError::Audit(_))
+            | Wave4HandlerError::Repository(Wave4RepositoryError::DocumentNumbering(_))
             | Wave4HandlerError::Repository(Wave4RepositoryError::Database(_))
             | Wave4HandlerError::Repository(Wave4RepositoryError::Serialize(_)) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -141,14 +147,25 @@ pub fn wave4_router(state: Wave4AppState) -> Router {
             "/api/v1/outbound/orders/:order_id",
             get(get_outbound_order_handler),
         )
-        .route("/api/v1/outbound/waves", post(create_outbound_wave_handler))
+        .route(
+            "/api/v1/outbound/waves",
+            get(list_outbound_waves_handler).post(create_outbound_wave_handler),
+        )
+        .route(
+            "/api/v1/outbound/waves/:wave_id",
+            get(get_outbound_wave_handler),
+        )
+        .route(
+            "/api/v1/outbound/waves/:wave_id/cancel",
+            post(cancel_outbound_wave_handler),
+        )
         .route(
             "/api/v1/outbound/pick-tasks/:id/complete",
             post(complete_pick_task_handler),
         )
         .route(
             "/api/v1/outbound/orders/:id/review",
-            post(review_outbound_order_handler),
+            get(get_outbound_review_handler).post(review_outbound_order_handler),
         )
         .route(
             "/api/v1/outbound/orders/:id/ship",
@@ -274,6 +291,17 @@ async fn review_outbound_order_handler(
         .review_outbound_order(&ctx, id, req, now, &idempotency_key, Some(audit))
         .await?;
     Ok(Json(outcome.value))
+}
+
+async fn get_outbound_review_handler(
+    ctx: AuthContext,
+    State(state): State<Wave4AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<OutboundOrder>, Wave4HandlerError> {
+    require_any_permission(&ctx, &[M4_READ_PERMISSION, "m4.write"])?;
+    Ok(Json(
+        state.wave4_repository.get_outbound_order(&ctx, id).await?,
+    ))
 }
 
 async fn ship_outbound_order_handler(
@@ -478,10 +506,16 @@ async fn get_store_dashboard_handler(
     }))
 }
 
+include!("wave4_handlers_waves.rs");
+
+#[cfg(test)]
+#[path = "wave4_handlers_review_tests.rs"]
+mod review_tests;
+
 #[cfg(test)]
 mod tests {
     use axum::http::HeaderMap;
-    use axum::{extract::Path, extract::Query, extract::State, Json};
+    use axum::{extract::State, Json};
     use chrono::{NaiveDate, TimeZone, Utc};
     use sqlx::PgPool;
     use uuid::Uuid;
@@ -492,9 +526,8 @@ mod tests {
 
     use super::{
         create_outbound_order_handler, create_traceability_outbound_report_handler,
-        dispose_temperature_excursion_handler, get_outbound_order_handler,
-        get_store_dashboard_handler, list_driver_today_tasks_handler, list_outbound_orders_handler,
-        list_pending_temperature_excursions_handler, wave4_router, ListOutboundOrdersQuery,
+        dispose_temperature_excursion_handler, get_store_dashboard_handler,
+        list_driver_today_tasks_handler, list_pending_temperature_excursions_handler, wave4_router,
         Wave4AppState, Wave4HandlerError,
     };
     use crate::{
@@ -595,6 +628,7 @@ mod tests {
             State(state),
             HeaderMap::new(),
             Json(CreateOutboundOrderRequest {
+                document_type: "sales_outbound".to_string(),
                 wms_order_no: "WMS-R-20260604-001".to_string(),
                 erp_order_no: Some("ERP-SO-001".to_string()),
                 customer_id: Uuid::new_v4(),
@@ -625,6 +659,7 @@ mod tests {
             State(state),
             HeaderMap::new(),
             Json(CreateOutboundOrderRequest {
+                document_type: "sales_outbound".to_string(),
                 wms_order_no: "WMS-R-20260604-002".to_string(),
                 erp_order_no: Some("ERP-SO-002".to_string()),
                 customer_id: Uuid::new_v4(),
@@ -637,39 +672,6 @@ mod tests {
         .expect_err("Idempotency-Key should be required before repository access");
 
         assert_eq!(result, Wave4HandlerError::InvalidIdempotencyKey);
-    }
-
-    #[tokio::test]
-    async fn outbound_read_handlers_require_m4_read_or_write_before_postgres() {
-        let owner_id = Uuid::new_v4();
-        let pool = PgPool::connect_lazy("postgres://localhost/wms")
-            .expect("lazy pool should not connect during handler read auth test");
-        let state = Wave4AppState::with_postgres(pool);
-
-        let list_denied = list_outbound_orders_handler(
-            ctx(owner_id, &[]),
-            State(state.clone()),
-            Query(ListOutboundOrdersQuery::default()),
-        )
-        .await
-        .expect_err("outbound list should require m4.read or m4.write before repository access");
-        assert!(matches!(
-            list_denied,
-            Wave4HandlerError::Auth(AuthError::PermissionDenied(permission))
-                if permission == "m4.read|m4.write"
-        ));
-
-        let detail_denied =
-            get_outbound_order_handler(ctx(owner_id, &[]), State(state), Path(Uuid::new_v4()))
-                .await
-                .expect_err(
-                    "outbound detail should require m4.read or m4.write before repository access",
-                );
-        assert!(matches!(
-            detail_denied,
-            Wave4HandlerError::Auth(AuthError::PermissionDenied(permission))
-                if permission == "m4.read|m4.write"
-        ));
     }
 
     #[tokio::test]

@@ -286,7 +286,7 @@ async fn location_batch_create_requires_idempotency_key(pool: PgPool) {
 
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     let error = error_response(response).await;
-    assert_eq!(error.code, "M1_LOCATION_IDEMPOTENCY_REQUIRED");
+    assert_eq!(error.code, "M1_IDEMPOTENCY_REQUIRED");
 }
 
 async fn seed_product(
@@ -304,7 +304,7 @@ async fn seed_product(
             storage_condition, special_drug_category, approval_no, manufacturer,
             status, created_at, updated_at
         )
-        VALUES ($1, $2, $3, $4, '10ml*1支', $5, 'normal', '国药准字H-M1', '示例药业', 'active', $6, $6)
+        VALUES ($1, $2, $3, $4, '10ml*1支', $5, 'none', '国药准字H-M1', '示例药业', 'active', $6, $6)
         "#,
     )
     .bind(Uuid::new_v4())
@@ -370,6 +370,14 @@ async fn seed_customer(
 }
 
 async fn seed_warehouse_zone(pool: &PgPool, owner_id: Uuid) -> (Uuid, Uuid) {
+    sqlx::query(
+        "INSERT INTO auth_owners (id, owner_code, owner_name) VALUES ($1, $2, '测试货主') ON CONFLICT (id) DO NOTHING",
+    )
+    .bind(owner_id)
+    .bind(format!("OWNER-{}", &owner_id.to_string()[..8]))
+    .execute(pool)
+    .await
+    .expect("seed owner");
     let warehouse_id = Uuid::new_v4();
     let zone_id = Uuid::new_v4();
     sqlx::query(

@@ -45,6 +45,13 @@ pub struct AuthContext {
     pub jti: String,
 }
 
+/// 登出专用上下文：验签但不检查撤销状态，保证重复登出仍然幂等。
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LogoutContext {
+    pub auth: AuthContext,
+    pub expires_at: i64,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum AuthError {
     MissingAuthorization,
@@ -113,6 +120,10 @@ impl AuthRuntimePolicy {
         }
     }
 
+    pub fn revocation_store(&self) -> Arc<dyn AuthRevocationStore> {
+        Arc::clone(&self.revocation_store)
+    }
+
     pub async fn validate_claims(&self, claims: &Claims) -> Result<(), AuthError> {
         match self
             .revocation_store
@@ -123,14 +134,20 @@ impl AuthRuntimePolicy {
                 return Err(AuthError::PermissionsRevoked);
             }
             Ok(_) => {}
-            Err(_) if self.fail_open_on_store_error => return Ok(()),
+            Err(error) if self.fail_open_on_store_error => {
+                tracing::warn!(error = ?error, alert = "P1", "auth revocation store unavailable; fail-open");
+                return Ok(());
+            }
             Err(_) => return Err(AuthError::RevocationStoreUnavailable),
         }
 
         match self.revocation_store.jti_is_blacklisted(&claims.jti).await {
             Ok(true) => Err(AuthError::TokenRevoked),
             Ok(false) => Ok(()),
-            Err(_) if self.fail_open_on_store_error => Ok(()),
+            Err(error) if self.fail_open_on_store_error => {
+                tracing::warn!(error = ?error, alert = "P1", "auth revocation store unavailable; fail-open");
+                Ok(())
+            }
             Err(_) => Err(AuthError::RevocationStoreUnavailable),
         }
     }
@@ -267,16 +284,10 @@ where
     type Rejection = AuthError;
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        let value = parts
-            .headers
-            .get(AUTHORIZATION)
-            .ok_or(AuthError::MissingAuthorization)?
-            .to_str()
-            .map_err(|_| AuthError::InvalidAuthorization)?;
-
-        let token = value
-            .strip_prefix("Bearer ")
-            .ok_or(AuthError::InvalidAuthorization)?;
+        if let Some(context) = parts.extensions.get::<AuthContext>().cloned() {
+            return Ok(context);
+        }
+        let token = bearer_token(parts)?;
         let secret = std::env::var(JWT_SECRET_ENV).map_err(|_| AuthError::MissingSecret)?;
         let token_data = decode_claims(token, &secret)?;
         let policy = parts
@@ -287,6 +298,38 @@ where
         policy.validate_claims(&token_data.claims).await?;
         Ok(AuthContext::from_claims(token_data.claims))
     }
+}
+
+#[axum::async_trait]
+impl<S> FromRequestParts<S> for LogoutContext
+where
+    S: Send + Sync,
+{
+    type Rejection = AuthError;
+
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        let token = bearer_token(parts)?;
+        let secret = std::env::var(JWT_SECRET_ENV).map_err(|_| AuthError::MissingSecret)?;
+        let claims = decode_claims_for_logout(token, &secret)?.claims;
+        let expires_at = claims.exp;
+        Ok(Self {
+            auth: AuthContext::from_claims(claims),
+            expires_at,
+        })
+    }
+}
+
+fn bearer_token(parts: &Parts) -> Result<&str, AuthError> {
+    let value = parts
+        .headers
+        .get(AUTHORIZATION)
+        .ok_or(AuthError::MissingAuthorization)?
+        .to_str()
+        .map_err(|_| AuthError::InvalidAuthorization)?;
+    value
+        .strip_prefix("Bearer ")
+        .filter(|token| !token.is_empty())
+        .ok_or(AuthError::InvalidAuthorization)
 }
 
 impl IntoResponse for AuthError {
@@ -396,13 +439,24 @@ fn decode_claims(token: &str, secret: &str) -> Result<TokenData<Claims>, AuthErr
     .map_err(|_| AuthError::InvalidToken)
 }
 
+fn decode_claims_for_logout(token: &str, secret: &str) -> Result<TokenData<Claims>, AuthError> {
+    let mut validation = Validation::new(Algorithm::HS256);
+    validation.validate_exp = false;
+    decode::<Claims>(
+        token,
+        &DecodingKey::from_secret(secret.as_bytes()),
+        &validation,
+    )
+    .map_err(|_| AuthError::InvalidToken)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         auth_runtime_layer, build_access_claims, decode_auth_context,
-        decode_auth_context_with_policy, encode_access_token, AuthContext, AuthError,
-        AuthRevocationStore, AuthRevocationStoreError, AuthRuntimePolicy, ACCESS_TOKEN_TTL_SECONDS,
-        JWT_SECRET_ENV,
+        decode_auth_context_with_policy, decode_claims_for_logout, encode_access_token,
+        AuthContext, AuthError, AuthRevocationStore, AuthRevocationStoreError, AuthRuntimePolicy,
+        ACCESS_TOKEN_TTL_SECONDS, JWT_SECRET_ENV,
     };
     use axum::{
         extract::FromRequestParts,
@@ -410,7 +464,7 @@ mod tests {
         routing::get,
         Router,
     };
-    use chrono::{TimeZone, Utc};
+    use chrono::{Duration, TimeZone, Utc};
     use std::{
         collections::{HashMap, HashSet},
         sync::{Arc, Mutex},
@@ -557,6 +611,28 @@ mod tests {
         assert_eq!(ctx.actor_name, "alice");
         assert!(ctx.has_permission("audit:read"));
         assert_eq!(ctx.require_owner(owner_id), Ok(()));
+    }
+
+    #[test]
+    fn logout_decoder_accepts_expired_signed_token_for_idempotence() {
+        let claims = build_access_claims(
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            "alice",
+            Vec::new(),
+            "expired-jti",
+            Utc::now() - Duration::hours(2),
+        );
+        let token = encode_access_token(&claims, "test-secret").expect("token should encode");
+
+        assert!(decode_auth_context(&token, "test-secret").is_err());
+        assert_eq!(
+            decode_claims_for_logout(&token, "test-secret")
+                .expect("logout should decode expired signed token")
+                .claims
+                .jti,
+            claims.jti
+        );
     }
 
     #[test]

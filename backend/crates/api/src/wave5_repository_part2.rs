@@ -1,5 +1,186 @@
 impl PgWave5Repository {
-pub async fn generate_billing_statement(
+    pub async fn receive_tms_route_plan(
+        &self,
+        ctx: &AuthContext,
+        req: ReceiveTmsRoutePlanRequest,
+        now: DateTime<Utc>,
+        idempotency_key: &str,
+        audit: Option<AuditWriteRequest>,
+    ) -> Result<IdempotentMutation<TmsRoutePlan>, Wave5RepositoryError> {
+        self.tms.validate_route_plan(&req)?;
+        let request_hash = request_hash(&serde_json::json!({ "request": req }))?;
+        let mut tx = self.pool.begin().await.map_err(map_db_error)?;
+        lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
+        if let Some(replay) = replay_idempotency::<TmsRoutePlan>(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            now,
+        )
+        .await?
+        {
+            return Ok(IdempotentMutation {
+                value: replay,
+                replayed: true,
+            });
+        }
+
+        let existing = sqlx::query_as::<_, TmsRoutePlanRow>(
+            r#"
+            SELECT id, owner_id, dispatch_result_id, delivery_date, vehicle_no, plate_no,
+                   driver_user_id, status, planning_version AS version, payload_hash,
+                   created_at, updated_at
+              FROM tms_route_plans
+             WHERE owner_id = $1 AND dispatch_result_id = $2
+             FOR UPDATE
+            "#,
+        )
+        .bind(ctx.owner_id)
+        .bind(&req.dispatch_result_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(map_db_error)?;
+        if let Some(row) = existing {
+            if row.payload_hash != request_hash {
+                return Err(Wave5RepositoryError::IdempotencyConflict);
+            }
+            let route_plan = load_tms_route_plan(&mut tx, row).await?;
+            store_idempotency_success(
+                &mut tx,
+                ctx.owner_id,
+                idempotency_key,
+                &request_hash,
+                "POST",
+                "/api/v1/tms/route-plans",
+                "tms_route_plan",
+                route_plan.id.to_string(),
+                &route_plan,
+                now,
+            )
+            .await?;
+            tx.commit().await.map_err(map_db_error)?;
+            return Ok(IdempotentMutation {
+                value: route_plan,
+                replayed: true,
+            });
+        }
+
+        ensure_route_orders(&mut tx, ctx.owner_id, &req.outbound_order_ids).await?;
+        ensure_route_driver(&mut tx, ctx.owner_id, req.driver_user_id).await?;
+        let route_plan_id = Uuid::new_v4();
+        sqlx::query(
+            r#"
+            INSERT INTO tms_route_plans (
+                id, owner_id, dispatch_result_id, delivery_date, vehicle_no, plate_no,
+                driver_user_id, status, planning_version, payload_hash, created_at, updated_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, 'received', $8, $9, $10, $10)
+            "#,
+        )
+        .bind(route_plan_id)
+        .bind(ctx.owner_id)
+        .bind(&req.dispatch_result_id)
+        .bind(req.delivery_date)
+        .bind(&req.vehicle_no)
+        .bind(&req.plate_no)
+        .bind(req.driver_user_id)
+        .bind(req.version)
+        .bind(&request_hash)
+        .bind(now)
+        .execute(&mut *tx)
+        .await
+        .map_err(map_db_error)?;
+
+        let mut stops = Vec::with_capacity(req.stops.len());
+        for stop in req.stops {
+            let stop_id = Uuid::new_v4();
+            sqlx::query(
+                r#"
+                INSERT INTO tms_route_stops (
+                    id, owner_id, route_plan_id, store_id, stop_sequence,
+                    estimated_arrival_at, created_at
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                "#,
+            )
+            .bind(stop_id)
+            .bind(ctx.owner_id)
+            .bind(route_plan_id)
+            .bind(stop.store_id)
+            .bind(stop.sequence)
+            .bind(stop.estimated_arrival_at)
+            .bind(now)
+            .execute(&mut *tx)
+            .await
+            .map_err(map_db_error)?;
+            for order_id in &stop.outbound_order_ids {
+                sqlx::query(
+                    r#"
+                    INSERT INTO tms_route_orders (
+                        id, owner_id, route_plan_id, route_stop_id,
+                        outbound_order_id, created_at
+                    )
+                    VALUES ($1, $2, $3, $4, $5, $6)
+                    "#,
+                )
+                .bind(Uuid::new_v4())
+                .bind(ctx.owner_id)
+                .bind(route_plan_id)
+                .bind(stop_id)
+                .bind(order_id)
+                .bind(now)
+                .execute(&mut *tx)
+                .await
+                .map_err(map_db_error)?;
+            }
+            stops.push(TmsRouteStop {
+                id: stop_id,
+                store_id: stop.store_id,
+                sequence: stop.sequence,
+                estimated_arrival_at: stop.estimated_arrival_at,
+                outbound_order_ids: stop.outbound_order_ids,
+            });
+        }
+        let route_plan = TmsRoutePlan {
+            id: route_plan_id,
+            owner_id: ctx.owner_id,
+            dispatch_result_id: req.dispatch_result_id,
+            delivery_date: req.delivery_date,
+            vehicle_no: req.vehicle_no,
+            plate_no: req.plate_no,
+            driver_user_id: req.driver_user_id,
+            status: "received".to_string(),
+            version: req.version,
+            outbound_order_ids: req.outbound_order_ids,
+            stops,
+            created_at: now,
+            updated_at: now,
+        };
+        finish_mutation(
+            tx,
+            ctx,
+            idempotency_key,
+            &request_hash,
+            "POST",
+            "/api/v1/tms/route-plans",
+            "tms_route_plan",
+            route_plan.id,
+            &route_plan,
+            audit,
+            "receive_tms_route_plan",
+            "M10",
+            "tms_route_plan",
+            now,
+        )
+        .await?;
+        Ok(IdempotentMutation {
+            value: route_plan,
+            replayed: false,
+        })
+    }
+
+    pub async fn generate_billing_statement(
         &self,
         ctx: &AuthContext,
         req: GenerateBillingStatementRequest,

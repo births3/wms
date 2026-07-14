@@ -1,21 +1,25 @@
 //! Wave 4 repository helpers for cross-module business closures.
 
+use std::collections::HashSet;
+
 use chrono::{DateTime, Duration, NaiveDate, Utc};
 use serde::{de::DeserializeOwned, Serialize};
 use sha2::{Digest, Sha256};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{
-    CompletePickTaskRequest, CreateOutboundOrderRequest, CreateOutboundWaveRequest, InventoryBatch,
-    OutboundOrder, OutboundOrderLine, OutboundWave, ReviewOutboundOrderRequest,
-    ShipOutboundOrderRequest, TemperatureExcursionEvent, TraceabilityOutboundReport,
-    TraceabilityOutboundReportRequest, TraceabilityStatusChangeEvent,
+    validate_review_submission, CompletePickTaskRequest, CreateOutboundOrderRequest,
+    CreateOutboundWaveRequest, InventoryBatch, OutboundOrder, OutboundOrderLine, OutboundWave,
+    ReviewOutboundOrderRequest, ReviewValidationError, ShipOutboundOrderRequest,
+    TemperatureExcursionEvent, TraceabilityOutboundReport, TraceabilityOutboundReportRequest,
+    TraceabilityStatusChangeEvent,
 };
 
 use crate::{
-    audit::{append_event_in_tx, AuditWriteRequest},
+    audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
     auth::AuthContext,
-    inventory::{allowed_transition, STATUS_QUALIFIED, STATUS_QUARANTINED},
+    document_numbering::{GenerateDocumentNumberRequest, PgDocumentNumberingService},
+    inventory::{STATUS_QUALIFIED, STATUS_QUARANTINED},
     outbound::{
         all_lines_reviewed_for_ship, short_pick_qty, status_after_pick, status_after_review,
         OUTBOUND_STATUS_CONFIRMED, OUTBOUND_STATUS_IN_WAVE, OUTBOUND_STATUS_REVIEWED,
@@ -50,6 +54,7 @@ pub enum Wave4RepositoryError {
     NotFound,
     DuplicateCode,
     EmptySelection,
+    InvalidDocumentType,
     BatchNotAffected(Uuid),
     InvalidStatus {
         expected: String,
@@ -60,9 +65,12 @@ pub enum Wave4RepositoryError {
         to: String,
         approval_source: String,
     },
+    ReviewValidation(ReviewValidationError),
     InvalidQuantity,
+    DocumentNumbering(String),
     InvalidTraceabilityEvent,
     IdempotencyConflict,
+    OrderAlreadyInWave,
     ShortPickNotReplenished,
     Audit(String),
     Database(String),
@@ -107,6 +115,7 @@ struct TemperatureExcursionEventRow {
 struct OutboundOrderRow {
     id: Uuid,
     owner_id: Uuid,
+    document_type: String,
     wms_order_no: String,
     erp_order_no: Option<String>,
     customer_id: Uuid,
@@ -140,6 +149,17 @@ struct OutboundWaveRow {
     updated_at: DateTime<Utc>,
 }
 
+struct PickTaskDraft {
+    order_id: Uuid,
+    line_no: i32,
+    batch_id: Uuid,
+    product_code: String,
+    batch_no: String,
+    location_id: Uuid,
+    location_code: String,
+    planned_qty: i64,
+}
+
 #[derive(FromRow)]
 struct TraceabilityOutboundReportRow {
     id: Uuid,
@@ -159,6 +179,7 @@ struct TraceabilityOutboundReportEventRow {
 
 include!("wave4_repository_part1.rs");
 include!("wave4_repository_part2.rs");
+include!("wave4_repository_waves.rs");
 
 async fn lock_outbound_order(
     tx: &mut Transaction<'_, Postgres>,
@@ -167,7 +188,7 @@ async fn lock_outbound_order(
 ) -> Result<OutboundOrderRow, Wave4RepositoryError> {
     sqlx::query_as::<_, OutboundOrderRow>(
         r#"
-        SELECT id, owner_id, wms_order_no, erp_order_no, customer_id,
+        SELECT id, owner_id, document_type, wms_order_no, erp_order_no, customer_id,
                warehouse_id, required_ship_at, status, short_pick,
                created_at, updated_at
           FROM outbound_orders
@@ -183,6 +204,36 @@ async fn lock_outbound_order(
     .ok_or(Wave4RepositoryError::NotFound)
 }
 
+async fn ensure_outbound_document_type(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    document_type: &str,
+) -> Result<(), Wave4RepositoryError> {
+    let valid: bool = sqlx::query_scalar(
+        r#"
+        SELECT EXISTS (
+            SELECT 1
+              FROM system_dictionary_items
+             WHERE dict_code = 'document_type'
+               AND item_code = $1
+               AND (owner_id IS NULL OR owner_id = $2)
+               AND enabled = TRUE
+               AND params->>'direction' = 'outbound'
+        )
+        "#,
+    )
+    .bind(document_type)
+    .bind(owner_id)
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(map_db_error)?;
+    if valid {
+        Ok(())
+    } else {
+        Err(Wave4RepositoryError::InvalidDocumentType)
+    }
+}
+
 async fn load_outbound_order(
     tx: &mut Transaction<'_, Postgres>,
     owner_id: Uuid,
@@ -190,7 +241,7 @@ async fn load_outbound_order(
 ) -> Result<OutboundOrder, Wave4RepositoryError> {
     let row = sqlx::query_as::<_, OutboundOrderRow>(
         r#"
-        SELECT id, owner_id, wms_order_no, erp_order_no, customer_id,
+        SELECT id, owner_id, document_type, wms_order_no, erp_order_no, customer_id,
                warehouse_id, required_ship_at, status, short_pick,
                created_at, updated_at
           FROM outbound_orders
@@ -247,6 +298,30 @@ async fn load_outbound_order_lines_from_pool(
         .into_iter()
         .map(map_outbound_order_line)
         .collect::<Result<Vec<_>, _>>()
+}
+
+async fn load_outbound_pick_operator_ids(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    order_id: Uuid,
+) -> Result<Vec<Uuid>, Wave4RepositoryError> {
+    sqlx::query_scalar(
+        r#"
+        SELECT DISTINCT actor_id
+          FROM audit_event
+         WHERE owner_id = $1
+           AND module = 'M4'
+           AND action = 'complete_pick_task'
+           AND resource_type = 'outbound_order'
+           AND resource_id = $2
+         ORDER BY actor_id
+        "#,
+    )
+    .bind(owner_id)
+    .bind(order_id.to_string())
+    .fetch_all(&mut **tx)
+    .await
+    .map_err(map_db_error)
 }
 
 async fn load_traceability_outbound_report(
@@ -318,8 +393,9 @@ async fn deduct_inventory_for_outbound(
                AND product_code = $2
                AND batch_no = $3
                AND quality_status = $4
+               AND recall_flag = FALSE
                AND qty_on_hand - qty_locked > 0
-             ORDER BY expiry_date ASC, location_code ASC
+             ORDER BY location_code ASC, id ASC
              LIMIT 1
              FOR UPDATE
             "#,
@@ -351,24 +427,8 @@ async fn deduct_inventory_for_outbound(
         .execute(&mut **tx)
         .await
         .map_err(map_db_error)?;
-        sqlx::query(
-            r#"
-            INSERT INTO inventory_movements (
-                id, owner_id, batch_id, movement_type, qty_delta,
-                source_document_type, source_document_id, occurred_at
-            )
-            VALUES ($1, $2, $3, 'outbound_ship', $4, 'outbound_order', $5, $6)
-            "#,
-        )
-        .bind(Uuid::new_v4())
-        .bind(owner_id)
-        .bind(batch_id)
-        .bind(-deducted)
-        .bind(order_id)
-        .bind(now)
-        .execute(&mut **tx)
-        .await
-        .map_err(map_db_error)?;
+        append_outbound_inventory_movement(tx, owner_id, batch_id, -deducted, order_id, now)
+            .await?;
         remaining -= deducted;
     }
     Ok(())
@@ -629,6 +689,7 @@ fn map_outbound_order(row: OutboundOrderRow, lines: Vec<OutboundOrderLine>) -> O
     OutboundOrder {
         id: row.id,
         owner_id: row.owner_id,
+        document_type: row.document_type,
         wms_order_no: row.wms_order_no,
         erp_order_no: row.erp_order_no,
         customer_id: row.customer_id,

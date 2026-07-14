@@ -20,10 +20,14 @@ const VALID_VIEW_IDS: &[&str] = &[
     "m1-zones",
     "m1-locations",
     "m1-system-dictionary",
+    "dock-management",
     "m1-feature-flags",
     "m2-receiving",
     "m2-inspecting",
     "m2-putaway",
+    "m3-status-config",
+    "m9-billing-rules",
+    "m10-route-plans",
     "m3-batches",
     "m4-orders",
     "m4-waves",
@@ -37,6 +41,7 @@ const VALID_VIEW_IDS: &[&str] = &[
     "h4-notify-records",
     "h5-express",
     "h9-print-templates",
+    "mcg-numbering",
 ];
 
 const VALID_ICON_KEYS: &[&str] = &[

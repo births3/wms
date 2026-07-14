@@ -7,6 +7,7 @@ use uuid::Uuid;
 use wms_domain::{
     ColdChainDevice, CreateColdChainDeviceRequest, IngestTemperatureExcursionRequest,
     IngestTemperatureReadingRequest, TemperatureExcursionEvent, TemperatureReading,
+    UpdateColdChainDeviceRequest,
 };
 
 use crate::auth::AuthContext;
@@ -15,7 +16,21 @@ use crate::auth::AuthContext;
 pub enum ColdChainError {
     DuplicateDevice(String),
     DeviceNotFound(String),
+    InvalidDeviceType(String),
+    ActiveMonitoring(String),
     FutureTimestamp,
+}
+
+pub const SUPPORTED_DEVICE_TYPES: [&str; 5] = [
+    "cold_storage",
+    "refrigerated_truck",
+    "insulated_container",
+    "thermometer",
+    "temperature_recorder",
+];
+
+pub fn is_supported_device_type(device_type: &str) -> bool {
+    SUPPORTED_DEVICE_TYPES.contains(&device_type)
 }
 
 #[derive(Clone, Debug, Default)]
@@ -32,6 +47,9 @@ impl ColdChainService {
         req: CreateColdChainDeviceRequest,
         now: DateTime<Utc>,
     ) -> Result<ColdChainDevice, ColdChainError> {
+        if !is_supported_device_type(&req.device_type) {
+            return Err(ColdChainError::InvalidDeviceType(req.device_type));
+        }
         let key = device_key(ctx.owner_id, &req.device_code);
         if self.devices.contains_key(&key) {
             return Err(ColdChainError::DuplicateDevice(req.device_code));
@@ -48,6 +66,57 @@ impl ColdChainService {
         };
         self.devices.insert(key, device.clone());
         Ok(device)
+    }
+
+    pub fn list_devices(&self, ctx: &AuthContext) -> Vec<ColdChainDevice> {
+        self.devices
+            .values()
+            .filter(|device| device.owner_id == ctx.owner_id)
+            .cloned()
+            .collect()
+    }
+
+    pub fn update_device(
+        &mut self,
+        ctx: &AuthContext,
+        device_code: &str,
+        req: UpdateColdChainDeviceRequest,
+    ) -> Result<ColdChainDevice, ColdChainError> {
+        if let Some(device_type) = &req.device_type {
+            if !is_supported_device_type(device_type) {
+                return Err(ColdChainError::InvalidDeviceType(device_type.clone()));
+            }
+        }
+        let device = self
+            .devices
+            .get_mut(&device_key(ctx.owner_id, device_code))
+            .ok_or_else(|| ColdChainError::DeviceNotFound(device_code.to_string()))?;
+        if let Some(device_type) = req.device_type {
+            device.device_type = device_type;
+        }
+        if let Some(location_code) = req.installed_at_location_code {
+            device.installed_at_location_code = Some(location_code);
+        }
+        if let Some(calibration_due_at) = req.calibration_due_at {
+            device.calibration_due_at = Some(calibration_due_at);
+        }
+        Ok(device.clone())
+    }
+
+    pub fn disable_device(
+        &mut self,
+        ctx: &AuthContext,
+        device_code: &str,
+    ) -> Result<ColdChainDevice, ColdChainError> {
+        let device = self
+            .devices
+            .get_mut(&device_key(ctx.owner_id, device_code))
+            .ok_or_else(|| ColdChainError::DeviceNotFound(device_code.to_string()))?;
+        if device.status == "monitoring" {
+            return Err(ColdChainError::ActiveMonitoring(device_code.to_string()));
+        }
+        device.status = "inactive".to_string();
+        Ok(device.clone())
     }
 
     pub fn ingest_reading(
@@ -131,7 +200,7 @@ mod tests {
         IngestTemperatureReadingRequest,
     };
 
-    use super::{ColdChainError, ColdChainService};
+    use super::{device_key, ColdChainError, ColdChainService};
     use crate::auth::AuthContext;
 
     fn ctx(owner_id: Uuid) -> AuthContext {
@@ -142,6 +211,37 @@ mod tests {
             permissions: vec!["m5.write".to_string()],
             jti: Uuid::new_v4().to_string(),
         }
+    }
+
+    #[test]
+    fn monitoring_device_cannot_be_disabled_in_memory() {
+        let owner_id = Uuid::new_v4();
+        let ctx = ctx(owner_id);
+        let mut service = ColdChainService::default();
+        service
+            .create_device(
+                &ctx,
+                CreateColdChainDeviceRequest {
+                    device_code: "TEMP-MONITORING".to_string(),
+                    device_type: "temperature_recorder".to_string(),
+                    installed_at_location_code: None,
+                    calibration_due_at: None,
+                },
+                Utc::now(),
+            )
+            .expect("device");
+        service
+            .devices
+            .get_mut(&device_key(owner_id, "TEMP-MONITORING"))
+            .expect("device in owner scope")
+            .status = "monitoring".to_string();
+
+        let result = service.disable_device(&ctx, "TEMP-MONITORING");
+
+        assert!(matches!(
+            result,
+            Err(ColdChainError::ActiveMonitoring(code)) if code == "TEMP-MONITORING"
+        ));
     }
 
     #[test]

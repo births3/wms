@@ -1,6 +1,8 @@
 //! H4 企业微信通知与审批服务。
 
+mod delivery;
 mod models;
+mod provider;
 mod validation;
 
 use chrono::{DateTime, Utc};
@@ -11,7 +13,7 @@ use wms_domain::{
     CreateH4ApprovalRequest, H4ApprovalCallbackRequest, H4ApprovalRecord, H4NotificationConfig,
     H4NotificationConfigListResponse, H4NotificationRecord, H4NotificationRecordListResponse,
     H4WechatSettings, H4WechatSettingsResponse, H4WechatSettingsTestResponse, PageMeta,
-    SendH4NotificationRequest, UpsertH4NotificationConfigRequest, UpsertH4WechatSettingsRequest,
+    UpsertH4NotificationConfigRequest, UpsertH4WechatSettingsRequest,
 };
 
 use crate::{
@@ -22,6 +24,10 @@ use crate::{
 };
 
 use self::models::{ApprovalRow, ConfigRow, RecordRow, WechatSettingsRow};
+pub use self::provider::{
+    UnconfiguredWechatProvider, WechatProvider, WechatProviderError, WechatProviderFuture,
+    WechatProviderRequest,
+};
 
 pub const DEFAULT_H4_QUERY_LIMIT: u32 = 50;
 pub const MAX_H4_QUERY_LIMIT: u32 = 100;
@@ -317,89 +323,6 @@ impl PgWechatNotifyService {
             status: status.to_string(),
             message: message.to_string(),
             checked_at: now,
-        })
-    }
-
-    pub async fn send_notification(
-        &self,
-        pool: &PgPool,
-        ctx: &AuthContext,
-        req: SendH4NotificationRequest,
-        now: DateTime<Utc>,
-        idempotency_key: &str,
-    ) -> Result<IdempotentMutation<Vec<H4NotificationRecord>>, WechatNotifyError> {
-        validation::validate_send_request(&req)?;
-        let request_hash = json_request_hash(&req)?;
-        let mut tx = pool.begin().await.map_err(map_db_error)?;
-        lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash, now).await?
-        {
-            return Ok(IdempotentMutation {
-                value,
-                replayed: true,
-            });
-        }
-        let config =
-            validation::load_enabled_config(&mut tx, ctx.owner_id, &req.event_type).await?;
-        let content = validation::render_template(&config.template, &req.payload)?;
-        let summary = validation::summarize(&content);
-        let mut records = Vec::new();
-        for recipient in req
-            .recipients
-            .iter()
-            .map(|value| value.trim())
-            .filter(|v| !v.is_empty())
-        {
-            let row = sqlx::query_as::<_, RecordRow>(
-                r#"
-                INSERT INTO h4_notification_records (
-                    id, owner_id, config_id, event_type, dedupe_key, recipient, channel,
-                    content, content_summary, status, retry_count, failure_reason,
-                    sent_at, created_at, updated_at
-                )
-                VALUES ($1, $2, $3, $4, $5, $6, 'wechat', $7, $8,
-                        'failed', 0, $9, NULL, $10, $10)
-                ON CONFLICT (owner_id, event_type, recipient, dedupe_key)
-                DO UPDATE SET updated_at = h4_notification_records.updated_at
-                RETURNING id, owner_id, config_id, event_type, dedupe_key, recipient,
-                          channel, content_summary, status, retry_count, failure_reason,
-                          sent_at, created_at, updated_at
-                "#,
-            )
-            .bind(Uuid::new_v4())
-            .bind(ctx.owner_id)
-            .bind(config.id)
-            .bind(&req.event_type)
-            .bind(&req.dedupe_key)
-            .bind(recipient)
-            .bind(&content)
-            .bind(&summary)
-            .bind(PROVIDER_NOT_CONFIGURED_REASON)
-            .bind(now)
-            .fetch_one(&mut *tx)
-            .await
-            .map_err(map_db_error)?;
-            records.push(row.into());
-        }
-        finish_mutation(
-            &mut tx,
-            ctx,
-            idempotency_key,
-            &request_hash,
-            "POST",
-            "/api/v1/wechat-notify/send",
-            "h4_notification_record",
-            req.dedupe_key.clone(),
-            &records,
-            "h4.notify.delivery_failed",
-            now,
-        )
-        .await?;
-        tx.commit().await.map_err(map_db_error)?;
-        Ok(IdempotentMutation {
-            value: records,
-            replayed: false,
         })
     }
 

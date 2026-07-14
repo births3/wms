@@ -40,6 +40,17 @@ pub(crate) async fn finish_mutation<T: Serialize>(
         now,
     )
     .await?;
+    append_mutation_audit(tx, ctx, action, resource_type, resource_id, response).await
+}
+
+pub(crate) async fn append_mutation_audit<T: Serialize>(
+    tx: &mut Transaction<'_, Postgres>,
+    ctx: &AuthContext,
+    action: &str,
+    resource_type: &str,
+    resource_id: String,
+    response: &T,
+) -> Result<(), WechatNotifyError> {
     append_event_in_tx(
         tx,
         &AuditWriteRequest::from_auth_context(
@@ -58,6 +69,32 @@ pub(crate) async fn finish_mutation<T: Serialize>(
     .await
     .map(|_| ())
     .map_err(|error| WechatNotifyError::Audit(format!("{error:?}")))
+}
+
+pub(crate) async fn update_idempotency_response<T: Serialize>(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    idempotency_key: &str,
+    request_hash: &str,
+    response: &T,
+) -> Result<(), WechatNotifyError> {
+    let response_body = serde_json::to_value(response)
+        .map_err(|error| WechatNotifyError::Serialize(error.to_string()))?;
+    sqlx::query(
+        r#"
+        UPDATE idempotency_request
+           SET response_body = $4
+         WHERE owner_id = $1 AND idempotency_key = $2 AND request_hash = $3
+        "#,
+    )
+    .bind(owner_id)
+    .bind(idempotency_key)
+    .bind(request_hash)
+    .bind(response_body)
+    .execute(&mut **tx)
+    .await
+    .map_err(map_db_error)?;
+    Ok(())
 }
 
 pub(crate) async fn lock_idempotency_key(

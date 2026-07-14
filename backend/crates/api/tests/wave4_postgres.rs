@@ -12,8 +12,9 @@ use wms_api::{
 };
 use wms_domain::{
     CompletePickTaskRequest, CreateOutboundOrderLineRequest, CreateOutboundOrderRequest,
-    CreateOutboundWaveRequest, OutboundOrder, ReviewOutboundOrderRequest, ShipOutboundOrderRequest,
-    TraceabilityOutboundReportRequest, TraceabilityStatusChangeEvent,
+    CreateOutboundWaveRequest, OutboundOrder, ReviewOutboundOrderLineRequest,
+    ReviewOutboundOrderRequest, ShipOutboundOrderRequest, TraceabilityOutboundReportRequest,
+    TraceabilityStatusChangeEvent,
 };
 
 #[path = "support/wave4.rs"]
@@ -110,6 +111,7 @@ async fn create_read_order(
     repo.create_outbound_order(
         ctx,
         CreateOutboundOrderRequest {
+            document_type: "sales_outbound".to_string(),
             wms_order_no: wms_order_no.to_string(),
             erp_order_no: Some(erp_order_no.to_string()),
             customer_id: Uuid::new_v4(),
@@ -131,222 +133,10 @@ async fn create_read_order(
     .value
 }
 
-#[sqlx::test(migrations = "../../migrations")]
-async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: PgPool) {
-    let owner_id = Uuid::new_v4();
-    let ctx = ctx(owner_id);
-    let repo = PgWave4Repository::new(pool.clone());
-    let now = Utc
-        .with_ymd_and_hms(2026, 6, 5, 8, 0, 0)
-        .single()
-        .expect("valid time");
-    seed_outbound_inventory(&pool, owner_id, "P-OUT-001", "B-OUT-001", 10, now).await;
-
-    let order = repo
-        .create_outbound_order(
-            &ctx,
-            CreateOutboundOrderRequest {
-                wms_order_no: "WMS-R-20260605-001".to_string(),
-                erp_order_no: Some("ERP-SO-001".to_string()),
-                customer_id: Uuid::new_v4(),
-                warehouse_id: Uuid::new_v4(),
-                required_ship_at: None,
-                lines: vec![CreateOutboundOrderLineRequest {
-                    line_no: 1,
-                    product_code: "P-OUT-001".to_string(),
-                    batch_no: "B-OUT-001".to_string(),
-                    planned_qty: 10,
-                }],
-            },
-            now,
-            "outbound-create-1",
-            None,
-        )
-        .await
-        .expect("outbound order should be created")
-        .value;
-    assert_eq!(order.status, "confirmed");
-
-    let wave = repo
-        .create_outbound_wave(
-            &ctx,
-            CreateOutboundWaveRequest {
-                wave_no: "WAVE-20260605-001".to_string(),
-                order_ids: vec![order.id],
-            },
-            now,
-            "outbound-wave-1",
-            None,
-        )
-        .await
-        .expect("wave should be created")
-        .value;
-    assert_eq!(wave.order_ids, vec![order.id]);
-
-    let short = repo
-        .complete_pick_task(
-            &ctx,
-            order.id,
-            CompletePickTaskRequest {
-                line_no: 1,
-                picked_qty: 8,
-                exception_code: Some("SHORT_PICK".to_string()),
-                exception_note: Some("零拣位不足，等待补拣".to_string()),
-            },
-            now,
-            "outbound-pick-short-1",
-            None,
-        )
-        .await
-        .expect("short pick can continue")
-        .value;
-    assert_eq!(short.status, "picked_short");
-    assert!(short.short_pick);
-
-    let reviewed_short = repo
-        .review_outbound_order(
-            &ctx,
-            order.id,
-            ReviewOutboundOrderRequest {
-                reviewer_id: Uuid::new_v4(),
-                review_mode: "pda_loose".to_string(),
-                second_reviewer_id: None,
-            },
-            now,
-            "outbound-review-short-1",
-            None,
-        )
-        .await
-        .expect("short pick can be reviewed with marker")
-        .value;
-    assert_eq!(reviewed_short.status, "reviewed_short");
-
-    let blocked_ship = repo
-        .ship_outbound_order(
-            &ctx,
-            order.id,
-            ShipOutboundOrderRequest {
-                carrier_type: "own_fleet".to_string(),
-                handover_to: "driver-001".to_string(),
-                package_count: 1,
-                shipped_at: Some(now),
-            },
-            now,
-            "outbound-ship-blocked-1",
-            None,
-        )
-        .await
-        .expect_err("short pick must be replenished before ship");
-    assert!(matches!(
-        blocked_ship,
-        Wave4RepositoryError::ShortPickNotReplenished
-    ));
-
-    let replenished_request = CompletePickTaskRequest {
-        line_no: 1,
-        picked_qty: 10,
-        exception_code: None,
-        exception_note: Some("补拣补齐".to_string()),
-    };
-    let replenished = repo
-        .complete_pick_task(
-            &ctx,
-            order.id,
-            replenished_request.clone(),
-            now,
-            "outbound-pick-replenished-1",
-            None,
-        )
-        .await
-        .expect("replenishment pick should clear short pick");
-    let pick_replay = repo
-        .complete_pick_task(
-            &ctx,
-            order.id,
-            replenished_request,
-            now,
-            "outbound-pick-replenished-1",
-            None,
-        )
-        .await
-        .expect("same-key complete pick should replay");
-    assert!(pick_replay.replayed);
-    assert_eq!(pick_replay.value.id, replenished.value.id);
-
-    let review_request = ReviewOutboundOrderRequest {
-        reviewer_id: Uuid::new_v4(),
-        review_mode: "pda_loose".to_string(),
-        second_reviewer_id: None,
-    };
-    let reviewed = repo
-        .review_outbound_order(
-            &ctx,
-            order.id,
-            review_request.clone(),
-            now,
-            "outbound-review-replenished-1",
-            None,
-        )
-        .await
-        .expect("replenished order should be reviewed again");
-    let review_replay = repo
-        .review_outbound_order(
-            &ctx,
-            order.id,
-            review_request,
-            now,
-            "outbound-review-replenished-1",
-            None,
-        )
-        .await
-        .expect("same-key outbound review should replay");
-    assert!(review_replay.replayed);
-    assert_eq!(review_replay.value.id, reviewed.value.id);
-
-    let ship_request = ShipOutboundOrderRequest {
-        carrier_type: "own_fleet".to_string(),
-        handover_to: "driver-001".to_string(),
-        package_count: 1,
-        shipped_at: Some(now),
-    };
-    let shipped = repo
-        .ship_outbound_order(
-            &ctx,
-            order.id,
-            ship_request.clone(),
-            now,
-            "outbound-ship-1",
-            None,
-        )
-        .await
-        .expect("replenished order can ship")
-        .value;
-    assert_eq!(shipped.status, "shipped");
-    assert_eq!(shipped.lines[0].shipped_qty, 10);
-    let ship_replay = repo
-        .ship_outbound_order(&ctx, order.id, ship_request, now, "outbound-ship-1", None)
-        .await
-        .expect("same-key outbound ship should replay");
-    assert!(ship_replay.replayed);
-    assert_eq!(ship_replay.value.id, shipped.id);
-
-    let counts: (i64, i64, i64) = sqlx::query_as(
-        r#"
-        SELECT
-            (SELECT qty_on_hand FROM inventory_batches
-              WHERE owner_id = $1 AND product_code = 'P-OUT-001' AND batch_no = 'B-OUT-001'),
-            (SELECT COALESCE(SUM(qty_delta), 0)::BIGINT FROM inventory_movements
-              WHERE owner_id = $1 AND source_document_type = 'outbound_order'),
-            (SELECT COUNT(*) FROM audit_event
-              WHERE owner_id = $1 AND action = 'ship_outbound_order')
-        "#,
-    )
-    .bind(owner_id)
-    .fetch_one(&pool)
-    .await
-    .expect("counts");
-    assert_eq!(counts, (0, -10, 1));
-}
+include!("wave4_postgres/document_numbering.rs");
+include!("wave4_postgres/temperature.rs");
+include!("wave4_postgres/wave_reads.rs");
+include!("wave4_postgres/review.rs");
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn outbound_order_reads_are_owner_scoped_filterable_and_include_lines(pool: PgPool) {
@@ -354,7 +144,7 @@ async fn outbound_order_reads_are_owner_scoped_filterable_and_include_lines(pool
     let other_owner_id = Uuid::new_v4();
     let owner_ctx = ctx(owner_id);
     let other_ctx = ctx(other_owner_id);
-    let repo = PgWave4Repository::new(pool);
+    let repo = PgWave4Repository::new(pool.clone());
     let now = Utc
         .with_ymd_and_hms(2026, 6, 5, 8, 30, 0)
         .single()
@@ -362,6 +152,15 @@ async fn outbound_order_reads_are_owner_scoped_filterable_and_include_lines(pool
 
     let first = create_read_order(&repo, &owner_ctx, "WMS-R-READ-001", "ERP-READ-001", now).await;
     let second = create_read_order(&repo, &owner_ctx, "WMS-R-READ-002", "ERP-READ-002", now).await;
+    seed_outbound_inventory(
+        &pool,
+        owner_id,
+        "P-WMS-R-READ-002",
+        "B-WMS-R-READ-002",
+        6,
+        now,
+    )
+    .await;
     repo.create_outbound_wave(
         &owner_ctx,
         CreateOutboundWaveRequest {
@@ -412,6 +211,28 @@ async fn outbound_order_reads_are_owner_scoped_filterable_and_include_lines(pool
         .await
         .expect_err("other owner must not read order detail");
     assert!(matches!(other_owner_detail, Wave4RepositoryError::NotFound));
+
+    let other_owner_review = repo
+        .review_outbound_order(
+            &other_ctx,
+            first.id,
+            ReviewOutboundOrderRequest {
+                reviewer_id: other_ctx.user_id,
+                review_mode: "pda_loose".to_string(),
+                second_reviewer_id: None,
+                lines: vec![ReviewOutboundOrderLineRequest {
+                    line_no: 1,
+                    product_code: "P-WMS-R-READ-001".to_string(),
+                    reviewed_qty: 6,
+                }],
+            },
+            now,
+            "outbound-cross-owner-review-1",
+            None,
+        )
+        .await
+        .expect_err("other owner must not submit review");
+    assert!(matches!(other_owner_review, Wave4RepositoryError::NotFound));
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -680,115 +501,4 @@ async fn temperature_excursion_disposition_quarantines_selected_batches_and_audi
     .await
     .expect("counts");
     assert_eq!(counts, (1, STATUS_QUARANTINED.to_string(), 1, 1));
-}
-
-#[sqlx::test(migrations = "../../migrations")]
-async fn temperature_excursion_disposition_rejects_unaffected_batch_without_side_effects(
-    pool: PgPool,
-) {
-    let owner_id = Uuid::new_v4();
-    let ctx = ctx(owner_id);
-    let repo = PgWave4Repository::new(pool.clone());
-    let now = Utc
-        .with_ymd_and_hms(2026, 6, 5, 9, 30, 0)
-        .single()
-        .expect("valid time");
-    let affected_batch_id = seed_inventory_batch(&pool, owner_id, now).await;
-    let unrelated_batch_id = seed_inventory_batch(&pool, owner_id, now).await;
-    seed_temperature_excursion(
-        &pool,
-        owner_id,
-        "TEMP-EXT-W4-002",
-        vec![affected_batch_id],
-        now,
-    )
-    .await;
-
-    let result = repo
-        .dispose_temperature_excursion_and_quarantine_batches(
-            &ctx,
-            "TEMP-EXT-W4-002",
-            vec![unrelated_batch_id],
-            now,
-            None,
-        )
-        .await
-        .expect_err("unaffected batch should be rejected");
-
-    assert!(matches!(
-        result,
-        Wave4RepositoryError::BatchNotAffected(id) if id == unrelated_batch_id
-    ));
-    let counts: (i64, String) = sqlx::query_as(
-        r#"
-        SELECT
-            (SELECT COUNT(*) FROM inventory_status_changes WHERE owner_id = $1),
-            (SELECT status FROM temperature_excursion_events
-              WHERE owner_id = $1 AND external_event_id = 'TEMP-EXT-W4-002')
-        "#,
-    )
-    .bind(owner_id)
-    .fetch_one(&pool)
-    .await
-    .expect("counts");
-    assert_eq!(counts, (0, "pending_disposition".to_string()));
-}
-
-#[sqlx::test(migrations = "../../migrations")]
-async fn temperature_excursion_disposition_audit_event_is_append_only_and_hash_chain_seals(
-    pool: PgPool,
-) {
-    let owner_id = Uuid::new_v4();
-    let ctx = ctx(owner_id);
-    let repo = PgWave4Repository::new(pool.clone());
-    let now = Utc
-        .with_ymd_and_hms(2026, 6, 5, 11, 0, 0)
-        .single()
-        .expect("valid time");
-    let batch_id = seed_inventory_batch(&pool, owner_id, now).await;
-    let event_id =
-        seed_temperature_excursion(&pool, owner_id, "TEMP-EXT-W4-003", vec![batch_id], now).await;
-    let mut audit = AuditWriteRequest::from_auth_context(
-        &ctx,
-        "dispose_temperature_excursion",
-        "M5",
-        "temperature_excursion",
-        event_id.to_string(),
-        None,
-    );
-    audit.occurred_at = now;
-
-    repo.dispose_temperature_excursion_and_quarantine_batches(
-        &ctx,
-        "TEMP-EXT-W4-003",
-        vec![batch_id],
-        now,
-        Some(audit),
-    )
-    .await
-    .expect("temperature excursion disposition should commit");
-
-    let update_result =
-        sqlx::query("UPDATE audit_event SET action = 'tampered' WHERE owner_id = $1")
-            .bind(owner_id)
-            .execute(&pool)
-            .await;
-    assert!(
-        update_result.is_err(),
-        "audit_event append_only invariant must reject UPDATE"
-    );
-
-    let delete_result = sqlx::query("DELETE FROM audit_event WHERE owner_id = $1")
-        .bind(owner_id)
-        .execute(&pool)
-        .await;
-    assert!(
-        delete_result.is_err(),
-        "audit_event append_only invariant must reject DELETE"
-    );
-
-    let seal = seal_audit_chain(&pool, now.date_naive(), now)
-        .await
-        .expect("Wave 4 audit hash chain should seal");
-    assert_eq!(seal.seal_date, now.date_naive());
 }

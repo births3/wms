@@ -1,7 +1,5 @@
 //! US-M1-011 system dictionary first backend slice.
 
-use std::collections::BTreeSet;
-
 use chrono::{DateTime, Duration, Utc};
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
@@ -16,9 +14,13 @@ use wms_domain::{
 };
 
 use crate::{
-    audit::{append_event_in_tx, AuditWriteRequest},
+    audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
     auth::AuthContext,
 };
+
+mod system_dictionary_validation;
+
+use system_dictionary_validation::{allowed_owner_params, validate_params};
 
 #[derive(Clone, Debug)]
 pub struct PgSystemDictionaryRepository {
@@ -59,7 +61,7 @@ struct SystemDictionaryCategoryRow {
     updated_at: DateTime<Utc>,
 }
 
-#[derive(FromRow)]
+#[derive(Clone, FromRow)]
 struct SystemDictionaryItemRow {
     id: Uuid,
     dict_code: String,
@@ -220,6 +222,7 @@ impl PgSystemDictionaryRepository {
             "global"
         };
         let existing = load_item_for_update(&mut tx, dict_code, item_code, req.owner_id).await?;
+        let before = existing.clone().map(SystemDictionaryItem::from);
         let row = if let Some(existing) = existing {
             sqlx::query_as::<_, SystemDictionaryItemRow>(
                 r#"
@@ -288,6 +291,7 @@ impl PgSystemDictionaryRepository {
             &request_hash,
             "PUT",
             &format!("/api/v1/system-dictionaries/{dict_code}/items/{item_code}"),
+            before.as_ref(),
             &item,
             "upsert_system_dictionary_item",
             now,
@@ -331,6 +335,7 @@ impl PgSystemDictionaryRepository {
         if existing.is_none() {
             return Err(SystemDictionaryError::NotFound);
         }
+        let before = existing.clone().map(SystemDictionaryItem::from);
 
         let row = sqlx::query_as::<_, SystemDictionaryItemRow>(
             r#"
@@ -363,6 +368,7 @@ impl PgSystemDictionaryRepository {
             &request_hash,
             "PATCH",
             &format!("/api/v1/system-dictionaries/{dict_code}/items/{item_code}/disable"),
+            before.as_ref(),
             &item,
             "disable_system_dictionary_item",
             now,
@@ -507,6 +513,48 @@ async fn load_item_for_update(
     .map_err(map_db_error)
 }
 
+pub(crate) async fn effective_item_enabled_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    dict_code: &str,
+    item_code: &str,
+    effective_at: DateTime<Utc>,
+) -> Result<bool, sqlx::Error> {
+    sqlx::query_scalar(
+        r#"
+        WITH scoped_items AS (
+            SELECT item.enabled,
+                   ROW_NUMBER() OVER (
+                       ORDER BY
+                           CASE WHEN item.owner_id = $1 THEN 1 ELSE 0 END DESC,
+                           item.updated_at DESC
+                   ) AS scope_rank
+              FROM system_dictionary_items item
+              JOIN system_dictionary_categories category
+                ON category.dict_code = item.dict_code
+               AND category.enabled = TRUE
+             WHERE item.dict_code = $2
+               AND item.item_code = $3
+               AND (item.owner_id IS NULL OR item.owner_id = $1)
+               AND (item.effective_from IS NULL OR item.effective_from <= $4)
+               AND (item.effective_to IS NULL OR item.effective_to > $4)
+        )
+        SELECT EXISTS (
+            SELECT 1
+              FROM scoped_items
+             WHERE scope_rank = 1
+               AND enabled = TRUE
+        )
+        "#,
+    )
+    .bind(owner_id)
+    .bind(dict_code)
+    .bind(item_code)
+    .bind(effective_at)
+    .fetch_one(&mut **tx)
+    .await
+}
+
 async fn validate_owner_override_params(
     tx: &mut Transaction<'_, Postgres>,
     category: &SystemDictionaryCategory,
@@ -561,71 +609,6 @@ fn ensure_request_owner(
     }
 }
 
-fn validate_params(schema: &Value, params: &Value) -> Result<(), SystemDictionaryError> {
-    let Some(params_object) = params.as_object() else {
-        return Err(SystemDictionaryError::ParamInvalid {
-            field: "$".to_string(),
-            message: "params 必须是 JSON object".to_string(),
-        });
-    };
-
-    if let Some(required) = schema.get("required").and_then(Value::as_array) {
-        for field in required.iter().filter_map(Value::as_str) {
-            if !params_object.contains_key(field) {
-                return Err(SystemDictionaryError::ParamInvalid {
-                    field: field.to_string(),
-                    message: "缺少必填参数".to_string(),
-                });
-            }
-        }
-    }
-
-    let Some(properties) = schema.get("properties").and_then(Value::as_object) else {
-        return Ok(());
-    };
-    for (field, property) in properties {
-        let Some(value) = params_object.get(field) else {
-            continue;
-        };
-        if property.get("type").and_then(Value::as_str) == Some("string") && !value.is_string() {
-            return Err(SystemDictionaryError::ParamInvalid {
-                field: field.clone(),
-                message: "参数必须是字符串".to_string(),
-            });
-        }
-        if let Some(allowed) = property.get("enum").and_then(Value::as_array) {
-            let Some(text) = value.as_str() else {
-                return Err(SystemDictionaryError::ParamInvalid {
-                    field: field.clone(),
-                    message: "参数必须是字符串".to_string(),
-                });
-            };
-            let ok = allowed
-                .iter()
-                .filter_map(Value::as_str)
-                .any(|item| item == text);
-            if !ok {
-                return Err(SystemDictionaryError::ParamInvalid {
-                    field: field.clone(),
-                    message: "参数值不在允许枚举中".to_string(),
-                });
-            }
-        }
-    }
-    Ok(())
-}
-
-fn allowed_owner_params(policy: &Value) -> BTreeSet<String> {
-    policy
-        .get("allowed_owner_params")
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-        .filter_map(Value::as_str)
-        .map(ToOwned::to_owned)
-        .collect()
-}
-
 #[allow(clippy::too_many_arguments)]
 async fn finish_mutation<T: Serialize>(
     mut tx: Transaction<'_, Postgres>,
@@ -634,12 +617,19 @@ async fn finish_mutation<T: Serialize>(
     request_hash: &str,
     method: &str,
     path: &str,
+    before: Option<&SystemDictionaryItem>,
     response: &T,
     action: &str,
     now: DateTime<Utc>,
 ) -> Result<(), SystemDictionaryError> {
     let response_body = serde_json::to_value(response)
         .map_err(|error| SystemDictionaryError::Serialize(error.to_string()))?;
+    let before_value = before
+        .map(serde_json::to_value)
+        .transpose()
+        .map_err(|error| SystemDictionaryError::Serialize(error.to_string()))?
+        .unwrap_or(Value::Null);
+    let audit_diff = AuditDiff::compute(before_value, response_body.clone());
     let resource_id = response_body
         .get("id")
         .and_then(Value::as_str)
@@ -664,7 +654,7 @@ async fn finish_mutation<T: Serialize>(
         "M1",
         "system_dictionary_item",
         resource_id,
-        None,
+        Some(audit_diff),
     );
     audit.occurred_at = now;
     append_event_in_tx(&mut tx, &audit)

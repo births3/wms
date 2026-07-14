@@ -5,7 +5,8 @@ use std::collections::BTreeMap;
 use chrono::{DateTime, NaiveDate, Utc};
 use uuid::Uuid;
 use wms_domain::{
-    ChangeInventoryStatusRequest, InventoryBatch, InventoryMovement, PutawayInventoryRequest,
+    CancelInventoryRecallRequest, ChangeInventoryStatusRequest, InventoryBatch,
+    InventoryBatchTrace, InventoryMovement, MarkInventoryRecallRequest, PutawayInventoryRequest,
 };
 
 use crate::auth::AuthContext;
@@ -15,13 +16,19 @@ pub const STATUS_QUARANTINED: &str = "quarantined";
 pub const STATUS_UNQUALIFIED: &str = "unqualified";
 pub const STATUS_PENDING_DESTRUCTION: &str = "pending_destruction";
 pub const STATUS_LOSS_DEDUCTED: &str = "loss_deducted";
+pub const APPROVAL_SOURCE_EXPIRY: &str = "M3-002-EXPIRY";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum InventoryError {
     NotFound,
     InvalidQuantity,
     ExpiredBatch,
+    InvalidReason,
     MissingApprovalSource,
+    RecallAlreadyActive,
+    RecallNotActive,
+    RecallStateChanged,
+    SameApprover,
     InvalidStateTransition {
         from: String,
         to: String,
@@ -33,6 +40,7 @@ pub enum InventoryError {
 pub struct InventoryStore {
     batches: BTreeMap<Uuid, InventoryBatch>,
     movements: BTreeMap<Uuid, InventoryMovement>,
+    recall_previous_status: BTreeMap<Uuid, String>,
 }
 
 impl InventoryStore {
@@ -113,6 +121,30 @@ impl InventoryStore {
             .collect()
     }
 
+    pub fn trace_batch(
+        &self,
+        ctx: &AuthContext,
+        batch_id: Uuid,
+    ) -> Result<InventoryBatchTrace, InventoryError> {
+        let batch = self
+            .batches
+            .get(&batch_id)
+            .filter(|batch| batch.owner_id == ctx.owner_id)
+            .cloned()
+            .ok_or(InventoryError::NotFound)?;
+        let movements = self
+            .movements
+            .values()
+            .filter(|movement| movement.owner_id == ctx.owner_id && movement.batch_id == batch_id)
+            .cloned()
+            .collect();
+        Ok(InventoryBatchTrace {
+            batch,
+            movements,
+            status_changes: Vec::new(),
+        })
+    }
+
     pub fn available_qty(&self, ctx: &AuthContext, batch_id: Uuid) -> Result<i64, InventoryError> {
         let batch = self
             .batches
@@ -131,6 +163,9 @@ impl InventoryStore {
         req: ChangeInventoryStatusRequest,
         now: DateTime<Utc>,
     ) -> Result<InventoryBatch, InventoryError> {
+        if req.reason.trim().is_empty() {
+            return Err(InventoryError::InvalidReason);
+        }
         if req.approval_source.trim().is_empty() || req.approval_id.trim().is_empty() {
             return Err(InventoryError::MissingApprovalSource);
         }
@@ -160,6 +195,119 @@ impl InventoryStore {
         batch.updated_at = now;
         Ok(batch.clone())
     }
+
+    pub fn mark_recall(
+        &mut self,
+        ctx: &AuthContext,
+        req: MarkInventoryRecallRequest,
+        now: DateTime<Utc>,
+    ) -> Result<InventoryBatch, InventoryError> {
+        if req.reason.trim().is_empty()
+            || req.approval_id.trim().is_empty()
+            || !matches!(req.approval_source.as_str(), "M-QL" | "M-TC")
+        {
+            return Err(InventoryError::MissingApprovalSource);
+        }
+        let (batch, previous_status) = {
+            let batch = self
+                .batches
+                .get_mut(&req.batch_id)
+                .filter(|batch| batch.owner_id == ctx.owner_id)
+                .ok_or(InventoryError::NotFound)?;
+            if batch.recall_flag {
+                return Err(InventoryError::RecallAlreadyActive);
+            }
+            if batch.quality_status == STATUS_QUALIFIED
+                && !allowed_transition(STATUS_QUALIFIED, STATUS_QUARANTINED, &req.approval_source)
+            {
+                return Err(InventoryError::InvalidStateTransition {
+                    from: batch.quality_status.clone(),
+                    to: STATUS_QUARANTINED.to_string(),
+                    approval_source: req.approval_source,
+                });
+            }
+            let previous_status = batch.quality_status.clone();
+            if previous_status == STATUS_QUALIFIED {
+                batch.quality_status = STATUS_QUARANTINED.to_string();
+            }
+            batch.recall_flag = true;
+            batch.updated_at = now;
+            (batch.clone(), previous_status)
+        };
+        self.recall_previous_status
+            .insert(batch.id, previous_status);
+        Ok(batch)
+    }
+
+    pub fn cancel_recall(
+        &mut self,
+        ctx: &AuthContext,
+        req: CancelInventoryRecallRequest,
+        now: DateTime<Utc>,
+    ) -> Result<InventoryBatch, InventoryError> {
+        if req.reason.trim().is_empty() || req.approval_id.trim().is_empty() {
+            return Err(InventoryError::MissingApprovalSource);
+        }
+        if req.second_approver_id == ctx.user_id {
+            return Err(InventoryError::SameApprover);
+        }
+        let previous_status = self
+            .recall_previous_status
+            .get(&req.batch_id)
+            .cloned()
+            .ok_or(InventoryError::RecallNotActive)?;
+        let batch = {
+            let batch = self
+                .batches
+                .get_mut(&req.batch_id)
+                .filter(|batch| batch.owner_id == ctx.owner_id)
+                .ok_or(InventoryError::NotFound)?;
+            if !batch.recall_flag {
+                return Err(InventoryError::RecallNotActive);
+            }
+            let expected_status = if previous_status == STATUS_QUALIFIED {
+                STATUS_QUARANTINED
+            } else {
+                previous_status.as_str()
+            };
+            if batch.quality_status != expected_status {
+                return Err(InventoryError::RecallStateChanged);
+            }
+            batch.quality_status = previous_status;
+            batch.recall_flag = false;
+            batch.updated_at = now;
+            batch.clone()
+        };
+        self.recall_previous_status.remove(&batch.id);
+        Ok(batch)
+    }
+
+    pub fn isolate_expired_batches(
+        &mut self,
+        ctx: &AuthContext,
+        as_of: NaiveDate,
+        now: DateTime<Utc>,
+    ) -> Result<Vec<InventoryBatch>, InventoryError> {
+        let ids = self
+            .batches
+            .values()
+            .filter(|batch| {
+                batch.owner_id == ctx.owner_id
+                    && batch.quality_status == STATUS_QUALIFIED
+                    && NaiveDate::parse_from_str(&batch.expiry_date, "%Y-%m-%d")
+                        .is_ok_and(|expiry| expiry <= as_of)
+            })
+            .map(|batch| batch.id)
+            .collect::<Vec<_>>();
+        let mut isolated = Vec::with_capacity(ids.len());
+        for id in ids {
+            let batch = self.batches.get_mut(&id).ok_or(InventoryError::NotFound)?;
+            batch.quality_status = STATUS_UNQUALIFIED.to_string();
+            batch.updated_at = now;
+            isolated.push(batch.clone());
+        }
+        Ok(isolated)
+    }
 }
 
 pub(crate) fn allowed_transition(from: &str, to: &str, source: &str) -> bool {
@@ -175,7 +323,9 @@ pub(crate) fn allowed_transition(from: &str, to: &str, source: &str) -> bool {
                 | "M-RC"
                 | "M3-MAINT"
                 | "M5-TEMP_EXCURSION"
+                | "M-TC"
         ),
+        (STATUS_QUALIFIED, STATUS_UNQUALIFIED) => normalized_source == APPROVAL_SOURCE_EXPIRY,
         (STATUS_QUARANTINED, STATUS_QUALIFIED | STATUS_UNQUALIFIED) => {
             matches!(normalized_source, "验收结论" | "M2-INSPECTION")
         }
@@ -198,7 +348,9 @@ mod tests {
     use uuid::Uuid;
     use wms_domain::{ChangeInventoryStatusRequest, PutawayInventoryRequest};
 
-    use super::{InventoryError, InventoryStore, STATUS_QUALIFIED, STATUS_QUARANTINED};
+    use super::{
+        InventoryError, InventoryStore, STATUS_QUALIFIED, STATUS_QUARANTINED, STATUS_UNQUALIFIED,
+    };
     use crate::auth::AuthContext;
 
     fn ctx(owner_id: Uuid) -> AuthContext {
@@ -295,6 +447,37 @@ mod tests {
     }
 
     #[test]
+    fn inventory_status_transition_rejects_blank_reason() {
+        let now = Utc
+            .with_ymd_and_hms(2026, 6, 4, 13, 0, 0)
+            .single()
+            .expect("valid time");
+        let today = NaiveDate::from_ymd_opt(2026, 6, 4).expect("valid date");
+        let ctx = ctx(Uuid::new_v4());
+        let mut store = InventoryStore::default();
+        let batch = store
+            .putaway_from_inbound(&ctx, putaway_req(), today, now)
+            .expect("putaway");
+
+        let error = store
+            .change_status(
+                &ctx,
+                ChangeInventoryStatusRequest {
+                    batch_id: batch.id,
+                    target_status: STATUS_QUARANTINED.to_string(),
+                    reason: " \t".to_string(),
+                    approval_source: "M-QL".to_string(),
+                    approval_id: "QL-001".to_string(),
+                },
+                now,
+            )
+            .expect_err("blank status reason must be rejected");
+
+        assert_eq!(error, InventoryError::InvalidReason);
+        assert_eq!(store.available_qty(&ctx, batch.id), Ok(10));
+    }
+
+    #[test]
     fn expired_batch_cannot_be_putaway() {
         let now = Utc
             .with_ymd_and_hms(2026, 6, 4, 13, 0, 0)
@@ -309,5 +492,42 @@ mod tests {
         let result = store.putaway_from_inbound(&ctx, req, today, now);
 
         assert!(matches!(result, Err(InventoryError::ExpiredBatch)));
+    }
+
+    #[test]
+    fn expiry_isolation_is_owner_scoped_and_idempotent_in_memory() {
+        let now = Utc
+            .with_ymd_and_hms(2026, 6, 4, 13, 0, 0)
+            .single()
+            .expect("valid time");
+        let today = NaiveDate::from_ymd_opt(2026, 6, 4).expect("valid date");
+        let owner = ctx(Uuid::new_v4());
+        let other = ctx(Uuid::new_v4());
+        let mut store = InventoryStore::default();
+        let mut expired = putaway_req();
+        expired.expiry_date = "2026-06-04".to_string();
+        let mut other_expired = expired.clone();
+        other_expired.source_receiving_order_id = Uuid::new_v4();
+        store
+            .putaway_from_inbound(&owner, expired, today, now)
+            .expect("putaway");
+        store
+            .putaway_from_inbound(&other, other_expired, today, now)
+            .expect("putaway");
+
+        let isolated = store
+            .isolate_expired_batches(&owner, today, now)
+            .expect("isolate");
+        assert_eq!(isolated.len(), 1);
+        assert_eq!(isolated[0].quality_status, STATUS_UNQUALIFIED);
+        assert!(store
+            .isolate_expired_batches(&owner, today, now)
+            .expect("replay")
+            .is_empty());
+        assert_eq!(store.list_batches(&other).len(), 1);
+        assert_eq!(
+            store.list_batches(&other)[0].quality_status,
+            STATUS_QUALIFIED
+        );
     }
 }

@@ -109,6 +109,63 @@ pub struct LoginResponse {
     pub user: CurrentUser,
 }
 
+/// 活跃登录会话。
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct AuthSession {
+    /// JWT jti，会话撤销的唯一标识。
+    pub session_id: String,
+    /// 所属用户。
+    pub user_id: Uuid,
+    /// 设备 / 客户端标识。
+    pub device_name: String,
+    /// 登录来源 IP。
+    pub ip: Option<String>,
+    /// 登录时间。
+    pub logged_in_at: DateTime<Utc>,
+    /// access token 过期时间。
+    pub expires_at: DateTime<Utc>,
+    /// 是否为当前请求使用的会话。
+    pub is_current: bool,
+}
+
+/// 活跃登录会话列表。
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct AuthSessionListResponse {
+    pub data: Vec<AuthSession>,
+    pub count: u32,
+}
+
+/// token 撤销结果。
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct AuthRevocationResponse {
+    /// 被撤销的 jti。
+    pub revoked_jti: String,
+    /// Redis 不可用时为 true；此时按 ADR-0024 进入 TTL 降级窗口。
+    pub revocation_degraded: bool,
+}
+
+/// 会话批量撤销结果。
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct AuthSessionRevokeResponse {
+    pub user_id: Uuid,
+    pub revoked_sessions: u32,
+    pub revocation_degraded: bool,
+}
+
+/// 修改当前用户密码。
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct PasswordChangeRequest {
+    pub current_password: String,
+    pub new_password: String,
+}
+
+/// 修改用户状态。
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct AuthUserStatusRequest {
+    /// active / disabled。
+    pub status: String,
+}
+
 /// 统一错误响应。
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct ErrorResponse {

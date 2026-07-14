@@ -221,6 +221,7 @@ async fn h3_resilience_rejections_write_h2_audit_for_bearer_actor(pool: PgPool) 
         ));
     let owner_id = Uuid::new_v4();
     let token = bearer_token(owner_id);
+    let request_id = Uuid::new_v4();
 
     for expected in [StatusCode::OK, StatusCode::TOO_MANY_REQUESTS] {
         let response = app
@@ -229,6 +230,7 @@ async fn h3_resilience_rejections_write_h2_audit_for_bearer_actor(pool: PgPool) 
                 Request::builder()
                     .uri("/limited")
                     .header("authorization", format!("Bearer {token}"))
+                    .header("x-request-id", request_id.to_string())
                     .body(Body::empty())
                     .expect("request should build"),
             )
@@ -253,6 +255,14 @@ async fn h3_resilience_rejections_write_h2_audit_for_bearer_actor(pool: PgPool) 
     assert_eq!(row.0, 1);
     assert_eq!(row.1.as_deref(), Some("h3.rate_limited"));
     assert_eq!(row.2.as_deref(), Some("audit-reader"));
+    let audit_request_id: Uuid = sqlx::query_scalar(
+        "SELECT request_id FROM audit_event WHERE owner_id = $1 AND module = 'H3' AND resource_type = 'api_resilience' ORDER BY id DESC LIMIT 1",
+    )
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("request id should be audited");
+    assert_eq!(audit_request_id, request_id);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -269,7 +279,6 @@ async fn h3_resilience_rejections_write_h2_audit_for_api_key(pool: PgPool) {
         circuit_failures: 10,
         circuit_open_seconds: 30,
     })
-    .with_api_key_audit_owner_id(owner_id)
     .with_audit_pool(pool.clone());
     let app = Router::new()
         .route("/limited", get(healthz))
@@ -277,17 +286,27 @@ async fn h3_resilience_rejections_write_h2_audit_for_api_key(pool: PgPool) {
             state,
             wms_api::resilience::resilience_middleware,
         ));
+    let key_id = Uuid::new_v4();
+    let request_id = Uuid::new_v4();
+    let auth_context = wms_api::auth::AuthContext {
+        user_id: key_id,
+        owner_id,
+        actor_name: "api-key-test".to_string(),
+        permissions: vec!["m2.write".to_string()],
+        jti: format!("api-key:{key_id}"),
+    };
 
     for expected in [StatusCode::OK, StatusCode::TOO_MANY_REQUESTS] {
+        let mut request = Request::builder()
+            .uri("/limited")
+            .header("x-wms-api-key", "external-key-a")
+            .header("x-request-id", request_id.to_string())
+            .body(Body::empty())
+            .expect("request should build");
+        request.extensions_mut().insert(auth_context.clone());
         let response = app
             .clone()
-            .oneshot(
-                Request::builder()
-                    .uri("/limited")
-                    .header("x-wms-api-key", "external-key-a")
-                    .body(Body::empty())
-                    .expect("request should build"),
-            )
+            .oneshot(request)
             .await
             .expect("router should respond");
         assert_eq!(response.status(), expected);
@@ -308,10 +327,15 @@ async fn h3_resilience_rejections_write_h2_audit_for_api_key(pool: PgPool) {
     .expect("audit row should query");
     assert_eq!(row.0, 1);
     assert_eq!(row.1.as_deref(), Some("h3.rate_limited"));
-    assert!(row
-        .2
-        .as_deref()
-        .is_some_and(|actor_name| actor_name.starts_with("api-key:")));
+    assert_eq!(row.2.as_deref(), Some("api-key-test"));
+    let audit_request_id: Uuid = sqlx::query_scalar(
+        "SELECT request_id FROM audit_event WHERE owner_id = $1 AND module = 'H3' AND resource_type = 'api_resilience' ORDER BY id DESC LIMIT 1",
+    )
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("request id should be audited");
+    assert_eq!(audit_request_id, request_id);
 }
 
 #[sqlx::test(migrations = "../../migrations")]

@@ -12,6 +12,7 @@ use wms_api::{
         auth_runtime_layer, build_access_claims, encode_access_token, AuthError,
         AuthRevocationStore, AuthRevocationStoreError, AuthRuntimePolicy,
     },
+    auth_repository::AuthRepository,
     role_management::{role_management_router, RoleListResponse, RoleManagementState},
 };
 
@@ -386,6 +387,61 @@ async fn role_writes_are_tenant_safe_atomic_idempotent_audited_and_revoke_tokens
         .await
         .expect("child exclusion");
 
+    sqlx::query(
+        "INSERT INTO auth_roles(id,owner_id,role_code,role_name) VALUES($1,$2,'grantor','独立授权岗')",
+    )
+    .bind(Uuid::new_v4())
+    .bind(owner)
+    .execute(&pool)
+    .await
+    .expect("independent role");
+    let grantor: Uuid =
+        sqlx::query_scalar("SELECT id FROM auth_roles WHERE owner_id=$1 AND role_code='grantor'")
+            .bind(owner)
+            .fetch_one(&pool)
+            .await
+            .expect("grantor id");
+    sqlx::query("INSERT INTO auth_role_permissions(role_id,permission_id) VALUES($1,$2)")
+        .bind(grantor)
+        .bind(receive_permission)
+        .execute(&pool)
+        .await
+        .expect("independent grant");
+    sqlx::query(
+        "INSERT INTO auth_user_roles(user_id,owner_id,role_id) VALUES($1,$2,$3),($4,$2,$5)",
+    )
+    .bind(user1)
+    .bind(owner)
+    .bind(grandchild)
+    .bind(user2)
+    .bind(grandchild)
+    .execute(&pool)
+    .await
+    .expect("inheritance role bindings");
+    sqlx::query("INSERT INTO auth_user_roles(user_id,owner_id,role_id) VALUES($1,$2,$3)")
+        .bind(user1)
+        .bind(owner)
+        .bind(grantor)
+        .execute(&pool)
+        .await
+        .expect("multi-role binding");
+    let user1_permissions = AuthRepository::new(pool.clone())
+        .current_user(user1, owner)
+        .await
+        .expect("user1 permissions")
+        .expect("user1");
+    assert!(user1_permissions
+        .permissions
+        .contains(&"m2.receive".to_string()));
+    let user2_permissions = AuthRepository::new(pool.clone())
+        .current_user(user2, owner)
+        .await
+        .expect("user2 permissions")
+        .expect("user2");
+    assert!(!user2_permissions
+        .permissions
+        .contains(&"m2.receive".to_string()));
+
     let list = app
         .oneshot(json_request(
             "GET",
@@ -469,4 +525,148 @@ async fn permission_change_rolls_back_when_immediate_revocation_fails(pool: PgPo
         .expect("idempotency count"),
         0
     );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn user_creation_is_owner_scoped_idempotent_atomic_and_audited(pool: PgPool) {
+    std::env::set_var("WMS_JWT_SECRET", "role-test-secret");
+    let (owner, other, _admin, token) = seed(&pool).await;
+    let foreign_role = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO auth_roles(id,owner_id,role_code,role_name) VALUES($1,$2,'foreign-user-role','跨货主角色')",
+    )
+    .bind(foreign_role)
+    .bind(other)
+    .execute(&pool)
+    .await
+    .expect("foreign role");
+    let owner_role: Uuid = sqlx::query_scalar(
+        "SELECT id FROM auth_roles WHERE owner_id=$1 AND role_code='system_admin'",
+    )
+    .bind(owner)
+    .fetch_one(&pool)
+    .await
+    .expect("owner role");
+    let second_role = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO auth_roles(id,owner_id,role_code,role_name) VALUES($1,$2,'user-manager','用户管理岗')",
+    )
+    .bind(second_role)
+    .bind(owner)
+    .execute(&pool)
+    .await
+    .expect("second owner role");
+    let store = std::sync::Arc::new(MemoryRevocations::default());
+    let app = role_management_router(RoleManagementState::new(pool.clone(), store.clone()))
+        .layer(auth_runtime_layer(AuthRuntimePolicy::strict(store)));
+    let request = serde_json::json!({
+        "username": "new-user",
+        "display_name": "新用户",
+        "phone": "13800138000",
+        "password": "StrongPass1!",
+        "role_ids": [owner_role, second_role]
+    });
+    let created = app
+        .clone()
+        .oneshot(json_request(
+            "POST",
+            "/api/v1/auth/users".into(),
+            &token,
+            Some("user-create-1"),
+            request.clone(),
+        ))
+        .await
+        .expect("create user response");
+    assert_eq!(created.status(), StatusCode::OK);
+    let replay = app
+        .clone()
+        .oneshot(json_request(
+            "POST",
+            "/api/v1/auth/users".into(),
+            &token,
+            Some("user-create-1"),
+            request.clone(),
+        ))
+        .await
+        .expect("replay user response");
+    assert_eq!(replay.status(), StatusCode::OK);
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>(
+            "SELECT count(*) FROM auth_users WHERE lower(username)='new-user'",
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("created user count"),
+        1
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, String>(
+            "SELECT phone FROM auth_users WHERE lower(username)='new-user'",
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("created user phone"),
+        "13800138000"
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>(
+            "SELECT count(*) FROM auth_user_roles ur JOIN auth_user_owner_bindings binding ON binding.user_id=ur.user_id AND binding.owner_id=ur.owner_id WHERE binding.owner_id=$1 AND ur.role_id=ANY($2)",
+        )
+        .bind(owner)
+        .bind(vec![owner_role, second_role])
+        .fetch_one(&pool)
+        .await
+        .expect("created user role"),
+        2
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>(
+            "SELECT count(*) FROM audit_event WHERE owner_id=$1 AND action='auth.user.create' AND resource_type='auth_user'",
+        )
+        .bind(owner)
+        .fetch_one(&pool)
+        .await
+        .expect("create audit"),
+        1
+    );
+
+    let rejected = app
+        .clone()
+        .oneshot(json_request(
+            "POST",
+            "/api/v1/auth/users".into(),
+            &token,
+            Some("user-create-foreign-role"),
+            serde_json::json!({
+                "username": "should-not-exist",
+                "display_name": "不应创建",
+                "phone": "13800138001",
+                "password": "StrongPass1!",
+                "role_ids": [foreign_role]
+            }),
+        ))
+        .await
+        .expect("foreign role response");
+    assert_eq!(rejected.status(), StatusCode::NOT_FOUND);
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>(
+            "SELECT count(*) FROM auth_users WHERE username='should-not-exist'",
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("foreign user count"),
+        0
+    );
+
+    let duplicate = app
+        .oneshot(json_request(
+            "POST",
+            "/api/v1/auth/users".into(),
+            &token,
+            Some("user-create-duplicate"),
+            request,
+        ))
+        .await
+        .expect("duplicate user response");
+    assert_eq!(duplicate.status(), StatusCode::CONFLICT);
 }

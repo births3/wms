@@ -70,44 +70,54 @@ impl PgWave3Repository {
         req: CreateBillingContractRequest,
         now: DateTime<Utc>,
     ) -> Result<BillingContract, Wave3RepositoryError> {
-        let valid_from = parse_date(&req.valid_from)?;
-        let valid_to = parse_date(&req.valid_to)?;
-        if valid_to < valid_from {
-            return Err(Wave3RepositoryError::InvalidEffectiveWindow);
+        let mut tx = self.begin().await?;
+        let contract = create_billing_contract_in_tx(&mut tx, ctx, &req, now).await?;
+        tx.commit().await.map_err(map_db_error)?;
+        Ok(contract)
+    }
+
+    pub async fn create_billing_contract_with_audit(
+        &self,
+        ctx: &AuthContext,
+        req: CreateBillingContractRequest,
+        now: DateTime<Utc>,
+        idempotency_key: &str,
+        mut audit: AuditWriteRequest,
+    ) -> Result<IdempotentMutation<BillingContract>, Wave3RepositoryError> {
+        let request_hash = request_hash(&serde_json::json!({ "request": req }))?;
+        let mut tx = self.begin().await?;
+        lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
+        if let Some(replay) =
+            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash, now).await?
+        {
+            return Ok(IdempotentMutation {
+                value: replay,
+                replayed: true,
+            });
         }
-        let row = sqlx::query_as::<_, BillingContractRow>(
-            r#"
-            INSERT INTO billing_contracts (
-                id, owner_id, account_id, contract_no, valid_from, valid_to,
-                status, created_at, updated_at
-            )
-            SELECT $1, $2, $3, $4, $5, $6, 'active', $7, $7
-              FROM billing_accounts
-             WHERE id = $3 AND owner_id = $2
-            RETURNING id, owner_id, account_id, contract_no, valid_from, valid_to,
-                      status, created_at
-            "#,
+
+        let contract = create_billing_contract_in_tx(&mut tx, ctx, &req, now).await?;
+        store_idempotency_success(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            "POST",
+            "/api/v1/billing/contracts",
+            "billing_contract",
+            contract.id.to_string(),
+            &contract,
+            now,
         )
-        .bind(Uuid::new_v4())
-        .bind(ctx.owner_id)
-        .bind(req.account_id)
-        .bind(&req.contract_no)
-        .bind(valid_from)
-        .bind(valid_to)
-        .bind(now)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(map_db_error)?
-        .ok_or(Wave3RepositoryError::NotFound)?;
-        Ok(BillingContract {
-            id: row.id,
-            owner_id: row.owner_id,
-            account_id: row.account_id,
-            contract_no: row.contract_no,
-            valid_from: row.valid_from.to_string(),
-            valid_to: row.valid_to.to_string(),
-            status: row.status,
-            created_at: row.created_at,
+        .await?;
+        audit.resource_id = contract.id.to_string();
+        append_event_in_tx(&mut tx, &audit)
+            .await
+            .map_err(|error| Wave3RepositoryError::Audit(format!("{error:?}")))?;
+        tx.commit().await.map_err(map_db_error)?;
+        Ok(IdempotentMutation {
+            value: contract,
+            replayed: false,
         })
     }
 
@@ -117,7 +127,10 @@ impl PgWave3Repository {
         req: CreateBillingRuleRequest,
         now: DateTime<Utc>,
     ) -> Result<BillingRule, Wave3RepositoryError> {
-        self.create_billing_rule_in_tx(ctx, req, now, None).await
+        let mut tx = self.begin().await?;
+        let rule = Self::create_billing_rule_in_tx(&mut tx, ctx, &req, now).await?;
+        tx.commit().await.map_err(map_db_error)?;
+        Ok(rule)
     }
 
     pub async fn create_billing_rule_with_audit(
@@ -125,39 +138,72 @@ impl PgWave3Repository {
         ctx: &AuthContext,
         req: CreateBillingRuleRequest,
         now: DateTime<Utc>,
-        audit: AuditWriteRequest,
-    ) -> Result<BillingRule, Wave3RepositoryError> {
-        self.create_billing_rule_in_tx(ctx, req, now, Some(audit))
+        idempotency_key: &str,
+        mut audit: AuditWriteRequest,
+    ) -> Result<IdempotentMutation<BillingRule>, Wave3RepositoryError> {
+        let request_hash = request_hash(&serde_json::json!({ "request": req }))?;
+        let mut tx = self.begin().await?;
+        lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
+        if let Some(replay) =
+            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash, now).await?
+        {
+            return Ok(IdempotentMutation {
+                value: replay,
+                replayed: true,
+            });
+        }
+
+        let rule = Self::create_billing_rule_in_tx(&mut tx, ctx, &req, now).await?;
+        store_idempotency_success(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            "POST",
+            "/api/v1/billing/rules",
+            "billing_rule",
+            rule.id.to_string(),
+            &rule,
+            now,
+        )
+        .await?;
+        audit.resource_id = rule.id.to_string();
+        append_event_in_tx(&mut tx, &audit)
             .await
+            .map_err(|error| Wave3RepositoryError::Audit(format!("{error:?}")))?;
+        tx.commit().await.map_err(map_db_error)?;
+        Ok(IdempotentMutation {
+            value: rule,
+            replayed: false,
+        })
     }
 
     async fn create_billing_rule_in_tx(
-        &self,
+        tx: &mut Transaction<'_, Postgres>,
         ctx: &AuthContext,
-        req: CreateBillingRuleRequest,
+        req: &CreateBillingRuleRequest,
         now: DateTime<Utc>,
-        audit: Option<AuditWriteRequest>,
     ) -> Result<BillingRule, Wave3RepositoryError> {
-        if req.unit_price_cents < 0 {
-            return Err(Wave3RepositoryError::InvalidRate);
-        }
+        validate_billing_rule_request(req).map_err(map_rule_validation_error)?;
         let effective_from = parse_date(&req.effective_from)?;
         let effective_to = parse_date(&req.effective_to)?;
         if effective_to < effective_from {
             return Err(Wave3RepositoryError::InvalidEffectiveWindow);
         }
 
-        let mut tx = self.begin().await?;
-        let contract_owner: Option<Uuid> = sqlx::query_scalar(
-            "SELECT owner_id FROM billing_contracts WHERE id = $1 AND owner_id = $2",
+        let contract_window: Option<(NaiveDate, NaiveDate)> = sqlx::query_as(
+            "SELECT valid_from, valid_to FROM billing_contracts WHERE id = $1 AND owner_id = $2 FOR UPDATE",
         )
         .bind(req.contract_id)
         .bind(ctx.owner_id)
-        .fetch_optional(&mut *tx)
+        .fetch_optional(&mut **tx)
         .await
         .map_err(map_db_error)?;
-        if contract_owner != Some(ctx.owner_id) {
+        let Some((contract_from, contract_to)) = contract_window else {
             return Err(Wave3RepositoryError::NotFound);
+        };
+        if effective_from < contract_from || effective_to > contract_to {
+            return Err(Wave3RepositoryError::InvalidEffectiveWindow);
         }
         let overlap: bool = sqlx::query_scalar(
             r#"
@@ -181,7 +227,7 @@ impl PgWave3Repository {
         .bind(&req.billing_cycle)
         .bind(effective_from)
         .bind(effective_to)
-        .fetch_one(&mut *tx)
+        .fetch_one(&mut **tx)
         .await
         .map_err(map_db_error)?;
         if overlap {
@@ -192,10 +238,10 @@ impl PgWave3Repository {
             id: Uuid::new_v4(),
             owner_id: ctx.owner_id,
             contract_id: req.contract_id,
-            charge_item: req.charge_item,
-            unit: req.unit,
+            charge_item: req.charge_item.clone(),
+            unit: req.unit.clone(),
             unit_price_cents: req.unit_price_cents,
-            billing_cycle: req.billing_cycle,
+            billing_cycle: req.billing_cycle.clone(),
             effective_from: effective_from.to_string(),
             effective_to: effective_to.to_string(),
             created_at: now,
@@ -219,16 +265,70 @@ impl PgWave3Repository {
         .bind(effective_from)
         .bind(effective_to)
         .bind(rule.created_at)
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await
         .map_err(map_db_error)?;
-        if let Some(mut audit) = audit {
-            audit.resource_id = rule.id.to_string();
-            append_event_in_tx(&mut tx, &audit)
-                .await
-                .map_err(|error| Wave3RepositoryError::Audit(format!("{error:?}")))?;
-        }
-        tx.commit().await.map_err(map_db_error)?;
         Ok(rule)
     }
+}
+
+fn map_rule_validation_error(error: BillingRuleValidationError) -> Wave3RepositoryError {
+    match error {
+        BillingRuleValidationError::InvalidChargeItem
+        | BillingRuleValidationError::InvalidUnit
+        | BillingRuleValidationError::InvalidBillingCycle => {
+            Wave3RepositoryError::InvalidBillingRuleField
+        }
+        BillingRuleValidationError::InvalidRate => Wave3RepositoryError::InvalidRate,
+        BillingRuleValidationError::InvalidEffectiveWindow => {
+            Wave3RepositoryError::InvalidEffectiveWindow
+        }
+    }
+}
+
+async fn create_billing_contract_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    ctx: &AuthContext,
+    req: &CreateBillingContractRequest,
+    now: DateTime<Utc>,
+) -> Result<BillingContract, Wave3RepositoryError> {
+    let valid_from = parse_date(&req.valid_from)?;
+    let valid_to = parse_date(&req.valid_to)?;
+    if valid_to < valid_from {
+        return Err(Wave3RepositoryError::InvalidEffectiveWindow);
+    }
+    let row = sqlx::query_as::<_, BillingContractRow>(
+        r#"
+        INSERT INTO billing_contracts (
+            id, owner_id, account_id, contract_no, valid_from, valid_to,
+            status, created_at, updated_at
+        )
+        SELECT $1, $2, $3, $4, $5, $6, 'active', $7, $7
+          FROM billing_accounts
+         WHERE id = $3 AND owner_id = $2
+        RETURNING id, owner_id, account_id, contract_no, valid_from, valid_to,
+                  status, created_at
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(ctx.owner_id)
+    .bind(req.account_id)
+    .bind(&req.contract_no)
+    .bind(valid_from)
+    .bind(valid_to)
+    .bind(now)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(map_db_error)?
+    .ok_or(Wave3RepositoryError::NotFound)?;
+    Ok(BillingContract {
+        id: row.id,
+        owner_id: row.owner_id,
+        account_id: row.account_id,
+        contract_no: row.contract_no,
+        valid_from: row.valid_from.to_string(),
+        valid_to: row.valid_to.to_string(),
+        status: row.status,
+        created_at: row.created_at,
+    })
 }

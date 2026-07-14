@@ -7,10 +7,18 @@ pub(super) fn apply_receiving_order_routes() -> Router<Wave3AppState> {
             get(super::list_receiving_orders_handler).post(super::create_receiving_order_handler),
         )
         .route(
+            "/api/v1/inbound/receiving-dashboard",
+            get(super::list_receiving_dashboard_handler),
+        )
+        .route(
             "/api/v1/inbound/receiving-orders/:id",
             get(get_receiving_order_handler)
                 .patch(update_receiving_order_handler)
                 .delete(delete_receiving_order_handler),
+        )
+        .route(
+            "/api/v1/inbound/receiving-orders/:id/print-data",
+            get(get_receiving_order_print_data_handler),
         )
         .route(
             "/api/v1/inbound/receiving-orders/:id/release",
@@ -50,6 +58,20 @@ pub(super) async fn get_receiving_order_handler(
         store.get(&ctx, id)?
     };
     Ok(Json(order))
+}
+
+pub(super) async fn get_receiving_order_print_data_handler(
+    ctx: AuthContext,
+    State(state): State<Wave3AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ReceivingOrderPrintData>, Wave3HandlerError> {
+    let data = if let Some(repository) = &state.wave3_repository {
+        repository.get_receiving_order_print_data(&ctx, id).await?
+    } else {
+        let store = state.inbound_store.lock().await;
+        store.get_print_data(&ctx, id)?
+    };
+    Ok(Json(data))
 }
 
 pub(super) async fn delete_receiving_order_handler(

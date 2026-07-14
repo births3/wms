@@ -17,19 +17,59 @@ impl IntoResponse for MasterDataHandlerError {
                 "M1_LOCATION_DUPLICATE",
                 "库位编码已存在",
             ),
+            MasterDataHandlerError::MasterData(MasterDataError::LocationHasStock) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M1_LOCATION_HAS_STOCK",
+                "库位仍有库存，不能停用",
+            ),
+            MasterDataHandlerError::MasterData(MasterDataError::InvalidLocationCapacity) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M1_LOCATION_CAPACITY_INVALID",
+                "库位已用容积不能超过最大容积",
+            ),
+            MasterDataHandlerError::MasterData(MasterDataError::InvalidLocationOwner) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M1_LOCATION_OWNER_INVALID",
+                "库位绑定货主不存在",
+            ),
+            MasterDataHandlerError::MasterData(MasterDataError::InvalidWarehouseType) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M1_WAREHOUSE_TYPE_INVALID",
+                "仓库类型必须是物理仓、逻辑仓或虚拟仓",
+            ),
             MasterDataHandlerError::MasterData(MasterDataError::InvalidLocationBatchRange) => (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "M1_LOCATION_BATCH_INVALID",
                 "库位批量创建范围非法",
             ),
+            MasterDataHandlerError::MasterData(MasterDataError::InvalidStorageCondition) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M1_INVALID_STORAGE_CONDITION",
+                "储存条件必须使用受控标准枚举",
+            ),
+            MasterDataHandlerError::MasterData(MasterDataError::InvalidSpecialDrugCategory) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M1_INVALID_SPECIAL_DRUG_CATEGORY",
+                "特殊药品分类必须使用已启用字典项",
+            ),
+            MasterDataHandlerError::MasterData(MasterDataError::InvalidCustomerAddress) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M1_CUSTOMER_ADDRESS_INVALID",
+                "客户地址字段不能为空",
+            ),
+            MasterDataHandlerError::MasterData(MasterDataError::InvalidCustomerProfile) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M1_CUSTOMER_PROFILE_INVALID",
+                "客户联系方式、类型、门店经营范围或资质字段非法",
+            ),
             MasterDataHandlerError::MasterData(MasterDataError::IdempotencyConflict) => (
                 StatusCode::CONFLICT,
-                "M1_LOCATION_IDEMPOTENCY_CONFLICT",
+                "M1_IDEMPOTENCY_CONFLICT",
                 "幂等键已被不同请求使用",
             ),
             MasterDataHandlerError::MissingIdempotencyKey => (
                 StatusCode::BAD_REQUEST,
-                "M1_LOCATION_IDEMPOTENCY_REQUIRED",
+                "M1_IDEMPOTENCY_REQUIRED",
                 "缺少 Idempotency-Key",
             ),
             MasterDataHandlerError::MasterData(
@@ -80,6 +120,10 @@ pub fn master_data_router(state: MasterDataAppState) -> Router {
             get(list_products_handler).post(create_product_handler),
         )
         .route(
+            "/api/v1/master-data/products/batch-sync",
+            post(batch_sync::batch_create_products_handler),
+        )
+        .route(
             "/api/v1/master-data/products/:id",
             get(get_product_handler)
                 .patch(update_product_handler)
@@ -90,6 +134,10 @@ pub fn master_data_router(state: MasterDataAppState) -> Router {
             get(list_suppliers_handler).post(create_supplier_handler),
         )
         .route(
+            "/api/v1/master-data/suppliers/batch-sync",
+            post(batch_sync::batch_create_suppliers_handler),
+        )
+        .route(
             "/api/v1/master-data/suppliers/:id",
             patch(update_supplier_handler).delete(delete_supplier_handler),
         )
@@ -98,8 +146,24 @@ pub fn master_data_router(state: MasterDataAppState) -> Router {
             get(list_customers_handler).post(create_customer_handler),
         )
         .route(
+            "/api/v1/master-data/customers/batch-sync",
+            post(batch_sync::batch_create_customers_handler),
+        )
+        .route(
             "/api/v1/master-data/customers/:id",
             patch(update_customer_handler).delete(delete_customer_handler),
+        )
+        .route(
+            "/api/v1/master-data/customers/:customer_id/addresses",
+            get(list_customer_addresses_handler).post(create_customer_address_handler),
+        )
+        .route(
+            "/api/v1/master-data/customers/:customer_id/addresses/:address_id",
+            patch(update_customer_address_handler),
+        )
+        .route(
+            "/api/v1/master-data/customers/:customer_id/profile",
+            get(get_customer_profile_handler).patch(upsert_customer_profile_handler),
         )
         .route(
             "/api/v1/master-data/warehouses",
@@ -155,11 +219,15 @@ async fn list_products_handler(
 async fn create_product_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
+    headers: HeaderMap,
     Json(req): Json<CreateProductRequest>,
 ) -> Result<Json<Product>, MasterDataHandlerError> {
     ctx.require_permission(MASTER_DATA_WRITE_PERMISSION)?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
     Ok(Json(
-        state.create_product(&ctx, req, chrono::Utc::now()).await?,
+        state
+            .create_product(&ctx, req, chrono::Utc::now(), &idempotency_key)
+            .await?,
     ))
 }
 
@@ -175,12 +243,14 @@ async fn update_product_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
     Path(id): Path<Uuid>,
+    headers: HeaderMap,
     Json(req): Json<UpdateProductRequest>,
 ) -> Result<Json<Product>, MasterDataHandlerError> {
     ctx.require_permission(MASTER_DATA_WRITE_PERMISSION)?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
     Ok(Json(
         state
-            .update_product(&ctx, id, req, chrono::Utc::now())
+            .update_product(&ctx, id, req, chrono::Utc::now(), &idempotency_key)
             .await?,
     ))
 }
@@ -189,8 +259,10 @@ async fn delete_product_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
     Path(id): Path<Uuid>,
+    headers: HeaderMap,
 ) -> Result<Json<Product>, MasterDataHandlerError> {
     ctx.require_permission(MASTER_DATA_WRITE_PERMISSION)?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
     Ok(Json(
         state
             .update_product(
@@ -207,6 +279,7 @@ async fn delete_product_handler(
                     attrs: None,
                 },
                 chrono::Utc::now(),
+                &idempotency_key,
             )
             .await?,
     ))
@@ -226,11 +299,15 @@ async fn list_suppliers_handler(
 async fn create_supplier_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
+    headers: HeaderMap,
     Json(req): Json<CreateSupplierRequest>,
 ) -> Result<Json<Supplier>, MasterDataHandlerError> {
     ctx.require_permission(MASTER_DATA_WRITE_PERMISSION)?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
     Ok(Json(
-        state.create_supplier(&ctx, req, chrono::Utc::now()).await?,
+        state
+            .create_supplier(&ctx, req, chrono::Utc::now(), &idempotency_key)
+            .await?,
     ))
 }
 
@@ -238,12 +315,14 @@ async fn update_supplier_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
     Path(id): Path<Uuid>,
+    headers: HeaderMap,
     Json(req): Json<UpdateSupplierRequest>,
 ) -> Result<Json<Supplier>, MasterDataHandlerError> {
     ctx.require_permission(MASTER_DATA_WRITE_PERMISSION)?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
     Ok(Json(
         state
-            .update_supplier(&ctx, id, req, chrono::Utc::now())
+            .update_supplier(&ctx, id, req, chrono::Utc::now(), &idempotency_key)
             .await?,
     ))
 }
@@ -252,8 +331,10 @@ async fn delete_supplier_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
     Path(id): Path<Uuid>,
+    headers: HeaderMap,
 ) -> Result<Json<Supplier>, MasterDataHandlerError> {
     ctx.require_permission(MASTER_DATA_WRITE_PERMISSION)?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
     Ok(Json(
         state
             .update_supplier(
@@ -266,6 +347,7 @@ async fn delete_supplier_handler(
                     status: Some("disabled".into()),
                 },
                 chrono::Utc::now(),
+                &idempotency_key,
             )
             .await?,
     ))
@@ -285,11 +367,15 @@ async fn list_customers_handler(
 async fn create_customer_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
+    headers: HeaderMap,
     Json(req): Json<CreateCustomerRequest>,
 ) -> Result<Json<Customer>, MasterDataHandlerError> {
     ctx.require_permission(MASTER_DATA_WRITE_PERMISSION)?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
     Ok(Json(
-        state.create_customer(&ctx, req, chrono::Utc::now()).await?,
+        state
+            .create_customer(&ctx, req, chrono::Utc::now(), &idempotency_key)
+            .await?,
     ))
 }
 
@@ -297,12 +383,14 @@ async fn update_customer_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
     Path(id): Path<Uuid>,
+    headers: HeaderMap,
     Json(req): Json<UpdateCustomerRequest>,
 ) -> Result<Json<Customer>, MasterDataHandlerError> {
     ctx.require_permission(MASTER_DATA_WRITE_PERMISSION)?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
     Ok(Json(
         state
-            .update_customer(&ctx, id, req, chrono::Utc::now())
+            .update_customer(&ctx, id, req, chrono::Utc::now(), &idempotency_key)
             .await?,
     ))
 }
@@ -311,8 +399,10 @@ async fn delete_customer_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
     Path(id): Path<Uuid>,
+    headers: HeaderMap,
 ) -> Result<Json<Customer>, MasterDataHandlerError> {
     ctx.require_permission(MASTER_DATA_WRITE_PERMISSION)?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
     Ok(Json(
         state
             .update_customer(
@@ -324,6 +414,7 @@ async fn delete_customer_handler(
                     status: Some("disabled".into()),
                 },
                 chrono::Utc::now(),
+                &idempotency_key,
             )
             .await?,
     ))
@@ -333,6 +424,7 @@ async fn list_warehouses_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
 ) -> Result<Json<WarehouseListResponse>, MasterDataHandlerError> {
+    ctx.require_permission(MASTER_DATA_READ_PERMISSION)?;
     let data = state.list_warehouses(&ctx).await?;
     Ok(Json(WarehouseListResponse {
         page: page(data.len()),
@@ -343,12 +435,14 @@ async fn list_warehouses_handler(
 async fn create_warehouse_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
+    headers: HeaderMap,
     Json(req): Json<CreateWarehouseRequest>,
 ) -> Result<Json<Warehouse>, MasterDataHandlerError> {
     ctx.require_permission(MASTER_DATA_WRITE_PERMISSION)?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
     Ok(Json(
         state
-            .create_warehouse(&ctx, req, chrono::Utc::now())
+            .create_warehouse(&ctx, req, chrono::Utc::now(), &idempotency_key)
             .await?,
     ))
 }
@@ -357,12 +451,14 @@ async fn update_warehouse_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
     Path(id): Path<Uuid>,
+    headers: HeaderMap,
     Json(req): Json<UpdateWarehouseRequest>,
 ) -> Result<Json<Warehouse>, MasterDataHandlerError> {
     ctx.require_permission(MASTER_DATA_WRITE_PERMISSION)?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
     Ok(Json(
         state
-            .update_warehouse(&ctx, id, req, chrono::Utc::now())
+            .update_warehouse(&ctx, id, req, chrono::Utc::now(), &idempotency_key)
             .await?,
     ))
 }
@@ -371,8 +467,10 @@ async fn delete_warehouse_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
     Path(id): Path<Uuid>,
+    headers: HeaderMap,
 ) -> Result<Json<Warehouse>, MasterDataHandlerError> {
     ctx.require_permission(MASTER_DATA_WRITE_PERMISSION)?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
     Ok(Json(
         state
             .update_warehouse(
@@ -380,9 +478,11 @@ async fn delete_warehouse_handler(
                 id,
                 UpdateWarehouseRequest {
                     warehouse_name: None,
+                    warehouse_type: None,
                     status: Some("disabled".into()),
                 },
                 chrono::Utc::now(),
+                &idempotency_key,
             )
             .await?,
     ))
@@ -392,6 +492,7 @@ async fn list_warehouse_zones_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
 ) -> Result<Json<WarehouseZoneListResponse>, MasterDataHandlerError> {
+    ctx.require_permission(MASTER_DATA_READ_PERMISSION)?;
     let data = state.list_warehouse_zones(&ctx).await?;
     Ok(Json(WarehouseZoneListResponse {
         page: page(data.len()),
@@ -460,6 +561,7 @@ async fn list_locations_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
 ) -> Result<Json<LocationListResponse>, MasterDataHandlerError> {
+    ctx.require_permission(MASTER_DATA_READ_PERMISSION)?;
     let data = state.list_locations(&ctx).await?;
     Ok(Json(LocationListResponse {
         page: page(data.len()),
@@ -470,11 +572,15 @@ async fn list_locations_handler(
 async fn create_location_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
+    headers: HeaderMap,
     Json(req): Json<CreateLocationRequest>,
 ) -> Result<Json<Location>, MasterDataHandlerError> {
     ctx.require_permission(MASTER_DATA_WRITE_PERMISSION)?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
     Ok(Json(
-        state.create_location(&ctx, req, chrono::Utc::now()).await?,
+        state
+            .create_location(&ctx, req, chrono::Utc::now(), &idempotency_key)
+            .await?,
     ))
 }
 
@@ -497,12 +603,14 @@ async fn update_location_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
     Path(id): Path<Uuid>,
+    headers: HeaderMap,
     Json(req): Json<UpdateLocationRequest>,
 ) -> Result<Json<Location>, MasterDataHandlerError> {
     ctx.require_permission(MASTER_DATA_WRITE_PERMISSION)?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
     Ok(Json(
         state
-            .update_location(&ctx, id, req, chrono::Utc::now())
+            .update_location(&ctx, id, req, chrono::Utc::now(), &idempotency_key)
             .await?,
     ))
 }
@@ -511,8 +619,10 @@ async fn delete_location_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
     Path(id): Path<Uuid>,
+    headers: HeaderMap,
 ) -> Result<Json<Location>, MasterDataHandlerError> {
     ctx.require_permission(MASTER_DATA_WRITE_PERMISSION)?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
     Ok(Json(
         state
             .update_location(
@@ -532,6 +642,7 @@ async fn delete_location_handler(
                     status: Some("disabled".into()),
                 },
                 chrono::Utc::now(),
+                &idempotency_key,
             )
             .await?,
     ))

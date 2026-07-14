@@ -5,13 +5,13 @@ use uuid::Uuid;
 use wms_api::{
     audit::AuditWriteRequest,
     auth::AuthContext,
-    inventory::STATUS_QUALIFIED,
+    inventory::{STATUS_QUALIFIED, STATUS_QUARANTINED},
     wave3_repository::{PgWave3Repository, Wave3RepositoryError},
 };
 use wms_domain::{
     CreateBillingAccountRequest, CreateBillingContractRequest, CreateBillingRuleRequest,
-    CreateReceivingOrderRequest, PutawayRequest, ReceiveReceivingOrderRequest, ReceivingOrderLine,
-    RejectReceivingOrderRequest, UpdateReceivingOrderRequest,
+    CreateReceivingOrderRequest, InventoryBatchQuery, PutawayRequest, ReceiveReceivingOrderRequest,
+    ReceivingOrderLine, RejectReceivingOrderRequest, UpdateReceivingOrderRequest,
 };
 
 fn ctx(owner_id: Uuid) -> AuthContext {
@@ -35,10 +35,6 @@ fn update_audit(ctx: &AuthContext, id: Uuid) -> AuditWriteRequest {
     )
 }
 
-fn receiving_order_req(receipt_no: &str) -> CreateReceivingOrderRequest {
-    receiving_order_req_with(receipt_no, None, Uuid::new_v4())
-}
-
 fn receiving_order_req_with(
     receipt_no: &str,
     supplier_id: Option<Uuid>,
@@ -50,15 +46,15 @@ fn receiving_order_req_with(
         supplier_id,
         warehouse_id,
         external_ref: Some(format!("ERP-{receipt_no}")),
-        expected_arrival_at: None,
+        expected_arrival_at: Some(Utc::now() + chrono::Duration::days(1)),
         lines: vec![ReceivingOrderLine {
             line_no: 1,
             product_id: None,
             product_code: "P-001".to_string(),
             expected_qty: 10,
-            batch_no: Some("B202606".to_string()),
-            production_date: Some("2026-01-01".to_string()),
-            expiry_date: Some("2028-01-01".to_string()),
+            batch_no: None,
+            production_date: None,
+            expiry_date: None,
         }],
     }
 }
@@ -85,7 +81,43 @@ async fn seed_active_supplier_and_warehouse(pool: &PgPool, owner_id: Uuid) -> (U
     .execute(pool)
     .await
     .expect("seed warehouse");
+    sqlx::query(
+        "INSERT INTO products (id, owner_id, product_code, product_name, specification, storage_condition, attrs, status) VALUES ($1, $2, 'P-001', 'Active Product', '1 unit', 'normal', '{\"unit_volume_cm3\": 1}', 'active')",
+    )
+    .bind(Uuid::new_v4())
+    .bind(owner_id)
+    .execute(pool)
+    .await
+    .expect("seed product");
     (supplier_id, warehouse_id)
+}
+
+async fn seed_location(pool: &PgPool, owner_id: Uuid, warehouse_id: Uuid) -> (Uuid, String) {
+    let zone_id = Uuid::new_v4();
+    let location_id = Uuid::new_v4();
+    let location_code = format!("M2-LOC-{}", &location_id.to_string()[..8]);
+    sqlx::query(
+        "INSERT INTO warehouse_zones (id, owner_id, warehouse_id, zone_code, zone_name, temperature_zone, quality_color, status) VALUES ($1, $2, $3, $4, 'M2 test zone', 'normal', 'qualified_green', 'active')",
+    )
+    .bind(zone_id)
+    .bind(owner_id)
+    .bind(warehouse_id)
+    .bind(format!("M2-ZONE-{}", &zone_id.to_string()[..8]))
+    .execute(pool)
+    .await
+    .expect("seed zone");
+    sqlx::query(
+        "INSERT INTO warehouse_locations (id, owner_id, warehouse_id, zone_id, location_code, row_no, column_no, layer_no, max_volume_cm3, used_volume_cm3, max_sku_count, location_type, status) VALUES ($1, $2, $3, $4, $5, 1, 1, 1, 100000, 0, 3, 'storage', 'available')",
+    )
+    .bind(location_id)
+    .bind(owner_id)
+    .bind(warehouse_id)
+    .bind(zone_id)
+    .bind(&location_code)
+    .execute(pool)
+    .await
+    .expect("seed location");
+    (location_id, location_code)
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -97,8 +129,10 @@ async fn receiving_order_persists_document_type(pool: PgPool) {
         .with_ymd_and_hms(2026, 6, 4, 9, 0, 0)
         .single()
         .expect("valid time");
-    let mut req = receiving_order_req("SR-PG-001");
+    let (supplier_id, warehouse_id) = seed_active_supplier_and_warehouse(&pool, owner_id).await;
+    let mut req = receiving_order_req_with("SR-PG-001", Some(supplier_id), warehouse_id);
     req.document_type = "sales_return".to_string();
+    req.lines[0].batch_no = Some("B-SALES-RETURN-001".to_string());
 
     let order = repo
         .create_receiving_order(&ctx, req, now)
@@ -126,8 +160,13 @@ async fn delete_receiving_order_is_owner_scoped_draft_only_and_audited(pool: PgP
         .with_ymd_and_hms(2026, 7, 11, 12, 0, 0)
         .single()
         .expect("valid time");
+    let (supplier_id, warehouse_id) = seed_active_supplier_and_warehouse(&pool, owner_id).await;
     let order = repo
-        .create_receiving_order(&ctx, receiving_order_req("ASN-DELETE-001"), now)
+        .create_receiving_order(
+            &ctx,
+            receiving_order_req_with("ASN-DELETE-001", Some(supplier_id), warehouse_id),
+            now,
+        )
         .await
         .expect("draft order should create");
 
@@ -281,8 +320,13 @@ async fn receiving_order_update_rejects_cross_owner_and_missing_master_data(pool
     let ctx = ctx(owner_id);
     let repo = PgWave3Repository::new(pool.clone());
     let now = Utc::now();
+    let (supplier_id, warehouse_id) = seed_active_supplier_and_warehouse(&pool, owner_id).await;
     let order = repo
-        .create_receiving_order(&ctx, receiving_order_req("ASN-PG-OWNER-001"), now)
+        .create_receiving_order(
+            &ctx,
+            receiving_order_req_with("ASN-PG-OWNER-001", Some(supplier_id), warehouse_id),
+            now,
+        )
         .await
         .expect("create receiving order");
     let foreign_warehouse_id = Uuid::new_v4();

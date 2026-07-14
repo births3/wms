@@ -45,6 +45,9 @@ impl PgWave3Repository {
                 actual: locked.status,
             });
         }
+        if let Some(lines) = &req.lines {
+            validate_receiving_order_lines(&locked.document_type, lines)?;
+        }
         if let Some(supplier_id) = req.supplier_id {
             ensure_owned_reference(&mut tx, "suppliers", ctx.owner_id, supplier_id).await?;
         }

@@ -26,6 +26,13 @@ pub struct CreateColdChainDeviceRequest {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct UpdateColdChainDeviceRequest {
+    pub device_type: Option<String>,
+    pub installed_at_location_code: Option<String>,
+    pub calibration_due_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct TemperatureReading {
     pub id: Uuid,
     pub owner_id: Uuid,

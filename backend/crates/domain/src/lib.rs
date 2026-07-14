@@ -1,30 +1,45 @@
 //! 主仓 OpenAPI 契约使用的 domain schema。
 
+mod alert_definition;
+mod api_key;
 mod audit;
 mod billing;
 mod cold_chain;
 mod common;
+mod dock;
+mod drug_inspection;
 mod h4;
+mod inventory_count;
 mod logistics;
+mod maintenance;
 mod master_dictionary;
 mod menu;
 mod operations;
 mod receiving_outbound;
 mod reporting;
+mod task_type;
 
+pub use alert_definition::*;
+pub use api_key::*;
 pub use audit::*;
 pub use billing::*;
 pub use cold_chain::*;
 pub use common::{
-    CurrentUser, ErrorResponse, HealthzResponse, LoginRequest, LoginResponse, PageMeta,
-    ResilienceStatus,
+    AuthRevocationResponse, AuthSession, AuthSessionListResponse, AuthSessionRevokeResponse,
+    AuthUserStatusRequest, CurrentUser, ErrorResponse, HealthzResponse, LoginRequest,
+    LoginResponse, PageMeta, PasswordChangeRequest, ResilienceStatus,
 };
+pub use dock::*;
+pub use drug_inspection::*;
 pub use h4::*;
+pub use inventory_count::*;
 pub use logistics::*;
+pub use maintenance::*;
 pub use master_dictionary::*;
 pub use menu::*;
 pub use operations::*;
 pub use receiving_outbound::*;
 pub use reporting::*;
+pub use task_type::*;
 
 // Schema helper fns are re-exported from common for module-level attributes.

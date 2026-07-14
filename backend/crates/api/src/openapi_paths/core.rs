@@ -99,37 +99,142 @@ pub(crate) fn login() {}
 #[allow(dead_code)]
 pub(crate) fn me() {}
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/logout",
+    tag = "auth",
+    params(("Idempotency-Key" = String, Header, description = "重复登出幂等键")),
+    responses(
+        (status = 200, description = "登出并撤销当前 token", body = AuthRevocationResponse),
+        (status = 401, description = "token 无效", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn logout() {}
+
+#[utoipa::path(
+    put,
+    path = "/api/v1/auth/me/password",
+    tag = "auth",
+    params(("Idempotency-Key" = String, Header, description = "修改密码幂等键")),
+    request_body = PasswordChangeRequest,
+    responses(
+        (status = 200, description = "修改密码并撤销全部会话", body = AuthSessionRevokeResponse),
+        (status = 401, description = "认证失败", body = ErrorResponse),
+        (status = 422, description = "密码策略不满足", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn change_auth_password() {}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/auth/sessions",
+    tag = "auth",
+    params(("user_id" = Option<uuid::Uuid>, Query, description = "管理员查看指定用户会话")),
+    responses(
+        (status = 200, description = "活跃登录会话", body = AuthSessionListResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "无权查看其他用户会话", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn list_auth_sessions() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/sessions/{session_id}/revoke",
+    tag = "auth",
+    params(("session_id" = String, Path, description = "会话 jti"), ("Idempotency-Key" = String, Header, description = "单设备撤销幂等键")),
+    responses(
+        (status = 200, description = "单设备会话失效", body = AuthRevocationResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 404, description = "会话不存在", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn revoke_auth_session() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/sessions/revoke-others",
+    tag = "auth",
+    params(("Idempotency-Key" = String, Header, description = "撤销其他会话幂等键")),
+    responses(
+        (status = 200, description = "撤销当前用户其他设备", body = AuthSessionRevokeResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn revoke_other_auth_sessions() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/users/{user_id}/kick",
+    tag = "auth",
+    params(("user_id" = uuid::Uuid, Path, description = "目标用户 ID"), ("Idempotency-Key" = String, Header, description = "强制下线幂等键")),
+    responses(
+        (status = 200, description = "管理员强制踢出用户", body = AuthSessionRevokeResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "无会话管理权限", body = ErrorResponse),
+        (status = 404, description = "用户不存在或不属于当前货主", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn kick_auth_user() {}
+
+#[utoipa::path(
+    put,
+    path = "/api/v1/auth/users/{user_id}/status",
+    tag = "auth",
+    params(("user_id" = uuid::Uuid, Path, description = "目标用户 ID"), ("Idempotency-Key" = String, Header, description = "用户状态变更幂等键")),
+    request_body = AuthUserStatusRequest,
+    responses(
+        (status = 200, description = "更新用户状态并撤销会话", body = AuthSessionRevokeResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "无会话管理权限", body = ErrorResponse),
+        (status = 404, description = "用户不存在或不属于当前货主", body = ErrorResponse),
+        (status = 422, description = "用户状态非法", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn change_auth_user_status() {}
+
 #[utoipa::path(get, path = "/api/v1/auth/roles", tag = "auth", responses((status = 200, description = "当前货主角色列表", body = RoleListResponse), (status = 401, body = ErrorResponse), (status = 403, body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn list_roles() {}
 
-#[utoipa::path(post, path = "/api/v1/auth/roles", tag = "auth", params(("Idempotency-Key" = String, Header, description = "幂等键")), request_body = CreateRoleRequest, responses((status = 200, body = RoleResponse), (status = 400, body = ErrorResponse), (status = 403, body = ErrorResponse), (status = 409, body = ErrorResponse)))]
+#[utoipa::path(post, path = "/api/v1/auth/roles", tag = "auth", params(("Idempotency-Key" = String, Header, description = "幂等键")), request_body = CreateRoleRequest, responses((status = 200, body = RoleResponse), (status = 400, body = ErrorResponse), (status = 401, body = ErrorResponse), (status = 403, body = ErrorResponse), (status = 409, body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn create_role() {}
 
-#[utoipa::path(put, path = "/api/v1/auth/roles/{role_id}", tag = "auth", params(("role_id" = uuid::Uuid, Path, description = "角色 ID"), ("Idempotency-Key" = String, Header, description = "幂等键")), request_body = UpdateRoleRequest, responses((status = 200, body = RoleResponse), (status = 403, body = ErrorResponse), (status = 422, body = ErrorResponse)))]
+#[utoipa::path(put, path = "/api/v1/auth/roles/{role_id}", tag = "auth", params(("role_id" = uuid::Uuid, Path, description = "角色 ID"), ("Idempotency-Key" = String, Header, description = "幂等键")), request_body = UpdateRoleRequest, responses((status = 200, body = RoleResponse), (status = 401, body = ErrorResponse), (status = 403, body = ErrorResponse), (status = 422, body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn update_role() {}
 
-#[utoipa::path(delete, path = "/api/v1/auth/roles/{role_id}", tag = "auth", params(("role_id" = uuid::Uuid, Path, description = "角色 ID"), ("Idempotency-Key" = String, Header, description = "幂等键")), responses((status = 200, body = DeleteRoleResponse), (status = 403, body = ErrorResponse), (status = 409, body = ErrorResponse)))]
+#[utoipa::path(delete, path = "/api/v1/auth/roles/{role_id}", tag = "auth", params(("role_id" = uuid::Uuid, Path, description = "角色 ID"), ("Idempotency-Key" = String, Header, description = "幂等键")), responses((status = 200, body = DeleteRoleResponse), (status = 401, body = ErrorResponse), (status = 403, body = ErrorResponse), (status = 409, body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn delete_role() {}
 
-#[utoipa::path(put, path = "/api/v1/auth/roles/{role_id}/permissions", tag = "auth", params(("role_id" = uuid::Uuid, Path, description = "角色 ID"), ("Idempotency-Key" = String, Header, description = "幂等键")), request_body = ReplaceRolePermissionsRequest, responses((status = 200, body = RoleResponse), (status = 403, body = ErrorResponse), (status = 422, body = ErrorResponse)))]
+#[utoipa::path(put, path = "/api/v1/auth/roles/{role_id}/permissions", tag = "auth", params(("role_id" = uuid::Uuid, Path, description = "角色 ID"), ("Idempotency-Key" = String, Header, description = "幂等键")), request_body = ReplaceRolePermissionsRequest, responses((status = 200, body = RoleResponse), (status = 401, body = ErrorResponse), (status = 403, body = ErrorResponse), (status = 422, body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn replace_role_permissions() {}
 
-#[utoipa::path(put, path = "/api/v1/auth/user-roles/batch", tag = "auth", params(("Idempotency-Key" = String, Header, description = "幂等键")), request_body = BatchAssignRolesRequest, responses((status = 200, body = BatchAssignRolesResponse), (status = 403, body = ErrorResponse), (status = 422, body = ErrorResponse)))]
+#[utoipa::path(put, path = "/api/v1/auth/user-roles/batch", tag = "auth", params(("Idempotency-Key" = String, Header, description = "幂等键")), request_body = BatchAssignRolesRequest, responses((status = 200, body = BatchAssignRolesResponse), (status = 401, body = ErrorResponse), (status = 403, body = ErrorResponse), (status = 422, body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn batch_assign_roles() {}
 
-#[utoipa::path(get, path = "/api/v1/auth/permissions", tag = "auth", responses((status = 200, body = PermissionListResponse), (status = 403, body = ErrorResponse)))]
+#[utoipa::path(get, path = "/api/v1/auth/permissions", tag = "auth", responses((status = 200, body = PermissionListResponse), (status = 401, body = ErrorResponse), (status = 403, body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn list_permissions() {}
 
-#[utoipa::path(get, path = "/api/v1/auth/users", tag = "auth", responses((status = 200, body = RoleUserListResponse), (status = 403, body = ErrorResponse)))]
+#[utoipa::path(get, path = "/api/v1/auth/users", tag = "auth", responses((status = 200, body = RoleUserListResponse), (status = 401, body = ErrorResponse), (status = 403, body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn list_role_users() {}
+
+#[utoipa::path(post, path = "/api/v1/auth/users", tag = "auth", params(("Idempotency-Key" = String, Header, description = "幂等键")), request_body = CreateUserRequest, responses((status = 200, body = RoleUserResponse), (status = 400, body = ErrorResponse), (status = 401, body = ErrorResponse), (status = 403, body = ErrorResponse), (status = 404, body = ErrorResponse), (status = 409, body = ErrorResponse), (status = 422, body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn create_auth_user() {}
 
 #[utoipa::path(get, path = "/api/v1/admin/menus/published", tag = "admin-menu", responses((status = 200, description = "已发布三层菜单树", body = AdminMenuTreeResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
@@ -165,6 +270,10 @@ pub(crate) fn rollback_admin_menu() {}
     tag = "audit",
     params(
         ("resource_type" = Option<String>, Query, description = "按资源类型过滤"),
+        ("action" = Option<String>, Query, description = "按操作类型过滤"),
+        ("resource_id" = Option<String>, Query, description = "按关联资源编号过滤"),
+        ("product_code" = Option<String>, Query, description = "按商品编码过滤（匹配审计变更前后值）"),
+        ("batch_no" = Option<String>, Query, description = "按批号过滤（匹配审计变更前后值）"),
         ("actor_id" = Option<uuid::Uuid>, Query, description = "按操作者过滤"),
         ("from" = Option<chrono::DateTime<chrono::Utc>>, Query, description = "开始时间（RFC3339）"),
         ("to" = Option<chrono::DateTime<chrono::Utc>>, Query, description = "结束时间（RFC3339）"),
@@ -179,6 +288,30 @@ pub(crate) fn rollback_admin_menu() {}
 )]
 #[allow(dead_code)]
 pub(crate) fn list_audit_events() {}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/audit/events/export",
+    tag = "audit",
+    params(
+        ("resource_type" = Option<String>, Query, description = "按资源类型过滤"),
+        ("action" = Option<String>, Query, description = "按操作类型过滤"),
+        ("resource_id" = Option<String>, Query, description = "按关联资源编号过滤"),
+        ("product_code" = Option<String>, Query, description = "按商品编码过滤（匹配审计变更前后值）"),
+        ("batch_no" = Option<String>, Query, description = "按批号过滤（匹配审计变更前后值）"),
+        ("actor_id" = Option<uuid::Uuid>, Query, description = "按操作者过滤"),
+        ("from" = Option<chrono::DateTime<chrono::Utc>>, Query, description = "开始时间（RFC3339）"),
+        ("to" = Option<chrono::DateTime<chrono::Utc>>, Query, description = "结束时间（RFC3339）"),
+    ),
+    responses(
+        (status = 200, description = "完整审计事件 CSV 导出"),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+        (status = 413, description = "结果超过导出上限", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn export_audit_events() {}
 
 #[utoipa::path(
     get,
@@ -302,6 +435,7 @@ pub(crate) fn list_products() {}
     post,
     path = "/api/v1/master-data/products",
     tag = "master-data",
+    params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")),
     request_body = CreateProductRequest,
     responses(
         (status = 200, description = "创建商品", body = Product),
@@ -310,6 +444,24 @@ pub(crate) fn list_products() {}
 )]
 #[allow(dead_code)]
 pub(crate) fn create_product() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/master-data/products/batch-sync",
+    tag = "master-data",
+    params(("Idempotency-Key" = String, Header, description = "整批幂等键")),
+    request_body = [CreateProductRequest],
+    responses(
+        (status = 200, description = "批量同步商品", body = ProductListResponse),
+        (status = 400, description = "缺少幂等键", body = ErrorResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+        (status = 409, description = "商品编码或幂等冲突", body = ErrorResponse),
+        (status = 422, description = "商品字段非法", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn batch_create_products() {}
 
 #[utoipa::path(
     get,
@@ -328,7 +480,7 @@ pub(crate) fn get_product() {}
     patch,
     path = "/api/v1/master-data/products/{id}",
     tag = "master-data",
-    params(("id" = uuid::Uuid, Path, description = "商品 ID")),
+    params(("id" = uuid::Uuid, Path, description = "商品 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")),
     request_body = UpdateProductRequest,
     responses(
         (status = 200, description = "更新商品", body = Product),
@@ -342,7 +494,7 @@ pub(crate) fn update_product() {}
     delete,
     path = "/api/v1/master-data/products/{id}",
     tag = "master-data",
-    params(("id" = uuid::Uuid, Path, description = "商品 ID")),
+    params(("id" = uuid::Uuid, Path, description = "商品 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")),
     responses(
         (status = 200, description = "删除商品", body = Product),
         (status = 401, description = "未登录", body = ErrorResponse),
@@ -355,15 +507,32 @@ pub(crate) fn delete_product() {}
 #[allow(dead_code)]
 pub(crate) fn list_suppliers() {}
 
-#[utoipa::path(post, path = "/api/v1/master-data/suppliers", tag = "master-data", request_body = CreateSupplierRequest, responses((status = 200, description = "创建供应商", body = Supplier), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(post, path = "/api/v1/master-data/suppliers", tag = "master-data", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = CreateSupplierRequest, responses((status = 200, description = "创建供应商", body = Supplier), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn create_supplier() {}
 
-#[utoipa::path(patch, path = "/api/v1/master-data/suppliers/{id}", tag = "master-data", params(("id" = uuid::Uuid, Path, description = "供应商 ID")), request_body = UpdateSupplierRequest, responses((status = 200, description = "更新供应商", body = Supplier), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(
+    post,
+    path = "/api/v1/master-data/suppliers/batch-sync",
+    tag = "master-data",
+    params(("Idempotency-Key" = String, Header, description = "整批幂等键")),
+    request_body = [CreateSupplierRequest],
+    responses(
+        (status = 200, description = "批量同步供应商", body = SupplierListResponse),
+        (status = 400, description = "缺少幂等键", body = ErrorResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+        (status = 409, description = "供应商编码或幂等冲突", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn batch_create_suppliers() {}
+
+#[utoipa::path(patch, path = "/api/v1/master-data/suppliers/{id}", tag = "master-data", params(("id" = uuid::Uuid, Path, description = "供应商 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = UpdateSupplierRequest, responses((status = 200, description = "更新供应商", body = Supplier), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn update_supplier() {}
 
-#[utoipa::path(delete, path = "/api/v1/master-data/suppliers/{id}", tag = "master-data", params(("id" = uuid::Uuid, Path, description = "供应商 ID")), responses((status = 200, description = "删除供应商", body = Supplier), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(delete, path = "/api/v1/master-data/suppliers/{id}", tag = "master-data", params(("id" = uuid::Uuid, Path, description = "供应商 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), responses((status = 200, description = "删除供应商", body = Supplier), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn delete_supplier() {}
 
@@ -371,15 +540,32 @@ pub(crate) fn delete_supplier() {}
 #[allow(dead_code)]
 pub(crate) fn list_customers() {}
 
-#[utoipa::path(post, path = "/api/v1/master-data/customers", tag = "master-data", request_body = CreateCustomerRequest, responses((status = 200, description = "创建客户", body = Customer), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(post, path = "/api/v1/master-data/customers", tag = "master-data", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = CreateCustomerRequest, responses((status = 200, description = "创建客户", body = Customer), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn create_customer() {}
 
-#[utoipa::path(patch, path = "/api/v1/master-data/customers/{id}", tag = "master-data", params(("id" = uuid::Uuid, Path, description = "客户 ID")), request_body = UpdateCustomerRequest, responses((status = 200, description = "更新客户", body = Customer), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(
+    post,
+    path = "/api/v1/master-data/customers/batch-sync",
+    tag = "master-data",
+    params(("Idempotency-Key" = String, Header, description = "整批幂等键")),
+    request_body = [CreateCustomerRequest],
+    responses(
+        (status = 200, description = "批量同步客户", body = CustomerListResponse),
+        (status = 400, description = "缺少幂等键", body = ErrorResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+        (status = 409, description = "客户编码或幂等冲突", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn batch_create_customers() {}
+
+#[utoipa::path(patch, path = "/api/v1/master-data/customers/{id}", tag = "master-data", params(("id" = uuid::Uuid, Path, description = "客户 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = UpdateCustomerRequest, responses((status = 200, description = "更新客户", body = Customer), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn update_customer() {}
 
-#[utoipa::path(delete, path = "/api/v1/master-data/customers/{id}", tag = "master-data", params(("id" = uuid::Uuid, Path, description = "客户 ID")), responses((status = 200, description = "删除客户", body = Customer), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(delete, path = "/api/v1/master-data/customers/{id}", tag = "master-data", params(("id" = uuid::Uuid, Path, description = "客户 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), responses((status = 200, description = "删除客户", body = Customer), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn delete_customer() {}
 
@@ -387,15 +573,15 @@ pub(crate) fn delete_customer() {}
 #[allow(dead_code)]
 pub(crate) fn list_warehouses() {}
 
-#[utoipa::path(post, path = "/api/v1/master-data/warehouses", tag = "master-data", request_body = CreateWarehouseRequest, responses((status = 200, description = "创建仓库", body = Warehouse), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(post, path = "/api/v1/master-data/warehouses", tag = "master-data", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = CreateWarehouseRequest, responses((status = 200, description = "创建仓库", body = Warehouse), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn create_warehouse() {}
 
-#[utoipa::path(patch, path = "/api/v1/master-data/warehouses/{id}", tag = "master-data", params(("id" = uuid::Uuid, Path, description = "仓库 ID")), request_body = UpdateWarehouseRequest, responses((status = 200, description = "更新仓库", body = Warehouse), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(patch, path = "/api/v1/master-data/warehouses/{id}", tag = "master-data", params(("id" = uuid::Uuid, Path, description = "仓库 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = UpdateWarehouseRequest, responses((status = 200, description = "更新仓库", body = Warehouse), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn update_warehouse() {}
 
-#[utoipa::path(delete, path = "/api/v1/master-data/warehouses/{id}", tag = "master-data", params(("id" = uuid::Uuid, Path, description = "仓库 ID")), responses((status = 200, description = "删除仓库", body = Warehouse), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(delete, path = "/api/v1/master-data/warehouses/{id}", tag = "master-data", params(("id" = uuid::Uuid, Path, description = "仓库 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), responses((status = 200, description = "删除仓库", body = Warehouse), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn delete_warehouse() {}
 
@@ -419,7 +605,7 @@ pub(crate) fn delete_warehouse_zone() {}
 #[allow(dead_code)]
 pub(crate) fn list_locations() {}
 
-#[utoipa::path(post, path = "/api/v1/master-data/locations", tag = "master-data", request_body = CreateLocationRequest, responses((status = 200, description = "创建库位", body = Location), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(post, path = "/api/v1/master-data/locations", tag = "master-data", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = CreateLocationRequest, responses((status = 200, description = "创建库位", body = Location), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn create_location() {}
 
@@ -427,11 +613,11 @@ pub(crate) fn create_location() {}
 #[allow(dead_code)]
 pub(crate) fn batch_create_locations() {}
 
-#[utoipa::path(patch, path = "/api/v1/master-data/locations/{id}", tag = "master-data", params(("id" = uuid::Uuid, Path, description = "库位 ID")), request_body = UpdateLocationRequest, responses((status = 200, description = "更新库位", body = Location), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(patch, path = "/api/v1/master-data/locations/{id}", tag = "master-data", params(("id" = uuid::Uuid, Path, description = "库位 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = UpdateLocationRequest, responses((status = 200, description = "更新库位", body = Location), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn update_location() {}
 
-#[utoipa::path(delete, path = "/api/v1/master-data/locations/{id}", tag = "master-data", params(("id" = uuid::Uuid, Path, description = "库位 ID")), responses((status = 200, description = "删除库位", body = Location), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(delete, path = "/api/v1/master-data/locations/{id}", tag = "master-data", params(("id" = uuid::Uuid, Path, description = "库位 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), responses((status = 200, description = "删除库位", body = Location), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn delete_location() {}
 

@@ -11,70 +11,103 @@ pub use crate::print_template::{
     SavePrintTemplateRequest,
 };
 pub use crate::role_management::{
-    BatchAssignRolesRequest, BatchAssignRolesResponse, CreateRoleRequest, DeleteRoleResponse,
-    PermissionListResponse, PermissionResponse, ReplaceRolePermissionsRequest, RoleListResponse,
-    RoleResponse, RoleUserListResponse, RoleUserResponse, UpdateRoleRequest,
+    BatchAssignRolesRequest, BatchAssignRolesResponse, CreateRoleRequest, CreateUserRequest,
+    DeleteRoleResponse, PermissionListResponse, PermissionResponse, ReplaceRolePermissionsRequest,
+    RoleListResponse, RoleResponse, RoleUserListResponse, RoleUserResponse, UpdateRoleRequest,
 };
+pub use crate::tms_plus::{
+    ReceiveTmsRoutePlanRequest, TmsRoutePlan, TmsRouteStop, TmsRouteStopRequest,
+};
+#[allow(unused_imports)]
 pub use wms_domain::{
-    AdminMenuButtonPermission, AdminMenuNode, AdminMenuTreeResponse, AdminMenuVersion, AuditActor,
-    AuditArchivePartitionState, AuditArchivePartitionStateListResponse, AuditArchiveRunRequest,
-    AuditArchiveRunResponse, AuditEvent, AuditEventListResponse, BatchCreateLocationsRequest,
-    BatchEnableAdminMenuRequest, BillingAccount, BillingChargeCalculation, BillingContract,
-    BillingRule, BillingStatement, BusinessArchiveJob, BusinessRetentionPolicy,
-    BusinessRetentionPolicyListResponse, CalculateBillingChargesRequest,
-    CancelExpressWaybillRequest, ChangeInventoryStatusRequest, ColdChainDevice,
-    CompletePickTaskRequest, ConfigEntry, ConfirmBillingStatementRequest,
+    AdminMenuButtonPermission, AdminMenuNode, AdminMenuTreeResponse, AdminMenuVersion, ApiKey,
+    ApiKeyListResponse, ApiKeyRotationResponse, AuditActor, AuditArchivePartitionState,
+    AuditArchivePartitionStateListResponse, AuditArchiveRunRequest, AuditArchiveRunResponse,
+    AuditEvent, AuditEventListResponse, AuthRevocationResponse, AuthSession,
+    AuthSessionListResponse, AuthSessionRevokeResponse, AuthUserStatusRequest,
+    BatchCreateLocationsRequest, BatchEnableAdminMenuRequest, BillingAccount,
+    BillingChargeCalculation, BillingContract, BillingRule, BillingStatement, BusinessArchiveJob,
+    BusinessRetentionPolicy, BusinessRetentionPolicyListResponse, CalculateBillingChargesRequest,
+    CancelExpressWaybillRequest, CancelInventoryRecallRequest, ChangeInventoryStatusRequest,
+    ColdChainDevice, CompletePickTaskRequest, ConfigEntry, ConfirmBillingStatementRequest,
     ConfirmContainerRecoveryRequest, ContainerRecovery, CreateAdminMenuNodeRequest,
-    CreateBillingAccountRequest, CreateBillingContractRequest, CreateBillingRuleRequest,
-    CreateColdChainDeviceRequest, CreateCrossdockPlanRequest, CreateCustomerRequest,
-    CreateExpressWaybillRequest, CreateH4ApprovalRequest, CreateLocationRequest,
+    CreateApiKeyRequest, CreateBillingAccountRequest, CreateBillingContractRequest,
+    CreateBillingRuleRequest, CreateColdChainDeviceRequest, CreateCrossdockPlanRequest,
+    CreateCustomerAddressRequest, CreateCustomerRequest, CreateExpressWaybillRequest,
+    CreateH4ApprovalRequest, CreateLocationRequest, CreateMaintenanceRecordRequest,
     CreateOutboundOrderLineRequest, CreateOutboundOrderRequest, CreateOutboundWaveRequest,
     CreatePackJobRequest, CreatePackingStationRequest, CreateProductRequest,
     CreateReceivingOrderRequest, CreateRetailReplenishmentSuggestionRequest,
     CreateSpecialDrugCategoryRequest, CreateSupplierRequest, CreateWarehouseRequest,
-    CreateWarehouseZoneRequest, CrossdockPlan, CurrentUser, Customer, CustomerListResponse,
+    CreateWarehouseZoneRequest, CrossdockPlan, CurrentUser, Customer, CustomerAddress,
+    CustomerAddressListResponse, CustomerListResponse, CustomerProfile, CustomerQualification,
     DisableSystemDictionaryItemRequest, DisposeTemperatureExcursionRequest,
     DocumentNumberAllocation, DocumentNumberAllocationListResponse, DriverTask,
     DriverTaskListResponse, ErrorResponse, EventDelivery, EventDeliveryListResponse,
-    EventDeliveryNackRequest, ExecuteMappingRequest, ExecuteMappingResponse, ExpressCarrier,
-    ExpressCarrierListResponse, ExpressRoutingRule, ExpressRoutingRuleListResponse,
-    ExpressTrackingEvent, ExpressTrackingResponse, ExpressWaybill, FeatureFlagArchiveRequest,
-    FeatureFlagArchiveResult, FeatureFlagBatchImportRequest, FeatureFlagBatchImportResult,
-    FeatureFlagConfig, FeatureFlagExportResponse, FeatureFlagMigrationResult,
-    FeatureFlagReconcileReport, FeatureFlagSourceSwitchRequest, FeatureFlagSourceSwitchResponse,
-    GenerateBillingStatementRequest, GspLedgerReport, GspLedgerRow, H4ApprovalCallbackRequest,
-    H4ApprovalRecord, H4NotificationConfig, H4NotificationConfigListResponse, H4NotificationRecord,
-    H4NotificationRecordListResponse, H4WechatSettings, H4WechatSettingsResponse,
-    H4WechatSettingsTestResponse, HealthzResponse, IngestTemperatureExcursionRequest,
-    IngestTemperatureReadingRequest, IngestTransitTemperatureRequest, InspectReceivingOrderRequest,
-    InspectionSignatureRecord, InventoryBatch, InventoryBatchListResponse, InventoryMovement,
-    Location, LocationListResponse, LoginRequest, LoginResponse, MappingDictionary,
-    MappingQueueItem, MappingRule, MappingTraceResponse, OutboundOrder, OutboundOrderLine,
-    OutboundOrderListResponse, OutboundWave, PackJob, PackingStation, PageMeta,
-    PlanBusinessArchiveJobRequest, PrintWaybillRequest, Product, ProductListResponse,
-    PublishAdminMenuRequest, PutawayInventoryRequest, PutawayRecord, PutawayRequest,
-    ReceiveReceivingOrderRequest, ReceiveTmsDispatchRequest, ReceivingInspectionRecord,
-    ReceivingOrder, ReceivingOrderLine, ReceivingOrderListResponse, ReceivingOrderReceipt,
-    RejectReceivingOrderRequest, ReportQueryRequest, ReportQueryResponse, ReportRow,
-    ResilienceStatus, RetailReplenishmentSuggestion, ReviewOutboundOrderRequest,
-    RollbackAdminMenuRequest, SendH4NotificationRequest, ShipOutboundOrderRequest,
-    SignInspectionRequest, SpecialDrugCategory, SpecialDrugCategoryListResponse,
-    StateMachineDefinition, StateMachineDefinitionListResponse, StateMachineState,
-    StateMachineTransition, StateTransitionValidationResponse, StoreDashboardResponse, Supplier,
-    SupplierListResponse, SystemDictionaryCategory, SystemDictionaryImpactPreview,
-    SystemDictionaryImpactReference, SystemDictionaryItem, SystemDictionaryItemListResponse,
+    EventDeliveryNackRequest, ExecuteMappingRequest, ExecuteMappingResponse,
+    ExpireInventoryBatchesRequest, ExpressCarrier, ExpressCarrierListResponse, ExpressRoutingRule,
+    ExpressRoutingRuleListResponse, ExpressTrackingEvent, ExpressTrackingResponse, ExpressWaybill,
+    FeatureFlagArchiveRequest, FeatureFlagArchiveResult, FeatureFlagBatchImportRequest,
+    FeatureFlagBatchImportResult, FeatureFlagConfig, FeatureFlagExportResponse,
+    FeatureFlagMigrationResult, FeatureFlagReconcileReport, FeatureFlagSourceSwitchRequest,
+    FeatureFlagSourceSwitchResponse, GenerateBillingStatementRequest, GspLedgerReport,
+    GspLedgerRow, H4ApprovalCallbackRequest, H4ApprovalRecord, H4NotificationConfig,
+    H4NotificationConfigListResponse, H4NotificationRecord, H4NotificationRecordListResponse,
+    H4WechatSettings, H4WechatSettingsResponse, H4WechatSettingsTestResponse, HealthzResponse,
+    IngestTemperatureExcursionRequest, IngestTemperatureReadingRequest,
+    IngestTransitTemperatureRequest, InspectReceivingOrderRequest, InspectionSignatureRecord,
+    InventoryBatch, InventoryBatchListResponse, InventoryBatchTrace, InventoryMovement,
+    InventoryStatusChange, InventoryStatusTransition, InventoryStatusTransitionListResponse,
+    Location, LocationListResponse, LoginRequest, LoginResponse, MaintenanceRecord,
+    MaintenanceRecordListResponse, MaintenanceTask, MaintenanceTaskListResponse, MappingDictionary,
+    MappingQueueItem, MappingRule, MappingTraceResponse, MarkInventoryRecallRequest, OutboundOrder,
+    OutboundOrderLine, OutboundOrderListResponse, OutboundWave, OutboundWaveListResponse, PackJob,
+    PackingStation, PageMeta, PasswordChangeRequest, PlanBusinessArchiveJobRequest,
+    PrintWaybillRequest, Product, ProductListResponse, PublishAdminMenuRequest,
+    PutawayInventoryRequest, PutawayLocationRecommendation, PutawayRecommendationQuery,
+    PutawayRecommendationResponse, PutawayRecord, PutawayRequest, ReceiveReceivingOrderRequest,
+    ReceiveTmsDispatchRequest, ReceivingDashboardQuery, ReceivingDashboardResponse,
+    ReceivingDashboardRow, ReceivingInspectionRecord, ReceivingOrder, ReceivingOrderLine,
+    ReceivingOrderListResponse, ReceivingOrderPrintData, ReceivingOrderReceipt,
+    ReceivingReceiptDetails, RejectReceivingOrderRequest, ReportQueryRequest, ReportQueryResponse,
+    ReportRow, ResilienceStatus, RetailReplenishmentSuggestion, ReviewOutboundOrderLineRequest,
+    ReviewOutboundOrderRequest, RollbackAdminMenuRequest, RotateApiKeyRequest,
+    SendH4NotificationRequest, ShipOutboundOrderRequest, SignInspectionRequest,
+    SpecialDrugCategory, SpecialDrugCategoryListResponse, StateMachineDefinition,
+    StateMachineDefinitionListResponse, StateMachineState, StateMachineTransition,
+    StateTransitionValidationResponse, StoreDashboardResponse, Supplier, SupplierListResponse,
+    SystemDictionaryCategory, SystemDictionaryImpactPreview, SystemDictionaryImpactReference,
+    SystemDictionaryItem, SystemDictionaryItemListResponse,
     TemperatureExcursionDispositionResponse, TemperatureExcursionEvent,
     TemperatureExcursionEventListResponse, TemperatureReading, TmsDispatch,
     TraceabilityOutboundReport, TraceabilityOutboundReportRequest, TraceabilityStatusChangeEvent,
-    TransitTemperatureReading, UpdateAdminMenuNodeRequest, UpdateCustomerRequest,
-    UpdateLocationRequest, UpdateProductRequest, UpdateReceivingOrderRequest,
-    UpdateSpecialDrugCategoryRequest, UpdateSupplierRequest, UpdateWarehouseRequest,
-    UpdateWarehouseZoneRequest, UpsertAdminMenuButtonPermissionRequest,
-    UpsertExpressCarrierRequest, UpsertExpressRoutingRuleRequest,
+    TransitTemperatureReading, UpdateAdminMenuNodeRequest, UpdateCustomerAddressRequest,
+    UpdateCustomerRequest, UpdateLocationRequest, UpdateProductRequest,
+    UpdateReceivingOrderRequest, UpdateSpecialDrugCategoryRequest, UpdateSupplierRequest,
+    UpdateWarehouseRequest, UpdateWarehouseZoneRequest, UpsertAdminMenuButtonPermissionRequest,
+    UpsertCustomerProfileRequest, UpsertExpressCarrierRequest, UpsertExpressRoutingRuleRequest,
     UpsertH4NotificationConfigRequest, UpsertH4WechatSettingsRequest,
-    UpsertSystemDictionaryItemRequest, Warehouse, WarehouseListResponse, WarehouseZone,
-    WarehouseZoneListResponse, WeighPackJobRequest,
+    UpsertInventoryStatusTransitionRequest, UpsertSystemDictionaryItemRequest, Warehouse,
+    WarehouseListResponse, WarehouseZone, WarehouseZoneListResponse, WeighPackJobRequest,
 };
+pub use wms_domain::{
+    ArriveDockAppointmentRequest, CancelDockAppointmentRequest, CreateDockAppointmentRequest,
+    CreateDockImportRequest, CreateDockRequest, Dock, DockAppointment,
+    UpdateDockAppointmentRequest, UpdateDockRequest,
+};
+pub use wms_domain::{
+    SetTaskTypeEnabledRequest, TaskType, TaskTypeListResponse, UpsertTaskTypeRequest,
+};
+
+#[allow(dead_code)]
+fn _dock_appointment_openapi_type_use(
+    _request: Option<CreateDockAppointmentRequest>,
+    _update_request: Option<UpdateDockAppointmentRequest>,
+    _cancel_request: Option<CancelDockAppointmentRequest>,
+    _arrive_request: Option<ArriveDockAppointmentRequest>,
+    _appointment: Option<DockAppointment>,
+) {
+}
 
 #[allow(dead_code)]
 fn _h4_openapi_type_use(
@@ -95,7 +128,28 @@ fn _h4_openapi_type_use(
 }
 
 mod core;
+mod customer_addresses;
+mod customer_profile;
+mod dock;
+mod dock_appointment;
+mod drug_inspection;
 mod extensions;
+mod inventory_count;
+mod maintenance;
+mod task_type;
 
 pub(crate) use core::*;
+pub(crate) use customer_addresses::*;
+pub(crate) use customer_profile::*;
+pub(crate) use dock::*;
+pub(crate) use dock_appointment::*;
+pub(crate) use drug_inspection::*;
 pub(crate) use extensions::*;
+pub(crate) use inventory_count::*;
+pub(crate) use maintenance::*;
+pub(crate) use task_type::*;
+
+pub use wms_domain::{
+    ApproveInventoryCountRequest, CreateInventoryCountRequest, InventoryCount, InventoryCountLine,
+    SubmitInventoryCountLineRequest, UpdateColdChainDeviceRequest,
+};

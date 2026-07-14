@@ -15,7 +15,7 @@ pub fn new(pool: PgPool) -> Self {
         let limit = i64::from(limit.unwrap_or(50).clamp(1, 200));
         let rows = sqlx::query_as::<_, OutboundOrderRow>(
             r#"
-            SELECT id, owner_id, wms_order_no, erp_order_no, customer_id,
+            SELECT id, owner_id, document_type, wms_order_no, erp_order_no, customer_id,
                    warehouse_id, required_ship_at, status, short_pick,
                    created_at, updated_at
               FROM outbound_orders
@@ -54,7 +54,7 @@ pub fn new(pool: PgPool) -> Self {
     ) -> Result<OutboundOrder, Wave4RepositoryError> {
         let row = sqlx::query_as::<_, OutboundOrderRow>(
             r#"
-            SELECT id, owner_id, wms_order_no, erp_order_no, customer_id,
+            SELECT id, owner_id, document_type, wms_order_no, erp_order_no, customer_id,
                    warehouse_id, required_ship_at, status, short_pick,
                    created_at, updated_at
               FROM outbound_orders
@@ -96,18 +96,40 @@ pub fn new(pool: PgPool) -> Self {
         }
 
         let order_id = Uuid::new_v4();
+        ensure_outbound_document_type(&mut tx, ctx.owner_id, &req.document_type).await?;
+        let wms_order_no = if req.wms_order_no.trim().is_empty() {
+            PgDocumentNumberingService::new()
+                .generate_in_tx(
+                    &mut tx,
+                    ctx,
+                    GenerateDocumentNumberRequest {
+                        document_type: req.document_type.clone(),
+                        idempotency_key: format!("m4-outbound-create:{order_id}"),
+                        source_module: "M4".to_string(),
+                        source_document_id: Some(order_id),
+                    },
+                    now,
+                )
+                .await
+                .map_err(|error| Wave4RepositoryError::DocumentNumbering(format!("{error:?}")))?
+                .value
+                .generated_no
+        } else {
+            req.wms_order_no.clone()
+        };
         sqlx::query(
             r#"
             INSERT INTO outbound_orders (
-                id, owner_id, wms_order_no, erp_order_no, customer_id, warehouse_id,
+                id, owner_id, document_type, wms_order_no, erp_order_no, customer_id, warehouse_id,
                 required_ship_at, status, short_pick, created_at, updated_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, FALSE, $9, $9)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, FALSE, $10, $10)
             "#,
         )
         .bind(order_id)
         .bind(ctx.owner_id)
-        .bind(&req.wms_order_no)
+        .bind(&req.document_type)
+        .bind(&wms_order_no)
         .bind(&req.erp_order_no)
         .bind(req.customer_id)
         .bind(req.warehouse_id)
@@ -202,14 +224,83 @@ pub fn new(pool: PgPool) -> Self {
         .await
         .map_err(map_insert_error)?;
 
+        let mut selected_order_ids = HashSet::with_capacity(req.order_ids.len());
+        let mut task_drafts = Vec::new();
         for order_id in &req.order_ids {
+            if !selected_order_ids.insert(*order_id) {
+                return Err(Wave4RepositoryError::OrderAlreadyInWave);
+            }
             let order = lock_outbound_order(&mut tx, ctx.owner_id, *order_id).await?;
+            let already_in_wave: bool = sqlx::query_scalar(
+                "SELECT EXISTS (SELECT 1 FROM outbound_wave_orders WHERE owner_id = $1 AND outbound_order_id = $2)",
+            )
+            .bind(ctx.owner_id)
+            .bind(order.id)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(map_db_error)?;
+            if already_in_wave {
+                return Err(Wave4RepositoryError::OrderAlreadyInWave);
+            }
             if order.status != OUTBOUND_STATUS_CONFIRMED {
                 return Err(Wave4RepositoryError::InvalidStatus {
                     expected: OUTBOUND_STATUS_CONFIRMED.to_string(),
                     actual: order.status,
                 });
             }
+            let order_with_lines = load_outbound_order(&mut tx, ctx.owner_id, order.id).await?;
+            for line in &order_with_lines.lines {
+                allocate_inventory_for_outbound(&mut tx, ctx.owner_id, order.id, line, now).await?;
+            }
+            let allocated_tasks = sqlx::query_as::<
+                _,
+                (Uuid, i32, Uuid, String, String, Uuid, String, i64),
+            >(
+                r#"
+                SELECT allocation.batch_id,
+                       allocation.line_no,
+                       allocation.outbound_order_id,
+                       batch.product_code,
+                       batch.batch_no,
+                       batch.location_id,
+                       batch.location_code,
+                       allocation.allocated_qty
+                  FROM inventory_allocations allocation
+                  JOIN inventory_batches batch
+                    ON batch.owner_id = allocation.owner_id
+                   AND batch.id = allocation.batch_id
+                 WHERE allocation.owner_id = $1
+                   AND allocation.outbound_order_id = $2
+                   AND allocation.status = 'locked'
+                 ORDER BY batch.location_code ASC, allocation.line_no ASC, allocation.batch_id ASC
+                "#,
+            )
+            .bind(ctx.owner_id)
+            .bind(order.id)
+            .fetch_all(&mut *tx)
+            .await
+            .map_err(map_db_error)?;
+            task_drafts.extend(allocated_tasks.into_iter().map(
+                |(
+                    batch_id,
+                    line_no,
+                    order_id,
+                    product_code,
+                    batch_no,
+                    location_id,
+                    location_code,
+                    planned_qty,
+                )| PickTaskDraft {
+                    order_id,
+                    line_no,
+                    batch_id,
+                    product_code,
+                    batch_no,
+                    location_id,
+                    location_code,
+                    planned_qty,
+                },
+            ));
             sqlx::query(
                 r#"
                 UPDATE outbound_orders
@@ -238,6 +329,44 @@ pub fn new(pool: PgPool) -> Self {
             .execute(&mut *tx)
             .await
             .map_err(map_insert_error)?;
+        }
+
+        task_drafts.sort_by(|left, right| {
+            left.location_code
+                .cmp(&right.location_code)
+                .then_with(|| left.order_id.cmp(&right.order_id))
+                .then_with(|| left.line_no.cmp(&right.line_no))
+                .then_with(|| left.batch_id.cmp(&right.batch_id))
+        });
+        for (index, task) in task_drafts.into_iter().enumerate() {
+            let route_sequence =
+                i32::try_from(index + 1).map_err(|_| Wave4RepositoryError::InvalidQuantity)?;
+            sqlx::query(
+                r#"
+                INSERT INTO outbound_pick_tasks (
+                    id, owner_id, wave_id, outbound_order_id, line_no, batch_id,
+                    product_code, batch_no, location_id, location_code, planned_qty,
+                    status, route_sequence, created_at, updated_at
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending_assignment', $12, $13, $13)
+                "#,
+            )
+            .bind(Uuid::new_v4())
+            .bind(ctx.owner_id)
+            .bind(wave_row.id)
+            .bind(task.order_id)
+            .bind(task.line_no)
+            .bind(task.batch_id)
+            .bind(task.product_code)
+            .bind(task.batch_no)
+            .bind(task.location_id)
+            .bind(task.location_code)
+            .bind(task.planned_qty)
+            .bind(route_sequence)
+            .bind(now)
+            .execute(&mut *tx)
+            .await
+            .map_err(map_db_error)?;
         }
 
         let wave = map_outbound_wave(wave_row, req.order_ids);
@@ -402,25 +531,39 @@ pub fn new(pool: PgPool) -> Self {
             });
         }
 
-        let order = lock_outbound_order(&mut tx, ctx.owner_id, order_id).await?;
-        if !matches!(order.status.as_str(), "picked" | "picked_short") {
+        let order_row = lock_outbound_order(&mut tx, ctx.owner_id, order_id).await?;
+        if !matches!(order_row.status.as_str(), "picked" | "picked_short") {
             return Err(Wave4RepositoryError::InvalidStatus {
                 expected: "picked|picked_short".to_string(),
-                actual: order.status,
+                actual: order_row.status,
             });
         }
-        sqlx::query(
-            r#"
-            UPDATE outbound_order_lines
-               SET reviewed_qty = picked_qty
-             WHERE owner_id = $1 AND outbound_order_id = $2
-            "#,
-        )
-        .bind(ctx.owner_id)
-        .bind(order_id)
-        .execute(&mut *tx)
-        .await
-        .map_err(map_db_error)?;
+
+        let order = load_outbound_order(&mut tx, ctx.owner_id, order_id).await?;
+        let pick_operator_ids =
+            load_outbound_pick_operator_ids(&mut tx, ctx.owner_id, order_id).await?;
+        validate_review_submission(&order.lines, &req, ctx.user_id, &pick_operator_ids)
+            .map_err(Wave4RepositoryError::ReviewValidation)?;
+
+        for line in &req.lines {
+            let affected = sqlx::query(
+                r#"
+                UPDATE outbound_order_lines
+                   SET reviewed_qty = $4
+                 WHERE owner_id = $1 AND outbound_order_id = $2 AND line_no = $3
+                "#,
+            )
+            .bind(ctx.owner_id)
+            .bind(order_id)
+            .bind(i32::try_from(line.line_no).map_err(|_| Wave4RepositoryError::InvalidQuantity)?)
+            .bind(line.reviewed_qty)
+            .execute(&mut *tx)
+            .await
+            .map_err(map_db_error)?;
+            if affected.rows_affected() != 1 {
+                return Err(Wave4RepositoryError::NotFound);
+            }
+        }
 
         let mut updated = load_outbound_order(&mut tx, ctx.owner_id, order_id).await?;
         let next_status = status_after_review(&updated.lines);
@@ -441,6 +584,34 @@ pub fn new(pool: PgPool) -> Self {
         .await
         .map_err(map_db_error)?;
         updated = load_outbound_order(&mut tx, ctx.owner_id, order_id).await?;
+
+        let audit = audit.map(|mut audit| {
+            audit.diff = Some(AuditDiff::compute(
+                serde_json::json!({
+                    "status": &order.status,
+                    "lines": order.lines.iter().map(|line| {
+                        serde_json::json!({
+                            "line_no": line.line_no,
+                            "reviewed_qty": line.reviewed_qty,
+                        })
+                    }).collect::<Vec<_>>(),
+                }),
+                serde_json::json!({
+                    "status": &updated.status,
+                    "reviewer_id": req.reviewer_id,
+                    "review_mode": &req.review_mode,
+                    "second_reviewer_id": &req.second_reviewer_id,
+                    "lines": req.lines.iter().map(|line| {
+                        serde_json::json!({
+                            "line_no": line.line_no,
+                            "product_code": &line.product_code,
+                            "reviewed_qty": line.reviewed_qty,
+                        })
+                    }).collect::<Vec<_>>(),
+                }),
+            ));
+            audit
+        });
 
         store_idempotency_success(
             &mut tx,

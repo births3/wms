@@ -179,13 +179,21 @@ pub(crate) fn record_print_template() {}
 #[allow(dead_code)]
 pub(crate) fn list_receiving_orders() {}
 
-#[utoipa::path(post, path = "/api/v1/inbound/receiving-orders", tag = "inbound", request_body = CreateReceivingOrderRequest, responses((status = 200, description = "创建收货单", body = ReceivingOrder), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(get, path = "/api/v1/inbound/receiving-dashboard", tag = "inbound", params(("supplier_id" = Option<uuid::Uuid>, Query, description = "供应商"), ("product_code" = Option<String>, Query, description = "商品编码"), ("from" = Option<chrono::DateTime<chrono::Utc>>, Query, description = "预计到货时间起点"), ("to" = Option<chrono::DateTime<chrono::Utc>>, Query, description = "预计到货时间终点")), responses((status = 200, description = "入库进度看板", body = ReceivingDashboardResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "权限不足", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn list_receiving_dashboard() {}
+
+#[utoipa::path(post, path = "/api/v1/inbound/receiving-orders", tag = "inbound", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = CreateReceivingOrderRequest, responses((status = 200, description = "创建收货单", body = ReceivingOrder), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 409, description = "幂等键冲突", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn create_receiving_order() {}
 
 #[utoipa::path(get, path = "/api/v1/inbound/receiving-orders/{id}", tag = "inbound", params(("id" = uuid::Uuid, Path, description = "收货单 ID")), responses((status = 200, description = "收货单详情", body = ReceivingOrder), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn get_receiving_order() {}
+
+#[utoipa::path(get, path = "/api/v1/inbound/receiving-orders/{id}/print-data", tag = "inbound", params(("id" = uuid::Uuid, Path, description = "收货单 ID")), responses((status = 200, description = "收货单打印业务数据", body = ReceivingOrderPrintData), (status = 401, description = "未登录", body = ErrorResponse), (status = 404, description = "收货单不存在", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn get_receiving_order_print_data() {}
 
 #[utoipa::path(patch, path = "/api/v1/inbound/receiving-orders/{id}", tag = "inbound", params(("id" = uuid::Uuid, Path, description = "收货单 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = UpdateReceivingOrderRequest, responses((status = 200, description = "更新收货单", body = ReceivingOrder), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "权限不足", body = ErrorResponse), (status = 409, description = "幂等键冲突", body = ErrorResponse), (status = 422, description = "状态或字段校验失败", body = ErrorResponse)))]
 #[allow(dead_code)]
@@ -219,9 +227,21 @@ pub(crate) fn sign_receiving_order_inspection() {}
 #[allow(dead_code)]
 pub(crate) fn putaway_receiving_order() {}
 
-#[utoipa::path(get, path = "/api/v1/inventory/batches", tag = "inventory", responses((status = 200, description = "库存批次列表", body = InventoryBatchListResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(get, path = "/api/v1/inbound/receiving-orders/{id}/putaway-recommendations", tag = "inbound", params(("id" = uuid::Uuid, Path, description = "收货单 ID"), ("product_code" = String, Query, description = "商品编码"), ("batch_no" = String, Query, description = "批号"), ("qty" = i64, Query, description = "待上架数量"), ("quality_status" = String, Query, description = "质量状态"), ("limit" = Option<u32>, Query, description = "推荐条数，默认 5，最大 50")), responses((status = 200, description = "智能上架库位推荐", body = PutawayRecommendationResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "无上架确认权限", body = ErrorResponse), (status = 404, description = "收货单或批次不存在", body = ErrorResponse), (status = 422, description = "库位、数量或商品体积校验失败", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn recommend_putaway_locations() {}
+
+#[utoipa::path(get, path = "/api/v1/inventory/batches", tag = "inventory", params(("product_code" = Option<String>, Query, description = "商品编码模糊匹配"), ("batch_no" = Option<String>, Query, description = "批号模糊匹配"), ("location_code" = Option<String>, Query, description = "库位编码模糊匹配"), ("location_type" = Option<String>, Query, description = "库位类型精确匹配"), ("zone_code" = Option<String>, Query, description = "库区编码精确匹配"), ("quality_status" = Option<String>, Query, description = "质量状态精确匹配"), ("production_from" = Option<String>, Query, description = "生产日期起始日，格式 YYYY-MM-DD"), ("production_to" = Option<String>, Query, description = "生产日期截止日，格式 YYYY-MM-DD"), ("expiry_from" = Option<String>, Query, description = "有效期起始日，格式 YYYY-MM-DD"), ("expiry_to" = Option<String>, Query, description = "有效期截止日，格式 YYYY-MM-DD"), ("created_from" = Option<String>, Query, description = "创建时间起点，RFC3339"), ("created_to" = Option<String>, Query, description = "创建时间终点，RFC3339")), responses((status = 200, description = "库存批次列表", body = InventoryBatchListResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn list_inventory_batches() {}
+
+#[utoipa::path(get, path = "/api/v1/inventory/batches/near-expiry-report", tag = "inventory", params(("as_of" = Option<String>, Query, description = "报告基准日，格式 YYYY-MM-DD"), ("warning_days" = Option<i64>, Query, description = "预警阈值天数，缺省读取货主覆盖或全局 inventory_policy")), responses((status = 200, description = "库存批次近效期预警报表", body = InventoryBatchListResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 422, description = "日期或阈值非法", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn near_expiry_report() {}
+
+#[utoipa::path(get, path = "/api/v1/inventory/batches/{id}/trace", tag = "inventory", params(("id" = uuid::Uuid, Path, description = "库存批次 ID")), responses((status = 200, description = "库存批次流转追溯", body = InventoryBatchTrace), (status = 401, description = "未登录", body = ErrorResponse), (status = 404, description = "库存批次不存在", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn get_inventory_batch_trace() {}
 
 #[utoipa::path(post, path = "/api/v1/inventory/batches/putaway", tag = "inventory", request_body = PutawayInventoryRequest, responses((status = 200, description = "入库上架增加库存", body = InventoryBatch), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
@@ -230,6 +250,26 @@ pub(crate) fn putaway_inventory_batch() {}
 #[utoipa::path(post, path = "/api/v1/inventory/batches/status", tag = "inventory", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = ChangeInventoryStatusRequest, responses((status = 200, description = "库存状态变更", body = InventoryBatch), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn change_inventory_batch_status() {}
+
+#[utoipa::path(get, path = "/api/v1/inventory/status-transitions", tag = "inventory", responses((status = 200, description = "库存状态转换规则", body = InventoryStatusTransitionListResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "权限不足", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn list_inventory_status_transitions() {}
+
+#[utoipa::path(put, path = "/api/v1/inventory/status-transitions/{from_status}/{to_status}", tag = "inventory", params(("from_status" = String, Path, description = "起始库存状态"), ("to_status" = String, Path, description = "目标库存状态"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = UpsertInventoryStatusTransitionRequest, responses((status = 200, description = "库存状态转换规则已保存", body = InventoryStatusTransition), (status = 400, description = "缺少幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "权限不足", body = ErrorResponse), (status = 409, description = "幂等冲突", body = ErrorResponse), (status = 422, description = "规则非法", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn upsert_inventory_status_transition() {}
+
+#[utoipa::path(post, path = "/api/v1/inventory/batches/recall", tag = "inventory", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = MarkInventoryRecallRequest, responses((status = 200, description = "标记库存批次召回并隔离", body = InventoryBatch), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 422, description = "审批源或状态非法", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn mark_inventory_batch_recall() {}
+
+#[utoipa::path(post, path = "/api/v1/inventory/batches/recall/cancel", tag = "inventory", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = CancelInventoryRecallRequest, responses((status = 200, description = "双人审批取消库存批次召回", body = InventoryBatch), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 409, description = "召回状态已被其他流程改变", body = ErrorResponse), (status = 422, description = "双人审批或召回状态非法", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn cancel_inventory_batch_recall() {}
+
+#[utoipa::path(post, path = "/api/v1/inventory/batches/expire", tag = "inventory", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = ExpireInventoryBatchesRequest, responses((status = 200, description = "按日期隔离过期库存批次", body = InventoryBatchListResponse), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 422, description = "日期格式非法", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn isolate_expired_inventory_batches() {}
 
 #[utoipa::path(post, path = "/api/v1/outbound/orders", tag = "outbound", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = CreateOutboundOrderRequest, responses((status = 200, description = "创建出库订单", body = OutboundOrder), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 409, description = "单号或幂等冲突", body = ErrorResponse)))]
 #[allow(dead_code)]
@@ -270,11 +310,76 @@ pub(crate) fn get_outbound_order() {}
 #[allow(dead_code)]
 pub(crate) fn create_outbound_wave() {}
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/outbound/waves",
+    tag = "outbound",
+    params(
+        ("status" = Option<String>, Query, description = "按波次状态过滤"),
+        ("q" = Option<String>, Query, description = "按波次号模糊查询"),
+        ("limit" = Option<u32>, Query, description = "返回条数，默认 50，最大 200"),
+    ),
+    responses(
+        (status = 200, description = "出库波次列表", body = OutboundWaveListResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn list_outbound_waves() {}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/outbound/waves/{wave_id}",
+    tag = "outbound",
+    params(("wave_id" = uuid::Uuid, Path, description = "出库波次 ID")),
+    responses(
+        (status = 200, description = "出库波次详情", body = OutboundWave),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 404, description = "出库波次不存在", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn get_outbound_wave() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/outbound/waves/{wave_id}/cancel",
+    tag = "outbound",
+    params(
+        ("wave_id" = uuid::Uuid, Path, description = "出库波次 ID"),
+        ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")
+    ),
+    responses(
+        (status = 200, description = "取消未开始拣选的出库波次并释放库存锁定", body = OutboundWave),
+        (status = 400, description = "缺少或非法幂等键", body = ErrorResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "无出库写权限", body = ErrorResponse),
+        (status = 404, description = "出库波次不存在", body = ErrorResponse),
+        (status = 422, description = "波次状态不允许取消", body = ErrorResponse)
+    )
+)]
+#[allow(dead_code)]
+pub(crate) fn cancel_outbound_wave() {}
+
 #[utoipa::path(post, path = "/api/v1/outbound/pick-tasks/{id}/complete", tag = "outbound", params(("id" = uuid::Uuid, Path, description = "出库订单 ID；当前最小闭环按订单行完成拣选"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = CompletePickTaskRequest, responses((status = 200, description = "完成拣选任务，短拣时订单进入待补齐状态", body = OutboundOrder), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 422, description = "数量或状态非法", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn complete_outbound_pick_task() {}
 
-#[utoipa::path(post, path = "/api/v1/outbound/orders/{id}/review", tag = "outbound", params(("id" = uuid::Uuid, Path, description = "出库订单 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = ReviewOutboundOrderRequest, responses((status = 200, description = "完成出库复核", body = OutboundOrder), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 422, description = "订单状态不可复核", body = ErrorResponse)))]
+#[utoipa::path(
+    get,
+    path = "/api/v1/outbound/orders/{id}/review",
+    tag = "outbound",
+    params(("id" = uuid::Uuid, Path, description = "出库订单 ID")),
+    responses(
+        (status = 200, description = "查询出库复核明细", body = OutboundOrder),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 404, description = "出库订单不存在", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn get_outbound_review() {}
+
+#[utoipa::path(post, path = "/api/v1/outbound/orders/{id}/review", tag = "outbound", params(("id" = uuid::Uuid, Path, description = "出库订单 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = ReviewOutboundOrderRequest, responses((status = 200, description = "完成出库复核", body = OutboundOrder), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 422, description = "订单状态或复核明细不一致", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn review_outbound_order() {}
 
@@ -342,9 +447,21 @@ pub(crate) fn switch_feature_flag_source() {}
 #[allow(dead_code)]
 pub(crate) fn archive_feature_flag_file_source() {}
 
-#[utoipa::path(post, path = "/api/v1/cold-chain/devices", tag = "cold-chain", request_body = CreateColdChainDeviceRequest, responses((status = 200, description = "创建冷链设备台账", body = ColdChainDevice), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(post, path = "/api/v1/cold-chain/devices", tag = "cold-chain", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = CreateColdChainDeviceRequest, responses((status = 200, description = "创建冷链设备台账", body = ColdChainDevice), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 409, description = "设备编码重复或幂等冲突", body = ErrorResponse), (status = 422, description = "设备类型非法", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn create_cold_chain_device() {}
+
+#[utoipa::path(get, path = "/api/v1/cold-chain/devices", tag = "cold-chain", responses((status = 200, description = "按货主查询冷链设备台账", body = [ColdChainDevice]), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "无冷链设备读取权限", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn list_cold_chain_devices() {}
+
+#[utoipa::path(patch, path = "/api/v1/cold-chain/devices/{device_code}", tag = "cold-chain", params(("device_code" = String, Path, description = "设备编码"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = UpdateColdChainDeviceRequest, responses((status = 200, description = "更新冷链设备台账", body = ColdChainDevice), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 404, description = "设备不存在", body = ErrorResponse), (status = 422, description = "设备类型非法", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn update_cold_chain_device() {}
+
+#[utoipa::path(post, path = "/api/v1/cold-chain/devices/{device_code}/disable", tag = "cold-chain", params(("device_code" = String, Path, description = "设备编码"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), responses((status = 200, description = "停用冷链设备台账", body = ColdChainDevice), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 404, description = "设备不存在", body = ErrorResponse), (status = 422, description = "设备仍处于监控中", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn disable_cold_chain_device() {}
 
 #[utoipa::path(post, path = "/api/v1/cold-chain/readings", tag = "cold-chain", params(("Idempotency-Key" = String, Header, description = "外部系统生成的幂等键"), ("X-WMS-API-Key" = String, Header, description = "外部冷链系统 API Key")), request_body = IngestTemperatureReadingRequest, responses((status = 200, description = "接收外部温控数据", body = TemperatureReading), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "外部系统 API Key 缺失或无效", body = ErrorResponse)))]
 #[allow(dead_code)]
@@ -366,11 +483,11 @@ pub(crate) fn dispose_temperature_excursion() {}
 #[allow(dead_code)]
 pub(crate) fn create_billing_account() {}
 
-#[utoipa::path(post, path = "/api/v1/billing/contracts", tag = "billing", request_body = CreateBillingContractRequest, responses((status = 200, description = "创建计费合同", body = BillingContract), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(post, path = "/api/v1/billing/contracts", tag = "billing", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = CreateBillingContractRequest, responses((status = 200, description = "创建计费合同", body = BillingContract), (status = 400, description = "缺少幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 404, description = "货主下的计费账户不存在", body = ErrorResponse), (status = 409, description = "幂等冲突或合同重复", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn create_billing_contract() {}
 
-#[utoipa::path(post, path = "/api/v1/billing/rules", tag = "billing", request_body = CreateBillingRuleRequest, responses((status = 200, description = "创建计费规则", body = BillingRule), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(post, path = "/api/v1/billing/rules", tag = "billing", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = CreateBillingRuleRequest, responses((status = 200, description = "创建计费规则", body = BillingRule), (status = 400, description = "缺少幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 404, description = "货主下的计费合同不存在", body = ErrorResponse), (status = 409, description = "幂等冲突或规则生效窗口重复", body = ErrorResponse), (status = 422, description = "规则项、单位、周期、费率或生效窗口校验失败", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn create_billing_rule() {}
 
@@ -442,6 +559,10 @@ pub(crate) fn confirm_billing_statement() {}
 #[allow(dead_code)]
 pub(crate) fn receive_tms_dispatch() {}
 
+#[utoipa::path(post, path = "/api/v1/tms/route-plans", tag = "tms", params(("Idempotency-Key" = String, Header, description = "外部 TMS 生成的幂等键")), request_body = ReceiveTmsRoutePlanRequest, responses((status = 200, description = "接收 TMS 路径规划结果", body = TmsRoutePlan), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 404, description = "出库订单或司机不存在", body = ErrorResponse), (status = 409, description = "路径规划结果或幂等冲突", body = ErrorResponse), (status = 422, description = "路径规划结果非法", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn receive_tms_route_plan() {}
+
 #[utoipa::path(post, path = "/api/v1/tms/transit-temperature-readings", tag = "tms", params(("Idempotency-Key" = String, Header, description = "外部 TMS 生成的幂等键")), request_body = IngestTransitTemperatureRequest, responses((status = 200, description = "接收在途温控读数", body = TransitTemperatureReading), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 404, description = "TMS 调度不存在", body = ErrorResponse), (status = 422, description = "温控数据非法", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn ingest_transit_temperature() {}
@@ -449,3 +570,19 @@ pub(crate) fn ingest_transit_temperature() {}
 #[utoipa::path(post, path = "/api/v1/tms/container-recoveries", tag = "tms", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = ConfirmContainerRecoveryRequest, responses((status = 200, description = "确认周转容器回收", body = ContainerRecovery), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 404, description = "TMS 调度不存在", body = ErrorResponse), (status = 409, description = "容器回收或幂等冲突", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn confirm_container_recovery() {}
+
+#[utoipa::path(get, path = "/api/v1/auth/api-keys", tag = "auth", params(("q" = Option<String>, Query, description = "调用方名称或用途"), ("status" = Option<String>, Query, description = "active / revoked / temporarily_disabled")), responses((status = 200, description = "当前货主 API Key 列表", body = ApiKeyListResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "仅系统管理员可访问", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn list_api_keys() {}
+
+#[utoipa::path(post, path = "/api/v1/auth/api-keys", tag = "auth", params(("Idempotency-Key" = String, Header, description = "创建幂等键；明文只在首次响应展示")), request_body = CreateApiKeyRequest, responses((status = 200, description = "创建 API Key，secret 只展示一次", body = ApiKey), (status = 400, description = "缺少幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "仅系统管理员可操作", body = ErrorResponse), (status = 422, description = "作用域或过期时间非法", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn create_api_key() {}
+
+#[utoipa::path(post, path = "/api/v1/auth/api-keys/{api_key_id}/rotate", tag = "auth", params(("api_key_id" = uuid::Uuid, Path, description = "API Key ID"), ("Idempotency-Key" = String, Header, description = "轮换幂等键；新 secret 只展示一次")), request_body = RotateApiKeyRequest, responses((status = 200, description = "轮换 API Key 并返回旧 Key 宽限期", body = ApiKeyRotationResponse), (status = 400, description = "缺少幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "仅系统管理员可操作", body = ErrorResponse), (status = 404, description = "API Key 不存在", body = ErrorResponse), (status = 422, description = "宽限期或过期时间非法", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn rotate_api_key() {}
+
+#[utoipa::path(post, path = "/api/v1/auth/api-keys/{api_key_id}/revoke", tag = "auth", params(("api_key_id" = uuid::Uuid, Path, description = "API Key ID"), ("Idempotency-Key" = String, Header, description = "吊销幂等键")), responses((status = 200, description = "吊销 API Key；重复吊销幂等", body = ApiKey), (status = 400, description = "缺少幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "仅系统管理员可操作", body = ErrorResponse), (status = 404, description = "API Key 不存在", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn revoke_api_key() {}

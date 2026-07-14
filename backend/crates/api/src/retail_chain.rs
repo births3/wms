@@ -33,7 +33,12 @@ impl RetailChainService {
         &self,
         req: &CreateCrossdockPlanRequest,
     ) -> Result<(), RetailChainError> {
-        if req.qty <= 0 || req.product_code.trim().is_empty() {
+        if req.asn_id.is_nil()
+            || req.outbound_order_id.is_nil()
+            || req.store_id.is_nil()
+            || req.qty <= 0
+            || req.product_code.trim().is_empty()
+        {
             return Err(RetailChainError::InvalidCrossdockQty);
         }
         Ok(())
@@ -70,14 +75,67 @@ mod tests {
     fn invalid_crossdock_qty_is_rejected() {
         let service = RetailChainService;
         assert_eq!(
-            service.validate_crossdock(&CreateCrossdockPlanRequest {
-                asn_id: Uuid::new_v4(),
-                outbound_order_id: Uuid::new_v4(),
-                store_id: Uuid::new_v4(),
-                product_code: "P-001".to_string(),
-                qty: 0,
-            }),
+            service.validate_crossdock(&crossdock_request_with(|request| request.qty = 0)),
             Err(RetailChainError::InvalidCrossdockQty)
         );
+    }
+
+    #[test]
+    fn nil_asn_id_is_rejected() {
+        let service = RetailChainService;
+        assert_eq!(
+            service.validate_crossdock(&crossdock_request_with(
+                |request| request.asn_id = Uuid::nil()
+            )),
+            Err(RetailChainError::InvalidCrossdockQty)
+        );
+    }
+
+    #[test]
+    fn nil_outbound_order_id_is_rejected() {
+        let service = RetailChainService;
+        assert_eq!(
+            service.validate_crossdock(&crossdock_request_with(|request| {
+                request.outbound_order_id = Uuid::nil()
+            })),
+            Err(RetailChainError::InvalidCrossdockQty)
+        );
+    }
+
+    #[test]
+    fn nil_store_id_is_rejected() {
+        let service = RetailChainService;
+        assert_eq!(
+            service.validate_crossdock(&crossdock_request_with(
+                |request| request.store_id = Uuid::nil()
+            )),
+            Err(RetailChainError::InvalidCrossdockQty)
+        );
+    }
+
+    #[test]
+    fn valid_crossdock_request_is_accepted() {
+        assert_eq!(
+            RetailChainService.validate_crossdock(&crossdock_request()),
+            Ok(())
+        );
+    }
+
+    fn crossdock_request() -> CreateCrossdockPlanRequest {
+        CreateCrossdockPlanRequest {
+            asn_id: Uuid::new_v4(),
+            outbound_order_id: Uuid::new_v4(),
+            store_id: Uuid::new_v4(),
+            product_code: "P-001".to_string(),
+            qty: 1,
+        }
+    }
+
+    fn crossdock_request_with(
+        customize: impl FnOnce(&mut CreateCrossdockPlanRequest),
+    ) -> CreateCrossdockPlanRequest {
+        let mut request = crossdock_request();
+        customize(&mut request);
+        request
     }
 }

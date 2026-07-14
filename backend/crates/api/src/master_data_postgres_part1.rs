@@ -5,18 +5,22 @@ use sha2::{Digest, Sha256};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{
-    BatchCreateLocationsRequest, CreateCustomerRequest, CreateProductRequest,
-    CreateLocationRequest, CreateSupplierRequest, CreateWarehouseRequest,
-    CreateWarehouseZoneRequest, Customer, Location,
+    BatchCreateLocationsRequest, CreateCustomerAddressRequest, CreateCustomerRequest,
+    CreateLocationRequest, CreateProductRequest, CreateSupplierRequest, CreateWarehouseRequest,
+    CreateWarehouseZoneRequest, Customer, CustomerAddress, CustomerProfile, Location,
     LocationListResponse, PageMeta, Product, SpecialDrugCategory, Supplier,
-    UpdateCustomerRequest, UpdateLocationRequest, UpdateProductRequest, UpdateSupplierRequest,
-    UpdateWarehouseRequest, UpdateWarehouseZoneRequest, Warehouse, WarehouseZone,
+    UpdateCustomerAddressRequest, UpdateCustomerRequest, UpdateLocationRequest,
+    UpdateProductRequest, UpdateSupplierRequest, UpdateWarehouseRequest,
+    UpdateWarehouseZoneRequest, UpsertCustomerProfileRequest, Warehouse, WarehouseZone,
 };
 
 use crate::{
     audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
     auth::AuthContext,
-    master_data::{product_attrs_with_default_source, MasterDataError},
+    master_data::{
+        product_attrs_with_default_source, validate_location_capacity, validate_location_code,
+        validate_product_storage_condition, validate_warehouse_type, MasterDataError,
+    },
 };
 
 const SPECIAL_DRUG_CATEGORY_DICT: &str = "special_drug_category";
@@ -43,6 +47,7 @@ struct ProductRow {
     approval_no: Option<String>,
     manufacturer: Option<String>,
     source: String,
+    attrs: Value,
     status: String,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
@@ -81,6 +86,7 @@ struct WarehouseRow {
     owner_id: Uuid,
     warehouse_code: String,
     warehouse_name: String,
+    warehouse_type: String,
     status: String,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
@@ -142,7 +148,7 @@ impl PgMasterDataReadRepository {
             r#"
             SELECT id, owner_id, product_code, product_name, specification, dosage_form,
                    storage_condition, special_drug_category, approval_no, manufacturer,
-                   source, status, created_at, updated_at
+                   source, attrs, status, created_at, updated_at
               FROM products
              WHERE owner_id = $1
              ORDER BY updated_at DESC, product_code
@@ -160,26 +166,54 @@ impl PgMasterDataReadRepository {
         ctx: &AuthContext,
         req: CreateProductRequest,
         now: DateTime<Utc>,
+        idempotency_key: &str,
     ) -> Result<Product, MasterDataError> {
+        let attrs = product_attrs_with_default_source(req.attrs.clone(), "api_import");
+        validate_product_storage_condition(&attrs)?;
+        let storage_condition = string_attr(&attrs, "storage_condition")
+            .ok_or(MasterDataError::InvalidStorageCondition)?;
+        let request_hash = request_hash(&json!({
+            "path": "/api/v1/master-data/products",
+            "request": &req,
+        }))?;
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
+        lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
+        if let Some(value) = replay_idempotency::<Product>(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            now,
+        )
+        .await?
+        {
+            tx.commit().await.map_err(map_db_error)?;
+            return Ok(value);
+        }
         let id = Uuid::new_v4();
-        let attrs = product_attrs_with_default_source(req.attrs, "api_import");
         let specification = non_empty_or(req.spec, "-");
-        let storage_condition =
-            string_attr(&attrs, "storage_condition").unwrap_or_else(|| "normal".to_string());
         let source = string_attr(&attrs, "source").unwrap_or_else(|| "api_import".to_string());
-        let special_drug_category = non_empty_or(req.special_drug_category_code, "normal");
+        let special_drug_category = non_empty_or(req.special_drug_category_code, "none");
+        ensure_enabled_dictionary_item(
+            &mut tx,
+            ctx.owner_id,
+            SPECIAL_DRUG_CATEGORY_DICT,
+            &special_drug_category,
+            now,
+        )
+        .await
+        .map_err(|_| MasterDataError::InvalidSpecialDrugCategory)?;
         let row = sqlx::query_as::<_, ProductRow>(
             r#"
             INSERT INTO products (
                 id, owner_id, product_code, product_name, specification, dosage_form,
                 storage_condition, special_drug_category, approval_no, manufacturer,
-                source, status, created_at, updated_at
+                source, attrs, status, created_at, updated_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'active', $12, $12)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'active', $13, $13)
             RETURNING id, owner_id, product_code, product_name, specification, dosage_form,
                       storage_condition, special_drug_category, approval_no, manufacturer,
-                      source, status, created_at, updated_at
+                      source, attrs, status, created_at, updated_at
             "#,
         )
         .bind(id)
@@ -193,6 +227,7 @@ impl PgMasterDataReadRepository {
         .bind(&req.approval_no)
         .bind(&req.manufacturer)
         .bind(&source)
+        .bind(&attrs)
         .bind(now)
         .fetch_one(&mut *tx)
         .await
@@ -208,8 +243,125 @@ impl PgMasterDataReadRepository {
             now,
         )
         .await?;
+        store_idempotency_success(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            &product,
+            now,
+            "POST",
+            "/api/v1/master-data/products",
+            "product",
+            &product.id.to_string(),
+        )
+        .await?;
         tx.commit().await.map_err(map_db_error)?;
         Ok(product)
+    }
+
+    pub async fn batch_create_products(
+        &self,
+        ctx: &AuthContext,
+        requests: Vec<CreateProductRequest>,
+        now: DateTime<Utc>,
+        idempotency_key: &str,
+    ) -> Result<Vec<Product>, MasterDataError> {
+        let request_hash = request_hash(&json!({
+            "path": "/api/v1/master-data/products/batch-sync",
+            "request": &requests,
+        }))?;
+        let mut tx = self.pool.begin().await.map_err(map_db_error)?;
+        lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
+        if let Some(value) = replay_idempotency::<Vec<Product>>(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            now,
+        )
+        .await?
+        {
+            tx.commit().await.map_err(map_db_error)?;
+            return Ok(value);
+        }
+
+        let mut products = Vec::with_capacity(requests.len());
+        for req in requests {
+            let attrs = product_attrs_with_default_source(req.attrs.clone(), "api_import");
+            validate_product_storage_condition(&attrs)?;
+            let storage_condition = string_attr(&attrs, "storage_condition")
+                .ok_or(MasterDataError::InvalidStorageCondition)?;
+            let id = Uuid::new_v4();
+            let specification = non_empty_or(req.spec, "-");
+            let source = string_attr(&attrs, "source").unwrap_or_else(|| "api_import".to_string());
+            let special_drug_category = non_empty_or(req.special_drug_category_code, "none");
+            ensure_enabled_dictionary_item(
+                &mut tx,
+                ctx.owner_id,
+                SPECIAL_DRUG_CATEGORY_DICT,
+                &special_drug_category,
+                now,
+            )
+            .await
+            .map_err(|_| MasterDataError::InvalidSpecialDrugCategory)?;
+            let row = sqlx::query_as::<_, ProductRow>(
+                r#"
+                INSERT INTO products (
+                    id, owner_id, product_code, product_name, specification, dosage_form,
+                    storage_condition, special_drug_category, approval_no, manufacturer,
+                    source, attrs, status, created_at, updated_at
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'active', $13, $13)
+                RETURNING id, owner_id, product_code, product_name, specification, dosage_form,
+                          storage_condition, special_drug_category, approval_no, manufacturer,
+                          source, attrs, status, created_at, updated_at
+                "#,
+            )
+            .bind(id)
+            .bind(ctx.owner_id)
+            .bind(&req.product_code)
+            .bind(&req.product_name)
+            .bind(&specification)
+            .bind(&req.dosage_form)
+            .bind(&storage_condition)
+            .bind(&special_drug_category)
+            .bind(&req.approval_no)
+            .bind(&req.manufacturer)
+            .bind(&source)
+            .bind(&attrs)
+            .bind(now)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(|error| map_catalog_write_error(error, &req.product_code))?;
+            let product = Product::from(row);
+            append_master_data_audit(
+                &mut tx,
+                ctx,
+                "batch_create_product",
+                "product",
+                product.id,
+                &product,
+                now,
+            )
+            .await?;
+            products.push(product);
+        }
+        store_idempotency_success(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            &products,
+            now,
+            "POST",
+            "/api/v1/master-data/products/batch-sync",
+            "product_batch",
+            idempotency_key,
+        )
+        .await?;
+        tx.commit().await.map_err(map_db_error)?;
+        Ok(products)
     }
 
     pub async fn list_suppliers(
@@ -256,8 +408,26 @@ impl PgMasterDataReadRepository {
         ctx: &AuthContext,
         req: CreateSupplierRequest,
         now: DateTime<Utc>,
+        idempotency_key: &str,
     ) -> Result<Supplier, MasterDataError> {
+        let request_hash = request_hash(&json!({
+            "path": "/api/v1/master-data/suppliers",
+            "request": &req,
+        }))?;
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
+        lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
+        if let Some(value) = replay_idempotency::<Supplier>(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            now,
+        )
+        .await?
+        {
+            tx.commit().await.map_err(map_db_error)?;
+            return Ok(value);
+        }
         let id = Uuid::new_v4();
         let source = req.source.unwrap_or_else(|| "api_import".to_string());
         let uscc = req
@@ -298,6 +468,19 @@ impl PgMasterDataReadRepository {
             now,
         )
         .await?;
+        store_idempotency_success(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            &supplier,
+            now,
+            "POST",
+            "/api/v1/master-data/suppliers",
+            "supplier",
+            &supplier.id.to_string(),
+        )
+        .await?;
         tx.commit().await.map_err(map_db_error)?;
         Ok(supplier)
     }
@@ -307,8 +490,26 @@ impl PgMasterDataReadRepository {
         ctx: &AuthContext,
         req: CreateCustomerRequest,
         now: DateTime<Utc>,
+        idempotency_key: &str,
     ) -> Result<Customer, MasterDataError> {
+        let request_hash = request_hash(&json!({
+            "path": "/api/v1/master-data/customers",
+            "request": &req,
+        }))?;
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
+        lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
+        if let Some(value) = replay_idempotency::<Customer>(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            now,
+        )
+        .await?
+        {
+            tx.commit().await.map_err(map_db_error)?;
+            return Ok(value);
+        }
         let id = Uuid::new_v4();
         let source = req.source.unwrap_or_else(|| "api_import".to_string());
         let row = sqlx::query_as::<_, CustomerRow>(
@@ -342,6 +543,19 @@ impl PgMasterDataReadRepository {
             now,
         )
         .await?;
+        store_idempotency_success(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            &customer,
+            now,
+            "POST",
+            "/api/v1/master-data/customers",
+            "customer",
+            &customer.id.to_string(),
+        )
+        .await?;
         tx.commit().await.map_err(map_db_error)?;
         Ok(customer)
     }
@@ -352,7 +566,7 @@ impl PgMasterDataReadRepository {
     ) -> Result<Vec<Warehouse>, MasterDataError> {
         let rows = sqlx::query_as::<_, WarehouseRow>(
             r#"
-            SELECT id, owner_id, warehouse_code, warehouse_name, status, created_at, updated_at
+            SELECT id, owner_id, warehouse_code, warehouse_name, warehouse_type, status, created_at, updated_at
               FROM warehouses
              WHERE owner_id = $1
              ORDER BY updated_at DESC, warehouse_code
@@ -407,6 +621,7 @@ impl PgMasterDataReadRepository {
 
         ensure_warehouse_zone_in_owner(&mut tx, ctx.owner_id, req.warehouse_id, req.zone_id)
             .await?;
+        ensure_bound_owner_exists(&mut tx, req.bound_owner_id).await?;
         ensure_enabled_dictionary_item(
             &mut tx,
             ctx.owner_id,

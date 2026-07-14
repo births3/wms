@@ -34,7 +34,6 @@ const IDEMPOTENCY_EXEMPTION_GROUPS: &[IdempotencyExemptionGroup] = &[
     IdempotencyExemptionGroup {
         operations: &[
             ("/api/v1/billing/accounts", PathItemType::Post),
-            ("/api/v1/billing/contracts", PathItemType::Post),
             ("/api/v1/billing/rules", PathItemType::Post),
         ],
         reason: "Wave 5 计费首批切片尚未接入业务幂等，本契约先显式标记豁免。",
@@ -72,7 +71,6 @@ const IDEMPOTENCY_EXEMPTION_GROUPS: &[IdempotencyExemptionGroup] = &[
     },
     IdempotencyExemptionGroup {
         operations: &[
-            ("/api/v1/inbound/receiving-orders", PathItemType::Post),
             ("/api/v1/inbound/receiving-orders/{id}", PathItemType::Patch),
             (
                 "/api/v1/inbound/receiving-orders/{id}",

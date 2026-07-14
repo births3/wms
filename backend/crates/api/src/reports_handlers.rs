@@ -110,24 +110,40 @@ async fn query_report_handler(
 ) -> Result<Json<ReportQueryResponse>, ReportsHandlerError> {
     ctx.require_permission(READ_PERMISSION)?;
     let limit = req.limit.unwrap_or(50).min(200) as i64;
-    if req.report_code != "m6_inbound_summary" {
-        return Err(ReportsHandlerError::UnsupportedReportCode(req.report_code));
-    }
-    let count: i64 = sqlx::query_scalar(
-        r#"
-        SELECT COUNT(*)::BIGINT
-          FROM receiving_orders
-         WHERE owner_id = $1
-        "#,
-    )
-    .bind(ctx.owner_id)
-    .fetch_one(state.pool.as_ref())
-    .await
-    .map_err(|error| ReportsHandlerError::Database(error.to_string()))?;
+    let (metric, count) = match req.report_code.as_str() {
+        "m6_inbound_summary" => (
+            "receiving_orders",
+            sqlx::query_scalar::<_, i64>(
+                r#"
+                SELECT COUNT(*)::BIGINT
+                  FROM receiving_orders
+                 WHERE owner_id = $1
+                "#,
+            )
+            .bind(ctx.owner_id)
+            .fetch_one(state.pool.as_ref())
+            .await,
+        ),
+        "m6_outbound_summary" => (
+            "outbound_orders",
+            sqlx::query_scalar::<_, i64>(
+                r#"
+                SELECT COUNT(*)::BIGINT
+                  FROM outbound_orders
+                 WHERE owner_id = $1
+                "#,
+            )
+            .bind(ctx.owner_id)
+            .fetch_one(state.pool.as_ref())
+            .await,
+        ),
+        _ => return Err(ReportsHandlerError::UnsupportedReportCode(req.report_code)),
+    };
+    let count = count.map_err(|error| ReportsHandlerError::Database(error.to_string()))?;
 
     let rows = vec![ReportRow {
         values: json!({
-            "metric": "receiving_orders",
+            "metric": metric,
             "count": count,
             "owner_id": ctx.owner_id,
             "filters": req.filters,

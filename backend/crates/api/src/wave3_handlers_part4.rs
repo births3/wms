@@ -1,3 +1,47 @@
+use serde::Deserialize;
+
+#[derive(Debug, Deserialize)]
+struct NearExpiryReportQuery {
+    as_of: Option<String>,
+    warning_days: Option<String>,
+}
+
+async fn near_expiry_report_handler(
+    ctx: AuthContext,
+    State(state): State<Wave3AppState>,
+    axum::extract::Query(query): axum::extract::Query<NearExpiryReportQuery>,
+) -> Result<Json<InventoryBatchListResponse>, Wave3HandlerError> {
+    require_any_permission(&ctx, &["m3.read", "m3.write"])?;
+    let as_of = match query.as_of {
+        Some(value) => chrono::NaiveDate::parse_from_str(&value, "%Y-%m-%d")
+            .map_err(|_| Wave3HandlerError::Repository(Wave3RepositoryError::InvalidDate(value)))?,
+        None => Utc::now().date_naive(),
+    };
+    let warning_days = query
+        .warning_days
+        .map(|value| {
+            value.parse::<i64>().map_err(|_| {
+                Wave3HandlerError::Repository(Wave3RepositoryError::InvalidQuantity)
+            })
+        })
+        .transpose()?;
+    let repository = state.wave3_repository.as_ref().ok_or_else(|| {
+        Wave3HandlerError::Repository(Wave3RepositoryError::Database(
+            "近效期报表需要 PostgreSQL repository".to_string(),
+        ))
+    })?;
+    let data = repository
+        .list_near_expiry_batches(&ctx, as_of, warning_days)
+        .await?;
+    Ok(Json(InventoryBatchListResponse {
+        page: PageMeta {
+            next_cursor: None,
+            count: data.len() as u32,
+        },
+        data,
+    }))
+}
+
 async fn putaway_receiving_order_handler(
     ctx: AuthContext,
     State(state): State<Wave3AppState>,
@@ -5,7 +49,7 @@ async fn putaway_receiving_order_handler(
     headers: HeaderMap,
     Json(req): Json<PutawayRequest>,
 ) -> Result<Json<PutawayRecord>, Wave3HandlerError> {
-    ctx.require_permission("m2.write")?;
+    ctx.require_permission("m2.putaway.write")?;
     let idempotency_key = idempotency_key_from_headers(&headers)?;
     let now = Utc::now();
     if let Some(repository) = &state.wave3_repository {
@@ -47,8 +91,33 @@ async fn putaway_receiving_order_handler(
 async fn list_inventory_batches_handler(
     ctx: AuthContext,
     State(state): State<Wave3AppState>,
+    Query(query): Query<InventoryBatchQuery>,
 ) -> Result<Json<InventoryBatchListResponse>, Wave3HandlerError> {
     require_any_permission(&ctx, &["m3.read", "m3.write"])?;
+    let production_from = parse_inventory_batch_date_filter(query.production_from.as_ref())?;
+    let production_to = parse_inventory_batch_date_filter(query.production_to.as_ref())?;
+    let expiry_from = parse_inventory_batch_date_filter(query.expiry_from.as_ref())?;
+    let expiry_to = parse_inventory_batch_date_filter(query.expiry_to.as_ref())?;
+    let created_from = parse_inventory_batch_datetime_filter(query.created_from.as_ref())?;
+    let created_to = parse_inventory_batch_datetime_filter(query.created_to.as_ref())?;
+    if production_from.zip(production_to).is_some_and(|(from, to)| from > to) {
+        return Err(Wave3RepositoryError::InvalidDate(
+            "production_from_after_production_to".to_string(),
+        )
+        .into());
+    }
+    if expiry_from.zip(expiry_to).is_some_and(|(from, to)| from > to) {
+        return Err(Wave3RepositoryError::InvalidDate(
+            "expiry_from_after_expiry_to".to_string(),
+        )
+        .into());
+    }
+    if created_from.zip(created_to).is_some_and(|(from, to)| from > to) {
+        return Err(Wave3RepositoryError::InvalidDate(
+            "created_from_after_created_to".to_string(),
+        )
+        .into());
+    }
     if let Some(config_center_state) = &state.config_center_state {
         if !config_center_state
             .is_feature_enabled(INVENTORY_BATCHES_SMOKE_FLAG)
@@ -60,7 +129,9 @@ async fn list_inventory_batches_handler(
         }
     }
     if let Some(repository) = &state.wave3_repository {
-        let batches = repository.list_inventory_batches(&ctx).await?;
+        let batches = repository
+            .list_inventory_batches_with_query(&ctx, query)
+            .await?;
         let count = batches.len() as u32;
         return Ok(Json(InventoryBatchListResponse {
             data: batches,
@@ -70,10 +141,34 @@ async fn list_inventory_batches_handler(
             },
         }));
     }
-    let batches = {
+    let mut batches = {
         let store = state.inventory_store.lock().await;
-        store.list_batches(&ctx)
+        store
+            .list_batches(&ctx)
+            .into_iter()
+            .filter(|batch| {
+                inventory_batch_matches_query(
+                    batch,
+                    &query,
+                    production_from,
+                    production_to,
+                    expiry_from,
+                    expiry_to,
+                    created_from,
+                    created_to,
+                )
+            })
+            .collect::<Vec<_>>()
     };
+    if expiry_from.is_some() || expiry_to.is_some() {
+        batches.sort_by(|left, right| {
+            left.expiry_date
+                .cmp(&right.expiry_date)
+                .then_with(|| left.product_code.cmp(&right.product_code))
+                .then_with(|| left.batch_no.cmp(&right.batch_no))
+                .then_with(|| left.id.cmp(&right.id))
+        });
+    }
     let count = batches.len() as u32;
     Ok(Json(InventoryBatchListResponse {
         data: batches,
@@ -82,6 +177,103 @@ async fn list_inventory_batches_handler(
             count,
         },
     }))
+}
+
+async fn get_inventory_batch_trace_handler(
+    ctx: AuthContext,
+    State(state): State<Wave3AppState>,
+    Path(batch_id): Path<Uuid>,
+) -> Result<Json<InventoryBatchTrace>, Wave3HandlerError> {
+    require_any_permission(&ctx, &["m3.read", "m3.write"])?;
+    if let Some(repository) = &state.wave3_repository {
+        return Ok(Json(
+            repository
+                .get_inventory_batch_trace(&ctx, batch_id)
+                .await?,
+        ));
+    }
+    let trace = state
+        .inventory_store
+        .lock()
+        .await
+        .trace_batch(&ctx, batch_id)?;
+    Ok(Json(trace))
+}
+
+fn parse_inventory_batch_date_filter(
+    value: Option<&String>,
+) -> Result<Option<NaiveDate>, Wave3HandlerError> {
+    value
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+        .map(|value| {
+            NaiveDate::parse_from_str(value, "%Y-%m-%d")
+                .map_err(|_| Wave3RepositoryError::InvalidDate(value.to_string()).into())
+        })
+        .transpose()
+}
+
+fn parse_inventory_batch_datetime_filter(
+    value: Option<&String>,
+) -> Result<Option<chrono::DateTime<chrono::Utc>>, Wave3HandlerError> {
+    value
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+        .map(|value| {
+            chrono::DateTime::parse_from_rfc3339(value)
+                .map(|value| value.with_timezone(&chrono::Utc))
+                .map_err(|_| Wave3RepositoryError::InvalidDate(value.to_string()).into())
+        })
+        .transpose()
+}
+
+fn inventory_batch_matches_query(
+    batch: &InventoryBatch,
+    query: &InventoryBatchQuery,
+    production_from: Option<NaiveDate>,
+    production_to: Option<NaiveDate>,
+    expiry_from: Option<NaiveDate>,
+    expiry_to: Option<NaiveDate>,
+    created_from: Option<chrono::DateTime<chrono::Utc>>,
+    created_to: Option<chrono::DateTime<chrono::Utc>>,
+) -> bool {
+    fn contains_filter(value: &str, filter: &Option<String>) -> bool {
+        filter.as_ref().is_none_or(|filter| {
+            let filter = filter.trim();
+            filter.is_empty() || value.to_lowercase().contains(&filter.to_lowercase())
+        })
+    }
+
+    contains_filter(&batch.product_code, &query.product_code)
+        && contains_filter(&batch.batch_no, &query.batch_no)
+        && contains_filter(&batch.location_code, &query.location_code)
+        // 内存库存模型未携带库位主数据；非空元数据条件不能伪造匹配结果。
+        && query
+            .location_type
+            .as_ref()
+            .is_none_or(|location_type| location_type.trim().is_empty())
+        && query
+            .zone_code
+            .as_ref()
+            .is_none_or(|zone_code| zone_code.trim().is_empty())
+        && query.quality_status.as_ref().is_none_or(|status| {
+            status.trim().is_empty() || batch.quality_status == status.trim()
+        })
+        && (production_from.is_none() && production_to.is_none()
+            || NaiveDate::parse_from_str(&batch.production_date, "%Y-%m-%d")
+                .ok()
+                .is_some_and(|production_date| {
+                    production_from.is_none_or(|from| production_date >= from)
+                        && production_to.is_none_or(|to| production_date <= to)
+                }))
+        && NaiveDate::parse_from_str(&batch.expiry_date, "%Y-%m-%d")
+            .ok()
+            .is_some_and(|expiry_date| {
+                expiry_from.is_none_or(|from| expiry_date >= from)
+                    && expiry_to.is_none_or(|to| expiry_date <= to)
+            })
+        && created_from.is_none_or(|from| batch.created_at >= from)
+        && created_to.is_none_or(|to| batch.created_at <= to)
 }
 
 async fn putaway_inventory_batch_handler(
@@ -148,13 +340,174 @@ async fn change_inventory_batch_status_handler(
     Ok(Json(batch))
 }
 
+async fn mark_inventory_recall_handler(
+    ctx: AuthContext,
+    State(state): State<Wave3AppState>,
+    headers: HeaderMap,
+    Json(req): Json<MarkInventoryRecallRequest>,
+) -> Result<Json<InventoryBatch>, Wave3HandlerError> {
+    ctx.require_permission("m3.write")?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
+    let now = Utc::now();
+    let batch_id = req.batch_id;
+    if let Some(repository) = &state.wave3_repository {
+        let audit = AuditWriteRequest::from_auth_context(
+            &ctx,
+            "mark_inventory_recall",
+            "M3",
+            "inventory_batch",
+            batch_id.to_string(),
+            None,
+        );
+        let outcome = repository
+            .mark_inventory_batch_recalled(&ctx, req, now, &idempotency_key, Some(audit))
+            .await?;
+        return Ok(Json(outcome.value));
+    }
+    let batch = {
+        let mut store = state.inventory_store.lock().await;
+        store.mark_recall(&ctx, req, now)?
+    };
+    append_audit(
+        &state,
+        &ctx,
+        "mark_inventory_recall",
+        "M3",
+        "inventory_batch",
+        batch_id.to_string(),
+    )
+    .await;
+    Ok(Json(batch))
+}
+
+async fn cancel_inventory_recall_handler(
+    ctx: AuthContext,
+    State(state): State<Wave3AppState>,
+    headers: HeaderMap,
+    Json(req): Json<CancelInventoryRecallRequest>,
+) -> Result<Json<InventoryBatch>, Wave3HandlerError> {
+    ctx.require_permission("m3.recall.cancel")?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
+    let now = Utc::now();
+    let batch_id = req.batch_id;
+    if let Some(repository) = &state.wave3_repository {
+        let audit = AuditWriteRequest::from_auth_context(
+            &ctx,
+            "cancel_inventory_recall",
+            "M3",
+            "inventory_batch",
+            batch_id.to_string(),
+            None,
+        );
+        let outcome = repository
+            .cancel_inventory_batch_recall(&ctx, req, now, &idempotency_key, Some(audit))
+            .await?;
+        return Ok(Json(outcome.value));
+    }
+    let batch = {
+        let mut store = state.inventory_store.lock().await;
+        store.cancel_recall(&ctx, req, now)?
+    };
+    append_audit(
+        &state,
+        &ctx,
+        "cancel_inventory_recall",
+        "M3",
+        "inventory_batch",
+        batch_id.to_string(),
+    )
+    .await;
+    Ok(Json(batch))
+}
+
+async fn isolate_expired_inventory_batches_handler(
+    ctx: AuthContext,
+    State(state): State<Wave3AppState>,
+    headers: HeaderMap,
+    Json(req): Json<ExpireInventoryBatchesRequest>,
+) -> Result<Json<InventoryBatchListResponse>, Wave3HandlerError> {
+    ctx.require_permission("m3.write")?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
+    let now = Utc::now();
+    let as_of = req
+        .as_of
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .map(|value| {
+            NaiveDate::parse_from_str(value.trim(), "%Y-%m-%d")
+                .map_err(|_| Wave3HandlerError::Repository(Wave3RepositoryError::InvalidDate("as_of".to_string())))
+        })
+        .transpose()?
+        .unwrap_or_else(|| now.date_naive());
+    if let Some(repository) = &state.wave3_repository {
+        let audit = AuditWriteRequest::from_auth_context(
+            &ctx,
+            "isolate_expired_inventory_batch",
+            "M3",
+            "inventory_expiry_job",
+            format!("{}:{}", ctx.owner_id, as_of),
+            None,
+        );
+        let outcome = repository
+            .isolate_expired_inventory_batches(&ctx, as_of, now, &idempotency_key, Some(audit))
+            .await?;
+        let count = outcome.value.len() as u32;
+        return Ok(Json(InventoryBatchListResponse {
+            data: outcome.value,
+            page: PageMeta { next_cursor: None, count },
+        }));
+    }
+    let batches = {
+        let mut store = state.inventory_store.lock().await;
+        store.isolate_expired_batches(&ctx, as_of, now)?
+    };
+    for batch in &batches {
+        append_audit(
+            &state,
+            &ctx,
+            "isolate_expired_inventory_batch",
+            "M3",
+            "inventory_batch",
+            batch.id.to_string(),
+        )
+        .await;
+    }
+    let count = batches.len() as u32;
+    Ok(Json(InventoryBatchListResponse {
+        data: batches,
+        page: PageMeta { next_cursor: None, count },
+    }))
+}
+
 async fn create_cold_chain_device_handler(
     ctx: AuthContext,
     State(state): State<Wave3AppState>,
+    headers: HeaderMap,
     Json(req): Json<CreateColdChainDeviceRequest>,
 ) -> Result<Json<ColdChainDevice>, Wave3HandlerError> {
     ctx.require_permission("m5.write")?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
     let now = Utc::now();
+    if let Some(repository) = &state.wave3_repository {
+        let audit = AuditWriteRequest::from_auth_context(
+            &ctx,
+            "create_device",
+            "M5",
+            "cold_chain_device",
+            "",
+            None,
+        );
+        let outcome = repository
+            .create_cold_chain_device_with_audit(
+                &ctx,
+                req,
+                now,
+                &idempotency_key,
+                audit,
+            )
+            .await?;
+        return Ok(Json(outcome.value));
+    }
     let device = {
         let mut service = state.cold_chain_service.lock().await;
         service.create_device(&ctx, req, now)?
@@ -163,6 +516,115 @@ async fn create_cold_chain_device_handler(
         &state,
         &ctx,
         "create_device",
+        "M5",
+        "cold_chain_device",
+        device.id.to_string(),
+    )
+    .await;
+    Ok(Json(device))
+}
+
+async fn list_cold_chain_devices_handler(
+    ctx: AuthContext,
+    State(state): State<Wave3AppState>,
+) -> Result<Json<Vec<ColdChainDevice>>, Wave3HandlerError> {
+    require_any_permission(&ctx, &["m5.read", "m5.write"])?;
+    if let Some(repository) = &state.wave3_repository {
+        return Ok(Json(repository.list_cold_chain_devices(&ctx).await?));
+    }
+    Ok(Json(state.cold_chain_service.lock().await.list_devices(&ctx)))
+}
+
+async fn update_cold_chain_device_handler(
+    ctx: AuthContext,
+    State(state): State<Wave3AppState>,
+    Path(device_code): Path<String>,
+    headers: HeaderMap,
+    Json(req): Json<UpdateColdChainDeviceRequest>,
+) -> Result<Json<ColdChainDevice>, Wave3HandlerError> {
+    ctx.require_permission("m5.write")?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
+    let now = Utc::now();
+    if let Some(repository) = &state.wave3_repository {
+        let audit = AuditWriteRequest::from_auth_context(
+            &ctx,
+            "update_device",
+            "M5",
+            "cold_chain_device",
+            "",
+            None,
+        );
+        return Ok(Json(
+            repository
+                .update_cold_chain_device_with_audit(
+                    &ctx,
+                    &device_code,
+                    req,
+                    now,
+                    &idempotency_key,
+                    audit,
+                )
+                .await?
+                .value,
+        ));
+    }
+    let device = state
+        .cold_chain_service
+        .lock()
+        .await
+        .update_device(&ctx, &device_code, req)?;
+    append_audit(
+        &state,
+        &ctx,
+        "update_device",
+        "M5",
+        "cold_chain_device",
+        device.id.to_string(),
+    )
+    .await;
+    Ok(Json(device))
+}
+
+async fn disable_cold_chain_device_handler(
+    ctx: AuthContext,
+    State(state): State<Wave3AppState>,
+    Path(device_code): Path<String>,
+    headers: HeaderMap,
+) -> Result<Json<ColdChainDevice>, Wave3HandlerError> {
+    ctx.require_permission("m5.write")?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
+    let now = Utc::now();
+    if let Some(repository) = &state.wave3_repository {
+        let audit = AuditWriteRequest::from_auth_context(
+            &ctx,
+            "disable_device",
+            "M5",
+            "cold_chain_device",
+            "",
+            None,
+        );
+        return Ok(Json(
+            repository
+                .disable_cold_chain_device_with_audit(
+                    &ctx,
+                    &device_code,
+                    now,
+                    &idempotency_key,
+                    audit,
+                )
+                .await?
+                .value,
+        ));
+    }
+    let device = state
+        .cold_chain_service
+        .lock()
+        .await
+        .disable_device(&ctx, &device_code)?;
+    append_audit(
+        &state,
+        &ctx,
+        "disable_device",
         "M5",
         "cold_chain_device",
         device.id.to_string(),
@@ -287,172 +749,55 @@ async fn create_billing_account_handler(
 async fn create_billing_contract_handler(
     ctx: AuthContext,
     State(state): State<Wave3AppState>,
+    headers: HeaderMap,
     Json(req): Json<CreateBillingContractRequest>,
 ) -> Result<Json<BillingContract>, Wave3HandlerError> {
     ctx.require_permission("m9.write")?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
     let now = Utc::now();
-    let contract = {
-        let mut store = state.billing_store.lock().await;
-        store.create_contract(&ctx, req, now)?
+    let Some(repository) = &state.wave3_repository else {
+        return Err(Wave3HandlerError::Repository(Wave3RepositoryError::Database(
+            "M9 合同创建需要 PostgreSQL repository 才能保证幂等".to_string(),
+        )));
     };
-    append_audit(
-        &state,
+    let audit = AuditWriteRequest::from_auth_context(
         &ctx,
         "create_contract",
         "M9",
         "billing_contract",
-        contract.id.to_string(),
-    )
-    .await;
-    Ok(Json(contract))
+        "",
+        None,
+    );
+    let outcome = repository
+        .create_billing_contract_with_audit(&ctx, req, now, &idempotency_key, audit)
+        .await?;
+    Ok(Json(outcome.value))
 }
 
 async fn create_billing_rule_handler(
     ctx: AuthContext,
     State(state): State<Wave3AppState>,
+    headers: HeaderMap,
     Json(req): Json<CreateBillingRuleRequest>,
 ) -> Result<Json<BillingRule>, Wave3HandlerError> {
     ctx.require_permission("m9.write")?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
     let now = Utc::now();
-    if let Some(repository) = &state.wave3_repository {
-        let audit = AuditWriteRequest::from_auth_context(
-            &ctx,
-            "create_rule",
-            "M9",
-            "billing_rule",
-            "",
-            None,
-        );
-        let rule = repository
-            .create_billing_rule_with_audit(&ctx, req, now, audit)
-            .await?;
-        return Ok(Json(rule));
-    }
-    let rule = {
-        let mut store = state.billing_store.lock().await;
-        store.create_rule(&ctx, req, now)?
+    let Some(repository) = &state.wave3_repository else {
+        return Err(Wave3HandlerError::Repository(Wave3RepositoryError::Database(
+            "M9 规则创建需要 PostgreSQL repository 才能保证幂等".to_string(),
+        )));
     };
-    append_audit(
-        &state,
+    let audit = AuditWriteRequest::from_auth_context(
         &ctx,
         "create_rule",
         "M9",
         "billing_rule",
-        rule.id.to_string(),
-    )
-    .await;
-    Ok(Json(rule))
-}
-
-fn require_any_permission(ctx: &AuthContext, permissions: &[&str]) -> Result<(), AuthError> {
-    if permissions
-        .iter()
-        .any(|permission| ctx.has_permission(permission))
-    {
-        Ok(())
-    } else {
-        Err(AuthError::PermissionDenied(permissions.join("|")))
-    }
-}
-
-fn idempotency_key_from_headers(headers: &HeaderMap) -> Result<String, Wave3HandlerError> {
-    headers
-        .get(IDEMPOTENCY_KEY_HEADER)
-        .and_then(|value| value.to_str().ok())
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(ToOwned::to_owned)
-        .ok_or(Wave3HandlerError::MissingIdempotencyKey)
-}
-
-fn cold_chain_external_context(
-    state: &Wave3AppState,
-    headers: &HeaderMap,
-) -> Result<(AuthContext, String), Wave3HandlerError> {
-    let idempotency_key = idempotency_key_from_headers(headers)?;
-    let config = state
-        .cold_chain_api_key
-        .as_ref()
-        .ok_or(Wave3HandlerError::ExternalAuthConfigMissing)?;
-    let configured_hash = config.key_sha256.trim();
-    if configured_hash.len() != 64
-        || !configured_hash
-            .chars()
-            .all(|value| value.is_ascii_hexdigit())
-    {
-        return Err(Wave3HandlerError::ExternalAuthConfigInvalid);
-    }
-
-    let api_key = headers
-        .get(EXTERNAL_API_KEY_HEADER)
-        .and_then(|value| value.to_str().ok())
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .ok_or(Wave3HandlerError::ExternalAuthMissing)?;
-    let provided_hash = sha256_hex(api_key.as_bytes());
-    if !constant_time_eq(
-        provided_hash.as_bytes(),
-        configured_hash.to_ascii_lowercase().as_bytes(),
-    ) {
-        return Err(Wave3HandlerError::ExternalAuthInvalid);
-    }
-
-    Ok((
-        AuthContext {
-            user_id: Uuid::nil(),
-            owner_id: config.owner_id,
-            actor_name: config.actor_name.clone(),
-            permissions: vec!["m5.write".to_string()],
-            jti: format!("m5-cold-chain:{idempotency_key}"),
-        },
-        idempotency_key,
-    ))
-}
-
-fn sha256_hex(value: &[u8]) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(value);
-    hex::encode(hasher.finalize())
-}
-
-fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
-    let mut diff = left.len() ^ right.len();
-    let max_len = left.len().max(right.len());
-    for index in 0..max_len {
-        let left_byte = left.get(index).copied().unwrap_or_default();
-        let right_byte = right.get(index).copied().unwrap_or_default();
-        diff |= (left_byte ^ right_byte) as usize;
-    }
-    diff == 0
-}
-
-async fn append_audit(
-    state: &Wave3AppState,
-    ctx: &AuthContext,
-    action: &'static str,
-    module: &'static str,
-    resource_type: &'static str,
-    resource_id: String,
-) {
-    append_audit_with_diff(state, ctx, action, module, resource_type, resource_id, None).await;
-}
-
-async fn append_audit_with_diff(
-    state: &Wave3AppState,
-    ctx: &AuthContext,
-    action: &'static str,
-    module: &'static str,
-    resource_type: &'static str,
-    resource_id: String,
-    diff: Option<AuditDiff>,
-) {
-    let mut audit_log = state.audit_log.lock().await;
-    audit_log.append_event(AuditWriteRequest::from_auth_context(
-        ctx,
-        action,
-        module,
-        resource_type,
-        resource_id,
-        diff,
-    ));
+        "",
+        None,
+    );
+    let outcome = repository
+        .create_billing_rule_with_audit(&ctx, req, now, &idempotency_key, audit)
+        .await?;
+    Ok(Json(outcome.value))
 }

@@ -5,3 +5,5 @@
 include!("master_data_postgres_part1.rs");
 include!("master_data_postgres_part2.rs");
 include!("master_data_postgres_part3.rs");
+include!("master_data_postgres/customer_addresses.rs");
+include!("master_data_postgres/customer_profile.rs");

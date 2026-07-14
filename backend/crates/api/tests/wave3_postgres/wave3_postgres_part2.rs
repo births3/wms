@@ -27,6 +27,7 @@ async fn receiving_receipt_is_single_closure_and_idempotent(pool: PgPool) {
         rejected_qty: 0,
         arrival_temperature_celsius: Some(4.8),
         exception_note: None,
+        details: None,
     };
     let first = repo
         .receive_receiving_order(&ctx, order.id, req.clone(), now, "idem-receive-1")
@@ -48,6 +49,7 @@ async fn receiving_receipt_is_single_closure_and_idempotent(pool: PgPool) {
                 rejected_qty: 0,
                 arrival_temperature_celsius: Some(4.8),
                 exception_note: None,
+                details: None,
             },
             now,
             "idem-receive-1",
@@ -73,6 +75,7 @@ async fn receiving_receipt_is_single_closure_and_idempotent(pool: PgPool) {
                 rejected_qty: 0,
                 arrival_temperature_celsius: None,
                 exception_note: None,
+                details: None,
             },
             now,
             "idem-receive-2",
@@ -190,7 +193,11 @@ async fn receiving_order_reject_closes_order_and_replays_idempotently(pool: PgPo
     assert_eq!(receiving_reject.rejected_qty, 10);
 
     let draft = repo
-        .create_receiving_order(&ctx, receiving_order_req("ASN-PG-REJECT-003"), now)
+        .create_receiving_order(
+            &ctx,
+            receiving_order_req_with("ASN-PG-REJECT-003", Some(supplier_id), warehouse_id),
+            now,
+        )
         .await
         .expect("create draft receiving order");
     let invalid = repo
@@ -240,6 +247,7 @@ async fn concurrent_same_idempotency_key_replays_first_receipt(pool: PgPool) {
         rejected_qty: 0,
         arrival_temperature_celsius: Some(4.8),
         exception_note: None,
+        details: None,
     };
     let (left, right) = tokio::join!(
         repo.receive_receiving_order(&ctx, order.id, req.clone(), now, "idem-receive-race"),
@@ -273,11 +281,73 @@ async fn putaway_commits_receiving_inventory_and_movement_in_one_transaction(poo
         .with_ymd_and_hms(2026, 6, 4, 11, 0, 0)
         .single()
         .expect("valid time");
+    let (supplier_id, warehouse_id) = seed_active_supplier_and_warehouse(&pool, owner_id).await;
+    sqlx::query(
+        "INSERT INTO system_dictionary_items (id, dict_code, item_code, item_name, enabled, owner_id, params, source, created_at, updated_at) VALUES ($1, 'quality_color', 'qualified_owner_green', '货主合格绿', TRUE, $2, '{\"inventory_quality_status\": \"qualified\"}', 'owner', $3, $3)",
+    )
+    .bind(Uuid::new_v4())
+    .bind(owner_id)
+    .bind(now)
+    .execute(&pool)
+    .await
+    .expect("owner quality-color override should persist");
+    let (location_id, location_code) = seed_location(&pool, owner_id, warehouse_id).await;
+    sqlx::query("UPDATE warehouse_zones SET quality_color = 'qualified_owner_green' WHERE owner_id = $1 AND warehouse_id = $2")
+        .bind(owner_id)
+        .bind(warehouse_id)
+        .execute(&pool)
+        .await
+        .expect("owner quality-color override should apply to the zone");
 
     let order = repo
-        .create_receiving_order(&ctx, receiving_order_req("ASN-PG-002"), now)
+        .create_receiving_order(
+            &ctx,
+            receiving_order_req_with("ASN-PG-002", Some(supplier_id), warehouse_id),
+            now,
+        )
         .await
         .expect("create receiving order");
+    sqlx::query("UPDATE receiving_orders SET status = 'released' WHERE id = $1")
+        .bind(order.id)
+        .execute(&pool)
+        .await
+        .expect("prepare released state");
+    repo.receive_receiving_order_with_audit(
+        &ctx,
+        order.id,
+        ReceiveReceivingOrderRequest {
+            actual_qty: 10,
+            shortage_qty: 0,
+            rejected_qty: 0,
+            arrival_temperature_celsius: None,
+            exception_note: None,
+            details: None,
+        },
+        now,
+        "receive-putaway-commit",
+        None,
+    )
+    .await
+    .expect("receive before putaway inspection");
+    repo.inspect_receiving_order_with_audit(
+        &ctx,
+        order.id,
+        wms_domain::InspectReceivingOrderRequest {
+            batch_no: "B202606".to_string(),
+            accepted_qty: 10,
+            rejected_qty: 0,
+            production_date: "2026-01-01".to_string(),
+            expiry_date: "2028-01-01".to_string(),
+            quality_status: STATUS_QUALIFIED.to_string(),
+            trace_codes: vec![],
+        },
+        now.date_naive(),
+        now,
+        "idem-putaway-inspect",
+        None,
+    )
+    .await
+    .expect("inspect before putaway");
     sqlx::query("UPDATE receiving_orders SET status = 'putaway' WHERE id = $1")
         .bind(order.id)
         .execute(&pool)
@@ -288,8 +358,8 @@ async fn putaway_commits_receiving_inventory_and_movement_in_one_transaction(poo
         batch_no: "B202606".to_string(),
         product_code: "P-001".to_string(),
         qty: 10,
-        location_id: Uuid::new_v4(),
-        location_code: "A-01-01".to_string(),
+        location_id,
+        location_code,
         quality_status: STATUS_QUALIFIED.to_string(),
     };
     let first = repo
@@ -354,6 +424,68 @@ async fn putaway_commits_receiving_inventory_and_movement_in_one_transaction(poo
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn inspection_accepts_quarantined_status_from_quality_color_dictionary(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let ctx = ctx(owner_id);
+    let repo = PgWave3Repository::new(pool.clone());
+    let now = Utc
+        .with_ymd_and_hms(2026, 6, 4, 11, 15, 0)
+        .single()
+        .expect("valid time");
+    let (supplier_id, warehouse_id) = seed_active_supplier_and_warehouse(&pool, owner_id).await;
+    let order = repo
+        .create_receiving_order(
+            &ctx,
+            receiving_order_req_with("ASN-PG-QUALITY-DICT", Some(supplier_id), warehouse_id),
+            now,
+        )
+        .await
+        .expect("create receiving order");
+    sqlx::query("UPDATE receiving_orders SET status = 'released' WHERE id = $1")
+        .bind(order.id)
+        .execute(&pool)
+        .await
+        .expect("prepare released state");
+    repo.receive_receiving_order_with_audit(
+        &ctx,
+        order.id,
+        ReceiveReceivingOrderRequest {
+            actual_qty: 10,
+            shortage_qty: 0,
+            rejected_qty: 0,
+            arrival_temperature_celsius: None,
+            exception_note: None,
+            details: None,
+        },
+        now,
+        "receive-quality-dict",
+        None,
+    )
+    .await
+    .expect("receive before quality inspection");
+
+    repo.inspect_receiving_order_with_audit(
+        &ctx,
+        order.id,
+        wms_domain::InspectReceivingOrderRequest {
+            batch_no: "B-QUARANTINED".to_string(),
+            accepted_qty: 0,
+            rejected_qty: 10,
+            production_date: "2026-01-01".to_string(),
+            expiry_date: "2028-01-01".to_string(),
+            quality_status: STATUS_QUARANTINED.to_string(),
+            trace_codes: vec![],
+        },
+        now.date_naive(),
+        now,
+        "idem-quality-dict-quarantined",
+        None,
+    )
+    .await
+    .expect("quarantined status should resolve through quality-color dictionary");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn putaway_audit_failure_rolls_back_all_business_writes(pool: PgPool) {
     let owner_id = Uuid::new_v4();
     let ctx = ctx(owner_id);
@@ -362,10 +494,57 @@ async fn putaway_audit_failure_rolls_back_all_business_writes(pool: PgPool) {
         .with_ymd_and_hms(2026, 6, 4, 11, 30, 0)
         .single()
         .expect("valid time");
+    let (supplier_id, warehouse_id) = seed_active_supplier_and_warehouse(&pool, owner_id).await;
+    let (location_id, location_code) = seed_location(&pool, owner_id, warehouse_id).await;
     let order = repo
-        .create_receiving_order(&ctx, receiving_order_req("ASN-PG-ROLLBACK"), now)
+        .create_receiving_order(
+            &ctx,
+            receiving_order_req_with("ASN-PG-ROLLBACK", Some(supplier_id), warehouse_id),
+            now,
+        )
         .await
         .expect("create order");
+    sqlx::query("UPDATE receiving_orders SET status='released' WHERE id=$1")
+        .bind(order.id)
+        .execute(&pool)
+        .await
+        .expect("prepare released state");
+    repo.receive_receiving_order_with_audit(
+        &ctx,
+        order.id,
+        ReceiveReceivingOrderRequest {
+            actual_qty: 10,
+            shortage_qty: 0,
+            rejected_qty: 0,
+            arrival_temperature_celsius: None,
+            exception_note: None,
+            details: None,
+        },
+        now,
+        "receive-putaway-rollback",
+        None,
+    )
+    .await
+    .expect("receive before rollback inspection");
+    repo.inspect_receiving_order_with_audit(
+        &ctx,
+        order.id,
+        wms_domain::InspectReceivingOrderRequest {
+            batch_no: "B202606".into(),
+            accepted_qty: 10,
+            rejected_qty: 0,
+            production_date: "2026-01-01".into(),
+            expiry_date: "2028-01-01".into(),
+            quality_status: STATUS_QUALIFIED.into(),
+            trace_codes: vec![],
+        },
+        now.date_naive(),
+        now,
+        "idem-putaway-rollback-inspect",
+        None,
+    )
+    .await
+    .expect("inspect before rollback test");
     sqlx::query("UPDATE receiving_orders SET status='putaway' WHERE id=$1")
         .bind(order.id)
         .execute(&pool)
@@ -391,8 +570,8 @@ async fn putaway_audit_failure_rolls_back_all_business_writes(pool: PgPool) {
                 batch_no: "B202606".into(),
                 product_code: "P-001".into(),
                 qty: 10,
-                location_id: Uuid::new_v4(),
-                location_code: "A01-01-01-02".into(),
+                location_id,
+                location_code,
                 quality_status: STATUS_QUALIFIED.into(),
             },
             now,
@@ -488,13 +667,18 @@ async fn billing_rule_effective_window_rejects_overlap(pool: PgPool) {
 async fn receiving_order_survives_repository_and_pool_restart(pool: PgPool) {
     let owner_id = Uuid::new_v4();
     let ctx = ctx(owner_id);
+    let (supplier_id, warehouse_id) = seed_active_supplier_and_warehouse(&pool, owner_id).await;
     let options = pool.connect_options().as_ref().clone();
     let order_id = {
         let repo = PgWave3Repository::new(pool.clone());
-        repo.create_receiving_order(&ctx, receiving_order_req("ASN-PG-RESTART-001"), Utc::now())
-            .await
-            .expect("create before restart")
-            .id
+        repo.create_receiving_order(
+            &ctx,
+            receiving_order_req_with("ASN-PG-RESTART-001", Some(supplier_id), warehouse_id),
+            Utc::now(),
+        )
+        .await
+        .expect("create before restart")
+        .id
     };
 
     pool.close().await;
@@ -511,4 +695,47 @@ async fn receiving_order_survives_repository_and_pool_restart(pool: PgPool) {
 
     assert_eq!(persisted.receipt_no, "ASN-PG-RESTART-001");
     assert_eq!(persisted.owner_id, owner_id);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn inventory_batch_query_combines_filters_and_keeps_owner_scope(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let other_owner_id = Uuid::new_v4();
+    let location_id = Uuid::new_v4();
+    for (row_owner_id, batch_no, quality_status) in [
+        (owner_id, "B-001", "qualified"),
+        (owner_id, "B-002", "quarantined"),
+        (other_owner_id, "B-001", "qualified"),
+    ] {
+        sqlx::query(
+            "INSERT INTO inventory_batches (id, owner_id, product_code, batch_no, production_date, expiry_date, qty_on_hand, qty_locked, quality_status, location_id, location_code) VALUES ($1, $2, 'P-QUERY', $3, '2026-01-01', '2028-01-01', 10, 0, $4, $5, 'A-01-01')",
+        )
+        .bind(Uuid::new_v4())
+        .bind(row_owner_id)
+        .bind(batch_no)
+        .bind(quality_status)
+        .bind(location_id)
+        .execute(&pool)
+        .await
+        .expect("seed inventory batch");
+    }
+
+    let ctx = ctx(owner_id);
+    let rows = PgWave3Repository::new(pool)
+        .list_inventory_batches_with_query(
+            &ctx,
+            InventoryBatchQuery {
+                product_code: Some("P-QUERY".to_string()),
+                batch_no: Some("B-001".to_string()),
+                location_code: Some("A-01".to_string()),
+                quality_status: Some("qualified".to_string()),
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("query inventory batches");
+
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].owner_id, owner_id);
+    assert_eq!(rows[0].batch_no, "B-001");
 }

@@ -24,6 +24,71 @@ impl PgWave3Repository {
         Ok(map_receiving_order(row, lines))
     }
 
+    pub async fn get_receiving_order_print_data(
+        &self,
+        ctx: &AuthContext,
+        id: Uuid,
+    ) -> Result<ReceivingOrderPrintData, Wave3RepositoryError> {
+        let order = self.get_receiving_order(ctx, id).await?;
+        let receipts = sqlx::query_as::<_, ReceivingOrderReceiptRow>(
+            r#"
+            SELECT id, receiving_order_id, owner_id, actual_qty, shortage_qty,
+                   rejected_qty, arrival_temperature_celsius, exception_note, receiving_details, occurred_at
+              FROM receiving_order_receipts
+             WHERE receiving_order_id = $1 AND owner_id = $2
+             ORDER BY occurred_at, id
+            "#,
+        )
+        .bind(id)
+        .bind(ctx.owner_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_db_error)?
+        .into_iter()
+        .map(map_receiving_order_receipt)
+        .collect();
+        let inspections = sqlx::query_as::<_, ReceivingInspectionRow>(
+            r#"
+            SELECT id, receiving_order_id, owner_id, batch_no, accepted_qty,
+                   rejected_qty, quality_status, occurred_at
+              FROM receiving_inspections
+             WHERE receiving_order_id = $1 AND owner_id = $2
+             ORDER BY occurred_at, id
+            "#,
+        )
+        .bind(id)
+        .bind(ctx.owner_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_db_error)?
+        .into_iter()
+        .map(map_receiving_inspection)
+        .collect();
+        let signatures = sqlx::query_as::<_, InspectionSignatureRow>(
+            r#"
+            SELECT id, receiving_order_id, owner_id, first_signer_id,
+                   second_signer_id, signed_at
+              FROM receiving_inspection_signatures
+             WHERE receiving_order_id = $1 AND owner_id = $2
+             ORDER BY signed_at, id
+            "#,
+        )
+        .bind(id)
+        .bind(ctx.owner_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_db_error)?
+        .into_iter()
+        .map(map_inspection_signature)
+        .collect();
+        Ok(ReceivingOrderPrintData {
+            order,
+            receipts,
+            inspections,
+            signatures,
+        })
+    }
+
     pub async fn delete_receiving_order(
         &self,
         ctx: &AuthContext,

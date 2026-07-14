@@ -70,6 +70,68 @@ fn params_schema_rejects_missing_or_invalid_enum() {
 }
 
 #[test]
+fn params_schema_validates_json_types_used_by_controlled_dictionaries() {
+    let schema = json!({
+        "properties": {
+            "requires_dual_sign": {"type": "boolean"},
+            "requires_dual_person_matrix": {"type": "array"},
+            "requires_dedicated_ledger": {"type": "boolean"},
+            "temperature": {"type": "number"}
+        }
+    });
+    validate_params(
+        &schema,
+        &json!({
+            "requires_dual_sign": true,
+            "requires_dual_person_matrix": [],
+            "requires_dedicated_ledger": false,
+            "temperature": 2.0
+        }),
+    )
+    .expect("controlled dictionary JSON types should pass");
+
+    let error = validate_params(&schema, &json!({"requires_dual_sign": "yes"}))
+        .expect_err("boolean dictionary params must reject strings");
+    assert!(matches!(
+        error,
+        SystemDictionaryError::ParamInvalid { ref field, .. } if field == "requires_dual_sign"
+    ));
+
+    let error = validate_params(
+        &json!({"properties": {"value": {"type": "uuid"}}}),
+        &json!({"value": "not-a-uuid"}),
+    )
+    .expect_err("unsupported schema types must fail closed");
+    assert!(
+        matches!(error, SystemDictionaryError::ParamInvalid { ref field, .. } if field == "value")
+    );
+}
+
+#[test]
+fn params_schema_enforces_numeric_bounds() {
+    let schema = json!({
+        "required": ["warning_days"],
+        "properties": {
+            "warning_days": {"type": "integer", "minimum": 1, "maximum": 3650}
+        }
+    });
+    validate_params(&schema, &json!({"warning_days": 180}))
+        .expect("valid expiry warning days should pass");
+    let below_minimum = validate_params(&schema, &json!({"warning_days": 0}))
+        .expect_err("zero warning days should fail");
+    assert!(matches!(
+        below_minimum,
+        SystemDictionaryError::ParamInvalid { ref field, .. } if field == "warning_days"
+    ));
+    let above_maximum = validate_params(&schema, &json!({"warning_days": 3651}))
+        .expect_err("excessive warning days should fail");
+    assert!(matches!(
+        above_maximum,
+        SystemDictionaryError::ParamInvalid { ref field, .. } if field == "warning_days"
+    ));
+}
+
+#[test]
 fn request_owner_scope_rejects_cross_owner_write() {
     let owner_id = Uuid::new_v4();
     let ctx = AuthContext {

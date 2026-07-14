@@ -11,9 +11,12 @@ mod tests;
 
 #[cfg(test)]
 pub(crate) use db::AuditSealProgress;
-pub use db::{append_event, append_event_in_tx, commit_with_audit, list_events, seal_audit_chain};
+pub use db::{
+    append_event, append_event_in_tx, commit_with_audit, export_events, list_events,
+    seal_audit_chain,
+};
 pub use models::{
     AuditChainSeal, AuditDiff, AuditError, AuditEventPage, AuditEventQuery, AuditEventQueryCursor,
     AuditEventRecord, AuditLog, AuditWriteRequest, AUDIT_SEAL_BATCH_SIZE,
-    DEFAULT_AUDIT_EVENT_QUERY_LIMIT, MAX_AUDIT_EVENT_QUERY_LIMIT,
+    DEFAULT_AUDIT_EVENT_QUERY_LIMIT, MAX_AUDIT_EVENT_QUERY_LIMIT, MAX_AUDIT_EXPORT_EVENTS,
 };

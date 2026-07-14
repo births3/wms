@@ -1,5 +1,5 @@
 impl PgWave3Repository {
-pub async fn inspect_receiving_order_with_audit(
+    pub async fn inspect_receiving_order_with_audit(
         &self,
         ctx: &AuthContext,
         id: Uuid,
@@ -11,6 +11,20 @@ pub async fn inspect_receiving_order_with_audit(
     ) -> Result<IdempotentMutation<ReceivingInspectionRecord>, Wave3RepositoryError> {
         if req.accepted_qty < 0 || req.rejected_qty < 0 {
             return Err(Wave3RepositoryError::InvalidQuantity);
+        }
+        let inspected_qty = req
+            .accepted_qty
+            .checked_add(req.rejected_qty)
+            .filter(|qty| *qty > 0)
+            .ok_or(Wave3RepositoryError::InvalidQuantity)?;
+        if req.batch_no.trim().is_empty() {
+            return Err(Wave3RepositoryError::InvalidBatchPolicy);
+        }
+        let mut unique_trace_codes = req.trace_codes.clone();
+        unique_trace_codes.sort_unstable();
+        unique_trace_codes.dedup();
+        if unique_trace_codes.len() != req.trace_codes.len() {
+            return Err(Wave3RepositoryError::DuplicateTraceCode);
         }
         let production_date = parse_date(&req.production_date)?;
         let expiry_date = parse_date(&req.expiry_date)?;
@@ -33,12 +47,91 @@ pub async fn inspect_receiving_order_with_audit(
             });
         }
 
+        resolve_quality_color(&mut tx, ctx.owner_id, &req.quality_status, now).await?;
+
         let order = lock_receiving_order(&mut tx, ctx.owner_id, id).await?;
         if order.status != "inspecting" {
             return Err(Wave3RepositoryError::InvalidStatus {
                 expected: "inspecting".to_string(),
                 actual: order.status,
             });
+        }
+
+        let received_qty: i64 = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(actual_qty), 0)::BIGINT FROM receiving_order_receipts WHERE receiving_order_id = $1 AND owner_id = $2",
+        )
+        .bind(id)
+        .bind(ctx.owner_id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(map_db_error)?;
+        let total_previous_inspected_qty: i64 = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(accepted_qty + rejected_qty), 0)::BIGINT FROM receiving_inspections WHERE receiving_order_id = $1 AND owner_id = $2",
+        )
+        .bind(id)
+        .bind(ctx.owner_id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(map_db_error)?;
+        if total_previous_inspected_qty
+            .checked_add(inspected_qty)
+            .is_none_or(|qty| qty > received_qty)
+        {
+            return Err(Wave3RepositoryError::QuantityClosureMismatch);
+        }
+
+        let line = sqlx::query_as::<_, ReceivingOrderLineRow>(
+            r#"
+            SELECT id, line_no, product_id, product_code, expected_qty, batch_no,
+                   production_date, expiry_date
+              FROM receiving_order_lines
+             WHERE receiving_order_id = $1
+               AND owner_id = $2
+               AND (
+                    ($3 = 'purchase_inbound' AND batch_no IS NULL)
+                    OR ($3 = 'sales_return' AND batch_no = $4)
+               )
+             ORDER BY line_no
+             LIMIT 1
+             FOR UPDATE
+            "#,
+        )
+        .bind(id)
+        .bind(ctx.owner_id)
+        .bind(&order.document_type)
+        .bind(&req.batch_no)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(map_db_error)?
+        .ok_or(Wave3RepositoryError::NotFound)?;
+        let previous_inspected_qty: i64 = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(accepted_qty + rejected_qty), 0)::BIGINT FROM receiving_inspections WHERE receiving_order_id = $1 AND owner_id = $2 AND batch_no = $3",
+        )
+        .bind(id)
+        .bind(ctx.owner_id)
+        .bind(&req.batch_no)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(map_db_error)?;
+        if previous_inspected_qty
+            .checked_add(inspected_qty)
+            .is_none_or(|qty| qty > line.expected_qty)
+        {
+            return Err(Wave3RepositoryError::QuantityClosureMismatch);
+        }
+        if !req.trace_codes.is_empty() {
+            let trace_exists: bool = sqlx::query_scalar(
+                "SELECT EXISTS (SELECT 1 FROM receiving_inspections WHERE receiving_order_id = $1 AND owner_id = $2 AND trace_codes && $3)",
+            )
+            .bind(id)
+            .bind(ctx.owner_id)
+            .bind(&req.trace_codes)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(map_db_error)?;
+            if trace_exists {
+                return Err(Wave3RepositoryError::DuplicateTraceCode);
+            }
         }
 
         let inspection = ReceivingInspectionRecord {
@@ -80,19 +173,15 @@ pub async fn inspect_receiving_order_with_audit(
             r#"
             UPDATE receiving_order_lines
                SET batch_no = $3, production_date = $4, expiry_date = $5
-             WHERE id = (
-                SELECT id FROM receiving_order_lines
-                 WHERE receiving_order_id = $1 AND owner_id = $2
-                 ORDER BY line_no
-                 LIMIT 1
-             )
+             WHERE id = $1 AND receiving_order_id = $2 AND owner_id = $6
             "#,
         )
+        .bind(line.id)
         .bind(id)
-        .bind(ctx.owner_id)
         .bind(&req.batch_no)
         .bind(production_date)
         .bind(expiry_date)
+        .bind(ctx.owner_id)
         .execute(&mut *tx)
         .await
         .map_err(map_db_error)?;
@@ -149,6 +238,47 @@ pub async fn inspect_receiving_order_with_audit(
 
         let mut tx = self.begin().await?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
+        let unauthorized_signers: i64 = sqlx::query_scalar(
+            r#"
+            WITH requested_signers(user_id) AS (
+                VALUES ($1::uuid), ($2::uuid)
+            )
+            SELECT COUNT(*)::BIGINT
+              FROM requested_signers signer
+             WHERE signer.user_id IS NOT NULL
+               AND NOT EXISTS (
+                   SELECT 1
+                     FROM auth_user_owner_bindings binding
+                     JOIN auth_users user_row
+                       ON user_row.id = binding.user_id
+                     JOIN auth_user_roles user_role
+                       ON user_role.user_id = binding.user_id
+                      AND user_role.owner_id = binding.owner_id
+                     JOIN auth_roles role
+                       ON role.id = user_role.role_id
+                      AND role.owner_id = binding.owner_id
+                     JOIN auth_role_permissions role_permission
+                       ON role_permission.role_id = role.id
+                     JOIN auth_permissions permission
+                       ON permission.id = role_permission.permission_id
+                      AND permission.permission_code = 'm2.write'
+                    WHERE binding.user_id = signer.user_id
+                      AND binding.owner_id = $3
+                      AND binding.is_active
+                      AND user_row.status = 'active'
+                      AND role.role_code = 'receiving_clerk'
+               )
+            "#,
+        )
+        .bind(req.first_signer_id)
+        .bind(req.second_signer_id)
+        .bind(ctx.owner_id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(map_db_error)?;
+        if unauthorized_signers > 0 {
+            return Err(Wave3RepositoryError::UnauthorizedSigner);
+        }
         if let Some(replay) =
             replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash, now).await?
         {
@@ -164,6 +294,49 @@ pub async fn inspect_receiving_order_with_audit(
                 expected: "inspecting".to_string(),
                 actual: order.status,
             });
+        }
+
+        let received_qty: i64 = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(actual_qty), 0)::BIGINT FROM receiving_order_receipts WHERE receiving_order_id = $1 AND owner_id = $2",
+        )
+        .bind(id)
+        .bind(ctx.owner_id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(map_db_error)?;
+        let inspected_qty: i64 = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(accepted_qty + rejected_qty), 0)::BIGINT FROM receiving_inspections WHERE receiving_order_id = $1 AND owner_id = $2",
+        )
+        .bind(id)
+        .bind(ctx.owner_id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(map_db_error)?;
+        if received_qty <= 0 || inspected_qty != received_qty {
+            return Err(Wave3RepositoryError::QuantityClosureMismatch);
+        }
+        let incomplete_lines: i64 = sqlx::query_scalar(
+            r#"
+            SELECT COUNT(*)::BIGINT
+              FROM receiving_order_lines AS line
+             WHERE line.receiving_order_id = $1
+               AND line.owner_id = $2
+               AND NOT EXISTS (
+                   SELECT 1
+                     FROM receiving_inspections AS inspection
+                    WHERE inspection.receiving_order_id = line.receiving_order_id
+                      AND inspection.owner_id = line.owner_id
+                      AND inspection.batch_no = line.batch_no
+               )
+            "#,
+        )
+        .bind(id)
+        .bind(ctx.owner_id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(map_db_error)?;
+        if incomplete_lines > 0 {
+            return Err(Wave3RepositoryError::QuantityClosureMismatch);
         }
 
         let signature = InspectionSignatureRecord {
@@ -229,28 +402,6 @@ pub async fn inspect_receiving_order_with_audit(
         })
     }
 
-    pub async fn list_inventory_batches(
-        &self,
-        ctx: &AuthContext,
-    ) -> Result<Vec<InventoryBatch>, Wave3RepositoryError> {
-        let rows = sqlx::query_as::<_, InventoryBatchRow>(
-            r#"
-            SELECT id, owner_id, product_code, batch_no, production_date, expiry_date,
-                   qty_on_hand, qty_locked, quality_status, location_id, location_code,
-                   recall_flag, created_at, updated_at
-              FROM inventory_batches
-             WHERE owner_id = $1
-             ORDER BY updated_at DESC, id
-            "#,
-        )
-        .bind(ctx.owner_id)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(map_db_error)?;
-
-        Ok(rows.into_iter().map(map_inventory_batch).collect())
-    }
-
     pub async fn change_inventory_status_with_audit(
         &self,
         ctx: &AuthContext,
@@ -259,6 +410,9 @@ pub async fn inspect_receiving_order_with_audit(
         idempotency_key: &str,
         audit: Option<AuditWriteRequest>,
     ) -> Result<IdempotentMutation<InventoryBatch>, Wave3RepositoryError> {
+        if req.reason.trim().is_empty() {
+            return Err(Wave3RepositoryError::InvalidReason);
+        }
         if req.approval_source.trim().is_empty() || req.approval_id.trim().is_empty() {
             return Err(Wave3RepositoryError::MissingApprovalSource);
         }
@@ -294,11 +448,32 @@ pub async fn inspect_receiving_order_with_audit(
         .map_err(map_db_error)?
         .ok_or(Wave3RepositoryError::NotFound)?;
         let from_status = batch_row.quality_status.clone();
+        let target_status_enabled = crate::system_dictionary::effective_item_enabled_in_tx(
+            &mut tx,
+            ctx.owner_id,
+            "inventory_quality_status",
+            &req.target_status,
+            now,
+        )
+        .await
+        .map_err(map_db_error)?;
+        if !target_status_enabled {
+            return Err(Wave3RepositoryError::InvalidQualityStatus);
+        }
 
         let batch = if from_status == req.target_status {
             map_inventory_batch(batch_row)
         } else {
-            if !allowed_transition(&from_status, &req.target_status, &req.approval_source) {
+            if !crate::inventory_status_config::is_transition_allowed_in_tx(
+                &mut tx,
+                ctx.owner_id,
+                &from_status,
+                &req.target_status,
+                &req.approval_source,
+            )
+            .await
+            .map_err(map_db_error)?
+            {
                 return Err(Wave3RepositoryError::InvalidStateTransition {
                     from: from_status,
                     to: req.target_status,

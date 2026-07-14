@@ -6,26 +6,41 @@ use sha2::{Digest, Sha256};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{
-    BillingAccount, BillingContract, BillingRule, ChangeInventoryStatusRequest,
-    CreateBillingAccountRequest, CreateBillingContractRequest, CreateBillingRuleRequest,
-    CreateReceivingOrderRequest, IngestTemperatureExcursionRequest,
-    IngestTemperatureReadingRequest, InspectReceivingOrderRequest, InspectionSignatureRecord,
-    InventoryBatch, InventoryMovement, PutawayRecord, PutawayRequest, ReceiveReceivingOrderRequest,
-    ReceivingInspectionRecord, ReceivingOrder, ReceivingOrderLine, ReceivingOrderReceipt,
-    RejectReceivingOrderRequest, SignInspectionRequest, TemperatureExcursionEvent,
-    TemperatureReading, UpdateReceivingOrderRequest, RECEIVING_DOCUMENT_TYPE_PURCHASE_INBOUND,
+    validate_billing_rule_request, validate_create_receiving_order_request, BillingAccount,
+    BillingContract, BillingRule, BillingRuleValidationError, ChangeInventoryStatusRequest,
+    ColdChainDevice, CreateBillingAccountRequest, CreateBillingContractRequest,
+    CreateBillingRuleRequest, CreateColdChainDeviceRequest, CreateReceivingOrderRequest,
+    IngestTemperatureExcursionRequest, IngestTemperatureReadingRequest,
+    InspectReceivingOrderRequest, InspectionSignatureRecord, InventoryBatch, InventoryMovement,
+    PutawayLocationRecommendation, PutawayRecommendationQuery, PutawayRecommendationResponse,
+    PutawayRecord, PutawayRequest, ReceiveReceivingOrderRequest, ReceivingDashboardQuery,
+    ReceivingDashboardRow, ReceivingInspectionRecord, ReceivingOrder, ReceivingOrderLine,
+    ReceivingOrderPrintData, ReceivingOrderReceipt, ReceivingOrderRequestValidationError,
+    ReceivingReceiptDetails, RejectReceivingOrderRequest, SignInspectionRequest,
+    TemperatureExcursionEvent, TemperatureReading, UpdateColdChainDeviceRequest,
+    UpdateReceivingOrderRequest, RECEIVING_DOCUMENT_TYPE_PURCHASE_INBOUND,
     RECEIVING_DOCUMENT_TYPE_SALES_RETURN,
 };
 
 use crate::{
     audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
     auth::AuthContext,
-    inventory::{allowed_transition, STATUS_QUALIFIED},
+    inventory::STATUS_QUALIFIED,
 };
 
 mod billing;
+mod cold_chain;
+mod expiry;
+mod inventory_count;
+mod maintenance;
+mod putaway;
+mod query;
+mod recall;
 mod receiving_read;
 mod receiving_update;
+mod trace;
+
+use query::parse_optional_date;
 
 #[derive(Clone, Debug)]
 pub struct PgWave3Repository {
@@ -55,15 +70,39 @@ pub enum Wave3RepositoryError {
         actual: String,
     },
     InvalidQuantity,
+    MissingSupplier,
+    MissingExpectedArrival,
+    InvalidExpectedArrival,
+    MissingProduct,
+    MultipleProducts,
     InvalidDocumentType,
+    InvalidBatchPolicy,
+    InvalidQualityStatus,
+    InvalidDeviceType,
+    ActiveMonitoring,
+    DuplicateTraceCode,
+    InvalidLocation,
+    LocationQualityMismatch,
+    LocationTemperatureMismatch,
+    LocationCapacityExceeded,
+    LocationSkuLimitExceeded,
+    NoAvailableLocation,
+    InvalidProductVolume,
+    DocumentNumbering(String),
     InvalidDate(String),
     BatchExpired,
     QuantityClosureMismatch,
     OverReceiptNotAllowed,
     MissingSecondSigner,
     SameSigner,
+    UnauthorizedSigner,
     InvalidReason,
     MissingApprovalSource,
+    RecallAlreadyActive,
+    RecallNotActive,
+    RecallStateChanged,
+    SameApprover,
+    SecondApproverNotAuthorized,
     InvalidStateTransition {
         from: String,
         to: String,
@@ -71,9 +110,21 @@ pub enum Wave3RepositoryError {
     },
     IdempotencyConflict,
     BillingRuleConflict,
+    InvalidBillingRuleField,
     InvalidEffectiveWindow,
     InvalidRate,
     FutureTimestamp,
+    InvalidInventoryState,
+    InvalidMaintenanceTaskState,
+    InvalidMaintenanceResult,
+    InvalidInventoryCountType,
+    InvalidInventoryCountState,
+    InventoryCountAlreadyActive,
+    InventoryCountLineNotFound,
+    InventoryCountLineAlreadySubmitted,
+    InventoryCountNotReady,
+    InventoryCountQuantityConflict,
+    NoInventoryData,
     Audit(String),
     Database(String),
     Serialize(String),
@@ -96,6 +147,7 @@ struct ReceivingOrderRow {
 
 #[derive(FromRow)]
 struct ReceivingOrderLineRow {
+    id: Uuid,
     line_no: i32,
     product_id: Option<Uuid>,
     product_code: String,
@@ -103,6 +155,42 @@ struct ReceivingOrderLineRow {
     batch_no: Option<String>,
     production_date: Option<NaiveDate>,
     expiry_date: Option<NaiveDate>,
+}
+
+#[derive(FromRow)]
+struct ReceivingOrderReceiptRow {
+    id: Uuid,
+    receiving_order_id: Uuid,
+    owner_id: Uuid,
+    actual_qty: i64,
+    shortage_qty: i64,
+    rejected_qty: i64,
+    arrival_temperature_celsius: Option<f64>,
+    exception_note: Option<String>,
+    receiving_details: Option<sqlx::types::Json<ReceivingReceiptDetails>>,
+    occurred_at: DateTime<Utc>,
+}
+
+#[derive(FromRow)]
+struct ReceivingInspectionRow {
+    id: Uuid,
+    receiving_order_id: Uuid,
+    owner_id: Uuid,
+    batch_no: String,
+    accepted_qty: i64,
+    rejected_qty: i64,
+    quality_status: String,
+    occurred_at: DateTime<Utc>,
+}
+
+#[derive(FromRow)]
+struct InspectionSignatureRow {
+    id: Uuid,
+    receiving_order_id: Uuid,
+    owner_id: Uuid,
+    first_signer_id: Uuid,
+    second_signer_id: Option<Uuid>,
+    signed_at: DateTime<Utc>,
 }
 
 #[derive(FromRow)]
@@ -148,6 +236,18 @@ struct TemperatureReadingRow {
 }
 
 #[derive(FromRow)]
+struct ColdChainDeviceRow {
+    id: Uuid,
+    owner_id: Uuid,
+    device_code: String,
+    device_type: String,
+    installed_at_location_code: Option<String>,
+    calibration_due_at: Option<DateTime<Utc>>,
+    status: String,
+    created_at: DateTime<Utc>,
+}
+
+#[derive(FromRow)]
 struct TemperatureExcursionEventRow {
     id: Uuid,
     owner_id: Uuid,
@@ -164,6 +264,7 @@ struct TemperatureExcursionEventRow {
 }
 
 include!("wave3_repository_part1.rs");
+include!("wave3_repository_quality.rs");
 include!("wave3_repository_part2.rs");
 include!("wave3_repository_part3.rs");
 
@@ -196,7 +297,7 @@ async fn load_receiving_order_lines_in_tx(
 ) -> Result<Vec<ReceivingOrderLine>, Wave3RepositoryError> {
     let rows = sqlx::query_as::<_, ReceivingOrderLineRow>(
         r#"
-        SELECT line_no, product_id, product_code, expected_qty, batch_no,
+        SELECT id, line_no, product_id, product_code, expected_qty, batch_no,
                production_date, expiry_date
           FROM receiving_order_lines
          WHERE receiving_order_id = $1 AND owner_id = $2
@@ -459,8 +560,69 @@ async fn insert_receiving_order_lines(
     Ok(())
 }
 
-fn parse_optional_date(value: Option<&str>) -> Result<Option<NaiveDate>, Wave3RepositoryError> {
-    value.map(parse_date).transpose()
+async fn insert_receiving_order_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    ctx: &AuthContext,
+    req: CreateReceivingOrderRequest,
+    now: DateTime<Utc>,
+) -> Result<ReceivingOrder, Wave3RepositoryError> {
+    let id = Uuid::new_v4();
+    let receipt_no = if req.receipt_no.trim().is_empty() {
+        crate::document_numbering::PgDocumentNumberingService::new()
+            .generate_in_tx(
+                tx,
+                ctx,
+                crate::document_numbering::GenerateDocumentNumberRequest {
+                    document_type: req.document_type.clone(),
+                    idempotency_key: format!("m2-asn-create:{id}"),
+                    source_module: "M2".to_string(),
+                    source_document_id: Some(id),
+                },
+                now,
+            )
+            .await
+            .map_err(|error| Wave3RepositoryError::DocumentNumbering(format!("{error:?}")))?
+            .value
+            .generated_no
+    } else {
+        req.receipt_no.clone()
+    };
+    sqlx::query(
+        r#"
+        INSERT INTO receiving_orders (
+            id, owner_id, receipt_no, document_type, supplier_id, warehouse_id,
+            external_ref, status, expected_arrival_at, created_at, updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, 'draft', $8, $9, $9)
+        "#,
+    )
+    .bind(id)
+    .bind(ctx.owner_id)
+    .bind(&receipt_no)
+    .bind(&req.document_type)
+    .bind(req.supplier_id)
+    .bind(req.warehouse_id)
+    .bind(&req.external_ref)
+    .bind(req.expected_arrival_at)
+    .bind(now)
+    .execute(&mut **tx)
+    .await
+    .map_err(map_db_error)?;
+    insert_receiving_order_lines(&mut *tx, ctx.owner_id, id, &req.lines).await?;
+    Ok(ReceivingOrder {
+        id,
+        owner_id: ctx.owner_id,
+        receipt_no,
+        document_type: req.document_type,
+        supplier_id: req.supplier_id,
+        warehouse_id: req.warehouse_id,
+        external_ref: req.external_ref,
+        status: "draft".to_string(),
+        expected_arrival_at: req.expected_arrival_at,
+        lines: req.lines,
+        created_at: now,
+        updated_at: now,
+    })
 }
 
 fn validate_document_type(value: &str) -> Result<(), Wave3RepositoryError> {
@@ -468,6 +630,61 @@ fn validate_document_type(value: &str) -> Result<(), Wave3RepositoryError> {
         RECEIVING_DOCUMENT_TYPE_PURCHASE_INBOUND | RECEIVING_DOCUMENT_TYPE_SALES_RETURN => Ok(()),
         _ => Err(Wave3RepositoryError::InvalidDocumentType),
     }
+}
+
+fn map_request_validation_error(
+    error: ReceivingOrderRequestValidationError,
+) -> Wave3RepositoryError {
+    match error {
+        ReceivingOrderRequestValidationError::MissingSupplier => {
+            Wave3RepositoryError::MissingSupplier
+        }
+        ReceivingOrderRequestValidationError::MissingExpectedArrival => {
+            Wave3RepositoryError::MissingExpectedArrival
+        }
+        ReceivingOrderRequestValidationError::InvalidExpectedArrival => {
+            Wave3RepositoryError::InvalidExpectedArrival
+        }
+        ReceivingOrderRequestValidationError::MissingProduct => {
+            Wave3RepositoryError::MissingProduct
+        }
+        ReceivingOrderRequestValidationError::MultipleProducts => {
+            Wave3RepositoryError::MultipleProducts
+        }
+    }
+}
+
+fn validate_receiving_order_lines(
+    document_type: &str,
+    lines: &[ReceivingOrderLine],
+) -> Result<(), Wave3RepositoryError> {
+    if lines.is_empty() {
+        return Err(Wave3RepositoryError::InvalidQuantity);
+    }
+
+    for line in lines {
+        if line.line_no == 0 || line.expected_qty <= 0 {
+            return Err(Wave3RepositoryError::InvalidQuantity);
+        }
+        let has_batch = line
+            .batch_no
+            .as_deref()
+            .is_some_and(|batch_no| !batch_no.trim().is_empty());
+        match document_type {
+            RECEIVING_DOCUMENT_TYPE_PURCHASE_INBOUND
+                if line.batch_no.is_some()
+                    || line.production_date.is_some()
+                    || line.expiry_date.is_some() =>
+            {
+                return Err(Wave3RepositoryError::InvalidBatchPolicy);
+            }
+            RECEIVING_DOCUMENT_TYPE_SALES_RETURN if !has_batch => {
+                return Err(Wave3RepositoryError::InvalidBatchPolicy);
+            }
+            _ => {}
+        }
+    }
+    Ok(())
 }
 
 fn parse_date(value: &str) -> Result<NaiveDate, Wave3RepositoryError> {
@@ -504,6 +721,45 @@ fn map_receiving_order_line(row: ReceivingOrderLineRow) -> ReceivingOrderLine {
     }
 }
 
+fn map_receiving_order_receipt(row: ReceivingOrderReceiptRow) -> ReceivingOrderReceipt {
+    ReceivingOrderReceipt {
+        id: row.id,
+        receiving_order_id: row.receiving_order_id,
+        owner_id: row.owner_id,
+        actual_qty: row.actual_qty,
+        shortage_qty: row.shortage_qty,
+        rejected_qty: row.rejected_qty,
+        arrival_temperature_celsius: row.arrival_temperature_celsius,
+        exception_note: row.exception_note,
+        details: row.receiving_details.map(|value| value.0),
+        occurred_at: row.occurred_at,
+    }
+}
+
+fn map_receiving_inspection(row: ReceivingInspectionRow) -> ReceivingInspectionRecord {
+    ReceivingInspectionRecord {
+        id: row.id,
+        receiving_order_id: row.receiving_order_id,
+        owner_id: row.owner_id,
+        batch_no: row.batch_no,
+        accepted_qty: row.accepted_qty,
+        rejected_qty: row.rejected_qty,
+        quality_status: row.quality_status,
+        occurred_at: row.occurred_at,
+    }
+}
+
+fn map_inspection_signature(row: InspectionSignatureRow) -> InspectionSignatureRecord {
+    InspectionSignatureRecord {
+        id: row.id,
+        receiving_order_id: row.receiving_order_id,
+        owner_id: row.owner_id,
+        first_signer_id: row.first_signer_id,
+        second_signer_id: row.second_signer_id,
+        signed_at: row.signed_at,
+    }
+}
+
 fn map_inventory_batch(row: InventoryBatchRow) -> InventoryBatch {
     InventoryBatch {
         id: row.id,
@@ -533,6 +789,19 @@ fn map_temperature_reading(row: TemperatureReadingRow) -> TemperatureReading {
         captured_at: row.captured_at,
         external_report_url: row.external_report_url,
         out_of_range: row.out_of_range,
+    }
+}
+
+fn map_cold_chain_device(row: ColdChainDeviceRow) -> wms_domain::ColdChainDevice {
+    wms_domain::ColdChainDevice {
+        id: row.id,
+        owner_id: row.owner_id,
+        device_code: row.device_code,
+        device_type: row.device_type,
+        installed_at_location_code: row.installed_at_location_code,
+        calibration_due_at: row.calibration_due_at,
+        status: row.status,
+        created_at: row.created_at,
     }
 }
 

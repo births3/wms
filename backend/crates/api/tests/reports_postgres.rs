@@ -115,6 +115,103 @@ async fn report_query_counts_owner_scoped_receiving_orders(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn report_query_counts_owner_scoped_outbound_orders(pool: PgPool) {
+    let owner_a = Uuid::new_v4();
+    let owner_b = Uuid::new_v4();
+    let now = Utc.with_ymd_and_hms(2026, 6, 4, 10, 0, 0).single().unwrap();
+    for (owner, code) in [
+        (owner_a, "OUT-A1"),
+        (owner_a, "OUT-A2"),
+        (owner_b, "OUT-B1"),
+    ] {
+        sqlx::query(
+            r#"
+            INSERT INTO outbound_orders (
+                id, owner_id, wms_order_no, customer_id, warehouse_id, status, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, 'confirmed', $6, $6)
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(owner)
+        .bind(code)
+        .bind(Uuid::new_v4())
+        .bind(Uuid::new_v4())
+        .bind(now)
+        .execute(&pool)
+        .await
+        .expect("seed outbound order");
+    }
+
+    let app = reports_router(ReportsAppState::with_postgres(pool)).layer(auth_runtime_layer(
+        AuthRuntimePolicy::new(Arc::new(AllowAllRevocationStore)),
+    ));
+    for (owner, expected_count) in [(owner_a, 2), (owner_b, 1)] {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/reports/query")
+                    .header(AUTHORIZATION, format!("Bearer {}", bearer_token(owner)))
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        serde_json::to_vec(&ReportQueryRequest {
+                            report_code: "m6_outbound_summary".to_string(),
+                            filters: json!({}),
+                            limit: Some(20),
+                        })
+                        .unwrap(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .expect("outbound report query");
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let payload: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(payload["report_code"], "m6_outbound_summary");
+        assert!(payload["generated_at"].is_string());
+        assert_eq!(payload["page"]["count"], 1);
+        assert_eq!(payload["rows"][0]["values"]["metric"], "outbound_orders");
+        assert_eq!(payload["rows"][0]["values"]["owner_id"], owner.to_string());
+        assert_eq!(payload["rows"][0]["values"]["count"], expected_count);
+    }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn report_query_rejects_unknown_report_code(pool: PgPool) {
+    let app = reports_router(ReportsAppState::with_postgres(pool)).layer(auth_runtime_layer(
+        AuthRuntimePolicy::new(Arc::new(AllowAllRevocationStore)),
+    ));
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/reports/query")
+                .header(
+                    AUTHORIZATION,
+                    format!("Bearer {}", bearer_token(Uuid::new_v4())),
+                )
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::to_vec(&ReportQueryRequest {
+                        report_code: "m6_unknown_summary".to_string(),
+                        filters: json!({}),
+                        limit: Some(20),
+                    })
+                    .unwrap(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .expect("unknown report query");
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let payload: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(payload["code"], "REPORT_UNSUPPORTED_CODE");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn gsp_inbound_ledger_is_owner_scoped(pool: PgPool) {
     let owner_a = Uuid::new_v4();
     let owner_b = Uuid::new_v4();

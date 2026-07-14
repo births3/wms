@@ -3,9 +3,12 @@
 use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
-use wms_domain::CurrentUser;
+use wms_domain::{AuthSession, CurrentUser};
 
-use crate::audit::{append_event, AuditWriteRequest};
+use crate::{
+    audit::{append_event, append_event_in_tx, AuditDiff, AuditWriteRequest},
+    auth::AuthContext,
+};
 
 #[derive(Clone)]
 pub struct AuthRepository {
@@ -149,12 +152,168 @@ impl AuthRepository {
         Ok(())
     }
 
-    pub async fn append_login_success_audit(
+    pub async fn password_hash(
+        &self,
+        actor: &AuthContext,
+    ) -> Result<Option<String>, AuthRepositoryError> {
+        sqlx::query_scalar(
+            "SELECT u.password_hash FROM auth_users u JOIN auth_user_owner_bindings b ON b.user_id=u.id AND b.owner_id=$1 AND b.is_active WHERE u.id=$2",
+        )
+        .bind(actor.owner_id)
+        .bind(actor.user_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|_| AuthRepositoryError::Database)
+    }
+
+    pub async fn change_password(
+        &self,
+        actor: &AuthContext,
+        new_password_hash: &str,
+        changed_at: DateTime<Utc>,
+    ) -> Result<bool, AuthRepositoryError> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|_| AuthRepositoryError::Database)?;
+        let old_password = sqlx::query_scalar::<_, String>(
+            "SELECT u.password_hash FROM auth_users u JOIN auth_user_owner_bindings b ON b.user_id=u.id AND b.owner_id=$1 AND b.is_active WHERE u.id=$2 FOR UPDATE",
+        )
+        .bind(actor.owner_id)
+        .bind(actor.user_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(|_| AuthRepositoryError::Database)?;
+        if old_password.is_none() {
+            tx.commit()
+                .await
+                .map_err(|_| AuthRepositoryError::Database)?;
+            return Ok(false);
+        }
+        sqlx::query(
+            "UPDATE auth_users SET password_hash=$3, permissions_changed_at=$4, updated_at=$4 WHERE id=$2 AND EXISTS (SELECT 1 FROM auth_user_owner_bindings WHERE owner_id=$1 AND user_id=auth_users.id AND is_active)",
+        )
+        .bind(actor.owner_id)
+        .bind(actor.user_id)
+        .bind(new_password_hash)
+        .bind(changed_at)
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| AuthRepositoryError::Database)?;
+        append_event_in_tx(
+            &mut tx,
+            &AuditWriteRequest::from_auth_context(
+                actor,
+                "auth.password.changed",
+                "H1",
+                "auth_user",
+                actor.user_id.to_string(),
+                Some(AuditDiff::compute(
+                    serde_json::json!({"credential": "present"}),
+                    serde_json::json!({"credential": "changed", "reason": "用户修改密码"}),
+                )),
+            ),
+        )
+        .await
+        .map_err(|_| AuthRepositoryError::Audit)?;
+        tx.commit()
+            .await
+            .map_err(|_| AuthRepositoryError::Database)?;
+        Ok(true)
+    }
+
+    pub async fn change_user_status(
+        &self,
+        actor: &AuthContext,
+        user_id: Uuid,
+        status: &str,
+        changed_at: DateTime<Utc>,
+    ) -> Result<bool, AuthRepositoryError> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|_| AuthRepositoryError::Database)?;
+        let old_status = sqlx::query_scalar::<_, String>(
+            "SELECT u.status FROM auth_users u JOIN auth_user_owner_bindings b ON b.user_id=u.id AND b.owner_id=$1 AND b.is_active WHERE u.id=$2 FOR UPDATE",
+        )
+        .bind(actor.owner_id)
+        .bind(user_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(|_| AuthRepositoryError::Database)?;
+        let Some(old_status) = old_status else {
+            tx.commit()
+                .await
+                .map_err(|_| AuthRepositoryError::Database)?;
+            return Ok(false);
+        };
+        sqlx::query(
+            "UPDATE auth_users SET status=$3, permissions_changed_at=$4, updated_at=$4 WHERE id=$2 AND EXISTS (SELECT 1 FROM auth_user_owner_bindings WHERE owner_id=$1 AND user_id=auth_users.id AND is_active)",
+        )
+        .bind(actor.owner_id)
+        .bind(user_id)
+        .bind(status)
+        .bind(changed_at)
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| AuthRepositoryError::Database)?;
+        append_event_in_tx(
+            &mut tx,
+            &AuditWriteRequest::from_auth_context(
+                actor,
+                "auth.user.status_changed",
+                "H1",
+                "auth_user",
+                user_id.to_string(),
+                Some(AuditDiff::compute(
+                    serde_json::json!({"status": old_status}),
+                    serde_json::json!({"status": status}),
+                )),
+            ),
+        )
+        .await
+        .map_err(|_| AuthRepositoryError::Audit)?;
+        tx.commit()
+            .await
+            .map_err(|_| AuthRepositoryError::Database)?;
+        Ok(true)
+    }
+
+    pub async fn record_login_session(
         &self,
         user: &CurrentUser,
         jti: &str,
+        expires_at: DateTime<Utc>,
         occurred_at: DateTime<Utc>,
+        device_name: &str,
+        ip: Option<&str>,
+        user_agent: Option<&str>,
     ) -> Result<(), AuthRepositoryError> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|_| AuthRepositoryError::Database)?;
+        sqlx::query(
+            r#"
+            INSERT INTO auth_sessions
+                (session_id, owner_id, user_id, device_name, ip, logged_in_at, expires_at)
+            VALUES ($1, $2, $3, $4, $5::inet, $6, $7)
+            ON CONFLICT (session_id) DO NOTHING
+            "#,
+        )
+        .bind(jti)
+        .bind(user.owner_id)
+        .bind(user.user_id)
+        .bind(device_name)
+        .bind(ip)
+        .bind(occurred_at)
+        .bind(expires_at)
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| AuthRepositoryError::Database)?;
         let request = AuditWriteRequest {
             occurred_at,
             actor_id: user.user_id,
@@ -167,13 +326,224 @@ impl AuthRepository {
             resource_id: user.user_id.to_string(),
             diff: None,
             request_id: None,
-            ip: None,
-            user_agent: None,
+            ip: ip.map(str::to_string),
+            user_agent: user_agent.map(str::to_string),
         };
-        append_event(&self.pool, &request)
+        append_event_in_tx(&mut tx, &request)
             .await
             .map_err(|_| AuthRepositoryError::Audit)?;
+        tx.commit()
+            .await
+            .map_err(|_| AuthRepositoryError::Database)?;
         Ok(())
+    }
+
+    pub async fn active_sessions(
+        &self,
+        owner_id: Uuid,
+        user_id: Uuid,
+        now: DateTime<Utc>,
+    ) -> Result<Vec<AuthSessionRow>, AuthRepositoryError> {
+        sqlx::query_as::<_, AuthSessionRow>(
+            r#"
+            SELECT session_id, user_id, device_name, host(ip) AS ip,
+                   logged_in_at, expires_at, revoked_at
+              FROM auth_sessions
+             WHERE owner_id = $1
+               AND user_id = $2
+               AND revoked_at IS NULL
+               AND expires_at > $3
+             ORDER BY logged_in_at DESC, session_id
+            "#,
+        )
+        .bind(owner_id)
+        .bind(user_id)
+        .bind(now)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|_| AuthRepositoryError::Database)
+    }
+
+    pub async fn user_belongs_to_owner(
+        &self,
+        owner_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<bool, AuthRepositoryError> {
+        sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM auth_user_owner_bindings WHERE owner_id=$1 AND user_id=$2 AND is_active)",
+        )
+        .bind(owner_id)
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|_| AuthRepositoryError::Database)
+    }
+
+    pub async fn revoke_session(
+        &self,
+        actor: &AuthContext,
+        user_id: Uuid,
+        session_id: &str,
+        reason: &str,
+        action: &str,
+    ) -> Result<SessionRevokeState, AuthRepositoryError> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|_| AuthRepositoryError::Database)?;
+        let row = sqlx::query_as::<_, AuthSessionRow>(
+            "SELECT session_id,user_id,device_name,host(ip) AS ip,logged_in_at,expires_at,revoked_at FROM auth_sessions WHERE owner_id=$1 AND user_id=$2 AND session_id=$3 FOR UPDATE",
+        )
+        .bind(actor.owner_id)
+        .bind(user_id)
+        .bind(session_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(|_| AuthRepositoryError::Database)?;
+        let Some(row) = row else {
+            tx.commit()
+                .await
+                .map_err(|_| AuthRepositoryError::Database)?;
+            return Ok(SessionRevokeState::NotFound);
+        };
+        if row.revoked_at.is_some() {
+            tx.commit()
+                .await
+                .map_err(|_| AuthRepositoryError::Database)?;
+            return Ok(SessionRevokeState::AlreadyRevoked {
+                expires_at: row.expires_at,
+            });
+        }
+        sqlx::query(
+            "UPDATE auth_sessions SET revoked_at=now(), revoke_reason=$4, revoked_by=$5 WHERE owner_id=$1 AND user_id=$2 AND session_id=$3",
+        )
+        .bind(actor.owner_id)
+        .bind(user_id)
+        .bind(session_id)
+        .bind(reason)
+        .bind(actor.user_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| AuthRepositoryError::Database)?;
+        append_event_in_tx(
+            &mut tx,
+            &AuditWriteRequest::from_auth_context(
+                actor,
+                action,
+                "H1",
+                "auth_session",
+                session_id,
+                Some(AuditDiff::compute(
+                    serde_json::json!({"status": "active"}),
+                    serde_json::json!({"status": "revoked", "reason": reason}),
+                )),
+            ),
+        )
+        .await
+        .map_err(|_| AuthRepositoryError::Audit)?;
+        tx.commit()
+            .await
+            .map_err(|_| AuthRepositoryError::Database)?;
+        Ok(SessionRevokeState::Revoked {
+            expires_at: row.expires_at,
+        })
+    }
+
+    pub async fn revoke_active_sessions(
+        &self,
+        actor: &AuthContext,
+        user_id: Uuid,
+        except_session_id: Option<&str>,
+        reason: &str,
+        action: &str,
+    ) -> Result<Vec<AuthSessionRow>, AuthRepositoryError> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|_| AuthRepositoryError::Database)?;
+        let rows = sqlx::query_as::<_, AuthSessionRow>(
+            "SELECT session_id,user_id,device_name,host(ip) AS ip,logged_in_at,expires_at,revoked_at FROM auth_sessions WHERE owner_id=$1 AND user_id=$2 AND revoked_at IS NULL AND expires_at > now() AND ($3::text IS NULL OR session_id <> $3) FOR UPDATE",
+        )
+        .bind(actor.owner_id)
+        .bind(user_id)
+        .bind(except_session_id)
+        .fetch_all(&mut *tx)
+        .await
+        .map_err(|_| AuthRepositoryError::Database)?;
+        if !rows.is_empty() {
+            sqlx::query(
+                "UPDATE auth_sessions SET revoked_at=now(), revoke_reason=$3, revoked_by=$4 WHERE owner_id=$1 AND user_id=$2 AND revoked_at IS NULL AND expires_at > now() AND ($5::text IS NULL OR session_id <> $5)",
+            )
+            .bind(actor.owner_id)
+            .bind(user_id)
+            .bind(reason)
+            .bind(actor.user_id)
+            .bind(except_session_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|_| AuthRepositoryError::Database)?;
+        }
+        append_event_in_tx(
+            &mut tx,
+            &AuditWriteRequest::from_auth_context(
+                actor,
+                action,
+                "H1",
+                "auth_user",
+                user_id.to_string(),
+                Some(AuditDiff::compute(
+                    serde_json::json!({"active_sessions": rows.len()}),
+                    serde_json::json!({"revoked_sessions": rows.len(), "reason": reason}),
+                )),
+            ),
+        )
+        .await
+        .map_err(|_| AuthRepositoryError::Audit)?;
+        tx.commit()
+            .await
+            .map_err(|_| AuthRepositoryError::Database)?;
+        Ok(rows)
+    }
+
+    pub async fn append_auth_event(
+        &self,
+        actor: &AuthContext,
+        action: &str,
+        resource_type: &str,
+        resource_id: &str,
+        diff: Option<AuditDiff>,
+    ) -> Result<(), AuthRepositoryError> {
+        append_event(
+            &self.pool,
+            &AuditWriteRequest::from_auth_context(
+                actor,
+                action,
+                "H1",
+                resource_type,
+                resource_id,
+                diff,
+            ),
+        )
+        .await
+        .map_err(|_| AuthRepositoryError::Audit)?;
+        Ok(())
+    }
+
+    pub async fn logout_audit_exists(
+        &self,
+        owner_id: Uuid,
+        jti: &str,
+    ) -> Result<bool, AuthRepositoryError> {
+        sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM audit_event WHERE owner_id=$1 AND jti=$2 AND action='auth.logout' AND resource_id=$2)",
+        )
+        .bind(owner_id)
+        .bind(jti)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|_| AuthRepositoryError::Database)
     }
 
     async fn role_codes(
@@ -206,15 +576,52 @@ impl AuthRepository {
     ) -> Result<Vec<String>, AuthRepositoryError> {
         sqlx::query_scalar::<_, String>(
             r#"
-            SELECT DISTINCT p.permission_code
-              FROM auth_user_roles ur
-              JOIN auth_role_permissions rp
-                ON rp.role_id = ur.role_id
-              JOIN auth_permissions p
-                ON p.id = rp.permission_id
-             WHERE ur.user_id = $1
-               AND ur.owner_id = $2
-             ORDER BY p.permission_code
+            WITH RECURSIVE hierarchy AS (
+                SELECT ur.role_id AS root_role_id,
+                       r.id,
+                       r.parent_role_id,
+                       0 AS depth
+                  FROM auth_user_roles ur
+                  JOIN auth_roles r ON r.id = ur.role_id
+                 WHERE ur.user_id = $1
+                   AND ur.owner_id = $2
+                UNION ALL
+                SELECT hierarchy.root_role_id,
+                       parent.id,
+                       parent.parent_role_id,
+                       hierarchy.depth + 1
+                  FROM auth_roles parent
+                  JOIN hierarchy ON hierarchy.parent_role_id = parent.id
+            ), decisions AS (
+                SELECT hierarchy.root_role_id,
+                       grant_row.permission_id,
+                       hierarchy.depth,
+                       TRUE AS allowed
+                  FROM hierarchy
+                  JOIN auth_role_permissions grant_row
+                    ON grant_row.role_id = hierarchy.id
+                UNION ALL
+                SELECT hierarchy.root_role_id,
+                       exclusion.permission_id,
+                       hierarchy.depth,
+                       FALSE AS allowed
+                  FROM hierarchy
+                  JOIN auth_role_permission_exclusions exclusion
+                    ON exclusion.role_id = hierarchy.id
+            ), nearest AS (
+                SELECT DISTINCT ON (root_role_id, permission_id)
+                       root_role_id,
+                       permission_id,
+                       allowed
+                  FROM decisions
+                 ORDER BY root_role_id, permission_id, depth, allowed
+            )
+            SELECT DISTINCT permission.permission_code
+              FROM nearest
+              JOIN auth_permissions permission
+                ON permission.id = nearest.permission_id
+             WHERE nearest.allowed
+             ORDER BY permission.permission_code
             "#,
         )
         .bind(user_id)
@@ -223,6 +630,38 @@ impl AuthRepository {
         .await
         .map_err(|_| AuthRepositoryError::Database)
     }
+}
+
+#[derive(Debug, FromRow)]
+pub struct AuthSessionRow {
+    pub session_id: String,
+    pub user_id: Uuid,
+    pub device_name: String,
+    pub ip: Option<String>,
+    pub logged_in_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc>,
+    pub revoked_at: Option<DateTime<Utc>>,
+}
+
+impl AuthSessionRow {
+    pub fn into_active_session(self, current_jti: &str) -> AuthSession {
+        AuthSession {
+            is_current: self.session_id == current_jti,
+            session_id: self.session_id,
+            user_id: self.user_id,
+            device_name: self.device_name,
+            ip: self.ip,
+            logged_in_at: self.logged_in_at,
+            expires_at: self.expires_at,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SessionRevokeState {
+    NotFound,
+    AlreadyRevoked { expires_at: DateTime<Utc> },
+    Revoked { expires_at: DateTime<Utc> },
 }
 
 #[derive(Debug, FromRow)]

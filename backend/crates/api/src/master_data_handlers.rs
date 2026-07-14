@@ -12,15 +12,16 @@ use axum::{
 use sqlx::PgPool;
 use uuid::Uuid;
 use wms_domain::{
-    BatchCreateLocationsRequest, CreateCustomerRequest, CreateLocationRequest,
-    CreateProductRequest, CreateSpecialDrugCategoryRequest, CreateSupplierRequest,
-    CreateWarehouseRequest, CreateWarehouseZoneRequest, Customer, CustomerListResponse,
+    BatchCreateLocationsRequest, CreateCustomerAddressRequest, CreateCustomerRequest,
+    CreateLocationRequest, CreateProductRequest, CreateSpecialDrugCategoryRequest,
+    CreateSupplierRequest, CreateWarehouseRequest, CreateWarehouseZoneRequest, Customer,
+    CustomerAddress, CustomerAddressListResponse, CustomerListResponse, CustomerProfile,
     ErrorResponse, Location, LocationListResponse, PageMeta, Product, ProductListResponse,
     SpecialDrugCategory, SpecialDrugCategoryListResponse, Supplier, SupplierListResponse,
-    UpdateCustomerRequest, UpdateLocationRequest, UpdateProductRequest,
-    UpdateSpecialDrugCategoryRequest, UpdateSupplierRequest, UpdateWarehouseRequest,
-    UpdateWarehouseZoneRequest, Warehouse, WarehouseListResponse, WarehouseZone,
-    WarehouseZoneListResponse,
+    UpdateCustomerAddressRequest, UpdateCustomerRequest, UpdateLocationRequest,
+    UpdateProductRequest, UpdateSpecialDrugCategoryRequest, UpdateSupplierRequest,
+    UpdateWarehouseRequest, UpdateWarehouseZoneRequest, UpsertCustomerProfileRequest, Warehouse,
+    WarehouseListResponse, WarehouseZone, WarehouseZoneListResponse,
 };
 
 use crate::{
@@ -29,7 +30,10 @@ use crate::{
     master_data_postgres::PgMasterDataReadRepository,
 };
 
+mod batch_sync;
+
 const IDEMPOTENCY_KEY_HEADER: &str = "idempotency-key";
+const MASTER_DATA_READ_PERMISSION: &str = "m1.master_data.read";
 const MASTER_DATA_WRITE_PERMISSION: &str = "m1.master_data.write";
 
 #[derive(Clone, Debug)]
@@ -100,9 +104,12 @@ impl MasterDataAppState {
         ctx: &AuthContext,
         req: CreateProductRequest,
         now: chrono::DateTime<chrono::Utc>,
+        idempotency_key: &str,
     ) -> Result<Product, MasterDataHandlerError> {
         if let Some(repository) = &self.read_repository {
-            return Ok(repository.create_product(ctx, req, now).await?);
+            return Ok(repository
+                .create_product(ctx, req, now, idempotency_key)
+                .await?);
         }
         Ok(self.write_store()?.create_product(ctx, req, now)?)
     }
@@ -124,9 +131,12 @@ impl MasterDataAppState {
         id: Uuid,
         req: UpdateProductRequest,
         now: chrono::DateTime<chrono::Utc>,
+        idempotency_key: &str,
     ) -> Result<Product, MasterDataHandlerError> {
         if let Some(repository) = &self.read_repository {
-            return Ok(repository.update_product(ctx, id, req, now).await?);
+            return Ok(repository
+                .update_product(ctx, id, req, now, idempotency_key)
+                .await?);
         }
         Ok(self.write_store()?.update_product(ctx, id, req, now)?)
     }
@@ -156,9 +166,12 @@ impl MasterDataAppState {
         ctx: &AuthContext,
         req: CreateSupplierRequest,
         now: chrono::DateTime<chrono::Utc>,
+        idempotency_key: &str,
     ) -> Result<Supplier, MasterDataHandlerError> {
         if let Some(repository) = &self.read_repository {
-            return Ok(repository.create_supplier(ctx, req, now).await?);
+            return Ok(repository
+                .create_supplier(ctx, req, now, idempotency_key)
+                .await?);
         }
         Ok(self.write_store()?.create_supplier(ctx, req, now)?)
     }
@@ -168,9 +181,12 @@ impl MasterDataAppState {
         ctx: &AuthContext,
         req: CreateCustomerRequest,
         now: chrono::DateTime<chrono::Utc>,
+        idempotency_key: &str,
     ) -> Result<Customer, MasterDataHandlerError> {
         if let Some(repository) = &self.read_repository {
-            return Ok(repository.create_customer(ctx, req, now).await?);
+            return Ok(repository
+                .create_customer(ctx, req, now, idempotency_key)
+                .await?);
         }
         Ok(self.write_store()?.create_customer(ctx, req, now)?)
     }
@@ -181,9 +197,12 @@ impl MasterDataAppState {
         id: Uuid,
         req: UpdateSupplierRequest,
         now: chrono::DateTime<chrono::Utc>,
+        idempotency_key: &str,
     ) -> Result<Supplier, MasterDataHandlerError> {
         if let Some(repository) = &self.read_repository {
-            return Ok(repository.update_supplier(ctx, id, req, now).await?);
+            return Ok(repository
+                .update_supplier(ctx, id, req, now, idempotency_key)
+                .await?);
         }
         Ok(self.write_store()?.update_supplier(ctx, id, req, now)?)
     }
@@ -194,9 +213,12 @@ impl MasterDataAppState {
         id: Uuid,
         req: UpdateCustomerRequest,
         now: chrono::DateTime<chrono::Utc>,
+        idempotency_key: &str,
     ) -> Result<Customer, MasterDataHandlerError> {
         if let Some(repository) = &self.read_repository {
-            return Ok(repository.update_customer(ctx, id, req, now).await?);
+            return Ok(repository
+                .update_customer(ctx, id, req, now, idempotency_key)
+                .await?);
         }
         Ok(self.write_store()?.update_customer(ctx, id, req, now)?)
     }
@@ -226,9 +248,12 @@ impl MasterDataAppState {
         ctx: &AuthContext,
         req: CreateWarehouseRequest,
         now: chrono::DateTime<chrono::Utc>,
+        idempotency_key: &str,
     ) -> Result<Warehouse, MasterDataHandlerError> {
         if let Some(repository) = &self.read_repository {
-            return Ok(repository.create_warehouse(ctx, req, now).await?);
+            return Ok(repository
+                .create_warehouse(ctx, req, now, idempotency_key)
+                .await?);
         }
         Ok(self.write_store()?.create_warehouse(ctx, req, now)?)
     }
@@ -239,9 +264,12 @@ impl MasterDataAppState {
         id: Uuid,
         req: UpdateWarehouseRequest,
         now: chrono::DateTime<chrono::Utc>,
+        idempotency_key: &str,
     ) -> Result<Warehouse, MasterDataHandlerError> {
         if let Some(repository) = &self.read_repository {
-            return Ok(repository.update_warehouse(ctx, id, req, now).await?);
+            return Ok(repository
+                .update_warehouse(ctx, id, req, now, idempotency_key)
+                .await?);
         }
         Ok(self.write_store()?.update_warehouse(ctx, id, req, now)?)
     }
@@ -251,9 +279,12 @@ impl MasterDataAppState {
         ctx: &AuthContext,
         req: CreateLocationRequest,
         now: chrono::DateTime<chrono::Utc>,
+        idempotency_key: &str,
     ) -> Result<Location, MasterDataHandlerError> {
         if let Some(repository) = &self.read_repository {
-            return Ok(repository.create_location(ctx, req, now).await?);
+            return Ok(repository
+                .create_location(ctx, req, now, idempotency_key)
+                .await?);
         }
         Ok(self.write_store()?.create_location(ctx, req, now)?)
     }
@@ -305,9 +336,12 @@ impl MasterDataAppState {
         id: Uuid,
         req: UpdateLocationRequest,
         now: chrono::DateTime<chrono::Utc>,
+        idempotency_key: &str,
     ) -> Result<Location, MasterDataHandlerError> {
         if let Some(repository) = &self.read_repository {
-            return Ok(repository.update_location(ctx, id, req, now).await?);
+            return Ok(repository
+                .update_location(ctx, id, req, now, idempotency_key)
+                .await?);
         }
         Ok(self.write_store()?.update_location(ctx, id, req, now)?)
     }
@@ -350,4 +384,6 @@ impl From<AuthError> for MasterDataHandlerError {
     }
 }
 
+include!("master_data_handlers/customer_addresses.rs");
+include!("master_data_handlers/customer_profile.rs");
 include!("master_data_handlers_part2.rs");

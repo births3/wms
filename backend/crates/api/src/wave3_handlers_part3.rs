@@ -1,27 +1,30 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
-    routing::{get, post},
+    routing::{get, patch, post},
     Json, Router,
 };
-use chrono::Utc;
+use chrono::{NaiveDate, Utc};
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 use wms_domain::{
-    BillingAccount, BillingContract, BillingRule, ChangeInventoryStatusRequest, ColdChainDevice,
-    CreateBillingAccountRequest, CreateBillingContractRequest, CreateBillingRuleRequest,
-    CreateColdChainDeviceRequest, CreateReceivingOrderRequest, ErrorResponse,
+    BillingAccount, BillingContract, BillingRule, CancelInventoryRecallRequest,
+    ChangeInventoryStatusRequest, ColdChainDevice, CreateBillingAccountRequest,
+    CreateBillingContractRequest, CreateBillingRuleRequest, CreateColdChainDeviceRequest,
+    CreateReceivingOrderRequest, ErrorResponse, ExpireInventoryBatchesRequest,
     IngestTemperatureExcursionRequest, IngestTemperatureReadingRequest,
     InspectReceivingOrderRequest, InspectionSignatureRecord, InventoryBatch,
-    InventoryBatchListResponse, PageMeta, PutawayInventoryRequest, PutawayRecord, PutawayRequest,
-    ReceiveReceivingOrderRequest, ReceivingInspectionRecord, ReceivingOrder,
-    ReceivingOrderListResponse, ReceivingOrderReceipt, RejectReceivingOrderRequest,
-    TemperatureExcursionEvent, TemperatureReading, UpdateReceivingOrderRequest,
+    InventoryBatchListResponse, InventoryBatchQuery, InventoryBatchTrace,
+    MarkInventoryRecallRequest, PageMeta, PutawayInventoryRequest, PutawayRecord, PutawayRequest,
+    ReceiveReceivingOrderRequest, ReceivingDashboardQuery, ReceivingDashboardResponse,
+    ReceivingInspectionRecord, ReceivingOrder, ReceivingOrderListResponse, ReceivingOrderPrintData,
+    ReceivingOrderReceipt, RejectReceivingOrderRequest, TemperatureExcursionEvent,
+    TemperatureReading, UpdateColdChainDeviceRequest, UpdateReceivingOrderRequest,
 };
 
 use crate::{
@@ -216,7 +219,8 @@ impl IntoResponse for Wave3HandlerError {
             | Wave3HandlerError::Inventory(InventoryError::NotFound)
             | Wave3HandlerError::ColdChain(ColdChainError::DeviceNotFound(_))
             | Wave3HandlerError::Billing(BillingError::NotFound)
-            | Wave3HandlerError::Repository(Wave3RepositoryError::NotFound) => {
+            | Wave3HandlerError::Repository(Wave3RepositoryError::NotFound)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::InventoryCountLineNotFound) => {
                 (StatusCode::NOT_FOUND, "W3-404", "资源不存在")
             }
             Wave3HandlerError::ConfigCenter(ConfigCenterError::MissingFlag(_)) => (
@@ -236,45 +240,100 @@ impl IntoResponse for Wave3HandlerError {
             | Wave3HandlerError::Billing(BillingError::BillingRuleConflict)
             | Wave3HandlerError::Repository(Wave3RepositoryError::DuplicateReceipt)
             | Wave3HandlerError::Repository(Wave3RepositoryError::DuplicateCode)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::RecallAlreadyActive)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::RecallStateChanged)
             | Wave3HandlerError::Repository(Wave3RepositoryError::IdempotencyConflict)
-            | Wave3HandlerError::Repository(Wave3RepositoryError::BillingRuleConflict) => {
+            | Wave3HandlerError::Repository(Wave3RepositoryError::BillingRuleConflict)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::InventoryCountAlreadyActive)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::InventoryCountLineAlreadySubmitted) => {
                 (StatusCode::CONFLICT, "W3-409", "资源重复")
             }
+            Wave3HandlerError::Receiving(ReceivingOrderError::UnauthorizedSigner)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::UnauthorizedSigner) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M2_VERIFIER_UNAUTHORIZED",
+                "签字人不是当前货主的有效验收岗用户",
+            ),
             Wave3HandlerError::Receiving(ReceivingOrderError::EmptyLines)
             | Wave3HandlerError::Receiving(ReceivingOrderError::InvalidStatus { .. })
             | Wave3HandlerError::Receiving(ReceivingOrderError::QuantityClosureMismatch)
             | Wave3HandlerError::Receiving(ReceivingOrderError::OverReceiptNotAllowed)
             | Wave3HandlerError::Receiving(ReceivingOrderError::InvalidQuantity)
+            | Wave3HandlerError::Receiving(ReceivingOrderError::MissingSupplier)
+            | Wave3HandlerError::Receiving(ReceivingOrderError::MissingExpectedArrival)
+            | Wave3HandlerError::Receiving(ReceivingOrderError::InvalidExpectedArrival)
+            | Wave3HandlerError::Receiving(ReceivingOrderError::MissingProduct)
+            | Wave3HandlerError::Receiving(ReceivingOrderError::MultipleProducts)
             | Wave3HandlerError::Receiving(ReceivingOrderError::InvalidReason)
             | Wave3HandlerError::Receiving(ReceivingOrderError::InvalidDocumentType)
+            | Wave3HandlerError::Receiving(ReceivingOrderError::InvalidBatchPolicy)
             | Wave3HandlerError::Receiving(ReceivingOrderError::BatchExpired)
             | Wave3HandlerError::Receiving(ReceivingOrderError::SameSigner)
             | Wave3HandlerError::Receiving(ReceivingOrderError::MissingSecondSigner)
             | Wave3HandlerError::Inventory(InventoryError::InvalidQuantity)
+            | Wave3HandlerError::ColdChain(ColdChainError::InvalidDeviceType(_))
+            | Wave3HandlerError::ColdChain(ColdChainError::ActiveMonitoring(_))
             | Wave3HandlerError::Inventory(InventoryError::ExpiredBatch)
+            | Wave3HandlerError::Inventory(InventoryError::InvalidReason)
             | Wave3HandlerError::Inventory(InventoryError::MissingApprovalSource)
+            | Wave3HandlerError::Inventory(InventoryError::RecallNotActive)
+            | Wave3HandlerError::Inventory(InventoryError::SameApprover)
+            | Wave3HandlerError::Inventory(InventoryError::RecallStateChanged)
+            | Wave3HandlerError::Inventory(InventoryError::RecallAlreadyActive)
             | Wave3HandlerError::Inventory(InventoryError::InvalidStateTransition { .. })
             | Wave3HandlerError::ColdChain(ColdChainError::FutureTimestamp)
             | Wave3HandlerError::Billing(BillingError::InvalidRate)
+            | Wave3HandlerError::Billing(BillingError::InvalidChargeItem)
+            | Wave3HandlerError::Billing(BillingError::InvalidUnit)
+            | Wave3HandlerError::Billing(BillingError::InvalidBillingCycle)
             | Wave3HandlerError::Billing(BillingError::InvalidQuantity)
             | Wave3HandlerError::Billing(BillingError::InvalidEffectiveWindow)
             | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidStatus { .. })
             | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidQuantity)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidDeviceType)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::ActiveMonitoring)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::MissingSupplier)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::MissingExpectedArrival)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidExpectedArrival)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::MissingProduct)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::MultipleProducts)
             | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidDocumentType)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidBatchPolicy)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidQualityStatus)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidLocation)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::LocationQualityMismatch)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::LocationTemperatureMismatch)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::LocationCapacityExceeded)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::LocationSkuLimitExceeded)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::NoAvailableLocation)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidProductVolume)
             | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidDate(_))
             | Wave3HandlerError::Repository(Wave3RepositoryError::BatchExpired)
             | Wave3HandlerError::Repository(Wave3RepositoryError::QuantityClosureMismatch)
             | Wave3HandlerError::Repository(Wave3RepositoryError::OverReceiptNotAllowed)
             | Wave3HandlerError::Repository(Wave3RepositoryError::MissingSecondSigner)
             | Wave3HandlerError::Repository(Wave3RepositoryError::SameSigner)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::DuplicateTraceCode)
             | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidReason)
             | Wave3HandlerError::Repository(Wave3RepositoryError::MissingApprovalSource)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::RecallNotActive)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::SameApprover)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::SecondApproverNotAuthorized)
             | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidStateTransition {
                 ..
             })
             | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidEffectiveWindow)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidBillingRuleField)
             | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidRate)
-            | Wave3HandlerError::Repository(Wave3RepositoryError::FutureTimestamp) => (
+            | Wave3HandlerError::Repository(Wave3RepositoryError::FutureTimestamp)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidInventoryState)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidMaintenanceTaskState)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidMaintenanceResult)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidInventoryCountType)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidInventoryCountState)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::InventoryCountNotReady)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::InventoryCountQuantityConflict)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::NoInventoryData) => (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "W3-422",
                 "业务规则校验失败",
@@ -286,6 +345,7 @@ impl IntoResponse for Wave3HandlerError {
             ),
             Wave3HandlerError::Repository(Wave3RepositoryError::Audit(_))
             | Wave3HandlerError::Repository(Wave3RepositoryError::Database(_))
+            | Wave3HandlerError::Repository(Wave3RepositoryError::DocumentNumbering(_))
             | Wave3HandlerError::Repository(Wave3RepositoryError::Serialize(_)) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "W3-500",
@@ -310,10 +370,23 @@ impl IntoResponse for Wave3HandlerError {
 }
 
 pub fn wave3_router(state: Wave3AppState) -> Router {
-    apply_receiving_order_routes()
+    apply_inventory_count_routes(apply_maintenance_routes(
+        apply_receiving_order_routes().route(
+            "/api/v1/inbound/receiving-orders/:id/putaway-recommendations",
+            get(m2_putaway::recommend_putaway_locations_handler),
+        ),
+    ))
         .route(
             "/api/v1/inventory/batches",
             get(list_inventory_batches_handler),
+        )
+        .route(
+            "/api/v1/inventory/batches/near-expiry-report",
+            get(near_expiry_report_handler),
+        )
+        .route(
+            "/api/v1/inventory/batches/:id/trace",
+            get(get_inventory_batch_trace_handler),
         )
         .route(
             "/api/v1/inventory/batches/putaway",
@@ -324,8 +397,28 @@ pub fn wave3_router(state: Wave3AppState) -> Router {
             post(change_inventory_batch_status_handler),
         )
         .route(
+            "/api/v1/inventory/batches/recall",
+            post(mark_inventory_recall_handler),
+        )
+        .route(
+            "/api/v1/inventory/batches/recall/cancel",
+            post(cancel_inventory_recall_handler),
+        )
+        .route(
+            "/api/v1/inventory/batches/expire",
+            post(isolate_expired_inventory_batches_handler),
+        )
+        .route(
             "/api/v1/cold-chain/devices",
-            post(create_cold_chain_device_handler),
+            get(list_cold_chain_devices_handler).post(create_cold_chain_device_handler),
+        )
+        .route(
+            "/api/v1/cold-chain/devices/:device_code",
+            patch(update_cold_chain_device_handler),
+        )
+        .route(
+            "/api/v1/cold-chain/devices/:device_code/disable",
+            post(disable_cold_chain_device_handler),
         )
         .route(
             "/api/v1/cold-chain/readings",
@@ -366,15 +459,68 @@ async fn list_receiving_orders_handler(
     }))
 }
 
+async fn list_receiving_dashboard_handler(
+    ctx: AuthContext,
+    State(state): State<Wave3AppState>,
+    Query(query): Query<ReceivingDashboardQuery>,
+) -> Result<Json<ReceivingDashboardResponse>, Wave3HandlerError> {
+    require_any_permission(&ctx, &["m2.read", "m2.write"])?;
+    let data = if let Some(repository) = &state.wave3_repository {
+        repository.list_receiving_dashboard(&ctx, &query).await?
+    } else {
+        let rows = state.inbound_store.lock().await.list(&ctx);
+        let mut grouped =
+            std::collections::BTreeMap::<String, (i64, i64, chrono::DateTime<Utc>)>::new();
+        for row in rows {
+            let created_at = row.created_at;
+            let entry = grouped.entry(row.status).or_insert((0, 0, created_at));
+            entry.0 += 1;
+            entry.1 += row.lines.iter().map(|line| line.expected_qty).sum::<i64>();
+            entry.2 = entry.2.max(created_at);
+        }
+        grouped
+            .into_iter()
+            .map(|(status, (order_count, expected_qty, created_at))| {
+                wms_domain::ReceivingDashboardRow {
+                    created_at,
+                    abnormal: matches!(status.as_str(), "closed_rejected" | "exception"),
+                    status,
+                    order_count,
+                    expected_qty,
+                }
+            })
+            .collect()
+    };
+    Ok(Json(ReceivingDashboardResponse {
+        data,
+        refreshed_at: Utc::now(),
+    }))
+}
+
 async fn create_receiving_order_handler(
     ctx: AuthContext,
     State(state): State<Wave3AppState>,
+    headers: HeaderMap,
     Json(req): Json<CreateReceivingOrderRequest>,
 ) -> Result<Json<ReceivingOrder>, Wave3HandlerError> {
     ctx.require_permission("m2.write")?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
     let now = Utc::now();
     let order = if let Some(repository) = &state.wave3_repository {
-        repository.create_receiving_order(&ctx, req, now).await?
+        let audit = AuditWriteRequest::from_auth_context(
+            &ctx,
+            "create",
+            "M2",
+            "receiving_order",
+            "pending",
+            None,
+        );
+        return Ok(Json(
+            repository
+                .create_receiving_order_with_audit(&ctx, req, now, &idempotency_key, audit)
+                .await?
+                .value,
+        ));
     } else {
         let mut store = state.inbound_store.lock().await;
         store.create(&ctx, req, now)?

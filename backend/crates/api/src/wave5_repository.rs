@@ -19,7 +19,9 @@ use crate::{
     auth::AuthContext,
     packing_station::{PackingStationError, PackingStationService},
     retail_chain::{RetailChainError, RetailChainService},
-    tms_plus::{TmsPlusError, TmsPlusService},
+    tms_plus::{
+        ReceiveTmsRoutePlanRequest, TmsPlusError, TmsPlusService, TmsRoutePlan, TmsRouteStop,
+    },
 };
 
 #[derive(Clone, Debug)]
@@ -177,6 +179,31 @@ struct TmsDispatchRow {
 }
 
 #[derive(FromRow)]
+struct TmsRoutePlanRow {
+    id: Uuid,
+    owner_id: Uuid,
+    dispatch_result_id: String,
+    delivery_date: NaiveDate,
+    vehicle_no: String,
+    plate_no: String,
+    driver_user_id: Uuid,
+    status: String,
+    version: i32,
+    payload_hash: String,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(FromRow)]
+struct TmsRouteStopRow {
+    id: Uuid,
+    store_id: Uuid,
+    sequence: i32,
+    estimated_arrival_at: DateTime<Utc>,
+    outbound_order_ids: Vec<Uuid>,
+}
+
+#[derive(FromRow)]
 struct TransitTemperatureReadingRow {
     id: Uuid,
     owner_id: Uuid,
@@ -303,6 +330,96 @@ async fn ensure_outbound_order(
     } else {
         Err(Wave5RepositoryError::NotFound)
     }
+}
+
+async fn ensure_route_orders(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    order_ids: &[Uuid],
+) -> Result<(), Wave5RepositoryError> {
+    let matched: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*)::BIGINT FROM outbound_orders WHERE owner_id = $1 AND id = ANY($2)",
+    )
+    .bind(owner_id)
+    .bind(order_ids)
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(map_db_error)?;
+    if usize::try_from(matched).ok() == Some(order_ids.len()) {
+        Ok(())
+    } else {
+        Err(Wave5RepositoryError::NotFound)
+    }
+}
+
+async fn ensure_route_driver(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    driver_user_id: Uuid,
+) -> Result<(), Wave5RepositoryError> {
+    let active: bool = sqlx::query_scalar(
+        r#"
+        SELECT EXISTS(
+            SELECT 1
+              FROM auth_user_owner_bindings binding
+              JOIN auth_users user_account ON user_account.id = binding.user_id
+             WHERE binding.owner_id = $1
+               AND binding.user_id = $2
+               AND binding.is_active = TRUE
+               AND user_account.status = 'active'
+        )
+        "#,
+    )
+    .bind(owner_id)
+    .bind(driver_user_id)
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(map_db_error)?;
+    if active {
+        Ok(())
+    } else {
+        Err(Wave5RepositoryError::NotFound)
+    }
+}
+
+async fn load_tms_route_plan(
+    tx: &mut Transaction<'_, Postgres>,
+    row: TmsRoutePlanRow,
+) -> Result<TmsRoutePlan, Wave5RepositoryError> {
+    let stop_rows = sqlx::query_as::<_, TmsRouteStopRow>(
+        r#"
+        SELECT stop.id, stop.store_id, stop.stop_sequence AS sequence,
+               stop.estimated_arrival_at,
+               COALESCE(
+                   array_agg(route_order.outbound_order_id ORDER BY route_order.created_at)
+                       FILTER (WHERE route_order.outbound_order_id IS NOT NULL),
+                   ARRAY[]::UUID[]
+               ) AS outbound_order_ids
+          FROM tms_route_stops stop
+          LEFT JOIN tms_route_orders route_order
+            ON route_order.owner_id = stop.owner_id
+           AND route_order.route_stop_id = stop.id
+         WHERE stop.owner_id = $1 AND stop.route_plan_id = $2
+         GROUP BY stop.id
+         ORDER BY stop.stop_sequence
+        "#,
+    )
+    .bind(row.owner_id)
+    .bind(row.id)
+    .fetch_all(&mut **tx)
+    .await
+    .map_err(map_db_error)?;
+    let stops = stop_rows
+        .into_iter()
+        .map(|stop| TmsRouteStop {
+            id: stop.id,
+            store_id: stop.store_id,
+            sequence: stop.sequence,
+            estimated_arrival_at: stop.estimated_arrival_at,
+            outbound_order_ids: stop.outbound_order_ids,
+        })
+        .collect();
+    Ok(map_tms_route_plan(row, stops))
 }
 
 async fn ensure_packing_station(
@@ -601,6 +718,28 @@ fn map_tms_dispatch(row: TmsDispatchRow) -> TmsDispatch {
         status: row.status,
         version: row.version,
         scheduled_load_at: row.scheduled_load_at,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+    }
+}
+
+fn map_tms_route_plan(row: TmsRoutePlanRow, stops: Vec<TmsRouteStop>) -> TmsRoutePlan {
+    let outbound_order_ids = stops
+        .iter()
+        .flat_map(|stop| stop.outbound_order_ids.iter().copied())
+        .collect();
+    TmsRoutePlan {
+        id: row.id,
+        owner_id: row.owner_id,
+        dispatch_result_id: row.dispatch_result_id,
+        delivery_date: row.delivery_date,
+        vehicle_no: row.vehicle_no,
+        plate_no: row.plate_no,
+        driver_user_id: row.driver_user_id,
+        status: row.status,
+        version: row.version,
+        outbound_order_ids,
+        stops,
         created_at: row.created_at,
         updated_at: row.updated_at,
     }

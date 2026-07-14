@@ -42,7 +42,17 @@ pub async fn ship_outbound_order(
             .map_err(|_| Wave4RepositoryError::ShortPickNotReplenished)?;
 
         for line in &order.lines {
-            deduct_inventory_for_outbound(&mut tx, ctx.owner_id, order_id, line, now).await?;
+            if !consume_inventory_allocation_for_outbound(
+                &mut tx,
+                ctx.owner_id,
+                order_id,
+                line,
+                now,
+            )
+            .await?
+            {
+                deduct_inventory_for_outbound(&mut tx, ctx.owner_id, order_id, line, now).await?;
+            }
         }
         sqlx::query(
             r#"
@@ -359,11 +369,16 @@ pub async fn ship_outbound_order(
             let batch = if from_status == STATUS_QUARANTINED {
                 map_inventory_batch(batch_row)
             } else {
-                if !allowed_transition(
+                if !crate::inventory_status_config::is_transition_allowed_in_tx(
+                    &mut tx,
+                    ctx.owner_id,
                     &from_status,
                     STATUS_QUARANTINED,
                     APPROVAL_SOURCE_TEMPERATURE_EXCURSION,
-                ) {
+                )
+                .await
+                .map_err(map_db_error)?
+                {
                     return Err(Wave4RepositoryError::InvalidStateTransition {
                         from: from_status,
                         to: STATUS_QUARANTINED.to_string(),
@@ -455,4 +470,219 @@ pub async fn ship_outbound_order(
             quarantined_batches,
         })
     }
+}
+
+#[derive(FromRow)]
+struct OutboundAllocationRow {
+    id: Uuid,
+    batch_id: Uuid,
+    allocated_qty: i64,
+}
+
+async fn append_outbound_inventory_movement(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    batch_id: Uuid,
+    qty_delta: i64,
+    order_id: Uuid,
+    now: DateTime<Utc>,
+) -> Result<(), Wave4RepositoryError> {
+    sqlx::query(
+        r#"
+        INSERT INTO inventory_movements (
+            id, owner_id, batch_id, movement_type, qty_delta,
+            source_document_type, source_document_id, occurred_at
+        )
+        VALUES ($1, $2, $3, 'outbound_ship', $4, 'outbound_order', $5, $6)
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(owner_id)
+    .bind(batch_id)
+    .bind(qty_delta)
+    .bind(order_id)
+    .bind(now)
+    .execute(&mut **tx)
+    .await
+    .map_err(map_db_error)?;
+    Ok(())
+}
+
+async fn allocate_inventory_for_outbound(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    order_id: Uuid,
+    line: &OutboundOrderLine,
+    now: DateTime<Utc>,
+) -> Result<(), Wave4RepositoryError> {
+    let candidates: Vec<(Uuid, i64)> = sqlx::query_as(
+        r#"
+        SELECT id, qty_on_hand - qty_locked AS available_qty
+          FROM inventory_batches
+         WHERE owner_id = $1
+           AND product_code = $2
+           AND batch_no = $3
+           AND quality_status = $4
+           AND recall_flag = FALSE
+           AND qty_on_hand - qty_locked > 0
+         ORDER BY location_code ASC, id ASC
+         FOR UPDATE
+        "#,
+    )
+    .bind(owner_id)
+    .bind(&line.product_code)
+    .bind(&line.batch_no)
+    .bind(STATUS_QUALIFIED)
+    .fetch_all(&mut **tx)
+    .await
+    .map_err(map_db_error)?;
+    let available = candidates.iter().try_fold(0_i64, |total, (_, qty)| {
+        total
+            .checked_add(*qty)
+            .ok_or(Wave4RepositoryError::InvalidQuantity)
+    })?;
+    if available < line.planned_qty {
+        return Err(Wave4RepositoryError::InvalidQuantity);
+    }
+
+    let line_no = i32::try_from(line.line_no).map_err(|_| Wave4RepositoryError::InvalidQuantity)?;
+    let mut remaining = line.planned_qty;
+    for (batch_id, available_qty) in candidates {
+        if remaining == 0 {
+            break;
+        }
+        let allocated_qty = available_qty.min(remaining);
+        let updated = sqlx::query(
+            r#"
+            UPDATE inventory_batches
+               SET qty_locked = qty_locked + $3,
+                   updated_at = $4,
+                   version = version + 1
+             WHERE owner_id = $1 AND id = $2
+               AND quality_status = $5 AND recall_flag = FALSE
+               AND qty_on_hand - qty_locked >= $3
+            "#,
+        )
+        .bind(owner_id)
+        .bind(batch_id)
+        .bind(allocated_qty)
+        .bind(now)
+        .bind(STATUS_QUALIFIED)
+        .execute(&mut **tx)
+        .await
+        .map_err(map_db_error)?;
+        if updated.rows_affected() != 1 {
+            return Err(Wave4RepositoryError::InvalidQuantity);
+        }
+        sqlx::query(
+            r#"
+            INSERT INTO inventory_allocations (
+                id, owner_id, outbound_order_id, line_no, batch_id,
+                allocated_qty, status, created_at, updated_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, 'locked', $7, $7)
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(owner_id)
+        .bind(order_id)
+        .bind(line_no)
+        .bind(batch_id)
+        .bind(allocated_qty)
+        .bind(now)
+        .execute(&mut **tx)
+        .await
+        .map_err(map_insert_error)?;
+        remaining -= allocated_qty;
+    }
+    Ok(())
+}
+
+async fn consume_inventory_allocation_for_outbound(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    order_id: Uuid,
+    line: &OutboundOrderLine,
+    now: DateTime<Utc>,
+) -> Result<bool, Wave4RepositoryError> {
+    let line_no = i32::try_from(line.line_no).map_err(|_| Wave4RepositoryError::InvalidQuantity)?;
+    let allocations = sqlx::query_as::<_, OutboundAllocationRow>(
+        r#"
+        SELECT id, batch_id, allocated_qty
+          FROM inventory_allocations
+         WHERE owner_id = $1 AND outbound_order_id = $2
+           AND line_no = $3 AND status = 'locked'
+         ORDER BY id
+         FOR UPDATE
+        "#,
+    )
+    .bind(owner_id)
+    .bind(order_id)
+    .bind(line_no)
+    .fetch_all(&mut **tx)
+    .await
+    .map_err(map_db_error)?;
+    if allocations.is_empty() {
+        return Ok(false);
+    }
+    let allocated_qty = allocations.iter().try_fold(0_i64, |total, allocation| {
+        total
+            .checked_add(allocation.allocated_qty)
+            .ok_or(Wave4RepositoryError::InvalidQuantity)
+    })?;
+    if allocated_qty != line.planned_qty {
+        return Err(Wave4RepositoryError::InvalidQuantity);
+    }
+
+    for allocation in allocations {
+        let updated = sqlx::query(
+            r#"
+            UPDATE inventory_batches
+               SET qty_on_hand = qty_on_hand - $3,
+                   qty_locked = qty_locked - $3,
+                   updated_at = $4,
+                   version = version + 1
+             WHERE owner_id = $1 AND id = $2
+               AND quality_status = $5 AND recall_flag = FALSE
+               AND qty_on_hand >= $3 AND qty_locked >= $3
+            "#,
+        )
+        .bind(owner_id)
+        .bind(allocation.batch_id)
+        .bind(allocation.allocated_qty)
+        .bind(now)
+        .bind(STATUS_QUALIFIED)
+        .execute(&mut **tx)
+        .await
+        .map_err(map_db_error)?;
+        if updated.rows_affected() != 1 {
+            return Err(Wave4RepositoryError::InvalidQuantity);
+        }
+        append_outbound_inventory_movement(
+            tx,
+            owner_id,
+            allocation.batch_id,
+            -allocation.allocated_qty,
+            order_id,
+            now,
+        )
+        .await?;
+        let marked = sqlx::query(
+            r#"
+            UPDATE inventory_allocations
+               SET status = 'consumed', consumed_at = $3, updated_at = $3
+             WHERE owner_id = $1 AND id = $2 AND status = 'locked'
+            "#,
+        )
+        .bind(owner_id)
+        .bind(allocation.id)
+        .bind(now)
+        .execute(&mut **tx)
+        .await
+        .map_err(map_db_error)?;
+        if marked.rows_affected() != 1 {
+            return Err(Wave4RepositoryError::InvalidQuantity);
+        }
+    }
+    Ok(true)
 }

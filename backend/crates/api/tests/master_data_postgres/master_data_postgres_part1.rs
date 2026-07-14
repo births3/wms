@@ -118,7 +118,7 @@ async fn products_are_read_from_postgres_by_owner(pool: PgPool) {
     assert_eq!(rows[0].spec.as_deref(), Some("10ml*1支"));
     assert_eq!(
         rows[0].special_drug_category_code.as_deref(),
-        Some("normal")
+        Some("none")
     );
     assert_eq!(
         rows[0].attrs,
@@ -180,31 +180,29 @@ async fn product_create_route_writes_source_and_audit(pool: PgPool) {
         auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(AllowAllRevocationStore))),
     );
 
+    let product_body = json!({
+        "product_code": "P-M1-CREATE",
+        "product_name": "新建冷链商品",
+        "approval_no": "国药准字H-CREATE",
+        "spec": "10ml*1支",
+        "dosage_form": "注射剂",
+        "manufacturer": "示例药业",
+        "special_drug_category_code": "none",
+        "attrs": {
+            "storage_condition": "cold",
+            "source": "manual",
+            "middle_package": "10盒/中包"
+        }
+    });
     let response = app
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/v1/master-data/products")
-                .header(AUTHORIZATION, format!("Bearer {token}"))
-                .header("content-type", "application/json")
-                .body(Body::from(
-                    json!({
-                        "product_code": "P-M1-CREATE",
-                        "product_name": "新建冷链商品",
-                        "approval_no": "国药准字H-CREATE",
-                        "spec": "10ml*1支",
-                        "dosage_form": "注射剂",
-                        "manufacturer": "示例药业",
-                        "special_drug_category_code": "normal",
-                        "attrs": {
-                            "storage_condition": "cold",
-                            "source": "manual"
-                        }
-                    })
-                    .to_string(),
-                ))
-                .expect("request should build"),
-        )
+        .clone()
+        .oneshot(request_json_with_key(
+            "POST",
+            "/api/v1/master-data/products",
+            &token,
+            product_body.clone(),
+            "m1-product-create-source",
+        ))
         .await
         .expect("router should respond");
 
@@ -215,6 +213,26 @@ async fn product_create_route_writes_source_and_audit(pool: PgPool) {
     assert_eq!(product.product_code, "P-M1-CREATE");
     assert_eq!(product.attrs["source"], "manual");
     assert_eq!(product.attrs["storage_condition"], "cold");
+    assert_eq!(product.attrs["middle_package"], "10盒/中包");
+
+    let replayed_response = app
+        .oneshot(request_json_with_key(
+            "POST",
+            "/api/v1/master-data/products",
+            &token,
+            product_body,
+            "m1-product-create-source",
+        ))
+        .await
+        .expect("replay should respond");
+    assert_eq!(replayed_response.status(), StatusCode::OK);
+    let replayed: Product = serde_json::from_slice(
+        &to_bytes(replayed_response.into_body(), usize::MAX)
+            .await
+            .unwrap(),
+    )
+    .expect("replayed product response");
+    assert_eq!(replayed.id, product.id);
 
     let audit_count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*)::BIGINT FROM audit_event WHERE owner_id = $1 AND action = 'create_product'",
@@ -224,6 +242,70 @@ async fn product_create_route_writes_source_and_audit(pool: PgPool) {
     .await
     .expect("audit count");
     assert_eq!(audit_count, 1);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn product_routes_accept_custom_enabled_special_drug_category(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let custom_code = "custom_antineoplastic";
+    let now = Utc
+        .with_ymd_and_hms(2026, 7, 13, 10, 0, 0)
+        .single()
+        .expect("valid time");
+    sqlx::query(
+        "INSERT INTO system_dictionary_items (id, dict_code, item_code, item_name, enabled, owner_id, params, source, created_at, updated_at) VALUES ($1, 'special_drug_category', $2, '自定义抗肿瘤药品', TRUE, NULL, $3, 'global', $4, $4)",
+    )
+    .bind(Uuid::new_v4())
+    .bind(custom_code)
+    .bind(json!({ "requires_dual_sign": true }))
+    .bind(now)
+    .execute(&pool)
+    .await
+    .expect("custom special drug category should be seeded");
+
+    let token = writer_token(owner_id);
+    let app = master_data_router(MasterDataAppState::with_postgres(pool)).layer(
+        auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(AllowAllRevocationStore))),
+    );
+    let create_response = app
+        .clone()
+        .oneshot(request_json_with_key(
+            "POST",
+            "/api/v1/master-data/products",
+            &token,
+            json!({
+                "product_code": "P-M1-CUSTOM-001",
+                "product_name": "自定义特殊药品",
+                "special_drug_category_code": custom_code,
+                "attrs": { "storage_condition": "normal" }
+            }),
+            "m1-product-custom-category-create",
+        ))
+        .await
+        .expect("custom category create should respond");
+    assert_eq!(create_response.status(), StatusCode::OK);
+    let created: Product = serde_json::from_slice(
+        &to_bytes(create_response.into_body(), usize::MAX)
+            .await
+            .expect("create response body"),
+    )
+    .expect("custom category product response");
+    assert_eq!(
+        created.special_drug_category_code.as_deref(),
+        Some(custom_code)
+    );
+
+    let update_response = app
+        .oneshot(request_json_with_key(
+            "PATCH",
+            &format!("/api/v1/master-data/products/{}", created.id),
+            &token,
+            json!({ "special_drug_category_code": custom_code }),
+            "m1-product-custom-category-update",
+        ))
+        .await
+        .expect("custom category update should respond");
+    assert_eq!(update_response.status(), StatusCode::OK);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -302,6 +384,7 @@ async fn supplier_and_customer_create_routes_write_source_and_audit(pool: PgPool
                 .method("POST")
                 .uri("/api/v1/master-data/suppliers")
                 .header(AUTHORIZATION, format!("Bearer {token}"))
+                .header("idempotency-key", "supplier-create-source")
                 .header("content-type", "application/json")
                 .body(Body::from(
                     json!({
@@ -332,6 +415,7 @@ async fn supplier_and_customer_create_routes_write_source_and_audit(pool: PgPool
                 .method("POST")
                 .uri("/api/v1/master-data/customers")
                 .header(AUTHORIZATION, format!("Bearer {token}"))
+                .header("idempotency-key", "customer-create-source")
                 .header("content-type", "application/json")
                 .body(Body::from(
                     json!({

@@ -190,6 +190,48 @@ pub async fn list_events(
         builder.push(" AND resource_type = ");
         builder.push_bind(resource_type);
     }
+    if let Some(action) = query
+        .action
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        builder.push(" AND action = ");
+        builder.push_bind(action);
+    }
+    if let Some(resource_id) = query
+        .resource_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        builder.push(" AND resource_id = ");
+        builder.push_bind(resource_id);
+    }
+    if let Some(product_code) = query
+        .product_code
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        builder.push(" AND (COALESCE(diff->'before'->>'product_code', '') ILIKE '%' || ");
+        builder.push_bind(product_code);
+        builder.push(" || '%' OR COALESCE(diff->'after'->>'product_code', '') ILIKE '%' || ");
+        builder.push_bind(product_code);
+        builder.push(" || '%')");
+    }
+    if let Some(batch_no) = query
+        .batch_no
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        builder.push(" AND (COALESCE(diff->'before'->>'batch_no', '') ILIKE '%' || ");
+        builder.push_bind(batch_no);
+        builder.push(" || '%' OR COALESCE(diff->'after'->>'batch_no', '') ILIKE '%' || ");
+        builder.push_bind(batch_no);
+        builder.push(" || '%')");
+    }
     if let Some(actor_id) = query.actor_id {
         builder.push(" AND actor_id = ");
         builder.push_bind(actor_id);
@@ -237,6 +279,35 @@ pub async fn list_events(
         events,
         next_cursor,
     })
+}
+
+pub async fn export_events(
+    pool: &PgPool,
+    query: &AuditEventQuery,
+) -> Result<Vec<AuditEventRecord>, AuditError> {
+    // ponytail: bounded in-memory export; move to a DB cursor stream if exports exceed 100k rows.
+    let mut page_query = query.clone();
+    page_query.limit = MAX_AUDIT_EVENT_QUERY_LIMIT;
+    page_query.cursor = None;
+    let mut events = Vec::new();
+
+    loop {
+        let page = list_events(pool, &page_query).await?;
+        if events.len() + page.events.len() > super::models::MAX_AUDIT_EXPORT_EVENTS {
+            return Err(AuditError::ExportTooLarge);
+        }
+        let next_cursor = page.next_cursor;
+        events.extend(page.events);
+        match next_cursor {
+            Some(cursor) => {
+                if events.len() >= super::models::MAX_AUDIT_EXPORT_EVENTS {
+                    return Err(AuditError::ExportTooLarge);
+                }
+                page_query.cursor = Some(cursor);
+            }
+            None => return Ok(events),
+        }
+    }
 }
 
 pub async fn append_event_in_tx(

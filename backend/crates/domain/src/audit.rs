@@ -36,6 +36,8 @@ pub struct AuditEvent {
     pub trace_id: String,
     /// 发生时间。
     pub occurred_at: DateTime<Utc>,
+    /// 操作来源 IP。
+    pub ip: Option<String>,
     /// 操作者摘要。
     pub actor: AuditActor,
     /// 变更详情。

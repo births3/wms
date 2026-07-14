@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::{
-    body::Body,
+    body::{to_bytes, Body},
     http::{header::AUTHORIZATION, Request, StatusCode},
 };
 use chrono::Utc;
@@ -136,4 +136,88 @@ async fn feature_flag_writes_persist_owner_scoped_audit_events(pool: PgPool) {
             .await
             .expect("other owner audit count should query");
     assert_eq!(other_owner_count, 0);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn feature_flag_import_is_exported_from_postgres_for_same_owner(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let other_owner_id = Uuid::new_v4();
+    let app = config_center_router(ConfigCenterAppState::with_postgres(
+        FeatureFlagRegistry::empty(),
+        pool.clone(),
+    ))
+    .layer(auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(
+        AllowAllRevocationStore,
+    ))));
+    let token = bearer_token(owner_id);
+    let response = app
+        .oneshot(
+            Request::post("/api/v1/config-center/feature-flags/import")
+                .header(AUTHORIZATION, format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::json!({
+                        "flags": [{
+                            "key": "config_center_pg_roundtrip",
+                            "owner": "platform",
+                            "created_at": "2026-07-14",
+                            "cleanup_by": "2026-10-01",
+                            "enabled": true,
+                            "source": "operator_upload"
+                        }]
+                    })
+                    .to_string(),
+                ))
+                .expect("import request should build"),
+        )
+        .await
+        .expect("import route should respond");
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let reloaded = config_center_router(ConfigCenterAppState::with_postgres(
+        FeatureFlagRegistry::empty(),
+        pool,
+    ))
+    .layer(auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(
+        AllowAllRevocationStore,
+    ))));
+    let response = reloaded
+        .clone()
+        .oneshot(
+            Request::get("/api/v1/config-center/feature-flags/export")
+                .header(AUTHORIZATION, format!("Bearer {token}"))
+                .body(Body::empty())
+                .expect("export request should build"),
+        )
+        .await
+        .expect("export route should respond");
+    assert_eq!(response.status(), StatusCode::OK);
+    let exported: serde_json::Value = serde_json::from_slice(
+        &to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("export body should read"),
+    )
+    .expect("export should be json");
+    assert_eq!(exported["flags"][0]["key"], "config_center_pg_roundtrip");
+
+    let other_token = bearer_token(other_owner_id);
+    let response = reloaded
+        .oneshot(
+            Request::get("/api/v1/config-center/feature-flags/export")
+                .header(AUTHORIZATION, format!("Bearer {other_token}"))
+                .body(Body::empty())
+                .expect("other export request should build"),
+        )
+        .await
+        .expect("other export route should respond");
+    assert_eq!(response.status(), StatusCode::OK);
+    let other_exported: serde_json::Value = serde_json::from_slice(
+        &to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("other export body should read"),
+    )
+    .expect("other export should be json");
+    assert!(other_exported["flags"]
+        .as_array()
+        .is_some_and(Vec::is_empty));
 }

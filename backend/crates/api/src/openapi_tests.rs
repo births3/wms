@@ -22,6 +22,7 @@ mod tests {
             "/metrics",
             "/api/v1/auth/login",
             "/api/v1/auth/me",
+            "/api/v1/auth/sessions/revoke-others",
             "/api/v1/admin/menus/published",
             "/api/v1/admin/menus/draft",
             "/api/v1/admin/menus/draft/nodes",
@@ -30,6 +31,7 @@ mod tests {
             "/api/v1/admin/menus/publish",
             "/api/v1/admin/menus/rollback",
             "/api/v1/audit/events",
+            "/api/v1/audit/events/export",
             "/api/v1/audit/archive/partitions",
             "/api/v1/audit/archive/runs",
             "/api/v1/event-bus/deliveries/pending",
@@ -43,6 +45,9 @@ mod tests {
             "/api/v1/master-data/suppliers/{id}",
             "/api/v1/master-data/customers",
             "/api/v1/master-data/customers/{id}",
+            "/api/v1/master-data/customers/{customer_id}/addresses",
+            "/api/v1/master-data/customers/{customer_id}/addresses/{address_id}",
+            "/api/v1/master-data/customers/{customer_id}/profile",
             "/api/v1/master-data/warehouses",
             "/api/v1/master-data/warehouses/{id}",
             "/api/v1/master-data/locations",
@@ -58,22 +63,37 @@ mod tests {
             "/api/v1/code-generator/document-number-rules/{rule_code}",
             "/api/v1/code-generator/document-number-rules/{rule_code}/enabled",
             "/api/v1/code-generator/document-number-allocations",
+            "/api/v1/docks",
+            "/api/v1/docks/import",
+            "/api/v1/docks/{id}",
+            "/api/v1/dock-appointments/{id}",
+            "/api/v1/dock-appointments/{id}/cancel",
             "/api/v1/state-machines",
             "/api/v1/state-machines/{machine_code}",
             "/api/v1/state-machines/{machine_code}/transition-validation",
             "/api/v1/inbound/receiving-orders",
+            "/api/v1/inbound/receiving-dashboard",
             "/api/v1/inbound/receiving-orders/{id}",
+            "/api/v1/inbound/receiving-orders/{id}/print-data",
+            "/api/v1/inbound/receiving-orders/{id}/release",
             "/api/v1/inbound/receiving-orders/{id}/receive",
             "/api/v1/inbound/receiving-orders/{id}/reject",
             "/api/v1/inbound/receiving-orders/{id}/inspect",
             "/api/v1/inbound/receiving-orders/{id}/sign",
             "/api/v1/inbound/receiving-orders/{id}/putaway",
             "/api/v1/inventory/batches",
+            "/api/v1/inventory/batches/{id}/trace",
             "/api/v1/inventory/batches/putaway",
             "/api/v1/inventory/batches/status",
+            "/api/v1/inventory/status-transitions",
+            "/api/v1/inventory/status-transitions/{from_status}/{to_status}",
+            "/api/v1/inventory/batches/recall",
+            "/api/v1/inventory/batches/expire",
             "/api/v1/outbound/orders",
             "/api/v1/outbound/orders/{id}",
             "/api/v1/outbound/waves",
+            "/api/v1/outbound/waves/{wave_id}",
+            "/api/v1/outbound/waves/{wave_id}/cancel",
             "/api/v1/outbound/pick-tasks/{id}/complete",
             "/api/v1/outbound/orders/{id}/review",
             "/api/v1/outbound/orders/{id}/ship",
@@ -113,6 +133,7 @@ mod tests {
             "/api/v1/wechat-notify/settings",
             "/api/v1/wechat-notify/settings/test",
             "/api/v1/wechat-notify/send",
+            "/api/v1/wechat-notify/approvals",
             "/api/v1/wechat-notify/records",
             "/api/v1/wechat-notify/records/{record_id}/resend",
             "/api/v1/print-templates/field-libraries",
@@ -128,8 +149,16 @@ mod tests {
             "/api/v1/billing/statements",
             "/api/v1/billing/statements/{id}/confirm",
             "/api/v1/tms/dispatches",
+            "/api/v1/tms/route-plans",
             "/api/v1/tms/transit-temperature-readings",
             "/api/v1/tms/container-recoveries",
+            "/api/v1/inventory/counts",
+            "/api/v1/inventory/counts/{id}",
+            "/api/v1/inventory/counts/{id}/lines/{line_id}/submit",
+            "/api/v1/inventory/counts/{id}/approve",
+            "/api/v1/inventory/maintenance/tasks",
+            "/api/v1/inventory/maintenance/records",
+            "/api/v1/task-engine/task-types/{task_type_code}/enabled",
         ] {
             assert!(
                 json.contains(required_path),
@@ -161,6 +190,9 @@ mod tests {
             "\"ReceivingOrder\"",
             "\"ReceiveReceivingOrderRequest\"",
             "\"InventoryBatch\"",
+            "\"InventoryBatchTrace\"",
+            "\"MarkInventoryRecallRequest\"",
+            "\"ExpireInventoryBatchesRequest\"",
             "\"ColdChainDevice\"",
             "\"BillingContract\"",
             "\"ExecuteMappingRequest\"",
@@ -373,14 +405,24 @@ mod tests {
                 .is_some_and(|reason| !reason.is_empty()),
             "login should document idempotency exemption",
         );
-        let master_data_idempotency_pointer =
-            format!("/paths/~1api~1v1~1master-data~1products/post/{IDEMPOTENCY_EXEMPT_REASON}");
-        assert!(
-            doc.pointer(&master_data_idempotency_pointer)
-                .and_then(serde_json::Value::as_str)
-                .is_some_and(|reason| !reason.is_empty()),
-            "master-data legacy write should document idempotency exemption",
-        );
+        for operation in [
+            "/paths/~1api~1v1~1master-data~1products/post",
+            "/paths/~1api~1v1~1master-data~1suppliers/post",
+            "/paths/~1api~1v1~1master-data~1customers/post",
+            "/paths/~1api~1v1~1master-data~1warehouses/post",
+        ] {
+            let parameters = doc
+                .pointer(&format!("{operation}/parameters"))
+                .and_then(serde_json::Value::as_array)
+                .expect("M1 master-data create should declare parameters");
+            assert!(
+                parameters.iter().any(|parameter| {
+                    parameter.get("name").and_then(serde_json::Value::as_str)
+                        == Some("Idempotency-Key")
+                }),
+                "M1 master-data create should declare Idempotency-Key",
+            );
+        }
         let h4_settings_test_idempotency_pointer = format!(
             "/paths/~1api~1v1~1wechat-notify~1settings~1test/post/{IDEMPOTENCY_EXEMPT_REASON}"
         );

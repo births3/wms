@@ -5,14 +5,21 @@ use std::collections::BTreeMap;
 use chrono::{DateTime, NaiveDate, Utc};
 use uuid::Uuid;
 use wms_domain::{
-    CreateReceivingOrderRequest, InspectReceivingOrderRequest, InspectionSignatureRecord,
-    PutawayRecord, PutawayRequest, ReceiveReceivingOrderRequest, ReceivingInspectionRecord,
-    ReceivingOrder, ReceivingOrderReceipt, RejectReceivingOrderRequest,
-    UpdateReceivingOrderRequest, RECEIVING_DOCUMENT_TYPE_PURCHASE_INBOUND,
-    RECEIVING_DOCUMENT_TYPE_SALES_RETURN,
+    validate_create_receiving_order_request, CreateReceivingOrderRequest,
+    InspectReceivingOrderRequest, InspectionSignatureRecord, PutawayRecord, PutawayRequest,
+    ReceiveReceivingOrderRequest, ReceivingInspectionRecord, ReceivingOrder,
+    ReceivingOrderPrintData, ReceivingOrderReceipt, ReceivingOrderRequestValidationError,
+    RejectReceivingOrderRequest, UpdateReceivingOrderRequest,
+    RECEIVING_DOCUMENT_TYPE_PURCHASE_INBOUND, RECEIVING_DOCUMENT_TYPE_SALES_RETURN,
 };
 
 use crate::auth::AuthContext;
+
+mod batch_policy;
+use batch_policy::validate_receiving_order_lines;
+mod print_data;
+#[cfg(test)]
+mod print_data_tests;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ReceivingOrderError {
@@ -26,10 +33,17 @@ pub enum ReceivingOrderError {
     QuantityClosureMismatch,
     OverReceiptNotAllowed,
     InvalidQuantity,
+    MissingSupplier,
+    MissingExpectedArrival,
+    InvalidExpectedArrival,
+    MissingProduct,
+    MultipleProducts,
     InvalidReason,
     InvalidDocumentType,
+    InvalidBatchPolicy,
     BatchExpired,
     SameSigner,
+    UnauthorizedSigner,
     MissingSecondSigner,
 }
 
@@ -53,6 +67,8 @@ impl ReceivingOrderStore {
             return Err(ReceivingOrderError::EmptyLines);
         }
         validate_document_type(&req.document_type)?;
+        validate_receiving_order_lines(&req.document_type, &req.lines)?;
+        validate_create_receiving_order_request(&req, now).map_err(map_request_validation_error)?;
         if self
             .orders
             .values()
@@ -225,6 +241,9 @@ impl ReceivingOrderStore {
             actual_qty: req.actual_qty,
             shortage_qty: req.shortage_qty,
             rejected_qty: req.rejected_qty,
+            arrival_temperature_celsius: req.arrival_temperature_celsius,
+            exception_note: req.exception_note,
+            details: req.details,
             occurred_at: now,
         };
         order.status = "inspecting".to_string();
@@ -270,6 +289,9 @@ impl ReceivingOrderStore {
             actual_qty: 0,
             shortage_qty: 0,
             rejected_qty: expected_qty,
+            arrival_temperature_celsius: None,
+            exception_note: Some(req.reason),
+            details: None,
             occurred_at: now,
         };
         order.status = "closed_rejected".to_string();
@@ -289,10 +311,45 @@ impl ReceivingOrderStore {
         if req.accepted_qty < 0 || req.rejected_qty < 0 {
             return Err(ReceivingOrderError::InvalidQuantity);
         }
+        let inspected_qty = req
+            .accepted_qty
+            .checked_add(req.rejected_qty)
+            .filter(|qty| *qty > 0)
+            .ok_or(ReceivingOrderError::InvalidQuantity)?;
         let expiry_date = NaiveDate::parse_from_str(&req.expiry_date, "%Y-%m-%d")
             .map_err(|_| ReceivingOrderError::BatchExpired)?;
         if expiry_date < today {
             return Err(ReceivingOrderError::BatchExpired);
+        }
+        if req.batch_no.trim().is_empty() {
+            return Err(ReceivingOrderError::InvalidBatchPolicy);
+        }
+
+        let received_qty = self
+            .receipts
+            .values()
+            .filter(|receipt| receipt.receiving_order_id == id && receipt.owner_id == ctx.owner_id)
+            .try_fold(0_i64, |total, receipt| {
+                total.checked_add(receipt.actual_qty)
+            })
+            .ok_or(ReceivingOrderError::InvalidQuantity)?;
+        let previous_inspected_qty = self
+            .inspections
+            .values()
+            .filter(|inspection| {
+                inspection.receiving_order_id == id && inspection.owner_id == ctx.owner_id
+            })
+            .try_fold(0_i64, |total, inspection| {
+                total
+                    .checked_add(inspection.accepted_qty)
+                    .and_then(|total| total.checked_add(inspection.rejected_qty))
+            })
+            .ok_or(ReceivingOrderError::InvalidQuantity)?;
+        if previous_inspected_qty
+            .checked_add(inspected_qty)
+            .is_none_or(|qty| qty > received_qty)
+        {
+            return Err(ReceivingOrderError::QuantityClosureMismatch);
         }
 
         let order = self
@@ -307,6 +364,39 @@ impl ReceivingOrderStore {
                 expected: "inspecting",
                 actual: order.status.clone(),
             });
+        }
+        let line = order
+            .lines
+            .iter_mut()
+            .find(|line| match order.document_type.as_str() {
+                RECEIVING_DOCUMENT_TYPE_SALES_RETURN => {
+                    line.batch_no.as_deref() == Some(req.batch_no.as_str())
+                }
+                _ => line.batch_no.is_none(),
+            })
+            .ok_or(ReceivingOrderError::InvalidBatchPolicy)?;
+        let line_inspected_qty = self
+            .inspections
+            .values()
+            .filter(|inspection| {
+                inspection.receiving_order_id == id
+                    && inspection.owner_id == ctx.owner_id
+                    && inspection.batch_no == req.batch_no
+            })
+            .try_fold(0_i64, |total, inspection| {
+                total
+                    .checked_add(inspection.accepted_qty)
+                    .and_then(|total| total.checked_add(inspection.rejected_qty))
+            })
+            .ok_or(ReceivingOrderError::InvalidQuantity)?;
+        if line_inspected_qty
+            .checked_add(inspected_qty)
+            .is_none_or(|qty| qty > line.expected_qty)
+        {
+            return Err(ReceivingOrderError::QuantityClosureMismatch);
+        }
+        if order.document_type == RECEIVING_DOCUMENT_TYPE_PURCHASE_INBOUND {
+            line.batch_no = Some(req.batch_no.clone());
         }
 
         let inspection = ReceivingInspectionRecord {
@@ -330,6 +420,52 @@ impl ReceivingOrderStore {
         req: wms_domain::SignInspectionRequest,
         now: DateTime<Utc>,
     ) -> Result<InspectionSignatureRecord, ReceivingOrderError> {
+        if req.first_signer_id != ctx.user_id {
+            return Err(ReceivingOrderError::UnauthorizedSigner);
+        }
+        let received_qty = self
+            .receipts
+            .values()
+            .filter(|receipt| receipt.receiving_order_id == id && receipt.owner_id == ctx.owner_id)
+            .try_fold(0_i64, |total, receipt| {
+                total.checked_add(receipt.actual_qty)
+            })
+            .ok_or(ReceivingOrderError::InvalidQuantity)?;
+        let inspected_qty = self
+            .inspections
+            .values()
+            .filter(|inspection| {
+                inspection.receiving_order_id == id && inspection.owner_id == ctx.owner_id
+            })
+            .try_fold(0_i64, |total, inspection| {
+                total
+                    .checked_add(inspection.accepted_qty)
+                    .and_then(|total| total.checked_add(inspection.rejected_qty))
+            })
+            .ok_or(ReceivingOrderError::InvalidQuantity)?;
+        if received_qty <= 0 || inspected_qty != received_qty {
+            return Err(ReceivingOrderError::QuantityClosureMismatch);
+        }
+        let all_lines_inspected = self
+            .orders
+            .get(&id)
+            .filter(|order| order.owner_id == ctx.owner_id)
+            .map(|order| {
+                order.lines.iter().all(|line| {
+                    line.batch_no.as_deref().is_some_and(|batch_no| {
+                        self.inspections.values().any(|inspection| {
+                            inspection.receiving_order_id == id
+                                && inspection.owner_id == ctx.owner_id
+                                && inspection.batch_no == batch_no
+                        })
+                    })
+                })
+            })
+            .ok_or(ReceivingOrderError::NotFound)?;
+        if !all_lines_inspected {
+            return Err(ReceivingOrderError::QuantityClosureMismatch);
+        }
+
         let order = self
             .orders
             .get_mut(&id)
@@ -415,438 +551,25 @@ fn validate_document_type(value: &str) -> Result<(), ReceivingOrderError> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use chrono::{TimeZone, Utc};
-    use uuid::Uuid;
-    use wms_domain::{
-        CreateReceivingOrderRequest, InspectReceivingOrderRequest, PutawayRequest,
-        ReceiveReceivingOrderRequest, ReceivingOrderLine, RejectReceivingOrderRequest,
-        UpdateReceivingOrderRequest,
-    };
-
-    use super::{ReceivingOrderError, ReceivingOrderStore};
-    use crate::auth::AuthContext;
-
-    fn ctx(owner_id: Uuid) -> AuthContext {
-        AuthContext {
-            user_id: Uuid::new_v4(),
-            owner_id,
-            actor_name: "tester".to_string(),
-            permissions: vec!["m2.write".to_string()],
-            jti: Uuid::new_v4().to_string(),
+fn map_request_validation_error(
+    error: ReceivingOrderRequestValidationError,
+) -> ReceivingOrderError {
+    match error {
+        ReceivingOrderRequestValidationError::MissingSupplier => {
+            ReceivingOrderError::MissingSupplier
         }
-    }
-
-    fn line() -> ReceivingOrderLine {
-        ReceivingOrderLine {
-            line_no: 1,
-            product_id: None,
-            product_code: "P-001".to_string(),
-            expected_qty: 10,
-            batch_no: Some("B202606".to_string()),
-            production_date: Some("2026-01-01".to_string()),
-            expiry_date: Some("2028-01-01".to_string()),
+        ReceivingOrderRequestValidationError::MissingExpectedArrival => {
+            ReceivingOrderError::MissingExpectedArrival
         }
-    }
-
-    #[test]
-    fn receiving_order_crud_is_owner_scoped() {
-        let now = Utc
-            .with_ymd_and_hms(2026, 6, 4, 10, 0, 0)
-            .single()
-            .expect("valid time");
-        let ctx_a = ctx(Uuid::new_v4());
-        let ctx_b = ctx(Uuid::new_v4());
-        let mut store = ReceivingOrderStore::default();
-
-        let created = store
-            .create(
-                &ctx_a,
-                CreateReceivingOrderRequest {
-                    receipt_no: "ASN-001".to_string(),
-                    document_type: "purchase_inbound".to_string(),
-                    supplier_id: Some(Uuid::new_v4()),
-                    warehouse_id: Uuid::new_v4(),
-                    external_ref: Some("ERP-ASN-001".to_string()),
-                    expected_arrival_at: None,
-                    lines: vec![line()],
-                },
-                now,
-            )
-            .expect("create receiving order");
-
-        assert_eq!(store.list(&ctx_a).len(), 1);
-        assert!(matches!(
-            store.get(&ctx_b, created.id),
-            Err(ReceivingOrderError::NotFound)
-        ));
-
-        store
-            .delete(&ctx_a, created.id)
-            .expect("delete draft receiving order");
-        assert!(store.list(&ctx_a).is_empty());
-    }
-
-    #[test]
-    fn receiving_order_requires_lines() {
-        let now = Utc
-            .with_ymd_and_hms(2026, 6, 4, 10, 0, 0)
-            .single()
-            .expect("valid time");
-        let ctx = ctx(Uuid::new_v4());
-        let mut store = ReceivingOrderStore::default();
-
-        let result = store.create(
-            &ctx,
-            CreateReceivingOrderRequest {
-                receipt_no: "ASN-EMPTY".to_string(),
-                document_type: "purchase_inbound".to_string(),
-                supplier_id: Some(Uuid::new_v4()),
-                warehouse_id: Uuid::new_v4(),
-                external_ref: None,
-                expected_arrival_at: None,
-                lines: vec![],
-            },
-            now,
-        );
-
-        assert!(matches!(result, Err(ReceivingOrderError::EmptyLines)));
-    }
-
-    #[test]
-    fn receiving_order_update_validation_is_atomic() {
-        let now = Utc::now();
-        let ctx = ctx(Uuid::new_v4());
-        let mut store = ReceivingOrderStore::default();
-        let created = store
-            .create(
-                &ctx,
-                CreateReceivingOrderRequest {
-                    receipt_no: "ASN-ATOMIC-001".to_string(),
-                    document_type: "purchase_inbound".to_string(),
-                    supplier_id: Some(Uuid::new_v4()),
-                    warehouse_id: Uuid::new_v4(),
-                    external_ref: None,
-                    expected_arrival_at: None,
-                    lines: vec![line()],
-                },
-                now,
-            )
-            .expect("create order");
-
-        let result = store.update(
-            &ctx,
-            created.id,
-            UpdateReceivingOrderRequest {
-                supplier_id: None,
-                warehouse_id: Some(Uuid::new_v4()),
-                external_ref: Some(Some("MUST-NOT-PERSIST".to_string())),
-                expected_arrival_at: None,
-                lines: Some(Vec::new()),
-            },
-            now,
-        );
-
-        assert!(matches!(result, Err(ReceivingOrderError::EmptyLines)));
-        assert_eq!(
-            store.get(&ctx, created.id).expect("order").external_ref,
-            None
-        );
-    }
-
-    #[test]
-    fn receiving_order_update_can_clear_external_reference() {
-        let now = Utc::now();
-        let ctx = ctx(Uuid::new_v4());
-        let mut store = ReceivingOrderStore::default();
-        let created = store
-            .create(
-                &ctx,
-                CreateReceivingOrderRequest {
-                    receipt_no: "ASN-CLEAR-001".to_string(),
-                    document_type: "purchase_inbound".to_string(),
-                    supplier_id: Some(Uuid::new_v4()),
-                    warehouse_id: Uuid::new_v4(),
-                    external_ref: Some("ERP-CLEAR-001".to_string()),
-                    expected_arrival_at: Some(now),
-                    lines: vec![line()],
-                },
-                now,
-            )
-            .expect("create order");
-
-        let updated = store
-            .update(
-                &ctx,
-                created.id,
-                UpdateReceivingOrderRequest {
-                    supplier_id: None,
-                    warehouse_id: None,
-                    external_ref: Some(None),
-                    expected_arrival_at: None,
-                    lines: None,
-                },
-                now,
-            )
-            .expect("clear nullable fields");
-
-        assert_eq!(updated.supplier_id, created.supplier_id);
-        assert_eq!(updated.external_ref, None);
-        assert_eq!(updated.expected_arrival_at, created.expected_arrival_at);
-    }
-
-    #[test]
-    fn receiving_order_rejects_invalid_document_type() {
-        let now = Utc
-            .with_ymd_and_hms(2026, 6, 4, 10, 0, 0)
-            .single()
-            .expect("valid time");
-        let ctx = ctx(Uuid::new_v4());
-        let mut store = ReceivingOrderStore::default();
-
-        let result = store.create(
-            &ctx,
-            CreateReceivingOrderRequest {
-                receipt_no: "ASN-BAD-TYPE".to_string(),
-                document_type: "purchase_return".to_string(),
-                supplier_id: Some(Uuid::new_v4()),
-                warehouse_id: Uuid::new_v4(),
-                external_ref: None,
-                expected_arrival_at: None,
-                lines: vec![line()],
-            },
-            now,
-        );
-
-        assert!(matches!(
-            result,
-            Err(ReceivingOrderError::InvalidDocumentType)
-        ));
-    }
-
-    #[test]
-    fn receiving_workflow_enforces_quantity_closure_and_dual_signature() {
-        let now = Utc
-            .with_ymd_and_hms(2026, 6, 4, 10, 0, 0)
-            .single()
-            .expect("valid time");
-        let ctx = ctx(Uuid::new_v4());
-        let mut store = ReceivingOrderStore::default();
-        let created = store
-            .create(
-                &ctx,
-                CreateReceivingOrderRequest {
-                    receipt_no: "ASN-W3-001".to_string(),
-                    document_type: "purchase_inbound".to_string(),
-                    supplier_id: Some(Uuid::new_v4()),
-                    warehouse_id: Uuid::new_v4(),
-                    external_ref: None,
-                    expected_arrival_at: None,
-                    lines: vec![line()],
-                },
-                now,
-            )
-            .expect("create order");
-        store.release(&ctx, created.id, now).expect("release order");
-
-        let mismatch = store.receive(
-            &ctx,
-            created.id,
-            ReceiveReceivingOrderRequest {
-                actual_qty: 8,
-                shortage_qty: 1,
-                rejected_qty: 0,
-                arrival_temperature_celsius: None,
-                exception_note: None,
-            },
-            now,
-        );
-        assert!(matches!(
-            mismatch,
-            Err(ReceivingOrderError::QuantityClosureMismatch)
-        ));
-
-        let receipt = store
-            .receive(
-                &ctx,
-                created.id,
-                ReceiveReceivingOrderRequest {
-                    actual_qty: 8,
-                    shortage_qty: 2,
-                    rejected_qty: 0,
-                    arrival_temperature_celsius: None,
-                    exception_note: None,
-                },
-                now,
-            )
-            .expect("closed receipt");
-        assert_eq!(receipt.actual_qty, 8);
-
-        store
-            .inspect(
-                &ctx,
-                created.id,
-                InspectReceivingOrderRequest {
-                    batch_no: "B202606".to_string(),
-                    accepted_qty: 8,
-                    rejected_qty: 0,
-                    production_date: "2026-01-01".to_string(),
-                    expiry_date: "2028-01-01".to_string(),
-                    quality_status: "qualified".to_string(),
-                    trace_codes: vec![],
-                },
-                chrono::NaiveDate::from_ymd_opt(2026, 6, 4).expect("valid date"),
-                now,
-            )
-            .expect("inspect");
-
-        let same_signer = store.sign_inspection(
-            &ctx,
-            created.id,
-            wms_domain::SignInspectionRequest {
-                first_signer_id: ctx.user_id,
-                second_signer_id: Some(ctx.user_id),
-                dual_required: true,
-            },
-            now,
-        );
-        assert!(matches!(same_signer, Err(ReceivingOrderError::SameSigner)));
-
-        let signature = store
-            .sign_inspection(
-                &ctx,
-                created.id,
-                wms_domain::SignInspectionRequest {
-                    first_signer_id: ctx.user_id,
-                    second_signer_id: Some(Uuid::new_v4()),
-                    dual_required: true,
-                },
-                now,
-            )
-            .expect("sign");
-        assert_eq!(signature.owner_id, ctx.owner_id);
-
-        let putaway = store
-            .putaway(
-                &ctx,
-                created.id,
-                PutawayRequest {
-                    batch_no: "B202606".to_string(),
-                    product_code: "P-001".to_string(),
-                    qty: 8,
-                    location_id: Uuid::new_v4(),
-                    location_code: "A-01-01".to_string(),
-                    quality_status: "qualified".to_string(),
-                },
-                now,
-            )
-            .expect("putaway");
-        assert_eq!(putaway.qty, 8);
-        assert_eq!(
-            store.get(&ctx, created.id).expect("get").status,
-            "completed"
-        );
-    }
-
-    #[test]
-    fn receiving_order_reject_accepts_receiving_status_and_closes_order() {
-        let now = Utc
-            .with_ymd_and_hms(2026, 6, 4, 10, 0, 0)
-            .single()
-            .expect("valid time");
-        let ctx = ctx(Uuid::new_v4());
-        let mut store = ReceivingOrderStore::default();
-        let created = store
-            .create(
-                &ctx,
-                CreateReceivingOrderRequest {
-                    receipt_no: "ASN-W3-REJECT".to_string(),
-                    document_type: "purchase_inbound".to_string(),
-                    supplier_id: Some(Uuid::new_v4()),
-                    warehouse_id: Uuid::new_v4(),
-                    external_ref: None,
-                    expected_arrival_at: None,
-                    lines: vec![line()],
-                },
-                now,
-            )
-            .expect("create order");
-        store.release(&ctx, created.id, now).expect("release order");
-
-        let receipt = store
-            .reject(
-                &ctx,
-                created.id,
-                RejectReceivingOrderRequest {
-                    reason: "外包装严重破损".to_string(),
-                },
-                now,
-            )
-            .expect("reject receiving order");
-
-        assert_eq!(receipt.rejected_qty, 10);
-        assert_eq!(
-            store.get(&ctx, created.id).expect("get").status,
-            "closed_rejected"
-        );
-    }
-
-    #[test]
-    fn receiving_inspection_rejects_expired_batch() {
-        let now = Utc
-            .with_ymd_and_hms(2026, 6, 4, 10, 0, 0)
-            .single()
-            .expect("valid time");
-        let ctx = ctx(Uuid::new_v4());
-        let mut store = ReceivingOrderStore::default();
-        let created = store
-            .create(
-                &ctx,
-                CreateReceivingOrderRequest {
-                    receipt_no: "ASN-W3-002".to_string(),
-                    document_type: "purchase_inbound".to_string(),
-                    supplier_id: Some(Uuid::new_v4()),
-                    warehouse_id: Uuid::new_v4(),
-                    external_ref: None,
-                    expected_arrival_at: None,
-                    lines: vec![line()],
-                },
-                now,
-            )
-            .expect("create order");
-        store.release(&ctx, created.id, now).expect("release order");
-        store
-            .receive(
-                &ctx,
-                created.id,
-                ReceiveReceivingOrderRequest {
-                    actual_qty: 10,
-                    shortage_qty: 0,
-                    rejected_qty: 0,
-                    arrival_temperature_celsius: None,
-                    exception_note: None,
-                },
-                now,
-            )
-            .expect("receive");
-
-        let result = store.inspect(
-            &ctx,
-            created.id,
-            InspectReceivingOrderRequest {
-                batch_no: "B-EXPIRED".to_string(),
-                accepted_qty: 1,
-                rejected_qty: 0,
-                production_date: "2025-01-01".to_string(),
-                expiry_date: "2026-01-01".to_string(),
-                quality_status: "qualified".to_string(),
-                trace_codes: vec![],
-            },
-            chrono::NaiveDate::from_ymd_opt(2026, 6, 4).expect("valid date"),
-            now,
-        );
-
-        assert!(matches!(result, Err(ReceivingOrderError::BatchExpired)));
+        ReceivingOrderRequestValidationError::InvalidExpectedArrival => {
+            ReceivingOrderError::InvalidExpectedArrival
+        }
+        ReceivingOrderRequestValidationError::MissingProduct => ReceivingOrderError::MissingProduct,
+        ReceivingOrderRequestValidationError::MultipleProducts => {
+            ReceivingOrderError::MultipleProducts
+        }
     }
 }
+
+#[cfg(test)]
+mod tests;

@@ -25,6 +25,7 @@ use wms_domain::{
 use crate::{
     audit::AuditWriteRequest,
     auth::{AuthContext, AuthError},
+    tms_plus::{ReceiveTmsRoutePlanRequest, TmsRoutePlan},
     wave5_repository::{PgWave5Repository, Wave5RepositoryError},
 };
 
@@ -147,6 +148,10 @@ pub fn wave5_router(state: Wave5AppState) -> Router {
             post(confirm_billing_statement_handler),
         )
         .route("/api/v1/tms/dispatches", post(receive_tms_dispatch_handler))
+        .route(
+            "/api/v1/tms/route-plans",
+            post(receive_tms_route_plan_handler),
+        )
         .route(
             "/api/v1/tms/transit-temperature-readings",
             post(ingest_transit_temperature_handler),
@@ -389,6 +394,29 @@ async fn receive_tms_dispatch_handler(
     Ok(Json(outcome.value))
 }
 
+async fn receive_tms_route_plan_handler(
+    ctx: AuthContext,
+    State(state): State<Wave5AppState>,
+    headers: HeaderMap,
+    Json(req): Json<ReceiveTmsRoutePlanRequest>,
+) -> Result<Json<TmsRoutePlan>, Wave5HandlerError> {
+    ctx.require_permission("m10.write")?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
+    let now = Utc::now();
+    let audit = audit(
+        &ctx,
+        "receive_tms_route_plan",
+        "M10",
+        "tms_route_plan",
+        &req.dispatch_result_id,
+    );
+    let outcome = state
+        .wave5_repository
+        .receive_tms_route_plan(&ctx, req, now, &idempotency_key, Some(audit))
+        .await?;
+    Ok(Json(outcome.value))
+}
+
 async fn ingest_transit_temperature_handler(
     ctx: AuthContext,
     State(state): State<Wave5AppState>,
@@ -471,9 +499,11 @@ mod tests {
 
     use super::{
         confirm_container_recovery_handler, create_pack_job_handler,
-        create_packing_station_handler, wave5_router, Wave5AppState, Wave5HandlerError,
+        create_packing_station_handler, receive_tms_route_plan_handler, wave5_router,
+        Wave5AppState, Wave5HandlerError,
     };
     use crate::auth::{AuthContext, AuthError};
+    use crate::tms_plus::{ReceiveTmsRoutePlanRequest, TmsRouteStopRequest};
     use crate::wave5_repository::Wave5RepositoryError;
 
     fn ctx(owner_id: Uuid, permissions: &[&str]) -> AuthContext {
@@ -590,6 +620,43 @@ mod tests {
                 customer_id: Uuid::new_v4(),
                 delivery_provider_type: "own_fleet".to_string(),
                 shipped_at: None,
+            }),
+        )
+        .await
+        .expect_err("m10.write should be checked before repository access");
+
+        assert!(matches!(
+            result,
+            Wave5HandlerError::Auth(AuthError::PermissionDenied(permission))
+                if permission == "m10.write"
+        ));
+    }
+
+    #[tokio::test]
+    async fn tms_route_plan_handler_requires_m10_permission() {
+        let owner_id = Uuid::new_v4();
+        let pool = PgPool::connect_lazy("postgres://localhost/wms")
+            .expect("lazy pool should not connect during handler auth test");
+        let state = Wave5AppState::with_postgres(pool);
+        let order_id = Uuid::new_v4();
+        let result = receive_tms_route_plan_handler(
+            ctx(owner_id, &[]),
+            State(state),
+            HeaderMap::new(),
+            Json(ReceiveTmsRoutePlanRequest {
+                dispatch_result_id: "TMS-RESULT-001".to_string(),
+                delivery_date: chrono::NaiveDate::from_ymd_opt(2026, 7, 14).expect("valid date"),
+                vehicle_no: "VH-001".to_string(),
+                plate_no: "沪A12345".to_string(),
+                driver_user_id: Uuid::new_v4(),
+                version: 1,
+                outbound_order_ids: vec![order_id],
+                stops: vec![TmsRouteStopRequest {
+                    store_id: Uuid::new_v4(),
+                    sequence: 1,
+                    estimated_arrival_at: chrono::Utc::now(),
+                    outbound_order_ids: vec![order_id],
+                }],
             }),
         )
         .await

@@ -4,14 +4,50 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::common::PageMeta;
+use crate::receiving_outbound::ReceivingOrder;
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct ReceiveReceivingOrderRequest {
     pub actual_qty: i64,
     pub shortage_qty: i64,
     pub rejected_qty: i64,
+    #[serde(default)]
     pub arrival_temperature_celsius: Option<f64>,
+    #[serde(default)]
     pub exception_note: Option<String>,
+    #[serde(default)]
+    pub details: Option<ReceivingReceiptDetails>,
+}
+
+/// 收货现场信息。固定字段使用类型化结构，避免打印或审计依赖前端展示字符串。
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ReceivingReceiptDetails {
+    #[serde(default)]
+    pub temperature_control_method: Option<String>,
+    #[serde(default)]
+    pub vehicle_no: Option<String>,
+    #[serde(default)]
+    pub origin: Option<String>,
+    #[serde(default)]
+    pub departure_at: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub arrival_at: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub storage_at: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub transport_mode: Option<String>,
+    #[serde(default)]
+    pub carrier: Option<String>,
+    #[serde(default)]
+    pub contact_name: Option<String>,
+    #[serde(default)]
+    pub contact_phone: Option<String>,
+    #[serde(default)]
+    pub contact_id_no: Option<String>,
+    #[serde(default)]
+    pub seal_checked: Option<String>,
+    #[serde(default)]
+    pub filing_checked: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -27,6 +63,9 @@ pub struct ReceivingOrderReceipt {
     pub actual_qty: i64,
     pub shortage_qty: i64,
     pub rejected_qty: i64,
+    pub arrival_temperature_celsius: Option<f64>,
+    pub exception_note: Option<String>,
+    pub details: Option<ReceivingReceiptDetails>,
     pub occurred_at: DateTime<Utc>,
 }
 
@@ -70,6 +109,15 @@ pub struct InspectionSignatureRecord {
     pub signed_at: DateTime<Utc>,
 }
 
+/// 收货单打印所需的业务事实，按货主范围聚合，不包含模板或渲染逻辑。
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ReceivingOrderPrintData {
+    pub order: ReceivingOrder,
+    pub receipts: Vec<ReceivingOrderReceipt>,
+    pub inspections: Vec<ReceivingInspectionRecord>,
+    pub signatures: Vec<InspectionSignatureRecord>,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct PutawayRequest {
     pub batch_no: String,
@@ -78,6 +126,37 @@ pub struct PutawayRequest {
     pub location_id: Uuid,
     pub location_code: String,
     pub quality_status: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct PutawayRecommendationQuery {
+    pub product_code: String,
+    pub batch_no: String,
+    pub qty: i64,
+    pub quality_status: String,
+    pub limit: Option<u32>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct PutawayLocationRecommendation {
+    pub location_id: Uuid,
+    pub location_code: String,
+    pub temperature_zone: String,
+    pub quality_color: String,
+    pub available_volume_cm3: i64,
+    pub required_volume_cm3: i64,
+    pub same_product: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct PutawayRecommendationResponse {
+    pub receiving_order_id: Uuid,
+    pub owner_id: Uuid,
+    pub product_code: String,
+    pub batch_no: String,
+    pub qty: i64,
+    pub quality_status: String,
+    pub data: Vec<PutawayLocationRecommendation>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -111,6 +190,22 @@ pub struct InventoryBatch {
     pub updated_at: DateTime<Utc>,
 }
 
+#[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
+pub struct InventoryBatchQuery {
+    pub product_code: Option<String>,
+    pub batch_no: Option<String>,
+    pub location_code: Option<String>,
+    pub location_type: Option<String>,
+    pub zone_code: Option<String>,
+    pub quality_status: Option<String>,
+    pub production_from: Option<String>,
+    pub production_to: Option<String>,
+    pub expiry_from: Option<String>,
+    pub expiry_to: Option<String>,
+    pub created_from: Option<String>,
+    pub created_to: Option<String>,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct InventoryBatchListResponse {
     pub data: Vec<InventoryBatch>,
@@ -130,6 +225,29 @@ pub struct PutawayInventoryRequest {
     pub source_receiving_order_id: Uuid,
 }
 
+#[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
+pub struct ReceivingDashboardQuery {
+    pub supplier_id: Option<Uuid>,
+    pub product_code: Option<String>,
+    pub from: Option<DateTime<Utc>>,
+    pub to: Option<DateTime<Utc>>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ReceivingDashboardRow {
+    pub created_at: DateTime<Utc>,
+    pub status: String,
+    pub order_count: i64,
+    pub expected_qty: i64,
+    pub abnormal: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ReceivingDashboardResponse {
+    pub data: Vec<ReceivingDashboardRow>,
+    pub refreshed_at: DateTime<Utc>,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct ChangeInventoryStatusRequest {
     pub batch_id: Uuid,
@@ -137,6 +255,52 @@ pub struct ChangeInventoryStatusRequest {
     pub reason: String,
     pub approval_source: String,
     pub approval_id: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct InventoryStatusTransition {
+    pub id: Uuid,
+    pub owner_id: Option<Uuid>,
+    pub from_status: String,
+    pub to_status: String,
+    pub approval_sources: Vec<String>,
+    pub enabled: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct InventoryStatusTransitionListResponse {
+    pub data: Vec<InventoryStatusTransition>,
+    pub page: PageMeta,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct UpsertInventoryStatusTransitionRequest {
+    pub owner_id: Option<Uuid>,
+    pub approval_sources: Vec<String>,
+    pub enabled: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct MarkInventoryRecallRequest {
+    pub batch_id: Uuid,
+    pub reason: String,
+    pub approval_source: String,
+    pub approval_id: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CancelInventoryRecallRequest {
+    pub batch_id: Uuid,
+    pub reason: String,
+    pub approval_id: String,
+    pub second_approver_id: Uuid,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
+pub struct ExpireInventoryBatchesRequest {
+    pub as_of: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -149,4 +313,24 @@ pub struct InventoryMovement {
     pub source_document_type: String,
     pub source_document_id: Uuid,
     pub occurred_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct InventoryStatusChange {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub batch_id: Uuid,
+    pub from_status: String,
+    pub to_status: String,
+    pub reason: String,
+    pub approval_source: String,
+    pub approval_id: String,
+    pub occurred_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct InventoryBatchTrace {
+    pub batch: InventoryBatch,
+    pub movements: Vec<InventoryMovement>,
+    pub status_changes: Vec<InventoryStatusChange>,
 }

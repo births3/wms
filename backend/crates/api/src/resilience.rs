@@ -20,7 +20,7 @@ use wms_domain::{ErrorResponse, ResilienceStatus};
 
 use crate::{
     audit::{append_event, AuditDiff, AuditWriteRequest},
-    auth::{decode_auth_context, JWT_SECRET_ENV},
+    auth::{decode_auth_context, AuthContext, JWT_SECRET_ENV},
 };
 
 const DEFAULT_GLOBAL_QPS: u32 = 1000;
@@ -34,8 +34,7 @@ const DEFAULT_CIRCUIT_FAILURES: u32 = 5;
 const DEFAULT_CIRCUIT_OPEN_SECONDS: u64 = 30;
 const API_KEY_HEADER: &str = "x-wms-api-key";
 const INTERNAL_SERVICE_HEADER: &str = "x-wms-internal-service";
-const API_KEY_AUDIT_OWNER_ID_ENV: &str = "WMS_H3_API_KEY_AUDIT_OWNER_ID";
-const COLD_CHAIN_OWNER_ID_ENV: &str = "WMS_M5_COLD_CHAIN_OWNER_ID";
+const REQUEST_ID_HEADER: &str = "x-request-id";
 
 #[derive(Clone, Debug)]
 pub struct ResilienceConfig {
@@ -55,7 +54,6 @@ pub struct ResilienceState {
     config: ResilienceConfig,
     inner: Arc<Mutex<ResilienceInner>>,
     audit_pool: Option<PgPool>,
-    api_key_audit_owner_id: Option<Uuid>,
 }
 
 #[derive(Debug)]
@@ -87,6 +85,10 @@ enum CallerIdentity {
     },
     ApiKey {
         key_hash: String,
+        key_id: Option<Uuid>,
+        owner_id: Option<Uuid>,
+        actor_name: Option<String>,
+        jti: Option<String>,
     },
     Internal,
     Anonymous,
@@ -128,7 +130,6 @@ impl ResilienceState {
                 DEFAULT_CIRCUIT_OPEN_SECONDS as u32,
             )),
         })
-        .with_optional_api_key_audit_owner_id(api_key_audit_owner_id_from_env())
     }
 
     pub fn new_for_test(
@@ -166,22 +167,11 @@ impl ResilienceState {
                 consecutive_failures: 0,
             })),
             audit_pool: None,
-            api_key_audit_owner_id: None,
         }
     }
 
     pub fn with_audit_pool(mut self, pool: PgPool) -> Self {
         self.audit_pool = Some(pool);
-        self
-    }
-
-    pub fn with_api_key_audit_owner_id(mut self, owner_id: Uuid) -> Self {
-        self.api_key_audit_owner_id = Some(owner_id);
-        self
-    }
-
-    fn with_optional_api_key_audit_owner_id(mut self, owner_id: Option<Uuid>) -> Self {
-        self.api_key_audit_owner_id = owner_id;
         self
     }
 
@@ -288,7 +278,7 @@ impl ResilienceState {
                     ));
                 }
             }
-            CallerIdentity::ApiKey { key_hash } => {
+            CallerIdentity::ApiKey { key_hash, .. } => {
                 let bucket = inner
                     .api_keys
                     .entry(key_hash.clone())
@@ -332,14 +322,28 @@ impl ResilienceState {
         None
     }
 
-    async fn write_audit(&self, caller: &CallerIdentity, path: &str, kind: ResilienceAuditKind) {
+    async fn write_audit(
+        &self,
+        caller: &CallerIdentity,
+        method: &str,
+        path: &str,
+        kind: ResilienceAuditKind,
+        status: StatusCode,
+        ip: Option<&str>,
+        user_agent: Option<&str>,
+        request_id: Option<Uuid>,
+    ) {
         let Some(pool) = &self.audit_pool else {
             return;
         };
-        let Some(req) = audit_request(caller, path, kind, self.api_key_audit_owner_id) else {
+        let Some(req) = audit_request(
+            caller, method, path, kind, status, ip, user_agent, request_id,
+        ) else {
             return;
         };
-        let _ = append_event(pool, &req).await;
+        if let Err(error) = append_event(pool, &req).await {
+            tracing::error!(?error, path, "H3 resilience audit write failed");
+        }
     }
 
     fn lock_inner(&self) -> std::sync::MutexGuard<'_, ResilienceInner> {
@@ -393,20 +397,50 @@ pub async fn resilience_middleware(
     }
 
     let path = request.uri().path().to_string();
+    let method = request.method().to_string();
+    let ip = client_ip(request.headers());
+    let user_agent = request
+        .headers()
+        .get(header::USER_AGENT)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_string);
+    let request_id = request_id(request.headers());
     let caller = caller_identity(&request);
     if let Err(rejection) = state.check_request(&caller) {
         let kind = match rejection {
             ResilienceRejection::RateLimited(_) => ResilienceAuditKind::RateLimited,
             ResilienceRejection::CircuitOpen(_) => ResilienceAuditKind::CircuitDegraded,
         };
-        let response = rejection_response(rejection);
-        state.write_audit(&caller, &path, kind).await;
+        let response = rejection_response(rejection, request_id);
+        state
+            .write_audit(
+                &caller,
+                &method,
+                &path,
+                kind,
+                response.status(),
+                ip.as_deref(),
+                user_agent.as_deref(),
+                request_id,
+            )
+            .await;
         return response;
     }
 
     let response = next.run(request).await;
     if let Some(kind) = state.record_response(response.status()) {
-        state.write_audit(&caller, &path, kind).await;
+        state
+            .write_audit(
+                &caller,
+                &method,
+                &path,
+                kind,
+                response.status(),
+                ip.as_deref(),
+                user_agent.as_deref(),
+                request_id,
+            )
+            .await;
     }
     response
 }
@@ -440,8 +474,22 @@ fn caller_identity(request: &Request) -> CallerIdentity {
         .map(str::trim)
         .filter(|value| !value.is_empty())
     {
+        let key_hash = short_sha256(value);
+        if let Some(context) = request.extensions().get::<AuthContext>() {
+            return CallerIdentity::ApiKey {
+                key_hash,
+                key_id: Some(context.user_id),
+                owner_id: Some(context.owner_id),
+                actor_name: Some(context.actor_name.clone()),
+                jti: Some(context.jti.clone()),
+            };
+        }
         return CallerIdentity::ApiKey {
-            key_hash: short_sha256(value),
+            key_hash,
+            key_id: None,
+            owner_id: None,
+            actor_name: None,
+            jti: None,
         };
     }
 
@@ -468,10 +516,19 @@ fn caller_identity(request: &Request) -> CallerIdentity {
 
 fn audit_request(
     caller: &CallerIdentity,
+    method: &str,
     path: &str,
     kind: ResilienceAuditKind,
-    api_key_audit_owner_id: Option<Uuid>,
+    status: StatusCode,
+    ip: Option<&str>,
+    user_agent: Option<&str>,
+    request_id: Option<Uuid>,
 ) -> Option<AuditWriteRequest> {
+    let source = match caller {
+        CallerIdentity::User { .. } => "bearer",
+        CallerIdentity::ApiKey { .. } => "api_key",
+        CallerIdentity::Internal | CallerIdentity::Anonymous => return None,
+    };
     let (actor_id, actor_name, owner_id, jti) = match caller {
         CallerIdentity::User {
             user_id,
@@ -479,11 +536,19 @@ fn audit_request(
             actor_name,
             jti,
         } => (*user_id, actor_name.clone(), *owner_id, jti.clone()),
-        CallerIdentity::ApiKey { key_hash } => (
-            Uuid::nil(),
-            format!("api-key:{key_hash}"),
-            api_key_audit_owner_id?,
-            format!("api-key:{key_hash}"),
+        CallerIdentity::ApiKey {
+            key_hash,
+            key_id,
+            owner_id,
+            actor_name,
+            jti,
+        } => (
+            key_id.unwrap_or_else(Uuid::nil),
+            actor_name
+                .clone()
+                .unwrap_or_else(|| format!("api-key:{key_hash}")),
+            (*owner_id)?,
+            jti.clone().unwrap_or_else(|| format!("api-key:{key_hash}")),
         ),
         CallerIdentity::Internal | CallerIdentity::Anonymous => return None,
     };
@@ -506,20 +571,34 @@ fn audit_request(
             serde_json::json!({}),
             serde_json::json!({
                 "event": event,
+                "method": method,
                 "path": path,
+                "status_code": status.as_u16(),
+                "source": source,
             }),
         )),
-        request_id: None,
-        ip: None,
-        user_agent: None,
+        request_id,
+        ip: ip.map(str::to_string),
+        user_agent: user_agent.map(str::to_string),
     })
 }
 
-fn api_key_audit_owner_id_from_env() -> Option<Uuid> {
-    env::var(API_KEY_AUDIT_OWNER_ID_ENV)
-        .or_else(|_| env::var(COLD_CHAIN_OWNER_ID_ENV))
-        .ok()
-        .and_then(|value| value.parse().ok())
+fn request_id(headers: &axum::http::HeaderMap) -> Option<Uuid> {
+    headers
+        .get(REQUEST_ID_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| Uuid::parse_str(value.trim()).ok())
+}
+
+fn client_ip(headers: &axum::http::HeaderMap) -> Option<String> {
+    ["x-forwarded-for", "x-real-ip"].iter().find_map(|name| {
+        headers
+            .get(*name)
+            .and_then(|value| value.to_str().ok())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(|value| value.split(',').next().unwrap_or(value).trim().to_string())
+    })
 }
 
 fn short_sha256(value: &str) -> String {
@@ -528,7 +607,7 @@ fn short_sha256(value: &str) -> String {
     hex::encode(hasher.finalize()).chars().take(16).collect()
 }
 
-fn rejection_response(rejection: ResilienceRejection) -> Response {
+fn rejection_response(rejection: ResilienceRejection, request_id: Option<Uuid>) -> Response {
     let (status, code, message, retry_after, circuit_state, degraded) = match rejection {
         ResilienceRejection::RateLimited(seconds) => (
             StatusCode::TOO_MANY_REQUESTS,
@@ -557,7 +636,9 @@ fn rejection_response(rejection: ResilienceRejection) -> Response {
                 "degraded": degraded,
                 "data_may_be_stale": degraded,
             }),
-            trace_id: "unavailable".to_string(),
+            trace_id: request_id
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "unavailable".to_string()),
             retry_hint: retry_after.map(|seconds| format!("{seconds}s 后重试")),
         }),
     )
@@ -576,6 +657,11 @@ fn rejection_response(rejection: ResilienceRejection) -> Response {
         response
             .headers_mut()
             .insert("x-wms-degraded-response", HeaderValue::from_static("true"));
+    }
+    if let Some(request_id) = request_id {
+        if let Ok(value) = HeaderValue::from_str(&request_id.to_string()) {
+            response.headers_mut().insert(REQUEST_ID_HEADER, value);
+        }
     }
     response
 }
@@ -600,4 +686,47 @@ fn env_u32(name: &str, default: u32) -> u32 {
         .and_then(|value| value.trim().parse::<u32>().ok())
         .filter(|value| *value > 0)
         .unwrap_or(default)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{audit_request, request_id, CallerIdentity, ResilienceAuditKind};
+    use axum::http::{HeaderMap, HeaderValue, StatusCode};
+    use uuid::Uuid;
+
+    #[test]
+    fn api_key_audit_requires_bound_owner_context() {
+        let caller = CallerIdentity::ApiKey {
+            key_hash: "key-hash".to_string(),
+            key_id: None,
+            owner_id: None,
+            actor_name: None,
+            jti: None,
+        };
+        assert!(audit_request(
+            &caller,
+            "GET",
+            "/dependency",
+            ResilienceAuditKind::RateLimited,
+            StatusCode::TOO_MANY_REQUESTS,
+            None,
+            None,
+            None,
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn request_id_accepts_only_uuid_header_values() {
+        let id = Uuid::new_v4();
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "x-request-id",
+            HeaderValue::from_str(&id.to_string()).expect("uuid header should be valid"),
+        );
+        assert_eq!(request_id(&headers), Some(id));
+
+        headers.insert("x-request-id", HeaderValue::from_static("not-a-uuid"));
+        assert_eq!(request_id(&headers), None);
+    }
 }

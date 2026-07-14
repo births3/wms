@@ -1,3 +1,11 @@
 include!("master_data_postgres/master_data_postgres_part1.rs");
 include!("master_data_postgres/master_data_postgres_part2.rs");
 include!("master_data_postgres/master_data_postgres_part3.rs");
+include!("master_data_postgres/m1_customer_addresses.rs");
+include!("master_data_postgres/m1_permission_defaults.rs");
+include!("master_data_postgres/m1_location_code_validation.rs");
+include!("master_data_postgres/m1_location_capacity.rs");
+include!("master_data_postgres/m1_location_disable_guard.rs");
+include!("master_data_postgres/m1_location_owner_binding.rs");
+include!("master_data_postgres/m1_warehouse_disable_cascade.rs");
+include!("master_data_postgres/m1_warehouse_type.rs");

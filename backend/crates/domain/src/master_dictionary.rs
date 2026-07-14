@@ -144,6 +144,83 @@ pub struct CustomerListResponse {
     pub page: PageMeta,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CustomerQualification {
+    pub certificate_type: String,
+    pub certificate_no: String,
+    pub expires_at: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CustomerProfile {
+    pub customer_id: Uuid,
+    pub owner_id: Uuid,
+    pub customer_type: String,
+    pub contact_name: Option<String>,
+    pub contact_phone: Option<String>,
+    pub business_scope: Vec<String>,
+    pub qualification_certificates: Vec<CustomerQualification>,
+    pub chain_name: Option<String>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct UpsertCustomerProfileRequest {
+    pub customer_type: String,
+    pub contact_name: String,
+    pub contact_phone: String,
+    #[serde(default)]
+    pub business_scope: Vec<String>,
+    #[serde(default)]
+    pub qualification_certificates: Vec<CustomerQualification>,
+    pub chain_name: Option<String>,
+}
+
+/// 客户收货地址。
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CustomerAddress {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub customer_id: Uuid,
+    pub province: String,
+    pub city: String,
+    pub district: String,
+    pub detail_address: String,
+    pub contact_name: String,
+    pub contact_phone: String,
+    pub is_default: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CreateCustomerAddressRequest {
+    pub province: String,
+    pub city: String,
+    pub district: String,
+    pub detail_address: String,
+    pub contact_name: String,
+    pub contact_phone: String,
+    pub is_default: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct UpdateCustomerAddressRequest {
+    pub province: Option<String>,
+    pub city: Option<String>,
+    pub district: Option<String>,
+    pub detail_address: Option<String>,
+    pub contact_name: Option<String>,
+    pub contact_phone: Option<String>,
+    pub is_default: Option<bool>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CustomerAddressListResponse {
+    pub data: Vec<CustomerAddress>,
+    pub page: PageMeta,
+}
+
 /// 仓库基础档案。
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct Warehouse {
@@ -151,6 +228,7 @@ pub struct Warehouse {
     pub owner_id: Uuid,
     pub warehouse_code: String,
     pub warehouse_name: String,
+    pub warehouse_type: String,
     pub status: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -160,12 +238,19 @@ pub struct Warehouse {
 pub struct CreateWarehouseRequest {
     pub warehouse_code: String,
     pub warehouse_name: String,
+    #[serde(default = "default_warehouse_type")]
+    pub warehouse_type: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct UpdateWarehouseRequest {
     pub warehouse_name: Option<String>,
+    pub warehouse_type: Option<String>,
     pub status: Option<String>,
+}
+
+fn default_warehouse_type() -> String {
+    "physical".to_string()
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]

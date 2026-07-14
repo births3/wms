@@ -7,6 +7,7 @@ use crate::auth::AuthContext;
 pub const AUDIT_SEAL_BATCH_SIZE: i64 = 10_000;
 pub const DEFAULT_AUDIT_EVENT_QUERY_LIMIT: u32 = 100;
 pub const MAX_AUDIT_EVENT_QUERY_LIMIT: u32 = 100;
+pub const MAX_AUDIT_EXPORT_EVENTS: usize = 100_000;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AuditDiff {
@@ -97,6 +98,10 @@ pub struct AuditEventQueryCursor {
 pub struct AuditEventQuery {
     pub owner_id: uuid::Uuid,
     pub resource_type: Option<String>,
+    pub action: Option<String>,
+    pub resource_id: Option<String>,
+    pub product_code: Option<String>,
+    pub batch_no: Option<String>,
     pub actor_id: Option<uuid::Uuid>,
     pub from: Option<DateTime<Utc>>,
     pub to: Option<DateTime<Utc>>,
@@ -119,6 +124,7 @@ pub enum AuditError {
     },
     EmptyChain,
     Database(String),
+    ExportTooLarge,
     Serialize(String),
 }
 

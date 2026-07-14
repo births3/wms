@@ -5,9 +5,9 @@ use std::collections::BTreeMap;
 use chrono::{DateTime, NaiveDate, Utc};
 use uuid::Uuid;
 use wms_domain::{
-    BillingAccount, BillingChargeCalculation, BillingContract, BillingRule,
-    CalculateBillingChargesRequest, CreateBillingAccountRequest, CreateBillingContractRequest,
-    CreateBillingRuleRequest,
+    validate_billing_rule_request, BillingAccount, BillingChargeCalculation, BillingContract,
+    BillingRule, BillingRuleValidationError, CalculateBillingChargesRequest,
+    CreateBillingAccountRequest, CreateBillingContractRequest, CreateBillingRuleRequest,
 };
 
 use crate::auth::AuthContext;
@@ -18,6 +18,9 @@ pub enum BillingError {
     DuplicateAccountCode(String),
     DuplicateContractNo(String),
     InvalidRate,
+    InvalidChargeItem,
+    InvalidUnit,
+    InvalidBillingCycle,
     InvalidQuantity,
     InvalidEffectiveWindow,
     BillingRuleConflict,
@@ -95,9 +98,7 @@ impl BillingStore {
         req: CreateBillingRuleRequest,
         now: DateTime<Utc>,
     ) -> Result<BillingRule, BillingError> {
-        if req.unit_price_cents < 0 {
-            return Err(BillingError::InvalidRate);
-        }
+        validate_billing_rule_request(&req).map_err(map_rule_validation_error)?;
         let contract = self
             .contracts
             .get(&req.contract_id)
@@ -106,6 +107,11 @@ impl BillingStore {
         let effective_from = parse_date(&req.effective_from)?;
         let effective_to = parse_date(&req.effective_to)?;
         if effective_to < effective_from {
+            return Err(BillingError::InvalidEffectiveWindow);
+        }
+        let contract_from = parse_date(&contract.valid_from)?;
+        let contract_to = parse_date(&contract.valid_to)?;
+        if effective_from < contract_from || effective_to > contract_to {
             return Err(BillingError::InvalidEffectiveWindow);
         }
         for existing in self.rules.values() {
@@ -209,6 +215,16 @@ impl BillingStore {
 
 fn parse_date(value: &str) -> Result<NaiveDate, BillingError> {
     NaiveDate::parse_from_str(value, "%Y-%m-%d").map_err(|_| BillingError::InvalidEffectiveWindow)
+}
+
+fn map_rule_validation_error(error: BillingRuleValidationError) -> BillingError {
+    match error {
+        BillingRuleValidationError::InvalidChargeItem => BillingError::InvalidChargeItem,
+        BillingRuleValidationError::InvalidUnit => BillingError::InvalidUnit,
+        BillingRuleValidationError::InvalidBillingCycle => BillingError::InvalidBillingCycle,
+        BillingRuleValidationError::InvalidRate => BillingError::InvalidRate,
+        BillingRuleValidationError::InvalidEffectiveWindow => BillingError::InvalidEffectiveWindow,
+    }
 }
 
 #[cfg(test)]

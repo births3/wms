@@ -4,8 +4,7 @@ use std::sync::Arc;
 
 use axum::{
     extract::{Path, State},
-    http::{HeaderMap, StatusCode},
-    response::{IntoResponse, Response},
+    http::HeaderMap,
     routing::{get, put},
     Json, Router,
 };
@@ -14,17 +13,21 @@ use serde::{de::DeserializeOwned, Serialize};
 use sha2::{Digest, Sha256};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
-use wms_domain::ErrorResponse;
 
 use crate::{
     audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
-    auth::{AuthContext, AuthError, AuthRevocationStore},
+    auth::{AuthContext, AuthRevocationStore},
 };
 
+mod errors;
+mod user_management;
+
+pub use errors::RoleError;
+
 pub use crate::role_management_models::{
-    BatchAssignRolesRequest, BatchAssignRolesResponse, CreateRoleRequest, DeleteRoleResponse,
-    PermissionListResponse, PermissionResponse, ReplaceRolePermissionsRequest, RoleListResponse,
-    RoleResponse, RoleUserListResponse, RoleUserResponse, UpdateRoleRequest,
+    BatchAssignRolesRequest, BatchAssignRolesResponse, CreateRoleRequest, CreateUserRequest,
+    DeleteRoleResponse, PermissionListResponse, PermissionResponse, ReplaceRolePermissionsRequest,
+    RoleListResponse, RoleResponse, RoleUserListResponse, RoleUserResponse, UpdateRoleRequest,
 };
 
 pub const ROLE_MANAGE_PERMISSION: &str = "h1.roles.manage";
@@ -54,7 +57,10 @@ pub fn role_management_router(state: RoleManagementState) -> Router {
         )
         .route("/api/v1/auth/user-roles/batch", put(batch_assign_roles))
         .route("/api/v1/auth/permissions", get(list_permissions))
-        .route("/api/v1/auth/users", get(list_role_users))
+        .route(
+            "/api/v1/auth/users",
+            get(list_role_users).post(user_management::create_user),
+        )
         .with_state(state)
 }
 
@@ -65,6 +71,7 @@ struct RoleRow {
     role_name: String,
     data_scope: String,
     parent_role_id: Option<Uuid>,
+    created_at: DateTime<Utc>,
 }
 
 async fn list_roles(
@@ -73,7 +80,7 @@ async fn list_roles(
 ) -> Result<Json<RoleListResponse>, RoleError> {
     ctx.require_permission(ROLE_MANAGE_PERMISSION)?;
     let rows = sqlx::query_as::<_, RoleRow>(
-        "SELECT id,role_code,role_name,data_scope,parent_role_id FROM auth_roles WHERE owner_id=$1 ORDER BY role_code",
+        "SELECT id,role_code,role_name,data_scope,parent_role_id,created_at FROM auth_roles WHERE owner_id=$1 ORDER BY role_code",
     )
     .bind(ctx.owner_id)
     .fetch_all(&state.pool)
@@ -165,7 +172,7 @@ async fn create_role(
     ensure_parent(&mut tx, ctx.owner_id, req.parent_role_id, None).await?;
     let id = Uuid::new_v4();
     let row = sqlx::query_as::<_, RoleRow>(
-        "INSERT INTO auth_roles(id,owner_id,role_code,role_name,data_scope,parent_role_id) VALUES($1,$2,$3,$4,$5,$6) RETURNING id,role_code,role_name,data_scope,parent_role_id",
+        "INSERT INTO auth_roles(id,owner_id,role_code,role_name,data_scope,parent_role_id) VALUES($1,$2,$3,$4,$5,$6) RETURNING id,role_code,role_name,data_scope,parent_role_id,created_at",
     )
     .bind(id).bind(ctx.owner_id).bind(req.role_code.trim()).bind(req.role_name.trim())
     .bind(req.data_scope.trim()).bind(req.parent_role_id)
@@ -206,7 +213,7 @@ async fn update_role(
     }
     ensure_role_owner(&mut tx, ctx.owner_id, role_id).await?;
     ensure_parent(&mut tx, ctx.owner_id, req.parent_role_id, Some(role_id)).await?;
-    let row=sqlx::query_as::<_,RoleRow>("UPDATE auth_roles SET role_name=$3,data_scope=$4,parent_role_id=$5,updated_at=now() WHERE id=$1 AND owner_id=$2 RETURNING id,role_code,role_name,data_scope,parent_role_id")
+    let row=sqlx::query_as::<_,RoleRow>("UPDATE auth_roles SET role_name=$3,data_scope=$4,parent_role_id=$5,updated_at=now() WHERE id=$1 AND owner_id=$2 RETURNING id,role_code,role_name,data_scope,parent_role_id,created_at")
         .bind(role_id).bind(ctx.owner_id).bind(req.role_name.trim()).bind(req.data_scope.trim()).bind(req.parent_role_id).fetch_one(&mut *tx).await?;
     let response = role_response_tx(&mut tx, row).await?;
     let users = affected_users(&mut tx, ctx.owner_id, role_id).await?;
@@ -531,7 +538,7 @@ async fn fetch_role_tx(
     owner: Uuid,
     id: Uuid,
 ) -> Result<RoleRow, RoleError> {
-    sqlx::query_as("SELECT id,role_code,role_name,data_scope,parent_role_id FROM auth_roles WHERE owner_id=$1 AND id=$2").bind(owner).bind(id).fetch_one(&mut **tx).await.map_err(Into::into)
+    sqlx::query_as("SELECT id,role_code,role_name,data_scope,parent_role_id,created_at FROM auth_roles WHERE owner_id=$1 AND id=$2").bind(owner).bind(id).fetch_one(&mut **tx).await.map_err(Into::into)
 }
 
 async fn role_response(pool: &PgPool, row: RoleRow) -> Result<RoleResponse, RoleError> {
@@ -559,6 +566,7 @@ async fn role_response_tx(
         data_scope: row.data_scope,
         parent_role_id: row.parent_role_id,
         permission_codes,
+        created_at: row.created_at,
     })
 }
 
@@ -665,19 +673,22 @@ async fn finish<T: Serialize>(
     action: &str,
 ) -> Result<(), RoleError> {
     let body = serde_json::to_value(response).map_err(|_| RoleError::Serialize)?;
-    sqlx::query("INSERT INTO idempotency_request(id,owner_id,idempotency_key,request_hash,method,path,status_code,response_body,resource_type,resource_id,expires_at) VALUES($1,$2,$3,$4,$5,$6,200,$7,'auth_role',$8,$9)")
-        .bind(Uuid::new_v4()).bind(ctx.owner_id).bind(key).bind(hash).bind(method).bind(path).bind(&body).bind(resource_id.to_string()).bind(Utc::now()+Duration::hours(24)).execute(&mut **tx).await?;
+    let resource_type = if action.contains("user_roles") {
+        "auth_user_roles"
+    } else if action.starts_with("auth.user.") {
+        "auth_user"
+    } else {
+        "auth_role"
+    };
+    sqlx::query("INSERT INTO idempotency_request(id,owner_id,idempotency_key,request_hash,method,path,status_code,response_body,resource_type,resource_id,expires_at) VALUES($1,$2,$3,$4,$5,$6,200,$7,$8,$9,$10)")
+        .bind(Uuid::new_v4()).bind(ctx.owner_id).bind(key).bind(hash).bind(method).bind(path).bind(&body).bind(resource_type).bind(resource_id.to_string()).bind(Utc::now()+Duration::hours(24)).execute(&mut **tx).await?;
     append_event_in_tx(
         tx,
         &AuditWriteRequest::from_auth_context(
             ctx,
             action,
             "H1",
-            if action.contains("user_roles") {
-                "auth_user_roles"
-            } else {
-                "auth_role"
-            },
+            resource_type,
             resource_id.to_string(),
             Some(AuditDiff::compute(serde_json::json!({}), body)),
         ),
@@ -692,89 +703,5 @@ fn map_write_error(error: sqlx::Error) -> RoleError {
         RoleError::DuplicateRole
     } else {
         RoleError::Database
-    }
-}
-
-#[derive(Debug)]
-pub enum RoleError {
-    Auth(AuthError),
-    Database,
-    Audit,
-    Serialize,
-    Validation,
-    MissingIdempotency,
-    IdempotencyConflict,
-    DuplicateRole,
-    RoleInUse,
-    UnknownPermission,
-    CrossOwner,
-    Revocation,
-}
-impl From<AuthError> for RoleError {
-    fn from(e: AuthError) -> Self {
-        Self::Auth(e)
-    }
-}
-impl From<sqlx::Error> for RoleError {
-    fn from(_: sqlx::Error) -> Self {
-        Self::Database
-    }
-}
-impl IntoResponse for RoleError {
-    fn into_response(self) -> Response {
-        if let Self::Auth(e) = self {
-            return e.into_response();
-        }
-        let (status, code, message) = match self {
-            Self::MissingIdempotency => (
-                StatusCode::BAD_REQUEST,
-                "H1-IDEMPOTENCY-REQUIRED",
-                "缺少 Idempotency-Key",
-            ),
-            Self::IdempotencyConflict => (
-                StatusCode::CONFLICT,
-                "H1-IDEMPOTENCY-CONFLICT",
-                "幂等键已用于不同请求",
-            ),
-            Self::DuplicateRole => (StatusCode::CONFLICT, "H1-ROLE-DUPLICATE", "角色编码已存在"),
-            Self::RoleInUse => (
-                StatusCode::CONFLICT,
-                "H1-ROLE-IN-USE",
-                "角色已绑定用户或子角色",
-            ),
-            Self::UnknownPermission => (
-                StatusCode::UNPROCESSABLE_ENTITY,
-                "H1-PERMISSION-UNKNOWN",
-                "包含未知权限码",
-            ),
-            Self::CrossOwner => (StatusCode::FORBIDDEN, "AUTH-004", "跨货主访问被拒绝"),
-            Self::Validation => (
-                StatusCode::UNPROCESSABLE_ENTITY,
-                "H1-ROLE-INVALID",
-                "角色参数非法",
-            ),
-            Self::Revocation => (
-                StatusCode::SERVICE_UNAVAILABLE,
-                "H1-REVOCATION-UNAVAILABLE",
-                "权限撤销存储不可用",
-            ),
-            _ => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "H1-ROLE-DATABASE",
-                "角色权限操作失败",
-            ),
-        };
-        (
-            status,
-            Json(ErrorResponse {
-                code: code.into(),
-                message: message.into(),
-                severity: "error".into(),
-                details: serde_json::json!({}),
-                trace_id: "unavailable".into(),
-                retry_hint: None,
-            }),
-        )
-            .into_response()
     }
 }

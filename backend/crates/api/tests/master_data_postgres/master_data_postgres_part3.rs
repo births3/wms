@@ -33,7 +33,7 @@ async fn warehouse_zone_location_routes_persist_update_disable_and_isolate_owner
     .await;
     let location: Location = json_response(
         app.clone(),
-        request_json(
+        request_json_with_key(
             "POST",
             "/api/v1/master-data/locations",
             &writer,
@@ -42,9 +42,26 @@ async fn warehouse_zone_location_routes_persist_update_disable_and_isolate_owner
                 "row_no": 1, "column_no": 1, "layer_no": 1, "max_volume_cm3": 1000,
                 "max_sku_count": 1, "location_type": "storage", "bound_owner_id": null
             }),
+            "m1-location-create-replay",
         ),
     )
     .await;
+    let replayed_location: Location = json_response(
+        app.clone(),
+        request_json_with_key(
+            "POST",
+            "/api/v1/master-data/locations",
+            &writer,
+            json!({
+                "warehouse_id": warehouse.id, "zone_id": zone.id, "location_code": "A01-01-01-01",
+                "row_no": 1, "column_no": 1, "layer_no": 1, "max_volume_cm3": 1000,
+                "max_sku_count": 1, "location_type": "storage", "bound_owner_id": null
+            }),
+            "m1-location-create-replay",
+        ),
+    )
+    .await;
+    assert_eq!(location.id, replayed_location.id);
 
     let warehouse: Warehouse = json_response(
         app.clone(),
@@ -109,7 +126,7 @@ async fn warehouse_zone_location_routes_persist_update_disable_and_isolate_owner
     let audit_count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*)::BIGINT FROM audit_event WHERE owner_id=$1 AND resource_type IN ('warehouse','warehouse_zone','location')",
     ).bind(owner_id).fetch_one(&pool).await.expect("audit count");
-    assert_eq!(audit_count, 6);
+    assert_eq!(audit_count, 8);
     let diff: serde_json::Value = sqlx::query_scalar(
         "SELECT diff FROM audit_event WHERE owner_id=$1 AND resource_type='warehouse_zone' AND action='update_warehouse_zone'",
     )
@@ -134,14 +151,27 @@ async fn warehouse_zone_create_replays_idempotency_key_and_rejects_changed_reque
     );
     let warehouse: Warehouse = json_response(
         app.clone(),
-        request_json(
+        request_json_with_key(
             "POST",
             "/api/v1/master-data/warehouses",
             &writer,
             json!({"warehouse_code":"WH-IDEM-01","warehouse_name":"幂等测试仓"}),
+            "warehouse-create-idempotency",
         ),
     )
     .await;
+    let replayed_warehouse: Warehouse = json_response(
+        app.clone(),
+        request_json_with_key(
+            "POST",
+            "/api/v1/master-data/warehouses",
+            &writer,
+            json!({"warehouse_code":"WH-IDEM-01","warehouse_name":"幂等测试仓"}),
+            "warehouse-create-idempotency",
+        ),
+    )
+    .await;
+    assert_eq!(warehouse.id, replayed_warehouse.id);
     let body = json!({
         "warehouse_id": warehouse.id, "zone_code":"IDEM-01", "zone_name":"幂等库区",
         "temperature_zone":"normal", "quality_color":"qualified_green"
@@ -190,14 +220,60 @@ async fn product_supplier_customer_updates_persist_and_append_audit(pool: PgPool
     );
     let product: Product = json_response(app.clone(), request_json("POST", "/api/v1/master-data/products", &writer, json!({
         "product_code":"P-LIFE-01", "product_name":"原商品", "approval_no":null, "spec":"1盒", "dosage_form":null,
-        "manufacturer":null, "special_drug_category_code":"normal", "attrs":{"storage_condition":"normal","source":"manual"}
+        "manufacturer":null, "special_drug_category_code":"none", "attrs":{"storage_condition":"normal","source":"manual"}
     }))).await;
-    let supplier: Supplier = json_response(app.clone(), request_json("POST", "/api/v1/master-data/suppliers", &writer, json!({
+    let supplier_body = json!({
         "supplier_code":"S-LIFE-01", "supplier_name":"原供应商", "license_no":"USCC-LIFE-01", "contact_name":null, "source":"manual"
-    }))).await;
-    let customer: Customer = json_response(app.clone(), request_json("POST", "/api/v1/master-data/customers", &writer, json!({
+    });
+    let supplier: Supplier = json_response(
+        app.clone(),
+        request_json_with_key(
+            "POST",
+            "/api/v1/master-data/suppliers",
+            &writer,
+            supplier_body.clone(),
+            "supplier-life-create",
+        ),
+    )
+    .await;
+    let replayed_supplier: Supplier = json_response(
+        app.clone(),
+        request_json_with_key(
+            "POST",
+            "/api/v1/master-data/suppliers",
+            &writer,
+            supplier_body,
+            "supplier-life-create",
+        ),
+    )
+    .await;
+    assert_eq!(supplier.id, replayed_supplier.id);
+    let customer_body = json!({
         "customer_code":"C-LIFE-01", "customer_name":"原客户", "license_no":"LIC-LIFE-01", "source":"manual"
-    }))).await;
+    });
+    let customer: Customer = json_response(
+        app.clone(),
+        request_json_with_key(
+            "POST",
+            "/api/v1/master-data/customers",
+            &writer,
+            customer_body.clone(),
+            "customer-life-create",
+        ),
+    )
+    .await;
+    let replayed_customer: Customer = json_response(
+        app.clone(),
+        request_json_with_key(
+            "POST",
+            "/api/v1/master-data/customers",
+            &writer,
+            customer_body,
+            "customer-life-create",
+        ),
+    )
+    .await;
+    assert_eq!(customer.id, replayed_customer.id);
 
     let product: Product = json_response(
         app.clone(),

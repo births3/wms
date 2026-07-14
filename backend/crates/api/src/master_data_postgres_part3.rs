@@ -5,7 +5,7 @@ impl PgMasterDataReadRepository {
         id: Uuid,
     ) -> Result<Product, MasterDataError> {
         sqlx::query_as::<_, ProductRow>(
-            "SELECT id, owner_id, product_code, product_name, specification, dosage_form, storage_condition, special_drug_category, approval_no, manufacturer, source, status, created_at, updated_at FROM products WHERE owner_id = $1 AND id = $2",
+            "SELECT id, owner_id, product_code, product_name, specification, dosage_form, storage_condition, special_drug_category, approval_no, manufacturer, source, attrs, status, created_at, updated_at FROM products WHERE owner_id = $1 AND id = $2",
         )
         .bind(ctx.owner_id)
         .bind(id)
@@ -22,8 +22,31 @@ impl PgMasterDataReadRepository {
         id: Uuid,
         req: UpdateProductRequest,
         now: DateTime<Utc>,
+        idempotency_key: &str,
     ) -> Result<Product, MasterDataError> {
+        if let Some(attrs) = req.attrs.as_ref() {
+            if attrs.get("storage_condition").is_some() {
+                validate_product_storage_condition(attrs)?;
+            }
+        }
+        let request_hash = request_hash(&json!({
+            "path": format!("/api/v1/master-data/products/{id}"),
+            "request": &req,
+        }))?;
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
+        lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
+        if let Some(value) = replay_idempotency::<Product>(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            now,
+        )
+        .await?
+        {
+            tx.commit().await.map_err(map_db_error)?;
+            return Ok(value);
+        }
         let before = load_master_data_before(&mut tx, ctx.owner_id, id, "product").await?;
         let storage_condition = req
             .attrs
@@ -33,17 +56,42 @@ impl PgMasterDataReadRepository {
             .attrs
             .as_ref()
             .and_then(|attrs| string_attr(attrs, "source"));
+        if let Some(category) = req.special_drug_category_code.as_deref() {
+            ensure_enabled_dictionary_item(
+                &mut tx,
+                ctx.owner_id,
+                SPECIAL_DRUG_CATEGORY_DICT,
+                category,
+                now,
+            )
+            .await
+            .map_err(|_| MasterDataError::InvalidSpecialDrugCategory)?;
+        }
         let row = sqlx::query_as::<_, ProductRow>(
-            r#"UPDATE products SET product_name = COALESCE($3, product_name), approval_no = COALESCE($4, approval_no), specification = COALESCE($5, specification), dosage_form = COALESCE($6, dosage_form), manufacturer = COALESCE($7, manufacturer), special_drug_category = COALESCE($8, special_drug_category), status = COALESCE($9, status), storage_condition = COALESCE($10, storage_condition), source = COALESCE($11, source), updated_at = $12, version = version + 1 WHERE owner_id = $1 AND id = $2 RETURNING id, owner_id, product_code, product_name, specification, dosage_form, storage_condition, special_drug_category, approval_no, manufacturer, source, status, created_at, updated_at"#,
+            r#"UPDATE products SET product_name = COALESCE($3, product_name), approval_no = COALESCE($4, approval_no), specification = COALESCE($5, specification), dosage_form = COALESCE($6, dosage_form), manufacturer = COALESCE($7, manufacturer), special_drug_category = COALESCE($8, special_drug_category), status = COALESCE($9, status), storage_condition = COALESCE($10, storage_condition), source = COALESCE($11, source), attrs = CASE WHEN $12 IS NULL THEN attrs ELSE attrs || $12 END, updated_at = $13, version = version + 1 WHERE owner_id = $1 AND id = $2 RETURNING id, owner_id, product_code, product_name, specification, dosage_form, storage_condition, special_drug_category, approval_no, manufacturer, source, attrs, status, created_at, updated_at"#,
         )
         .bind(ctx.owner_id).bind(id).bind(req.product_name).bind(req.approval_no)
         .bind(req.spec).bind(req.dosage_form).bind(req.manufacturer)
-        .bind(req.special_drug_category_code).bind(req.status).bind(storage_condition).bind(source).bind(now)
+        .bind(req.special_drug_category_code).bind(req.status).bind(storage_condition).bind(source)
+        .bind(req.attrs).bind(now)
         .fetch_optional(&mut *tx).await.map_err(map_db_error)?
         .ok_or(MasterDataError::NotFound)?;
         let value = Product::from(row);
         append_master_data_update_audit(&mut tx, ctx, "update_product", "product", id, before, &value, now)
             .await?;
+        store_idempotency_success(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            &value,
+            now,
+            "PATCH",
+            &format!("/api/v1/master-data/products/{id}"),
+            "product",
+            &id.to_string(),
+        )
+        .await?;
         tx.commit().await.map_err(map_db_error)?;
         Ok(value)
     }
@@ -54,8 +102,26 @@ impl PgMasterDataReadRepository {
         id: Uuid,
         req: UpdateSupplierRequest,
         now: DateTime<Utc>,
+        idempotency_key: &str,
     ) -> Result<Supplier, MasterDataError> {
+        let request_hash = request_hash(&json!({
+            "path": format!("/api/v1/master-data/suppliers/{id}"),
+            "request": &req,
+        }))?;
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
+        lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
+        if let Some(value) = replay_idempotency::<Supplier>(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            now,
+        )
+        .await?
+        {
+            tx.commit().await.map_err(map_db_error)?;
+            return Ok(value);
+        }
         let before = load_master_data_before(&mut tx, ctx.owner_id, id, "supplier").await?;
         let row = sqlx::query_as::<_, SupplierRow>(
             r#"UPDATE suppliers SET supplier_name = COALESCE($3, supplier_name), uscc = COALESCE($4, uscc), contact_name = COALESCE($5, contact_name), status = COALESCE($6, status), updated_at = $7, version = version + 1 WHERE owner_id = $1 AND id = $2 RETURNING id, owner_id, supplier_code, supplier_name, uscc, contact_name, source, status, created_at, updated_at"#,
@@ -64,6 +130,19 @@ impl PgMasterDataReadRepository {
         let value = Supplier::from(row);
         append_master_data_update_audit(&mut tx, ctx, "update_supplier", "supplier", id, before, &value, now)
             .await?;
+        store_idempotency_success(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            &value,
+            now,
+            "PATCH",
+            &format!("/api/v1/master-data/suppliers/{id}"),
+            "supplier",
+            &id.to_string(),
+        )
+        .await?;
         tx.commit().await.map_err(map_db_error)?;
         Ok(value)
     }
@@ -74,8 +153,26 @@ impl PgMasterDataReadRepository {
         id: Uuid,
         req: UpdateCustomerRequest,
         now: DateTime<Utc>,
+        idempotency_key: &str,
     ) -> Result<Customer, MasterDataError> {
+        let request_hash = request_hash(&json!({
+            "path": format!("/api/v1/master-data/customers/{id}"),
+            "request": &req,
+        }))?;
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
+        lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
+        if let Some(value) = replay_idempotency::<Customer>(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            now,
+        )
+        .await?
+        {
+            tx.commit().await.map_err(map_db_error)?;
+            return Ok(value);
+        }
         let before = load_master_data_before(&mut tx, ctx.owner_id, id, "customer").await?;
         let row = sqlx::query_as::<_, CustomerRow>(
             r#"UPDATE customers SET customer_name = COALESCE($3, customer_name), license_no = COALESCE($4, license_no), status = COALESCE($5, status), updated_at = $6, version = version + 1 WHERE owner_id = $1 AND id = $2 RETURNING id, owner_id, customer_code, customer_name, license_no, source, status, created_at, updated_at"#,
@@ -84,6 +181,19 @@ impl PgMasterDataReadRepository {
         let value = Customer::from(row);
         append_master_data_update_audit(&mut tx, ctx, "update_customer", "customer", id, before, &value, now)
             .await?;
+        store_idempotency_success(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            &value,
+            now,
+            "PATCH",
+            &format!("/api/v1/master-data/customers/{id}"),
+            "customer",
+            &id.to_string(),
+        )
+        .await?;
         tx.commit().await.map_err(map_db_error)?;
         Ok(value)
     }
@@ -93,11 +203,30 @@ impl PgMasterDataReadRepository {
         ctx: &AuthContext,
         req: CreateWarehouseRequest,
         now: DateTime<Utc>,
+        idempotency_key: &str,
     ) -> Result<Warehouse, MasterDataError> {
+        validate_warehouse_type(&req.warehouse_type)?;
+        let request_hash = request_hash(&json!({
+            "path": "/api/v1/master-data/warehouses",
+            "request": &req,
+        }))?;
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
+        lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
+        if let Some(value) = replay_idempotency::<Warehouse>(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            now,
+        )
+        .await?
+        {
+            tx.commit().await.map_err(map_db_error)?;
+            return Ok(value);
+        }
         let row = sqlx::query_as::<_, WarehouseRow>(
-            r#"INSERT INTO warehouses (id, owner_id, warehouse_code, warehouse_name, warehouse_type, status, created_at, updated_at) VALUES ($1, $2, $3, $4, 'standard', 'active', $5, $5) RETURNING id, owner_id, warehouse_code, warehouse_name, status, created_at, updated_at"#,
-        ).bind(Uuid::new_v4()).bind(ctx.owner_id).bind(&req.warehouse_code).bind(&req.warehouse_name).bind(now)
+            r#"INSERT INTO warehouses (id, owner_id, warehouse_code, warehouse_name, warehouse_type, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, 'active', $6, $6) RETURNING id, owner_id, warehouse_code, warehouse_name, warehouse_type, status, created_at, updated_at"#,
+        ).bind(Uuid::new_v4()).bind(ctx.owner_id).bind(&req.warehouse_code).bind(&req.warehouse_name).bind(&req.warehouse_type).bind(now)
         .fetch_one(&mut *tx).await.map_err(|error| map_catalog_write_error(error, &req.warehouse_code))?;
         let value = Warehouse::from(row);
         append_master_data_audit(
@@ -110,6 +239,19 @@ impl PgMasterDataReadRepository {
             now,
         )
         .await?;
+        store_idempotency_success(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            &value,
+            now,
+            "POST",
+            "/api/v1/master-data/warehouses",
+            "warehouse",
+            &value.id.to_string(),
+        )
+        .await?;
         tx.commit().await.map_err(map_db_error)?;
         Ok(value)
     }
@@ -120,14 +262,39 @@ impl PgMasterDataReadRepository {
         id: Uuid,
         req: UpdateWarehouseRequest,
         now: DateTime<Utc>,
+        idempotency_key: &str,
     ) -> Result<Warehouse, MasterDataError> {
+        let request_hash = request_hash(&json!({
+            "path": format!("/api/v1/master-data/warehouses/{id}"),
+            "request": &req,
+        }))?;
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
+        lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
+        if let Some(value) = replay_idempotency::<Warehouse>(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            now,
+        )
+        .await?
+        {
+            tx.commit().await.map_err(map_db_error)?;
+            return Ok(value);
+        }
         let before = load_master_data_before(&mut tx, ctx.owner_id, id, "warehouse").await?;
+        let disable = req.status.as_deref() == Some("disabled");
+        if let Some(warehouse_type) = req.warehouse_type.as_deref() {
+            validate_warehouse_type(warehouse_type)?;
+        }
         let row = sqlx::query_as::<_, WarehouseRow>(
-            r#"UPDATE warehouses SET warehouse_name = COALESCE($3, warehouse_name), status = COALESCE($4, status), updated_at = $5, version = version + 1 WHERE owner_id = $1 AND id = $2 RETURNING id, owner_id, warehouse_code, warehouse_name, status, created_at, updated_at"#,
-        ).bind(ctx.owner_id).bind(id).bind(req.warehouse_name).bind(req.status).bind(now)
+            r#"UPDATE warehouses SET warehouse_name = COALESCE($3, warehouse_name), warehouse_type = COALESCE($4, warehouse_type), status = COALESCE($5, status), updated_at = $6, version = version + 1 WHERE owner_id = $1 AND id = $2 RETURNING id, owner_id, warehouse_code, warehouse_name, warehouse_type, status, created_at, updated_at"#,
+        ).bind(ctx.owner_id).bind(id).bind(req.warehouse_name).bind(req.warehouse_type).bind(req.status).bind(now)
         .fetch_optional(&mut *tx).await.map_err(map_db_error)?.ok_or(MasterDataError::NotFound)?;
         let value = Warehouse::from(row);
+        if disable {
+            disable_warehouse_children(&mut tx, ctx, id, now).await?;
+        }
         append_master_data_update_audit(
             &mut tx,
             ctx,
@@ -139,6 +306,19 @@ impl PgMasterDataReadRepository {
             now,
         )
         .await?;
+        store_idempotency_success(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            &value,
+            now,
+            "PATCH",
+            &format!("/api/v1/master-data/warehouses/{id}"),
+            "warehouse",
+            &id.to_string(),
+        )
+        .await?;
         tx.commit().await.map_err(map_db_error)?;
         Ok(value)
     }
@@ -148,10 +328,31 @@ impl PgMasterDataReadRepository {
         ctx: &AuthContext,
         req: CreateLocationRequest,
         now: DateTime<Utc>,
+        idempotency_key: &str,
     ) -> Result<Location, MasterDataError> {
+        validate_location_code(&req.location_code, req.row_no, req.column_no, req.layer_no)?;
+        validate_location_capacity(req.max_volume_cm3, 0)?;
+        let hash = request_hash(&json!({
+            "path": "/api/v1/master-data/locations",
+            "request": &req,
+        }))?;
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
+        lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
+        if let Some(value) = replay_idempotency::<Location>(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            now,
+        )
+        .await?
+        {
+            tx.commit().await.map_err(map_db_error)?;
+            return Ok(value);
+        }
         ensure_warehouse_zone_in_owner(&mut tx, ctx.owner_id, req.warehouse_id, req.zone_id)
             .await?;
+        ensure_bound_owner_exists(&mut tx, req.bound_owner_id).await?;
         ensure_enabled_dictionary_item(
             &mut tx,
             ctx.owner_id,
@@ -176,6 +377,19 @@ impl PgMasterDataReadRepository {
             now,
         )
         .await?;
+        store_idempotency_success(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            &value,
+            now,
+            "POST",
+            "/api/v1/master-data/locations",
+            "location",
+            &value.id.to_string(),
+        )
+        .await?;
         tx.commit().await.map_err(map_db_error)?;
         Ok(value)
     }
@@ -186,9 +400,59 @@ impl PgMasterDataReadRepository {
         id: Uuid,
         req: UpdateLocationRequest,
         now: DateTime<Utc>,
+        idempotency_key: &str,
     ) -> Result<Location, MasterDataError> {
+        let hash = request_hash(&json!({
+            "path": format!("/api/v1/master-data/locations/{id}"),
+            "request": &req,
+        }))?;
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
+        lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
+        if let Some(value) = replay_idempotency::<Location>(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            now,
+        )
+        .await?
+        {
+            tx.commit().await.map_err(map_db_error)?;
+            return Ok(value);
+        }
         let before = load_master_data_before(&mut tx, ctx.owner_id, id, "location").await?;
+        let current = sqlx::query_as::<_, (String, i32, i32, i32, i64, i64)>(
+            "SELECT location_code, row_no, column_no, layer_no, max_volume_cm3, used_volume_cm3 FROM warehouse_locations WHERE owner_id = $1 AND id = $2 FOR UPDATE",
+        )
+        .bind(ctx.owner_id)
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(map_db_error)?
+        .ok_or(MasterDataError::NotFound)?;
+        validate_location_code(
+            req.location_code.as_deref().unwrap_or(&current.0),
+            req.row_no.unwrap_or(current.1),
+            req.column_no.unwrap_or(current.2),
+            req.layer_no.unwrap_or(current.3),
+        )?;
+        validate_location_capacity(
+            req.max_volume_cm3.unwrap_or(current.4),
+            req.used_volume_cm3.unwrap_or(current.5),
+        )?;
+        if req.status.as_deref() == Some("disabled") {
+            let has_stock: bool = sqlx::query_scalar(
+                "SELECT EXISTS (SELECT 1 FROM inventory_batches WHERE owner_id = $1 AND location_id = $2 AND qty_on_hand > 0)",
+            )
+            .bind(ctx.owner_id)
+            .bind(id)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(map_db_error)?;
+            if has_stock {
+                return Err(MasterDataError::LocationHasStock);
+            }
+        }
         if let Some(zone_id) = req.zone_id {
             let warehouse_id = sqlx::query_scalar(
                 "SELECT warehouse_id FROM warehouse_locations WHERE owner_id = $1 AND id = $2",
@@ -201,6 +465,7 @@ impl PgMasterDataReadRepository {
             .ok_or(MasterDataError::NotFound)?;
             ensure_warehouse_zone_in_owner(&mut tx, ctx.owner_id, warehouse_id, zone_id).await?;
         }
+        ensure_bound_owner_exists(&mut tx, req.bound_owner_id).await?;
         if let Some(location_type) = req.location_type.as_deref() {
             ensure_enabled_dictionary_item(
                 &mut tx,
@@ -218,6 +483,19 @@ impl PgMasterDataReadRepository {
         let value = Location::from(row);
         append_master_data_update_audit(&mut tx, ctx, "update_location", "location", id, before, &value, now)
             .await?;
+        store_idempotency_success(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            &value,
+            now,
+            "PATCH",
+            &format!("/api/v1/master-data/locations/{id}"),
+            "location",
+            &id.to_string(),
+        )
+        .await?;
         tx.commit().await.map_err(map_db_error)?;
         Ok(value)
     }
@@ -240,8 +518,10 @@ impl PgMasterDataReadRepository {
         idempotency_key: &str,
     ) -> Result<WarehouseZone, MasterDataError> {
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
-        let hash = request_hash(&serde_json::to_value(&req)
-            .map_err(|error| MasterDataError::Serialize(error.to_string()))?)?;
+        let hash = request_hash(&json!({
+            "path": "/api/v1/master-data/warehouse-zones",
+            "request": &req,
+        }))?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
         if let Some(value) = replay_idempotency(
             &mut tx,
@@ -323,7 +603,10 @@ impl PgMasterDataReadRepository {
         idempotency_key: &str,
     ) -> Result<WarehouseZone, MasterDataError> {
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
-        let hash = request_hash(&json!({ "id": id, "request": req }))?;
+        let hash = request_hash(&json!({
+            "path": format!("/api/v1/master-data/warehouse-zones/{id}"),
+            "request": &req,
+        }))?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
         if let Some(value) = replay_idempotency(
             &mut tx,

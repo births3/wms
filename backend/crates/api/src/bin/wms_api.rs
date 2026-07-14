@@ -14,13 +14,21 @@ use utoipa::OpenApi;
 use wms_api::ApiDoc;
 use wms_api::{
     admin_menu_handlers::{admin_menu_router, AdminMenuAppState},
+    api_key_auth::{api_key_auth_middleware, ApiKeyAuthState},
+    api_key_handlers::{api_key_router, ApiKeyManagementState},
     auth::{auth_runtime_layer, AuthRuntimePolicy, RedisAuthRevocationStore, JWT_SECRET_ENV},
     auth_handlers::{auth_router, AuthAppState},
     config_center::{config_center_router, ConfigCenterAppState},
+    dock_appointment_handlers::{dock_appointment_router, DockAppointmentAppState},
+    dock_handlers::{dock_router, DockAppState},
     document_numbering_handlers::{document_numbering_router, DocumentNumberingAppState},
+    drug_inspection_handlers::{drug_inspection_router, DrugInspectionAppState},
     express::{express_router, ExpressAppState},
     feature_flags::FeatureFlagRegistry,
     h2_lifecycle_handlers::{h2_lifecycle_router, H2LifecycleAppState},
+    inventory_status_config_handlers::{
+        inventory_status_config_router, InventoryStatusConfigAppState,
+    },
     master_data_handlers::{master_data_router, MasterDataAppState},
     parameter_mapping::{parameter_mapping_router, ParameterMappingAppState},
     print_template_handlers::{print_template_router, PrintTemplateAppState},
@@ -29,6 +37,7 @@ use wms_api::{
     role_management::{role_management_router, RoleManagementState},
     state_machine::state_machine_router,
     system_dictionary_handlers::{system_dictionary_router, SystemDictionaryAppState},
+    task_type_handlers::{task_type_router, TaskTypeAppState},
     wave3_handlers::{wave3_router, Wave3AppState},
     wave4_handlers::{wave4_router, Wave4AppState},
     wave5_handlers::{wave5_router, Wave5AppState},
@@ -107,6 +116,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .connect(&database_url)
         .await
         .map_err(|error| io::Error::other(format!("failed to connect PostgreSQL: {error:?}")))?;
+    wms_api::api_key_expiry::spawn(pool.clone());
+    wms_api::inventory_expiry_job::spawn(pool.clone());
     let config_center_state = ConfigCenterAppState::with_postgres(file_registry, pool.clone());
     let auth_state = AuthAppState::new(pool.clone());
     let role_management_state = RoleManagementState::new(pool.clone(), revocation_store.clone());
@@ -225,6 +236,8 @@ fn app(
         ParameterMappingAppState::with_postgres(audit_query_state.pool.clone());
     let resilience_state =
         ResilienceState::from_env().with_audit_pool(audit_query_state.pool.clone());
+    let api_key_auth_state = ApiKeyAuthState::new(audit_query_state.pool.clone());
+    let shared_pool = audit_query_state.pool.clone();
     Router::new()
         .route("/healthz", get(healthz))
         .route("/readyz", get(healthz))
@@ -239,14 +252,32 @@ fn app(
                 .with_state(resilience_state.clone()),
         )
         .merge(auth_router(auth_state))
+        .merge(api_key_router(ApiKeyManagementState::new(
+            audit_query_state.pool.clone(),
+        )))
         .merge(mount_reports(audit_query_state.pool.clone()))
         .merge(audit_query_router(audit_query_state))
         .merge(h2_lifecycle_router(h2_lifecycle_state))
         .merge(config_center_router(config_center_state))
+        .merge(drug_inspection_router(
+            DrugInspectionAppState::with_postgres(shared_pool.clone()),
+        ))
+        .merge(dock_router(DockAppState::with_postgres(
+            shared_pool.clone(),
+        )))
+        .merge(dock_appointment_router(
+            DockAppointmentAppState::with_postgres(shared_pool.clone()),
+        ))
         .merge(master_data_router(master_data_state))
         .merge(parameter_mapping_router(parameter_mapping_state))
         .merge(admin_menu_router(admin_menu_state))
         .merge(system_dictionary_router(system_dictionary_state))
+        .merge(task_type_router(TaskTypeAppState::with_postgres(
+            shared_pool.clone(),
+        )))
+        .merge(inventory_status_config_router(
+            InventoryStatusConfigAppState::with_postgres(shared_pool.clone()),
+        ))
         .merge(state_machine_router())
         .merge(document_numbering_router(document_numbering_state))
         .merge(print_template_router(print_template_state))
@@ -257,6 +288,10 @@ fn app(
         .merge(wave5_router(wave5_state))
         .layer(Extension(ApiDocsMode::from_env()))
         .layer(from_fn_with_state(resilience_state, resilience_middleware))
+        .layer(from_fn_with_state(
+            api_key_auth_state,
+            api_key_auth_middleware,
+        ))
 }
 
 async fn healthz() -> Json<HealthzResponse> {

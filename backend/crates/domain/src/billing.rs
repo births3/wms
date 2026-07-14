@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -62,6 +62,65 @@ pub struct CreateBillingRuleRequest {
     pub billing_cycle: String,
     pub effective_from: String,
     pub effective_to: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum BillingRuleValidationError {
+    InvalidChargeItem,
+    InvalidUnit,
+    InvalidBillingCycle,
+    InvalidRate,
+    InvalidEffectiveWindow,
+}
+
+pub fn validate_billing_rule_request(
+    request: &CreateBillingRuleRequest,
+) -> Result<(), BillingRuleValidationError> {
+    if !matches!(
+        request.charge_item.as_str(),
+        "storage"
+            | "inbound_operation"
+            | "outbound_operation"
+            | "consumable"
+            | "handling"
+            | "loading_unloading"
+            | "packing_operation"
+    ) {
+        return Err(BillingRuleValidationError::InvalidChargeItem);
+    }
+    if !matches!(
+        request.unit.as_str(),
+        "square_meter_day"
+            | "square_meter"
+            | "pallet_day"
+            | "pallet"
+            | "pallet_position"
+            | "order"
+            | "line"
+            | "piece"
+            | "box"
+            | "job"
+            | "hour"
+    ) {
+        return Err(BillingRuleValidationError::InvalidUnit);
+    }
+    if !matches!(
+        request.billing_cycle.as_str(),
+        "daily" | "weekly" | "monthly" | "quarterly" | "one_off"
+    ) {
+        return Err(BillingRuleValidationError::InvalidBillingCycle);
+    }
+    if request.unit_price_cents < 0 {
+        return Err(BillingRuleValidationError::InvalidRate);
+    }
+    let effective_from = NaiveDate::parse_from_str(&request.effective_from, "%Y-%m-%d")
+        .map_err(|_| BillingRuleValidationError::InvalidEffectiveWindow)?;
+    let effective_to = NaiveDate::parse_from_str(&request.effective_to, "%Y-%m-%d")
+        .map_err(|_| BillingRuleValidationError::InvalidEffectiveWindow)?;
+    if effective_to < effective_from {
+        return Err(BillingRuleValidationError::InvalidEffectiveWindow);
+    }
+    Ok(())
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]

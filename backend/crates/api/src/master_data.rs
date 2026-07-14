@@ -19,6 +19,14 @@ pub enum MasterDataError {
     NotFound,
     DuplicateCode(String),
     DuplicateLocationCode(String),
+    LocationHasStock,
+    InvalidLocationCapacity,
+    InvalidLocationOwner,
+    InvalidWarehouseType,
+    InvalidStorageCondition,
+    InvalidSpecialDrugCategory,
+    InvalidCustomerAddress,
+    InvalidCustomerProfile,
     InvalidLocationBatchRange,
     IdempotencyConflict,
     Audit(String),
@@ -113,6 +121,12 @@ impl MasterDataStore {
         req: CreateProductRequest,
         now: DateTime<Utc>,
     ) -> Result<Product, MasterDataError> {
+        let attrs = product_attrs_with_default_source(req.attrs, "api_import");
+        validate_product_storage_condition(&attrs)?;
+        let special_drug_category_code = req
+            .special_drug_category_code
+            .unwrap_or_else(|| "none".to_string());
+        validate_special_drug_category(&special_drug_category_code)?;
         self.products.create(Product {
             id: Uuid::new_v4(),
             owner_id: ctx.owner_id,
@@ -122,9 +136,9 @@ impl MasterDataStore {
             spec: req.spec,
             dosage_form: req.dosage_form,
             manufacturer: req.manufacturer,
-            special_drug_category_code: req.special_drug_category_code,
+            special_drug_category_code: Some(special_drug_category_code),
             status: "active".to_string(),
-            attrs: product_attrs_with_default_source(req.attrs, "api_import"),
+            attrs,
             created_at: now,
             updated_at: now,
         })
@@ -145,6 +159,14 @@ impl MasterDataStore {
         req: UpdateProductRequest,
         now: DateTime<Utc>,
     ) -> Result<Product, MasterDataError> {
+        if let Some(attrs) = req.attrs.as_ref() {
+            if attrs.get("storage_condition").is_some() {
+                validate_product_storage_condition(attrs)?;
+            }
+        }
+        if let Some(category) = req.special_drug_category_code.as_deref() {
+            validate_special_drug_category(category)?;
+        }
         self.products.update(ctx.owner_id, id, now, |product| {
             if let Some(value) = req.product_name {
                 product.product_name = value;
@@ -168,7 +190,15 @@ impl MasterDataStore {
                 product.status = value;
             }
             if let Some(value) = req.attrs {
-                product.attrs = value;
+                if let (Some(existing), Some(next)) =
+                    (product.attrs.as_object_mut(), value.as_object())
+                {
+                    for (key, item) in next {
+                        existing.insert(key.clone(), item.clone());
+                    }
+                } else {
+                    product.attrs = value;
+                }
             }
         })
     }
@@ -297,11 +327,13 @@ impl MasterDataStore {
         req: CreateWarehouseRequest,
         now: DateTime<Utc>,
     ) -> Result<Warehouse, MasterDataError> {
+        validate_warehouse_type(&req.warehouse_type)?;
         self.warehouses.create(Warehouse {
             id: Uuid::new_v4(),
             owner_id: ctx.owner_id,
             warehouse_code: req.warehouse_code,
             warehouse_name: req.warehouse_name,
+            warehouse_type: req.warehouse_type,
             status: "active".to_string(),
             created_at: now,
             updated_at: now,
@@ -319,9 +351,18 @@ impl MasterDataStore {
         req: UpdateWarehouseRequest,
         now: DateTime<Utc>,
     ) -> Result<Warehouse, MasterDataError> {
+        let current = self.warehouses.get(ctx.owner_id, id)?;
+        let warehouse_type = req
+            .warehouse_type
+            .as_deref()
+            .unwrap_or(&current.warehouse_type);
+        validate_warehouse_type(warehouse_type)?;
         self.warehouses.update(ctx.owner_id, id, now, |warehouse| {
             if let Some(value) = req.warehouse_name {
                 warehouse.warehouse_name = value;
+            }
+            if let Some(value) = req.warehouse_type {
+                warehouse.warehouse_type = value;
             }
             if let Some(value) = req.status {
                 warehouse.status = value;
@@ -343,6 +384,8 @@ impl MasterDataStore {
         req: CreateLocationRequest,
         now: DateTime<Utc>,
     ) -> Result<Location, MasterDataError> {
+        validate_location_code(&req.location_code, req.row_no, req.column_no, req.layer_no)?;
+        validate_location_capacity(req.max_volume_cm3, 0)?;
         self.locations.create(Location {
             id: Uuid::new_v4(),
             owner_id: ctx.owner_id,
@@ -374,6 +417,18 @@ impl MasterDataStore {
         req: UpdateLocationRequest,
         now: DateTime<Utc>,
     ) -> Result<Location, MasterDataError> {
+        let current = self.locations.get(ctx.owner_id, id)?;
+        validate_location_code(
+            req.location_code
+                .as_deref()
+                .unwrap_or(&current.location_code),
+            req.row_no.unwrap_or(current.row_no),
+            req.column_no.unwrap_or(current.column_no),
+            req.layer_no.unwrap_or(current.layer_no),
+        )?;
+        let max_volume_cm3 = req.max_volume_cm3.unwrap_or(current.max_volume_cm3);
+        let used_volume_cm3 = req.used_volume_cm3.unwrap_or(current.used_volume_cm3);
+        validate_location_capacity(max_volume_cm3, used_volume_cm3)?;
         self.locations.update(ctx.owner_id, id, now, |location| {
             if let Some(value) = req.zone_id {
                 location.zone_id = value;
@@ -485,6 +540,87 @@ pub(crate) fn product_attrs_with_default_source(
     serde_json::json!({ "source": default_source })
 }
 
+pub(crate) fn validate_product_storage_condition(
+    attrs: &serde_json::Value,
+) -> Result<(), MasterDataError> {
+    let Some(value) = attrs
+        .get("storage_condition")
+        .and_then(serde_json::Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    else {
+        return Err(MasterDataError::InvalidStorageCondition);
+    };
+    if matches!(value, "frozen" | "cold" | "cool" | "normal") {
+        Ok(())
+    } else {
+        Err(MasterDataError::InvalidStorageCondition)
+    }
+}
+
+pub(crate) fn validate_special_drug_category(category: &str) -> Result<(), MasterDataError> {
+    if matches!(
+        category,
+        "none"
+            | "narcotic"
+            | "psychotropic_1"
+            | "psychotropic_2"
+            | "toxic_medical"
+            | "radioactive"
+            | "vaccine"
+            | "blood_product"
+    ) {
+        Ok(())
+    } else {
+        Err(MasterDataError::InvalidSpecialDrugCategory)
+    }
+}
+
+pub(crate) fn validate_location_code(
+    code: &str,
+    row_no: i32,
+    column_no: i32,
+    layer_no: i32,
+) -> Result<(), MasterDataError> {
+    let parts = code.trim().split('-').collect::<Vec<_>>();
+    let valid = parts.len() == 4
+        && parts[0].len() == 3
+        && parts[0].chars().all(|item| item.is_ascii_alphanumeric())
+        && [row_no, column_no, layer_no]
+            .into_iter()
+            .zip(&parts[1..])
+            .all(|(expected, actual)| {
+                actual.len() == 2
+                    && actual.chars().all(|item| item.is_ascii_digit())
+                    && actual.parse::<i32>().ok() == Some(expected)
+                    && (1..=99).contains(&expected)
+            });
+    if valid {
+        Ok(())
+    } else {
+        Err(MasterDataError::InvalidLocationBatchRange)
+    }
+}
+
+pub(crate) fn validate_location_capacity(
+    max_volume_cm3: i64,
+    used_volume_cm3: i64,
+) -> Result<(), MasterDataError> {
+    if max_volume_cm3 >= 0 && used_volume_cm3 >= 0 && used_volume_cm3 <= max_volume_cm3 {
+        Ok(())
+    } else {
+        Err(MasterDataError::InvalidLocationCapacity)
+    }
+}
+
+pub(crate) fn validate_warehouse_type(value: &str) -> Result<(), MasterDataError> {
+    if matches!(value, "physical" | "logical" | "virtual") {
+        Ok(())
+    } else {
+        Err(MasterDataError::InvalidWarehouseType)
+    }
+}
+
 impl CatalogEntity for Product {
     fn id(&self) -> Uuid {
         self.id
@@ -577,154 +713,5 @@ impl CatalogEntity for SpecialDrugCategory {
 
 #[cfg(test)]
 mod tests {
-    use chrono::{TimeZone, Utc};
-    use serde_json::json;
-    use uuid::Uuid;
-    use wms_domain::{
-        CreateLocationRequest, CreateProductRequest, CreateSupplierRequest, UpdateProductRequest,
-    };
-
-    use super::{MasterDataError, MasterDataStore};
-    use crate::auth::AuthContext;
-
-    fn ctx(owner_id: Uuid) -> AuthContext {
-        AuthContext {
-            user_id: Uuid::new_v4(),
-            owner_id,
-            actor_name: "tester".to_string(),
-            permissions: vec!["m1.write".to_string()],
-            jti: Uuid::new_v4().to_string(),
-        }
-    }
-
-    #[test]
-    fn product_crud_is_owner_scoped() {
-        let now = Utc
-            .with_ymd_and_hms(2026, 6, 4, 9, 0, 0)
-            .single()
-            .expect("valid time");
-        let owner_a = Uuid::new_v4();
-        let owner_b = Uuid::new_v4();
-        let ctx_a = ctx(owner_a);
-        let ctx_b = ctx(owner_b);
-        let mut store = MasterDataStore::default();
-
-        let created = store
-            .create_product(
-                &ctx_a,
-                CreateProductRequest {
-                    product_code: "P-001".to_string(),
-                    product_name: "感冒灵颗粒".to_string(),
-                    approval_no: Some("国药准字Z0001".to_string()),
-                    spec: Some("10g*9袋".to_string()),
-                    dosage_form: Some("颗粒剂".to_string()),
-                    manufacturer: Some("示例药业".to_string()),
-                    special_drug_category_code: None,
-                    attrs: json!({"storage": "常温"}),
-                },
-                now,
-            )
-            .expect("create product");
-
-        assert_eq!(store.list_products(&ctx_a).len(), 1);
-        assert_eq!(created.attrs["source"], "api_import");
-        assert!(matches!(
-            store.get_product(&ctx_b, created.id),
-            Err(MasterDataError::NotFound)
-        ));
-
-        let updated = store
-            .update_product(
-                &ctx_a,
-                created.id,
-                UpdateProductRequest {
-                    product_name: Some("感冒灵颗粒新版".to_string()),
-                    approval_no: None,
-                    spec: None,
-                    dosage_form: None,
-                    manufacturer: None,
-                    special_drug_category_code: None,
-                    status: None,
-                    attrs: None,
-                },
-                now,
-            )
-            .expect("update product");
-        assert_eq!(updated.product_name, "感冒灵颗粒新版");
-
-        let deleted = store
-            .delete_product(&ctx_a, created.id)
-            .expect("delete product");
-        assert_eq!(deleted.product_code, "P-001");
-        assert!(store.list_products(&ctx_a).is_empty());
-    }
-
-    #[test]
-    fn supplier_codes_are_unique_per_owner() {
-        let now = Utc
-            .with_ymd_and_hms(2026, 6, 4, 9, 0, 0)
-            .single()
-            .expect("valid time");
-        let ctx = ctx(Uuid::new_v4());
-        let mut store = MasterDataStore::default();
-        let req = CreateSupplierRequest {
-            supplier_code: "S-001".to_string(),
-            supplier_name: "国药控股".to_string(),
-            license_no: Some("LIC-001".to_string()),
-            contact_name: Some("张三".to_string()),
-            source: Some("manual".to_string()),
-        };
-
-        let created = store
-            .create_supplier(&ctx, req.clone(), now)
-            .expect("first supplier");
-        assert_eq!(created.source, "manual");
-        let duplicate = store.create_supplier(&ctx, req, now);
-
-        assert!(matches!(duplicate, Err(MasterDataError::DuplicateCode(code)) if code == "S-001"));
-    }
-
-    #[test]
-    fn location_contract_keeps_zone_grid_and_capacity_fields() {
-        let now = Utc
-            .with_ymd_and_hms(2026, 6, 4, 9, 0, 0)
-            .single()
-            .expect("valid time");
-        let ctx = ctx(Uuid::new_v4());
-        let mut store = MasterDataStore::default();
-        let warehouse_id = Uuid::new_v4();
-        let zone_id = Uuid::new_v4();
-
-        let location = store
-            .create_location(
-                &ctx,
-                CreateLocationRequest {
-                    warehouse_id,
-                    zone_id,
-                    location_code: "A01-01-02-03".to_string(),
-                    row_no: 1,
-                    column_no: 2,
-                    layer_no: 3,
-                    max_volume_cm3: 5_000_000,
-                    max_sku_count: 1,
-                    location_type: "storage".to_string(),
-                    bound_owner_id: Some(ctx.owner_id),
-                },
-                now,
-            )
-            .expect("create location");
-
-        assert_eq!(location.warehouse_id, warehouse_id);
-        assert_eq!(location.zone_id, zone_id);
-        assert_eq!(location.location_code, "A01-01-02-03");
-        assert_eq!(location.row_no, 1);
-        assert_eq!(location.column_no, 2);
-        assert_eq!(location.layer_no, 3);
-        assert_eq!(location.max_volume_cm3, 5_000_000);
-        assert_eq!(location.used_volume_cm3, 0);
-        assert_eq!(location.max_sku_count, 1);
-        assert_eq!(location.location_type, "storage");
-        assert_eq!(location.bound_owner_id, Some(ctx.owner_id));
-        assert_eq!(location.status, "available");
-    }
+    include!("master_data_tests.rs");
 }

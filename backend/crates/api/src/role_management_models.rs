@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -29,6 +30,15 @@ pub struct BatchAssignRolesRequest {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CreateUserRequest {
+    pub username: String,
+    pub display_name: String,
+    pub phone: String,
+    pub password: String,
+    pub role_ids: Vec<Uuid>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct RoleResponse {
     pub id: Uuid,
     pub role_code: String,
@@ -36,6 +46,7 @@ pub struct RoleResponse {
     pub data_scope: String,
     pub parent_role_id: Option<Uuid>,
     pub permission_codes: Vec<String>,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
