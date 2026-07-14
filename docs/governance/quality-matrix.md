@@ -14,9 +14,9 @@
 | 指标 | 数量 |
 |---|---:|
 | 故事总数 | 174 |
-| 已完成（已验证） | 39 |
-| 未完成 / 延期 | 135 |
-| 完成率 | 22.4% |
+| 已完成（已验证） | 40 |
+| 未完成 / 延期 | 134 |
+| 完成率 | 23.0% |
 
 > “已完成”表示故事已进入 `stories` 并通过矩阵维度门禁；延期故事中的局部代码、页面或测试切片不计入完成。
 
@@ -54,7 +54,7 @@
 | SA | 0 | 3 | 3 |
 | ST | 0 | 6 | 6 |
 | TC | 0 | 7 | 7 |
-| TE | 3 | 8 | 11 |
+| TE | 4 | 7 | 11 |
 | VR | 0 | 6 | 6 |
 
 ## 已完成故事
@@ -100,6 +100,7 @@
 | US-TE-001 任务类型配置 | TE | S2 |
 | US-TE-002 任务组与人员资格 | TE | S3 |
 | US-TE-004 任务优先级规则 | TE | S3 |
+| US-TE-006 任务释放控制 | TE | S3 |
 
 ## 未完成 / 延期故事
 
@@ -228,7 +229,6 @@
 | US-TC-007 "码上放心"平台上报 | TC | 当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。 |
 | US-TE-003 任务创建（各模块触发） | TE | 已实现统一任务模型、业务源幂等、待分配初态和审计，并接入 M2 验收通过→上架、M4 波次下发→拣选、最终复核→装车三条原子触发链。仍缺补货、移库、盘点、销退上架等其余业务触发源以及全链路发布证据。 |
 | US-TE-005 任务分配 | TE | 已实现手工分派、按资格有效期、当前活跃负荷和最大并发容量自动分派，以及改派、下发、召回；状态与分配事件原子写入，PC 调度页已通过一次性 PostgreSQL 真实浏览器 E2E。仍缺就近定位、冷库技能匹配和真实 PDA 推送证据。 |
-| US-TE-006 任务释放控制 | TE | 当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。 |
 | US-TE-007 任务合并 | TE | 当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。 |
 | US-TE-008 任务执行（PDA） | TE | 已实现 PDA 面向的本人统一待办 API，以及已下发→执行中→完成/异常状态机、本人执行权限、数量差异拦截、幂等和审计。受 ADR-0027 约束尚未启动生产 PDA 应用，扫码三/四步、SQLite 离线缓存、冲突待主管处理和真机证据仍缺。 |
 | US-TE-009 任务跟踪看板 | TE | 已补按状态、类型、仓库、人员与优先级展示的 PC 任务调度列表和主管干预，并完成一次性 PostgreSQL 真实浏览器 E2E/截图。仍缺实时推送/刷新周期配置、超时高亮、超时企业微信通知和 PAD 视图。 |
@@ -284,3 +284,4 @@
 | US-TE-001 任务类型配置 | TE | S2 | write、config_rule、frontend_interaction | L1、L2、L3、L4、L5、L7、L8、L9、L11 | mte-task-types | GET /api/v1/task-engine/task-types<br>PUT /api/v1/task-engine/task-types/{task_type_code}<br>PATCH /api/v1/task-engine/task-types/{task_type_code}/enabled | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-TE-002 任务组与人员资格 | TE | S3 | write、config_rule、frontend_interaction、audit_compliance | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | mte-task-groups | GET /api/v1/task-engine/task-groups<br>GET /api/v1/task-engine/workers<br>PUT /api/v1/task-engine/task-groups/{task_group_code} | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-TE-004 任务优先级规则 | TE | S3 | write、config_rule、frontend_interaction、api_change、audit_compliance | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | mte-task-types、mte-task-dispatch | GET /api/v1/task-engine/priority-rule<br>PUT /api/v1/task-engine/priority-rule<br>GET /api/v1/task-engine/tasks<br>POST /api/v1/task-engine/tasks/{task_id}/transitions | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
+| US-TE-006 任务释放控制 | TE | S3 | write、config_rule、frontend_interaction、api_change、runtime_guard、audit_compliance | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | mte-task-types、mte-task-dispatch | GET /api/v1/task-engine/task-types<br>PUT /api/v1/task-engine/task-types/{task_type_code}<br>POST /api/v1/task-engine/tasks<br>GET /api/v1/task-engine/tasks<br>POST /api/v1/task-engine/tasks/{task_id}/transitions | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
