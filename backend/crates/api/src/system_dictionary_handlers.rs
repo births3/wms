@@ -19,6 +19,7 @@ use wms_domain::{
 
 use crate::{
     auth::{AuthContext, AuthError},
+    dual_person_policy::invalidate_policy_cache,
     system_dictionary::{PgSystemDictionaryRepository, SystemDictionaryError},
 };
 
@@ -30,6 +31,8 @@ const GLOBAL_WRITE_PERMISSION: &str = "m1.system_dictionary.global.write";
 #[derive(Clone, Debug)]
 pub struct SystemDictionaryAppState {
     repository: Arc<PgSystemDictionaryRepository>,
+    pool: PgPool,
+    policy_cache: Option<redis::aio::MultiplexedConnection>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -53,7 +56,26 @@ pub enum SystemDictionaryHandlerError {
 impl SystemDictionaryAppState {
     pub fn with_postgres(pool: PgPool) -> Self {
         Self {
-            repository: Arc::new(PgSystemDictionaryRepository::new(pool)),
+            repository: Arc::new(PgSystemDictionaryRepository::new(pool.clone())),
+            pool,
+            policy_cache: None,
+        }
+    }
+
+    pub fn with_postgres_and_redis(
+        pool: PgPool,
+        policy_cache: redis::aio::MultiplexedConnection,
+    ) -> Self {
+        Self {
+            repository: Arc::new(PgSystemDictionaryRepository::new(pool.clone())),
+            pool,
+            policy_cache: Some(policy_cache),
+        }
+    }
+
+    async fn invalidate_policy_cache(&self, item: &SystemDictionaryItem) {
+        if item.dict_code == "special_drug_category" {
+            invalidate_policy_cache(&self.pool, self.policy_cache.clone(), item.owner_id).await;
         }
     }
 }
@@ -216,6 +238,9 @@ async fn upsert_system_dictionary_item_handler(
             &idempotency_key,
         )
         .await?;
+    if !result.replayed {
+        state.invalidate_policy_cache(&result.value).await;
+    }
     Ok(Json(result.value))
 }
 
@@ -239,6 +264,9 @@ async fn disable_system_dictionary_item_handler(
             &idempotency_key,
         )
         .await?;
+    if !result.replayed {
+        state.invalidate_policy_cache(&result.value).await;
+    }
     Ok(Json(result.value))
 }
 

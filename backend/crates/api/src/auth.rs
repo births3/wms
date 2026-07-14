@@ -172,6 +172,10 @@ impl RedisAuthRevocationStore {
             .map_err(AuthRevocationStoreError::from)?;
         Ok(Self::new(connection))
     }
+
+    pub fn multiplexed_connection(&self) -> redis::aio::MultiplexedConnection {
+        self.connection.clone()
+    }
 }
 
 #[axum::async_trait]
