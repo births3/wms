@@ -132,6 +132,294 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/alert-definitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_alert_definitions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/alert-definitions/change-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["submit_alert_definition_change"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/alert-definitions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_alert_definition"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/alert-escalation-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_alert_escalation_rules"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/alert-escalation-rules/{rule_code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["upsert_alert_escalation_rule"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_alert_instances"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/alerts/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_active_alerts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/alerts/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_alert_changes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/alerts/exports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create_alert_export"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/alerts/exports/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_alert_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/alerts/exports/{token}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["download_alert_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/alerts/gsp-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_gsp_alert_report"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/alerts/statistics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_alert_statistics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/alerts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_alert_instance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/alerts/{id}/acknowledge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["acknowledge_alert_instance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/alerts/{id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["close_alert_instance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/alerts/{id}/handling": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["handle_alert_instance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/alerts/{id}/ignore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ignore_alert_instance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/audit/archive/partitions": {
         parameters: {
             query?: never;
@@ -3243,6 +3531,205 @@ export interface components {
             /** Format: int64 */
             version_no: number;
         };
+        AlertActionRequest: {
+            description: string;
+        };
+        AlertChangeEvent: {
+            /** Format: uuid */
+            alert_instance_id: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            occurred_at: string;
+            to_status: string;
+        };
+        AlertChangeListResponse: {
+            data: components["schemas"]["AlertChangeEvent"][];
+            /** Format: date-time */
+            server_time: string;
+        };
+        /** @description 货主范围内可配置的告警定义。 */
+        AlertDefinition: {
+            alert_code: string;
+            condition_expression: string;
+            /** Format: date-time */
+            created_at: string;
+            default_severity: string;
+            enabled: boolean;
+            escalation_ref?: string | null;
+            event_type: string;
+            /** Format: uuid */
+            id: string;
+            is_disable_allowed: boolean;
+            is_gsp_forced: boolean;
+            message_template: string;
+            message_templates: {
+                [key: string]: string;
+            };
+            name: string;
+            /** Format: uuid */
+            owner_id: string;
+            recipient_roles: string[];
+            /** Format: int64 */
+            silence_period_seconds: number;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: int64 */
+            version: number;
+        };
+        /** @enum {string} */
+        AlertDefinitionChangeOperation: "upsert" | "set_enabled" | "delete";
+        AlertDefinitionDraft: {
+            alert_code: string;
+            condition_expression: string;
+            default_severity: string;
+            escalation_ref?: string | null;
+            event_type: string;
+            is_disable_allowed: boolean;
+            message_template: string;
+            message_templates: {
+                [key: string]: string;
+            };
+            name: string;
+            recipient_roles: string[];
+            /** Format: int64 */
+            silence_period_seconds: number;
+        };
+        AlertDefinitionListResponse: {
+            data: components["schemas"]["AlertDefinition"][];
+            page: components["schemas"]["PageMeta"];
+        };
+        AlertEscalationLevelDraft: {
+            /** Format: int32 */
+            level: number;
+            recipient_roles: string[];
+            /** Format: int64 */
+            threshold_seconds: number;
+        };
+        AlertEscalationRule: {
+            /** Format: date-time */
+            created_at: string;
+            enabled: boolean;
+            holiday_dates: string[];
+            /** Format: uuid */
+            id: string;
+            levels: components["schemas"]["AlertEscalationLevelDraft"][];
+            notify_lower_levels: boolean;
+            off_hours_end: string;
+            off_hours_handler_roles: string[];
+            off_hours_start: string;
+            /** Format: uuid */
+            owner_id: string;
+            rule_code: string;
+            rule_name: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: int64 */
+            version: number;
+        };
+        AlertEscalationRuleListResponse: {
+            data: components["schemas"]["AlertEscalationRule"][];
+            page: components["schemas"]["PageMeta"];
+        };
+        AlertExportJob: {
+            /** Format: date-time */
+            completed_at?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            download_url?: string | null;
+            email_notification_status?: string | null;
+            format: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: int64 */
+            row_count: number;
+            status: string;
+        };
+        AlertInstance: {
+            /** Format: date-time */
+            acknowledged_at?: string | null;
+            action_description?: string | null;
+            alert_code: string;
+            /** Format: uuid */
+            alert_definition_id: string;
+            alert_name: string;
+            close_reason?: string | null;
+            /** Format: date-time */
+            closed_at?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: int32 */
+            escalation_level: number;
+            event_payload: unknown;
+            event_type: string;
+            /** Format: date-time */
+            handled_at?: string | null;
+            /** Format: uuid */
+            id: string;
+            ignored_reason?: string | null;
+            /** Format: date-time */
+            notified_at?: string | null;
+            /** Format: uuid */
+            owner_id: string;
+            recipients: string[];
+            resource_id: string;
+            resource_path?: string | null;
+            resource_type: string;
+            severity: string;
+            status: string;
+            /** Format: date-time */
+            triggered_at: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            warehouse_id?: string | null;
+        };
+        AlertInstanceListQuery: {
+            active_only?: boolean | null;
+            alert_code?: string | null;
+            /** Format: date-time */
+            from?: string | null;
+            /** Format: int64 */
+            limit?: number | null;
+            severity?: string | null;
+            status?: string | null;
+            /** Format: date-time */
+            to?: string | null;
+            /** Format: uuid */
+            warehouse_id?: string | null;
+        };
+        AlertInstanceListResponse: {
+            data: components["schemas"]["AlertInstance"][];
+            page: components["schemas"]["PageMeta"];
+        };
+        AlertMonthlyMetric: {
+            /** Format: double */
+            acknowledgement_rate: number;
+            /** Format: double */
+            average_response_seconds?: number | null;
+            /** Format: double */
+            escalation_rate: number;
+            month: string;
+            /** Format: int64 */
+            triggered_count: number;
+        };
+        AlertRankingItem: {
+            /** Format: double */
+            average_response_seconds?: number | null;
+            /** Format: int64 */
+            count: number;
+            key: string;
+            /** Format: int64 */
+            unacknowledged_count: number;
+        };
+        AlertStatisticsResponse: {
+            alert_type_top10: components["schemas"]["AlertRankingItem"][];
+            /** Format: date-time */
+            generated_at: string;
+            monthly: components["schemas"]["AlertMonthlyMetric"][];
+            possibly_stale: boolean;
+            recipient_top10: components["schemas"]["AlertRankingItem"][];
+        };
         ApiKey: {
             caller_name: string;
             /** Format: date-time */
@@ -3701,6 +4188,11 @@ export interface components {
             sort_order: number;
             title: string;
             view_id?: string | null;
+        };
+        CreateAlertExportRequest: {
+            filters: components["schemas"]["AlertInstanceListQuery"];
+            format: string;
+            recipient_email?: string | null;
         };
         CreateApiKeyRequest: {
             caller_name: string;
@@ -4577,6 +5069,16 @@ export interface components {
             contract_id: string;
             period_end: string;
             period_start: string;
+        };
+        GspAlertLifecycleRecord: {
+            alert: components["schemas"]["AlertInstance"];
+            lifecycle_events: unknown;
+        };
+        GspAlertLifecycleReport: {
+            data: components["schemas"]["GspAlertLifecycleRecord"][];
+            /** Format: date-time */
+            generated_at: string;
+            page: components["schemas"]["PageMeta"];
         };
         GspLedgerReport: {
             /** Format: date-time */
@@ -6118,6 +6620,15 @@ export interface components {
             /** Format: uuid */
             store_id?: string | null;
         };
+        SubmitAlertDefinitionChangeRequest: {
+            definition?: components["schemas"]["AlertDefinitionDraft"] | null;
+            /** Format: uuid */
+            definition_id?: string | null;
+            enabled?: boolean | null;
+            /** Format: int64 */
+            expected_version?: number | null;
+            operation: components["schemas"]["AlertDefinitionChangeOperation"];
+        };
         SubmitInventoryCountLineRequest: {
             /** Format: int64 */
             physical_qty: number;
@@ -6603,6 +7114,17 @@ export interface components {
             enabled: boolean;
             /** Format: int32 */
             sort_order: number;
+        };
+        UpsertAlertEscalationRuleRequest: {
+            enabled: boolean;
+            holiday_dates: string[];
+            levels: components["schemas"]["AlertEscalationLevelDraft"][];
+            notify_lower_levels: boolean;
+            off_hours_end: string;
+            off_hours_handler_roles: string[];
+            off_hours_start: string;
+            rule_code: string;
+            rule_name: string;
         };
         UpsertCustomerProfileRequest: {
             business_scope?: string[];
@@ -7300,6 +7822,741 @@ export interface operations {
             };
             /** @description 菜单版本不存在 */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_alert_definitions: {
+        parameters: {
+            query?: {
+                keyword?: string | null;
+                severity?: string | null;
+                enabled?: boolean | null;
+                limit?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 货主范围内告警定义列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertDefinitionListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 查询条件非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    submit_alert_definition_change: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitAlertDefinitionChangeRequest"];
+            };
+        };
+        responses: {
+            /** @description 告警定义变更已提交 M-QL 审批 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QualityLiaisonOrder"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 目标告警定义不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 版本或幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 字段非法或未配置 M-QL 审批类型 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_alert_definition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 告警定义 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 告警定义详情 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertDefinition"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 告警定义不存在或不属于当前货主 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_alert_escalation_rules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 升级规则列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertEscalationRuleListResponse"];
+                };
+            };
+        };
+    };
+    upsert_alert_escalation_rule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 升级规则编码 */
+                rule_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertAlertEscalationRuleRequest"];
+            };
+        };
+        responses: {
+            /** @description 升级规则已保存 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertEscalationRule"];
+                };
+            };
+            /** @description 规则字段非法或超过三级 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_alert_instances: {
+        parameters: {
+            query?: {
+                warehouse_id?: string | null;
+                severity?: string | null;
+                status?: string | null;
+                alert_code?: string | null;
+                from?: string | null;
+                to?: string | null;
+                active_only?: boolean | null;
+                limit?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 货主范围内告警实例列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertInstanceListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_active_alerts: {
+        parameters: {
+            query?: {
+                warehouse_id?: string | null;
+                severity?: string | null;
+                status?: string | null;
+                alert_code?: string | null;
+                from?: string | null;
+                to?: string | null;
+                active_only?: boolean | null;
+                limit?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前用户有权查看的活动告警 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertInstanceListResponse"];
+                };
+            };
+            /** @description 仓库范围越权 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 仓库主管未选择授权仓库 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_alert_changes: {
+        parameters: {
+            query?: {
+                /** @description ISO-8601 增量起点，默认最近五秒 */
+                since?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 看板增量变更 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertChangeListResponse"];
+                };
+            };
+        };
+    };
+    create_alert_export: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAlertExportRequest"];
+            };
+        };
+        responses: {
+            /** @description 十万行以内同步生成 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertExportJob"];
+                };
+            };
+            /** @description 超过十万行进入异步队列 */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertExportJob"];
+                };
+            };
+            /** @description 格式或过滤条件非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_alert_export: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 导出任务 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 导出任务状态 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertExportJob"];
+                };
+            };
+            /** @description 导出任务不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    download_alert_export: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 七天有效下载令牌 */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 下载 Excel 或 PDF 文件 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 导出文件不存在或已过期 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_gsp_alert_report: {
+        parameters: {
+            query?: {
+                warehouse_id?: string | null;
+                severity?: string | null;
+                status?: string | null;
+                alert_code?: string | null;
+                from?: string | null;
+                to?: string | null;
+                active_only?: boolean | null;
+                limit?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description GSP 强制告警完整生命周期报表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GspAlertLifecycleReport"];
+                };
+            };
+        };
+    };
+    get_alert_statistics: {
+        parameters: {
+            query?: {
+                warehouse_id?: string | null;
+                severity?: string | null;
+                status?: string | null;
+                alert_code?: string | null;
+                from?: string | null;
+                to?: string | null;
+                active_only?: boolean | null;
+                limit?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 月度趋势及告警和接收人排行 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertStatisticsResponse"];
+                };
+            };
+            /** @description 查询范围超过一年 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_alert_instance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 告警实例 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 告警实例详情 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertInstance"];
+                };
+            };
+            /** @description 告警实例不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    acknowledge_alert_instance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 告警实例 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 确认接警 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertInstance"];
+                };
+            };
+            /** @description 告警实例不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 状态不允许确认 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    close_alert_instance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 告警实例 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AlertActionRequest"];
+            };
+        };
+        responses: {
+            /** @description 关闭告警 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertInstance"];
+                };
+            };
+            /** @description 告警实例不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 关闭原因为空 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    handle_alert_instance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 告警实例 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AlertActionRequest"];
+            };
+        };
+        responses: {
+            /** @description 记录处理过程 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertInstance"];
+                };
+            };
+            /** @description 告警实例不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 处理说明为空 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    ignore_alert_instance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 告警实例 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AlertActionRequest"];
+            };
+        };
+        responses: {
+            /** @description 忽略告警 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertInstance"];
+                };
+            };
+            /** @description 告警实例不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 忽略原因为空 */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -1,7 +1,7 @@
 # 错误码字典（Error Codes Dictionary）
 
 > 时间：2026-07-15
-> 版本：v3.8（当前 148 项）
+> 版本：v3.9（当前 174 项）
 > 文档层级：L2 规范（必须遵守）
 > 关联：[ADR-0010](adr/0010-error-codes.md) / [coding-standards.md §4](coding-standards.md)
 
@@ -76,10 +76,10 @@
 | 级别 | 数量 | 主要场景 |
 |---|---|---|
 | info | 1 | 状态变更通知 / 数据已存在等正常路径 |
-| warning | 39 | 业务规则拦截（库存不足 / 资质过期等）|
-| error | 100 | 业务异常（数据冲突 / 校验失败）|
-| critical | 8 | 合规/安全异常（跨货主访问 / 篡改尝试）|
-| **合计** | **148** | — |
+| warning | 55 | 业务规则拦截（库存不足 / 资质过期等）|
+| error | 108 | 业务异常（数据冲突 / 校验失败）|
+| critical | 10 | 合规/安全异常（跨货主访问 / 篡改尝试）|
+| **合计** | **174** | — |
 
 ---
 
@@ -93,7 +93,7 @@
 | H6 | 2 | 状态机查询与校验 |
 | H5 | 2 | 快递面单 |
 | H_DOCK | 11 | 月台预约 |
-| H_AL | 2 | 告警引擎 |
+| H_AL | 28 | 告警引擎 |
 | M1 | 12 | 主数据校验 / 配置中心 |
 | M2 | 8 | 入库流程 |
 | M3 | 8 | 库存与状态 |
@@ -857,6 +857,318 @@ error_codes:
     introduced_in: v3.3
 
   # ========== H-AL 告警引擎 ==========
+  - code: HAL_IDEMPOTENCY_REQUIRED
+    module: H_AL
+    category: IDEMPOTENCY
+    detail: REQUIRED
+    http_status: 400
+    severity: warning
+    message_zh: '缺少告警定义变更幂等键'
+    message_en: 'Alert definition change idempotency key is required'
+    related_fields: []
+    related_stories: [US-AL-001]
+    introduced_in: v3.9
+
+  - code: HAL_ALERT_NOT_FOUND
+    module: H_AL
+    category: ALERT
+    detail: NOT_FOUND
+    http_status: 404
+    severity: error
+    message_zh: '告警定义不存在'
+    message_en: 'Alert definition was not found'
+    related_fields: []
+    related_stories: [US-AL-001]
+    introduced_in: v3.9
+
+  - code: HAL_ALERT_DUPLICATE
+    module: H_AL
+    category: ALERT
+    detail: DUPLICATE
+    http_status: 409
+    severity: warning
+    message_zh: '告警编码或名称已存在'
+    message_en: 'Alert code or name already exists'
+    related_fields: []
+    related_stories: [US-AL-001]
+    introduced_in: v3.9
+
+  - code: HAL_ALERT_STALE
+    module: H_AL
+    category: ALERT
+    detail: STALE
+    http_status: 409
+    severity: warning
+    message_zh: '告警定义版本已过期'
+    message_en: 'Alert definition version is stale'
+    related_fields: []
+    related_stories: [US-AL-001]
+    introduced_in: v3.9
+
+  - code: HAL_ALERT_IN_USE
+    module: H_AL
+    category: ALERT
+    detail: IN_USE
+    http_status: 409
+    severity: warning
+    message_zh: '告警定义已有触发记录，不能删除'
+    message_en: 'Alert definition has trigger history and cannot be deleted'
+    related_fields: []
+    related_stories: [US-AL-001]
+    introduced_in: v3.9
+
+  - code: HAL_ALERT_GSP_REQUIRED
+    module: H_AL
+    category: ALERT
+    detail: GSP_REQUIRED
+    http_status: 422
+    severity: critical
+    message_zh: 'GSP 强制告警不能停用或删除'
+    message_en: 'GSP-mandatory alert cannot be disabled or deleted'
+    related_fields: []
+    related_stories: [US-AL-001]
+    introduced_in: v3.9
+
+  - code: HAL_ALERT_DISABLE_NOT_ALLOWED
+    module: H_AL
+    category: ALERT
+    detail: DISABLE_NOT_ALLOWED
+    http_status: 422
+    severity: warning
+    message_zh: '该告警定义不允许停用'
+    message_en: 'This alert definition cannot be disabled'
+    related_fields: []
+    related_stories: [US-AL-001]
+    introduced_in: v3.9
+
+  - code: HAL_CONDITION_INVALID
+    module: H_AL
+    category: CONDITION
+    detail: INVALID
+    http_status: 422
+    severity: warning
+    message_zh: '告警触发条件必须是有效 JSON'
+    message_en: 'Alert condition must be valid JSON'
+    related_fields: []
+    related_stories: [US-AL-001]
+    introduced_in: v3.9
+
+  - code: HAL_ALERT_INVALID
+    module: H_AL
+    category: ALERT
+    detail: INVALID
+    http_status: 422
+    severity: warning
+    message_zh: '告警定义字段或变更结构非法'
+    message_en: 'Alert definition fields or change shape are invalid'
+    related_fields: []
+    related_stories: [US-AL-001]
+    introduced_in: v3.9
+
+  - code: HAL_ALERT_APPROVAL_NOT_CONFIGURED
+    module: H_AL
+    category: APPROVAL
+    detail: NOT_CONFIGURED
+    http_status: 422
+    severity: error
+    message_zh: '未配置告警定义变更审批类型'
+    message_en: 'Alert definition change approval type is not configured'
+    related_fields: []
+    related_stories: [US-AL-001]
+    introduced_in: v3.9
+
+  - code: HAL_ALERT_IDEMPOTENCY_CONFLICT
+    module: H_AL
+    category: IDEMPOTENCY
+    detail: CONFLICT
+    http_status: 409
+    severity: warning
+    message_zh: '幂等键已被不同的告警变更请求使用'
+    message_en: 'Idempotency key was used by a different alert change request'
+    related_fields: []
+    related_stories: [US-AL-001]
+    introduced_in: v3.9
+
+  - code: HAL_ALERT_INTERNAL
+    module: H_AL
+    category: ALERT
+    detail: INTERNAL
+    http_status: 500
+    severity: error
+    message_zh: '告警处理失败'
+    message_en: 'Alert processing failed'
+    related_fields: []
+    related_stories: [US-AL-001, US-AL-002]
+    introduced_in: v3.9
+
+  - code: HAL_CHANNEL_NOT_FOUND
+    module: H_AL
+    category: CHANNEL
+    detail: NOT_FOUND
+    http_status: 422
+    severity: error
+    message_zh: '告警通知通道不存在或未启用'
+    message_en: 'Alert notification channel was not found or is disabled'
+    related_fields: []
+    related_stories: [US-AL-001]
+    introduced_in: v3.9
+
+  - code: HAL_ESCALATION_RULE_NOT_FOUND
+    module: H_AL
+    category: ESCALATION
+    detail: RULE_NOT_FOUND
+    http_status: 422
+    severity: warning
+    message_zh: '告警升级规则不存在或未启用'
+    message_en: 'Alert escalation rule was not found or is disabled'
+    related_fields: []
+    related_stories: [US-AL-001, US-AL-003]
+    introduced_in: v3.9
+
+  - code: HAL_ALERT_INSTANCE_NOT_FOUND
+    module: H_AL
+    category: ALERT
+    detail: INSTANCE_NOT_FOUND
+    http_status: 404
+    severity: error
+    message_zh: '告警实例不存在'
+    message_en: 'Alert instance was not found'
+    related_fields: []
+    related_stories: [US-AL-002]
+    introduced_in: v3.9
+
+  - code: HAL_ALERT_STATUS_INVALID
+    module: H_AL
+    category: ALERT
+    detail: STATUS_INVALID
+    http_status: 409
+    severity: warning
+    message_zh: '当前告警状态不允许执行该操作'
+    message_en: 'The current alert status does not allow this action'
+    related_fields: []
+    related_stories: [US-AL-002]
+    introduced_in: v3.9
+
+  - code: HAL_ALERT_REASON_REQUIRED
+    module: H_AL
+    category: ALERT
+    detail: REASON_REQUIRED
+    http_status: 422
+    severity: warning
+    message_zh: '关闭或忽略告警必须填写原因'
+    message_en: 'Closing or ignoring an alert requires a reason'
+    related_fields: []
+    related_stories: [US-AL-002]
+    introduced_in: v3.9
+
+  - code: HAL_ESCALATION_LEVEL_LIMIT
+    module: H_AL
+    category: ESCALATION
+    detail: LEVEL_LIMIT
+    http_status: 422
+    severity: warning
+    message_zh: '告警升级规则最多允许三级'
+    message_en: 'An alert escalation rule supports at most three levels'
+    related_fields: []
+    related_stories: [US-AL-003]
+    introduced_in: v3.9
+
+  - code: HAL_ESCALATION_INVALID
+    module: H_AL
+    category: ESCALATION
+    detail: INVALID
+    http_status: 422
+    severity: warning
+    message_zh: '告警升级规则格式或阈值非法'
+    message_en: 'Alert escalation rule shape or threshold is invalid'
+    related_fields: []
+    related_stories: [US-AL-003]
+    introduced_in: v3.9
+
+  - code: HAL_ESCALATION_INTERNAL
+    module: H_AL
+    category: ESCALATION
+    detail: INTERNAL
+    http_status: 500
+    severity: error
+    message_zh: '告警升级处理失败'
+    message_en: 'Alert escalation processing failed'
+    related_fields: []
+    related_stories: [US-AL-003]
+    introduced_in: v3.9
+
+  - code: HAL_EXPORT_NOT_FOUND
+    module: H_AL
+    category: EXPORT
+    detail: NOT_FOUND
+    http_status: 404
+    severity: error
+    message_zh: '告警报表导出任务或下载链接不存在'
+    message_en: 'Alert report export job or download link was not found'
+    related_fields: []
+    related_stories: [US-AL-004]
+    introduced_in: v3.9
+
+  - code: HAL_QUERY_RANGE_TOO_LARGE
+    module: H_AL
+    category: QUERY
+    detail: RANGE_TOO_LARGE
+    http_status: 422
+    severity: warning
+    message_zh: '告警统计查询时间范围过大'
+    message_en: 'Alert statistics query range is too large'
+    related_fields: []
+    related_stories: [US-AL-004]
+    introduced_in: v3.9
+
+  - code: HAL_WAREHOUSE_SCOPE_REQUIRED
+    module: H_AL
+    category: AUTHORIZATION
+    detail: WAREHOUSE_SCOPE_REQUIRED
+    http_status: 422
+    severity: warning
+    message_zh: '必须选择已授权的仓库范围'
+    message_en: 'An authorized warehouse scope must be selected'
+    related_fields: []
+    related_stories: [US-AL-004]
+    introduced_in: v3.9
+
+  - code: HAL_WAREHOUSE_SCOPE_DENIED
+    module: H_AL
+    category: AUTHORIZATION
+    detail: WAREHOUSE_SCOPE_DENIED
+    http_status: 403
+    severity: critical
+    message_zh: '无权查询该仓库的告警数据'
+    message_en: 'The user cannot query alert data for this warehouse'
+    related_fields: []
+    related_stories: [US-AL-004]
+    introduced_in: v3.9
+
+  - code: HAL_EXPORT_FORMAT_INVALID
+    module: H_AL
+    category: EXPORT
+    detail: FORMAT_INVALID
+    http_status: 422
+    severity: warning
+    message_zh: '告警报表仅支持 Excel 或 PDF 格式'
+    message_en: 'Alert reports support only Excel or PDF format'
+    related_fields: []
+    related_stories: [US-AL-004]
+    introduced_in: v3.9
+
+  - code: HAL_DASHBOARD_INTERNAL
+    module: H_AL
+    category: DASHBOARD
+    detail: INTERNAL
+    http_status: 500
+    severity: error
+    message_zh: '告警看板或报表处理失败'
+    message_en: 'Alert dashboard or report processing failed'
+    related_fields: []
+    related_stories: [US-AL-004]
+    introduced_in: v3.9
+
   - code: H_AL_GSP_ALERT_DISABLE_DENIED
     module: H_AL
     category: ALERT

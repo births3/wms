@@ -522,6 +522,1210 @@
         }
       }
     },
+    "/api/v1/alert-definitions": {
+      "get": {
+        "tags": [
+          "alert-engine"
+        ],
+        "operationId": "list_alert_definitions",
+        "parameters": [
+          {
+            "name": "keyword",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "enabled",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "nullable": true
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "货主范围内告警定义列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertDefinitionListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "查询条件非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alert-definitions/change-requests": {
+      "post": {
+        "tags": [
+          "alert-engine"
+        ],
+        "operationId": "submit_alert_definition_change",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitAlertDefinitionChangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "告警定义变更已提交 M-QL 审批",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QualityLiaisonOrder"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "目标告警定义不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "字段非法或未配置 M-QL 审批类型",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alert-definitions/{id}": {
+      "get": {
+        "tags": [
+          "alert-engine"
+        ],
+        "operationId": "get_alert_definition",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "告警定义 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "告警定义详情",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertDefinition"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "告警定义不存在或不属于当前货主",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alert-escalation-rules": {
+      "get": {
+        "tags": [
+          "alert-engine"
+        ],
+        "operationId": "list_alert_escalation_rules",
+        "responses": {
+          "200": {
+            "description": "升级规则列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertEscalationRuleListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alert-escalation-rules/{rule_code}": {
+      "put": {
+        "tags": [
+          "alert-engine"
+        ],
+        "operationId": "upsert_alert_escalation_rule",
+        "parameters": [
+          {
+            "name": "rule_code",
+            "in": "path",
+            "description": "升级规则编码",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertAlertEscalationRuleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "升级规则已保存",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertEscalationRule"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "规则字段非法或超过三级",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts": {
+      "get": {
+        "tags": [
+          "alert-engine"
+        ],
+        "operationId": "list_alert_instances",
+        "parameters": [
+          {
+            "name": "warehouse_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "alert_code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "nullable": true
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "nullable": true
+            }
+          },
+          {
+            "name": "active_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "nullable": true
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "货主范围内告警实例列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertInstanceListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/active": {
+      "get": {
+        "tags": [
+          "alert-engine"
+        ],
+        "operationId": "list_active_alerts",
+        "parameters": [
+          {
+            "name": "warehouse_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "alert_code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "nullable": true
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "nullable": true
+            }
+          },
+          {
+            "name": "active_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "nullable": true
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "当前用户有权查看的活动告警",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertInstanceListResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "仓库范围越权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "仓库主管未选择授权仓库",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/changes": {
+      "get": {
+        "tags": [
+          "alert-engine"
+        ],
+        "operationId": "list_alert_changes",
+        "parameters": [
+          {
+            "name": "since",
+            "in": "query",
+            "description": "ISO-8601 增量起点，默认最近五秒",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "看板增量变更",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertChangeListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/exports": {
+      "post": {
+        "tags": [
+          "alert-engine"
+        ],
+        "operationId": "create_alert_export",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAlertExportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "十万行以内同步生成",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertExportJob"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "超过十万行进入异步队列",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertExportJob"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "格式或过滤条件非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/exports/{id}": {
+      "get": {
+        "tags": [
+          "alert-engine"
+        ],
+        "operationId": "get_alert_export",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "导出任务 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "导出任务状态",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertExportJob"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "导出任务不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/exports/{token}/download": {
+      "get": {
+        "tags": [
+          "alert-engine"
+        ],
+        "operationId": "download_alert_export",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "description": "七天有效下载令牌",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "下载 Excel 或 PDF 文件"
+          },
+          "404": {
+            "description": "导出文件不存在或已过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/gsp-report": {
+      "get": {
+        "tags": [
+          "alert-engine"
+        ],
+        "operationId": "get_gsp_alert_report",
+        "parameters": [
+          {
+            "name": "warehouse_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "alert_code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "nullable": true
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "nullable": true
+            }
+          },
+          {
+            "name": "active_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "nullable": true
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "GSP 强制告警完整生命周期报表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GspAlertLifecycleReport"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/statistics": {
+      "get": {
+        "tags": [
+          "alert-engine"
+        ],
+        "operationId": "get_alert_statistics",
+        "parameters": [
+          {
+            "name": "warehouse_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "alert_code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "nullable": true
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "nullable": true
+            }
+          },
+          {
+            "name": "active_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "nullable": true
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "月度趋势及告警和接收人排行",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertStatisticsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "查询范围超过一年",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{id}": {
+      "get": {
+        "tags": [
+          "alert-engine"
+        ],
+        "operationId": "get_alert_instance",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "告警实例 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "告警实例详情",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertInstance"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "告警实例不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{id}/acknowledge": {
+      "post": {
+        "tags": [
+          "alert-engine"
+        ],
+        "operationId": "acknowledge_alert_instance",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "告警实例 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "确认接警",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertInstance"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "告警实例不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态不允许确认",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{id}/close": {
+      "post": {
+        "tags": [
+          "alert-engine"
+        ],
+        "operationId": "close_alert_instance",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "告警实例 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlertActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "关闭告警",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertInstance"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "告警实例不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "关闭原因为空",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{id}/handling": {
+      "post": {
+        "tags": [
+          "alert-engine"
+        ],
+        "operationId": "handle_alert_instance",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "告警实例 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlertActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "记录处理过程",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertInstance"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "告警实例不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "处理说明为空",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{id}/ignore": {
+      "post": {
+        "tags": [
+          "alert-engine"
+        ],
+        "operationId": "ignore_alert_instance",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "告警实例 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlertActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "忽略告警",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertInstance"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "告警实例不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "忽略原因为空",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/audit/archive/partitions": {
       "get": {
         "tags": [
@@ -16934,6 +18138,674 @@
           }
         }
       },
+      "AlertActionRequest": {
+        "type": "object",
+        "required": [
+          "description"
+        ],
+        "properties": {
+          "description": {
+            "type": "string"
+          }
+        }
+      },
+      "AlertChangeEvent": {
+        "type": "object",
+        "required": [
+          "id",
+          "alert_instance_id",
+          "to_status",
+          "occurred_at"
+        ],
+        "properties": {
+          "alert_instance_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "to_status": {
+            "type": "string"
+          }
+        }
+      },
+      "AlertChangeListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "server_time"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AlertChangeEvent"
+            }
+          },
+          "server_time": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AlertDefinition": {
+        "type": "object",
+        "description": "货主范围内可配置的告警定义。",
+        "required": [
+          "id",
+          "owner_id",
+          "alert_code",
+          "name",
+          "event_type",
+          "condition_expression",
+          "default_severity",
+          "recipient_roles",
+          "silence_period_seconds",
+          "is_disable_allowed",
+          "enabled",
+          "message_template",
+          "message_templates",
+          "is_gsp_forced",
+          "created_at",
+          "updated_at",
+          "version"
+        ],
+        "properties": {
+          "alert_code": {
+            "type": "string"
+          },
+          "condition_expression": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "default_severity": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "escalation_ref": {
+            "type": "string",
+            "nullable": true
+          },
+          "event_type": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "is_disable_allowed": {
+            "type": "boolean"
+          },
+          "is_gsp_forced": {
+            "type": "boolean"
+          },
+          "message_template": {
+            "type": "string"
+          },
+          "message_templates": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "name": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "recipient_roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "silence_period_seconds": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "AlertDefinitionChangeOperation": {
+        "type": "string",
+        "enum": [
+          "upsert",
+          "set_enabled",
+          "delete"
+        ]
+      },
+      "AlertDefinitionDraft": {
+        "type": "object",
+        "required": [
+          "alert_code",
+          "name",
+          "event_type",
+          "condition_expression",
+          "default_severity",
+          "recipient_roles",
+          "silence_period_seconds",
+          "is_disable_allowed",
+          "message_template",
+          "message_templates"
+        ],
+        "properties": {
+          "alert_code": {
+            "type": "string"
+          },
+          "condition_expression": {
+            "type": "string"
+          },
+          "default_severity": {
+            "type": "string"
+          },
+          "escalation_ref": {
+            "type": "string",
+            "nullable": true
+          },
+          "event_type": {
+            "type": "string"
+          },
+          "is_disable_allowed": {
+            "type": "boolean"
+          },
+          "message_template": {
+            "type": "string"
+          },
+          "message_templates": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "name": {
+            "type": "string"
+          },
+          "recipient_roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "silence_period_seconds": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "AlertDefinitionListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AlertDefinition"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "AlertEscalationLevelDraft": {
+        "type": "object",
+        "required": [
+          "level",
+          "threshold_seconds",
+          "recipient_roles"
+        ],
+        "properties": {
+          "level": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "recipient_roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "threshold_seconds": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "AlertEscalationRule": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "rule_code",
+          "rule_name",
+          "notify_lower_levels",
+          "off_hours_start",
+          "off_hours_end",
+          "off_hours_handler_roles",
+          "holiday_dates",
+          "enabled",
+          "levels",
+          "version",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "holiday_dates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "levels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AlertEscalationLevelDraft"
+            }
+          },
+          "notify_lower_levels": {
+            "type": "boolean"
+          },
+          "off_hours_end": {
+            "type": "string"
+          },
+          "off_hours_handler_roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "off_hours_start": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rule_code": {
+            "type": "string"
+          },
+          "rule_name": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "AlertEscalationRuleListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AlertEscalationRule"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "AlertExportJob": {
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "format",
+          "row_count",
+          "created_at"
+        ],
+        "properties": {
+          "completed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "download_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "email_notification_status": {
+            "type": "string",
+            "nullable": true
+          },
+          "format": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "row_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "AlertInstance": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "alert_definition_id",
+          "alert_code",
+          "alert_name",
+          "severity",
+          "event_type",
+          "resource_type",
+          "resource_id",
+          "event_payload",
+          "recipients",
+          "status",
+          "escalation_level",
+          "triggered_at",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "acknowledged_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "action_description": {
+            "type": "string",
+            "nullable": true
+          },
+          "alert_code": {
+            "type": "string"
+          },
+          "alert_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "alert_name": {
+            "type": "string"
+          },
+          "close_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "closed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "escalation_level": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "event_payload": {},
+          "event_type": {
+            "type": "string"
+          },
+          "handled_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ignored_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "notified_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "recipients": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "resource_id": {
+            "type": "string"
+          },
+          "resource_path": {
+            "type": "string",
+            "nullable": true
+          },
+          "resource_type": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "triggered_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        }
+      },
+      "AlertInstanceListQuery": {
+        "type": "object",
+        "properties": {
+          "active_only": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "alert_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "from": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "severity": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        }
+      },
+      "AlertInstanceListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AlertInstance"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "AlertMonthlyMetric": {
+        "type": "object",
+        "required": [
+          "month",
+          "triggered_count",
+          "acknowledgement_rate",
+          "escalation_rate"
+        ],
+        "properties": {
+          "acknowledgement_rate": {
+            "type": "number",
+            "format": "double"
+          },
+          "average_response_seconds": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "escalation_rate": {
+            "type": "number",
+            "format": "double"
+          },
+          "month": {
+            "type": "string"
+          },
+          "triggered_count": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "AlertRankingItem": {
+        "type": "object",
+        "required": [
+          "key",
+          "count",
+          "unacknowledged_count"
+        ],
+        "properties": {
+          "average_response_seconds": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "key": {
+            "type": "string"
+          },
+          "unacknowledged_count": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "AlertStatisticsResponse": {
+        "type": "object",
+        "required": [
+          "generated_at",
+          "possibly_stale",
+          "monthly",
+          "alert_type_top10",
+          "recipient_top10"
+        ],
+        "properties": {
+          "alert_type_top10": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AlertRankingItem"
+            }
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "monthly": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AlertMonthlyMetric"
+            }
+          },
+          "possibly_stale": {
+            "type": "boolean"
+          },
+          "recipient_top10": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AlertRankingItem"
+            }
+          }
+        }
+      },
       "ApiKey": {
         "type": "object",
         "required": [
@@ -18275,6 +20147,25 @@
             "type": "string"
           },
           "view_id": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "CreateAlertExportRequest": {
+        "type": "object",
+        "required": [
+          "format",
+          "filters"
+        ],
+        "properties": {
+          "filters": {
+            "$ref": "#/components/schemas/AlertInstanceListQuery"
+          },
+          "format": {
+            "type": "string"
+          },
+          "recipient_email": {
             "type": "string",
             "nullable": true
           }
@@ -21136,6 +23027,42 @@
           },
           "period_start": {
             "type": "string"
+          }
+        }
+      },
+      "GspAlertLifecycleRecord": {
+        "type": "object",
+        "required": [
+          "alert",
+          "lifecycle_events"
+        ],
+        "properties": {
+          "alert": {
+            "$ref": "#/components/schemas/AlertInstance"
+          },
+          "lifecycle_events": {}
+        }
+      },
+      "GspAlertLifecycleReport": {
+        "type": "object",
+        "required": [
+          "generated_at",
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GspAlertLifecycleRecord"
+            }
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
           }
         }
       },
@@ -25930,6 +27857,39 @@
           }
         }
       },
+      "SubmitAlertDefinitionChangeRequest": {
+        "type": "object",
+        "required": [
+          "operation"
+        ],
+        "properties": {
+          "definition": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AlertDefinitionDraft"
+              }
+            ],
+            "nullable": true
+          },
+          "definition_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "enabled": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "expected_version": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "operation": {
+            "$ref": "#/components/schemas/AlertDefinitionChangeOperation"
+          }
+        }
+      },
       "SubmitInventoryCountLineRequest": {
         "type": "object",
         "required": [
@@ -27490,6 +29450,59 @@
           }
         }
       },
+      "UpsertAlertEscalationRuleRequest": {
+        "type": "object",
+        "required": [
+          "rule_code",
+          "rule_name",
+          "notify_lower_levels",
+          "off_hours_start",
+          "off_hours_end",
+          "off_hours_handler_roles",
+          "holiday_dates",
+          "enabled",
+          "levels"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "holiday_dates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          "levels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AlertEscalationLevelDraft"
+            }
+          },
+          "notify_lower_levels": {
+            "type": "boolean"
+          },
+          "off_hours_end": {
+            "type": "string"
+          },
+          "off_hours_handler_roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "off_hours_start": {
+            "type": "string"
+          },
+          "rule_code": {
+            "type": "string"
+          },
+          "rule_name": {
+            "type": "string"
+          }
+        }
+      },
       "UpsertCustomerProfileRequest": {
         "type": "object",
         "required": [
@@ -28548,6 +30561,10 @@
     {
       "name": "quality-liaison",
       "description": "M-QL 质量联系单与审批联动"
+    },
+    {
+      "name": "alert-engine",
+      "description": "H-AL 告警定义与审批变更"
     },
     {
       "name": "express",

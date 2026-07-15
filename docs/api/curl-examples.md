@@ -107,6 +107,214 @@ curl -sS \
   '{}'
 ```
 
+## GET /api/v1/alert-definitions
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/alert-definitions" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/alert-definitions/change-requests
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/alert-definitions/change-requests" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/alert-definitions/{id}
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/alert-definitions/<id>" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## GET /api/v1/alert-escalation-rules
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/alert-escalation-rules" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## PUT /api/v1/alert-escalation-rules/{rule_code}
+
+```bash
+curl -sS \
+  -X PUT \
+  "$WMS_API_BASE/api/v1/alert-escalation-rules/<rule_code>" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/alerts
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/alerts" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## GET /api/v1/alerts/active
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/alerts/active" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## GET /api/v1/alerts/changes
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/alerts/changes" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/alerts/exports
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/alerts/exports" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/alerts/exports/{id}
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/alerts/exports/<id>" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## GET /api/v1/alerts/exports/{token}/download
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/alerts/exports/<token>/download" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## GET /api/v1/alerts/gsp-report
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/alerts/gsp-report" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## GET /api/v1/alerts/statistics
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/alerts/statistics" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## GET /api/v1/alerts/{id}
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/alerts/<id>" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/alerts/{id}/acknowledge
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/alerts/<id>/acknowledge" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/alerts/{id}/close
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/alerts/<id>/close" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/alerts/{id}/handling
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/alerts/<id>/handling" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/alerts/{id}/ignore
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/alerts/<id>/ignore" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
 ## GET /api/v1/audit/archive/partitions
 
 ```bash
