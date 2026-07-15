@@ -34,6 +34,48 @@ APP_TSX = REPO_ROOT / "apps" / "web-admin" / "src" / "App.tsx"
 ADMIN_VIEW_RENDERER_TSX = REPO_ROOT / "apps" / "web-admin" / "src" / "app-shell" / "AdminViewRenderer.tsx"
 ADMIN_MENU_DEV_MOCK_TS = REPO_ROOT / "apps" / "web-admin" / "dev-mocks" / "admin-menu-dev-mock.ts"
 
+# 规则启用时的历史债务上限。配置中的 legacy_pages 只能是它的子集，确保债务只减不增。
+LEGACY_SCREENSHOT_PAGE_CEILING = frozenset(
+    {
+        "dashboard",
+        "dock-management",
+        "h1-api-keys",
+        "h1-menu-management",
+        "h1-role-permission",
+        "h1-session-management",
+        "h2-audit-trail",
+        "h3-api-contract",
+        "h4-notify-configs",
+        "h4-notify-records",
+        "h4-wechat-settings",
+        "h5-express",
+        "h9-print-templates",
+        "m-di-platforms",
+        "m1-business-partners",
+        "m1-feature-flags",
+        "m1-locations",
+        "m1-products",
+        "m1-system-dictionary",
+        "m1-warehouses",
+        "m1-zones",
+        "m10-route-plans",
+        "m2-inspecting",
+        "m2-putaway",
+        "m2-receiving",
+        "m3-batches",
+        "m3-status-config",
+        "m4-orders",
+        "m4-returns",
+        "m4-review",
+        "m4-waves",
+        "m9-billing-rules",
+        "mcg-numbering",
+        "mte-task-dispatch",
+        "mte-task-groups",
+        "mte-task-types",
+    }
+)
+
 STORY_HEADING_RE = re.compile(r"^##\s+(US-[A-Z0-9]+-\d{3})[：:]\s*(.+?)\s*$", re.MULTILINE)
 MENU_ITEM_RE = re.compile(r'\{\s*id:\s*"([^"]+)"\s*,\s*title:\s*"([^"]+)"')
 MENU_TREE_ITEM_RE = re.compile(r'menuItem\("([^"]+)"\)')
@@ -198,12 +240,20 @@ def has_menu_screenshot_evidence(story: dict[str, Any], page_id: str, *, validat
     return False
 
 
+def validate_screenshot_legacy_pages(pages: set[str]) -> set[str]:
+    additions = pages - LEGACY_SCREENSHOT_PAGE_CEILING
+    if additions:
+        joined = ", ".join(sorted(additions))
+        raise ValueError(f"menu-e2e-screenshot-policy.toml 的 legacy_pages 不得新增：{joined}")
+    return pages
+
+
 def read_screenshot_legacy_pages() -> set[str]:
     data = tomllib.loads(SCREENSHOT_POLICY.read_text(encoding="utf-8"))
     pages = data.get("policy", {}).get("legacy_pages", [])
     if not isinstance(pages, list) or not all(isinstance(page, str) and page for page in pages):
         raise ValueError("menu-e2e-screenshot-policy.toml 的 policy.legacy_pages 必须是字符串数组")
-    return set(pages)
+    return validate_screenshot_legacy_pages(set(pages))
 
 
 def scan_scope_gaps(

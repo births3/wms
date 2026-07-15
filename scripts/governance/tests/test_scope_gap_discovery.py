@@ -1,6 +1,8 @@
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 
@@ -268,6 +270,15 @@ def test_scope_gap_does_not_retroactively_block_legacy_menu_page_screenshot_debt
     assert result.ok
     assert result.strict_ok
     assert result.gaps == []
+
+
+def test_screenshot_legacy_pages_may_shrink_but_must_not_grow():
+    from check_scope_gap_discovery import validate_screenshot_legacy_pages
+
+    assert validate_screenshot_legacy_pages({"m2-receiving"}) == {"m2-receiving"}
+
+    with pytest.raises(ValueError, match="不得新增"):
+        validate_screenshot_legacy_pages({"m2-receiving", "new-menu-page"})
 
 
 def test_scope_gap_module_filter_keeps_requested_module_without_other_gaps():
