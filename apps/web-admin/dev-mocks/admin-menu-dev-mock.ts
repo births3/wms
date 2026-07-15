@@ -257,6 +257,11 @@ function devAdminMenuSeed(): DevAdminMenuNode[] {
         ["h4-notify-records", "H4 发送记录", "History"],
       ]),
       group(parent, "h5-express", "H5 快递能力", "Truck", 50, [["h5-express", "H5 快递对接", "Truck"]]),
+      group(parent, "hal-alert", "H-AL 告警能力", "Bell", 60, [
+        ["hal-alert-dashboard", "H-AL 告警看板", "Activity"],
+        ["hal-alert-definitions", "H-AL 告警定义", "Bell"],
+        ["hal-alert-escalations", "H-AL 升级规则", "History"],
+      ]),
       group(parent, "h9-print", "H9 打印能力", "Printer", 90, [["h9-print-templates", "H9 打印模板", "Printer"]]),
       group(parent, "mcg-numbering", "M-CG 编码能力", "KeyRound", 100, [["mcg-numbering", "M-CG 单据号规则", "KeyRound"]]),
     ]),
@@ -348,6 +353,9 @@ function devViewPermissionKey(viewId: string) {
     "h4-notify-configs": "h4.notify.read",
     "h4-notify-records": "h4.notify.read",
     "h5-express": "h5.express.read",
+    "hal-alert-dashboard": "hal.alert.read",
+    "hal-alert-definitions": "hal.alert-definition.read",
+    "hal-alert-escalations": "hal.escalation.read",
     "h9-print-templates": "h9.print_template.read",
     "mcg-numbering": "mcg.document_numbering.read",
   };

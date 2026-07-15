@@ -13,6 +13,9 @@ import { M1MasterDataPage, type MasterDataViewId } from "@/pages/master-data/M1M
 import { M4OutboundPage, type M4OutboundMode } from "@/pages/outbound/M4OutboundPage";
 import { H2AuditTrailPage, H3ApiContractPage } from "@/pages/platform/HorizontalCapabilityPages";
 import { H5ExpressPage } from "@/pages/express/H5ExpressPage";
+import { AlertDefinitionPage } from "@/pages/alert-engine/AlertDefinitionPage";
+import { AlertDashboardPage } from "@/pages/alert-engine/AlertDashboardPage";
+import { AlertEscalationPage } from "@/pages/alert-engine/AlertEscalationPage";
 import { H9PrintTemplatePage } from "@/pages/print-template/H9PrintTemplatePage";
 import { MCGDocumentNumberingPage } from "@/pages/document-numbering/MCGDocumentNumberingPage";
 import { DockManagementPage } from "@/pages/dock/DockManagementPage";
@@ -71,6 +74,9 @@ export function renderAdminView(
   if (view === "h2-audit-trail") return <H2AuditTrailPage />;
   if (view === "h3-api-contract") return <H3ApiContractPage />;
   if (wechatNotifyMode) return <H4WechatNotifyPage mode={wechatNotifyMode} />;
+  if (view === "hal-alert-dashboard") return <AlertDashboardPage />;
+  if (view === "hal-alert-definitions") return <AlertDefinitionPage />;
+  if (view === "hal-alert-escalations") return <AlertEscalationPage />;
   if (view === "h5-express") return <H5ExpressPage />;
   if (view === "h9-print-templates") return <H9PrintTemplatePage />;
   if (view === "mcg-numbering") return <MCGDocumentNumberingPage />;

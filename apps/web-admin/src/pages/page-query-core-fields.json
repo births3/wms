@@ -166,6 +166,36 @@
       "more": ["createdAt"]
     },
     {
+      "id": "hal-alert-definitions",
+      "title": "H-AL 告警定义",
+      "required": true,
+      "source": "apps/web-admin/src/pages/alert-engine/AlertDefinitionPage.tsx",
+      "fieldConstant": "alertDefinitionQueryFields",
+      "coreConstant": "alertDefinitionCoreQueryFieldKeys",
+      "core": ["keyword", "enabled"],
+      "more": ["severity"]
+    },
+    {
+      "id": "hal-alert-dashboard",
+      "title": "H-AL 告警看板",
+      "required": true,
+      "source": "apps/web-admin/src/pages/alert-engine/AlertDashboardPage.tsx",
+      "fieldConstant": "alertDashboardQueryFields",
+      "coreConstant": "alertDashboardCoreQueryFieldKeys",
+      "core": ["alertCode", "severity", "status"],
+      "more": ["warehouseId", "triggeredAt"]
+    },
+    {
+      "id": "hal-alert-escalations",
+      "title": "H-AL 告警升级规则",
+      "required": true,
+      "source": "apps/web-admin/src/pages/alert-engine/AlertEscalationPage.tsx",
+      "fieldConstant": "alertEscalationQueryFields",
+      "coreConstant": "alertEscalationCoreQueryFieldKeys",
+      "core": ["keyword", "enabled"],
+      "more": ["handlerRole"]
+    },
+    {
       "id": "h5-express",
       "title": "H5 快递对接",
       "required": true,

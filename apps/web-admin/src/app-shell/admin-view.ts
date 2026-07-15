@@ -29,6 +29,9 @@ export type AdminView =
   | "h4-wechat-settings"
   | "h4-notify-configs"
   | "h4-notify-records"
+  | "hal-alert-dashboard"
+  | "hal-alert-definitions"
+  | "hal-alert-escalations"
   | "h5-express"
   | "h9-print-templates"
   | "mcg-numbering";

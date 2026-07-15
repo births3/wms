@@ -38,6 +38,13 @@ const permissions: DevPermission[] = [
   ["audit.read", "审计查询"],
   ["h4.notify.read", "H4 通知读取"],
   ["h5.express.read", "H5 快递读取"],
+  ["hal.alert-definition.read", "H-AL 告警定义读取"],
+  ["hal.alert-definition.write", "H-AL 告警定义变更申请"],
+  ["hal.alert.read", "H-AL 告警读取"],
+  ["hal.alert.handle", "H-AL 告警处置"],
+  ["hal.alert.report", "H-AL 告警报表"],
+  ["hal.escalation.read", "H-AL 升级规则读取"],
+  ["hal.escalation.write", "H-AL 升级规则维护"],
   ["mcg.document_numbering.read", "M-CG 单据号读取"],
   ["mcg.document_numbering.write", "M-CG 单据号维护"],
 ].map(([permission_code, permission_name], index) => ({
@@ -205,7 +212,7 @@ async function batchAssignRoles(req: IncomingMessage, res: ServerResponse) {
 
 function rolePermissionSeed(roleCode: string) {
   const seeds: Record<string, string[]> = {
-    warehouse_manager: ["m1.master_data.read", "m2.write", "m3.read", "m4.read", "audit.read"],
+    warehouse_manager: ["m1.master_data.read", "m2.write", "m3.read", "m4.read", "audit.read", "hal.alert-definition.read", "hal.alert-definition.write", "hal.alert.read", "hal.alert.handle", "hal.alert.report", "hal.escalation.read", "hal.escalation.write"],
     receiving_clerk: ["m1.master_data.read", "m2.write"],
     maintenance_clerk: ["m1.master_data.read", "m3.read"],
     custodian: ["m3.read", "m4.read"],
