@@ -1,9 +1,10 @@
 use chrono::{DateTime, Utc};
 use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
-use wms_domain::StockLossReason;
+use wms_domain::{StockLossReason, SubmitAlertDefinitionChangeRequest};
 
 use crate::{
+    alert_definition_repository::{apply_approved_change_in_tx, AlertDefinitionRepositoryError},
     auth::AuthContext,
     stock_adjustment::quality_liaison::{
         create_approved_stock_loss_order_in_tx, ApprovedStockLossRequest,
@@ -19,12 +20,25 @@ pub(super) async fn apply_approved_action_in_tx(
     liaison: &QualityLiaisonOrderRow,
     now: DateTime<Utc>,
 ) -> Result<(), QualityLiaisonError> {
-    if liaison
+    let action = liaison
         .business_payload
         .get("action")
-        .and_then(serde_json::Value::as_str)
-        != Some("create_stock_loss")
-    {
+        .and_then(serde_json::Value::as_str);
+    if action == Some("apply_alert_definition_change") {
+        let change = liaison
+            .business_payload
+            .get("change")
+            .cloned()
+            .ok_or(QualityLiaisonError::BusinessActionInvalid)
+            .and_then(|value| {
+                serde_json::from_value::<SubmitAlertDefinitionChangeRequest>(value)
+                    .map_err(|_| QualityLiaisonError::BusinessActionInvalid)
+            })?;
+        return apply_approved_change_in_tx(tx, ctx, &change, now)
+            .await
+            .map_err(map_alert_definition_error);
+    }
+    if action != Some("create_stock_loss") {
         return Ok(());
     }
     let warehouse_id = payload_uuid(&liaison.business_payload, "warehouse_id")?;
@@ -70,6 +84,15 @@ pub(super) async fn apply_approved_action_in_tx(
         | StockAdjustmentError::QuantityExceeded => QualityLiaisonError::BusinessActionInvalid,
         _ => QualityLiaisonError::BusinessAction(format!("{error:?}")),
     })
+}
+
+fn map_alert_definition_error(error: AlertDefinitionRepositoryError) -> QualityLiaisonError {
+    match error {
+        AlertDefinitionRepositoryError::Database(_) | AlertDefinitionRepositoryError::Audit(_) => {
+            QualityLiaisonError::BusinessAction(format!("{error:?}"))
+        }
+        _ => QualityLiaisonError::BusinessActionInvalid,
+    }
 }
 
 fn payload_uuid(payload: &serde_json::Value, key: &str) -> Result<Uuid, QualityLiaisonError> {

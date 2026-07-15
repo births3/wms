@@ -1,6 +1,8 @@
 //! 主仓 OpenAPI 契约使用的 domain schema。
 
 mod alert_definition;
+mod alert_engine;
+mod alert_runtime;
 mod api_key;
 mod audit;
 mod billing;
@@ -24,6 +26,8 @@ mod task_engine;
 mod task_type;
 
 pub use alert_definition::*;
+pub use alert_engine::*;
+pub use alert_runtime::*;
 pub use api_key::*;
 pub use audit::*;
 pub use billing::*;

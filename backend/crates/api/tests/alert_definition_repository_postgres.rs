@@ -27,7 +27,7 @@ fn at(hour: u32) -> chrono::DateTime<Utc> {
 fn request(code: &str, forced: bool, disable_allowed: bool) -> CreateAlertDefinitionRequest {
     CreateAlertDefinitionRequest {
         alert_code: code.to_string(),
-        name: "库存低于安全阈值".to_string(),
+        name: format!("{code} 告警"),
         event_type: "inventory.changed".to_string(),
         condition_expression: "quantity < safety_stock".to_string(),
         default_severity: "warning".to_string(),
@@ -80,6 +80,23 @@ async fn duplicate_code_fails_for_the_same_owner(pool: PgPool) {
     assert!(matches!(
         repo.create(owner_id, &request("inventory.low", false, true), at(10))
             .await,
+        Err(AlertDefinitionRepositoryError::DuplicateCode)
+    ));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn duplicate_name_fails_for_the_same_owner(pool: PgPool) {
+    let owner_id = owner(&pool).await;
+    let repo = PgAlertDefinitionRepository::new(pool);
+    let first = request("inventory.low", false, true);
+    let mut second = request("inventory.lower", false, true);
+    second.name = first.name.clone();
+    repo.create(owner_id, &first, at(9))
+        .await
+        .expect("first definition should be created");
+
+    assert!(matches!(
+        repo.create(owner_id, &second, at(10)).await,
         Err(AlertDefinitionRepositoryError::DuplicateCode)
     ));
 }
@@ -156,4 +173,24 @@ async fn delete_is_owner_scoped_and_missing_rows_are_not_found(pool: PgPool) {
     repo.delete(owner_a, definition.id)
         .await
         .expect("owner should delete its own definition");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn gsp_forced_alert_cannot_be_deleted(pool: PgPool) {
+    let owner_id = owner(&pool).await;
+    let repo = PgAlertDefinitionRepository::new(pool.clone());
+    let forced_id: Uuid = sqlx::query_scalar(
+        "SELECT id FROM alert_definitions WHERE owner_id = $1 AND is_gsp_forced ORDER BY alert_code LIMIT 1",
+    )
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("GSP forced alert should seed");
+
+    assert_eq!(
+        repo.delete(owner_id, forced_id)
+            .await
+            .expect_err("GSP forced alert must not be deleted"),
+        AlertDefinitionRepositoryError::GspForcedCannotDelete
+    );
 }

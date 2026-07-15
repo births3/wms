@@ -59,12 +59,12 @@ BEGIN
     SELECT md5(target_owner_id::text || ':gsp-alert:' || defaults.alert_code)::uuid,
            target_owner_id, defaults.*
       FROM (VALUES
-        ('qualification_expiry_30d', '资质有效期不足30天', 'qualification.expiry', 'expiry < current_date + 30', 'warning', ARRAY['warehouse_manager']::TEXT[], 'GSP 6.79', 0::BIGINT, FALSE, '资质有效期不足30天：{{subject}}', TRUE),
-        ('near_expiry_6m', '近效期不足6个月', 'inventory.near_expiry', 'expiry < current_date + 6 months', 'warning', ARRAY['warehouse_manager']::TEXT[], 'GSP 7.100', 0::BIGINT, FALSE, '近效期不足6个月：{{batch}}', TRUE),
-        ('maintenance_overdue_3d', '养护超期超过3天', 'maintenance.overdue', 'planned_at + 3 days < now()', 'critical', ARRAY['warehouse_manager']::TEXT[], 'GSP 7.97', 0::BIGINT, FALSE, '养护任务已超期3天：{{task_id}}', TRUE),
-        ('quarantine_overdue_24h', '不合格隔离超过24小时未处理', 'quarantine.overdue', 'isolated_at + 24 hours < now()', 'critical', ARRAY['warehouse_manager']::TEXT[], 'GSP 8.119 / 不-1', 0::BIGINT, FALSE, '不合格品隔离超过24小时未处理：{{batch}}', TRUE),
-        ('cold_chain_break_received', '冷链断链事件', 'cold_chain.break', 'event_received = true', 'critical', ARRAY['warehouse_manager']::TEXT[], 'GSP 冷-7', 0::BIGINT, FALSE, '收到冷链断链事件：{{event_id}}', TRUE),
-        ('destruction_approval_overdue_48h', '销毁审批超过48小时', 'destruction.approval', 'submitted_at + 48 hours < now()', 'critical', ARRAY['warehouse_manager']::TEXT[], 'GSP 7.103', 0::BIGINT, FALSE, '销毁审批已超过48小时：{{request_id}}', TRUE)
+        ('qualification_expiry_30d', '资质有效期不足30天', 'qualification.expiry', '{"field":"days_to_expiry","op":"lt","value":30}', 'warning', ARRAY['warehouse_manager']::TEXT[], 'gsp-default', 0::BIGINT, FALSE, '资质有效期不足30天：{{subject}}', TRUE),
+        ('near_expiry_6m', '近效期不足6个月', 'inventory.near_expiry', '{"field":"months_to_expiry","op":"lt","value":6}', 'warning', ARRAY['warehouse_manager']::TEXT[], 'gsp-default', 0::BIGINT, FALSE, '近效期不足6个月：{{batch}}', TRUE),
+        ('maintenance_overdue_3d', '养护超期超过3天', 'maintenance.overdue', '{"field":"overdue_days","op":"gt","value":3}', 'critical', ARRAY['warehouse_manager']::TEXT[], 'gsp-default', 0::BIGINT, FALSE, '养护任务已超期3天：{{task_id}}', TRUE),
+        ('quarantine_overdue_24h', '不合格隔离超过24小时未处理', 'quarantine.overdue', '{"field":"isolated_hours","op":"gt","value":24}', 'critical', ARRAY['warehouse_manager']::TEXT[], 'gsp-default', 0::BIGINT, FALSE, '不合格品隔离超过24小时未处理：{{batch}}', TRUE),
+        ('cold_chain_break_received', '冷链断链事件', 'cold_chain.break', '{"field":"event_received","op":"eq","value":true}', 'critical', ARRAY['warehouse_manager']::TEXT[], 'gsp-default', 0::BIGINT, FALSE, '收到冷链断链事件：{{event_id}}', TRUE),
+        ('destruction_approval_overdue_48h', '销毁审批超过48小时', 'destruction.approval', '{"field":"approval_wait_hours","op":"gt","value":48}', 'critical', ARRAY['warehouse_manager']::TEXT[], 'gsp-default', 0::BIGINT, FALSE, '销毁审批已超过48小时：{{request_id}}', TRUE)
     ) AS defaults(alert_code, name, event_type, condition_expression, default_severity,
                   recipient_roles, escalation_ref, silence_period_seconds,
                   is_disable_allowed, message_template, is_gsp_forced)

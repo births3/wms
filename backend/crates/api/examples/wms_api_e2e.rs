@@ -10,6 +10,10 @@ use tokio::net::TcpListener;
 use uuid::Uuid;
 use wms_api::{
     admin_menu_handlers::{admin_menu_router, AdminMenuAppState},
+    alert_dashboard_handlers::{alert_dashboard_router, AlertDashboardAppState},
+    alert_definition_handlers::{alert_definition_router, AlertDefinitionAppState},
+    alert_escalation_handlers::{alert_escalation_router, AlertEscalationAppState},
+    alert_instance_handlers::{alert_instance_router, AlertInstanceAppState},
     api_key_auth::{api_key_auth_middleware, ApiKeyAuthState},
     api_key_handlers::{api_key_router, ApiKeyManagementState},
     auth::{
@@ -26,6 +30,7 @@ use wms_api::{
     feature_flags::FeatureFlagRegistry,
     master_data_handlers::{master_data_router, MasterDataAppState},
     print_template_handlers::{print_template_router, PrintTemplateAppState},
+    quality_liaison_handlers::{quality_liaison_router, QualityLiaisonAppState},
     role_management::{role_management_router, RoleManagementState},
     system_dictionary_handlers::{system_dictionary_router, SystemDictionaryAppState},
     task_engine_handlers::{task_engine_router, TaskEngineAppState},
@@ -91,6 +96,21 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .merge(auth_router(AuthAppState::new(pool.clone())))
         .merge(api_key_router(ApiKeyManagementState::new(pool.clone())))
         .merge(admin_menu_router(AdminMenuAppState::with_postgres(
+            pool.clone(),
+        )))
+        .merge(quality_liaison_router(
+            QualityLiaisonAppState::with_postgres(pool.clone()),
+        ))
+        .merge(alert_definition_router(
+            AlertDefinitionAppState::with_postgres(pool.clone()),
+        ))
+        .merge(alert_dashboard_router(
+            AlertDashboardAppState::with_postgres(pool.clone()),
+        ))
+        .merge(alert_escalation_router(
+            AlertEscalationAppState::with_postgres(pool.clone()),
+        ))
+        .merge(alert_instance_router(AlertInstanceAppState::with_postgres(
             pool.clone(),
         )))
         .merge(config_center_router(ConfigCenterAppState::with_postgres(
@@ -805,5 +825,6 @@ async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
     )
     .execute(pool)
     .await?;
+    wms_api_e2e_seed::seed_hal_alert_capabilities(pool).await?;
     Ok(())
 }

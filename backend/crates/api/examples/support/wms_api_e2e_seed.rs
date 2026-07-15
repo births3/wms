@@ -248,3 +248,176 @@ pub async fn seed_m4_review_data(pool: &PgPool) -> Result<(), sqlx::Error> {
     .await?;
     Ok(())
 }
+
+pub async fn seed_hal_alert_capabilities(pool: &PgPool) -> Result<(), sqlx::Error> {
+    let owner_id = Uuid::parse_str("00000000-0000-0000-0000-000000000001")
+        .expect("static H-AL owner UUID should parse");
+    sqlx::query(
+        r#"
+        INSERT INTO h4_notification_configs (
+            id, owner_id, event_type, enabled, template, recipient_rule,
+            channels, created_by, updated_by
+        ) VALUES (
+            '00000000-0000-0000-0000-000000006001', $1,
+            'business.inventory.changed', TRUE, '库存低于阈值：{{product_code}}',
+            '{}'::jsonb, ARRAY['wechat']::text[],
+            '00000000-0000-0000-0000-000000000101',
+            '00000000-0000-0000-0000-000000000101'
+        )
+        ON CONFLICT (owner_id, event_type) DO UPDATE
+        SET enabled = TRUE, channels = EXCLUDED.channels, updated_at = now()
+        "#,
+    )
+    .bind(owner_id)
+    .execute(pool)
+    .await?;
+
+    sqlx::query(
+        r#"
+        INSERT INTO alert_escalation_rules (
+            id, owner_id, rule_code, rule_name, notify_lower_levels,
+            off_hours_start, off_hours_end, off_hours_handler_roles,
+            holiday_dates, enabled, created_by, updated_by, created_at, updated_at
+        ) VALUES (
+            '00000000-0000-0000-0000-000000006010', $1,
+            'gsp-critical-default', 'GSP 严重告警三级升级', TRUE,
+            '18:00', '08:00', ARRAY['warehouse_manager','system_admin']::text[],
+            ARRAY['2026-10-01'::date], TRUE,
+            '00000000-0000-0000-0000-000000000101',
+            '00000000-0000-0000-0000-000000000101', now(), now()
+        )
+        ON CONFLICT (owner_id, rule_code) DO UPDATE
+        SET rule_name = EXCLUDED.rule_name,
+            notify_lower_levels = EXCLUDED.notify_lower_levels,
+            off_hours_start = EXCLUDED.off_hours_start,
+            off_hours_end = EXCLUDED.off_hours_end,
+            off_hours_handler_roles = EXCLUDED.off_hours_handler_roles,
+            holiday_dates = EXCLUDED.holiday_dates,
+            enabled = TRUE,
+            updated_at = now()
+        "#,
+    )
+    .bind(owner_id)
+    .execute(pool)
+    .await?;
+    sqlx::query(
+        "DELETE FROM alert_escalation_levels WHERE rule_id = '00000000-0000-0000-0000-000000006010'",
+    )
+    .execute(pool)
+    .await?;
+    sqlx::query(
+        r#"
+        INSERT INTO alert_escalation_levels (
+            id, owner_id, rule_id, level_no, threshold_seconds,
+            recipient_roles, created_at, updated_at
+        ) VALUES
+            ('00000000-0000-0000-0000-000000006011', $1, '00000000-0000-0000-0000-000000006010', 1, 1800, ARRAY['warehouse_manager']::text[], now(), now()),
+            ('00000000-0000-0000-0000-000000006012', $1, '00000000-0000-0000-0000-000000006010', 2, 7200, ARRAY['warehouse_manager','system_admin']::text[], now(), now()),
+            ('00000000-0000-0000-0000-000000006013', $1, '00000000-0000-0000-0000-000000006010', 3, 86400, ARRAY['system_admin']::text[], now(), now())
+        "#,
+    )
+    .bind(owner_id)
+    .execute(pool)
+    .await?;
+
+    for (event_id, idempotency_key, event_type, resource_type, resource_id) in [
+        (
+            "00000000-0000-0000-0000-000000006101",
+            "hal-e2e-event-1",
+            "maintenance.overdue",
+            "maintenance_task",
+            "MT-E2E-001",
+        ),
+        (
+            "00000000-0000-0000-0000-000000006102",
+            "hal-e2e-event-2",
+            "cold_chain.break",
+            "cold_chain_event",
+            "CC-E2E-001",
+        ),
+        (
+            "00000000-0000-0000-0000-000000006103",
+            "hal-e2e-event-3",
+            "qualification.expiry",
+            "supplier",
+            "SUP-E2E-001",
+        ),
+    ] {
+        sqlx::query(
+            r#"
+            INSERT INTO event_bus_event (
+                id, owner_id, idempotency_key, event_type, source_module,
+                resource_type, resource_id, payload, created_at
+            ) VALUES ($1, $2, $3, $4, 'H-AL-E2E', $5, $6, '{}'::jsonb, now())
+            ON CONFLICT (id) DO UPDATE SET created_at = now()
+            "#,
+        )
+        .bind(Uuid::parse_str(event_id).expect("static H-AL event UUID should parse"))
+        .bind(owner_id)
+        .bind(idempotency_key)
+        .bind(event_type)
+        .bind(resource_type)
+        .bind(resource_id)
+        .execute(pool)
+        .await?;
+    }
+
+    sqlx::query(
+        r#"
+        INSERT INTO alert_instances (
+            id, owner_id, alert_definition_id, alert_code, severity, event_id,
+            event_type, resource_type, resource_id, resource_path, warehouse_id,
+            event_payload, recipients, status, dedup_key, escalation_level,
+            action_description, triggered_at, notified_at, acknowledged_at,
+            handled_at, created_at, updated_at
+        )
+        SELECT seed.id, $1, definition.id, seed.alert_code, seed.severity,
+               seed.event_id, definition.event_type, seed.resource_type,
+               seed.resource_id, seed.resource_path,
+               '00000000-0000-0000-0000-000000001301', '{}'::jsonb,
+               seed.recipients, seed.status, seed.dedup_key,
+               seed.escalation_level, seed.action_description,
+               seed.triggered_at, seed.triggered_at, seed.acknowledged_at,
+               seed.handled_at, seed.triggered_at, now()
+          FROM (VALUES
+            ('00000000-0000-0000-0000-000000006201'::uuid, 'maintenance_overdue_3d', 'critical', '00000000-0000-0000-0000-000000006101'::uuid, 'maintenance_task', 'MT-E2E-001', '/inventory/maintenance/MT-E2E-001', ARRAY['系统管理员']::text[], 'escalated', 'hal-e2e-alert-1', 2, '已联系养护负责人', now() - interval '3 hours', NULL::timestamptz, NULL::timestamptz),
+            ('00000000-0000-0000-0000-000000006202'::uuid, 'cold_chain_break_received', 'critical', '00000000-0000-0000-0000-000000006102'::uuid, 'cold_chain_event', 'CC-E2E-001', '/cold-chain/events/CC-E2E-001', ARRAY['仓库经理','系统管理员']::text[], 'handling', 'hal-e2e-alert-2', 1, '正在核对温控记录', now() - interval '40 minutes', now() - interval '35 minutes', now() - interval '20 minutes'),
+            ('00000000-0000-0000-0000-000000006203'::uuid, 'qualification_expiry_30d', 'warning', '00000000-0000-0000-0000-000000006103'::uuid, 'supplier', 'SUP-E2E-001', '/master-data/suppliers/SUP-E2E-001', ARRAY['仓库经理']::text[], 'notified', 'hal-e2e-alert-3', 0, NULL::text, now() - interval '10 minutes', NULL::timestamptz, NULL::timestamptz)
+          ) AS seed(id, alert_code, severity, event_id, resource_type, resource_id,
+                    resource_path, recipients, status, dedup_key, escalation_level,
+                    action_description, triggered_at, acknowledged_at, handled_at)
+          JOIN alert_definitions definition
+            ON definition.owner_id = $1 AND definition.alert_code = seed.alert_code
+        ON CONFLICT (id) DO UPDATE
+        SET status = EXCLUDED.status,
+            escalation_level = EXCLUDED.escalation_level,
+            action_description = EXCLUDED.action_description,
+            triggered_at = EXCLUDED.triggered_at,
+            notified_at = EXCLUDED.notified_at,
+            acknowledged_at = EXCLUDED.acknowledged_at,
+            handled_at = EXCLUDED.handled_at,
+            closed_at = NULL,
+            close_reason = NULL,
+            updated_at = now()
+        "#,
+    )
+    .bind(owner_id)
+    .execute(pool)
+    .await?;
+    sqlx::query(
+        r#"
+        INSERT INTO alert_lifecycle_events (
+            id, owner_id, alert_instance_id, from_status, to_status,
+            action_description, actor_id, actor_name, occurred_at, created_at
+        ) VALUES
+            ('00000000-0000-0000-0000-000000006301', $1, '00000000-0000-0000-0000-000000006201', NULL, 'escalated', '升级到 L2', NULL, 'H-AL E2E', now() - interval '3 hours', now() - interval '3 hours'),
+            ('00000000-0000-0000-0000-000000006302', $1, '00000000-0000-0000-0000-000000006202', NULL, 'handling', '正在核对温控记录', '00000000-0000-0000-0000-000000000101', '系统管理员', now() - interval '20 minutes', now() - interval '20 minutes'),
+            ('00000000-0000-0000-0000-000000006303', $1, '00000000-0000-0000-0000-000000006203', NULL, 'notified', NULL, NULL, 'H-AL E2E', now() - interval '10 minutes', now() - interval '10 minutes')
+        ON CONFLICT (id) DO NOTHING
+        "#,
+    )
+    .bind(owner_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}

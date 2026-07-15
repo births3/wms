@@ -14,6 +14,10 @@ use utoipa::OpenApi;
 use wms_api::ApiDoc;
 use wms_api::{
     admin_menu_handlers::{admin_menu_router, AdminMenuAppState},
+    alert_dashboard_handlers::{alert_dashboard_router, AlertDashboardAppState},
+    alert_definition_handlers::{alert_definition_router, AlertDefinitionAppState},
+    alert_escalation_handlers::{alert_escalation_router, AlertEscalationAppState},
+    alert_instance_handlers::{alert_instance_router, AlertInstanceAppState},
     api_key_auth::{api_key_auth_middleware, ApiKeyAuthState},
     api_key_handlers::{api_key_router, ApiKeyManagementState},
     auth::{auth_runtime_layer, AuthRuntimePolicy, RedisAuthRevocationStore, JWT_SECRET_ENV},
@@ -121,6 +125,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .await
         .map_err(|error| io::Error::other(format!("failed to connect PostgreSQL: {error:?}")))?;
     wms_api::api_key_expiry::spawn(pool.clone());
+    wms_api::alert_engine_job::spawn(pool.clone());
     wms_api::inventory_expiry_job::spawn(pool.clone());
     wms_api::task_release_job::spawn(pool.clone());
     let config_center_state = ConfigCenterAppState::with_postgres(file_registry, pool.clone());
@@ -305,6 +310,18 @@ fn app(
         .merge(quality_liaison_router(
             QualityLiaisonAppState::with_postgres(shared_pool.clone()),
         ))
+        .merge(alert_definition_router(
+            AlertDefinitionAppState::with_postgres(shared_pool.clone()),
+        ))
+        .merge(alert_dashboard_router(
+            AlertDashboardAppState::with_postgres(shared_pool.clone()),
+        ))
+        .merge(alert_escalation_router(
+            AlertEscalationAppState::with_postgres(shared_pool.clone()),
+        ))
+        .merge(alert_instance_router(AlertInstanceAppState::with_postgres(
+            shared_pool.clone(),
+        )))
         .merge(document_numbering_router(document_numbering_state))
         .merge(print_template_router(print_template_state))
         .merge(wechat_notify_router(wechat_notify_state))

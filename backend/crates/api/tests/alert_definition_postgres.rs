@@ -132,11 +132,6 @@ async fn alert_definition_delete_is_rejected_when_trigger_history_exists(pool: P
 #[sqlx::test(migrations = "../../migrations")]
 async fn gsp_seed_covers_existing_and_new_owners_idempotently(pool: PgPool) {
     let existing_owner = owner(&pool).await;
-    sqlx::query("DELETE FROM alert_definitions WHERE owner_id = $1")
-        .bind(existing_owner)
-        .execute(&pool)
-        .await
-        .expect("existing owner seed should be reset");
     let new_owner = owner(&pool).await;
     let expected: Vec<String> = [
         "qualification_expiry_30d",
@@ -155,7 +150,7 @@ async fn gsp_seed_covers_existing_and_new_owners_idempotently(pool: PgPool) {
         .bind(existing_owner)
         .execute(&pool)
         .await
-        .expect("existing owner seed should run");
+        .expect("existing owner seed should remain idempotent");
     for owner_id in [existing_owner, new_owner] {
         let codes: Vec<String> = sqlx::query_scalar(
             "SELECT ARRAY_AGG(alert_code ORDER BY alert_code) FROM alert_definitions WHERE owner_id = $1 AND is_gsp_forced AND NOT is_disable_allowed",

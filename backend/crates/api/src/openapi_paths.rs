@@ -94,6 +94,17 @@ pub use wms_domain::{
     WarehouseZoneListResponse, WeighPackJobRequest,
 };
 pub use wms_domain::{
+    AlertActionRequest, AlertChangeEvent, AlertChangeListResponse, AlertEscalationLevelDraft,
+    AlertEscalationRule, AlertEscalationRuleListResponse, AlertExportJob, AlertInstance,
+    AlertInstanceListQuery, AlertInstanceListResponse, AlertMonthlyMetric, AlertRankingItem,
+    AlertStatisticsResponse, CreateAlertExportRequest, GspAlertLifecycleRecord,
+    GspAlertLifecycleReport, UpsertAlertEscalationRuleRequest,
+};
+pub use wms_domain::{
+    AlertDefinition, AlertDefinitionChangeOperation, AlertDefinitionDraft,
+    AlertDefinitionListQuery, AlertDefinitionListResponse, SubmitAlertDefinitionChangeRequest,
+};
+pub use wms_domain::{
     ArriveDockAppointmentRequest, CancelDockAppointmentRequest, CreateDockAppointmentRequest,
     CreateDockImportRequest, CreateDockRequest, Dock, DockAppointment,
     UpdateDockAppointmentRequest, UpdateDockRequest,
@@ -146,6 +157,8 @@ fn _h4_openapi_type_use(
 ) {
 }
 
+mod alert_definition;
+mod alert_runtime;
 mod core;
 mod customer_addresses;
 mod customer_profile;
@@ -161,6 +174,8 @@ mod stock_adjustment;
 mod task_engine;
 mod task_type;
 
+pub(crate) use alert_definition::*;
+pub(crate) use alert_runtime::*;
 pub(crate) use core::*;
 pub(crate) use customer_addresses::*;
 pub(crate) use customer_profile::*;
