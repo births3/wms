@@ -3,7 +3,8 @@
 
 类别：4. 流程治理
 Tier：T1（< 10s，纯静态扫描）
-输入：docs/domain/user-stories-*.md、governance/quality-matrix.toml、apps/web-admin/src/App.tsx
+输入：docs/domain/user-stories-*.md、governance/quality-matrix.toml、
+      governance/menu-e2e-screenshot-policy.toml、apps/web-admin/src/App.tsx
 输出：人类可读 + --json；--strict 按模块把发现型缺口升级为失败
 退出码：
   0  当前矩阵接线无硬错误；发现型缺口已输出
@@ -28,6 +29,7 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 STORY_DIR = REPO_ROOT / "docs" / "domain"
 MATRIX = REPO_ROOT / "governance" / "quality-matrix.toml"
+SCREENSHOT_POLICY = REPO_ROOT / "governance" / "menu-e2e-screenshot-policy.toml"
 APP_TSX = REPO_ROOT / "apps" / "web-admin" / "src" / "App.tsx"
 ADMIN_VIEW_RENDERER_TSX = REPO_ROOT / "apps" / "web-admin" / "src" / "app-shell" / "AdminViewRenderer.tsx"
 ADMIN_MENU_DEV_MOCK_TS = REPO_ROOT / "apps" / "web-admin" / "dev-mocks" / "admin-menu-dev-mock.ts"
@@ -147,12 +149,61 @@ def read_dev_mock_published_views() -> set[str]:
 
 
 def page_module(page_id: str) -> str:
-    return page_id.split("-", 1)[0].upper()
+    prefix = page_id.split("-", 1)[0].upper()
+    return "AL" if prefix == "HAL" else prefix
 
 
 def has_frontend_e2e_checks(story: dict[str, Any]) -> bool:
     checks = story.get("e2e_checks")
     return isinstance(checks, list) and any(isinstance(item, str) and item.strip() for item in checks)
+
+
+def has_real_frontend_e2e_check(story: dict[str, Any]) -> bool:
+    checks = story.get("e2e_checks")
+    return isinstance(checks, list) and any(
+        isinstance(item, str) and ("test:e2e:" in item or "playwright test" in item)
+        for item in checks
+    )
+
+
+def has_menu_screenshot_evidence(story: dict[str, Any], page_id: str, *, validate_files: bool) -> bool:
+    if not has_real_frontend_e2e_check(story):
+        return False
+    evidence_refs = story.get("evidence_refs")
+    if not isinstance(evidence_refs, list):
+        return False
+    records = story.get("e2e_screenshots")
+    if not isinstance(records, list):
+        return False
+    for record in records:
+        if not isinstance(record, dict) or record.get("page") != page_id:
+            continue
+        spec = record.get("spec")
+        screenshot = record.get("screenshot")
+        if not isinstance(spec, str) or not spec.startswith("prototypes/e2e/") or not spec.endswith(".spec.ts"):
+            continue
+        if (
+            not isinstance(screenshot, str)
+            or not screenshot.startswith("artifacts/screenshot-portal/real-web/")
+            or not screenshot.endswith(".png")
+        ):
+            continue
+        if spec not in evidence_refs or screenshot not in evidence_refs:
+            continue
+        if validate_files:
+            spec_path = REPO_ROOT / spec
+            if not spec_path.is_file() or Path(screenshot).name not in spec_path.read_text(encoding="utf-8"):
+                continue
+        return True
+    return False
+
+
+def read_screenshot_legacy_pages() -> set[str]:
+    data = tomllib.loads(SCREENSHOT_POLICY.read_text(encoding="utf-8"))
+    pages = data.get("policy", {}).get("legacy_pages", [])
+    if not isinstance(pages, list) or not all(isinstance(page, str) and page for page in pages):
+        raise ValueError("menu-e2e-screenshot-policy.toml 的 policy.legacy_pages 必须是字符串数组")
+    return set(pages)
 
 
 def scan_scope_gaps(
@@ -163,6 +214,8 @@ def scan_scope_gaps(
     admin_pages: dict[str, str],
     admin_navigation: AdminNavigation | None = None,
     modules: set[str] | None = None,
+    screenshot_legacy_pages: set[str] | None = None,
+    validate_screenshot_files: bool = False,
 ) -> ScopeScanResult:
     story_headings = parse_story_headings(story_docs)
     stories_by_id = {story.story_id: story for story in story_headings}
@@ -363,6 +416,41 @@ def scan_scope_gaps(
                 )
             )
 
+    if screenshot_legacy_pages is not None:
+        stories_by_page: dict[str, list[dict[str, Any]]] = {}
+        for story in matrix_stories:
+            story_id = str(story.get("id", ""))
+            module = story_module(story_id) if story_id.startswith("US-") else str(story.get("module", "")).upper()
+            if not should_scan_module(module):
+                continue
+            for page_id in story.get("frontend_pages", []):
+                if isinstance(page_id, str) and page_id:
+                    stories_by_page.setdefault(page_id, []).append(story)
+        for page_id in sorted(admin_navigation.menu_sections):
+            module = page_module(page_id)
+            if not should_scan_module(module) or page_id in screenshot_legacy_pages:
+                continue
+            stories = stories_by_page.get(page_id, [])
+            if any(
+                has_menu_screenshot_evidence(story, page_id, validate_files=validate_screenshot_files)
+                for story in stories
+            ):
+                continue
+            story_id = str(stories[0].get("id", "-")) if stories else "-"
+            gaps.append(
+                ScopeGap(
+                    severity="block",
+                    kind="menu_page_missing_e2e_screenshot_evidence",
+                    module=module,
+                    story_id=story_id,
+                    file=rel(MATRIX),
+                    message=(
+                        f"菜单页 {page_id} 缺少真实 Playwright E2E 截图证据；需登记 e2e_checks、"
+                        "e2e_screenshots(page/spec/screenshot) 并在 evidence_refs 引用 spec 与 PNG 产物路径"
+                    ),
+                )
+            )
+
     for story in story_headings:
         if story.module not in active_modules:
             continue
@@ -426,6 +514,8 @@ def main(argv: list[str] | None = None) -> int:
         admin_pages=admin_navigation.menu_sections,
         admin_navigation=admin_navigation,
         modules={module.upper() for module in args.module} if args.module else None,
+        screenshot_legacy_pages=read_screenshot_legacy_pages(),
+        validate_screenshot_files=True,
     )
     effective_ok = result.strict_ok if args.strict else result.ok
     payload = {

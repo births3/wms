@@ -100,5 +100,7 @@ PDA 必须有真机扫码、离线重放、幂等和易用性证据；外部系�
 - 明确不在本轮范围的故事写入 `governance/quality-matrix.toml` 的 `[[deferred_stories]]`，必须有原因；这只关闭范围缺口，不表示功能已完成。
 - issue、review 或验收反馈发现“页面已有但按钮/弹窗/流程没做”时，先定位对应用户故事是否已进入矩阵；没有进入矩阵则先补矩阵或登记待办，再补实现。
 - 管理端页面进入 `frontend_pages` 后，必须同时检查 `menuSections`、`defaultMenuTree`、`renderAdminView` 路由可达和 `apps/web-admin/dev-mocks/admin-menu-dev-mock.ts` 已发布菜单种子，避免只登记菜单标题但默认三层菜单、运行时已发布菜单或页面渲染漏接。
-- 带 `frontend_interaction` 且声明管理端页面的故事，必须登记 `e2e_checks`。该字段可以写 Playwright E2E 命令，也可以写页面级 self-check 命令；严格模式下缺失视为闭环缺口。
+- 带 `frontend_interaction` 且声明管理端页面的故事，必须登记 `e2e_checks`。页面级 self-check 可证明菜单、路由和公共组件接线，但不能替代真实浏览器验收。
+- `governance/menu-e2e-screenshot-policy.toml` 生效后新增的菜单页，必须登记真实 Playwright `e2e_checks`，并在所属故事写 `e2e_screenshots = [{ page, spec, screenshot }]`；`spec` 与 `screenshot` 还必须进入 `evidence_refs`。截图路径固定使用 `artifacts/screenshot-portal/real-web/<页面证据目录>/*.png`，由 E2E 运行时生成，不把临时 PNG 入库。
+- `legacy_pages` 只冻结规则启用前的页面，不得用于豁免新页面；历史页面补齐证据后应从列表删除。`check_scope_gap_discovery.py` 默认对基线外缺证据页面硬失败，避免“菜单可见但流程未验收”。
 - 页面级 self-check 至少覆盖菜单入口、默认菜单树、已发布菜单 dev mock、路由渲染、公共 `QueryPanel` / `DataGrid` 使用、真实后端或 dev mock 数据入口。

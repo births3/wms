@@ -13,6 +13,7 @@
 - 新增页面必须先分类再实现：列表型页面使用公共 `QueryPanel` + `DataGrid`，双栏目录型页面使用分类 / 明细分栏，配置型页面按配置域分区，详情弹窗按业务信息分区上下展示。
 - 新增或重构管理端页面前必须先写页面设计契约：页面类型、主信息载体、标准动作入口、私有动作入口、详情展示方式和禁止常驻区域；列表型页面不得常驻轨迹、审计、明细、当前处理对象、节点状态或动作表单。
 - 新增菜单页必须登记页面级查询分类；核心查询首屏一行展示，更多查询折叠展示。
+- 新增菜单页必须在质量矩阵登记真实 Playwright 命令与 `e2e_screenshots` 的 page/spec/screenshot 映射，并由 E2E 生成 `artifacts/screenshot-portal/real-web/` 页面级 PNG；self-check 只能补静态接线证据，不能替代截图验收。
 - 没有现成能力时，新增为标准可复用单元：通用 UI 放 `@wms/ui`，业务复合放 `@wms/ui business` 或业务模块，页面私有组件放页面目录，工具函数放现有 `lib`/`utils`。
 - 新增组件或工具函数需说明复用缺口、放置理由和后续复用点；禁止为单一场景复制相似页面、表单或请求逻辑。
 - 不得把 `prototypes/src/pages/*` 直接复制到生产应用；必须走 [docs/prototypes/prototype-to-production.md](../docs/prototypes/prototype-to-production.md)。

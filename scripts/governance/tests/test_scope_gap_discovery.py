@@ -176,6 +176,100 @@ def test_scope_gap_discovers_frontend_story_without_e2e_checks():
     assert with_e2e.gaps == []
 
 
+def test_scope_gap_blocks_new_menu_page_without_real_e2e_screenshot_evidence():
+    from check_scope_gap_discovery import AdminNavigation, scan_scope_gaps
+
+    navigation = AdminNavigation(
+        menu_sections={"hal-alert-dashboard": "H-AL 告警看板"},
+        default_menu_tree={"hal-alert-dashboard"},
+        routed_views={"hal-alert-dashboard"},
+    )
+    result = scan_scope_gaps(
+        story_docs={"docs/domain/user-stories-h-alert.md": "## US-AL-004：告警看板与统计"},
+        matrix_stories=[
+            {
+                "id": "US-AL-004",
+                "module": "AL",
+                "types": ["frontend_interaction"],
+                "frontend_pages": ["hal-alert-dashboard"],
+                "e2e_checks": ["node apps/web-admin/self-checks/hal-alert-dashboard.mjs"],
+                "evidence_refs": [],
+            }
+        ],
+        admin_pages=navigation.menu_sections,
+        admin_navigation=navigation,
+        screenshot_legacy_pages=set(),
+    )
+
+    assert not result.ok
+    assert [gap.kind for gap in result.gaps] == ["menu_page_missing_e2e_screenshot_evidence"]
+    assert result.gaps[0].severity == "block"
+
+
+def test_scope_gap_accepts_new_menu_page_with_real_e2e_screenshot_evidence():
+    from check_scope_gap_discovery import AdminNavigation, scan_scope_gaps
+
+    navigation = AdminNavigation(
+        menu_sections={"hal-alert-dashboard": "H-AL 告警看板"},
+        default_menu_tree={"hal-alert-dashboard"},
+        routed_views={"hal-alert-dashboard"},
+    )
+    spec = "prototypes/e2e/web-admin-hal-real.spec.ts"
+    screenshot = "artifacts/screenshot-portal/real-web/h-al-alert-dashboard/active-alerts.png"
+    result = scan_scope_gaps(
+        story_docs={"docs/domain/user-stories-h-alert.md": "## US-AL-004：告警看板与统计"},
+        matrix_stories=[
+            {
+                "id": "US-AL-004",
+                "module": "AL",
+                "types": ["frontend_interaction"],
+                "frontend_pages": ["hal-alert-dashboard"],
+                "e2e_checks": ["pnpm --dir apps/web-admin run test:e2e:hal-real"],
+                "e2e_screenshots": [
+                    {"page": "hal-alert-dashboard", "spec": spec, "screenshot": screenshot}
+                ],
+                "evidence_refs": [spec, screenshot],
+            }
+        ],
+        admin_pages=navigation.menu_sections,
+        admin_navigation=navigation,
+        screenshot_legacy_pages=set(),
+    )
+
+    assert result.ok
+    assert result.strict_ok
+    assert result.gaps == []
+
+
+def test_scope_gap_does_not_retroactively_block_legacy_menu_page_screenshot_debt():
+    from check_scope_gap_discovery import AdminNavigation, scan_scope_gaps
+
+    navigation = AdminNavigation(
+        menu_sections={"m2-receiving": "M2 收货管理"},
+        default_menu_tree={"m2-receiving"},
+        routed_views={"m2-receiving"},
+    )
+    result = scan_scope_gaps(
+        story_docs={"docs/domain/user-stories-m2-inbound.md": "## US-M2-002：收货管理"},
+        matrix_stories=[
+            {
+                "id": "US-M2-002",
+                "module": "M2",
+                "types": ["frontend_interaction"],
+                "frontend_pages": ["m2-receiving"],
+                "e2e_checks": ["pnpm --dir apps/web-admin run test:e2e:m2-real"],
+            }
+        ],
+        admin_pages=navigation.menu_sections,
+        admin_navigation=navigation,
+        screenshot_legacy_pages={"m2-receiving"},
+    )
+
+    assert result.ok
+    assert result.strict_ok
+    assert result.gaps == []
+
+
 def test_scope_gap_module_filter_keeps_requested_module_without_other_gaps():
     from check_scope_gap_discovery import scan_scope_gaps
 
