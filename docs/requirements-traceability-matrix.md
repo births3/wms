@@ -41,7 +41,7 @@
 
 | 模块/能力 | 用户故事源 | 故事数量 | 当前 RTM |
 |---|---|---:|---|
-| H-AL 告警引擎 | [user-stories-h-alert.md](domain/user-stories-h-alert.md) | 5 | 合规风险 RTM |
+| H-AL 告警引擎 | [user-stories-h-alert.md](domain/user-stories-h-alert.md) | 5 | 前端体验 RTM / 后端实现 RTM / 测试证据 RTM / 合规风险 RTM |
 | H-DOCK 月台预约管理 | [user-stories-h-dock-management.md](domain/user-stories-h-dock-management.md) | 7 | 前端体验 RTM / 后端实现 RTM |
 | H-Driver 司机端 | [user-stories-h-driver.md](domain/user-stories-h-driver.md) | 5 | 后端实现 RTM / 测试证据 RTM |
 | H-Store 门店用户端 | [user-stories-h-store.md](domain/user-stories-h-store.md) | 6 | 后端实现 RTM / 测试证据 RTM |
@@ -84,6 +84,10 @@
 
 | 范围 | 需求来源 | 前端入口 | 设计/截图证据 | 当前结论 | 缺口说明 | 补齐路径 |
 |---|---|---|---|---|---|---|
+| H-AL PC 告警定义 | US-AL-001 | `apps/web-admin` 基础能力 / H-AL 告警定义 | `prototypes/e2e/web-admin-hal-real.spec.ts`；`artifacts/screenshot-portal/real-web/h-al-alert-definitions/alert-definition-approved.png` | 已覆盖 | 无 | 后续告警生命周期、升级、看板和通道静默分别按 US-AL-002~005 扩展，不回填到定义页。 |
+| H-AL PC 活跃告警与生命周期 | US-AL-002 | `apps/web-admin` 基础能力 / H-AL 告警看板 | `prototypes/e2e/web-admin-hal-real.spec.ts`；`artifacts/screenshot-portal/real-web/h-al-alert-dashboard/active-alerts.png` | 部分覆盖 | PC 查询、确认、处理、关闭、忽略及真实浏览器证据已覆盖；ADR-0027 尚未 Accepted，真 PDA 离线重放与企业微信点击确认缺外部证据。 | 保持延期；ADR-0027 Accepted 且具备设备/企微环境后补 PDA 与外部回调证据。 |
+| H-AL PC 告警升级 | US-AL-003 | `apps/web-admin` 基础能力 / H-AL 升级规则 | `prototypes/e2e/web-admin-hal-real.spec.ts`；`artifacts/screenshot-portal/real-web/h-al-alert-escalations/escalation-rule.png` | 已覆盖 | 无 | 规则变更时保持最多三级、非工作时段路由、接收人回退和幂等升级测试同步。 |
+| H-AL PC 看板与统计 | US-AL-004 | `apps/web-admin` 基础能力 / H-AL 告警看板 | `prototypes/e2e/web-admin-hal-real.spec.ts`；`artifacts/screenshot-portal/real-web/h-al-alert-dashboard/statistics-and-export.png` | 已覆盖 | 无 | 新增筛选、统计或导出格式时同步更新同筛选缓存、OpenAPI、真实浏览器动作和截图。 |
 | M2 PC 入库：收货、验收、上架 | US-M2-002 / US-M2-003 / US-M2-005 / US-M2-006 | `apps/web-admin` 入库业务菜单 | [m2-inbound-web-design-plan.md](m2-inbound-web-design-plan.md) | 部分覆盖 | 收货扩展字段、整单拒收、质量核对明细、推荐库位校验仍未形成完整 OpenAPI / 后端持久化闭环。 | 按 M2 设计方案 §7.3-§7.5 补 API、后端、前端动作验证和真实截图；不得用原型截图替代。 |
 | M4 PC 出库：订单、波次、复核发货、采购退货 | US-M4-001 / US-M4-002 / US-M4-004 / US-M4-006 / US-M4-010 | `apps/web-admin` 出库业务菜单 | [m4-outbound-web-design-plan.md](m4-outbound-web-design-plan.md)；`prototypes/e2e/web-admin-m4-real.spec.ts` | 部分覆盖 | 已接 M4 出库订单列表、刷新、新建、详情、波次列表、波次详情和波次创建真实 API，真实临时数据库 E2E 已验证单据类型、自动单号、列表回显、详情响应、库存分配、波次刷新和截图；容量/路径规则、下发取消、校验、复核、发货、采购退货仍未形成完整后端闭环。 | 按 M4 设计方案 §8.2-§8.5 补容量/路径/动作及其他出库动作 API、动作测试和真实截图。 |
 | M1 PC 系统字典中心 | US-M1-011 | `apps/web-admin` 系统管理 / 系统字典菜单 | 待补真实管理页设计与截图 | 待补证据 | 系统字典管理页、字典项参数 schema、导入导出、审批和影响预览尚未实现。 | 先按 US-M1-011 补 OpenAPI / 后端 / 前端管理页，再补真实截图和动作测试；M2/M4 单据类型接入同一字典源。 |
@@ -96,6 +100,10 @@
 
 | 范围 | 需求来源 | API / 契约 | Handler / Service | Domain / Repository / Migration | 测试 / 证据 | 当前结论 | 缺口说明 | 补齐路径 |
 |---|---|---|---|---|---|---|---|---|
+| H-AL 告警定义注册 | US-AL-001 | `GET /api/v1/alert-definitions*`；`POST /api/v1/alert-definitions/change-requests`；M-QL 类型/审批回调；OpenAPI/api-client | `alert_definition_handlers.rs`；`alert_definition_service.rs`；`quality_liaison/actions.rs` | `alert_definition.rs`；`alert_definition_repository.rs`；`202607130015_h1_alert_definitions.sql`；`202607150011_hal_alert_definition_workflow.sql` | `alert_definition_postgres.rs`；`alert_definition_repository_postgres.rs`；`alert_definition_change_postgres.rs`；真实 PC E2E | 已覆盖 | 无 | 定义变更继续保持 M-QL 审批原子应用、GSP 不可停删和 append-only H2 审计。 |
+| H-AL 告警触发与生命周期 | US-AL-002 | `GET /api/v1/alerts*`；`POST /api/v1/alerts/{id}/{acknowledge,handling,close,ignore}`；OpenAPI/api-client | `alert_engine_job.rs`；`alert_lifecycle_service.rs`；`alert_instance_handlers.rs` | `alert_engine.rs`；`alert_instance_repository.rs`；`202607150012_hal_alert_runtime.sql` | `alert_lifecycle_postgres.rs`；PC 真实 E2E | 部分覆盖 | H2 条件匹配、去重、H4 重试、状态机和 PC 动作已覆盖；真 PDA/企微外部确认链受 ADR-0027 与外部环境阻塞。 | 保持质量矩阵延期项，取得真实设备和企微环境后补端侧/回调测试与证据。 |
+| H-AL 告警升级 | US-AL-003 | `GET/PUT /api/v1/alert-escalation-rules*`；OpenAPI/api-client | `alert_escalation_handlers.rs`；`alert_engine_job.rs` | `alert_escalation.rs`；`202607150013_hal_alert_escalation.sql` | `alert_escalation_postgres.rs`；PC 真实 E2E | 已覆盖 | 无 | 保持三级上限、夜间/节假日路由、H1 角色回退、重复升级跳过和 H2 审计。 |
+| H-AL 看板、统计与报表 | US-AL-004 | `GET /api/v1/alerts/{active,statistics,gsp-report,changes}`；`POST/GET /api/v1/alerts/exports*`；OpenAPI/api-client | `alert_dashboard_handlers.rs`；`alert_dashboard.rs` | `alert_statistics_snapshots`；`alert_report_exports`；`202607150014_hal_alert_dashboard.sql` | `alert_dashboard_postgres.rs`；PC 真实 E2E | 已覆盖 | 无 | 保持仓库范围、同筛选统计快照回退、10 万行异步导出、7 天下载和查询审计。 |
 | M2 收货单 CRUD 与收货闭环 | US-M2-001 / US-M2-002 | `backend/crates/api/src/lib.rs` inbound OpenAPI；`packages/api-client/src/schema.ts` | `backend/crates/api/src/inbound.rs`；`backend/crates/api/src/wave3_handlers.rs` | `backend/crates/api/src/wave3_repository.rs`；`backend/migrations/202606030001_wave3_core_tables.sql` | `backend/crates/api/tests/wave3_postgres.rs` | 已覆盖 | 无 | 保持 OpenAPI、api-client、repository 测试同步。 |
 | M2 验收、双签、上架入库存 | US-M2-003 / US-M2-004 / US-M2-005 | `/api/v1/inbound/receiving-orders/{id}/inspect`、`/sign`、`/putaway` | `backend/crates/api/src/inbound.rs`；`backend/crates/api/src/wave3_handlers.rs` | `backend/crates/api/src/wave3_repository.rs`；`receiving_inspections`、`receiving_putaways`、`inventory_batches` | `backend/crates/api/tests/wave3_postgres.rs` | 已覆盖 | 无 | 扩字段时先补用户故事字段表和 OpenAPI，再补 repository 测试。 |
 | M1 系统字典中心 | US-M1-011 | `backend/crates/api/src/lib.rs` system-dictionary OpenAPI | `backend/crates/api/src/system_dictionary_handlers.rs` | `backend/crates/api/src/system_dictionary.rs`；`backend/migrations/202606280001_system_dictionary.sql` | `backend/crates/api/tests/system_dictionary_postgres.rs`；`backend/crates/api/src/system_dictionary_tests.rs` | 部分覆盖 | 首批后端覆盖字典表、`document_type` 预置项、参数 schema、货主覆盖和基础幂等；M-QL 审批、H2-005 事件、导入导出、影响预览和 PC 管理页仍未实现。 | 后续分组补 M-QL 审批、H2-005 事件、导入导出、M2/M4 运行时字典校验和真实前端截图。 |
@@ -116,6 +124,8 @@
 
 | 范围 | 需求来源 | 验证命令 | 证据对象 | 当前结论 | 缺口说明 | 补齐路径 |
 |---|---|---|---|---|---|---|
+| H-AL 告警定义 | US-AL-001 | `cargo test ... --test alert_definition_postgres --test alert_definition_repository_postgres --test alert_definition_change_postgres`；`pnpm --dir apps/web-admin run test:e2e:hal-real` | PostgreSQL 仓储/API/M-QL 原子测试；Playwright 报告与真实截图 | 已覆盖 | 无 | 变更字段、审批动作或 GSP 规则时同步扩展三组 PostgreSQL 测试与真实浏览器用例。 |
+| H-AL 生命周期、升级与看板 | US-AL-002 / US-AL-003 / US-AL-004 | `cargo test ... --test alert_lifecycle_postgres --test alert_escalation_postgres --test alert_dashboard_postgres`；`pnpm --dir apps/web-admin run test:e2e:hal-real` | PostgreSQL 条件/状态/升级/权限/缓存/导出测试；Playwright 三个菜单页真实流程与截图 | 部分覆盖 | US-AL-003/004 已覆盖；US-AL-002 仅缺真 PDA 离线重放和企业微信点击确认外部证据。 | 本地回归继续成组运行；外部证据未满足前不关闭 US-AL-002。 |
 | T1 治理门禁 | US-H3-001 / US-H3-002 | `just gov-t1` | `scripts/governance/governance_checks.py` | 已覆盖 | 无 | 新增治理脚本时同步 smoke、T1 和 gate-rules。 |
 | 系统字典文档对齐 | US-M1-011 / US-M2-002 / US-M4-001 / US-M4-012 | `python3 scripts/governance/check_system_dictionary_alignment.py --json` | `scripts/governance/check_system_dictionary_alignment.py` | 已覆盖 | 无 | 后续实现 OpenAPI / 前端 / 后端时扩展脚本检查生成物和代码引用。 |
 | Web 设计 RTM | US-M2-002 / US-M4-001 | `python3 scripts/governance/check_web_design_rtm.py --json` | `docs/*-web-design-plan.md` | 已覆盖 | 无 | 设计方案新增 RTM 类型时同步 `check_web_design_rtm.py`。 |

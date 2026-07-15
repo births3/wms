@@ -14,9 +14,9 @@
 | 指标 | 数量 |
 |---|---:|
 | 故事总数 | 174 |
-| 已完成（已验证） | 40 |
-| 未完成 / 延期 | 134 |
-| 完成率 | 23.0% |
+| 已完成（已验证） | 43 |
+| 未完成 / 延期 | 131 |
+| 完成率 | 24.7% |
 
 > “已完成”表示故事已进入 `stories` 并通过矩阵维度门禁；延期故事中的局部代码、页面或测试切片不计入完成。
 
@@ -24,7 +24,7 @@
 
 | 模块 | 已完成 | 未完成 / 延期 | 总数 |
 |---|---:|---:|---:|
-| AL | 0 | 5 | 5 |
+| AL | 3 | 2 | 5 |
 | BA | 0 | 4 | 4 |
 | CG | 0 | 2 | 2 |
 | DI | 0 | 4 | 4 |
@@ -96,6 +96,9 @@
 | US-M2-002 PDA/PC Web 收货 | M2 | S3 |
 | US-M2-008 收货进度看板 | M2 | S1 |
 | US-M4-001 出库订单管理 | M4 | S2 |
+| US-AL-001 告警定义注册 | AL | S3 |
+| US-AL-003 告警升级机制 | AL | S3 |
+| US-AL-004 告警看板与统计 | AL | S3 |
 | US-DOCK-001 月台档案管理 | DOCK | S2 |
 | US-TE-001 任务类型配置 | TE | S2 |
 | US-TE-002 任务组与人员资格 | TE | S3 |
@@ -110,10 +113,7 @@
 | US-H4-003 企业微信审批流对接 | H4 | 当前仅完成受 JWT 权限保护的内部审批记录和指定审批人回写模型；企业微信审批推送、外部回调签名校验、轮询兜底、业务单据原子回写和外部联调证据尚未完成。 |
 | US-M3-003 库存状态管理 | M3 | 已完成状态变更 API、幂等、审计、PC 弹窗，补齐状态变更原因非空校验，并用真实 PostgreSQL 证明隔离库存创建出库波次时不会锁定或生成分配记录；已补状态转换规则的全局/货主覆盖维护 API、状态字典校验、幂等和审计，并新增 PC 状态规则配置页、菜单接线和页面自检；移库门禁、调度接线、ERP 异步反馈重试及真实浏览器/外部系统证据仍未闭环。 |
 | US-M3-002 批次与效期管理 | M3 | 已完成批号查询、按有效期范围过滤并按有效期/商品/批号排序的近效期查询切片、PC 效期风险筛选、基础状态变更、按货主/日期隔离过期批次的幂等审计 API、批次 movement/状态变更追溯查询、带审批源幂等审计的召回标记、保存召回前状态并校验质量审批权限的双人取消召回 API，以及每小时扫描货主并调用现有隔离仓储的过期自动隔离定时入口；已将近效期预警默认值 180 天和货主覆盖落到 inventory_policy 系统字典，并让 PC 页面读取该配置；PC 详情已展示追溯分区；独立近效期报表 API 已接入并通过 PostgreSQL 回归。调度与 H4 预警联动、已发货客户回收提示、真实浏览器 E2E 和完整外部通知证据仍未闭环。 |
-| US-AL-001 告警定义注册 | AL | 已完成告警定义领域模型、PostgreSQL 表与 6 条 GSP 强制告警种子、货主级编码唯一、GSP 告警不可禁用及已有触发记录不可删除的仓储层验证；仍缺完整查询/更新接口与 OpenAPI、PC 配置页面、角色权限、条件表达式和通知渠道校验、M-QL 变更联系单、幂等审计及真实浏览器 E2E，不能关闭故事。 |
-| US-AL-002 告警触发与生命周期 | AL | 当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。 |
-| US-AL-003 告警升级机制 | AL | 当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。 |
-| US-AL-004 告警看板与统计 | AL | 当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。 |
+| US-AL-002 告警触发与生命周期 | AL | 已完成 H2 事件订阅、JSON 条件匹配、静默去重、H4 重试与失败二级告警、生命周期状态机、PC 确认/处理/关闭/忽略、业务解除和 7 天自动关闭、权限、审计、OpenAPI、PostgreSQL 测试及真实 PC E2E。受 ADR-0027 Proposed 约束，生产 PDA 应用禁止启动，企微/PDA 点击确认、离线暂存恢复和真机证据尚不能补齐，因此不得整体关闭。 |
 | US-AL-005 告警通道与静默配置 | AL | 当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。 |
 | US-DOCK-002 预约创建 | DOCK | 当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。 |
 | US-DOCK-003 预约时间窗冲突检测 | DOCK | 当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。 |
@@ -280,6 +280,9 @@
 | US-M2-002 PDA/PC Web 收货 | M2 | S3 | write、inventory_change、frontend_interaction、critical_path | L1、L2、L3、L4、L5、L6、L7、L8、L9、L10、L11 | m2-receiving | POST /api/v1/inbound/receiving-orders/{id}/receive | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-M2-008 收货进度看板 | M2 | S1 | read_only、frontend_interaction | L1、L2、L3、L7、L8 | m2-receiving | GET /api/v1/inbound/receiving-dashboard | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:not_applicable<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-M4-001 出库订单管理 | M4 | S2 | write、frontend_interaction、api_change | L1、L2、L3、L4、L5、L7、L8、L9、L11 | m4-orders | GET /api/v1/outbound/orders<br>POST /api/v1/outbound/orders<br>GET /api/v1/outbound/orders/{id} | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
+| US-AL-001 告警定义注册 | AL | S3 | read_only、write、api_change、frontend_interaction、config_rule、integration、audit_compliance | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | hal-alert-definitions | GET /api/v1/alert-definitions<br>GET /api/v1/alert-definitions/{id}<br>POST /api/v1/alert-definitions/change-requests<br>PUT /api/v1/quality-liaisons/types/{type_code}<br>POST /api/v1/quality-liaisons/{id}/approval-callback | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
+| US-AL-003 告警升级机制 | AL | S3 | read_only、write、api_change、frontend_interaction、config_rule、integration、audit_compliance | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | hal-alert-escalations | GET /api/v1/alert-escalation-rules<br>PUT /api/v1/alert-escalation-rules/{rule_code} | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
+| US-AL-004 告警看板与统计 | AL | S3 | read_only、write、api_change、frontend_interaction、integration、audit_compliance | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | hal-alert-dashboard | GET /api/v1/alerts/active<br>GET /api/v1/alerts/statistics<br>GET /api/v1/alerts/gsp-report<br>GET /api/v1/alerts/changes<br>POST /api/v1/alerts/exports<br>GET /api/v1/alerts/exports/{id}<br>GET /api/v1/alerts/exports/{token}/download | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-DOCK-001 月台档案管理 | DOCK | S2 | write、api_change、frontend_interaction、integration | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | dock-management | GET /api/v1/docks<br>POST /api/v1/docks<br>POST /api/v1/docks/import<br>PATCH /api/v1/docks/{id}<br>DELETE /api/v1/docks/{id} | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-TE-001 任务类型配置 | TE | S2 | write、config_rule、frontend_interaction | L1、L2、L3、L4、L5、L7、L8、L9、L11 | mte-task-types | GET /api/v1/task-engine/task-types<br>PUT /api/v1/task-engine/task-types/{task_type_code}<br>PATCH /api/v1/task-engine/task-types/{task_type_code}/enabled | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-TE-002 任务组与人员资格 | TE | S3 | write、config_rule、frontend_interaction、audit_compliance | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | mte-task-groups | GET /api/v1/task-engine/task-groups<br>GET /api/v1/task-engine/workers<br>PUT /api/v1/task-engine/task-groups/{task_group_code} | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |

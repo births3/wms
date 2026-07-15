@@ -132,6 +132,21 @@ def test_quality_matrix_accepts_registered_horizontal_modules():
     ) == []
 
 
+def test_quality_matrix_registers_alert_module_and_navigation_check():
+    """H-AL 独立故事模块和管理端导航检查必须可进入矩阵。"""
+    from check_quality_matrix import ALLOWED_MODULES, NAVIGATION_CHECK_SOURCES
+
+    assert "AL" in ALLOWED_MODULES
+    assert (
+        "node apps/web-admin/self-checks/hal-alert-definition-slice-self-check.mjs"
+        in NAVIGATION_CHECK_SOURCES
+    )
+    assert (
+        "node apps/web-admin/self-checks/hal-alert-runtime-slice-self-check.mjs"
+        in NAVIGATION_CHECK_SOURCES
+    )
+
+
 def test_quality_matrix_accepts_h9_field_library_slice():
     """H9 字段库第一切片必须能独立进入质量矩阵。"""
     from check_quality_matrix import check_story
