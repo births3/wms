@@ -144,7 +144,7 @@ fn rule_request(width: i32) -> UpsertDocumentNumberRuleRequest {
     UpsertDocumentNumberRuleRequest {
         document_type: DOCUMENT_TYPE_PURCHASE_INBOUND.to_string(),
         rule_name: "采购入库 API 日流水".to_string(),
-        template: "{OWNER}-{DOCUMENT_TYPE}-{YYYY}{MM}{DD}-{SEQ}".to_string(),
+        template: "{OWNER}-{DOCUMENT_TYPE}-{YY}{MM}{DD}-{SEQ}".to_string(),
         reset_policy: "daily".to_string(),
         sequence_width: width,
         enabled: true,
@@ -271,7 +271,7 @@ async fn document_number_rule_management_is_owner_scoped_idempotent_and_audited(
         .expect("number should generate with public-managed rule");
     assert_eq!(
         generated.value.generated_no,
-        "HZ005-purchase_inbound-20260702-000001"
+        "HZ005-purchase_inbound-260702-000001"
     );
 
     let audit_count: i64 = sqlx::query_scalar(

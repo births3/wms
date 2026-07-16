@@ -11,7 +11,7 @@ fn validate_template(template: &str) -> Result<(), DocumentNumberingError> {
         let token = &after_start[..end];
         if !matches!(
             token,
-            "OWNER" | "DOCUMENT_TYPE" | "YYYY" | "MM" | "DD" | "SEQ"
+            "OWNER" | "DOCUMENT_TYPE" | "YYYY" | "YY" | "MM" | "DD" | "SEQ"
         ) {
             return Err(DocumentNumberingError::TemplateInvalid);
         }
@@ -440,6 +440,7 @@ fn render_number(
         .replace("{OWNER}", owner_code)
         .replace("{DOCUMENT_TYPE}", &rule.document_type)
         .replace("{YYYY}", &format!("{:04}", occurred_at.year()))
+        .replace("{YY}", &format!("{:02}", occurred_at.year().rem_euclid(100)))
         .replace("{MM}", &format!("{:02}", occurred_at.month()))
         .replace("{DD}", &format!("{:02}", occurred_at.day()))
         .replace("{SEQ}", &seq))

@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 
-const artifactsDir = path.resolve("../apps/web-admin/.e2e-artifacts/mcg-real/screenshots");
+const artifactsDir = path.resolve("../artifacts/screenshot-portal/real-web/mcg-numbering");
 
 test("M-CG 规则配置使用真实 API 完成新增、预览、编辑和停用", async ({ page }) => {
   fs.mkdirSync(artifactsDir, { recursive: true });
@@ -18,7 +18,7 @@ test("M-CG 规则配置使用真实 API 完成新增、预览、编辑和停用"
   await editor.getByLabel("规则名称").fill("E2E 编码规则");
   await editor.getByLabel("单据类型").selectOption("purchase_inbound");
   await editor.getByLabel("流水位数").fill("6");
-  await editor.getByLabel("编码模板").fill("{OWNER}-E2E-{YYYY}{MM}{DD}-{SEQ}");
+  await editor.getByLabel("编码模板").fill("{OWNER}-E2E-{YY}{MM}{DD}-{SEQ}");
   await editor.getByRole("button", { name: "保存", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("规则已新增");
   await expect(page.getByText(ruleCode).first()).toBeVisible();

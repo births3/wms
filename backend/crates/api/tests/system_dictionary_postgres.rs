@@ -54,8 +54,11 @@ async fn document_type_presets_are_queryable(pool: PgPool) {
         vec![
             "purchase_inbound",
             "purchase_return_outbound",
+            "quality_liaison",
             "sales_outbound",
-            "sales_return"
+            "sales_return",
+            "stock_loss",
+            "stock_surplus"
         ]
     );
     assert!(items.iter().all(|item| item.source == "global"));
