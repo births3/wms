@@ -39,6 +39,8 @@ test("M-TE 任务类型配置使用真实 API 展示预置类型并保存自定�
 });
 
 test("M-TE 任务组和调度使用真实 API 完成创建、自动分派与下发", async ({ page }) => {
+  const browserNow = Date.now();
+  await page.clock.install({ time: new Date(browserNow) });
   await login(page);
   await configurePriorityRule(page);
   await configurePutawayRelease(page, "scheduled");
@@ -120,6 +122,9 @@ test("M-TE 任务组和调度使用真实 API 完成创建、自动分派与下�
   await page.getByRole("button", { name: "下发", exact: true }).click();
   await page.getByRole("dialog", { name: "确认任务操作" }).getByRole("button", { name: "确认执行" }).click();
   await expect(row).toContainText("已下发");
+  await page.clock.setSystemTime(new Date(browserNow + 24 * 60 * 60 * 1000));
+  await page.getByLabel("自动刷新").selectOption("5000");
+  await expect(row).toContainText("未接单超时");
 
   const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
   const screenshotDir = path.join(repoRoot, "artifacts/screenshot-portal/real-web/m-te-task-execution");

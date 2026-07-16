@@ -32,8 +32,9 @@ type Notice = { kind: "success" | "error"; text: string } | null;
 export function TaskDispatchPage() {
   const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(defaultQuery);
   const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(defaultQuery);
+  const [refreshInterval, setRefreshInterval] = React.useState(15_000);
   const filters = { status: text(appliedQuery.status), taskTypeCode: text(appliedQuery.taskTypeCode), warehouseId: text(appliedQuery.warehouseId) };
-  const tasksQuery = useWarehouseTasksQuery(filters);
+  const tasksQuery = useWarehouseTasksQuery(filters, refreshInterval);
   const groupsQuery = useTaskGroupsQuery();
   const usersQuery = useTaskWorkersQuery();
   const transition = useTransitionWarehouseTaskMutation();
@@ -68,6 +69,7 @@ export function TaskDispatchPage() {
     <PageHeader title="M-TE 任务调度" subtitle="统一查看、分派、下发和处置仓内物理任务" />
     {notice && <div className={notice.kind === "error" ? "rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" : "rounded-md border border-wms-success/30 bg-wms-success/10 px-3 py-2 text-sm text-wms-success"} role={notice.kind === "error" ? "alert" : "status"}>{notice.text}</div>}
     <QueryPanel fields={mteTaskDispatchQueryFields} defaultVisibleFieldKeys={mteTaskDispatchCoreQueryFieldKeys} value={draftQuery} onValueChange={setDraftQuery} onQuery={() => setAppliedQuery(draftQuery)} onReset={() => { const next = defaultQuery(); setDraftQuery(next); setAppliedQuery(next); }} />
+    <label className="ml-auto flex items-center gap-2 text-sm text-muted-foreground">自动刷新<select aria-label="自动刷新" className="h-9 rounded-md border border-input bg-background px-3 text-foreground" value={refreshInterval} onChange={(event) => setRefreshInterval(Number(event.target.value))}><option value="0">关闭</option><option value="5000">每 5 秒</option><option value="15000">每 15 秒</option><option value="30000">每 30 秒</option></select></label>
     <Card><CardContent className="p-5"><DataGrid storageKey="mte.task-dispatch" columns={taskColumns(workerNames)} data={rows} rowKey={(row) => row.id} selectable selectedRowKeys={selected} onSelectedRowKeysChange={setSelected} caption={tasksQuery.isPending ? "加载任务队列..." : undefined} emptyTitle={tasksQuery.isError ? "读取任务队列失败" : "暂无任务"} emptyDescription={tasksQuery.isError ? errorText(tasksQuery.error, "请检查鉴权和 API 服务") : "业务事件触发后任务会进入待分配池"} refreshAction={refreshAction} toolbarActions={toolbarActions} exportFileBaseName="M-TE-tasks" queryState={appliedQuery} querySummaryItems={buildQueryPanelSummaryItems(mteTaskDispatchQueryFields, appliedQuery)} onApplyQueryState={(value) => { const next = normalizeQuery(value); setDraftQuery(next); setAppliedQuery(next); }} onClearQueryState={() => { const next = defaultQuery(); setDraftQuery(next); setAppliedQuery(next); }} /></CardContent></Card>
     <Dialog open={assignOpen} onOpenChange={(open) => !busy && setAssignOpen(open)}><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>{assignAction === "assign" ? "分派任务" : "改派任务"}</DialogTitle><DialogDescription>仅展示任务组“{selectedTask?.task_group_code ?? ""}”内的有效成员。</DialogDescription></DialogHeader><label className="grid gap-1 text-sm">执行人<Select value={assigneeId} onValueChange={setAssigneeId}><SelectTrigger><SelectValue placeholder="请选择合格成员" /></SelectTrigger><SelectContent>{qualifiedUsers.map((user) => <SelectItem key={user.user_id} value={user.user_id}>{user.display_name}（{user.username}）</SelectItem>)}</SelectContent></Select></label>{qualifiedUsers.length === 0 && <div className="rounded-md border border-wms-warning/30 bg-wms-warning/10 px-3 py-2 text-sm text-wms-warning" role="status">该任务组尚未配置成员，请先在“任务组与人员资格”页面维护。</div>}<DialogFooter><DialogClose asChild><Button type="button" variant="outline" disabled={busy}>取消</Button></DialogClose><Button type="button" disabled={busy || !selectedTask || !assigneeId} onClick={() => selectedTask && void mutate(selectedTask, assignAction, assigneeId)}>{busy ? "处理中..." : "确认分派"}</Button></DialogFooter></DialogContent></Dialog>
     <Dialog open={confirmOpen} onOpenChange={(open) => !busy && setConfirmOpen(open)}><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>确认任务操作</DialogTitle><DialogDescription>{confirmAction ? `确认对任务 ${confirmAction.task.task_no} 执行“${actionLabels[confirmAction.action]}”？此操作会立即更新任务并写入审计。` : "请确认任务操作。"}</DialogDescription></DialogHeader><DialogFooter><DialogClose asChild><Button type="button" variant="outline" disabled={busy}>取消</Button></DialogClose><Button type="button" variant={confirmAction?.action === "cancel" ? "destructive" : "default"} disabled={busy || !confirmAction} onClick={() => confirmAction && void mutate(confirmAction.task, confirmAction.action)}>{busy ? "处理中..." : "确认执行"}</Button></DialogFooter></DialogContent></Dialog>
@@ -88,6 +90,7 @@ const actionLabels: Record<TaskTransitionAction, string> = { release: "释放", 
 function taskColumns(workerNames: ReadonlyMap<string, string>): DataGridColumn<WarehouseTask>[] { return [
   { key: "task_no", header: "任务号", width: 190, minWidth: 160, mono: true, sortable: true, sortValue: (row) => row.task_no, filterValue: (row) => row.task_no, copyValue: (row) => row.task_no, filter: { type: "text" } },
   { key: "status", header: "状态", width: 110, minWidth: 95, render: (row) => <StatusBadge status={statusTone(row.status)} label={statusLabels[row.status] ?? row.status} size="sm" /> },
+  { key: "attention", header: "关注", width: 120, minWidth: 105, render: (row) => { const label = taskAttention(row); return label ? <StatusBadge status="isolated" label={label} size="sm" /> : "—"; } },
   { key: "task_type_code", header: "任务类型", width: 120, minWidth: 100, mono: true, sortable: true, sortValue: (row) => row.task_type_code, filterValue: (row) => row.task_type_code, copyValue: (row) => row.task_type_code, filter: { type: "text" } },
   { key: "priority", header: "优先级", width: 95, minWidth: 80, sortable: true, sortValue: (row) => row.priority, render: (row) => String(row.priority) },
   { key: "priority_factors", header: "优先因素", width: 150, minWidth: 120, render: (row) => [row.urgent_order && "订单加急", row.cold_chain && "冷链", row.manually_expedited && "手动加急"].filter(Boolean).join(" / ") || "默认" },
@@ -100,6 +103,12 @@ function taskColumns(workerNames: ReadonlyMap<string, string>): DataGridColumn<W
   { key: "assignee_user_id", header: "执行人", width: 190, minWidth: 150, render: (row) => row.assignee_user_id ? workerNames.get(row.assignee_user_id) ?? row.assignee_user_id : "待分配", copyValue: (row) => row.assignee_user_id ?? "" },
   { key: "created_at", header: "创建时间", width: 180, minWidth: 150, sortable: true, sortValue: (row) => row.created_at, render: (row) => formatDateTime(row.created_at) },
 ]; }
+
+export function taskAttention(task: WarehouseTask, now = Date.now()) {
+  const startedAt = task.status === "in_progress" ? task.started_at : task.status === "dispatched" ? task.dispatched_at : null;
+  if (!startedAt || now <= new Date(startedAt).getTime() + task.estimated_minutes * 60_000) return null;
+  return task.status === "in_progress" ? "执行超时" : "未接单超时";
+}
 
 function statusTone(status: string): "completed" | "isolated" | "pending" { if (status === "completed") return "completed"; if (status === "exception" || status === "cancelled") return "isolated"; return "pending"; }
 function defaultQuery(): QueryPanelValue { return { keyword: "", status: "", taskTypeCode: "", warehouseId: "" }; }

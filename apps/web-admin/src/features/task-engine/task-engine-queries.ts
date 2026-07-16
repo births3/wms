@@ -88,7 +88,7 @@ export function useUpsertTaskGroupMutation() {
   });
 }
 
-export function useWarehouseTasksQuery(filters: WarehouseTaskFilters) {
+export function useWarehouseTasksQuery(filters: WarehouseTaskFilters, refetchInterval: number) {
   return useQuery<components["schemas"]["WarehouseTaskListResponse"], ApiError>({
     queryKey: [...taskEngineQueryKey, "tasks", filters],
     queryFn: async () => {
@@ -107,6 +107,7 @@ export function useWarehouseTasksQuery(filters: WarehouseTaskFilters) {
       return result.data;
     },
     retry: false,
+    refetchInterval: refetchInterval || false,
   });
 }
 
