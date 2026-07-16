@@ -2,7 +2,8 @@ import { expect, test } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 
-const artifactsDir = path.resolve("../apps/web-admin/.e2e-artifacts/m3-real/screenshots");
+const artifactsDir = path.resolve("../artifacts/screenshot-portal/real-web/m3-batches");
+const statusConfigArtifactsDir = path.resolve("../artifacts/screenshot-portal/real-web/m3-status-config");
 
 test("M3 库存查询使用真实 API 传递组合筛选并展示结果", async ({ page }) => {
   fs.mkdirSync(artifactsDir, { recursive: true });
@@ -44,6 +45,52 @@ test("M3 库存查询使用真实 API 传递组合筛选并展示结果", async 
   await expect(page.getByRole("status")).toContainText("批号列表已查询");
   await expect(page.getByText("B-M4-E2E-001", { exact: true })).toBeVisible();
   await page.screenshot({ path: path.join(artifactsDir, "inventory-query.png"), fullPage: false });
+
+  await page.getByRole("button", { name: "导出", exact: true }).click();
+  const exportDialog = page.getByRole("dialog", { name: "导出列表" });
+  await expect(exportDialog).toContainText("当前筛选结果共 1 条");
+  await expect(exportDialog.getByLabel("导出格式")).toContainText("xlsx");
+  await page.screenshot({ path: path.join(artifactsDir, "inventory-export-dialog.png"), fullPage: false });
+  const downloadPromise = page.waitForEvent("download");
+  await exportDialog.getByRole("button", { name: "导出", exact: true }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^M3批号管理_\d{10}\.xlsx$/);
+  const downloadPath = await download.path();
+  if (!downloadPath) throw new Error("M3 库存 Excel 下载未生成本地文件");
+  expect(fs.statSync(downloadPath).size).toBeGreaterThan(0);
+  expect(fs.readFileSync(downloadPath).subarray(0, 2).toString()).toBe("PK");
+  await page.screenshot({ path: path.join(artifactsDir, "inventory-exported.png"), fullPage: false });
+});
+
+test("M3 库存状态规则使用真实 API 保存货主覆盖", async ({ page }) => {
+  fs.mkdirSync(statusConfigArtifactsDir, { recursive: true });
+  await login(page);
+  const navigation = page.getByRole("navigation");
+  const target = navigation.getByRole("button", { name: /M3 状态规则/ });
+  if (!(await target.isVisible())) {
+    const section = navigation.getByRole("button", { name: "库内业务", exact: true });
+    if ((await section.getAttribute("aria-expanded")) !== "true") await section.click();
+    const group = navigation.getByRole("button", { name: "库存管理", exact: true });
+    if ((await group.getAttribute("aria-expanded")) !== "true") await group.click();
+  }
+  await target.click();
+  await expect(page.getByRole("heading", { name: "M3 库存状态管理" })).toBeVisible();
+
+  await page.getByRole("button", { name: "新增", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "新增库存状态转换规则" });
+  await dialog.getByLabel("起始状态").selectOption("qualified");
+  await dialog.getByLabel("目标状态").selectOption("quarantined");
+  await dialog.getByLabel("原因/审批来源").fill("E2E 质量隔离审批");
+  const responsePromise = page.waitForResponse(
+    (response) => response.url().endsWith("/api/v1/inventory/status-transitions/qualified/quarantined")
+      && response.request().method() === "PUT",
+  );
+  await dialog.getByRole("button", { name: "保存", exact: true }).click();
+  const response = await responsePromise;
+  expect(response.status()).toBe(200);
+  await expect(page.getByRole("status")).toContainText("qualified → quarantined 规则已保存");
+  await expect(page.getByRole("row").filter({ hasText: "E2E 质量隔离审批" })).toBeVisible();
+  await page.screenshot({ path: path.join(statusConfigArtifactsDir, "owner-transition-saved.png"), fullPage: false });
 });
 
 async function login(page: import("@playwright/test").Page) {

@@ -28,6 +28,9 @@ use wms_api::{
     drug_inspection_handlers::{drug_inspection_router, DrugInspectionAppState},
     dual_person_policy_handlers::{dual_person_policy_router, DualPersonPolicyAppState},
     feature_flags::FeatureFlagRegistry,
+    inventory_status_config_handlers::{
+        inventory_status_config_router, InventoryStatusConfigAppState,
+    },
     master_data_handlers::{master_data_router, MasterDataAppState},
     print_template_handlers::{print_template_router, PrintTemplateAppState},
     quality_liaison_handlers::{quality_liaison_router, QualityLiaisonAppState},
@@ -145,6 +148,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         )))
         .merge(dual_person_policy_router(
             DualPersonPolicyAppState::with_postgres(pool.clone()),
+        ))
+        // Real browser tests must mount the same inventory configuration route as production.
+        .merge(inventory_status_config_router(
+            InventoryStatusConfigAppState::with_postgres(pool.clone()),
         ))
         .merge(print_template_router(PrintTemplateAppState::with_postgres(
             pool.clone(),

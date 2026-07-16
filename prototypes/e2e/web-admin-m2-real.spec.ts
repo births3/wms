@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 
-const artifactsDir = path.resolve("../apps/web-admin/.e2e-artifacts/m2-real/screenshots");
+const artifactsDir = path.resolve("../artifacts/screenshot-portal/real-web/m2-inbound");
 const supplierId = "00000000-0000-0000-0000-000000001101";
 const warehouseId = "00000000-0000-0000-0000-000000001301";
 const productId = "00000000-0000-0000-0000-000000001001";

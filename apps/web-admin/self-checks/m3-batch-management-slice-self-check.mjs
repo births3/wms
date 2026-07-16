@@ -26,6 +26,8 @@ const cancelDialog = readFileSync(
 assert.match(appShell, /id:\s*"m3-batches"/, "库内业务菜单应登记 M3 批号管理视图");
 assert.match(viewRenderer, /<M3BatchManagementPage\b/, "视图渲染器应渲染 M3 批号管理页面");
 assert.match(page, /<DataGrid\b/, "M3 批号管理页应复用 DataGrid");
+assert.match(page, /exportFileBaseName="M3 批号管理"/, "M3 库存查询应使用可识别的 Excel 导出文件名");
+assert.doesNotMatch(page, /showExportAction=\{false\}/, "M3 库存查询不得关闭 DataGrid 标准 Excel 导出");
 assert.match(page, /detailAction=\{gridDetailAction\}/, "M3 批号管理应提供标准详情动作");
 assert.match(page, /toolbarActions=\{\[statusAction, recallAction, cancelRecallAction\]\}/, "M3 批号管理应提供状态、召回和撤回动作");
 assert.match(page, /M3BatchRecallDialog/, "M3 召回必须使用独立弹窗");
