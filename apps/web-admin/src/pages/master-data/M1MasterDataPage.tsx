@@ -18,7 +18,9 @@ import {
 import { Plus, Upload } from "lucide-react";
 
 import {
+  batchCreateCustomers,
   batchCreateProducts,
+  batchCreateSuppliers,
   batchCreateLocations,
   createCustomer,
   createProduct,
@@ -280,7 +282,9 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
   }
 
   async function importSuppliersFromDialog(requests: CreateSupplierRequest[]) {
-    await importSourceRows(requests, createSupplier, "供应商");
+    const createdRows = await batchCreateSuppliers(requests);
+    await rowsQuery.refetch();
+    setLastEvent(`已批量导入 ${createdRows.length} 个供应商`);
   }
 
   async function createCustomerFromDialog(request: CreateCustomerRequest) {
@@ -290,7 +294,9 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
   }
 
   async function importCustomersFromDialog(requests: CreateCustomerRequest[]) {
-    await importSourceRows(requests, createCustomer, "客户");
+    const createdRows = await batchCreateCustomers(requests);
+    await rowsQuery.refetch();
+    setLastEvent(`已批量导入 ${createdRows.length} 个客户`);
   }
 
   function openCrudEdit(row: MasterDataRow) {
@@ -319,27 +325,6 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
     await rowsQuery.refetch();
     setRowActionError(null);
     setLastEvent(`${saved.code} ${form.mode === "create" ? "已新建" : "已保存"}`);
-  }
-
-  async function importSourceRows<Request>(
-    requests: Request[],
-    createOne: (request: Request) => Promise<MasterDataRow>,
-    entityName: string,
-  ) {
-    const createdRows: MasterDataRow[] = [];
-    try {
-      for (const request of requests) {
-        createdRows.push(await createOne(request));
-      }
-    } catch (error) {
-      if (createdRows.length > 0) {
-        await rowsQuery.refetch();
-        setLastEvent(`已批量导入 ${createdRows.length} 个${entityName}，后续行失败`);
-      }
-      throw error;
-    }
-    await rowsQuery.refetch();
-    setLastEvent(`已批量导入 ${createdRows.length} 个${entityName}`);
   }
 
   function updateLocationBatchRange(patch: Partial<LocationBatchRange>) {

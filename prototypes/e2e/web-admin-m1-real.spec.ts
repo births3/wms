@@ -3,6 +3,9 @@ import fs from "node:fs";
 import path from "node:path";
 
 const artifactsDir = path.resolve("../apps/web-admin/.e2e-artifacts/m1-real/screenshots");
+const productEvidenceDir = path.resolve("../artifacts/screenshot-portal/real-web/m1-products");
+const businessPartnerEvidenceDir = path.resolve("../artifacts/screenshot-portal/real-web/m1-business-partners");
+const featureFlagEvidenceDir = path.resolve("../artifacts/screenshot-portal/real-web/m1-feature-flags");
 
 test("M1 管理端读取真实后端数据", async ({ page }) => {
   fs.mkdirSync(artifactsDir, { recursive: true });
@@ -73,6 +76,11 @@ test("M1 管理端读取真实后端数据", async ({ page }) => {
       await expect(page.getByText(item.text).first()).toBeVisible();
     }
     await page.screenshot({ path: path.join(artifactsDir, item.shot), fullPage: false });
+    if (item.title === "功能开关 / 配置中心") {
+      fs.mkdirSync(featureFlagEvidenceDir, { recursive: true });
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.screenshot({ path: path.join(featureFlagEvidenceDir, "feature-flags-current.png"), fullPage: false });
+    }
 
     if (item.text === "C-M1-E2E-001") {
       const row = page.locator("tr", { hasText: item.text }).first();
@@ -191,10 +199,11 @@ test("M1 管理端读取真实后端数据", async ({ page }) => {
   await expect(createDockDialog).toBeHidden();
   await page.getByLabel("关键字").fill(dockCode);
   await page.getByRole("button", { name: "查询", exact: true }).click();
-  await expect(page.getByText(dockCode, { exact: true })).toBeVisible();
+  const dockRow = page.locator("tr", { hasText: dockCode }).first();
+  await expect(dockRow).toBeVisible();
   await page.screenshot({ path: path.join(artifactsDir, "docks-created.png"), fullPage: false });
 
-  await page.locator("tr", { hasText: dockCode }).getByRole("checkbox").click();
+  await dockRow.getByRole("checkbox").click();
   await page.getByRole("button", { name: "预约", exact: true }).click();
   const appointmentDialog = page.getByRole("dialog");
   const appointmentNo = `AP-E2E-${Date.now()}`;
@@ -253,7 +262,7 @@ test("M1 管理端读取真实后端数据", async ({ page }) => {
   await expect(page.getByText("已导入 1 个月台", { exact: true })).toBeVisible();
   await page.getByLabel("关键字").fill(importedDockCode);
   await page.getByRole("button", { name: "查询", exact: true }).click();
-  await expect(page.getByText(importedDockCode, { exact: true })).toBeVisible();
+  await expect(page.locator("tr", { hasText: importedDockCode }).first()).toBeVisible();
   await page.screenshot({ path: path.join(artifactsDir, "docks-imported.png"), fullPage: false });
 
   const negativeResults = await page.evaluate(async () => {
@@ -335,6 +344,137 @@ test("M1 供应商资质 PC 真实维护", async ({ page }) => {
   await expect(supplierDialog).toBeHidden();
   await expect(page.getByText("E2E 供应商联系人").first()).toBeVisible();
   await page.screenshot({ path: path.join(artifactsDir, "supplier-qualification-updated.png"), fullPage: false });
+});
+
+test("M1 商品批量导入调用原子批量接口", async ({ page }) => {
+  fs.mkdirSync(productEvidenceDir, { recursive: true });
+  await page.goto("/");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.getByLabel("货主编码").fill("PY_OWNER");
+  await page.getByLabel("登录账号").fill("admin");
+  await page.getByRole("textbox", { name: "密码", exact: true }).fill("CorrectHorse1!");
+  await page.getByRole("button", { name: "登录" }).click();
+  await expect(page.getByRole("heading", { name: "运营总览" })).toBeVisible();
+
+  await page.getByRole("button", { name: "基础档案" }).click();
+  const masterDataGroup = page.getByRole("navigation").getByRole("button", { name: "主数据", exact: true });
+  if ((await masterDataGroup.getAttribute("aria-expanded")) !== "true") await masterDataGroup.click();
+  await page.getByRole("navigation").getByRole("button", { name: /M1 商品档案/ }).click();
+  await expect(page.getByRole("heading", { name: "M1 商品档案" })).toBeVisible();
+
+  const marker = Date.now();
+  const firstCode = `P-E2E-BATCH-${marker}-1`;
+  const secondCode = `P-E2E-BATCH-${marker}-2`;
+  await page.getByRole("button", { name: "导入", exact: true }).click();
+  await page.getByRole("textbox", { name: "商品批量导入内容" }).fill([
+    "product_code,product_name,spec,approval_no,dosage_form,manufacturer,storage_condition,special_drug_category_code",
+    `${firstCode},E2E 批量商品一,10ml*1支,国药准字E2E1,注射剂,E2E药业,normal,none`,
+    `${secondCode},E2E 批量商品二,20片,国药准字E2E2,片剂,E2E药业,normal,none`,
+  ].join("\n"));
+  await expect(page.getByText("已解析 2 条，预览前 8 条", { exact: true })).toBeVisible();
+  const batchResponse = page.waitForResponse(
+    (response) => response.url().endsWith("/api/v1/master-data/products/batch-sync")
+      && response.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "确认导入", exact: true }).click();
+  const response = await batchResponse;
+  expect(response.status(), await response.text()).toBe(200);
+  expect(response.request().postDataJSON()).toHaveLength(2);
+  await expect(page.getByRole("dialog")).toBeHidden();
+  await expect(page.getByText("已批量导入 2 个商品", { exact: true })).toBeVisible();
+  await expect(page.getByText(firstCode, { exact: true })).toBeVisible();
+  await expect(page.getByText(secondCode, { exact: true })).toBeVisible();
+  await page.screenshot({
+    path: path.join(productEvidenceDir, "product-batch-import-current.png"),
+    fullPage: false,
+  });
+});
+
+test("M1 供应商批量导入调用原子批量接口", async ({ page }) => {
+  fs.mkdirSync(businessPartnerEvidenceDir, { recursive: true });
+  await page.goto("/");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.getByLabel("货主编码").fill("PY_OWNER");
+  await page.getByLabel("登录账号").fill("admin");
+  await page.getByRole("textbox", { name: "密码", exact: true }).fill("CorrectHorse1!");
+  await page.getByRole("button", { name: "登录" }).click();
+  await expect(page.getByRole("heading", { name: "运营总览" })).toBeVisible();
+
+  await page.getByRole("button", { name: "基础档案" }).click();
+  const masterDataGroup = page.getByRole("navigation").getByRole("button", { name: "主数据", exact: true });
+  if ((await masterDataGroup.getAttribute("aria-expanded")) !== "true") await masterDataGroup.click();
+  await page.getByRole("navigation").getByRole("button", { name: /M1 客商档案/ }).click();
+  await expect(page.getByRole("heading", { name: "M1 客商档案" })).toBeVisible();
+
+  const marker = Date.now();
+  const firstCode = `S-E2E-BATCH-${marker}-1`;
+  const secondCode = `S-E2E-BATCH-${marker}-2`;
+  await page.getByRole("button", { name: "供入", exact: true }).click();
+  await page.getByRole("textbox", { name: "批量导入供应商" }).fill([
+    "supplier_code,supplier_name,license_no,contact_name",
+    `${firstCode},E2E 批量供应商一,91310000MA1FL3L80L,联系人一`,
+    `${secondCode},E2E 批量供应商二,91110108MA01ABCD1F,联系人二`,
+  ].join("\n"));
+  const batchResponse = page.waitForResponse(
+    (response) => response.url().endsWith("/api/v1/master-data/suppliers/batch-sync")
+      && response.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "确认导入", exact: true }).click();
+  const response = await batchResponse;
+  expect(response.status(), await response.text()).toBe(200);
+  expect(response.request().postDataJSON()).toHaveLength(2);
+  await expect(page.getByText("已批量导入 2 个供应商", { exact: true })).toBeVisible();
+  await expect(page.getByText(firstCode, { exact: true })).toBeVisible();
+  await expect(page.getByText(secondCode, { exact: true })).toBeVisible();
+  await page.screenshot({
+    path: path.join(businessPartnerEvidenceDir, "supplier-batch-import-current.png"),
+    fullPage: false,
+  });
+});
+
+test("M1 客户批量导入调用原子批量接口", async ({ page }) => {
+  fs.mkdirSync(businessPartnerEvidenceDir, { recursive: true });
+  await page.goto("/");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.getByLabel("货主编码").fill("PY_OWNER");
+  await page.getByLabel("登录账号").fill("admin");
+  await page.getByRole("textbox", { name: "密码", exact: true }).fill("CorrectHorse1!");
+  await page.getByRole("button", { name: "登录" }).click();
+  await expect(page.getByRole("heading", { name: "运营总览" })).toBeVisible();
+
+  await page.getByRole("button", { name: "基础档案" }).click();
+  const masterDataGroup = page.getByRole("navigation").getByRole("button", { name: "主数据", exact: true });
+  if ((await masterDataGroup.getAttribute("aria-expanded")) !== "true") await masterDataGroup.click();
+  await page.getByRole("navigation").getByRole("button", { name: /M1 客商档案/ }).click();
+  await expect(page.getByRole("heading", { name: "M1 客商档案" })).toBeVisible();
+
+  const marker = Date.now();
+  const firstCode = `C-E2E-BATCH-${marker}-1`;
+  const secondCode = `C-E2E-BATCH-${marker}-2`;
+  await page.getByRole("button", { name: "客入", exact: true }).click();
+  await page.getByRole("textbox", { name: "批量导入客户" }).fill([
+    "customer_code,customer_name,license_no",
+    `${firstCode},E2E 批量客户一,LIC-E2E-1`,
+    `${secondCode},E2E 批量客户二,`,
+  ].join("\n"));
+  const batchResponse = page.waitForResponse(
+    (response) => response.url().endsWith("/api/v1/master-data/customers/batch-sync")
+      && response.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "确认导入", exact: true }).click();
+  const response = await batchResponse;
+  expect(response.status(), await response.text()).toBe(200);
+  expect(response.request().postDataJSON()).toHaveLength(2);
+  await expect(page.getByText("已批量导入 2 个客户", { exact: true })).toBeVisible();
+  await expect(page.getByText(firstCode, { exact: true })).toBeVisible();
+  await expect(page.getByText(secondCode, { exact: true })).toBeVisible();
+  await page.screenshot({
+    path: path.join(businessPartnerEvidenceDir, "customer-batch-import-current.png"),
+    fullPage: false,
+  });
 });
 
 test("M-VR 双人策略矩阵真实保存", async ({ page }) => {

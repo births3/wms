@@ -288,6 +288,19 @@ export async function createSupplier(request: CreateSupplierRequest): Promise<Ma
   return supplierRow(result.data);
 }
 
+export async function batchCreateSuppliers(
+  requests: CreateSupplierRequest[],
+): Promise<MasterDataRow[]> {
+  const result = await api.POST("/api/v1/master-data/suppliers/batch-sync", {
+    params: { header: { "Idempotency-Key": idempotencyKey("web-m1-supplier-batch") } },
+    body: requests,
+  });
+  if (!result.data) {
+    throw new ApiError(result.error, "批量导入供应商失败", result.response.status);
+  }
+  return result.data.data.map(supplierRow);
+}
+
 export async function createCustomer(request: CreateCustomerRequest): Promise<MasterDataRow> {
   const result = await api.POST("/api/v1/master-data/customers", {
     params: { header: { "Idempotency-Key": idempotencyKey("web-m1-customer-create") } },
@@ -297,6 +310,19 @@ export async function createCustomer(request: CreateCustomerRequest): Promise<Ma
     throw new ApiError(result.error, "新建客户失败", result.response.status);
   }
   return customerRow(result.data);
+}
+
+export async function batchCreateCustomers(
+  requests: CreateCustomerRequest[],
+): Promise<MasterDataRow[]> {
+  const result = await api.POST("/api/v1/master-data/customers/batch-sync", {
+    params: { header: { "Idempotency-Key": idempotencyKey("web-m1-customer-batch") } },
+    body: requests,
+  });
+  if (!result.data) {
+    throw new ApiError(result.error, "批量导入客户失败", result.response.status);
+  }
+  return result.data.data.map(customerRow);
 }
 
 export async function updateSupplier(input: {

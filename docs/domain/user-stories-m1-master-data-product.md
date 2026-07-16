@@ -153,8 +153,8 @@
 
 | 维度 | 场景 |
 |------|------|
-| L4 错误路径 | 客户编码重复 → M1_CUSTOMER_DUPLICATE; 经营范围未配置 → M1_SCOPE_REQUIRED; 门店地址不完整 → M1_ADDRESS_INCOMPLETE |
-| L5 数据一致 | 门店经营范围与出库校验联动; 客户停用后不可新建出库订单 |
+| L4 错误路径 | 客户编码重复 → M1_CUSTOMER_DUPLICATE; 门店地址不完整 → M1_ADDRESS_INCOMPLETE |
+| L5 数据一致 | 客户/门店变更与审计记录原子写入; 客户停用后不可新建出库订单 |
 | L8 权限 | 仓库主管可管理; 门店用户只读本门店 |
 | L11 幂等 | 创建/修改支持 Idempotency-Key |
 
