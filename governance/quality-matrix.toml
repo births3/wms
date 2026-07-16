@@ -76,7 +76,7 @@ evidence_refs = ["backend/crates/api/tests/stock_adjustment_postgres.rs", "backe
 [evidence_profiles.DOCK]
 backend_files = ["backend/crates/api/src/dock_handlers.rs", "backend/crates/api/src/dock_repository.rs"]
 database_objects = ["warehouse_docks", "dock_appointments", "auth_roles", "auth_role_permissions", "auth_permissions", "audit_event"]
-test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test dock_postgres", "pnpm --dir apps/web-admin run test:e2e:m1-real"]
+test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test dock_postgres", "just web-admin-m1-real-e2e"]
 evidence_refs = ["backend/crates/api/tests/dock_postgres.rs", "prototypes/e2e/web-admin-m1-real.spec.ts", "apps/web-admin/.e2e-artifacts/m1-real/screenshots/docks-imported.png"]
 
 [evidence_profiles.TE]
@@ -99,7 +99,7 @@ story_file = "docs/domain/user-stories-m1-master-data-warehouse.md"
 types = ["write", "config_rule", "frontend_interaction"]
 frontend_pages = ["m1-system-dictionary"]
 navigation_checks = ["pnpm --dir apps/web-admin run test:e2e:shell-dev"]
-e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m1-real"]
+e2e_checks = ["just web-admin-m1-real-e2e"]
 api_paths = [
   "GET /api/v1/system-dictionaries/{dict_code}/items",
   "PUT /api/v1/system-dictionaries/{dict_code}/items/{item_code}",
@@ -250,7 +250,7 @@ navigation_checks = [
   "node apps/web-admin/self-checks/m1-zone-real-api-self-check.mjs",
   "node apps/web-admin/self-checks/m1-location-contract-self-check.mjs",
 ]
-e2e_checks = ["set -a; source .env; set +a; pnpm --dir apps/web-admin run test:e2e:m1-real"]
+e2e_checks = ["just web-admin-m1-real-e2e"]
 api_paths = [
   "GET /api/v1/master-data/warehouses",
   "POST /api/v1/master-data/warehouses",
@@ -267,7 +267,7 @@ database_objects = ["warehouses", "warehouse_zones", "warehouse_locations", "inv
 test_checks = [
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test master_data_postgres",
   "pnpm --dir apps/web-admin exec tsc --noEmit",
-  "set -a; source .env; set +a; pnpm --dir apps/web-admin run test:e2e:m1-real",
+  "just web-admin-m1-real-e2e",
 ]
 evidence_refs = [
   "backend/migrations/202607130005_m1_master_data_permissions.sql",
@@ -311,7 +311,7 @@ governance = "verified"
 required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
 covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
 frontend_pages = ["m1-warehouses", "m1-zones", "m1-locations"]
-e2e_checks = ["set -a; source .env; set +a; pnpm --dir apps/web-admin run test:e2e:m1-real"]
+e2e_checks = ["just web-admin-m1-real-e2e"]
 
 [[deferred_stories]]
 id = "US-H4-002"
@@ -1421,10 +1421,10 @@ covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
 id = "US-M3-003"
 title = "库存状态管理"
 module = "M3"
-types = ["write", "config_rule", "integration"]
-reason = "已完成状态变更 API、幂等、审计、PC 弹窗，补齐状态变更原因非空校验，并用真实 PostgreSQL 证明隔离库存创建出库波次时不会锁定或生成分配记录；已补状态转换规则的全局/货主覆盖维护 API、状态字典校验、幂等和审计，并新增 PC 状态规则配置页、菜单接线和页面自检；移库门禁、调度接线、ERP 异步反馈重试及真实浏览器/外部系统证据仍未闭环。"
+types = ["write", "config_rule", "frontend_interaction", "integration"]
+reason = "已完成状态变更 API、幂等、审计、PC 弹窗和隔离库存出库门禁；状态转换规则的全局/货主覆盖维护 API、状态字典校验、幂等、审计及 PC 配置页已闭环，真实 PostgreSQL 浏览器 E2E 已验证货主覆盖规则保存和本地门户截图；截图需由 PR 附件或 CI artifact 长期归档。移库门禁、调度接线、ERP 异步反馈重试及外部系统证据仍未闭环。"
 owner = "M3 模块负责人"
-resume_when = "补齐状态配置页真实浏览器 E2E、移库同等状态门禁、过期任务、ERP outbox 重试和外部系统证据后移入 stories。"
+resume_when = "补齐移库同等状态门禁、过期任务、ERP outbox 重试和外部系统证据后移入 stories。"
 frontend_pages = ["m3-batches", "m3-status-config"]
 navigation_checks = [
   "node apps/web-admin/self-checks/m3-batch-management-slice-self-check.mjs",
@@ -1433,7 +1433,11 @@ navigation_checks = [
 e2e_checks = [
   "node apps/web-admin/self-checks/m3-batch-management-slice-self-check.mjs",
   "node apps/web-admin/self-checks/m3-inventory-status-config-self-check.mjs",
+  "pnpm --dir apps/web-admin run test:e2e:m3-real --grep '库存状态规则'",
   "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave4_postgres outbound_complete_pick_review_ship_replays_and_deducts_inventory",
+]
+e2e_screenshots = [
+  { page = "m3-status-config", spec = "prototypes/e2e/web-admin-m3-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m3-status-config/owner-transition-saved.png" },
 ]
 api_paths = [
   "GET /api/v1/inventory/status-transitions",
@@ -1473,10 +1477,13 @@ evidence_refs = [
   "backend/crates/api/tests/m3_status_allocation_postgres.rs",
   "backend/crates/api/tests/m3_status_transition_config_postgres.rs",
   "backend/crates/api/src/openapi_paths/extensions.rs",
+  "backend/crates/api/examples/wms_api_e2e.rs",
   "shared/openapi/openapi.json",
   "apps/web-admin/src/pages/inventory/M3InventoryStatusConfigPage.tsx",
   "apps/web-admin/src/features/inventory/inventory-status-config-queries.ts",
   "apps/web-admin/self-checks/m3-inventory-status-config-self-check.mjs",
+  "prototypes/e2e/web-admin-m3-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/m3-status-config/owner-transition-saved.png",
 ]
 
 [[deferred_stories]]
@@ -1484,10 +1491,10 @@ id = "US-M3-002"
 title = "批次与效期管理"
 module = "M3"
 story_file = "docs/domain/user-stories-m3-inventory-query.md"
-types = ["write", "integration", "runtime_guard", "audit_compliance"]
-reason = "已完成批号查询、按有效期范围过滤并按有效期/商品/批号排序的近效期查询切片、PC 效期风险筛选、基础状态变更、按货主/日期隔离过期批次的幂等审计 API、批次 movement/状态变更追溯查询、带审批源幂等审计的召回标记、保存召回前状态并校验质量审批权限的双人取消召回 API，以及每小时扫描货主并调用现有隔离仓储的过期自动隔离定时入口；已将近效期预警默认值 180 天和货主覆盖落到 inventory_policy 系统字典，并让 PC 页面读取该配置；PC 详情已展示追溯分区；独立近效期报表 API 已接入并通过 PostgreSQL 回归。调度与 H4 预警联动、已发货客户回收提示、真实浏览器 E2E 和完整外部通知证据仍未闭环。"
+types = ["write", "frontend_interaction", "integration", "runtime_guard", "audit_compliance"]
+reason = "已完成批号查询、近效期查询/报表、PC 风险筛选、过期隔离、追溯、召回及双人取消召回，并将 180 天预警默认值和货主覆盖落到 inventory_policy 字典；真实 PostgreSQL 浏览器 E2E 已验证批次追溯、状态变更、召回/取消召回和本地门户截图，截图需由 PR 附件或 CI artifact 长期归档。调度与 H4 预警联动、已发货客户回收提示和完整外部通知证据仍未闭环。"
 owner = "M3 模块负责人"
-resume_when = "补齐调度接线、H4 预警、真实浏览器 E2E、批次全链路追溯、已发货客户回收提示及异常证据后移入 stories。"
+resume_when = "补齐调度接线、H4 预警、已发货客户回收提示及异常证据后移入 stories。"
 frontend_pages = ["m3-batches"]
 navigation_checks = ["node apps/web-admin/self-checks/m3-batch-management-slice-self-check.mjs", "pnpm --dir apps/web-admin run test:e2e:shell-dev"]
 e2e_checks = [
@@ -1496,6 +1503,9 @@ e2e_checks = [
   "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_recall_postgres",
   "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_trace_postgres",
   "set -a; source .env; set +a; pnpm --dir apps/web-admin run test:e2e:m2-real",
+]
+e2e_screenshots = [
+  { page = "m3-batches", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/inventory-trace.png" },
 ]
 test_checks = [
   "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test system_dictionary_postgres",
@@ -1529,6 +1539,7 @@ evidence_refs = [
   "apps/web-admin/src/pages/inventory/M3BatchViewHelpers.tsx",
   "apps/web-admin/self-checks/m3-batch-management-slice-self-check.mjs",
   "prototypes/e2e/web-admin-m2-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/m2-inbound/inventory-trace.png",
 ]
 
 [[stories]]
@@ -1807,12 +1818,12 @@ story_file = "docs/domain/user-stories-h-dock-management.md"
 types = ["write", "api_change", "frontend_interaction", "integration"]
 frontend_pages = ["dock-management"]
 navigation_checks = ["node apps/web-admin/self-checks/m1-dock-management-navigation-self-check.mjs"]
-e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m1-real"]
+e2e_checks = ["just web-admin-m1-real-e2e"]
 test_checks = [
   "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test dock_postgres",
   "cargo check --manifest-path backend/Cargo.toml -p wms-api --bin wms-api",
   "just openapi-check",
-  "pnpm --dir apps/web-admin run test:e2e:m1-real",
+  "just web-admin-m1-real-e2e",
 ]
 api_paths = [
   "GET /api/v1/docks",
@@ -2011,11 +2022,14 @@ id = "US-M1-001"
 title = "商品档案管理"
 module = "M1"
 story_file = "docs/domain/user-stories-m1-master-data-product.md"
-types = ["write", "api_change", "integration"]
+types = ["write", "api_change", "frontend_interaction", "integration"]
 frontend_pages = ["m1-products"]
 api_paths = ["POST /api/v1/master-data/products/batch-sync"]
 database_objects = ["products", "audit_event", "idempotency_request"]
-e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m1-real"]
+e2e_checks = ["just web-admin-m1-real-e2e"]
+e2e_screenshots = [
+  { page = "m1-products", spec = "prototypes/e2e/web-admin-m1-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m1-products/product-batch-import-current.png" },
+]
 test_checks = [
   "set -a; source /home/test1/workspace/wms/.env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m1_product_batch_sync_postgres -- --nocapture",
   "node apps/web-admin/self-checks/m1-product-batch-import-self-check.mjs",
@@ -2028,11 +2042,13 @@ evidence_refs = [
   "apps/web-admin/src/pages/master-data/M1MasterDataPage.tsx",
   "apps/web-admin/src/pages/master-data/ProductBatchImportDialog.tsx",
   "apps/web-admin/self-checks/m1-product-batch-import-self-check.mjs",
+  "prototypes/e2e/web-admin-m1-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/m1-products/product-batch-import-current.png",
   "backend/crates/api/src/openapi_paths/core.rs",
   "shared/openapi/openapi.json",
   "packages/api-client/src/schema.ts",
 ]
-reason = "已完成商品批量 API 同步后端切片及管理端批量导入解析预览：整批 PostgreSQL 事务、重复幂等回放、货主隔离、受控储存条件/特殊药品字典校验、API Key 中间件鉴权、请求审计和原子回滚均有真实 PostgreSQL 回归证据，页面有 Excel 复制表格/CSV/TSV 文本预览与批量提交自检；故事仍不能整体关闭，原生 xlsx 文件解析、M-PM 未匹配项展示、ERP 回写、PC/PDA、真实浏览器 E2E 和完整字段映射证据尚未闭环。"
+reason = "已完成商品批量 API 同步后端切片及管理端批量导入解析预览：整批 PostgreSQL 事务、重复幂等回放、货主隔离、受控储存条件/特殊药品字典校验、API Key 中间件鉴权、请求审计和原子回滚均有真实 PostgreSQL 回归证据；管理端批量导入已直接调用原子批量接口，并由一次性 PostgreSQL 浏览器 E2E 验证两条请求、解析预览、页面回显和本地门户截图；截图按门禁不入库，长期证据仍须由 PR 附件或 CI artifact 归档；故事仍不能整体关闭，原生 xlsx 文件解析、M-PM 未匹配项展示、ERP 回写、PDA 和完整字段映射证据尚未闭环。"
 owner = "M1 模块负责人"
 resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
 
@@ -2041,11 +2057,17 @@ id = "US-M1-002"
 title = "供应商资质档案"
 module = "M1"
 story_file = "docs/domain/user-stories-m1-master-data-product.md"
-types = ["write", "api_change", "integration"]
+types = ["write", "api_change", "frontend_interaction", "integration"]
+frontend_pages = ["m1-business-partners"]
 api_paths = ["POST /api/v1/master-data/suppliers/batch-sync"]
 database_objects = ["suppliers", "audit_event", "idempotency_request"]
+e2e_checks = ["just web-admin-m1-real-e2e"]
+e2e_screenshots = [
+  { page = "m1-business-partners", spec = "prototypes/e2e/web-admin-m1-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m1-business-partners/supplier-batch-import-current.png" },
+]
 test_checks = [
   "set -a; source /home/test1/workspace/wms/.env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m1_supplier_batch_sync_postgres -- --nocapture",
+  "pnpm --dir apps/web-admin exec tsc --noEmit",
 ]
 evidence_refs = [
   "backend/crates/api/src/master_data_handlers_part2.rs",
@@ -2054,8 +2076,13 @@ evidence_refs = [
   "backend/crates/api/src/openapi_paths/core.rs",
   "shared/openapi/openapi.json",
   "packages/api-client/src/schema.ts",
+  "apps/web-admin/src/features/master-data/master-data-queries/api.ts",
+  "apps/web-admin/src/pages/master-data/M1MasterDataPage.tsx",
+  "apps/web-admin/src/pages/master-data/MasterDataSourceActions.tsx",
+  "prototypes/e2e/web-admin-m1-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/m1-business-partners/supplier-batch-import-current.png",
 ]
-reason = "已完成供应商批量 API 同步后端切片：整批 PostgreSQL 事务、重复幂等回放/冲突、货主隔离、API Key 中间件鉴权、请求审计和原子回滚均有真实 PostgreSQL 回归证据；故事仍不能整体关闭，资质证照有效期/上传、经营范围标签、到期预警、过期供应商收货拦截、印章及样张备案、USCC 格式校验、完整供应商更新/查询、PC/PDA、Excel 导入和真实浏览器 E2E 证据尚未闭环。"
+reason = "已完成供应商批量 API 同步后端切片：整批 PostgreSQL 事务、重复幂等回放/冲突、货主隔离、API Key 中间件鉴权、请求审计和原子回滚均有真实 PostgreSQL 回归证据；管理端批量导入已直接调用原子批量接口，并由一次性 PostgreSQL 浏览器 E2E 验证两条请求、页面回显和本地门户截图；截图按门禁不入库，长期证据仍须由 PR 附件或 CI artifact 归档；故事仍不能整体关闭，资质证照有效期/上传、经营范围标签、到期预警、过期供应商收货拦截、印章及样张备案、服务端 USCC 格式校验、完整供应商更新/查询、PDA、Excel 原生导入和完整外部系统联调尚未闭环。"
 owner = "M1 模块负责人"
 resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
 
@@ -2077,7 +2104,10 @@ api_paths = [
 database_objects = ["customers", "customer_addresses", "audit_event", "idempotency_request"]
 e2e_checks = [
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test master_data_postgres customer_addresses_support",
-  "pnpm --dir apps/web-admin run test:e2e:m1-real",
+  "just web-admin-m1-real-e2e",
+]
+e2e_screenshots = [
+  { page = "m1-business-partners", spec = "prototypes/e2e/web-admin-m1-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m1-business-partners/customer-batch-import-current.png" },
 ]
 test_checks = [
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test master_data_postgres customer_addresses_support -- --nocapture",
@@ -2103,11 +2133,12 @@ evidence_refs = [
   "apps/web-admin/src/pages/master-data/CustomerAddressEditor.tsx",
   "apps/web-admin/src/pages/master-data/CustomerProfileEditor.tsx",
   "prototypes/e2e/web-admin-m1-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/m1-business-partners/customer-batch-import-current.png",
   "apps/web-admin/.e2e-artifacts/m1-real/screenshots/business-partners-customer-address.png",
   "backend/migrations/202606280002_database_design_standard_alignment.sql",
   "backend/migrations/202607130012_m1_customer_profile_fields.sql",
 ]
-reason = "已补客户多地址及客户/门店联系方式、经营范围、资质证照、连锁归属的 PostgreSQL 读写、默认地址互斥、货主隔离、幂等和审计，并新增客户批量同步 API：整批事务、重复幂等回放/冲突、货主隔离、API Key 中间件鉴权、请求审计和原子回滚有真实 PostgreSQL 回归证据；管理端维护、OpenAPI 契约、后端测试和真实浏览器 E2E 截图均有证据；仍缺 Excel 原生导入、批量同步前端交互与完整外部系统联调，不能标记完成。"
+reason = "已补客户多地址及客户/门店联系方式、经营范围、资质证照、连锁归属的 PostgreSQL 读写、默认地址互斥、货主隔离、幂等和审计，并新增客户批量同步 API：整批事务、重复幂等回放/冲突、货主隔离、API Key 中间件鉴权、请求审计和原子回滚有真实 PostgreSQL 回归证据；管理端批量导入已直接调用原子批量接口，并由一次性 PostgreSQL 浏览器 E2E 验证两条请求、页面回显和本地门户截图；截图按门禁不入库，长期证据仍须由 PR 附件或 CI artifact 归档；仍缺 Excel 原生导入与完整外部系统联调，不能标记完成。"
 owner = "M1 模块负责人"
 resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
 
@@ -2128,6 +2159,9 @@ types = ["write", "permission", "frontend_interaction"]
 frontend_pages = ["h1-role-permission"]
 navigation_checks = ["node apps/web-admin/self-checks/h1-role-permission-slice-self-check.mjs"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:h1-real"]
+e2e_screenshots = [
+  { page = "h1-role-permission", spec = "prototypes/e2e/web-admin-h1-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h1-role-permission/user-create-role-binding.png" },
+]
 api_paths = ["POST /api/v1/auth/users"]
 database_objects = ["auth_users", "auth_user_owner_bindings", "auth_user_roles", "idempotency_request", "audit_event"]
 test_checks = [
@@ -2141,6 +2175,7 @@ evidence_refs = [
   "backend/crates/api/src/role_management_models.rs",
   "backend/crates/api/tests/role_management_postgres.rs",
   "backend/migrations/202607140002_m1_user_management.sql",
+  "backend/migrations/202607160001_h1_role_permission_admin_menu.sql",
   "backend/crates/api/src/openapi_paths/core.rs",
   "shared/openapi/openapi.json",
   "packages/api-client/src/schema.ts",
@@ -2150,9 +2185,9 @@ evidence_refs = [
   "prototypes/e2e/web-admin-h1-real.spec.ts",
   "artifacts/screenshot-portal/real-web/h1-role-permission/user-create-role-binding.png",
 ]
-reason = "已补用户创建后端切片和管理端弹窗/API 接线：用户名/姓名/手机号/密码/角色校验、货主隔离、多角色原子绑定、幂等、密码哈希、审计、真实浏览器创建用户与角色绑定截图均有证据，并已登记 OpenAPI；仍缺完整角色/用户/权限矩阵验收和发布证据，不能标记完成。"
+reason = "已补用户创建后端切片、生产菜单和管理端弹窗/API 接线：用户名/姓名/手机号/密码/角色校验、货主隔离、多角色原子绑定、幂等、密码哈希、审计、真实浏览器创建用户与角色绑定和本地门户截图均有证据，并已登记 OpenAPI；截图需由 PR 附件或 CI artifact 长期归档。仍缺完整角色/用户/权限矩阵验收和发布证据，不能标记完成。"
 owner = "M1 模块负责人"
-resume_when = "补齐 H1 角色权限页创建用户交互与真实 API、浏览器 E2E/截图，并完成完整权限矩阵与发布证据后复核。"
+resume_when = "补齐完整角色/用户/权限矩阵与发布证据后复核。"
 
 [[deferred_stories]]
 id = "US-M1-007"
@@ -2169,7 +2204,10 @@ module = "M1"
 types = ["write", "config_rule", "frontend_interaction"]
 frontend_pages = ["m1-feature-flags"]
 navigation_checks = ["node apps/web-admin/self-checks/m1-feature-flag-import-self-check.mjs"]
-e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m1-real"]
+e2e_checks = ["just web-admin-m1-real-e2e"]
+e2e_screenshots = [
+  { page = "m1-feature-flags", spec = "prototypes/e2e/web-admin-m1-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m1-feature-flags/feature-flags-current.png" },
+]
 api_paths = [
   "POST /api/v1/config-center/feature-flags/migrate",
   "GET /api/v1/config-center/feature-flags/export",
@@ -2191,10 +2229,12 @@ evidence_refs = [
   "apps/web-admin/src/pages/config-center/FeatureFlagConfigCenterPage.tsx",
   "apps/web-admin/src/features/config-center/feature-flag-queries.ts",
   "apps/web-admin/self-checks/m1-feature-flag-import-self-check.mjs",
+  "prototypes/e2e/web-admin-m1-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/m1-feature-flags/feature-flags-current.png",
 ]
-reason = "已补 Feature Flag 配置中心 PostgreSQL 导入/导出、货主隔离、事务内审计和真实数据库重载验证，并将配置中心源文件拆分至 539 行；仍缺完整配置项分组/校验/变更历史、前端所有操作真实 API 接线、真实浏览器 E2E 截图、审批/回滚和发布证据，不能标记完成。"
+reason = "已补 Feature Flag 配置中心 PostgreSQL 导入/导出、货主隔离、事务内审计和真实数据库重载验证，并将配置中心源文件拆分至 539 行；真实 PostgreSQL 浏览器 E2E 已验证迁移操作、页面回显和本地门户截图，截图需由 PR 附件或 CI artifact 长期归档。仍缺完整配置项分组/校验/变更历史、前端所有操作真实 API 接线、审批/回滚和发布证据，不能标记完成。"
 owner = "M1 模块负责人"
-resume_when = "补齐配置项完整生命周期、前端真实 API 交互、浏览器 E2E/截图、审批回滚和发布证据后复核。"
+resume_when = "补齐配置项完整生命周期、前端其余真实 API 交互、审批回滚和发布证据后复核。"
 
 [[deferred_stories]]
 id = "US-M1-009"
@@ -2215,7 +2255,7 @@ navigation_checks = [
   "node apps/web-admin/self-checks/m1-special-drug-system-dictionary-self-check.mjs",
   "pnpm --dir apps/web-admin run test:e2e:shell-dev",
 ]
-e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m1-real"]
+e2e_checks = ["just web-admin-m1-real-e2e"]
 api_paths = [
   "GET /api/v1/system-dictionaries/{dict_code}/items",
   "PUT /api/v1/system-dictionaries/{dict_code}/items/{item_code}",
@@ -2228,7 +2268,7 @@ test_checks = [
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test system_dictionary_postgres special_drug_category",
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test master_data_postgres product_routes_accept_custom_enabled_special_drug_category",
   "pnpm --dir apps/web-admin exec tsc --noEmit",
-  "pnpm --dir apps/web-admin run test:e2e:m1-real",
+  "just web-admin-m1-real-e2e",
 ]
 evidence_refs = [
   "backend/migrations/202606290001_special_drug_category_dictionary.sql",
@@ -2322,8 +2362,12 @@ id = "US-M2-001"
 title = "创建 ASN（采购入库通知）"
 module = "M2"
 story_file = "docs/domain/user-stories-m2-inbound-asn.md"
+types = ["write", "api_change", "frontend_interaction", "audit_compliance"]
 frontend_pages = ["m2-receiving"]
-e2e_checks = ["node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
+e2e_screenshots = [
+  { page = "m2-receiving", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/receiving.png" },
+]
 api_paths = ["POST /api/v1/inbound/receiving-orders"]
 database_objects = ["receiving_orders", "receiving_order_lines", "audit_event", "idempotency_request"]
 test_checks = [
@@ -2343,18 +2387,25 @@ evidence_refs = [
   "backend/crates/api/tests/m2_deferred_closeout_postgres.rs",
   "apps/web-admin/src/pages/inbound/M2InboundDialogs.tsx",
   "apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs",
+  "prototypes/e2e/web-admin-m2-real.spec.ts",
+  "prototypes/playwright-web-admin-m2-real-config.ts",
+  "artifacts/screenshot-portal/real-web/m2-inbound/receiving.png",
 ]
-reason = "已补创建契约切片：领域层和内存/PostgreSQL 创建入口现在统一要求供应商、预计到货日期不得早于当前日期、商品编码非空且一个 ASN 只能对应一个商品；销售退货仍允许同一商品的多批号多行，前端新建 ASN 也已标记供应商、预计到货和销退原批号为必填，并有真实 PostgreSQL/前端自检证据。仍缺供应商本地资质与商品存在性/货主校验、M-VR 初始待校验到待收货接线、完整单号并发唯一性证据、开放 API/API Key、作废企业微信审批、完整审计/真实浏览器 E2E 和 ASN 打印证据，继续延期。"
+reason = "已补创建契约切片：领域层和内存/PostgreSQL 创建入口统一要求供应商、非历史预计到货日期、商品编码非空且采购 ASN 只能对应一个商品；真实 PostgreSQL 浏览器 E2E 已验证 PC 创建、放行、收货、打印数据绑定、页面回显和本地门户截图，截图需由 PR 附件或 CI artifact 长期归档。仍缺供应商本地资质与商品存在性/货主校验、M-VR 初始状态接线、完整单号并发唯一性、开放 API/API Key、作废企业微信审批、完整审计和物理打印证据。"
 owner = "M2 模块负责人"
-resume_when = "补齐供应商资质和商品/货主引用校验、M-VR 状态接线、API Key、作废审批、打印、完整审计及真实浏览器 E2E 证据后再转为已验证。"
+resume_when = "补齐供应商资质和商品/货主引用校验、M-VR 状态接线、API Key、作废审批、完整审计及物理打印证据后再转为已验证。"
 
 [[deferred_stories]]
 id = "US-M2-003"
 title = "PDA/PC Web 验收"
 module = "M2"
+types = ["write", "api_change", "frontend_interaction", "audit_compliance"]
 frontend_pages = ["m2-inspecting"]
 navigation_checks = ["node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
+e2e_screenshots = [
+  { page = "m2-inspecting", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/inspection-dual-sign-validation.png" },
+]
 test_checks = [
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --lib receiving_inspection_cannot_exceed_actual_receipt_or_sign_early",
   "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_deferred_closeout_postgres inspection_uses_actual_receipt_quantity_and_blocks_early_signature",
@@ -2389,9 +2440,9 @@ evidence_refs = [
   "apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs",
   "prototypes/e2e/web-admin-m2-real.spec.ts",
   "prototypes/playwright-web-admin-m2-real-config.ts",
-  "apps/web-admin/.e2e-artifacts/m2-real/screenshots/inspection.png",
+  "artifacts/screenshot-portal/real-web/m2-inbound/inspection-dual-sign-validation.png",
 ]
-reason = "已补验收累计量、零数量、签字前总量闭合和逐明细验收门禁，并完成 PC Web 按商品/货主/仓库实时查询 M-VR 入库/验收策略、服务端防降级、规则 ID 与主管审批 ID 落库；PostgreSQL、审计回放和一次性数据库真实浏览器 E2E 均已验证。故事仍不能整体关闭：逐商品/逐批号 UI、多商品 ASN、质量联系单/不合格分流、档案补录、PDA 离线和完整权限/审计断言尚未闭环。"
+reason = "已补验收累计量、零数量、签字前总量闭合和逐明细验收门禁，并完成 PC Web 按商品/货主/仓库实时查询 M-VR 入库/验收策略、服务端防降级、规则 ID 与主管审批 ID 落库；PostgreSQL、审计回放、真实浏览器 E2E 和本地门户截图均已验证，截图需由 PR 附件或 CI artifact 长期归档。故事仍不能整体关闭：逐商品/逐批号 UI、多商品 ASN、质量联系单/不合格分流、档案补录、PDA 离线和完整权限/审计断言尚未闭环。"
 owner = "M2 模块负责人"
 resume_when = "补齐逐商品/逐批号验收 UI、多商品 ASN、质量联系单与不合格分流、档案补录、PDA 离线及权限/审计断言后再移入 stories。"
 
@@ -2400,10 +2451,13 @@ id = "US-M2-004"
 title = "双人验收签字"
 module = "M2"
 story_file = "docs/domain/user-stories-m2-inbound-verify.md"
-types = ["write", "api_change", "audit_compliance"]
+types = ["write", "api_change", "frontend_interaction", "audit_compliance"]
 frontend_pages = ["m2-inspecting"]
 api_paths = ["GET /api/v1/m-vr/dual-person-policy", "POST /api/v1/inbound/receiving-orders/{id}/sign"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
+e2e_screenshots = [
+  { page = "m2-inspecting", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/inspection-dual-sign-submitted.png" },
+]
 database_objects = ["auth_users", "auth_user_owner_bindings", "auth_user_roles", "auth_roles", "dual_person_policy_rules", "h4_approval_records", "receiving_inspection_signatures", "audit_event"]
 test_checks = [
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --lib receiving_ -- --nocapture",
@@ -2427,9 +2481,9 @@ evidence_refs = [
   "apps/web-admin/src/features/validation-rules/dual-person-policy-queries.ts",
   "apps/web-admin/src/pages/inbound/M2InboundPage.tsx",
   "prototypes/e2e/web-admin-m2-real.spec.ts",
-  "apps/web-admin/.e2e-artifacts/m2-real/screenshots/inspection.png",
+  "artifacts/screenshot-portal/real-web/m2-inbound/inspection-dual-sign-submitted.png",
 ]
-reason = "已补同货主启用 receiving_clerk 双签资格门禁，并完成 M-VR single/dual_scan/dual_scan_with_approval 三档策略解析、客户端不可降级、规则 ID/H4 审批 ID 落库和审计 diff；PC Web 实时查询策略，一次性 PostgreSQL 真实浏览器 E2E 覆盖相同签字人拦截与双签成功。故事仍不能整体关闭：待第二人签字状态、签字结论/备注、30 分钟超时、电子药检单附件、PDA 离线和完整审计回查尚未闭环。"
+reason = "已补同货主启用 receiving_clerk 双签资格门禁，并完成 M-VR single/dual_scan/dual_scan_with_approval 三档策略解析、客户端不可降级、规则 ID/H4 审批 ID 落库和审计 diff；PC Web 实时查询策略，真实 PostgreSQL 浏览器 E2E 和本地门户截图覆盖相同签字人拦截与双签成功，截图需由 PR 附件或 CI artifact 长期归档。故事仍不能整体关闭：待第二人签字状态、签字结论/备注、30 分钟超时、电子药检单附件、PDA 离线和完整审计回查尚未闭环。"
 owner = "M2 模块负责人"
 resume_when = "补齐待第二人状态、结论备注、超时、附件、PDA 离线和完整审计回查后再移入 stories。"
 
@@ -2445,6 +2499,9 @@ api_paths = [
   "POST /api/v1/inbound/receiving-orders/{id}/putaway",
 ]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
+e2e_screenshots = [
+  { page = "m2-putaway", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/putaway-recommendations.png" },
+]
 database_objects = [
   "warehouse_locations",
   "warehouse_zones",
@@ -2479,8 +2536,9 @@ evidence_refs = [
   "apps/web-admin/src/pages/inbound/M2InboundPage.tsx",
   "apps/web-admin/src/pages/inbound/M2InboundDialogs.tsx",
   "prototypes/e2e/web-admin-m2-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/m2-inbound/putaway-recommendations.png",
 ]
-reason = "已补推荐库位 API 与 PC Web 上架确认的真实接口接线，覆盖同货主、温区/质量颜色、容量、SKU 数量、验收数量、幂等和审计约束；真实 PostgreSQL 和浏览器 E2E 已验证推荐读取、失败校验、上架提交与库存追溯。验收签字后已原子创建 M-TE 上架任务，但任务完成尚未驱动上架确认；M-VR 动态上架策略、LPN、全自动模式和 PDA 离线冲突仍未闭环。"
+reason = "已补推荐库位 API 与 PC Web 上架确认的真实接口接线，覆盖同货主、温区/质量颜色、容量、SKU 数量、验收数量、幂等和审计约束；真实 PostgreSQL 浏览器 E2E 和本地门户截图已验证推荐读取、失败校验、上架提交与库存追溯，截图需由 PR 附件或 CI artifact 长期归档。验收签字后已原子创建 M-TE 上架任务，但任务完成尚未驱动上架确认；M-VR 动态上架策略、LPN、全自动模式和 PDA 离线冲突仍未闭环。"
 owner = "M2 模块负责人"
 resume_when = "补齐 M-VR 规则命中、LPN/任务引擎、全自动模式和 PDA 离线冲突，并复跑真实浏览器 E2E/截图后再移入 stories。"
 
@@ -3056,7 +3114,8 @@ resume_when = "该故事进入已批准实施波次，并具备前端、API、�
 id = "US-CG-001"
 title = "编码规则配置"
 module = "CG"
-reason = "PC 规则管理页、M1 单据类型字典绑定、真实 PostgreSQL API 和真实浏览器动作已验证；但配置审批、规则变更审计展示以及发布前跨业务模块接入验收仍未完成，暂不能关闭故事。"
+types = ["write", "config_rule", "frontend_interaction"]
+reason = "PC 规则管理页、M1 单据类型字典绑定、真实 PostgreSQL API、真实浏览器动作和本地门户截图已验证，截图需由 PR 附件或 CI artifact 长期归档；但配置审批、规则变更审计展示以及发布前跨业务模块接入验收仍未完成，暂不能关闭故事。"
 owner = "CG 模块负责人"
 resume_when = "补齐配置审批、规则变更审计展示，并完成 M2/M3/M4 创建单据接入及真实 PostgreSQL/E2E/截图证据后移入 stories。"
 frontend_pages = ["mcg-numbering"]
@@ -3064,6 +3123,9 @@ navigation_checks = ["pnpm --dir prototypes exec playwright test --config=playwr
 e2e_checks = [
     "node apps/web-admin/self-checks/mcg-document-numbering-slice-self-check.mjs",
     "pnpm --dir prototypes exec playwright test --config=playwright-web-admin-mcg-real-config.ts",
+]
+e2e_screenshots = [
+  { page = "mcg-numbering", spec = "prototypes/e2e/web-admin-mcg-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/mcg-numbering/rule-created.png" },
 ]
 api_paths = ["GET /api/v1/code-generator/document-number-rules", "PUT /api/v1/code-generator/document-number-rules/{rule_code}", "PATCH /api/v1/code-generator/document-number-rules/{rule_code}/enabled"]
 test_checks = [
@@ -3076,7 +3138,7 @@ evidence_refs = [
     "apps/web-admin/src/pages/document-numbering/MCGDocumentNumberingPage.tsx",
     "apps/web-admin/self-checks/mcg-document-numbering-slice-self-check.mjs",
     "prototypes/e2e/web-admin-mcg-real.spec.ts",
-    "apps/web-admin/.e2e-artifacts/mcg-real/screenshots/rule-created.png",
+    "artifacts/screenshot-portal/real-web/mcg-numbering/rule-created.png",
 ]
 
 [[deferred_stories]]
@@ -3740,6 +3802,9 @@ types = ["write", "frontend_interaction", "runtime_guard", "audit_compliance"]
 frontend_pages = ["mte-task-dispatch"]
 navigation_checks = ["node apps/web-admin/self-checks/mte-task-execution-slice-self-check.mjs"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:mte-real --grep '任务组和调度'"]
+e2e_screenshots = [
+  { page = "mte-task-dispatch", spec = "prototypes/e2e/web-admin-te-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m-te-task-execution/task-dispatched.png" },
+]
 api_paths = ["POST /api/v1/task-engine/tasks/{task_id}/transitions", "GET /api/v1/task-engine/tasks"]
 database_objects = ["warehouse_tasks", "task_groups", "task_group_memberships", "task_execution_events", "audit_event", "idempotency_request"]
 test_checks = [
@@ -3757,7 +3822,7 @@ evidence_refs = [
   "prototypes/e2e/web-admin-te-real.spec.ts",
   "artifacts/screenshot-portal/real-web/m-te-task-execution/task-dispatched.png",
 ]
-reason = "已实现手工分派、按资格有效期、当前活跃负荷和最大并发容量自动分派，以及改派、下发、召回；状态与分配事件原子写入，PC 调度页已通过一次性 PostgreSQL 真实浏览器 E2E。仍缺就近定位、冷库技能匹配和真实 PDA 推送证据。"
+reason = "已实现手工分派、按资格有效期、当前活跃负荷和最大并发容量自动分派，以及改派、下发、召回；状态与分配事件原子写入，PC 调度页已通过一次性 PostgreSQL 真实浏览器 E2E 和本地门户截图，截图需由 PR 附件或 CI artifact 长期归档。仍缺就近定位、冷库技能匹配和真实 PDA 推送证据。"
 owner = "TE 模块负责人"
 resume_when = "定位和冷库技能模型可用后补齐自动分派权重，并完成真 PDA 推送与全链路发布证据。"
 
@@ -3882,9 +3947,9 @@ evidence_refs = [
   "prototypes/e2e/web-admin-te-real.spec.ts",
   "artifacts/screenshot-portal/real-web/m-te-task-execution/task-dispatched.png",
 ]
-reason = "已补按状态、类型、仓库、人员与优先级展示的 PC 任务调度列表和主管干预，并完成一次性 PostgreSQL 真实浏览器 E2E/截图。仍缺实时推送/刷新周期配置、超时高亮、超时企业微信通知和 PAD 视图。"
+reason = "已补按状态、类型、仓库、人员与优先级展示的 PC 任务调度列表和主管干预；支持关闭或 5/15/30 秒自动刷新，并按任务预计时长高亮执行超时和未接单超时，真实 PostgreSQL 浏览器 E2E/截图已验证。仍缺超时企业微信通知和 PAD 视图。"
 owner = "TE 模块负责人"
-resume_when = "补超时规则与 H4 通知、实时刷新策略和 PAD 适配，并完成正式发布证据。"
+resume_when = "补 H4 超时通知和 PAD 适配，并完成正式发布证据。"
 
 [[deferred_stories]]
 id = "US-TE-010"
