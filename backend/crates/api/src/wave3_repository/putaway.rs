@@ -132,6 +132,9 @@ impl PgWave3Repository {
             .await
             .map_err(map_db_error)?;
         }
+        if let Some(warehouse_id) = req.warehouse_id {
+            ensure_owned_reference(&mut tx, "warehouses", ctx.owner_id, warehouse_id).await?;
+        }
 
         let enabled_rules = req.enabled_rules.clone().unwrap_or_else(|| {
             serde_json::json!({
@@ -227,19 +230,38 @@ impl PgWave3Repository {
         &self,
         tx: &mut Transaction<'_, Postgres>,
         owner_id: Uuid,
+        warehouse_id: Option<Uuid>,
+        product_category: Option<&str>,
     ) -> Result<Option<PutawayStrategyProfileRow>, Wave3RepositoryError> {
+        // 优先精确绑定（仓库+品类）→ 仅仓库 → 仅品类 → 货主通用默认方案。
         sqlx::query_as::<_, PutawayStrategyProfileRow>(
             r#"
             SELECT id, owner_id, profile_code, profile_name, is_default, top_n,
                    enabled_rules, rule_priority, warehouse_id, product_category,
                    notify_on_no_location, status, created_at, updated_at
               FROM putaway_strategy_profiles
-             WHERE owner_id = $1 AND status = 'active'
-             ORDER BY is_default DESC, updated_at DESC
+             WHERE owner_id = $1
+               AND status = 'active'
+               AND (warehouse_id IS NULL OR warehouse_id = $2)
+               AND (
+                    product_category IS NULL
+                    OR ($3::text IS NOT NULL AND product_category = $3)
+               )
+             ORDER BY
+               CASE
+                 WHEN warehouse_id IS NOT NULL AND product_category IS NOT NULL THEN 0
+                 WHEN warehouse_id IS NOT NULL THEN 1
+                 WHEN product_category IS NOT NULL THEN 2
+                 ELSE 3
+               END,
+               is_default DESC,
+               updated_at DESC
              LIMIT 1
             "#,
         )
         .bind(owner_id)
+        .bind(warehouse_id)
+        .bind(product_category)
         .fetch_optional(&mut **tx)
         .await
         .map_err(map_db_error)
@@ -269,7 +291,7 @@ impl PgWave3Repository {
                 created_at, updated_at
             ) VALUES (
                 $1, $2, NULL, 'm2.putaway.no_location', $3, 'warehouse_manager', 'wechat',
-                $4, $5, 'failed', 0, 'queued_for_wechat_delivery', NULL, $6, $6
+                $4, $5, 'retrying', 0, 'awaiting_wechat_delivery', NULL, $6, $6
             )
             ON CONFLICT (owner_id, event_type, recipient, dedupe_key) DO UPDATE
                SET content = EXCLUDED.content,
@@ -299,8 +321,33 @@ impl PgWave3Repository {
             return Err(Wave3RepositoryError::InvalidQuantity);
         }
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
+        let order = lock_receiving_order(&mut tx, ctx.owner_id, receiving_order_id).await?;
+        if order.status != "putaway" {
+            return Err(Wave3RepositoryError::InvalidStatus {
+                expected: "putaway".to_string(),
+                actual: order.status,
+            });
+        }
+        let product_category: Option<String> = sqlx::query_scalar(
+            r#"
+            SELECT NULLIF(TRIM(attrs ->> 'category'), '')
+              FROM products
+             WHERE owner_id = $1 AND product_code = $2 AND status = 'active'
+            "#,
+        )
+        .bind(ctx.owner_id)
+        .bind(&query.product_code)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(map_db_error)?
+        .flatten();
         let profile = self
-            .load_default_putaway_profile(&mut tx, ctx.owner_id)
+            .load_default_putaway_profile(
+                &mut tx,
+                ctx.owner_id,
+                Some(order.warehouse_id),
+                product_category.as_deref(),
+            )
             .await?;
         let default_top_n = profile
             .as_ref()
@@ -321,13 +368,6 @@ impl PgWave3Repository {
             .map(|row| row.notify_on_no_location)
             .unwrap_or(true);
         let limit = query.limit.unwrap_or(default_top_n).min(50);
-        let order = lock_receiving_order(&mut tx, ctx.owner_id, receiving_order_id).await?;
-        if order.status != "putaway" {
-            return Err(Wave3RepositoryError::InvalidStatus {
-                expected: "putaway".to_string(),
-                actual: order.status,
-            });
-        }
 
         let valid_line: bool = sqlx::query_scalar(
             "SELECT EXISTS (SELECT 1 FROM receiving_order_lines WHERE receiving_order_id = $1 AND owner_id = $2 AND product_code = $3 AND batch_no = $4)",

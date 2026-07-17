@@ -224,3 +224,46 @@ async fn putaway_strategy_profile_drives_default_top_n(pool: PgPool) {
         Some("western_medicine")
     );
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn putaway_strategy_rejects_foreign_warehouse_binding(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let ctx = AuthContext {
+        user_id: Uuid::new_v4(),
+        owner_id,
+        actor_name: "m2-putaway-strategy-bind".to_string(),
+        permissions: vec!["m2.putaway.write".to_string()],
+        jti: Uuid::new_v4().to_string(),
+    };
+    let repository = PgWave3Repository::new(pool.clone());
+    let foreign_warehouse = Uuid::new_v4();
+    let error = repository
+        .upsert_putaway_strategy_profile_with_audit(
+            &ctx,
+            UpsertPutawayStrategyProfileRequest {
+                profile_code: "wh-bound".to_string(),
+                profile_name: "仓库绑定方案".to_string(),
+                is_default: false,
+                top_n: 3,
+                enabled_rules: None,
+                rule_priority: None,
+                warehouse_id: Some(foreign_warehouse),
+                product_category: None,
+                notify_on_no_location: true,
+                status: "active".to_string(),
+            },
+            chrono::Utc::now(),
+            "m2-upsert-foreign-warehouse",
+            AuditWriteRequest::from_auth_context(
+                &ctx,
+                "upsert",
+                "M2",
+                "putaway_strategy_profile",
+                "pending".to_string(),
+                None,
+            ),
+        )
+        .await
+        .expect_err("foreign warehouse must fail");
+    assert!(matches!(error, Wave3RepositoryError::NotFound));
+}
