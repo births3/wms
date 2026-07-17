@@ -2043,7 +2043,7 @@ e2e_screenshots = [
   { page = "m1-products", spec = "prototypes/e2e/web-admin-m1-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m1-products/product-batch-import-current.png" },
 ]
 test_checks = [
-  "set -a; source /home/test1/workspace/wms/.env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m1_product_batch_sync_postgres -- --nocapture",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m1_product_batch_sync_postgres -- --test-threads=1",
   "node apps/web-admin/self-checks/m1-product-batch-import-self-check.mjs",
 ]
 evidence_refs = [
@@ -2078,12 +2078,16 @@ e2e_screenshots = [
   { page = "m1-business-partners", spec = "prototypes/e2e/web-admin-m1-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m1-business-partners/supplier-batch-import-current.png" },
 ]
 test_checks = [
-  "set -a; source /home/test1/workspace/wms/.env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m1_supplier_batch_sync_postgres -- --nocapture",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m1_supplier_batch_sync_postgres -- --test-threads=1",
+  "node apps/web-admin/self-checks/m1-product-source-actions-self-check.mjs",
   "pnpm --dir apps/web-admin exec tsc --noEmit",
 ]
 evidence_refs = [
   "backend/crates/api/src/master_data_handlers_part2.rs",
+  "backend/crates/api/src/master_data.rs",
+  "backend/crates/api/src/master_data_postgres_part1.rs",
   "backend/crates/api/src/master_data_postgres_part2.rs",
+  "backend/crates/api/src/master_data_postgres_part3.rs",
   "backend/crates/api/tests/m1_supplier_batch_sync_postgres.rs",
   "backend/crates/api/src/openapi_paths/core.rs",
   "shared/openapi/openapi.json",
@@ -2091,10 +2095,13 @@ evidence_refs = [
   "apps/web-admin/src/features/master-data/master-data-queries/api.ts",
   "apps/web-admin/src/pages/master-data/M1MasterDataPage.tsx",
   "apps/web-admin/src/pages/master-data/MasterDataSourceActions.tsx",
+  "apps/web-admin/src/pages/master-data/supplier-qualification-validation.ts",
+  "apps/web-admin/self-checks/m1-product-source-actions-self-check.mjs",
+  "docs/error-codes.md",
   "prototypes/e2e/web-admin-m1-real.spec.ts",
   "artifacts/screenshot-portal/real-web/m1-business-partners/supplier-batch-import-current.png",
 ]
-reason = "已完成供应商批量 API 同步后端切片：整批 PostgreSQL 事务、重复幂等回放/冲突、货主隔离、API Key 中间件鉴权、请求审计和原子回滚均有真实 PostgreSQL 回归证据；管理端批量导入已直接调用原子批量接口，并由一次性 PostgreSQL 浏览器 E2E 验证两条请求、页面回显和本地门户截图；截图按门禁不入库，长期证据仍须由 PR 附件或 CI artifact 归档；故事仍不能整体关闭，资质证照有效期/上传、经营范围标签、到期预警、过期供应商收货拦截、印章及样张备案、服务端 USCC 格式校验、完整供应商更新/查询、PDA、Excel 原生导入和完整外部系统联调尚未闭环。"
+reason = "已完成供应商批量 API 同步后端切片：整批 PostgreSQL 事务、重复幂等回放/冲突、货主隔离、API Key 中间件鉴权、请求审计和原子回滚均有真实 PostgreSQL 回归证据；供应商创建、批量同步和更新入口现统一执行 GB 32100 字符集、长度、校验码与大写归一化校验，前后端共用同一算法语义并覆盖 422 契约；管理端批量导入已直接调用原子批量接口，并由一次性 PostgreSQL 浏览器 E2E 验证两条请求、页面回显和本地门户截图；截图按门禁不入库，长期证据仍须由 PR 附件或 CI artifact 归档；故事仍不能整体关闭，资质证照有效期/上传、经营范围标签、到期预警、过期供应商收货拦截、印章及样张备案、完整供应商更新/查询、PDA、Excel 原生导入和完整外部系统联调尚未闭环。"
 owner = "M1 模块负责人"
 resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
 
@@ -2167,6 +2174,7 @@ resume_when = "该故事进入已批准实施波次，并具备前端、API、�
 id = "US-M1-006"
 title = "用户与权限管理"
 module = "M1"
+story_file = "docs/domain/user-stories-m1-master-data-warehouse.md"
 types = ["write", "permission", "frontend_interaction"]
 frontend_pages = ["h1-role-permission"]
 navigation_checks = ["node apps/web-admin/self-checks/h1-role-permission-slice-self-check.mjs"]
@@ -2426,7 +2434,7 @@ e2e_screenshots = [
 test_checks = [
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --lib receiving_inspection_cannot_exceed_actual_receipt_or_sign_early",
   "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_deferred_closeout_postgres inspection_uses_actual_receipt_quantity_and_blocks_early_signature",
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave3_evidence_postgres inspect_and_sign_receiving_order_replay_without_duplicate_audit",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave3_evidence_receiving_postgres inspect_and_sign_receiving_order_replay_without_duplicate_audit -- --test-threads=1",
   "node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs",
   "pnpm --dir apps/web-admin exec tsc --noEmit",
 ]
@@ -2451,7 +2459,7 @@ evidence_refs = [
   "backend/crates/api/tests/m2_deferred_closeout_postgres.rs",
   "backend/crates/api/tests/task_engine_postgres.rs",
   "backend/migrations/202607150003_mte_task_execution.sql",
-  "backend/crates/api/tests/wave3_evidence_postgres.rs",
+  "backend/crates/api/tests/wave3_evidence_receiving_postgres.rs",
   "apps/web-admin/src/pages/inbound/M2InboundPage.tsx",
   "apps/web-admin/src/pages/inbound/M2InboundDialogs.tsx",
   "apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs",
@@ -2479,7 +2487,7 @@ database_objects = ["auth_users", "auth_user_owner_bindings", "auth_user_roles",
 test_checks = [
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --lib receiving_ -- --nocapture",
   "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_deferred_closeout_postgres inspection_uses_actual_receipt_quantity_and_blocks_early_signature",
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave3_evidence_postgres inspect_and_sign_receiving_order_replay_without_duplicate_audit",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave3_evidence_receiving_postgres inspect_and_sign_receiving_order_replay_without_duplicate_audit -- --test-threads=1",
   "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --lib postgres_inspect_and_sign_handlers_write_idempotency_and_audit",
 ]
 evidence_refs = [
@@ -2493,7 +2501,7 @@ evidence_refs = [
   "backend/crates/api/src/wave3_handlers_part2.rs",
   "backend/crates/api/tests/support/auth.rs",
   "backend/crates/api/tests/m2_deferred_closeout_postgres.rs",
-  "backend/crates/api/tests/wave3_evidence_postgres.rs",
+  "backend/crates/api/tests/wave3_evidence_receiving_postgres.rs",
   "backend/crates/api/src/dual_person_policy.rs",
   "apps/web-admin/src/features/validation-rules/dual-person-policy-queries.ts",
   "apps/web-admin/src/pages/inbound/M2InboundPage.tsx",
