@@ -52,6 +52,18 @@ async fn seed_receiving_references(
     owner_id: Uuid,
     request: &mut CreateReceivingOrderRequest,
 ) {
+    sqlx::query(
+        "INSERT INTO warehouses (id, owner_id, warehouse_code, warehouse_name, warehouse_type, status) VALUES ($1, $2, $3, 'Evidence Warehouse', 'normal', 'active')",
+    )
+    .bind(request.warehouse_id)
+    .bind(owner_id)
+    .bind(format!(
+        "EVIDENCE-WH-{}",
+        &request.warehouse_id.to_string()[..8]
+    ))
+    .execute(pool)
+    .await
+    .expect("seed evidence warehouse");
     let supplier_id = request.supplier_id.expect("request supplier");
     sqlx::query(
         "INSERT INTO suppliers (id, owner_id, supplier_code, supplier_name, uscc, status) VALUES ($1, $2, $3, 'Evidence Supplier', $4, 'active')",
