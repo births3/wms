@@ -410,6 +410,42 @@ def test_scope_gap_deferred_story_can_cover_existing_menu_but_requires_e2e() -> 
     assert covered.gaps == []
 
 
+def test_deferred_story_screenshot_evidence_still_covers_menu_page() -> None:
+    from check_scope_gap_discovery import AdminNavigation, scan_scope_gaps
+
+    page = "m2-putaway-strategy"
+    spec = "prototypes/e2e/web-admin-m2-real.spec.ts"
+    screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/putaway-strategy-config.png"
+    navigation = AdminNavigation(
+        menu_sections={page: "M2 上架策略"},
+        default_menu_tree={page},
+        routed_views={page},
+    )
+    result = scan_scope_gaps(
+        story_docs={"docs/domain/user-stories-m2.md": "## US-M2-010：上架策略配置"},
+        matrix_stories=[],
+        deferred_stories=[
+            {
+                "id": "US-M2-010",
+                "module": "M2",
+                "reason": "规则执行未闭环",
+                "owner": "M2 模块负责人",
+                "resume_when": "规则真实参与推荐后恢复",
+                "types": ["frontend_interaction"],
+                "frontend_pages": [page],
+                "e2e_checks": ["pnpm --dir apps/web-admin run test:e2e:m2-real"],
+                "e2e_screenshots": [{"page": page, "spec": spec, "screenshot": screenshot}],
+                "evidence_refs": [spec, screenshot],
+            }
+        ],
+        admin_pages=navigation.menu_sections,
+        admin_navigation=navigation,
+        screenshot_legacy_pages=set(),
+    )
+
+    assert result.gaps == []
+
+
 def test_scope_gap_blocks_invalid_deferred_story():
     from check_scope_gap_discovery import scan_scope_gaps
 

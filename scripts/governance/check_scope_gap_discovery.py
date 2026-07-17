@@ -468,7 +468,7 @@ def scan_scope_gaps(
 
     if screenshot_legacy_pages is not None:
         stories_by_page: dict[str, list[dict[str, Any]]] = {}
-        for story in matrix_stories:
+        for story in [*matrix_stories, *(deferred_stories or [])]:
             story_id = str(story.get("id", ""))
             module = story_module(story_id) if story_id.startswith("US-") else str(story.get("module", "")).upper()
             if not should_scan_module(module):
