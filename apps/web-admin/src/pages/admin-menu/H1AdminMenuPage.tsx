@@ -58,6 +58,7 @@ const viewIdOptions = [
   "m2-receiving",
   "m2-inspecting",
   "m2-putaway",
+  "m2-putaway-strategy",
   "m3-batches",
   "m3-location-history",
   "m3-status-config",

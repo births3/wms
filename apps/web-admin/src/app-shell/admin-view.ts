@@ -8,6 +8,7 @@ export type AdminView =
   | "m2-receiving"
   | "m2-inspecting"
   | "m2-putaway"
+  | "m2-putaway-strategy"
   | "m-di-platforms"
   | "m3-batches"
   | "m3-location-history"

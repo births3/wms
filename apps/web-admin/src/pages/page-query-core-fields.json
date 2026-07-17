@@ -266,6 +266,16 @@
       "more": ["documentTypeFilter", "arrivalDate", "createdAt"]
     },
     {
+      "id": "m2-putaway-strategy",
+      "title": "M2 上架策略",
+      "required": true,
+      "source": "apps/web-admin/src/pages/inbound/M2PutawayStrategyPage.tsx",
+      "fieldConstant": "queryFields",
+      "coreConstant": "defaultVisibleFieldKeys",
+      "core": ["keyword", "status", "isDefault"],
+      "more": []
+    },
+    {
       "id": "m3-batches",
       "title": "M3 批号管理",
       "required": true,

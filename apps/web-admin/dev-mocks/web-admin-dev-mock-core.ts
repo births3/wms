@@ -43,6 +43,53 @@ import type {
   DevWarehouse,
 } from "./web-admin-dev-mock-model";
 
+function defaultPutawayEnabledRules() {
+  return {
+    temperature_match: true,
+    owner_isolation: true,
+    capacity_match: true,
+    same_product_cluster: true,
+    abc_class: true,
+    category_zone: true,
+    expiry_isolation: true,
+    empty_location_first: true,
+    quality_color_match: true,
+  };
+}
+
+function defaultPutawayRulePriority() {
+  return [
+    "temperature_match",
+    "owner_isolation",
+    "capacity_match",
+    "same_product_cluster",
+    "abc_class",
+    "category_zone",
+    "expiry_isolation",
+    "empty_location_first",
+    "quality_color_match",
+  ];
+}
+
+const devPutawayStrategyProfiles: Array<Record<string, unknown>> = [
+  {
+    id: "00000000-0000-0000-0000-00000000a010",
+    owner_id: "00000000-0000-0000-0000-000000000001",
+    profile_code: "default",
+    profile_name: "通用方案",
+    is_default: true,
+    top_n: 3,
+    enabled_rules: defaultPutawayEnabledRules(),
+    rule_priority: defaultPutawayRulePriority(),
+    warehouse_id: null,
+    product_category: null,
+    notify_on_no_location: true,
+    status: "active",
+    created_at: "2026-07-18T00:00:00.000Z",
+    updated_at: "2026-07-18T00:00:00.000Z",
+  },
+];
+
 const {
   devCreatedCustomers,
   devAuthSessions,
@@ -395,6 +442,46 @@ async function tryHandleDevMockRoute(
     }
     sendJson(res, 200, data);
     return true;
+  }
+
+  if (pathname === "/api/v1/inbound/putaway-strategy-profiles") {
+    if (req.method === "GET") {
+      sendJson(res, 200, { data: devPutawayStrategyProfiles });
+      return true;
+    }
+    if (req.method === "PUT") {
+      const body = (await readJsonBody(req)) as Record<string, unknown>;
+      const profileCode = String(body.profile_code ?? "").trim() || "default";
+      const existing = devPutawayStrategyProfiles.find((item) => item.profile_code === profileCode);
+      const now = new Date().toISOString();
+      const next = {
+        id: existing?.id ?? crypto.randomUUID(),
+        owner_id: existing?.owner_id ?? "00000000-0000-0000-0000-000000000001",
+        profile_code: profileCode,
+        profile_name: String(body.profile_name ?? "通用方案"),
+        is_default: Boolean(body.is_default ?? true),
+        top_n: Number(body.top_n ?? 3) || 3,
+        enabled_rules: body.enabled_rules ?? defaultPutawayEnabledRules(),
+        rule_priority: body.rule_priority ?? defaultPutawayRulePriority(),
+        warehouse_id: (body.warehouse_id as string | null | undefined) ?? null,
+        product_category: (body.product_category as string | null | undefined) ?? null,
+        notify_on_no_location: body.notify_on_no_location !== false,
+        status: body.status === "disabled" ? "disabled" : "active",
+        created_at: existing?.created_at ?? now,
+        updated_at: now,
+      };
+      if (existing) {
+        Object.assign(existing, next);
+        sendJson(res, 200, existing);
+      } else {
+        if (next.is_default) {
+          for (const item of devPutawayStrategyProfiles) item.is_default = false;
+        }
+        devPutawayStrategyProfiles.unshift(next);
+        sendJson(res, 200, next);
+      }
+      return true;
+    }
   }
 
   // 未单独实现的入库列表子路径：GET 返回空列表，避免「Dev mock route not found」

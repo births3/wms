@@ -7,6 +7,7 @@ import { H1SessionPage } from "@/pages/auth/H1SessionPage";
 import { H1ApiKeyPage } from "@/pages/api-key/H1ApiKeyPage";
 import { H4WechatNotifyPage, type H4WechatNotifyMode } from "@/pages/wechat-notify/H4WechatNotifyPage";
 import { M2InboundPage, type M2InboundMode } from "@/pages/inbound/M2InboundPage";
+import { M2PutawayStrategyPage } from "@/pages/inbound/M2PutawayStrategyPage";
 import { M3BatchManagementPage } from "@/pages/inventory/M3BatchManagementPage";
 import { M3InventoryStatusConfigPage } from "@/pages/inventory/M3InventoryStatusConfigPage";
 import { M3LocationHistoryPage } from "@/pages/inventory/M3LocationHistoryPage";
@@ -58,6 +59,9 @@ export function renderAdminView(
         onBack={() => navigateTo("dashboard")}
       />
     );
+  }
+  if (view === "m2-putaway-strategy") {
+    return <M2PutawayStrategyPage currentUser={currentUser} />;
   }
   if (view === "m3-batches") {
     return (

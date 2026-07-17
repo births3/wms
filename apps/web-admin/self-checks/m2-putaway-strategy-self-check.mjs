@@ -1,0 +1,31 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+const root = resolve(new URL("..", import.meta.url).pathname);
+const appShell = readFileSync(resolve(root, "src/App.tsx"), "utf8");
+const viewRenderer = readFileSync(resolve(root, "src/app-shell/AdminViewRenderer.tsx"), "utf8");
+const adminView = readFileSync(resolve(root, "src/app-shell/admin-view.ts"), "utf8");
+const page = readFileSync(resolve(root, "src/pages/inbound/M2PutawayStrategyPage.tsx"), "utf8");
+const queries = readFileSync(resolve(root, "src/features/inbound/putaway-strategy-queries.ts"), "utf8");
+const devMock = readFileSync(resolve(root, "dev-mocks/admin-menu-dev-mock.ts"), "utf8");
+const pageQuery = readFileSync(resolve(root, "src/pages/page-query-core-fields.json"), "utf8");
+
+assert.match(adminView, /"m2-putaway-strategy"/, "AdminView 应包含 m2-putaway-strategy");
+assert.match(appShell, /id:\s*"m2-putaway-strategy"/, "菜单应登记 m2-putaway-strategy");
+assert.match(viewRenderer, /m2-putaway-strategy/, "视图渲染器应覆盖 m2-putaway-strategy");
+assert.match(viewRenderer, /M2PutawayStrategyPage/, "视图渲染器应挂载 M2PutawayStrategyPage");
+assert.match(devMock, /m2-putaway-strategy/, "dev mock 菜单应包含 m2-putaway-strategy");
+assert.match(pageQuery, /"id":\s*"m2-putaway-strategy"/, "查询面板配置应登记 m2-putaway-strategy");
+assert.match(page, /<DataGrid\b/, "上架策略页必须使用公共 DataGrid");
+assert.match(page, /<QueryPanel\b/, "上架策略页必须使用公共 QueryPanel");
+assert.match(page, /<Dialog\b/, "上架策略写操作必须使用 Dialog");
+assert.match(page, /draggable/, "规则优先级应支持拖拽排序");
+assert.match(page, /notifyOnNoLocation|notify_on_no_location/, "页面应配置无库位通知");
+assert.match(page, /rulePriority|rule_priority/, "页面应维护规则优先级");
+assert.match(page, /productCategory|product_category/, "页面应支持品类绑定");
+assert.match(page, /PUTAWAY_RULE_CATALOG/, "页面应声明完整规则目录");
+assert.match(queries, /api\.GET\("\/api\/v1\/inbound\/putaway-strategy-profiles"\)/, "读取必须使用真实策略 API");
+assert.match(queries, /api\.PUT\("\/api\/v1\/inbound\/putaway-strategy-profiles"/, "写入必须使用真实策略 API");
+assert.match(queries, /Idempotency-Key/, "写入必须携带幂等键");
+console.log("m2 putaway strategy self-check passed");

@@ -217,6 +217,7 @@ function devAdminMenuSeed(): DevAdminMenuNode[] {
         ["m2-receiving", "M2 收货管理", "CheckCircle2"],
         ["m2-inspecting", "M2 验收管理", "ClipboardList"],
         ["m2-putaway", "M2 上架管理", "PackageCheck"],
+        ["m2-putaway-strategy", "M2 上架策略", "ClipboardList"],
       ]),
     ]),
     section("outbound", "出库业务", "ClipboardList", 40, (parent) => [
@@ -336,6 +337,7 @@ function devViewPermissionKey(viewId: string) {
     "m2-receiving": "m2.write",
     "m2-inspecting": "m2.write",
     "m2-putaway": "m2.write",
+    "m2-putaway-strategy": "m2.putaway.write",
     "m3-batches": "m3.read",
     "m3-location-history": "m3.read",
     "m3-status-config": "m3.read",

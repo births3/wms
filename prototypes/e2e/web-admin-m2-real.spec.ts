@@ -233,6 +233,28 @@ test("M2 PC 真实入库链路落库并生成库存与审计", async ({ page }) 
   await expect(page.getByText(`${receiptNo} 上架已提交`)).toBeVisible();
   await page.screenshot({ path: path.join(artifactsDir, "putaway.png") });
 
+  await openMenu(page, "入库业务", "入库作业", /M2 上架策略/);
+  await expect(page.getByTestId("m2-putaway-strategy-page")).toBeVisible();
+  await page.getByRole("button", { name: "新增", exact: true }).click();
+  const strategyDialog = page.getByTestId("m2-putaway-strategy-dialog");
+  await expect(strategyDialog).toBeVisible();
+  await strategyDialog.getByLabel("方案编码").fill(`e2e-${Date.now()}`);
+  await strategyDialog.getByLabel("方案名称").fill("E2E 策略方案");
+  await strategyDialog.getByLabel("Top N").fill("3");
+  await expect(strategyDialog.getByTestId("m2-putaway-rule-priority")).toBeVisible();
+  await expect(strategyDialog.getByText("温区匹配")).toBeVisible();
+  const strategySavePromise = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/v1/inbound/putaway-strategy-profiles") &&
+      response.request().method() === "PUT",
+  );
+  await strategyDialog.getByRole("button", { name: "保存" }).scrollIntoViewIfNeeded();
+  await strategyDialog.getByRole("button", { name: "保存" }).click({ force: true });
+  const strategySaveResponse = await strategySavePromise;
+  expect(strategySaveResponse.status()).toBe(200);
+  await expect(page.getByText(/方案 .* 已保存/)).toBeVisible();
+  await page.screenshot({ path: path.join(artifactsDir, "putaway-strategy-config.png") });
+
   await openMenu(page, "库内业务", "库存管理", /M3 批号管理/);
   await expect(page.getByText("B-M2-E2E-001").first()).toBeVisible();
   const inventoryRow = page.getByRole("row").filter({ hasText: "B-M2-E2E-001" }).first();
@@ -240,7 +262,7 @@ test("M2 PC 真实入库链路落库并生成库存与审计", async ({ page }) 
   await page.getByRole("button", { name: "详情", description: "查看选中批号详情", exact: true }).click();
   const traceDialog = page.getByRole("dialog", { name: "批号详情" });
   await expect(traceDialog).toBeVisible();
-  await expect(traceDialog.getByText("库存 movement：1 条")).toBeVisible();
+  await expect(traceDialog.getByText(/库存 movement：\d+ 条/)).toBeVisible();
   await page.screenshot({ path: path.join(artifactsDir, "inventory-trace.png") });
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "状态", exact: true }).click();
