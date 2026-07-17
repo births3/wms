@@ -1889,6 +1889,339 @@ required_layers = ["L1", "L2", "L3", "L7", "L8"]
 covered_layers = ["L1", "L2", "L3", "L7", "L8"]
 
 [[stories]]
+id = "US-M2-001"
+title = "创建 ASN（采购入库通知）"
+module = "M2"
+story_file = "docs/domain/user-stories-m2-inbound-asn.md"
+types = ["write", "api_change", "frontend_interaction", "audit_compliance"]
+frontend_pages = ["m2-receiving"]
+navigation_checks = ["node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
+e2e_screenshots = [
+  { page = "m2-receiving", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/receiving.png" },
+]
+api_paths = [
+  "POST /api/v1/inbound/receiving-orders",
+  "POST /api/v1/inbound/receiving-orders/{id}/release",
+  "POST /api/v1/inbound/receiving-orders/{id}/cancel",
+  "GET /api/v1/inbound/receiving-orders/{id}/print-data",
+]
+database_objects = ["receiving_orders", "receiving_order_lines", "suppliers", "products", "audit_event", "idempotency_request"]
+test_checks = [
+  "cargo test --manifest-path backend/Cargo.toml -p wms-domain receiving_outbound --lib",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_asn_reference_validation_postgres -- --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_deferred_closeout_postgres create_asn_rejects_expired_supplier_qualification -- --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_deferred_closeout_postgres cancel_released_asn_requires_approval_and_writes_audit -- --test-threads=1",
+  "node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs",
+  "pnpm --dir apps/web-admin exec tsc --noEmit",
+]
+evidence_refs = [
+  "docs/domain/user-stories-m2-inbound-asn.md",
+  "backend/migrations/202607170006_m2_inbound_closeout.sql",
+  "backend/crates/domain/src/receiving_outbound.rs",
+  "backend/crates/api/src/wave3_repository_part1.rs",
+  "backend/crates/api/src/wave3_repository/receiving_read.rs",
+  "backend/crates/api/src/wave3_handlers/receiving_handlers.rs",
+  "backend/crates/api/tests/m2_asn_reference_validation_postgres.rs",
+  "backend/crates/api/tests/m2_deferred_closeout_postgres.rs",
+  "backend/crates/api/tests/m2_deferred_closeout/closeout_actions.rs",
+  "apps/web-admin/src/pages/inbound/M2InboundDialogs.tsx",
+  "apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs",
+  "prototypes/e2e/web-admin-m2-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/m2-inbound/receiving.png",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+
+[[stories]]
+id = "US-M2-003"
+title = "PDA/PC Web 验收"
+module = "M2"
+story_file = "docs/domain/user-stories-m2-inbound-verify.md"
+types = ["write", "api_change", "frontend_interaction", "audit_compliance"]
+frontend_pages = ["m2-inspecting"]
+navigation_checks = ["node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
+e2e_screenshots = [
+  { page = "m2-inspecting", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/inspection-dual-sign-validation.png" },
+]
+test_checks = [
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --lib receiving_inspection_cannot_exceed_actual_receipt_or_sign_early",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_deferred_closeout_postgres inspection_uses_actual_receipt_quantity_and_blocks_early_signature -- --test-threads=1",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave3_evidence_receiving_postgres inspect_and_sign_receiving_order_replay_without_duplicate_audit -- --test-threads=1",
+  "node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs",
+  "pnpm --dir apps/web-admin exec tsc --noEmit",
+]
+api_paths = [
+  "POST /api/v1/inbound/receiving-orders/{id}/inspect",
+  "POST /api/v1/inbound/receiving-orders/{id}/sign",
+]
+database_objects = [
+  "receiving_order_receipts",
+  "receiving_order_lines",
+  "receiving_inspections",
+  "receiving_inspection_signatures",
+  "warehouse_tasks",
+  "task_execution_events",
+]
+evidence_refs = [
+  "docs/domain/user-stories-m2-inbound-verify.md",
+  "backend/crates/api/src/inbound.rs",
+  "backend/crates/api/src/wave3_repository_part2.rs",
+  "backend/crates/api/tests/m2_deferred_closeout_postgres.rs",
+  "backend/crates/api/tests/wave3_evidence_receiving_postgres.rs",
+  "apps/web-admin/src/pages/inbound/M2InboundPage.tsx",
+  "apps/web-admin/src/pages/inbound/M2InboundDialogs.tsx",
+  "prototypes/e2e/web-admin-m2-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/m2-inbound/inspection-dual-sign-validation.png",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+
+[[stories]]
+id = "US-M2-004"
+title = "双人验收签字"
+module = "M2"
+story_file = "docs/domain/user-stories-m2-inbound-verify.md"
+types = ["write", "api_change", "frontend_interaction", "audit_compliance"]
+frontend_pages = ["m2-inspecting"]
+navigation_checks = ["node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs"]
+api_paths = ["GET /api/v1/m-vr/dual-person-policy", "POST /api/v1/inbound/receiving-orders/{id}/sign"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
+e2e_screenshots = [
+  { page = "m2-inspecting", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/inspection-dual-sign-submitted.png" },
+]
+database_objects = ["auth_users", "auth_user_owner_bindings", "auth_user_roles", "auth_roles", "dual_person_policy_rules", "h4_approval_records", "receiving_inspection_signatures", "audit_event"]
+test_checks = [
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --lib receiving_ -- --nocapture",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_deferred_closeout_postgres inspection_uses_actual_receipt_quantity_and_blocks_early_signature -- --test-threads=1",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave3_evidence_receiving_postgres inspect_and_sign_receiving_order_replay_without_duplicate_audit -- --test-threads=1",
+]
+evidence_refs = [
+  "docs/domain/user-stories-m2-inbound-verify.md",
+  "backend/crates/api/src/inbound.rs",
+  "backend/crates/api/src/wave3_repository_part2.rs",
+  "backend/crates/api/src/dual_person_policy.rs",
+  "backend/crates/api/tests/m2_deferred_closeout_postgres.rs",
+  "backend/crates/api/tests/wave3_evidence_receiving_postgres.rs",
+  "apps/web-admin/src/pages/inbound/M2InboundPage.tsx",
+  "prototypes/e2e/web-admin-m2-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/m2-inbound/inspection-dual-sign-submitted.png",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+
+[[stories]]
+id = "US-M2-005"
+title = "PDA/PC Web 智能上架"
+module = "M2"
+story_file = "docs/domain/user-stories-m2-inbound-verify.md"
+types = ["read_only", "write", "api_change", "integration", "runtime_guard", "audit_compliance"]
+frontend_pages = ["m2-putaway"]
+navigation_checks = ["node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs"]
+api_paths = [
+  "GET /api/v1/inbound/receiving-orders/{id}/putaway-recommendations",
+  "POST /api/v1/inbound/receiving-orders/{id}/putaway",
+]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
+e2e_screenshots = [
+  { page = "m2-putaway", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/putaway-recommendations.png" },
+]
+database_objects = [
+  "warehouse_locations",
+  "warehouse_zones",
+  "products",
+  "inventory_batches",
+  "receiving_putaways",
+  "inventory_movements",
+  "idempotency_request",
+  "audit_event",
+  "putaway_strategy_profiles",
+]
+test_checks = [
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_smart_putaway_postgres -- --nocapture",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_deferred_closeout_postgres putaway_strategy_profile_drives_default_top_n -- --test-threads=1",
+  "pnpm --dir apps/web-admin exec tsc --noEmit",
+]
+evidence_refs = [
+  "docs/domain/user-stories-m2-inbound-verify.md",
+  "backend/migrations/202607140007_m2_smart_putaway.sql",
+  "backend/migrations/202607170006_m2_inbound_closeout.sql",
+  "backend/crates/api/src/m2_putaway.rs",
+  "backend/crates/api/src/wave3_repository/putaway.rs",
+  "backend/crates/api/tests/m2_smart_putaway_postgres.rs",
+  "apps/web-admin/src/pages/inbound/M2InboundDialogs.tsx",
+  "prototypes/e2e/web-admin-m2-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/m2-inbound/putaway-recommendations.png",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+
+[[stories]]
+id = "US-M2-006"
+title = "收货异常处理"
+module = "M2"
+story_file = "docs/domain/user-stories-m2-inbound-verify.md"
+types = ["write", "api_change", "frontend_interaction", "audit_compliance"]
+frontend_pages = ["m2-receiving"]
+navigation_checks = ["node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
+api_paths = [
+  "POST /api/v1/inbound/receiving-orders/{id}/receive",
+  "POST /api/v1/inbound/receiving-orders/{id}/reject",
+  "POST /api/v1/inbound/receiving-orders/{id}/force-close-shortage",
+]
+database_objects = ["receiving_orders", "receiving_order_receipts", "idempotency_request", "audit_event"]
+test_checks = [
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave3_postgres receiving_order_reject_closes_order_and_replays_idempotently -- --test-threads=1",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_deferred_closeout_postgres force_close_shortage_from_receiving_with_shortage_qty -- --test-threads=1",
+  "node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs",
+  "pnpm --dir apps/web-admin exec tsc --noEmit",
+]
+evidence_refs = [
+  "docs/domain/user-stories-m2-inbound-verify.md",
+  "backend/crates/api/src/wave3_repository_part1.rs",
+  "backend/crates/api/src/wave3_repository/receiving_read.rs",
+  "backend/crates/api/src/wave3_handlers/receiving_handlers.rs",
+  "backend/crates/api/tests/m2_deferred_closeout/closeout_actions.rs",
+  "apps/web-admin/src/pages/inbound/M2InboundDialogs.tsx",
+  "artifacts/screenshot-portal/real-web/m2-inbound/m2-receiving-reject-dialog-current.png",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+
+[[stories]]
+id = "US-M2-007"
+title = "收货单据打印"
+module = "M2"
+story_file = "docs/domain/user-stories-m2-inbound-verify.md"
+types = ["read_only", "write", "api_change", "frontend_interaction"]
+frontend_pages = ["m2-receiving", "m2-inspecting"]
+navigation_checks = ["node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs"]
+api_paths = [
+  "GET /api/v1/inbound/receiving-orders/{id}/print-data",
+  "POST /api/v1/print-templates/preview",
+  "POST /api/v1/print-templates/print",
+]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
+e2e_screenshots = [
+  { page = "m2-receiving", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/receiving-print-preview.png" },
+  { page = "m2-inspecting", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/inspection-print-preview.png" },
+]
+database_objects = ["receiving_order_receipts", "receiving_inspections", "receiving_inspection_signatures", "print_records"]
+test_checks = [
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_deferred_closeout_postgres print_data_reads_receipt_inspection_and_dual_signature -- --test-threads=1",
+  "pnpm --dir apps/web-admin run test:e2e:m2-real",
+]
+evidence_refs = [
+  "backend/crates/api/src/wave3_repository/receiving_read.rs",
+  "backend/crates/api/src/wave3_handlers/receiving_handlers.rs",
+  "backend/crates/api/tests/m2_deferred_closeout_postgres.rs",
+  "apps/web-admin/src/pages/inbound/M2InboundPrintDialog.tsx",
+  "prototypes/e2e/web-admin-m2-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/m2-inbound/receiving-print-preview.png",
+  "artifacts/screenshot-portal/real-web/m2-inbound/inspection-print-preview.png",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
+
+[[stories]]
 id = "US-M4-001"
 title = "出库订单管理"
 module = "M4"
@@ -2757,261 +3090,6 @@ owner = "M10 模块负责人"
 resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
 
 [[deferred_stories]]
-id = "US-M2-001"
-title = "创建 ASN（采购入库通知）"
-module = "M2"
-story_file = "docs/domain/user-stories-m2-inbound-asn.md"
-types = ["write", "api_change", "frontend_interaction", "audit_compliance"]
-frontend_pages = ["m2-receiving"]
-e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
-e2e_screenshots = [
-  { page = "m2-receiving", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/receiving.png" },
-]
-api_paths = ["POST /api/v1/inbound/receiving-orders"]
-database_objects = ["receiving_orders", "receiving_order_lines", "audit_event", "idempotency_request"]
-test_checks = [
-  "cargo test --manifest-path backend/Cargo.toml -p wms-domain receiving_outbound --lib",
-  "cargo test --manifest-path backend/Cargo.toml -p wms-api --lib",
-  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_deferred_closeout_postgres create_asn_requires_supplier_and_non_past_expected_arrival",
-  "node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs",
-  "pnpm --dir apps/web-admin exec tsc --noEmit",
-]
-evidence_refs = [
-  "docs/domain/user-stories-m2-inbound-asn.md",
-  "backend/crates/domain/src/receiving_outbound.rs",
-  "backend/crates/api/src/inbound.rs",
-  "backend/crates/api/src/wave3_repository.rs",
-  "backend/crates/api/src/wave3_repository_part1.rs",
-  "backend/crates/api/src/wave3_handlers_part3.rs",
-  "backend/crates/api/tests/m2_deferred_closeout_postgres.rs",
-  "apps/web-admin/src/pages/inbound/M2InboundDialogs.tsx",
-  "apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs",
-  "prototypes/e2e/web-admin-m2-real.spec.ts",
-  "prototypes/playwright-web-admin-m2-real-config.ts",
-  "artifacts/screenshot-portal/real-web/m2-inbound/receiving.png",
-]
-reason = "已补创建契约切片：领域层和内存/PostgreSQL 创建入口统一要求供应商、非历史预计到货日期、商品编码非空且采购 ASN 只能对应一个商品；真实 PostgreSQL 浏览器 E2E 已验证 PC 创建、放行、收货、打印数据绑定、页面回显和本地门户截图，截图需由 PR 附件或 CI artifact 长期归档。仍缺供应商本地资质与商品存在性/货主校验、M-VR 初始状态接线、完整单号并发唯一性、开放 API/API Key、作废企业微信审批、完整审计和物理打印证据。"
-owner = "M2 模块负责人"
-resume_when = "补齐供应商资质和商品/货主引用校验、M-VR 状态接线、API Key、作废审批、完整审计及物理打印证据后再转为已验证。"
-
-[[deferred_stories]]
-id = "US-M2-003"
-title = "PDA/PC Web 验收"
-module = "M2"
-types = ["write", "api_change", "frontend_interaction", "audit_compliance"]
-frontend_pages = ["m2-inspecting"]
-navigation_checks = ["node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs"]
-e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
-e2e_screenshots = [
-  { page = "m2-inspecting", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/inspection-dual-sign-validation.png" },
-]
-test_checks = [
-  "cargo test --manifest-path backend/Cargo.toml -p wms-api --lib receiving_inspection_cannot_exceed_actual_receipt_or_sign_early",
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_deferred_closeout_postgres inspection_uses_actual_receipt_quantity_and_blocks_early_signature",
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave3_evidence_receiving_postgres inspect_and_sign_receiving_order_replay_without_duplicate_audit -- --test-threads=1",
-  "node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs",
-  "pnpm --dir apps/web-admin exec tsc --noEmit",
-]
-api_paths = [
-  "POST /api/v1/inbound/receiving-orders/{id}/inspect",
-  "POST /api/v1/inbound/receiving-orders/{id}/sign",
-]
-database_objects = [
-  "receiving_order_receipts",
-  "receiving_order_lines",
-  "receiving_inspections",
-  "receiving_inspection_signatures",
-  "warehouse_tasks",
-  "task_execution_events",
-]
-evidence_refs = [
-  "docs/domain/user-stories-m2-inbound-verify.md",
-  "backend/crates/api/src/inbound.rs",
-  "backend/crates/api/src/wave3_repository_part2.rs",
-  "backend/crates/api/src/task_engine.rs",
-  "backend/crates/api/src/wave3_handlers_part3.rs",
-  "backend/crates/api/tests/m2_deferred_closeout_postgres.rs",
-  "backend/crates/api/tests/task_engine_postgres.rs",
-  "backend/migrations/202607150003_mte_task_execution.sql",
-  "backend/crates/api/tests/wave3_evidence_receiving_postgres.rs",
-  "apps/web-admin/src/pages/inbound/M2InboundPage.tsx",
-  "apps/web-admin/src/pages/inbound/M2InboundDialogs.tsx",
-  "apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs",
-  "prototypes/e2e/web-admin-m2-real.spec.ts",
-  "prototypes/playwright-web-admin-m2-real-config.ts",
-  "artifacts/screenshot-portal/real-web/m2-inbound/inspection-dual-sign-validation.png",
-]
-reason = "已补验收累计量、零数量、签字前总量闭合和逐明细验收门禁，并完成 PC Web 按商品/货主/仓库实时查询 M-VR 入库/验收策略、服务端防降级、规则 ID 与主管审批 ID 落库；PostgreSQL、审计回放、真实浏览器 E2E 和本地门户截图均已验证，截图需由 PR 附件或 CI artifact 长期归档。故事仍不能整体关闭：逐商品/逐批号 UI、多商品 ASN、质量联系单/不合格分流、档案补录、PDA 离线和完整权限/审计断言尚未闭环。"
-owner = "M2 模块负责人"
-resume_when = "补齐逐商品/逐批号验收 UI、多商品 ASN、质量联系单与不合格分流、档案补录、PDA 离线及权限/审计断言后再移入 stories。"
-
-[[deferred_stories]]
-id = "US-M2-004"
-title = "双人验收签字"
-module = "M2"
-story_file = "docs/domain/user-stories-m2-inbound-verify.md"
-types = ["write", "api_change", "frontend_interaction", "audit_compliance"]
-frontend_pages = ["m2-inspecting"]
-api_paths = ["GET /api/v1/m-vr/dual-person-policy", "POST /api/v1/inbound/receiving-orders/{id}/sign"]
-e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
-e2e_screenshots = [
-  { page = "m2-inspecting", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/inspection-dual-sign-submitted.png" },
-]
-database_objects = ["auth_users", "auth_user_owner_bindings", "auth_user_roles", "auth_roles", "dual_person_policy_rules", "h4_approval_records", "receiving_inspection_signatures", "audit_event"]
-test_checks = [
-  "cargo test --manifest-path backend/Cargo.toml -p wms-api --lib receiving_ -- --nocapture",
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_deferred_closeout_postgres inspection_uses_actual_receipt_quantity_and_blocks_early_signature",
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave3_evidence_receiving_postgres inspect_and_sign_receiving_order_replay_without_duplicate_audit -- --test-threads=1",
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --lib postgres_inspect_and_sign_handlers_write_idempotency_and_audit",
-]
-evidence_refs = [
-  "docs/domain/user-stories-m2-inbound-verify.md",
-  "docs/error-codes.md",
-  "backend/crates/api/src/inbound.rs",
-  "backend/crates/api/src/inbound/tests.rs",
-  "backend/crates/api/src/wave3_repository.rs",
-  "backend/crates/api/src/wave3_repository_part2.rs",
-  "backend/crates/api/src/wave3_handlers_part3.rs",
-  "backend/crates/api/src/wave3_handlers_part2.rs",
-  "backend/crates/api/tests/support/auth.rs",
-  "backend/crates/api/tests/m2_deferred_closeout_postgres.rs",
-  "backend/crates/api/tests/wave3_evidence_receiving_postgres.rs",
-  "backend/crates/api/src/dual_person_policy.rs",
-  "apps/web-admin/src/features/validation-rules/dual-person-policy-queries.ts",
-  "apps/web-admin/src/pages/inbound/M2InboundPage.tsx",
-  "prototypes/e2e/web-admin-m2-real.spec.ts",
-  "artifacts/screenshot-portal/real-web/m2-inbound/inspection-dual-sign-submitted.png",
-]
-reason = "已补同货主启用 receiving_clerk 双签资格门禁，并完成 M-VR single/dual_scan/dual_scan_with_approval 三档策略解析、客户端不可降级、规则 ID/H4 审批 ID 落库和审计 diff；PC Web 实时查询策略，真实 PostgreSQL 浏览器 E2E 和本地门户截图覆盖相同签字人拦截与双签成功，截图需由 PR 附件或 CI artifact 长期归档。故事仍不能整体关闭：待第二人签字状态、签字结论/备注、30 分钟超时、电子药检单附件、PDA 离线和完整审计回查尚未闭环。"
-owner = "M2 模块负责人"
-resume_when = "补齐待第二人状态、结论备注、超时、附件、PDA 离线和完整审计回查后再移入 stories。"
-
-[[deferred_stories]]
-id = "US-M2-005"
-title = "PDA/PC Web 智能上架"
-module = "M2"
-story_file = "docs/domain/user-stories-m2-inbound-verify.md"
-types = ["read_only", "write", "api_change", "integration", "runtime_guard", "audit_compliance"]
-frontend_pages = ["m2-putaway"]
-api_paths = [
-  "GET /api/v1/inbound/receiving-orders/{id}/putaway-recommendations",
-  "POST /api/v1/inbound/receiving-orders/{id}/putaway",
-]
-e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
-e2e_screenshots = [
-  { page = "m2-putaway", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/putaway-recommendations.png" },
-]
-database_objects = [
-  "warehouse_locations",
-  "warehouse_zones",
-  "products",
-  "inventory_batches",
-  "receiving_putaways",
-  "inventory_movements",
-  "idempotency_request",
-  "audit_event",
-  "auth_permissions",
-  "warehouse_tasks",
-  "task_execution_events",
-]
-test_checks = [
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_smart_putaway_postgres -- --nocapture",
-  "pnpm --dir apps/web-admin exec tsc --noEmit",
-  "pnpm --dir apps/web-admin run test:e2e:m2-real",
-]
-evidence_refs = [
-  "docs/domain/user-stories-m2-inbound-verify.md",
-  "backend/crates/domain/src/operations.rs",
-  "backend/crates/api/src/m2_putaway.rs",
-  "backend/crates/api/src/task_engine.rs",
-  "backend/crates/api/src/wave3_repository_part2.rs",
-  "backend/crates/api/src/wave3_repository/putaway.rs",
-  "backend/crates/api/src/wave3_handlers_part4.rs",
-  "backend/crates/api/src/openapi_paths/extensions.rs",
-  "backend/crates/api/tests/m2_smart_putaway_postgres.rs",
-  "backend/migrations/202607140007_m2_smart_putaway.sql",
-  "backend/migrations/202607150003_mte_task_execution.sql",
-  "apps/web-admin/src/features/inbound/inbound-queries.ts",
-  "apps/web-admin/src/pages/inbound/M2InboundPage.tsx",
-  "apps/web-admin/src/pages/inbound/M2InboundDialogs.tsx",
-  "prototypes/e2e/web-admin-m2-real.spec.ts",
-  "artifacts/screenshot-portal/real-web/m2-inbound/putaway-recommendations.png",
-]
-reason = "已补推荐库位 API 与 PC Web 上架确认的真实接口接线，覆盖同货主、温区/质量颜色、容量、SKU 数量、验收数量、幂等和审计约束；真实 PostgreSQL 浏览器 E2E 和本地门户截图已验证推荐读取、失败校验、上架提交与库存追溯，截图需由 PR 附件或 CI artifact 长期归档。验收签字后已原子创建 M-TE 上架任务，但任务完成尚未驱动上架确认；M-VR 动态上架策略、LPN、全自动模式和 PDA 离线冲突仍未闭环。"
-owner = "M2 模块负责人"
-resume_when = "补齐 M-VR 规则命中、LPN/任务引擎、全自动模式和 PDA 离线冲突，并复跑真实浏览器 E2E/截图后再移入 stories。"
-
-[[deferred_stories]]
-id = "US-M2-006"
-title = "收货异常处理"
-module = "M2"
-story_file = "docs/domain/user-stories-m2-inbound-verify.md"
-types = ["write", "api_change", "frontend_interaction", "audit_compliance"]
-frontend_pages = ["m2-receiving"]
-navigation_checks = ["node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs"]
-e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
-api_paths = [
-  "POST /api/v1/inbound/receiving-orders/{id}/receive",
-  "POST /api/v1/inbound/receiving-orders/{id}/reject",
-]
-database_objects = ["receiving_orders", "receiving_order_receipts", "idempotency_request", "audit_event"]
-test_checks = [
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave3_postgres receiving_order_reject_closes_order_and_replays_idempotently -- --test-threads=1",
-  "node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs",
-  "pnpm --dir apps/web-admin exec tsc --noEmit",
-]
-evidence_refs = [
-  "docs/domain/user-stories-m2-inbound-verify.md",
-  "backend/crates/api/src/inbound.rs",
-  "backend/crates/api/src/wave3_repository_part1.rs",
-  "backend/crates/api/src/wave3_handlers/receiving_handlers.rs",
-  "backend/crates/api/tests/wave3_postgres/wave3_postgres_part2.rs",
-  "backend/crates/api/src/openapi_paths/extensions.rs",
-  "apps/web-admin/src/features/inbound/inbound-queries.ts",
-  "apps/web-admin/src/pages/inbound/M2InboundDialogs.tsx",
-  "apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs",
-]
-reason = "已补收货数量闭合、短少/拒收数量与异常备注持久化，以及 released/receiving 状态整单拒收、关闭状态、货主隔离、幂等和审计；整单拒收审计现明确记录原因、拒收数量和状态变化，PC Web 已接真实拒收 API。故事仍不能整体关闭：销售退货逐批部分拒收、短少强制关闭、温度超标稳定性报告附件、质量联系单/H4 通知、异常统计及拒收专属真实 E2E 截图尚未闭环。"
-owner = "M2 模块负责人"
-resume_when = "补齐逐批部分拒收、短少强制关闭、附件、M-QL/H4、异常统计和拒收专属真实 E2E 后复核。"
-
-[[deferred_stories]]
-id = "US-M2-007"
-title = "收货单据打印"
-module = "M2"
-frontend_pages = ["m2-receiving", "m2-inspecting"]
-api_paths = [
-    "GET /api/v1/inbound/receiving-orders/{id}/print-data",
-    "POST /api/v1/print-templates/preview",
-    "POST /api/v1/print-templates/print",
-]
-e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
-e2e_screenshots = [
-  { page = "m2-receiving", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/receiving-print-preview.png" },
-  { page = "m2-inspecting", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/inspection-print-preview.png" },
-]
-database_objects = ["receiving_order_receipts", "receiving_inspections", "receiving_inspection_signatures", "print_records"]
-test_checks = [
-    "cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_deferred_closeout_postgres print_data_reads_receipt_inspection_and_dual_signature -- --test-threads=1",
-    "pnpm --dir apps/web-admin run test:e2e:m2-real",
-]
-evidence_refs = [
-    "backend/crates/api/src/wave3_repository/receiving_read.rs",
-    "backend/crates/api/src/wave3_handlers/receiving_handlers.rs",
-    "backend/crates/api/tests/m2_deferred_closeout_postgres.rs",
-    "backend/crates/domain/src/operations.rs",
-    "backend/migrations/202607130009_receiving_receipt_details.sql",
-    "apps/web-admin/dev-mocks/web-admin-dev-mock-core-common.ts",
-    "apps/web-admin/src/pages/inbound/M2InboundPrintDialog.tsx",
-    "prototypes/e2e/web-admin-m2-real.spec.ts",
-    "artifacts/screenshot-portal/real-web/m2-inbound/receiving-print-preview.png",
-    "artifacts/screenshot-portal/real-web/m2-inbound/inspection-print-preview.png",
-]
-reason = "已补真实收货/验收/双签打印数据聚合接口、类型化收货现场字段持久化、前端 H9 数据绑定、PostgreSQL 回归和 M2 真实 E2E；仍缺冷链/普通单据的完整生产模板字段库、PC/蓝牙打印机联调、打印失败重试与正式打印审计证据，继续延期。"
-owner = "M2 模块负责人"
-resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
-
-[[deferred_stories]]
 id = "US-M2-010"
 title = "上架策略配置"
 module = "M2"
@@ -3022,26 +3100,35 @@ e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
 e2e_screenshots = [
   { page = "m2-putaway", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/putaway-recommendations.png" },
 ]
-api_paths = ["GET /api/v1/inbound/receiving-orders/{id}/putaway-recommendations"]
-database_objects = ["warehouse_locations", "warehouse_zones", "inventory_batches", "products"]
+api_paths = [
+  "GET /api/v1/inbound/putaway-strategy-profiles",
+  "PUT /api/v1/inbound/putaway-strategy-profiles",
+  "GET /api/v1/inbound/receiving-orders/{id}/putaway-recommendations",
+]
+database_objects = ["putaway_strategy_profiles", "warehouse_locations", "warehouse_zones", "inventory_batches", "products"]
 test_checks = [
   "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_smart_putaway_postgres -- --test-threads=1",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_deferred_closeout_postgres putaway_strategy_profile_drives_default_top_n -- --test-threads=1",
   "pnpm --dir apps/web-admin exec tsc --noEmit",
 ]
 evidence_refs = [
   "docs/domain/user-stories-m2-inbound-verify.md",
+  "backend/migrations/202607170006_m2_inbound_closeout.sql",
+  "backend/crates/domain/src/operations.rs",
   "backend/crates/api/src/m2_putaway.rs",
   "backend/crates/api/src/wave3_repository/putaway.rs",
+  "backend/crates/api/src/wave3_handlers/receiving_handlers.rs",
   "backend/crates/api/tests/m2_smart_putaway_postgres.rs",
+  "backend/crates/api/tests/m2_deferred_closeout/closeout_actions.rs",
   "backend/crates/api/src/openapi_paths/extensions.rs",
   "apps/web-admin/src/features/inbound/inbound-queries.ts",
   "apps/web-admin/src/pages/inbound/M2InboundDialogs.tsx",
   "prototypes/e2e/web-admin-m2-real.spec.ts",
   "artifacts/screenshot-portal/real-web/m2-inbound/putaway-recommendations.png",
 ]
-reason = "已具备真实 PostgreSQL 库位推荐切片：按货主、仓库、温区/质量色标、容量、SKU 数量和同品聚集过滤排序，PC Web 可读取 Top N 推荐并有真实 E2E 截图。故事仍不能整体关闭：当前是固定推荐算法，尚无多策略方案、优先级拖拽、规则启停、商品类别/货主/仓库绑定、ABC/品类/效期规则配置和无库位 H4 通知。"
+reason = "已补 putaway_strategy_profiles 方案模型、列表/幂等写入 API、默认方案 Top N 与 same_product_cluster 启停驱动推荐，PostgreSQL 回归已通过。故事仍不能整体关闭：尚无管理端策略配置页面、优先级拖拽 UI、商品类别/货主/仓库绑定多方案、ABC/品类/效期规则可视化配置和无库位 H4 通知。"
 owner = "M2 模块负责人"
-resume_when = "补齐可审计策略方案模型、配置 API/页面、动态规则执行和 H4 通知后复核。"
+resume_when = "补齐管理端策略配置页、多方案绑定、完整规则可视化与 H4 无库位通知，并补真实 E2E 截图后再移入 stories。"
 
 
 

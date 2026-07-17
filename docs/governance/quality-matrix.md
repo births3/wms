@@ -14,9 +14,9 @@
 | 指标 | 数量 |
 |---|---:|
 | 故事总数 | 174 |
-| 已完成（已验证） | 52 |
-| 未完成 / 延期 | 122 |
-| 完成率 | 29.9% |
+| 已完成（已验证） | 58 |
+| 未完成 / 延期 | 116 |
+| 完成率 | 33.3% |
 
 > “已完成”表示故事已进入 `stories` 并通过矩阵维度门禁；延期故事中的局部代码、页面或测试切片不计入完成。
 
@@ -39,7 +39,7 @@
 | H9 | 5 | 0 | 5 |
 | M1 | 2 | 9 | 11 |
 | M10 | 0 | 4 | 4 |
-| M2 | 2 | 7 | 9 |
+| M2 | 8 | 1 | 9 |
 | M3 | 9 | 0 | 9 |
 | M4 | 1 | 10 | 11 |
 | M5 | 0 | 3 | 3 |
@@ -104,6 +104,12 @@
 | US-H9-005 业务模块接入规则 | H9 | S1 |
 | US-M2-002 PDA/PC Web 收货 | M2 | S3 |
 | US-M2-008 收货进度看板 | M2 | S1 |
+| US-M2-001 创建 ASN（采购入库通知） | M2 | S3 |
+| US-M2-003 PDA/PC Web 验收 | M2 | S3 |
+| US-M2-004 双人验收签字 | M2 | S3 |
+| US-M2-005 PDA/PC Web 智能上架 | M2 | S3 |
+| US-M2-006 收货异常处理 | M2 | S3 |
+| US-M2-007 收货单据打印 | M2 | S2 |
 | US-M4-001 出库订单管理 | M4 | S2 |
 | US-AL-001 告警定义注册 | AL | S3 |
 | US-AL-003 告警升级机制 | AL | S3 |
@@ -152,13 +158,7 @@
 | US-M10-002 在途温控数据接入 | M10 | 当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。 |
 | US-M10-003 容器回收追踪 | M10 | 当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。 |
 | US-M10-004 出库订单与 TMS 协作 | M10 | 当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。 |
-| US-M2-001 创建 ASN（采购入库通知） | M2 | 已补创建契约切片：领域层和内存/PostgreSQL 创建入口统一要求供应商、非历史预计到货日期、商品编码非空且采购 ASN 只能对应一个商品；真实 PostgreSQL 浏览器 E2E 已验证 PC 创建、放行、收货、打印数据绑定、页面回显和本地门户截图，截图需由 PR 附件或 CI artifact 长期归档。仍缺供应商本地资质与商品存在性/货主校验、M-VR 初始状态接线、完整单号并发唯一性、开放 API/API Key、作废企业微信审批、完整审计和物理打印证据。 |
-| US-M2-003 PDA/PC Web 验收 | M2 | 已补验收累计量、零数量、签字前总量闭合和逐明细验收门禁，并完成 PC Web 按商品/货主/仓库实时查询 M-VR 入库/验收策略、服务端防降级、规则 ID 与主管审批 ID 落库；PostgreSQL、审计回放、真实浏览器 E2E 和本地门户截图均已验证，截图需由 PR 附件或 CI artifact 长期归档。故事仍不能整体关闭：逐商品/逐批号 UI、多商品 ASN、质量联系单/不合格分流、档案补录、PDA 离线和完整权限/审计断言尚未闭环。 |
-| US-M2-004 双人验收签字 | M2 | 已补同货主启用 receiving_clerk 双签资格门禁，并完成 M-VR single/dual_scan/dual_scan_with_approval 三档策略解析、客户端不可降级、规则 ID/H4 审批 ID 落库和审计 diff；PC Web 实时查询策略，真实 PostgreSQL 浏览器 E2E 和本地门户截图覆盖相同签字人拦截与双签成功，截图需由 PR 附件或 CI artifact 长期归档。故事仍不能整体关闭：待第二人签字状态、签字结论/备注、30 分钟超时、电子药检单附件、PDA 离线和完整审计回查尚未闭环。 |
-| US-M2-005 PDA/PC Web 智能上架 | M2 | 已补推荐库位 API 与 PC Web 上架确认的真实接口接线，覆盖同货主、温区/质量颜色、容量、SKU 数量、验收数量、幂等和审计约束；真实 PostgreSQL 浏览器 E2E 和本地门户截图已验证推荐读取、失败校验、上架提交与库存追溯，截图需由 PR 附件或 CI artifact 长期归档。验收签字后已原子创建 M-TE 上架任务，但任务完成尚未驱动上架确认；M-VR 动态上架策略、LPN、全自动模式和 PDA 离线冲突仍未闭环。 |
-| US-M2-006 收货异常处理 | M2 | 已补收货数量闭合、短少/拒收数量与异常备注持久化，以及 released/receiving 状态整单拒收、关闭状态、货主隔离、幂等和审计；整单拒收审计现明确记录原因、拒收数量和状态变化，PC Web 已接真实拒收 API。故事仍不能整体关闭：销售退货逐批部分拒收、短少强制关闭、温度超标稳定性报告附件、质量联系单/H4 通知、异常统计及拒收专属真实 E2E 截图尚未闭环。 |
-| US-M2-007 收货单据打印 | M2 | 已补真实收货/验收/双签打印数据聚合接口、类型化收货现场字段持久化、前端 H9 数据绑定、PostgreSQL 回归和 M2 真实 E2E；仍缺冷链/普通单据的完整生产模板字段库、PC/蓝牙打印机联调、打印失败重试与正式打印审计证据，继续延期。 |
-| US-M2-010 上架策略配置 | M2 | 已具备真实 PostgreSQL 库位推荐切片：按货主、仓库、温区/质量色标、容量、SKU 数量和同品聚集过滤排序，PC Web 可读取 Top N 推荐并有真实 E2E 截图。故事仍不能整体关闭：当前是固定推荐算法，尚无多策略方案、优先级拖拽、规则启停、商品类别/货主/仓库绑定、ABC/品类/效期规则配置和无库位 H4 通知。 |
+| US-M2-010 上架策略配置 | M2 | 已补 putaway_strategy_profiles 方案模型、列表/幂等写入 API、默认方案 Top N 与 same_product_cluster 启停驱动推荐，PostgreSQL 回归已通过。故事仍不能整体关闭：尚无管理端策略配置页面、优先级拖拽 UI、商品类别/货主/仓库绑定多方案、ABC/品类/效期规则可视化配置和无库位 H4 通知。 |
 | US-M4-002 波次规划 | M4 | 已补 M4 PC 波次列表、详情、创建、刷新和未拣选取消真实 API：后端在同一事务内校验已确认订单、按合格库存进行货主隔离锁定、生成按库位排序的拣选明细和 M-TE 拣选任务、更新订单入波次，取消时释放库存锁定并恢复订单状态，且写入幂等和审计；独立 PostgreSQL 回归与临时数据库浏览器 E2E 已验证列表读取、创建响应、库存分配、拣选任务、刷新回显、详情读取、取消响应和真实页面截图。故事仍不能整体关闭：容量/完整路径规则、任务执行回写、异常回滚和完整波次规则证据尚未闭环。 |
 | US-M4-003 PDA 拣选作业 | M4 | 当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。 |
 | US-M4-004 出库复核 | M4 | 已补出库复核查询/提交闭环：状态、逐行商品/数量、拣选与复核分离、短拣、货主隔离、幂等和审计；PC 页面提交前查询 M-VR 出库/复核策略，服务端按整单最严格策略强制第二复核员资质和已通过的 H4 主管审批，并在 outbound_review_records 落规则/双人/审批证据；全量复核完成后原子创建 M-TE 装车任务，短拣不提前创建。一次性 PostgreSQL 真实浏览器 E2E 已验证策略展示、第二人提交与成功回显。故事仍不能整体关闭：装车任务执行回写、PDA 整件/零件扫码、离线冲突、追溯码和真实 PDA/外部运行证据尚未闭环。 |
@@ -288,6 +288,12 @@
 | US-H9-005 业务模块接入规则 | H9 | S1 | read_only、frontend_interaction、api_change | L1、L2、L3、L7、L8、L9 | h9-print-templates | POST /api/v1/print-templates/resolve | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:not_applicable<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-M2-002 PDA/PC Web 收货 | M2 | S3 | write、inventory_change、frontend_interaction、critical_path | L1、L2、L3、L4、L5、L6、L7、L8、L9、L10、L11 | m2-receiving | POST /api/v1/inbound/receiving-orders/{id}/receive | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-M2-008 收货进度看板 | M2 | S1 | read_only、frontend_interaction | L1、L2、L3、L7、L8 | m2-receiving | GET /api/v1/inbound/receiving-dashboard | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:not_applicable<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
+| US-M2-001 创建 ASN（采购入库通知） | M2 | S3 | write、api_change、frontend_interaction、audit_compliance | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | m2-receiving | POST /api/v1/inbound/receiving-orders<br>POST /api/v1/inbound/receiving-orders/{id}/release<br>POST /api/v1/inbound/receiving-orders/{id}/cancel<br>GET /api/v1/inbound/receiving-orders/{id}/print-data | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
+| US-M2-003 PDA/PC Web 验收 | M2 | S3 | write、api_change、frontend_interaction、audit_compliance | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | m2-inspecting | POST /api/v1/inbound/receiving-orders/{id}/inspect<br>POST /api/v1/inbound/receiving-orders/{id}/sign | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
+| US-M2-004 双人验收签字 | M2 | S3 | write、api_change、frontend_interaction、audit_compliance | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | m2-inspecting | GET /api/v1/m-vr/dual-person-policy<br>POST /api/v1/inbound/receiving-orders/{id}/sign | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
+| US-M2-005 PDA/PC Web 智能上架 | M2 | S3 | read_only、write、api_change、integration、runtime_guard、audit_compliance | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | m2-putaway | GET /api/v1/inbound/receiving-orders/{id}/putaway-recommendations<br>POST /api/v1/inbound/receiving-orders/{id}/putaway | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
+| US-M2-006 收货异常处理 | M2 | S3 | write、api_change、frontend_interaction、audit_compliance | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | m2-receiving | POST /api/v1/inbound/receiving-orders/{id}/receive<br>POST /api/v1/inbound/receiving-orders/{id}/reject<br>POST /api/v1/inbound/receiving-orders/{id}/force-close-shortage | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
+| US-M2-007 收货单据打印 | M2 | S2 | read_only、write、api_change、frontend_interaction | L1、L2、L3、L4、L5、L7、L8、L9、L11 | m2-receiving、m2-inspecting | GET /api/v1/inbound/receiving-orders/{id}/print-data<br>POST /api/v1/print-templates/preview<br>POST /api/v1/print-templates/print | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-M4-001 出库订单管理 | M4 | S2 | write、frontend_interaction、api_change | L1、L2、L3、L4、L5、L7、L8、L9、L11 | m4-orders | GET /api/v1/outbound/orders<br>POST /api/v1/outbound/orders<br>GET /api/v1/outbound/orders/{id} | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-AL-001 告警定义注册 | AL | S3 | read_only、write、api_change、frontend_interaction、config_rule、integration、audit_compliance | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | hal-alert-definitions | GET /api/v1/alert-definitions<br>GET /api/v1/alert-definitions/{id}<br>POST /api/v1/alert-definitions/change-requests<br>PUT /api/v1/quality-liaisons/types/{type_code}<br>POST /api/v1/quality-liaisons/{id}/approval-callback | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-AL-003 告警升级机制 | AL | S3 | read_only、write、api_change、frontend_interaction、config_rule、integration、audit_compliance | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | hal-alert-escalations | GET /api/v1/alert-escalation-rules<br>PUT /api/v1/alert-escalation-rules/{rule_code} | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |

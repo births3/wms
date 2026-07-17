@@ -59,6 +59,8 @@ NAVIGATION_CHECK_SOURCES = {
     / "apps/web-admin/self-checks/hal-alert-definition-slice-self-check.mjs",
     "node apps/web-admin/self-checks/hal-alert-runtime-slice-self-check.mjs": REPO_ROOT
     / "apps/web-admin/self-checks/hal-alert-runtime-slice-self-check.mjs",
+    "node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs": REPO_ROOT
+    / "apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs",
 }
 
 DIMENSIONS = (

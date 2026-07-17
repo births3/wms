@@ -86,9 +86,15 @@ try {
   const inboundQueriesSource = readFileSync(fileURLToPath(new URL("../src/features/inbound/inbound-queries.ts", import.meta.url)), "utf8");
   const realE2eSource = readFileSync(fileURLToPath(new URL("../../../prototypes/e2e/web-admin-m2-real.spec.ts", import.meta.url)), "utf8");
   const helperSource = readFileSync(fileURLToPath(new URL("../src/pages/inbound/m2-inbound-page-helpers.ts", import.meta.url)), "utf8");
+  const appShell = readFileSync(fileURLToPath(new URL("../src/App.tsx", import.meta.url)), "utf8");
   const devMockCore = readFileSync(fileURLToPath(new URL("../dev-mocks/web-admin-dev-mock-core.ts", import.meta.url)), "utf8");
   const devMockCommon = readFileSync(fileURLToPath(new URL("../dev-mocks/web-admin-dev-mock-core-common.ts", import.meta.url)), "utf8");
   const devMockModel = readFileSync(fileURLToPath(new URL("../dev-mocks/web-admin-dev-mock-model.ts", import.meta.url)), "utf8");
+  // 页面导航契约：质量矩阵 navigation_checks 依赖这些菜单 page id 字面量
+  assert.match(appShell, /id:\s*"m2-receiving"/, "管理端菜单应登记 m2-receiving");
+  assert.match(appShell, /id:\s*"m2-inspecting"/, "管理端菜单应登记 m2-inspecting");
+  assert.match(appShell, /id:\s*"m2-putaway"/, "管理端菜单应登记 m2-putaway");
+  assert.match(pageSource, /M2InboundPage|m2-receiving|m2-inspecting|m2-putaway/, "M2 入库页应覆盖收货/验收/上架视图");
   const createFormBlock = /const emptyCreateForm: CreateFormState = \{([\s\S]*?)\};/.exec(pageSource)?.[1] ?? "";
   const inspectFormBlock = /const emptyInspectForm: InspectFormState = \{([\s\S]*?)\};/.exec(pageSource)?.[1] ?? "";
   const signFormBlock = /const emptySignForm: SignFormState = \{([\s\S]*?)\};/.exec(pageSource)?.[1] ?? "";
