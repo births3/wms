@@ -55,6 +55,66 @@ pub struct RejectReceivingOrderRequest {
     pub reason: String,
 }
 
+/// 待收货/草稿 ASN 审批作废（软作废，状态变为 cancelled）。
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CancelReceivingOrderRequest {
+    pub reason: String,
+    /// H4/企业微信审批单号或审批记录 ID；待收货状态必填。
+    #[serde(default)]
+    pub approval_id: Option<String>,
+}
+
+/// 验收环节短少强制关闭。
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ForceCloseShortageRequest {
+    pub reason: String,
+}
+
+/// 上架策略方案（最小可配置模型）。
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct PutawayStrategyProfile {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub profile_code: String,
+    pub profile_name: String,
+    pub is_default: bool,
+    pub top_n: i32,
+    pub enabled_rules: serde_json::Value,
+    pub rule_priority: serde_json::Value,
+    pub status: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct UpsertPutawayStrategyProfileRequest {
+    pub profile_code: String,
+    pub profile_name: String,
+    #[serde(default)]
+    pub is_default: bool,
+    #[serde(default = "default_putaway_top_n")]
+    pub top_n: i32,
+    #[serde(default)]
+    pub enabled_rules: Option<serde_json::Value>,
+    #[serde(default)]
+    pub rule_priority: Option<serde_json::Value>,
+    #[serde(default = "default_active_status")]
+    pub status: String,
+}
+
+fn default_putaway_top_n() -> i32 {
+    3
+}
+
+fn default_active_status() -> String {
+    "active".to_string()
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct PutawayStrategyProfileListResponse {
+    pub data: Vec<PutawayStrategyProfile>,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct ReceivingOrderReceipt {
     pub id: Uuid,

@@ -7,19 +7,20 @@ use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{
     validate_billing_rule_request, validate_create_receiving_order_request, BillingAccount,
-    BillingContract, BillingRule, BillingRuleValidationError, ChangeInventoryStatusRequest,
-    ColdChainDevice, CreateBillingAccountRequest, CreateBillingContractRequest,
-    CreateBillingRuleRequest, CreateColdChainDeviceRequest, CreateReceivingOrderRequest,
-    IngestTemperatureExcursionRequest, IngestTemperatureReadingRequest,
-    InspectReceivingOrderRequest, InspectionSignatureRecord, InventoryBatch, InventoryMovement,
-    PutawayLocationRecommendation, PutawayRecommendationQuery, PutawayRecommendationResponse,
-    PutawayRecord, PutawayRequest, ReceiveReceivingOrderRequest, ReceivingDashboardQuery,
+    BillingContract, BillingRule, BillingRuleValidationError, CancelReceivingOrderRequest,
+    ChangeInventoryStatusRequest, ColdChainDevice, CreateBillingAccountRequest,
+    CreateBillingContractRequest, CreateBillingRuleRequest, CreateColdChainDeviceRequest,
+    CreateReceivingOrderRequest, ForceCloseShortageRequest, IngestTemperatureExcursionRequest,
+    IngestTemperatureReadingRequest, InspectReceivingOrderRequest, InspectionSignatureRecord,
+    InventoryBatch, InventoryMovement, PutawayLocationRecommendation, PutawayRecommendationQuery,
+    PutawayRecommendationResponse, PutawayRecord, PutawayRequest, PutawayStrategyProfile,
+    PutawayStrategyProfileListResponse, ReceiveReceivingOrderRequest, ReceivingDashboardQuery,
     ReceivingDashboardRow, ReceivingInspectionRecord, ReceivingOrder, ReceivingOrderLine,
     ReceivingOrderPrintData, ReceivingOrderReceipt, ReceivingOrderRequestValidationError,
     ReceivingReceiptDetails, RejectReceivingOrderRequest, SignInspectionRequest,
     TemperatureExcursionEvent, TemperatureReading, UpdateColdChainDeviceRequest,
-    UpdateReceivingOrderRequest, RECEIVING_DOCUMENT_TYPE_PURCHASE_INBOUND,
-    RECEIVING_DOCUMENT_TYPE_SALES_RETURN,
+    UpdateReceivingOrderRequest, UpsertPutawayStrategyProfileRequest,
+    RECEIVING_DOCUMENT_TYPE_PURCHASE_INBOUND, RECEIVING_DOCUMENT_TYPE_SALES_RETURN,
 };
 
 use crate::{
@@ -110,6 +111,7 @@ pub enum Wave3RepositoryError {
     SameSigner,
     UnauthorizedSigner,
     InvalidReason,
+    SupplierQualificationExpired,
     MissingApprovalSource,
     RecallAlreadyActive,
     RecallNotActive,

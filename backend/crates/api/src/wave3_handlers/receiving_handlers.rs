@@ -44,6 +44,19 @@ pub(super) fn apply_receiving_order_routes() -> Router<Wave3AppState> {
             "/api/v1/inbound/receiving-orders/:id/putaway",
             post(super::putaway_receiving_order_handler),
         )
+        .route(
+            "/api/v1/inbound/receiving-orders/:id/cancel",
+            post(cancel_receiving_order_handler),
+        )
+        .route(
+            "/api/v1/inbound/receiving-orders/:id/force-close-shortage",
+            post(force_close_shortage_handler),
+        )
+        .route(
+            "/api/v1/inbound/putaway-strategy-profiles",
+            get(list_putaway_strategy_profiles_handler)
+                .put(upsert_putaway_strategy_profile_handler),
+        )
 }
 
 pub(super) async fn get_receiving_order_handler(
@@ -146,6 +159,105 @@ pub(super) async fn update_receiving_order_handler(
         .await;
     }
     Ok(Json(order))
+}
+
+pub(super) async fn cancel_receiving_order_handler(
+    ctx: AuthContext,
+    State(state): State<Wave3AppState>,
+    Path(id): Path<Uuid>,
+    headers: HeaderMap,
+    Json(req): Json<wms_domain::CancelReceivingOrderRequest>,
+) -> Result<Json<ReceivingOrder>, Wave3HandlerError> {
+    ctx.require_permission("m2.write")?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
+    let now = Utc::now();
+    let repository = state.wave3_repository.as_ref().ok_or_else(|| {
+        Wave3HandlerError::Repository(crate::wave3_repository::Wave3RepositoryError::Database(
+            "ASN 作废需要 PostgreSQL repository".to_string(),
+        ))
+    })?;
+    let audit = AuditWriteRequest::from_auth_context(
+        &ctx,
+        "cancel",
+        "M2",
+        "receiving_order",
+        id.to_string(),
+        None,
+    );
+    let result = repository
+        .cancel_receiving_order_with_audit(&ctx, id, req, now, &idempotency_key, Some(audit))
+        .await?;
+    Ok(Json(result.value))
+}
+
+pub(super) async fn force_close_shortage_handler(
+    ctx: AuthContext,
+    State(state): State<Wave3AppState>,
+    Path(id): Path<Uuid>,
+    headers: HeaderMap,
+    Json(req): Json<wms_domain::ForceCloseShortageRequest>,
+) -> Result<Json<ReceivingOrder>, Wave3HandlerError> {
+    ctx.require_permission("m2.write")?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
+    let now = Utc::now();
+    let repository = state.wave3_repository.as_ref().ok_or_else(|| {
+        Wave3HandlerError::Repository(crate::wave3_repository::Wave3RepositoryError::Database(
+            "短少强制关闭需要 PostgreSQL repository".to_string(),
+        ))
+    })?;
+    let audit = AuditWriteRequest::from_auth_context(
+        &ctx,
+        "force_close_shortage",
+        "M2",
+        "receiving_order",
+        id.to_string(),
+        None,
+    );
+    let result = repository
+        .force_close_shortage_with_audit(&ctx, id, req, now, &idempotency_key, Some(audit))
+        .await?;
+    Ok(Json(result.value))
+}
+
+pub(super) async fn list_putaway_strategy_profiles_handler(
+    ctx: AuthContext,
+    State(state): State<Wave3AppState>,
+) -> Result<Json<wms_domain::PutawayStrategyProfileListResponse>, Wave3HandlerError> {
+    ctx.require_permission("m2.putaway.write")?;
+    let repository = state.wave3_repository.as_ref().ok_or_else(|| {
+        Wave3HandlerError::Repository(crate::wave3_repository::Wave3RepositoryError::Database(
+            "上架策略方案需要 PostgreSQL repository".to_string(),
+        ))
+    })?;
+    Ok(Json(repository.list_putaway_strategy_profiles(&ctx).await?))
+}
+
+pub(super) async fn upsert_putaway_strategy_profile_handler(
+    ctx: AuthContext,
+    State(state): State<Wave3AppState>,
+    headers: HeaderMap,
+    Json(req): Json<wms_domain::UpsertPutawayStrategyProfileRequest>,
+) -> Result<Json<wms_domain::PutawayStrategyProfile>, Wave3HandlerError> {
+    ctx.require_permission("m2.putaway.write")?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
+    let now = Utc::now();
+    let repository = state.wave3_repository.as_ref().ok_or_else(|| {
+        Wave3HandlerError::Repository(crate::wave3_repository::Wave3RepositoryError::Database(
+            "上架策略方案需要 PostgreSQL repository".to_string(),
+        ))
+    })?;
+    let audit = AuditWriteRequest::from_auth_context(
+        &ctx,
+        "upsert",
+        "M2",
+        "putaway_strategy_profile",
+        "pending".to_string(),
+        None,
+    );
+    let result = repository
+        .upsert_putaway_strategy_profile_with_audit(&ctx, req, now, &idempotency_key, audit)
+        .await?;
+    Ok(Json(result.value))
 }
 
 pub(super) async fn release_receiving_order_handler(

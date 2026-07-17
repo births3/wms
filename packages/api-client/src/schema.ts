@@ -1476,6 +1476,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/inbound/putaway-strategy-profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_putaway_strategy_profiles"];
+        put: operations["upsert_putaway_strategy_profile"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/inbound/receiving-dashboard": {
         parameters: {
             query?: never;
@@ -1522,6 +1538,38 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["update_receiving_order"];
+        trace?: never;
+    };
+    "/api/v1/inbound/receiving-orders/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["cancel_receiving_order"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inbound/receiving-orders/{id}/force-close-shortage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["force_close_shortage_receiving_order"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/inbound/receiving-orders/{id}/inspect": {
@@ -4252,6 +4300,12 @@ export interface components {
             /** Format: uuid */
             second_approver_id: string;
         };
+        /** @description 待收货/草稿 ASN 审批作废（软作废，状态变为 cancelled）。 */
+        CancelReceivingOrderRequest: {
+            /** @description H4/企业微信审批单号或审批记录 ID；待收货状态必填。 */
+            approval_id?: string | null;
+            reason: string;
+        };
         ChangeDrugInspectionPlatformStatusRequest: {
             status: string;
         };
@@ -5222,6 +5276,10 @@ export interface components {
         };
         FeatureFlagSourceSwitchResponse: {
             active_source: string;
+        };
+        /** @description 验收环节短少强制关闭。 */
+        ForceCloseShortageRequest: {
+            reason: string;
         };
         GenerateBillingStatementRequest: {
             charge_ids: string[];
@@ -6372,6 +6430,28 @@ export interface components {
             /** Format: int64 */
             qty: number;
             quality_status: string;
+        };
+        /** @description 上架策略方案（最小可配置模型）。 */
+        PutawayStrategyProfile: {
+            /** Format: date-time */
+            created_at: string;
+            enabled_rules: unknown;
+            /** Format: uuid */
+            id: string;
+            is_default: boolean;
+            /** Format: uuid */
+            owner_id: string;
+            profile_code: string;
+            profile_name: string;
+            rule_priority: unknown;
+            status: string;
+            /** Format: int32 */
+            top_n: number;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        PutawayStrategyProfileListResponse: {
+            data: components["schemas"]["PutawayStrategyProfile"][];
         };
         QualityLiaisonApprovalCallbackRequest: {
             conclusion: string;
@@ -7587,6 +7667,16 @@ export interface components {
             enabled: boolean;
             /** Format: uuid */
             owner_id?: string | null;
+        };
+        UpsertPutawayStrategyProfileRequest: {
+            enabled_rules?: unknown;
+            is_default?: boolean;
+            profile_code: string;
+            profile_name: string;
+            rule_priority?: unknown;
+            status?: string;
+            /** Format: int32 */
+            top_n?: number;
         };
         UpsertQualityLiaisonTypeRequest: {
             approval_template_id: string;
@@ -12907,6 +12997,107 @@ export interface operations {
             };
         };
     };
+    list_putaway_strategy_profiles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 上架策略方案列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PutawayStrategyProfileListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无上架权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    upsert_putaway_strategy_profile: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertPutawayStrategyProfileRequest"];
+            };
+        };
+        responses: {
+            /** @description 创建或更新上架策略方案 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PutawayStrategyProfile"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无上架权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 方案字段校验失败 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     list_receiving_dashboard: {
         parameters: {
             query?: {
@@ -13166,6 +13357,138 @@ export interface operations {
                 };
             };
             /** @description 状态或字段校验失败 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    cancel_receiving_order: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 收货单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelReceivingOrderRequest"];
+            };
+        };
+        responses: {
+            /** @description ASN 审批作废 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceivingOrder"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 状态或审批校验失败 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    force_close_shortage_receiving_order: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 收货单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ForceCloseShortageRequest"];
+            };
+        };
+        responses: {
+            /** @description 短少强制关闭 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceivingOrder"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 状态或短少数校验失败 */
             422: {
                 headers: {
                     [name: string]: unknown;

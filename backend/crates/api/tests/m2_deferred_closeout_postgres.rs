@@ -7,9 +7,10 @@ use wms_api::{
     wave3_repository::{PgWave3Repository, Wave3RepositoryError},
 };
 use wms_domain::{
-    CreateReceivingOrderRequest, InspectReceivingOrderRequest, PutawayRequest,
-    ReceiveReceivingOrderRequest, ReceivingDashboardQuery, ReceivingOrderLine,
-    ReceivingReceiptDetails, SignInspectionRequest, RECEIVING_DOCUMENT_TYPE_PURCHASE_INBOUND,
+    CancelReceivingOrderRequest, CreateReceivingOrderRequest, ForceCloseShortageRequest,
+    InspectReceivingOrderRequest, PutawayRequest, ReceiveReceivingOrderRequest,
+    ReceivingDashboardQuery, ReceivingOrderLine, ReceivingReceiptDetails, SignInspectionRequest,
+    UpsertPutawayStrategyProfileRequest, RECEIVING_DOCUMENT_TYPE_PURCHASE_INBOUND,
     RECEIVING_DOCUMENT_TYPE_SALES_RETURN,
 };
 
@@ -768,3 +769,4 @@ async fn dashboard_groups_real_postgres_receiving_statuses(pool: PgPool) {
 }
 
 include!("m2_deferred_closeout/print_data.rs");
+include!("m2_deferred_closeout/closeout_actions.rs");

@@ -207,6 +207,22 @@ pub(crate) fn delete_receiving_order() {}
 #[allow(dead_code)]
 pub(crate) fn release_receiving_order() {}
 
+#[utoipa::path(post, path = "/api/v1/inbound/receiving-orders/{id}/cancel", tag = "inbound", params(("id" = uuid::Uuid, Path, description = "收货单 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = CancelReceivingOrderRequest, responses((status = 200, description = "ASN 审批作废", body = ReceivingOrder), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "权限不足", body = ErrorResponse), (status = 422, description = "状态或审批校验失败", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn cancel_receiving_order() {}
+
+#[utoipa::path(post, path = "/api/v1/inbound/receiving-orders/{id}/force-close-shortage", tag = "inbound", params(("id" = uuid::Uuid, Path, description = "收货单 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = ForceCloseShortageRequest, responses((status = 200, description = "短少强制关闭", body = ReceivingOrder), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "权限不足", body = ErrorResponse), (status = 422, description = "状态或短少数校验失败", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn force_close_shortage_receiving_order() {}
+
+#[utoipa::path(get, path = "/api/v1/inbound/putaway-strategy-profiles", tag = "inbound", responses((status = 200, description = "上架策略方案列表", body = PutawayStrategyProfileListResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "无上架权限", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn list_putaway_strategy_profiles() {}
+
+#[utoipa::path(put, path = "/api/v1/inbound/putaway-strategy-profiles", tag = "inbound", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = UpsertPutawayStrategyProfileRequest, responses((status = 200, description = "创建或更新上架策略方案", body = PutawayStrategyProfile), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "无上架权限", body = ErrorResponse), (status = 422, description = "方案字段校验失败", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn upsert_putaway_strategy_profile() {}
+
 #[utoipa::path(post, path = "/api/v1/inbound/receiving-orders/{id}/receive", tag = "inbound", params(("id" = uuid::Uuid, Path, description = "收货单 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = ReceiveReceivingOrderRequest, responses((status = 200, description = "PDA 收货闭环记录", body = ReceivingOrderReceipt), (status = 400, description = "缺少或非法幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn receive_receiving_order() {}

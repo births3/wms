@@ -7113,6 +7113,125 @@
         "x-auth-exempt-reason": "健康探针不依赖登录态，用于负载均衡和运行时就绪检查。"
       }
     },
+    "/api/v1/inbound/putaway-strategy-profiles": {
+      "get": {
+        "tags": [
+          "inbound"
+        ],
+        "operationId": "list_putaway_strategy_profiles",
+        "responses": {
+          "200": {
+            "description": "上架策略方案列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PutawayStrategyProfileListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无上架权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "inbound"
+        ],
+        "operationId": "upsert_putaway_strategy_profile",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertPutawayStrategyProfileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "创建或更新上架策略方案",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PutawayStrategyProfile"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无上架权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "方案字段校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/inbound/receiving-dashboard": {
       "get": {
         "tags": [
@@ -7478,6 +7597,188 @@
           }
         },
         "x-idempotency-exempt-reason": "收货单 CRUD 旧契约未接入 L11 幂等，本轮不扩大调用侧 header 面。"
+      }
+    },
+    "/api/v1/inbound/receiving-orders/{id}/cancel": {
+      "post": {
+        "tags": [
+          "inbound"
+        ],
+        "operationId": "cancel_receiving_order",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "收货单 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelReceivingOrderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "ASN 审批作废",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceivingOrder"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "状态或审批校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/inbound/receiving-orders/{id}/force-close-shortage": {
+      "post": {
+        "tags": [
+          "inbound"
+        ],
+        "operationId": "force_close_shortage_receiving_order",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "收货单 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForceCloseShortageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "短少强制关闭",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceivingOrder"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "状态或短少数校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/inbound/receiving-orders/{id}/inspect": {
@@ -20579,6 +20880,23 @@
           }
         }
       },
+      "CancelReceivingOrderRequest": {
+        "type": "object",
+        "description": "待收货/草稿 ASN 审批作废（软作废，状态变为 cancelled）。",
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "approval_id": {
+            "type": "string",
+            "description": "H4/企业微信审批单号或审批记录 ID；待收货状态必填。",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
       "ChangeDrugInspectionPlatformStatusRequest": {
         "type": "object",
         "required": [
@@ -23718,6 +24036,18 @@
         ],
         "properties": {
           "active_source": {
+            "type": "string"
+          }
+        }
+      },
+      "ForceCloseShortageRequest": {
+        "type": "object",
+        "description": "验收环节短少强制关闭。",
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "reason": {
             "type": "string"
           }
         }
@@ -27320,6 +27650,73 @@
           },
           "quality_status": {
             "type": "string"
+          }
+        }
+      },
+      "PutawayStrategyProfile": {
+        "type": "object",
+        "description": "上架策略方案（最小可配置模型）。",
+        "required": [
+          "id",
+          "owner_id",
+          "profile_code",
+          "profile_name",
+          "is_default",
+          "top_n",
+          "enabled_rules",
+          "rule_priority",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "enabled_rules": {},
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "is_default": {
+            "type": "boolean"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "profile_code": {
+            "type": "string"
+          },
+          "profile_name": {
+            "type": "string"
+          },
+          "rule_priority": {},
+          "status": {
+            "type": "string"
+          },
+          "top_n": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PutawayStrategyProfileListResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PutawayStrategyProfile"
+            }
           }
         }
       },
@@ -31231,6 +31628,37 @@
             "type": "string",
             "format": "uuid",
             "nullable": true
+          }
+        }
+      },
+      "UpsertPutawayStrategyProfileRequest": {
+        "type": "object",
+        "required": [
+          "profile_code",
+          "profile_name"
+        ],
+        "properties": {
+          "enabled_rules": {
+            "nullable": true
+          },
+          "is_default": {
+            "type": "boolean"
+          },
+          "profile_code": {
+            "type": "string"
+          },
+          "profile_name": {
+            "type": "string"
+          },
+          "rule_priority": {
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "top_n": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },

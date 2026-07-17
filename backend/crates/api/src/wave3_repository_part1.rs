@@ -801,16 +801,22 @@ async fn validate_receiving_order_references(
     let supplier_id = req
         .supplier_id
         .ok_or(Wave3RepositoryError::MissingSupplier)?;
-    let supplier_is_active: bool = sqlx::query_scalar(
-        "SELECT EXISTS (SELECT 1 FROM suppliers WHERE id = $1 AND owner_id = $2 AND status = 'active')",
+    let supplier_row: Option<(String, Option<DateTime<Utc>>)> = sqlx::query_as(
+        "SELECT status, qualification_valid_until FROM suppliers WHERE id = $1 AND owner_id = $2",
     )
     .bind(supplier_id)
     .bind(owner_id)
-    .fetch_one(&mut **tx)
+    .fetch_optional(&mut **tx)
     .await
     .map_err(map_db_error)?;
-    if !supplier_is_active {
+    let Some((supplier_status, qualification_valid_until)) = supplier_row else {
         return Err(Wave3RepositoryError::NotFound);
+    };
+    if supplier_status != "active" {
+        return Err(Wave3RepositoryError::NotFound);
+    }
+    if qualification_valid_until.is_some_and(|until| until < chrono::Utc::now()) {
+        return Err(Wave3RepositoryError::SupplierQualificationExpired);
     }
 
     for line in &req.lines {

@@ -19,7 +19,200 @@ struct PutawayLocationRow {
     _same_product_distance: Option<i64>,
 }
 
+#[derive(FromRow)]
+struct PutawayStrategyProfileRow {
+    id: Uuid,
+    owner_id: Uuid,
+    profile_code: String,
+    profile_name: String,
+    is_default: bool,
+    top_n: i32,
+    enabled_rules: Value,
+    rule_priority: Value,
+    status: String,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+fn map_putaway_strategy_profile(row: PutawayStrategyProfileRow) -> PutawayStrategyProfile {
+    PutawayStrategyProfile {
+        id: row.id,
+        owner_id: row.owner_id,
+        profile_code: row.profile_code,
+        profile_name: row.profile_name,
+        is_default: row.is_default,
+        top_n: row.top_n,
+        enabled_rules: row.enabled_rules,
+        rule_priority: row.rule_priority,
+        status: row.status,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+    }
+}
+
 impl PgWave3Repository {
+    pub async fn list_putaway_strategy_profiles(
+        &self,
+        ctx: &AuthContext,
+    ) -> Result<PutawayStrategyProfileListResponse, Wave3RepositoryError> {
+        let rows = sqlx::query_as::<_, PutawayStrategyProfileRow>(
+            r#"
+            SELECT id, owner_id, profile_code, profile_name, is_default, top_n,
+                   enabled_rules, rule_priority, status, created_at, updated_at
+              FROM putaway_strategy_profiles
+             WHERE owner_id = $1
+             ORDER BY is_default DESC, profile_code
+            "#,
+        )
+        .bind(ctx.owner_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_db_error)?;
+        Ok(PutawayStrategyProfileListResponse {
+            data: rows.into_iter().map(map_putaway_strategy_profile).collect(),
+        })
+    }
+
+    pub async fn upsert_putaway_strategy_profile_with_audit(
+        &self,
+        ctx: &AuthContext,
+        req: UpsertPutawayStrategyProfileRequest,
+        now: DateTime<Utc>,
+        idempotency_key: &str,
+        audit: AuditWriteRequest,
+    ) -> Result<IdempotentMutation<PutawayStrategyProfile>, Wave3RepositoryError> {
+        let profile_code = req.profile_code.trim();
+        let profile_name = req.profile_name.trim();
+        if profile_code.is_empty() || profile_name.is_empty() {
+            return Err(Wave3RepositoryError::InvalidReason);
+        }
+        if req.top_n <= 0 || req.top_n > 50 {
+            return Err(Wave3RepositoryError::InvalidQuantity);
+        }
+        if req.status != "active" && req.status != "disabled" {
+            return Err(Wave3RepositoryError::InvalidReason);
+        }
+        let request_hash = request_hash(&serde_json::json!({ "request": &req }))?;
+        let mut tx = self.begin().await?;
+        lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
+        if let Some(replay) =
+            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash, now).await?
+        {
+            return Ok(IdempotentMutation {
+                value: replay,
+                replayed: true,
+            });
+        }
+
+        if req.is_default && req.status == "active" {
+            sqlx::query(
+                "UPDATE putaway_strategy_profiles SET is_default = FALSE, updated_at = $2 WHERE owner_id = $1 AND is_default",
+            )
+            .bind(ctx.owner_id)
+            .bind(now)
+            .execute(&mut *tx)
+            .await
+            .map_err(map_db_error)?;
+        }
+
+        let enabled_rules = req.enabled_rules.clone().unwrap_or_else(|| {
+            serde_json::json!({
+                "temperature_match": true,
+                "owner_isolation": true,
+                "capacity_match": true,
+                "same_product_cluster": true,
+                "quality_color_match": true
+            })
+        });
+        let rule_priority = req.rule_priority.clone().unwrap_or_else(|| {
+            serde_json::json!([
+                "temperature_match",
+                "owner_isolation",
+                "capacity_match",
+                "quality_color_match",
+                "same_product_cluster"
+            ])
+        });
+        let id = Uuid::new_v4();
+        let row = sqlx::query_as::<_, PutawayStrategyProfileRow>(
+            r#"
+            INSERT INTO putaway_strategy_profiles (
+                id, owner_id, profile_code, profile_name, is_default, top_n,
+                enabled_rules, rule_priority, status, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)
+            ON CONFLICT (owner_id, profile_code) DO UPDATE
+               SET profile_name = EXCLUDED.profile_name,
+                   is_default = EXCLUDED.is_default,
+                   top_n = EXCLUDED.top_n,
+                   enabled_rules = EXCLUDED.enabled_rules,
+                   rule_priority = EXCLUDED.rule_priority,
+                   status = EXCLUDED.status,
+                   updated_at = EXCLUDED.updated_at,
+                   version = putaway_strategy_profiles.version + 1
+            RETURNING id, owner_id, profile_code, profile_name, is_default, top_n,
+                      enabled_rules, rule_priority, status, created_at, updated_at
+            "#,
+        )
+        .bind(id)
+        .bind(ctx.owner_id)
+        .bind(profile_code)
+        .bind(profile_name)
+        .bind(req.is_default)
+        .bind(req.top_n)
+        .bind(enabled_rules)
+        .bind(rule_priority)
+        .bind(&req.status)
+        .bind(now)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(map_db_error)?;
+        let profile = map_putaway_strategy_profile(row);
+        store_idempotency_success(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            "PUT",
+            "/api/v1/inbound/putaway-strategy-profiles",
+            "putaway_strategy_profile",
+            profile.id.to_string(),
+            &profile,
+            now,
+        )
+        .await?;
+        let mut audit = audit;
+        audit.resource_id = profile.id.to_string();
+        append_event_in_tx(&mut tx, &audit)
+            .await
+            .map_err(|error| Wave3RepositoryError::Audit(format!("{error:?}")))?;
+        tx.commit().await.map_err(map_db_error)?;
+        Ok(IdempotentMutation {
+            value: profile,
+            replayed: false,
+        })
+    }
+
+    async fn load_default_putaway_profile(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        owner_id: Uuid,
+    ) -> Result<Option<PutawayStrategyProfileRow>, Wave3RepositoryError> {
+        sqlx::query_as::<_, PutawayStrategyProfileRow>(
+            r#"
+            SELECT id, owner_id, profile_code, profile_name, is_default, top_n,
+                   enabled_rules, rule_priority, status, created_at, updated_at
+              FROM putaway_strategy_profiles
+             WHERE owner_id = $1 AND status = 'active'
+             ORDER BY is_default DESC, updated_at DESC
+             LIMIT 1
+            "#,
+        )
+        .bind(owner_id)
+        .fetch_optional(&mut **tx)
+        .await
+        .map_err(map_db_error)
+    }
+
     pub async fn recommend_putaway_locations(
         &self,
         ctx: &AuthContext,
@@ -29,8 +222,20 @@ impl PgWave3Repository {
         if query.qty <= 0 || query.limit == Some(0) {
             return Err(Wave3RepositoryError::InvalidQuantity);
         }
-        let limit = query.limit.unwrap_or(5).min(50);
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
+        let profile = self
+            .load_default_putaway_profile(&mut tx, ctx.owner_id)
+            .await?;
+        let default_top_n = profile
+            .as_ref()
+            .map(|row| u32::try_from(row.top_n).unwrap_or(3))
+            .unwrap_or(5);
+        let same_product_enabled = profile
+            .as_ref()
+            .and_then(|row| row.enabled_rules.get("same_product_cluster"))
+            .and_then(|value| value.as_bool())
+            .unwrap_or(true);
+        let limit = query.limit.unwrap_or(default_top_n).min(50);
         let order = lock_receiving_order(&mut tx, ctx.owner_id, receiving_order_id).await?;
         if order.status != "putaway" {
             return Err(Wave3RepositoryError::InvalidStatus {
@@ -168,6 +373,15 @@ impl PgWave3Repository {
         .map_err(map_db_error)?;
         if locations.is_empty() {
             return Err(Wave3RepositoryError::NoAvailableLocation);
+        }
+
+        let mut locations = locations;
+        if !same_product_enabled {
+            locations.sort_by(|left, right| {
+                left.available_volume_cm3
+                    .cmp(&right.available_volume_cm3)
+                    .then_with(|| left.location_code.cmp(&right.location_code))
+            });
         }
 
         let data = locations
