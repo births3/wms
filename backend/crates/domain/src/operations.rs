@@ -70,7 +70,7 @@ pub struct ForceCloseShortageRequest {
     pub reason: String,
 }
 
-/// 上架策略方案（最小可配置模型）。
+/// 上架策略方案（可配置规则优先级、启停、仓库/品类绑定与无库位通知）。
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct PutawayStrategyProfile {
     pub id: Uuid,
@@ -81,6 +81,12 @@ pub struct PutawayStrategyProfile {
     pub top_n: i32,
     pub enabled_rules: serde_json::Value,
     pub rule_priority: serde_json::Value,
+    #[serde(default)]
+    pub warehouse_id: Option<Uuid>,
+    #[serde(default)]
+    pub product_category: Option<String>,
+    #[serde(default = "default_notify_on_no_location")]
+    pub notify_on_no_location: bool,
     pub status: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -98,8 +104,18 @@ pub struct UpsertPutawayStrategyProfileRequest {
     pub enabled_rules: Option<serde_json::Value>,
     #[serde(default)]
     pub rule_priority: Option<serde_json::Value>,
+    #[serde(default)]
+    pub warehouse_id: Option<Uuid>,
+    #[serde(default)]
+    pub product_category: Option<String>,
+    #[serde(default = "default_notify_on_no_location")]
+    pub notify_on_no_location: bool,
     #[serde(default = "default_active_status")]
     pub status: String,
+}
+
+fn default_notify_on_no_location() -> bool {
+    true
 }
 
 fn default_putaway_top_n() -> i32 {

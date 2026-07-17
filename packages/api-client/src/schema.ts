@@ -6431,7 +6431,7 @@ export interface components {
             qty: number;
             quality_status: string;
         };
-        /** @description 上架策略方案（最小可配置模型）。 */
+        /** @description 上架策略方案（可配置规则优先级、启停、仓库/品类绑定与无库位通知）。 */
         PutawayStrategyProfile: {
             /** Format: date-time */
             created_at: string;
@@ -6439,8 +6439,10 @@ export interface components {
             /** Format: uuid */
             id: string;
             is_default: boolean;
+            notify_on_no_location?: boolean;
             /** Format: uuid */
             owner_id: string;
+            product_category?: string | null;
             profile_code: string;
             profile_name: string;
             rule_priority: unknown;
@@ -6449,6 +6451,8 @@ export interface components {
             top_n: number;
             /** Format: date-time */
             updated_at: string;
+            /** Format: uuid */
+            warehouse_id?: string | null;
         };
         PutawayStrategyProfileListResponse: {
             data: components["schemas"]["PutawayStrategyProfile"][];
@@ -7671,12 +7675,16 @@ export interface components {
         UpsertPutawayStrategyProfileRequest: {
             enabled_rules?: unknown;
             is_default?: boolean;
+            notify_on_no_location?: boolean;
+            product_category?: string | null;
             profile_code: string;
             profile_name: string;
             rule_priority?: unknown;
             status?: string;
             /** Format: int32 */
             top_n?: number;
+            /** Format: uuid */
+            warehouse_id?: string | null;
         };
         UpsertQualityLiaisonTypeRequest: {
             approval_template_id: string;

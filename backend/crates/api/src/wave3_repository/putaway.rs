@@ -29,6 +29,9 @@ struct PutawayStrategyProfileRow {
     top_n: i32,
     enabled_rules: Value,
     rule_priority: Value,
+    warehouse_id: Option<Uuid>,
+    product_category: Option<String>,
+    notify_on_no_location: bool,
     status: String,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
@@ -44,11 +47,25 @@ fn map_putaway_strategy_profile(row: PutawayStrategyProfileRow) -> PutawayStrate
         top_n: row.top_n,
         enabled_rules: row.enabled_rules,
         rule_priority: row.rule_priority,
+        warehouse_id: row.warehouse_id,
+        product_category: row.product_category,
+        notify_on_no_location: row.notify_on_no_location,
         status: row.status,
         created_at: row.created_at,
         updated_at: row.updated_at,
     }
 }
+
+const DEFAULT_RULE_PRIORITY: &[&str] = &[
+    "temperature_match",
+    "owner_isolation",
+    "capacity_match",
+    "same_product_cluster",
+    "abc_class",
+    "category_zone",
+    "expiry_isolation",
+    "empty_location_first",
+];
 
 impl PgWave3Repository {
     pub async fn list_putaway_strategy_profiles(
@@ -58,7 +75,8 @@ impl PgWave3Repository {
         let rows = sqlx::query_as::<_, PutawayStrategyProfileRow>(
             r#"
             SELECT id, owner_id, profile_code, profile_name, is_default, top_n,
-                   enabled_rules, rule_priority, status, created_at, updated_at
+                   enabled_rules, rule_priority, warehouse_id, product_category,
+                   notify_on_no_location, status, created_at, updated_at
               FROM putaway_strategy_profiles
              WHERE owner_id = $1
              ORDER BY is_default DESC, profile_code
@@ -121,36 +139,46 @@ impl PgWave3Repository {
                 "owner_isolation": true,
                 "capacity_match": true,
                 "same_product_cluster": true,
-                "quality_color_match": true
+                "quality_color_match": true,
+                "abc_class": true,
+                "category_zone": true,
+                "expiry_isolation": true,
+                "empty_location_first": true
             })
         });
-        let rule_priority = req.rule_priority.clone().unwrap_or_else(|| {
-            serde_json::json!([
-                "temperature_match",
-                "owner_isolation",
-                "capacity_match",
-                "quality_color_match",
-                "same_product_cluster"
-            ])
-        });
+        let rule_priority = req
+            .rule_priority
+            .clone()
+            .unwrap_or_else(|| serde_json::json!(DEFAULT_RULE_PRIORITY));
+        let product_category = req
+            .product_category
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string);
         let id = Uuid::new_v4();
         let row = sqlx::query_as::<_, PutawayStrategyProfileRow>(
             r#"
             INSERT INTO putaway_strategy_profiles (
                 id, owner_id, profile_code, profile_name, is_default, top_n,
-                enabled_rules, rule_priority, status, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)
+                enabled_rules, rule_priority, warehouse_id, product_category,
+                notify_on_no_location, status, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $13)
             ON CONFLICT (owner_id, profile_code) DO UPDATE
                SET profile_name = EXCLUDED.profile_name,
                    is_default = EXCLUDED.is_default,
                    top_n = EXCLUDED.top_n,
                    enabled_rules = EXCLUDED.enabled_rules,
                    rule_priority = EXCLUDED.rule_priority,
+                   warehouse_id = EXCLUDED.warehouse_id,
+                   product_category = EXCLUDED.product_category,
+                   notify_on_no_location = EXCLUDED.notify_on_no_location,
                    status = EXCLUDED.status,
                    updated_at = EXCLUDED.updated_at,
                    version = putaway_strategy_profiles.version + 1
             RETURNING id, owner_id, profile_code, profile_name, is_default, top_n,
-                      enabled_rules, rule_priority, status, created_at, updated_at
+                      enabled_rules, rule_priority, warehouse_id, product_category,
+                      notify_on_no_location, status, created_at, updated_at
             "#,
         )
         .bind(id)
@@ -161,6 +189,9 @@ impl PgWave3Repository {
         .bind(req.top_n)
         .bind(enabled_rules)
         .bind(rule_priority)
+        .bind(req.warehouse_id)
+        .bind(product_category)
+        .bind(req.notify_on_no_location)
         .bind(&req.status)
         .bind(now)
         .fetch_one(&mut *tx)
@@ -200,7 +231,8 @@ impl PgWave3Repository {
         sqlx::query_as::<_, PutawayStrategyProfileRow>(
             r#"
             SELECT id, owner_id, profile_code, profile_name, is_default, top_n,
-                   enabled_rules, rule_priority, status, created_at, updated_at
+                   enabled_rules, rule_priority, warehouse_id, product_category,
+                   notify_on_no_location, status, created_at, updated_at
               FROM putaway_strategy_profiles
              WHERE owner_id = $1 AND status = 'active'
              ORDER BY is_default DESC, updated_at DESC
@@ -211,6 +243,50 @@ impl PgWave3Repository {
         .fetch_optional(&mut **tx)
         .await
         .map_err(map_db_error)
+    }
+
+    async fn record_no_location_h4_notify(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        ctx: &AuthContext,
+        receiving_order_id: Uuid,
+        product_code: &str,
+        batch_no: &str,
+        now: DateTime<Utc>,
+    ) -> Result<(), Wave3RepositoryError> {
+        let dedupe_key = format!(
+            "m2-putaway-no-location:{}:{}:{}",
+            receiving_order_id, product_code, batch_no
+        );
+        let content = format!(
+            "收货单 {receiving_order_id} 商品 {product_code} 批号 {batch_no} 无可用上架库位，请仓库主管介入。"
+        );
+        sqlx::query(
+            r#"
+            INSERT INTO h4_notification_records (
+                id, owner_id, config_id, event_type, dedupe_key, recipient, channel,
+                content, content_summary, status, retry_count, failure_reason, sent_at,
+                created_at, updated_at
+            ) VALUES (
+                $1, $2, NULL, 'm2.putaway.no_location', $3, 'warehouse_manager', 'wechat',
+                $4, $5, 'failed', 0, 'queued_for_wechat_delivery', NULL, $6, $6
+            )
+            ON CONFLICT (owner_id, event_type, recipient, dedupe_key) DO UPDATE
+               SET content = EXCLUDED.content,
+                   content_summary = EXCLUDED.content_summary,
+                   updated_at = EXCLUDED.updated_at
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(ctx.owner_id)
+        .bind(&dedupe_key)
+        .bind(&content)
+        .bind(&content)
+        .bind(now)
+        .execute(&mut **tx)
+        .await
+        .map_err(map_db_error)?;
+        Ok(())
     }
 
     pub async fn recommend_putaway_locations(
@@ -234,6 +310,15 @@ impl PgWave3Repository {
             .as_ref()
             .and_then(|row| row.enabled_rules.get("same_product_cluster"))
             .and_then(|value| value.as_bool())
+            .unwrap_or(true);
+        let empty_location_first = profile
+            .as_ref()
+            .and_then(|row| row.enabled_rules.get("empty_location_first"))
+            .and_then(|value| value.as_bool())
+            .unwrap_or(false);
+        let notify_on_no_location = profile
+            .as_ref()
+            .map(|row| row.notify_on_no_location)
             .unwrap_or(true);
         let limit = query.limit.unwrap_or(default_top_n).min(50);
         let order = lock_receiving_order(&mut tx, ctx.owner_id, receiving_order_id).await?;
@@ -372,14 +457,39 @@ impl PgWave3Repository {
         .await
         .map_err(map_db_error)?;
         if locations.is_empty() {
+            if notify_on_no_location {
+                self.record_no_location_h4_notify(
+                    &mut tx,
+                    ctx,
+                    receiving_order_id,
+                    &query.product_code,
+                    &query.batch_no,
+                    Utc::now(),
+                )
+                .await?;
+                tx.commit().await.map_err(map_db_error)?;
+            }
             return Err(Wave3RepositoryError::NoAvailableLocation);
         }
 
         let mut locations = locations;
-        if !same_product_enabled {
+        if !same_product_enabled || empty_location_first {
             locations.sort_by(|left, right| {
-                left.available_volume_cm3
-                    .cmp(&right.available_volume_cm3)
+                let empty_cmp = if empty_location_first {
+                    // 空库位（非同品占用）优先
+                    (!left.same_product).cmp(&(!right.same_product)).reverse()
+                } else {
+                    std::cmp::Ordering::Equal
+                };
+                empty_cmp
+                    .then_with(|| {
+                        if same_product_enabled {
+                            right.same_product.cmp(&left.same_product)
+                        } else {
+                            std::cmp::Ordering::Equal
+                        }
+                    })
+                    .then_with(|| left.available_volume_cm3.cmp(&right.available_volume_cm3))
                     .then_with(|| left.location_code.cmp(&right.location_code))
             });
         }

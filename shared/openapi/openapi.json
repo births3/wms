@@ -27655,7 +27655,7 @@
       },
       "PutawayStrategyProfile": {
         "type": "object",
-        "description": "上架策略方案（最小可配置模型）。",
+        "description": "上架策略方案（可配置规则优先级、启停、仓库/品类绑定与无库位通知）。",
         "required": [
           "id",
           "owner_id",
@@ -27682,9 +27682,16 @@
           "is_default": {
             "type": "boolean"
           },
+          "notify_on_no_location": {
+            "type": "boolean"
+          },
           "owner_id": {
             "type": "string",
             "format": "uuid"
+          },
+          "product_category": {
+            "type": "string",
+            "nullable": true
           },
           "profile_code": {
             "type": "string"
@@ -27703,6 +27710,11 @@
           "updated_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
           }
         }
       },
@@ -31644,6 +31656,13 @@
           "is_default": {
             "type": "boolean"
           },
+          "notify_on_no_location": {
+            "type": "boolean"
+          },
+          "product_category": {
+            "type": "string",
+            "nullable": true
+          },
           "profile_code": {
             "type": "string"
           },
@@ -31659,6 +31678,11 @@
           "top_n": {
             "type": "integer",
             "format": "int32"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
           }
         }
       },

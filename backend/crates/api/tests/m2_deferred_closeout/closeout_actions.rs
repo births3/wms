@@ -177,9 +177,19 @@ async fn putaway_strategy_profile_drives_default_top_n(pool: PgPool) {
                     "owner_isolation": true,
                     "capacity_match": true,
                     "same_product_cluster": false,
-                    "quality_color_match": true
+                    "quality_color_match": true,
+                    "empty_location_first": true
                 })),
-                rule_priority: None,
+                rule_priority: Some(serde_json::json!([
+                    "temperature_match",
+                    "owner_isolation",
+                    "capacity_match",
+                    "empty_location_first",
+                    "same_product_cluster"
+                ])),
+                warehouse_id: None,
+                product_category: Some("western_medicine".to_string()),
+                notify_on_no_location: true,
                 status: "active".to_string(),
             },
             chrono::Utc::now(),
@@ -197,6 +207,11 @@ async fn putaway_strategy_profile_drives_default_top_n(pool: PgPool) {
         .expect("upsert strategy");
     assert_eq!(profile.value.top_n, 2);
     assert!(profile.value.is_default);
+    assert_eq!(
+        profile.value.product_category.as_deref(),
+        Some("western_medicine")
+    );
+    assert!(profile.value.notify_on_no_location);
 
     let listed = repository
         .list_putaway_strategy_profiles(&ctx)
@@ -204,4 +219,8 @@ async fn putaway_strategy_profile_drives_default_top_n(pool: PgPool) {
         .expect("list strategies");
     assert_eq!(listed.data.len(), 1);
     assert_eq!(listed.data[0].profile_code, "default");
+    assert_eq!(
+        listed.data[0].product_category.as_deref(),
+        Some("western_medicine")
+    );
 }
