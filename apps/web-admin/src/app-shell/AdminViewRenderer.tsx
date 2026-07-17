@@ -10,6 +10,9 @@ import { M2InboundPage, type M2InboundMode } from "@/pages/inbound/M2InboundPage
 import { M3BatchManagementPage } from "@/pages/inventory/M3BatchManagementPage";
 import { M3InventoryStatusConfigPage } from "@/pages/inventory/M3InventoryStatusConfigPage";
 import { M3LocationHistoryPage } from "@/pages/inventory/M3LocationHistoryPage";
+import { M3InventoryCountPage } from "@/pages/inventory/M3InventoryCountPage";
+import { M3MaintenancePage } from "@/pages/inventory/M3MaintenancePage";
+import { M3RelocationPage } from "@/pages/inventory/M3RelocationPage";
 import { M1MasterDataPage, type MasterDataViewId } from "@/pages/master-data/M1MasterDataPage";
 import { M4OutboundPage, type M4OutboundMode } from "@/pages/outbound/M4OutboundPage";
 import { H2AuditTrailPage, H3ApiContractPage } from "@/pages/platform/HorizontalCapabilityPages";
@@ -68,6 +71,9 @@ export function renderAdminView(
     return <M3LocationHistoryPage onBack={() => navigateTo("m3-batches")} />;
   }
   if (view === "m3-status-config") return <M3InventoryStatusConfigPage currentUser={currentUser} />;
+  if (view === "m3-counts") return <M3InventoryCountPage />;
+  if (view === "m3-maintenance") return <M3MaintenancePage />;
+  if (view === "m3-relocations") return <M3RelocationPage />;
   if (view === "mte-task-types") return <TaskTypeConfigPage />;
   if (view === "mte-task-groups") return <TaskGroupConfigPage />;
   if (view === "mte-task-dispatch") return <TaskDispatchPage />;

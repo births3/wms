@@ -84,6 +84,29 @@ test("M3 库存查询使用真实 API 传递组合筛选并展示结果", async 
   await page.screenshot({ path: path.join(locationHistoryArtifactsDir, "location-history.png"), fullPage: false });
 });
 
+test("M3 盘点养护移库页面可打开", async ({ page }) => {
+  await login(page);
+  const artifactsRoot = path.resolve("../artifacts/screenshot-portal/real-web");
+  for (const [name, heading, dir, file] of [
+    ["M3 库存盘点", "M3 库存盘点", "m3-counts", "count-page.png"],
+    ["M3 在库养护", "M3 在库养护", "m3-maintenance", "maintenance-page.png"],
+    ["M3 库内移库", "M3 库内移库", "m3-relocations", "relocation-page.png"],
+  ] as const) {
+    const navigation = page.getByRole("navigation");
+    const target = navigation.getByRole("button", { name: new RegExp(name) });
+    if (!(await target.isVisible())) {
+      const section = navigation.getByRole("button", { name: "库内业务", exact: true });
+      if ((await section.getAttribute("aria-expanded")) !== "true") await section.click();
+      const group = navigation.getByRole("button", { name: "库存管理", exact: true });
+      if ((await group.getAttribute("aria-expanded")) !== "true") await group.click();
+    }
+    await target.click();
+    await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+    fs.mkdirSync(path.join(artifactsRoot, dir), { recursive: true });
+    await page.screenshot({ path: path.join(artifactsRoot, dir, file), fullPage: false });
+  }
+});
+
 test("M3 库存状态规则使用真实 API 保存货主覆盖", async ({ page }) => {
   fs.mkdirSync(statusConfigArtifactsDir, { recursive: true });
   await login(page);

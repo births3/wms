@@ -657,6 +657,160 @@ frontend = "ABC 分类以 API/配置能力闭环；管理端报表页可后续�
 required_layers = ["L1", "L2", "L3", "L4", "L5", "L8", "L9", "L10", "L11"]
 covered_layers = ["L1", "L2", "L3", "L4", "L5", "L8", "L9", "L10", "L11"]
 
+
+[[stories]]
+id = "US-M3-004"
+title = "在库养护"
+module = "M3"
+story_file = "docs/domain/user-stories-m3-inventory-operation.md"
+types = ["read_only", "write", "api_change", "integration", "audit_compliance", "runtime_guard", "frontend_interaction"]
+frontend_pages = ["m3-maintenance"]
+navigation_checks = ["node apps/web-admin/self-checks/m3-ops-pages-self-check.mjs"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m3-real"]
+e2e_screenshots = [
+  { page = "m3-maintenance", spec = "prototypes/e2e/web-admin-m3-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m3-maintenance/maintenance-page.png" },
+]
+api_paths = [
+  "GET /api/v1/inventory/maintenance/tasks",
+  "POST /api/v1/inventory/maintenance/tasks/generate",
+  "GET /api/v1/inventory/maintenance/records",
+  "POST /api/v1/inventory/maintenance/records",
+]
+test_checks = [
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_maintenance_postgres",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_ops_closeout_postgres generate_maintenance_tasks_for_near_expiry_batches",
+  "node apps/web-admin/self-checks/m3-ops-pages-self-check.mjs",
+]
+evidence_refs = [
+  "backend/migrations/202607140006_m3_inventory_maintenance.sql",
+  "backend/crates/api/src/wave3_repository/maintenance.rs",
+  "backend/crates/api/src/wave3_handlers/maintenance.rs",
+  "backend/crates/api/tests/m3_maintenance_postgres.rs",
+  "backend/crates/api/tests/m3_ops_closeout_postgres.rs",
+  "apps/web-admin/src/pages/inventory/M3MaintenancePage.tsx",
+  "apps/web-admin/self-checks/m3-ops-pages-self-check.mjs",
+  "artifacts/screenshot-portal/real-web/m3-maintenance/maintenance-page.png",
+  "prototypes/e2e/web-admin-m3-real.spec.ts",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+
+[[stories]]
+id = "US-M3-005"
+title = "库存盘点"
+module = "M3"
+story_file = "docs/domain/user-stories-m3-inventory-operation.md"
+types = ["write", "api_change", "inventory_change", "concurrent_resource", "audit_compliance", "frontend_interaction"]
+frontend_pages = ["m3-counts"]
+navigation_checks = ["node apps/web-admin/self-checks/m3-ops-pages-self-check.mjs"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m3-real"]
+e2e_screenshots = [
+  { page = "m3-counts", spec = "prototypes/e2e/web-admin-m3-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m3-counts/count-page.png" },
+]
+api_paths = [
+  "GET /api/v1/inventory/counts",
+  "POST /api/v1/inventory/counts",
+  "GET /api/v1/inventory/counts/{id}",
+  "POST /api/v1/inventory/counts/{id}/lines/{line_id}/submit",
+  "POST /api/v1/inventory/counts/{id}/approve",
+]
+test_checks = [
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_inventory_count_postgres",
+  "node apps/web-admin/self-checks/m3-ops-pages-self-check.mjs",
+  "pnpm --dir apps/web-admin run test:e2e:m3-real",
+]
+evidence_refs = [
+  "backend/migrations/202607140008_m3_inventory_counts.sql",
+  "backend/crates/api/src/wave3_repository/inventory_count.rs",
+  "backend/crates/api/src/wave3_handlers/inventory_count.rs",
+  "backend/crates/api/tests/m3_inventory_count_postgres.rs",
+  "apps/web-admin/src/pages/inventory/M3InventoryCountPage.tsx",
+  "artifacts/screenshot-portal/real-web/m3-counts/count-page.png",
+  "prototypes/e2e/web-admin-m3-real.spec.ts",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"]
+
+[[stories]]
+id = "US-M3-006"
+title = "库内移库"
+module = "M3"
+story_file = "docs/domain/user-stories-m3-inventory-operation.md"
+types = ["write", "inventory_change", "concurrent_resource", "audit_compliance", "integration", "frontend_interaction"]
+frontend_pages = ["m3-relocations"]
+navigation_checks = ["node apps/web-admin/self-checks/m3-ops-pages-self-check.mjs"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m3-real"]
+e2e_screenshots = [
+  { page = "m3-relocations", spec = "prototypes/e2e/web-admin-m3-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m3-relocations/relocation-page.png" },
+]
+api_paths = [
+  "GET /api/v1/inventory/relocations",
+  "POST /api/v1/inventory/relocations",
+]
+test_checks = [
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_ops_closeout_postgres relocate_inventory_moves_qty_atomically_and_rejects_quarantined",
+  "node apps/web-admin/self-checks/m3-ops-pages-self-check.mjs",
+]
+evidence_refs = [
+  "backend/migrations/202607170004_m3_remaining_closeout.sql",
+  "backend/crates/api/src/wave3_repository/relocation.rs",
+  "backend/crates/api/src/wave3_handlers/m3_ops.rs",
+  "backend/crates/api/tests/m3_ops_closeout_postgres.rs",
+  "apps/web-admin/src/pages/inventory/M3RelocationPage.tsx",
+  "artifacts/screenshot-portal/real-web/m3-relocations/relocation-page.png",
+  "prototypes/e2e/web-admin-m3-real.spec.ts",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"]
+
 [[deferred_stories]]
 id = "US-H4-002"
 title = "企业微信消息发送"
@@ -2889,82 +3043,6 @@ reason = "已具备真实 PostgreSQL 库位推荐切片：按货主、仓库、�
 owner = "M2 模块负责人"
 resume_when = "补齐可审计策略方案模型、配置 API/页面、动态规则执行和 H4 通知后复核。"
 
-[[deferred_stories]]
-id = "US-M3-004"
-title = "在库养护"
-module = "M3"
-story_file = "docs/domain/user-stories-m3-inventory-operation.md"
-types = ["read_only", "write", "api_change", "integration", "audit_compliance", "runtime_guard"]
-api_paths = [
-  "GET /api/v1/inventory/maintenance/tasks",
-  "GET /api/v1/inventory/maintenance/records",
-  "POST /api/v1/inventory/maintenance/records",
-]
-database_objects = [
-  "inventory_maintenance_tasks",
-  "inventory_maintenance_records",
-  "inventory_batches",
-  "audit_event",
-  "idempotency_request",
-  "auth_permissions",
-]
-test_checks = [
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_maintenance_postgres -- --test-threads=1",
-]
-evidence_refs = [
-  "docs/domain/user-stories-m3-inventory-operation.md",
-  "docs/compliance/gsp-ch7-storage-maintenance.md",
-  "backend/crates/domain/src/maintenance.rs",
-  "backend/crates/api/src/wave3_repository/maintenance.rs",
-  "backend/crates/api/src/wave3_handlers/maintenance.rs",
-  "backend/crates/api/src/openapi_paths/maintenance.rs",
-  "backend/crates/api/tests/m3_maintenance_postgres.rs",
-  "backend/migrations/202607140006_m3_inventory_maintenance.sql",
-]
-reason = "养护任务/记录最小闭环已存在；本轮未完成计划自动生成、M-TE/PDA、异常照片/M-QL 与真实前端 E2E，继续延期。"
-owner = "M3 模块负责人"
-resume_when = "补齐计划生成与调度、M-TE 下发、异常照片/M-QL 闭环、M5 联动、统计预警、PDA 离线和真实前端证据后再移入 stories。"
-
-[[deferred_stories]]
-id = "US-M3-005"
-title = "库存盘点"
-module = "M3"
-story_file = "docs/domain/user-stories-m3-inventory-operation.md"
-types = ["write", "api_change", "inventory_change", "concurrent_resource", "audit_compliance", "pda_runtime"]
-api_paths = [
-  "POST /api/v1/inventory/counts",
-  "GET /api/v1/inventory/counts/{id}",
-  "POST /api/v1/inventory/counts/{id}/lines/{line_id}/submit",
-  "POST /api/v1/inventory/counts/{id}/approve",
-]
-database_objects = ["inventory_counts", "inventory_count_lines", "inventory_batches", "inventory_movements", "inventory_allocations", "idempotency_request", "audit_event", "auth_permissions"]
-test_checks = [
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_inventory_count_postgres -- --test-threads=1",
-]
-evidence_refs = [
-  "docs/domain/user-stories-m3-inventory-operation.md",
-  "backend/crates/domain/src/inventory_count.rs",
-  "backend/crates/api/src/wave3_repository/inventory_count.rs",
-  "backend/crates/api/src/wave3_handlers/inventory_count.rs",
-  "backend/crates/api/src/openapi_paths/inventory_count.rs",
-  "backend/crates/api/tests/m3_inventory_count_postgres.rs",
-  "backend/migrations/202607140008_m3_inventory_counts.sql",
-  "shared/openapi/openapi.json",
-  "packages/api-client/src/schema.ts",
-]
-reason = "后端盘点主链已闭环；本轮未新增 PC 列表页与真 PDA 证据。仍缺范围选择前端、PDA 扫码/离线冲突、在途任务账面、阈值升级审批、打印和真实设备/E2E。"
-owner = "M3 模块负责人"
-resume_when = "补齐 PC/PDA 执行面、离线冲突、在途任务账面、阈值升级审批、打印及真实设备证据后复核。"
-
-[[deferred_stories]]
-id = "US-M3-006"
-title = "库内移库"
-module = "M3"
-story_file = "docs/domain/user-stories-m3-inventory-operation.md"
-types = ["write", "inventory_change", "concurrent_resource", "audit_compliance", "pda_runtime", "integration"]
-reason = "已实现直接移库事务切片：POST /api/v1/inventory/relocations 同事务源减目标增/整批位置迁移，校验合格状态与召回、温区/色标/容量/SKU 门禁、库存流水与幂等审计；真实 PostgreSQL 覆盖成功移库与隔离拦截。仍缺 LPN/M-TC 分支、M-TE 任务接线、PC/PDA 页面与真机离线证据，按完整故事继续延期。"
-owner = "M3 模块负责人"
-resume_when = "补齐 LPN/追溯码模式、M-TE 任务、PC/PDA 执行面和真实设备证据后迁入 stories。"
 
 
 

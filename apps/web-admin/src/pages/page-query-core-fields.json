@@ -296,6 +296,36 @@
       "more": []
     },
     {
+      "id": "m3-counts",
+      "title": "M3 库存盘点",
+      "required": true,
+      "source": "apps/web-admin/src/pages/inventory/M3InventoryCountPage.tsx",
+      "fieldConstant": "m3CountQueryFields",
+      "coreConstant": "m3CountCoreQueryFieldKeys",
+      "core": ["keyword", "status"],
+      "more": []
+    },
+    {
+      "id": "m3-maintenance",
+      "title": "M3 在库养护",
+      "required": true,
+      "source": "apps/web-admin/src/pages/inventory/M3MaintenancePage.tsx",
+      "fieldConstant": "m3MaintenanceQueryFields",
+      "coreConstant": "m3MaintenanceCoreQueryFieldKeys",
+      "core": ["keyword", "status"],
+      "more": []
+    },
+    {
+      "id": "m3-relocations",
+      "title": "M3 库内移库",
+      "required": true,
+      "source": "apps/web-admin/src/pages/inventory/M3RelocationPage.tsx",
+      "fieldConstant": "m3RelocationQueryFields",
+      "coreConstant": "m3RelocationCoreQueryFieldKeys",
+      "core": ["keyword"],
+      "more": []
+    },
+    {
       "id": "mte-task-types",
       "title": "M-TE 任务类型配置",
       "required": true,
