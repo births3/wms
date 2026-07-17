@@ -10,6 +10,7 @@ export type AdminView =
   | "m2-putaway"
   | "m-di-platforms"
   | "m3-batches"
+  | "m3-location-history"
   | "m3-status-config"
   | "mte-task-types"
   | "mte-task-groups"

@@ -9,6 +9,7 @@ import { H4WechatNotifyPage, type H4WechatNotifyMode } from "@/pages/wechat-noti
 import { M2InboundPage, type M2InboundMode } from "@/pages/inbound/M2InboundPage";
 import { M3BatchManagementPage } from "@/pages/inventory/M3BatchManagementPage";
 import { M3InventoryStatusConfigPage } from "@/pages/inventory/M3InventoryStatusConfigPage";
+import { M3LocationHistoryPage } from "@/pages/inventory/M3LocationHistoryPage";
 import { M1MasterDataPage, type MasterDataViewId } from "@/pages/master-data/M1MasterDataPage";
 import { M4OutboundPage, type M4OutboundMode } from "@/pages/outbound/M4OutboundPage";
 import { H2AuditTrailPage, H3ApiContractPage } from "@/pages/platform/HorizontalCapabilityPages";
@@ -56,7 +57,15 @@ export function renderAdminView(
     );
   }
   if (view === "m3-batches") {
-    return <M3BatchManagementPage onBack={() => navigateTo("dashboard")} />;
+    return (
+      <M3BatchManagementPage
+        onBack={() => navigateTo("dashboard")}
+        onOpenLocationHistory={() => navigateTo("m3-location-history")}
+      />
+    );
+  }
+  if (view === "m3-location-history") {
+    return <M3LocationHistoryPage onBack={() => navigateTo("m3-batches")} />;
   }
   if (view === "m3-status-config") return <M3InventoryStatusConfigPage currentUser={currentUser} />;
   if (view === "mte-task-types") return <TaskTypeConfigPage />;

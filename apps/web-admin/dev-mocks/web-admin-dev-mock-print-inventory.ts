@@ -33,6 +33,65 @@ export async function handlePrintInventoryDevMock(
     sendJson(res, 200, { data, page: { count: data.length, next_cursor: null } });
     return true;
   }
+  if (req.method === "GET" && pathname === "/api/v1/inventory/locations/history") {
+    const url = new URL(req.url ?? "/", "http://localhost");
+    const locationCode = url.searchParams.get("location_code")?.trim() ?? "";
+    if (!locationCode) {
+      sendJson(res, 422, { code: "M3_LOCATION_REQUIRED", message: "库位编码不能为空" });
+      return true;
+    }
+    const data = inventoryBatches()
+      .filter((batch) => batch.location_code.includes(locationCode))
+      .map((batch) => ({
+        id: `00000000-0000-0000-0000-0000000070${batch.id.slice(-2)}`,
+        owner_id: batch.owner_id,
+        batch_id: batch.id,
+        movement_type: "inbound_putaway",
+        qty_delta: batch.qty_on_hand,
+        source_document_type: "receiving_order",
+        source_document_id: "00000000-0000-0000-0000-000000001901",
+        occurred_at: batch.created_at,
+        location_code: batch.location_code,
+        from_location_code: null,
+        to_location_code: batch.location_code,
+        lpn_code: null,
+        operator_user_id: devUserId,
+        operator_name: "dev-keeper",
+        volume_delta_cm3: null,
+        product_code: batch.product_code,
+        product_name: null,
+        batch_no: batch.batch_no,
+        expiry_date: batch.expiry_date,
+      }));
+    sendJson(res, 200, {
+      location_code: locationCode,
+      data,
+      risks: data.some((item) => item.product_code.includes("COLD"))
+        ? [{
+          risk_code: "temperature_mismatch",
+          severity: "high",
+          message: `库位 ${locationCode} 历史存在冷链相关商品记录，需复核清洁状态`,
+        }]
+        : [],
+      product_shares: Object.values(
+        data.reduce<Record<string, { product_code: string; product_name: string | null; event_count: number; total_qty_delta: number }>>((summary, item) => {
+          const key = item.product_code;
+          const current = summary[key] ?? {
+            product_code: key,
+            product_name: item.product_name,
+            event_count: 0,
+            total_qty_delta: 0,
+          };
+          current.event_count += 1;
+          current.total_qty_delta += item.qty_delta;
+          summary[key] = current;
+          return summary;
+        }, {}),
+      ),
+      page: { count: data.length, next_cursor: null },
+    });
+    return true;
+  }
   const trace = pathname.match(/^\/api\/v1\/inventory\/batches\/([^/]+)\/trace$/);
   if (req.method === "GET" && trace) {
     const batch = inventoryBatches().find((item) => item.id === decodeURIComponent(trace[1]));

@@ -49,9 +49,11 @@ import {
   type QualityStatusOption,
 } from "./M3BatchViewHelpers";
 import { buildBatchColumns } from "./M3BatchColumns";
+import { rememberLocationHistoryCode } from "./M3LocationHistoryPage";
 
 interface M3BatchManagementPageProps {
   onBack: () => void;
+  onOpenLocationHistory?: () => void;
 }
 
 /** 近效期阈值：有效期在 90 天内（含）视为近效期 */
@@ -134,7 +136,7 @@ type StatusForm = {
   reason: string;
 };
 
-export function M3BatchManagementPage({}: M3BatchManagementPageProps) {
+export function M3BatchManagementPage({ onOpenLocationHistory }: M3BatchManagementPageProps) {
   const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(() => defaultM3BatchQueryValue());
   const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(() => defaultM3BatchQueryValue());
   const normalizedAppliedQuery = React.useMemo(() => normalizeM3BatchQueryValue(appliedQuery), [appliedQuery]);
@@ -418,6 +420,7 @@ export function M3BatchManagementPage({}: M3BatchManagementPageProps) {
         batches={batches}
         query={normalizedAppliedQuery}
         qualityStatusOptions={qualityStatusOptions}
+        onOpenLocationHistory={onOpenLocationHistory}
       />
 
       <M3BatchDetailDialog
@@ -602,10 +605,12 @@ function InventoryDimensionSummary({
   batches,
   query,
   qualityStatusOptions,
+  onOpenLocationHistory,
 }: {
   batches: InventoryBatch[];
   query: QueryPanelValue;
   qualityStatusOptions: QualityStatusOption[];
+  onOpenLocationHistory?: () => void;
 }) {
   const locationCode = queryString(query.locationCode).trim();
   const batchNo = queryString(query.batchNo).trim();
@@ -621,8 +626,24 @@ function InventoryDimensionSummary({
   const location = locationCode ? dimensionBatches[0] : undefined;
   return (
     <section className="rounded-lg border bg-card p-4" aria-label={locationCode ? "库位维度专项视图" : "批次维度专项视图"}>
-      <h2 className="font-semibold">{locationCode ? `库位 ${locationCode} 当前内容` : `批次 ${batchNo} 库位分布`}</h2>
-      <p className="mt-1 text-sm text-muted-foreground">共 {dimensionBatches.length} 条库存记录，总数量 {totalQty}；状态分布：{statusSummary || "无"}</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="font-semibold">{locationCode ? `库位 ${locationCode} 当前内容` : `批次 ${batchNo} 库位分布`}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">共 {dimensionBatches.length} 条库存记录，总数量 {totalQty}；状态分布：{statusSummary || "无"}</p>
+        </div>
+        {locationCode && onOpenLocationHistory && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              rememberLocationHistoryCode(locationCode);
+              onOpenLocationHistory();
+            }}
+          >
+            历史追踪
+          </Button>
+        )}
+      </div>
       {location && (
         <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-3 lg:grid-cols-6">
           <div><dt className="text-muted-foreground">排-列-层</dt><dd>{location.row_no ?? "—"}-{location.column_no ?? "—"}-{location.layer_no ?? "—"}</dd></div>

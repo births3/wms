@@ -54,6 +54,8 @@ assert.match(page, /expiryRisks\.has\(expiryTone\(batch\.expiry_date, warningDay
 assert.match(page, /useInventoryExpiryPolicyQuery/, "M3 应读取近效期配置中心阈值");
 assert.match(page, /DEFAULT_NEAR_EXPIRY_DAYS = 180/, "M3 应保留六个月默认近效期阈值");
 assert.match(page, /emptyTitle="暂无库存批次"/, "M3 应保持 emptyTitle");
+assert.match(page, /历史追踪/, "库位专项视图应提供跳转到库位历史的入口");
+assert.match(page, /rememberLocationHistoryCode/, "跳转库位历史前应写入库位编码");
 assert.match(queries, /api\.GET\("\/api\/v1\/inventory\/batches",\s*\{\s*params:\s*\{\s*query\s*\}/, "批号列表应把服务端查询条件传给 inventory batches API");
 assert.match(queries, /queryKey:\s*\[\.\.\.inventoryBatchesQueryKey,\s*query\]/, "库存查询条件应进入 Query 缓存键，避免复用旧结果");
 assert.match(queries, /useChangeInventoryStatusMutation/, "M3 状态变更必须复用 API mutation");

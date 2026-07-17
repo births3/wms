@@ -68,6 +68,20 @@ test("M3 库存查询使用真实 API 传递组合筛选并展示结果", async 
   expect(fs.statSync(downloadPath).size).toBeGreaterThan(0);
   expect(fs.readFileSync(downloadPath).subarray(0, 2).toString()).toBe("PK");
   await page.screenshot({ path: path.join(artifactsDir, "inventory-exported.png"), fullPage: false });
+
+  const historyResponsePromise = page.waitForResponse((response) =>
+    response.url().includes("/api/v1/inventory/locations/history") &&
+    response.request().method() === "GET" &&
+    new URL(response.url()).searchParams.get("location_code") === "A01-01-02-03",
+  );
+  await locationSummary.getByRole("button", { name: "历史追踪", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "M3 库位历史追踪" })).toBeVisible();
+  const historyResponse = await historyResponsePromise;
+  expect(historyResponse.ok()).toBeTruthy();
+  await expect(page.getByRole("region", { name: "商品分布" }).or(page.getByText("暂无库位历史"))).toBeVisible();
+  const locationHistoryArtifactsDir = path.resolve("../artifacts/screenshot-portal/real-web/m3-location-history");
+  fs.mkdirSync(locationHistoryArtifactsDir, { recursive: true });
+  await page.screenshot({ path: path.join(locationHistoryArtifactsDir, "location-history.png"), fullPage: false });
 });
 
 test("M3 库存状态规则使用真实 API 保存货主覆盖", async ({ page }) => {

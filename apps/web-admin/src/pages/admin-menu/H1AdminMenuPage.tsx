@@ -59,6 +59,7 @@ const viewIdOptions = [
   "m2-inspecting",
   "m2-putaway",
   "m3-batches",
+  "m3-location-history",
   "m3-status-config",
   "m4-orders",
   "m4-waves",

@@ -276,6 +276,16 @@
       "more": ["recallFlag", "productionDate", "expiryDate", "createdAt"]
     },
     {
+      "id": "m3-location-history",
+      "title": "M3 库位历史",
+      "required": true,
+      "source": "apps/web-admin/src/pages/inventory/M3LocationHistoryPage.tsx",
+      "fieldConstant": "m3LocationHistoryQueryFields",
+      "coreConstant": "m3LocationHistoryCoreQueryFieldKeys",
+      "core": ["locationCode", "days"],
+      "more": ["movementType", "productCode", "batchNo"]
+    },
+    {
       "id": "m3-status-config",
       "title": "M3 状态规则",
       "required": true,
