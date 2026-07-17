@@ -8097,6 +8097,16 @@
         "operationId": "list_inventory_batches",
         "parameters": [
           {
+            "name": "q",
+            "in": "query",
+            "description": "商品名称/编码、批号、库位或容器模糊匹配",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
             "name": "product_code",
             "in": "query",
             "description": "商品编码模糊匹配",
@@ -8140,6 +8150,16 @@
             "name": "zone_code",
             "in": "query",
             "description": "库区编码精确匹配",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "temperature_zone",
+            "in": "query",
+            "description": "温区精确匹配",
             "required": false,
             "schema": {
               "type": "string",
@@ -23872,9 +23892,23 @@
           "batch_no": {
             "type": "string"
           },
+          "column_no": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "container_lpn": {
+            "type": "string",
+            "nullable": true
+          },
           "created_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "current_sku_count": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
           },
           "expiry_date": {
             "type": "string"
@@ -23883,6 +23917,11 @@
             "type": "string",
             "format": "uuid"
           },
+          "layer_no": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
           "location_code": {
             "type": "string"
           },
@@ -23890,12 +23929,30 @@
             "type": "string",
             "format": "uuid"
           },
+          "manufacturer": {
+            "type": "string",
+            "nullable": true
+          },
+          "max_sku_count": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "max_volume_cm3": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
           "owner_id": {
             "type": "string",
             "format": "uuid"
           },
           "product_code": {
             "type": "string"
+          },
+          "product_name": {
+            "type": "string",
+            "nullable": true
           },
           "production_date": {
             "type": "string"
@@ -23908,15 +23965,46 @@
             "type": "integer",
             "format": "int64"
           },
+          "quality_color": {
+            "type": "string",
+            "nullable": true
+          },
           "quality_status": {
             "type": "string"
           },
           "recall_flag": {
             "type": "boolean"
           },
+          "remaining_volume_cm3": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "row_no": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "specification": {
+            "type": "string",
+            "nullable": true
+          },
+          "temperature_zone": {
+            "type": "string",
+            "nullable": true
+          },
           "updated_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "used_volume_cm3": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "zone_code": {
+            "type": "string",
+            "nullable": true
           }
         }
       },

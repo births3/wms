@@ -9,6 +9,7 @@ const root = resolve(__dirname, "..");
 const appShell = readFileSync(resolve(root, "src/App.tsx"), "utf8");
 const viewRenderer = readFileSync(resolve(root, "src/app-shell/AdminViewRenderer.tsx"), "utf8");
 const page = readFileSync(resolve(root, "src/pages/inventory/M3BatchManagementPage.tsx"), "utf8");
+const columns = readFileSync(resolve(root, "src/pages/inventory/M3BatchColumns.tsx"), "utf8");
 const viewHelpers = readFileSync(resolve(root, "src/pages/inventory/M3BatchViewHelpers.tsx"), "utf8");
 const detailDialog = readFileSync(resolve(root, "src/pages/inventory/M3BatchDetailDialog.tsx"), "utf8");
 const queries = readFileSync(resolve(root, "src/features/inventory/inventory-queries.ts"), "utf8");
@@ -33,7 +34,7 @@ assert.match(page, /toolbarActions=\{\[statusAction, recallAction, cancelRecallA
 assert.match(page, /M3BatchRecallDialog/, "M3 召回必须使用独立弹窗");
 assert.match(page, /M3BatchRecallCancelDialog/, "M3 取消召回必须使用独立弹窗");
 assert.match(page, /变更库存状态|确认变更/, "M3 状态变更必须使用弹窗确认");
-assert.match(page, /onDoubleClick:\s*\(row\)\s*=>\s*onOpenDetail\(row\.id\)/, "M3 批号列应支持双击打开详情");
+assert.match(columns, /onDoubleClick:\s*\(row\)\s*=>\s*onOpenDetail\(row\.id\)/, "M3 批号列应支持双击打开详情");
 assert.match(page, /<M3BatchDetailDialog\b/, "M3 页面应挂载批号详情 Dialog");
 assert.match(detailDialog, /export function M3BatchDetailDialog\b/, "M3 应提供批号详情 Dialog");
 assert.match(detailDialog, /useInventoryBatchTraceQuery/, "M3 详情应读取批次追溯");
@@ -47,7 +48,7 @@ assert.match(page, /qualityStatusOptions\.length === 0/, "M3 应明确处理无�
 assert.doesNotMatch(page, /const qualityStatusOptions\s*=\s*\[/, "M3 不得把硬编码质量状态选项作为真实来源");
 assert.doesNotMatch(viewHelpers, /qualityStatusLabels\s*:/, "M3 状态展示不得依赖本地硬编码标签表");
 assert.match(detailDialog, /qualityStatusOptions/, "M3 详情状态展示应消费字典选项");
-assert.match(page, /ExpiryDateCell|近效期|已过期/, "M3 有效期列应有近效期/过期视觉区分");
+assert.match(columns, /ExpiryDateCell/, "M3 有效期列应有近效期/过期视觉区分");
 assert.match(page, /key:\s*"expiryRisk"/, "M3 应支持按效期风险筛选");
 assert.match(page, /expiryRisks\.has\(expiryTone\(batch\.expiry_date, warningDays\)\)/, "效期风险筛选应复用配置阈值判定");
 assert.match(page, /useInventoryExpiryPolicyQuery/, "M3 应读取近效期配置中心阈值");

@@ -208,6 +208,12 @@ struct InventoryBatchRow {
     id: Uuid,
     owner_id: Uuid,
     product_code: String,
+    #[sqlx(default)]
+    product_name: Option<String>,
+    #[sqlx(default)]
+    specification: Option<String>,
+    #[sqlx(default)]
+    manufacturer: Option<String>,
     batch_no: String,
     production_date: NaiveDate,
     expiry_date: NaiveDate,
@@ -216,6 +222,30 @@ struct InventoryBatchRow {
     quality_status: String,
     location_id: Uuid,
     location_code: String,
+    #[sqlx(default)]
+    row_no: Option<i32>,
+    #[sqlx(default)]
+    column_no: Option<i32>,
+    #[sqlx(default)]
+    layer_no: Option<i32>,
+    #[sqlx(default)]
+    zone_code: Option<String>,
+    #[sqlx(default)]
+    temperature_zone: Option<String>,
+    #[sqlx(default)]
+    quality_color: Option<String>,
+    #[sqlx(default)]
+    max_volume_cm3: Option<i64>,
+    #[sqlx(default)]
+    used_volume_cm3: Option<i64>,
+    #[sqlx(default)]
+    remaining_volume_cm3: Option<i64>,
+    #[sqlx(default)]
+    max_sku_count: Option<i32>,
+    #[sqlx(default)]
+    current_sku_count: Option<i64>,
+    #[sqlx(default)]
+    container_lpn: Option<String>,
     recall_flag: bool,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,

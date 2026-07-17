@@ -245,6 +245,21 @@ fn inventory_batch_matches_query(
     }
 
     contains_filter(&batch.product_code, &query.product_code)
+        && query.q.as_ref().is_none_or(|filter| {
+            let filter = filter.trim().to_lowercase();
+            filter.is_empty()
+                || batch.product_code.to_lowercase().contains(&filter)
+                || batch
+                    .product_name
+                    .as_ref()
+                    .is_some_and(|value| value.to_lowercase().contains(&filter))
+                || batch.batch_no.to_lowercase().contains(&filter)
+                || batch.location_code.to_lowercase().contains(&filter)
+                || batch
+                    .container_lpn
+                    .as_ref()
+                    .is_some_and(|value| value.to_lowercase().contains(&filter))
+        })
         && contains_filter(&batch.batch_no, &query.batch_no)
         && contains_filter(&batch.location_code, &query.location_code)
         // 内存库存模型未携带库位主数据；非空元数据条件不能伪造匹配结果。
@@ -256,6 +271,13 @@ fn inventory_batch_matches_query(
             .zone_code
             .as_ref()
             .is_none_or(|zone_code| zone_code.trim().is_empty())
+        && query
+            .temperature_zone
+            .as_ref()
+            .is_none_or(|temperature_zone| {
+                temperature_zone.trim().is_empty()
+                    || batch.temperature_zone.as_deref() == Some(temperature_zone.trim())
+            })
         && query.quality_status.as_ref().is_none_or(|status| {
             status.trim().is_empty() || batch.quality_status == status.trim()
         })

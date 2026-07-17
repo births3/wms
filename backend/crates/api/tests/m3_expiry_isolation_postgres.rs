@@ -6,6 +6,7 @@ use wms_api::{
     inventory::{STATUS_QUALIFIED, STATUS_UNQUALIFIED},
     wave3_repository::PgWave3Repository,
 };
+use wms_domain::InventoryBatchQuery;
 
 fn ctx(owner_id: Uuid) -> AuthContext {
     AuthContext {
@@ -81,7 +82,7 @@ async fn seed_location(
     .await
     .expect("seed query zone");
     sqlx::query(
-        "INSERT INTO warehouse_locations (id, owner_id, warehouse_id, zone_id, location_code, row_no, column_no, layer_no, max_volume_cm3, location_type) VALUES ($1, $2, $3, $4, $5, 1, 1, 1, 1000, $6)",
+        "INSERT INTO warehouse_locations (id, owner_id, warehouse_id, zone_id, location_code, row_no, column_no, layer_no, max_volume_cm3, max_sku_count, location_type) VALUES ($1, $2, $3, $4, $5, 1, 1, 1, 1000, 3, $6)",
     )
     .bind(location_id)
     .bind(owner_id)
@@ -93,6 +94,19 @@ async fn seed_location(
     .await
     .expect("seed query location");
     (location_id, location_code)
+}
+
+async fn seed_product(pool: &PgPool, owner_id: Uuid, product_code: &str, product_name: &str) {
+    sqlx::query(
+        "INSERT INTO products (id, owner_id, product_code, product_name, specification, storage_condition) VALUES ($1, $2, $3, $4, '10mg', 'normal')",
+    )
+    .bind(Uuid::new_v4())
+    .bind(owner_id)
+    .bind(product_code)
+    .bind(product_name)
+    .execute(pool)
+    .await
+    .expect("seed query product");
 }
 
 async fn seed_query_batch(
@@ -118,6 +132,74 @@ async fn seed_query_batch(
     .await
     .expect("seed location query batch");
     id
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn inventory_query_returns_location_snapshot_and_supports_product_and_temperature_search(
+    pool: PgPool,
+) {
+    let owner_id = Uuid::new_v4();
+    let other_owner_id = Uuid::new_v4();
+    let repo = PgWave3Repository::new(pool.clone());
+    let (location_id, location_code) = seed_location(&pool, owner_id, "ZONE-A", "storage").await;
+    let (other_location_id, other_location_code) =
+        seed_location(&pool, other_owner_id, "ZONE-B", "storage").await;
+    seed_product(&pool, owner_id, "P-QUERY-LOCATION", "阿莫西林胶囊").await;
+    seed_product(&pool, owner_id, "P-QUERY-SECOND", "维生素片").await;
+    seed_product(
+        &pool,
+        other_owner_id,
+        "P-QUERY-LOCATION",
+        "其他货主阿莫西林",
+    )
+    .await;
+    seed_query_batch(&pool, owner_id, "B-LOCATION-1", location_id, &location_code).await;
+    sqlx::query(
+        "INSERT INTO inventory_batches (id, owner_id, product_code, batch_no, production_date, expiry_date, qty_on_hand, quality_status, location_id, location_code) VALUES ($1, $2, 'P-QUERY-SECOND', 'B-LOCATION-2', '2026-01-01', '2027-01-01', 5, $3, $4, $5)",
+    )
+    .bind(Uuid::new_v4())
+    .bind(owner_id)
+    .bind(STATUS_QUALIFIED)
+    .bind(location_id)
+    .bind(&location_code)
+    .execute(&pool)
+    .await
+    .expect("seed second sku");
+    seed_query_batch(
+        &pool,
+        other_owner_id,
+        "B-OTHER-OWNER",
+        other_location_id,
+        &other_location_code,
+    )
+    .await;
+
+    let rows = repo
+        .list_inventory_batches_with_query(
+            &ctx(owner_id),
+            InventoryBatchQuery {
+                q: Some("阿莫西林".to_string()),
+                temperature_zone: Some("normal".to_string()),
+                ..InventoryBatchQuery::default()
+            },
+        )
+        .await
+        .expect("query enriched inventory snapshot");
+
+    assert_eq!(rows.len(), 1);
+    let row = &rows[0];
+    assert_eq!(row.product_name.as_deref(), Some("阿莫西林胶囊"));
+    assert_eq!(row.zone_code.as_deref(), Some("ZONE-A"));
+    assert_eq!(row.temperature_zone.as_deref(), Some("normal"));
+    assert_eq!(row.quality_color.as_deref(), Some("qualified_green"));
+    assert_eq!(row.row_no, Some(1));
+    assert_eq!(row.column_no, Some(1));
+    assert_eq!(row.layer_no, Some(1));
+    assert_eq!(row.max_volume_cm3, Some(1000));
+    assert_eq!(row.used_volume_cm3, Some(0));
+    assert_eq!(row.remaining_volume_cm3, Some(1000));
+    assert_eq!(row.max_sku_count, Some(3));
+    assert_eq!(row.current_sku_count, Some(2));
 }
 
 #[sqlx::test(migrations = "../../migrations")]

@@ -5303,26 +5303,49 @@ export interface components {
         };
         InventoryBatch: {
             batch_no: string;
+            /** Format: int32 */
+            column_no?: number | null;
+            container_lpn?: string | null;
             /** Format: date-time */
             created_at: string;
+            /** Format: int64 */
+            current_sku_count?: number | null;
             expiry_date: string;
             /** Format: uuid */
             id: string;
+            /** Format: int32 */
+            layer_no?: number | null;
             location_code: string;
             /** Format: uuid */
             location_id: string;
+            manufacturer?: string | null;
+            /** Format: int32 */
+            max_sku_count?: number | null;
+            /** Format: int64 */
+            max_volume_cm3?: number | null;
             /** Format: uuid */
             owner_id: string;
             product_code: string;
+            product_name?: string | null;
             production_date: string;
             /** Format: int64 */
             qty_locked: number;
             /** Format: int64 */
             qty_on_hand: number;
+            quality_color?: string | null;
             quality_status: string;
             recall_flag: boolean;
+            /** Format: int64 */
+            remaining_volume_cm3?: number | null;
+            /** Format: int32 */
+            row_no?: number | null;
+            specification?: string | null;
+            temperature_zone?: string | null;
             /** Format: date-time */
             updated_at: string;
+            /** Format: int64 */
+            used_volume_cm3?: number | null;
+            zone_code?: string | null;
         };
         InventoryBatchListResponse: {
             data: components["schemas"]["InventoryBatch"][];
@@ -13234,6 +13257,8 @@ export interface operations {
     list_inventory_batches: {
         parameters: {
             query?: {
+                /** @description 商品名称/编码、批号、库位或容器模糊匹配 */
+                q?: string | null;
                 /** @description 商品编码模糊匹配 */
                 product_code?: string | null;
                 /** @description 批号模糊匹配 */
@@ -13244,6 +13269,8 @@ export interface operations {
                 location_type?: string | null;
                 /** @description 库区编码精确匹配 */
                 zone_code?: string | null;
+                /** @description 温区精确匹配 */
+                temperature_zone?: string | null;
                 /** @description 质量状态精确匹配 */
                 quality_status?: string | null;
                 /** @description 生产日期起始日，格式 YYYY-MM-DD */

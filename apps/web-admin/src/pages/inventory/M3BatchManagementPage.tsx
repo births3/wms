@@ -20,9 +20,7 @@ import {
   Input,
   PageHeader,
   QueryPanel,
-  StatusBadge,
   buildQueryPanelSummaryItems,
-  type DataGridColumn,
   type DataGridDetailAction,
   type DataGridRefreshAction,
   type DataGridToolbarAction,
@@ -46,15 +44,11 @@ import { M3BatchDetailDialog } from "./M3BatchDetailDialog";
 import { M3BatchRecallDialog } from "./M3BatchRecallDialog";
 import { M3BatchRecallCancelDialog } from "./M3BatchRecallCancelDialog";
 import {
-  availableQty,
-  expiryCopyValue,
-  ExpiryDateCell,
   expiryTone,
-  formatDateTime,
-  qualityStatusKey,
   qualityStatusLabel,
   type QualityStatusOption,
 } from "./M3BatchViewHelpers";
+import { buildBatchColumns } from "./M3BatchColumns";
 
 interface M3BatchManagementPageProps {
   onBack: () => void;
@@ -90,6 +84,18 @@ function buildM3BatchQueryFields(qualityStatusOptions: QualityStatusOption[]): Q
       label: "库位",
       type: "text",
       placeholder: "按库位编码模糊查询",
+    },
+    {
+      key: "zoneCode",
+      label: "库区",
+      type: "text",
+      placeholder: "按库区编码查询",
+    },
+    {
+      key: "temperatureZone",
+      label: "温区",
+      type: "text",
+      placeholder: "normal / cool / cold / frozen",
     },
     {
       key: "qualityStatus",
@@ -408,6 +414,12 @@ export function M3BatchManagementPage({}: M3BatchManagementPageProps) {
         }}
       />
 
+      <InventoryDimensionSummary
+        batches={batches}
+        query={normalizedAppliedQuery}
+        qualityStatusOptions={qualityStatusOptions}
+      />
+
       <M3BatchDetailDialog
         batch={detailBatch}
         expiryWarningDays={expiryWarningDays}
@@ -479,158 +491,14 @@ export function M3BatchManagementPage({}: M3BatchManagementPageProps) {
   );
 }
 
-function buildBatchColumns(
-  onOpenDetail: (id: string) => void,
-  expiryWarningDays: number,
-  qualityStatusOptions: QualityStatusOption[],
-): DataGridColumn<InventoryBatch>[] {
-  return [
-    {
-      key: "batch_no",
-      header: "批号",
-      mono: true,
-      width: 190,
-      minWidth: 170,
-      sortable: true,
-      sortValue: (row) => row.batch_no,
-      filterValue: (row) => row.batch_no,
-      copyValue: (row) => row.batch_no,
-      filter: { type: "text" },
-      onDoubleClick: (row) => onOpenDetail(row.id),
-      render: (row) => <span className="text-primary">{row.batch_no}</span>,
-    },
-    {
-      key: "product_code",
-      header: "商品编码",
-      mono: true,
-      width: 170,
-      minWidth: 150,
-      sortable: true,
-      sortValue: (row) => row.product_code,
-      filterValue: (row) => row.product_code,
-      copyValue: (row) => row.product_code,
-      filter: { type: "text" },
-    },
-    {
-      key: "location_code",
-      header: "库位",
-      mono: true,
-      width: 150,
-      minWidth: 130,
-      sortable: true,
-      sortValue: (row) => row.location_code,
-      filterValue: (row) => row.location_code,
-      copyValue: (row) => row.location_code,
-      filter: { type: "text" },
-    },
-    {
-      key: "quantity",
-      header: "数量",
-      width: 210,
-      minWidth: 190,
-      sortable: true,
-      sortValue: (row) => availableQty(row),
-      filterValue: (row) => availableQty(row),
-      copyValue: (row) => `现存 ${row.qty_on_hand} / 锁定 ${row.qty_locked} / 可用 ${availableQty(row)}`,
-      filter: { type: "numberRange" },
-      render: (row) => (
-        <div className="text-sm">
-          <div className="font-medium">{row.qty_on_hand} 件</div>
-          <div className="text-xs text-muted-foreground">锁定 {row.qty_locked} / 可用 {availableQty(row)}</div>
-        </div>
-      ),
-    },
-    {
-      key: "quality_status",
-      header: "质量状态",
-      width: 150,
-      minWidth: 130,
-      sortable: true,
-      sortValue: (row) => qualityStatusLabel(row.quality_status, qualityStatusOptions),
-      filterValue: (row) => row.quality_status,
-      copyValue: (row) => qualityStatusLabel(row.quality_status, qualityStatusOptions),
-      filter: {
-        type: "multiSelect",
-        options: qualityStatusOptions,
-      },
-      render: (row) => (
-        <StatusBadge status={qualityStatusKey(row.quality_status, row.recall_flag)} label={qualityStatusLabel(row.quality_status, qualityStatusOptions)} size="sm" />
-      ),
-    },
-    {
-      key: "recall_flag",
-      header: "召回",
-      width: 120,
-      minWidth: 110,
-      sortable: true,
-      sortValue: (row) => (row.recall_flag ? 1 : 0),
-      filterValue: (row) => (row.recall_flag ? "true" : "false"),
-      copyValue: (row) => (row.recall_flag ? "已标记" : "未标记"),
-      filter: {
-        type: "multiSelect",
-        options: [
-          { label: "已标记", value: "true" },
-          { label: "未标记", value: "false" },
-        ],
-      },
-      render: (row) => row.recall_flag ? <StatusBadge status="isolated" label="已标记" size="sm" /> : <span className="text-muted-foreground">未标记</span>,
-    },
-    {
-      key: "production_date",
-      header: "生产日期",
-      width: 150,
-      minWidth: 130,
-      sortable: true,
-      sortValue: (row) => row.production_date,
-      filterValue: (row) => row.production_date,
-      copyValue: (row) => row.production_date,
-      filter: { type: "dateRange" },
-    },
-    {
-      key: "expiry_date",
-      header: "有效期",
-      width: 170,
-      minWidth: 150,
-      sortable: true,
-      sortValue: (row) => row.expiry_date,
-      filterValue: (row) => row.expiry_date,
-      copyValue: (row) => expiryCopyValue(row.expiry_date, expiryWarningDays),
-      filter: { type: "dateRange" },
-      render: (row) => <ExpiryDateCell expiryDate={row.expiry_date} warningDays={expiryWarningDays} />,
-    },
-    {
-      key: "created_at",
-      header: "创建时间",
-      width: 190,
-      minWidth: 180,
-      sortable: true,
-      sortValue: (row) => row.created_at,
-      filterValue: (row) => row.created_at,
-      copyValue: (row) => formatDateTime(row.created_at),
-      filter: { type: "dateRange" },
-      render: (row) => formatDateTime(row.created_at),
-    },
-    {
-      key: "updated_at",
-      header: "更新时间",
-      width: 190,
-      minWidth: 180,
-      sortable: true,
-      sortValue: (row) => row.updated_at,
-      filterValue: (row) => row.updated_at,
-      copyValue: (row) => formatDateTime(row.updated_at),
-      filter: { type: "dateRange" },
-      render: (row) => formatDateTime(row.updated_at),
-    },
-  ];
-}
-
 function defaultM3BatchQueryValue(): QueryPanelValue {
   return {
     keyword: "",
     productCode: "",
     batchNo: "",
     locationCode: "",
+    zoneCode: "",
+    temperatureZone: "",
     qualityStatus: [],
     recallFlag: [],
     expiryRisk: [],
@@ -672,6 +540,8 @@ function normalizeM3BatchQueryValue(value: QueryPanelValue): QueryPanelValue {
     productCode: queryString(value.productCode),
     batchNo: queryString(value.batchNo),
     locationCode: queryString(value.locationCode),
+    zoneCode: queryString(value.zoneCode),
+    temperatureZone: queryString(value.temperatureZone),
     qualityStatus: queryStringArray(value.qualityStatus),
     recallFlag: queryStringArray(value.recallFlag),
     expiryRisk: queryStringArray(value.expiryRisk),
@@ -712,9 +582,12 @@ function toInventoryBatchQuery(query: QueryPanelValue): InventoryBatchQuery {
   const expiryDate = queryRange(query.expiryDate);
   const createdAt = queryRange(query.createdAt);
   return {
+    q: optionalQueryString(query.keyword),
     product_code: optionalQueryString(query.productCode),
     batch_no: optionalQueryString(query.batchNo),
     location_code: optionalQueryString(query.locationCode),
+    zone_code: optionalQueryString(query.zoneCode),
+    temperature_zone: optionalQueryString(query.temperatureZone),
     quality_status: qualityStatuses.length === 1 ? qualityStatuses[0] : undefined,
     production_from: productionDate.from || undefined,
     production_to: productionDate.to || undefined,
@@ -723,6 +596,45 @@ function toInventoryBatchQuery(query: QueryPanelValue): InventoryBatchQuery {
     created_from: createdAt.from ? `${createdAt.from}T00:00:00Z` : undefined,
     created_to: createdAt.to ? `${createdAt.to}T23:59:59Z` : undefined,
   };
+}
+
+function InventoryDimensionSummary({
+  batches,
+  query,
+  qualityStatusOptions,
+}: {
+  batches: InventoryBatch[];
+  query: QueryPanelValue;
+  qualityStatusOptions: QualityStatusOption[];
+}) {
+  const locationCode = queryString(query.locationCode).trim();
+  const batchNo = queryString(query.batchNo).trim();
+  if (!locationCode && !batchNo) return null;
+  const dimensionBatches = batches;
+  const totalQty = dimensionBatches.reduce((total, batch) => total + batch.qty_on_hand, 0);
+  const statusSummary = Object.entries(
+    dimensionBatches.reduce<Record<string, number>>((summary, batch) => {
+      summary[batch.quality_status] = (summary[batch.quality_status] ?? 0) + batch.qty_on_hand;
+      return summary;
+    }, {}),
+  ).map(([status, qty]) => `${qualityStatusLabel(status, qualityStatusOptions)} ${qty}`).join("、");
+  const location = locationCode ? dimensionBatches[0] : undefined;
+  return (
+    <section className="rounded-lg border bg-card p-4" aria-label={locationCode ? "库位维度专项视图" : "批次维度专项视图"}>
+      <h2 className="font-semibold">{locationCode ? `库位 ${locationCode} 当前内容` : `批次 ${batchNo} 库位分布`}</h2>
+      <p className="mt-1 text-sm text-muted-foreground">共 {dimensionBatches.length} 条库存记录，总数量 {totalQty}；状态分布：{statusSummary || "无"}</p>
+      {location && (
+        <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-3 lg:grid-cols-6">
+          <div><dt className="text-muted-foreground">排-列-层</dt><dd>{location.row_no ?? "—"}-{location.column_no ?? "—"}-{location.layer_no ?? "—"}</dd></div>
+          <div><dt className="text-muted-foreground">库区 / 温区</dt><dd>{location.zone_code ?? "—"} / {location.temperature_zone ?? "—"}</dd></div>
+          <div><dt className="text-muted-foreground">质量色标</dt><dd>{location.quality_color ?? "—"}</dd></div>
+          <div><dt className="text-muted-foreground">容积</dt><dd>{location.used_volume_cm3 ?? "—"} / {location.max_volume_cm3 ?? "—"}</dd></div>
+          <div><dt className="text-muted-foreground">剩余容积</dt><dd>{location.remaining_volume_cm3 ?? "—"}</dd></div>
+          <div><dt className="text-muted-foreground">SKU</dt><dd>{location.current_sku_count ?? "—"} / {location.max_sku_count ?? "—"}</dd></div>
+        </dl>
+      )}
+    </section>
+  );
 }
 
 function optionalQueryString(value: QueryPanelValue[string]) {

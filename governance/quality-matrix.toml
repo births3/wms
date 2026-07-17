@@ -2805,7 +2805,7 @@ id = "US-M3-001"
 title = "实时库存查询"
 module = "M3"
 story_file = "docs/domain/user-stories-m3-inventory-query.md"
-types = ["read_only", "api_change", "integration"]
+types = ["read_only", "api_change", "frontend_interaction", "integration"]
 frontend_pages = ["m3-batches"]
 navigation_checks = ["node apps/web-admin/self-checks/m3-batch-management-slice-self-check.mjs"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m3-real"]
@@ -2816,11 +2816,12 @@ test_checks = [
   "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_expiry_isolation_postgres inventory_query_combines_filters_without_cross_owner_rows",
   "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_expiry_isolation_postgres inventory_query_filters_location_type_and_zone_without_cross_owner_rows",
   "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_expiry_isolation_postgres inventory_query_filters_production_and_created_date_ranges",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_expiry_isolation_postgres inventory_query_returns_location_snapshot_and_supports_product_and_temperature_search",
   "node apps/web-admin/self-checks/m3-batch-management-slice-self-check.mjs",
   "pnpm --dir apps/web-admin exec tsc --noEmit",
 ]
 api_paths = ["GET /api/v1/inventory/batches"]
-database_objects = ["inventory_batches", "warehouse_locations", "warehouse_zones"]
+database_objects = ["inventory_batches", "products", "warehouse_locations", "warehouse_zones"]
 evidence_refs = [
   "docs/domain/user-stories-m3-inventory-query.md",
   "backend/crates/domain/src/operations.rs",
@@ -2828,6 +2829,7 @@ evidence_refs = [
   "backend/crates/api/src/wave3_repository/query.rs",
   "backend/crates/api/src/openapi_paths/extensions.rs",
   "backend/crates/api/tests/m3_expiry_isolation_postgres.rs",
+  "backend/migrations/202607170001_m3_inventory_query_snapshot.sql",
   "apps/web-admin/src/features/inventory/inventory-queries.ts",
   "apps/web-admin/src/pages/inventory/M3BatchManagementPage.tsx",
   "packages/api-client/src/schema.ts",
@@ -2839,9 +2841,9 @@ evidence_refs = [
   "artifacts/screenshot-portal/real-web/m3-batches/inventory-export-dialog.png",
   "artifacts/screenshot-portal/real-web/m3-batches/inventory-exported.png",
 ]
-reason = "已补实时库存查询的库位类型 location_type、库区编码 zone_code 过滤、库位/库区关联查询和货主隔离，并以真实 PostgreSQL 覆盖组合条件、空值条件、未知条件和跨货主数据；管理端已复用 DataGrid 标准 Excel 导出，真实 PostgreSQL 浏览器 E2E 验证组合筛选仅导出当前 1 条结果，下载文件为非空 .xlsx 且具有 ZIP 文件头。故事仍不能整体关闭：内存 mock 没有库位主数据、库位专项视图及温区/库位元信息、批次专项视图、剩余筛选参数和开放 API 调用凭据尚未闭环。"
+reason = "已补生产查询的商品名称/规格/厂家、容器 LPN、排-列-层、库区/温区/色标、容积和当前 SKU 数，支持商品名称/编码、批号、库位、容器模糊检索与温区组合过滤；PC 已展示库位/批次专项汇总、Excel 导出，并由真实 PostgreSQL 和全新临时库浏览器 E2E 截图证明。仍缺从库位专项视图跳转到真正的 US-M3-011 库位历史页，因此按完整故事口径继续延期。"
 owner = "M3 模块负责人"
-resume_when = "补齐库位和批次专项视图、库位元信息、剩余筛选参数和外部 API 鉴权后移入 stories。"
+resume_when = "完成 US-M3-011 库位历史查询页与从库位专项视图的一键跳转，复跑真实 E2E 后再迁入 stories。"
 
 [[deferred_stories]]
 id = "US-M4-002"

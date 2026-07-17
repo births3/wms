@@ -531,15 +531,18 @@ async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
         INSERT INTO inventory_batches (
             id, owner_id, product_code, batch_no, production_date, expiry_date,
             qty_on_hand, qty_locked, quality_status, location_id, location_code
+            , container_lpn
         )
         VALUES (
             '00000000-0000-0000-0000-000000001501', '00000000-0000-0000-0000-000000000001',
             'P-M1-E2E-001', 'B-M4-E2E-001', '2026-01-01', '2028-01-01',
-            100, 0, 'qualified', '00000000-0000-0000-0000-000000001401', 'A01-01-02-03'
+            100, 0, 'qualified', '00000000-0000-0000-0000-000000001401', 'A01-01-02-03',
+            'LPN-E2E-001'
         )
         ON CONFLICT (owner_id, product_code, batch_no, location_id, quality_status)
         DO UPDATE SET qty_on_hand = EXCLUDED.qty_on_hand,
                       qty_locked = 0,
+                      container_lpn = EXCLUDED.container_lpn,
                       updated_at = now()
         "#,
     )
