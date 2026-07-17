@@ -601,7 +601,13 @@ function validate(form: Form) {
   const topN = Number(form.topN);
   if (!Number.isInteger(topN) || topN < 1 || topN > 50) return "Top N 必须是 1-50 的整数";
   if (form.rulePriority.length === 0) return "至少保留一条规则";
+  const warehouseId = form.warehouseId.trim();
+  if (warehouseId && !isUuid(warehouseId)) return "仓库绑定必须是合法 UUID，或留空表示货主通用";
   return null;
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 function normalizeQuery(value: unknown): QueryPanelValue {

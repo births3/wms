@@ -25,6 +25,7 @@ assert.match(page, /notifyOnNoLocation|notify_on_no_location/, "页面应配置�
 assert.match(page, /rulePriority|rule_priority/, "页面应维护规则优先级");
 assert.match(page, /productCategory|product_category/, "页面应支持品类绑定");
 assert.match(page, /PUTAWAY_RULE_CATALOG/, "页面应声明完整规则目录");
+assert.match(page, /isUuid|仓库绑定必须是合法 UUID/, "页面应校验仓库 UUID");
 assert.match(queries, /api\.GET\("\/api\/v1\/inbound\/putaway-strategy-profiles"\)/, "读取必须使用真实策略 API");
 assert.match(queries, /api\.PUT\("\/api\/v1\/inbound\/putaway-strategy-profiles"/, "写入必须使用真实策略 API");
 assert.match(queries, /Idempotency-Key/, "写入必须携带幂等键");
