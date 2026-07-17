@@ -1825,36 +1825,22 @@ audit = "模板解析为只读行为，不单独写审计；模板保存和打�
 required_layers = ["L1", "L2", "L3", "L7", "L8", "L9"]
 covered_layers = ["L1", "L2", "L3", "L7", "L8", "L9"]
 
-[[stories]]
+[[deferred_stories]]
 id = "US-M2-002"
 title = "PDA/PC Web 收货"
 module = "M2"
 story_file = "docs/domain/user-stories-m2-inbound-asn.md"
-types = ["write", "inventory_change", "frontend_interaction", "critical_path"]
+types = ["write", "inventory_change", "frontend_interaction", "critical_path", "integration", "pda_runtime", "hardware_runtime"]
 frontend_pages = ["m2-receiving"]
 navigation_checks = ["pnpm --dir apps/web-admin run test:e2e:shell-dev"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
 api_paths = [
   "POST /api/v1/inbound/receiving-orders/{id}/receive",
 ]
-
-[stories.dimensions]
-requirement = "verified"
-fields = "verified"
-frontend = "verified"
-api = "verified"
-backend = "verified"
-database = "verified"
-security = "verified"
-audit = "verified"
-tests = "verified"
-evidence = "verified"
-docs = "verified"
-governance = "verified"
-
-[stories.tests]
-required_layers = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"]
-covered_layers = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"]
+reason = "PC 数量闭环和基础收货落库已有真实 E2E；但 GSP 必填现场字段仍可为空，温度超标处置/稳定性报告、收货节点 M-VR 双人策略、追溯码与容器绑定、PDA 扫码离线重放及真机证据未闭环，不能标记完成。"
+owner = "M2 入库模块负责人"
+resume_when = "补齐服务端必填/温控校验、收货节点双人策略和审计字段，完成追溯码/LPN、PDA 离线冲突链及真机验收后重新执行完整故事验收。"
+evidence_refs = ["docs/reviews/m2-overall-review-2026-07-18.md"]
 
 [[stories]]
 id = "US-M2-008"
@@ -1888,12 +1874,12 @@ audit = "看板只读聚合，不产生写操作；来源单据的创建、收�
 required_layers = ["L1", "L2", "L3", "L7", "L8"]
 covered_layers = ["L1", "L2", "L3", "L7", "L8"]
 
-[[stories]]
+[[deferred_stories]]
 id = "US-M2-001"
 title = "创建 ASN（采购入库通知）"
 module = "M2"
 story_file = "docs/domain/user-stories-m2-inbound-asn.md"
-types = ["write", "api_change", "frontend_interaction", "audit_compliance"]
+types = ["write", "api_change", "frontend_interaction", "audit_compliance", "integration", "external_runtime"]
 frontend_pages = ["m2-receiving"]
 navigation_checks = ["node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
@@ -1929,32 +1915,18 @@ evidence_refs = [
   "apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs",
   "prototypes/e2e/web-admin-m2-real.spec.ts",
   "artifacts/screenshot-portal/real-web/m2-inbound/receiving.png",
+  "docs/reviews/m2-overall-review-2026-07-18.md",
 ]
+reason = "ASN 自动编号、引用校验、审计、作废入口和 PC 真实 E2E 已有；但创建后 M-VR 自动校验/状态流转未闭环，inbound:push API Key 可获得整个 M2 读写权限且仓库范围未传入业务上下文，真实 ERP 推送与回执证据也未完成。"
+owner = "M2 入库模块负责人"
+resume_when = "收敛外部 API Key 到 ASN 推送最小权限并强制仓库范围，接通创建后 M-VR 自动校验和状态迁移，取得 dev/staging ERP 推送、失败重试与审计证据后重新验收。"
 
-[stories.dimensions]
-requirement = "verified"
-fields = "verified"
-frontend = "verified"
-api = "verified"
-backend = "verified"
-database = "verified"
-security = "verified"
-audit = "verified"
-tests = "verified"
-evidence = "verified"
-docs = "verified"
-governance = "verified"
-
-[stories.tests]
-required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
-covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
-
-[[stories]]
+[[deferred_stories]]
 id = "US-M2-003"
 title = "PDA/PC Web 验收"
 module = "M2"
 story_file = "docs/domain/user-stories-m2-inbound-verify.md"
-types = ["write", "api_change", "frontend_interaction", "audit_compliance"]
+types = ["write", "api_change", "frontend_interaction", "audit_compliance", "integration", "pda_runtime", "hardware_runtime", "external_runtime"]
 frontend_pages = ["m2-inspecting"]
 navigation_checks = ["node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
@@ -1990,32 +1962,18 @@ evidence_refs = [
   "apps/web-admin/src/pages/inbound/M2InboundDialogs.tsx",
   "prototypes/e2e/web-admin-m2-real.spec.ts",
   "artifacts/screenshot-portal/real-web/m2-inbound/inspection-dual-sign-validation.png",
+  "docs/reviews/m2-overall-review-2026-07-18.md",
 ]
+reason = "批号、数量、日期、质量状态和追溯码的基础验收链已有 PostgreSQL/E2E；但页面必填的外观、包装、说明书、标签未进入 API/数据库，抽验数量、批准文号、不合格自动 M-QL、近效期/过期判定、档案补录审批/ERP 恢复、PDA 离线及真机证据未闭环。"
+owner = "M2 入库模块负责人"
+resume_when = "补齐验收 DTO/数据库/审计字段和服务端规则，接通 M-QL/H4/ERP 档案补录与不合格闭环，并完成 PDA 扫码、离线冲突和真机验收后重新验收。"
 
-[stories.dimensions]
-requirement = "verified"
-fields = "verified"
-frontend = "verified"
-api = "verified"
-backend = "verified"
-database = "verified"
-security = "verified"
-audit = "verified"
-tests = "verified"
-evidence = "verified"
-docs = "verified"
-governance = "verified"
-
-[stories.tests]
-required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
-covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
-
-[[stories]]
+[[deferred_stories]]
 id = "US-M2-004"
 title = "双人验收签字"
 module = "M2"
 story_file = "docs/domain/user-stories-m2-inbound-verify.md"
-types = ["write", "api_change", "frontend_interaction", "audit_compliance"]
+types = ["write", "api_change", "frontend_interaction", "audit_compliance", "integration", "critical_path", "pda_runtime", "external_runtime"]
 frontend_pages = ["m2-inspecting"]
 navigation_checks = ["node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs"]
 api_paths = ["GET /api/v1/m-vr/dual-person-policy", "POST /api/v1/inbound/receiving-orders/{id}/sign"]
@@ -2039,32 +1997,18 @@ evidence_refs = [
   "apps/web-admin/src/pages/inbound/M2InboundPage.tsx",
   "prototypes/e2e/web-admin-m2-real.spec.ts",
   "artifacts/screenshot-portal/real-web/m2-inbound/inspection-dual-sign-submitted.png",
+  "docs/reviews/m2-overall-review-2026-07-18.md",
 ]
+reason = "服务端已解析 M-VR 策略并校验两个用户 ID 的角色与差异性，但 PostgreSQL 路径未校验第一签字人等于当前认证用户，PC/E2E 由同一管理员一次提交两个收货员 ID；缺少待第二人状态、第二人独立认证/扫码、附件及真实双人/PDA/审批证据，存在 GSP 代签风险。"
+owner = "M2 入库模块负责人"
+resume_when = "先封堵代签：第一人必须绑定当前认证主体，第二人通过独立认证动作完成签字；再补待第二人状态、审批/附件、并发幂等和真实双人设备验收。"
 
-[stories.dimensions]
-requirement = "verified"
-fields = "verified"
-frontend = "verified"
-api = "verified"
-backend = "verified"
-database = "verified"
-security = "verified"
-audit = "verified"
-tests = "verified"
-evidence = "verified"
-docs = "verified"
-governance = "verified"
-
-[stories.tests]
-required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
-covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
-
-[[stories]]
+[[deferred_stories]]
 id = "US-M2-005"
 title = "PDA/PC Web 智能上架"
 module = "M2"
 story_file = "docs/domain/user-stories-m2-inbound-verify.md"
-types = ["read_only", "write", "api_change", "integration", "runtime_guard", "audit_compliance"]
+types = ["read_only", "write", "api_change", "integration", "inventory_change", "concurrent_resource", "runtime_guard", "audit_compliance", "pda_runtime", "hardware_runtime", "external_runtime"]
 frontend_pages = ["m2-putaway"]
 navigation_checks = ["node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs"]
 api_paths = [
@@ -2101,32 +2045,18 @@ evidence_refs = [
   "apps/web-admin/src/pages/inbound/M2InboundDialogs.tsx",
   "prototypes/e2e/web-admin-m2-real.spec.ts",
   "artifacts/screenshot-portal/real-web/m2-inbound/putaway-recommendations.png",
+  "docs/reviews/m2-overall-review-2026-07-18.md",
 ]
+reason = "PC 推荐库位、合法性校验、部分上架、库存/库位原子更新、幂等审计和真实 E2E 已通过；但全自动模式、容器 LPN/整托上架、上架节点 M-VR 双人/审批、完成后 M2 ERP 反馈 outbox 与重试、PDA 离线冲突及真机证据未闭环。"
+owner = "M2 入库模块负责人"
+resume_when = "补齐 LPN/任务字段、全自动和半自动两种模式、上架节点双人策略、M2 ERP outbox/worker，并完成并发、PDA 离线和真实 ERP/设备验收后重新验收。"
 
-[stories.dimensions]
-requirement = "verified"
-fields = "verified"
-frontend = "verified"
-api = "verified"
-backend = "verified"
-database = "verified"
-security = "verified"
-audit = "verified"
-tests = "verified"
-evidence = "verified"
-docs = "verified"
-governance = "verified"
-
-[stories.tests]
-required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
-covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
-
-[[stories]]
+[[deferred_stories]]
 id = "US-M2-006"
 title = "收货异常处理"
 module = "M2"
 story_file = "docs/domain/user-stories-m2-inbound-verify.md"
-types = ["write", "api_change", "frontend_interaction", "audit_compliance"]
+types = ["write", "api_change", "frontend_interaction", "audit_compliance", "integration", "inventory_change", "external_runtime"]
 frontend_pages = ["m2-receiving"]
 navigation_checks = ["node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
@@ -2150,32 +2080,18 @@ evidence_refs = [
   "backend/crates/api/tests/m2_deferred_closeout/closeout_actions.rs",
   "apps/web-admin/src/pages/inbound/M2InboundDialogs.tsx",
   "artifacts/screenshot-portal/real-web/m2-inbound/m2-receiving-reject-dialog-current.png",
+  "docs/reviews/m2-overall-review-2026-07-18.md",
 ]
+reason = "整单拒收、数量闭环和短少强制关闭已有实现与测试；但销售退货批号级部分拒收、破损/温度/资质异常结构化处置、稳定性报告、不合格自动 M-QL、企业微信通知以及按供应商/商品/类型/批号统计未闭环。"
+owner = "M2 入库模块负责人"
+resume_when = "补齐批号级异常数据模型与数量约束，接通附件、M-QL/H4 和异常统计查询，并取得企业微信 dev/staging 回执证据后重新验收。"
 
-[stories.dimensions]
-requirement = "verified"
-fields = "verified"
-frontend = "verified"
-api = "verified"
-backend = "verified"
-database = "verified"
-security = "verified"
-audit = "verified"
-tests = "verified"
-evidence = "verified"
-docs = "verified"
-governance = "verified"
-
-[stories.tests]
-required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
-covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
-
-[[stories]]
+[[deferred_stories]]
 id = "US-M2-007"
 title = "收货单据打印"
 module = "M2"
 story_file = "docs/domain/user-stories-m2-inbound-verify.md"
-types = ["read_only", "write", "api_change", "frontend_interaction"]
+types = ["read_only", "write", "api_change", "frontend_interaction", "integration", "pda_runtime", "hardware_runtime"]
 frontend_pages = ["m2-receiving", "m2-inspecting"]
 navigation_checks = ["node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs"]
 api_paths = [
@@ -2201,33 +2117,19 @@ evidence_refs = [
   "prototypes/e2e/web-admin-m2-real.spec.ts",
   "artifacts/screenshot-portal/real-web/m2-inbound/receiving-print-preview.png",
   "artifacts/screenshot-portal/real-web/m2-inbound/inspection-print-preview.png",
+  "docs/reviews/m2-overall-review-2026-07-18.md",
 ]
-
-[stories.dimensions]
-requirement = "verified"
-fields = "verified"
-frontend = "verified"
-api = "verified"
-backend = "verified"
-database = "verified"
-security = "verified"
-audit = "verified"
-tests = "verified"
-evidence = "verified"
-docs = "verified"
-governance = "verified"
-
-[stories.tests]
-required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
-covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
+reason = "H9 业务数据聚合、PC 预览/打印记录和浏览器 E2E 已有；但 PDA 蓝牙打印机、PC 网络打印机、设备离线/补打队列及真实打印产物人工核对证据未完成，不能以浏览器截图替代硬件验收。"
+owner = "M2 入库模块负责人"
+resume_when = "取得 Wave 5 打印设备和真实工位，完成蓝牙/网络打印、离线补打、模板缺失/数据缺失错误路径及打印产物人工验收后重新验收。"
 
 
-[[stories]]
+[[deferred_stories]]
 id = "US-M2-010"
 title = "上架策略配置"
 module = "M2"
 story_file = "docs/domain/user-stories-m2-inbound-verify.md"
-types = ["read_only", "write", "api_change", "config_rule", "frontend_interaction", "integration"]
+types = ["read_only", "write", "api_change", "config_rule", "frontend_interaction", "integration", "external_runtime"]
 frontend_pages = ["m2-putaway-strategy"]
 navigation_checks = ["node apps/web-admin/self-checks/m2-putaway-strategy-self-check.mjs"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
@@ -2265,25 +2167,11 @@ evidence_refs = [
   "prototypes/e2e/web-admin-m2-real.spec.ts",
   "artifacts/screenshot-portal/real-web/m2-inbound/putaway-strategy-config.png",
   "artifacts/screenshot-portal/real-web/m2-inbound/putaway-recommendations.png",
+  "docs/reviews/m2-overall-review-2026-07-18.md",
 ]
-
-[stories.dimensions]
-requirement = "verified"
-fields = "verified"
-frontend = "verified"
-api = "verified"
-backend = "verified"
-database = "verified"
-security = "verified"
-audit = "verified"
-tests = "verified"
-evidence = "verified"
-docs = "verified"
-governance = "verified"
-
-[stories.tests]
-required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
-covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+reason = "多方案、仓库/品类绑定、Top N、启停/优先级配置、同品/空库位和无库位通知开关已有存储与 PC E2E；但运行时未执行 rule_priority，ABC 分类、品类分区和效期隔离仅被保存未参与推荐，企业微信真实通知证据也未完成。"
+owner = "M2 入库模块负责人"
+resume_when = "让配置的规则优先级和全部已声明规则真实参与过滤/排序，补规则启停/组合/变更即时生效测试及企业微信通知证据后重新验收。"
 
 [[stories]]
 id = "US-M4-001"

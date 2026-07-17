@@ -90,6 +90,13 @@ PDA 必须有真机扫码、离线重放、幂等和易用性证据；外部系�
 
 迭代顺序固定为：补事实源 → 补脚本 → 跑失败 → 修实现 → 生成展示页 → 复跑治理。
 
+## Review 驳回与类型反推
+
+- 测试、E2E 或截图通过只证明其覆盖切片，不自动证明整条故事完成。
+- Review 发现任一验收标准未实现或缺少适用的 S4 证据时，在用户确认记录/延期后，必须把故事从 `stories` 移回 `deferred_stories`，写清已实现切片、剩余缺口、责任人和恢复条件；不得继续保留十二维 `verified`。
+- 登记或复核 `types` 时必须从完整故事段反推：PDA/离线对应 `pda_runtime`，蓝牙/打印机/扫码设备对应 `hardware_runtime`，ERP/企业微信/外部平台对应 `external_runtime`，库存数量变化对应 `inventory_change`，同库位/同批次竞争对应 `concurrent_resource`。
+- `check_quality_matrix.py --json` 只证明矩阵内部一致；模块结论必须同时以完整验收标准人工语义审查和 `--complete-module <模块>` 为准。
+
 ## 范围缺口自发现标准线
 
 `scripts/governance/check_scope_gap_discovery.py` 是质量矩阵之外的范围缺口发现入口：
