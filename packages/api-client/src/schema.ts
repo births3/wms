@@ -1844,6 +1844,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/inventory/locations/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_location_history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/inventory/maintenance/records": {
         parameters: {
             query?: never;
@@ -5409,18 +5425,31 @@ export interface components {
         InventoryMovement: {
             /** Format: uuid */
             batch_id: string;
+            batch_no?: string | null;
+            expiry_date?: string | null;
+            from_location_code?: string | null;
             /** Format: uuid */
             id: string;
+            location_code?: string | null;
+            lpn_code?: string | null;
             movement_type: string;
             /** Format: date-time */
             occurred_at: string;
+            operator_name?: string | null;
+            /** Format: uuid */
+            operator_user_id?: string | null;
             /** Format: uuid */
             owner_id: string;
+            product_code?: string | null;
+            product_name?: string | null;
             /** Format: int64 */
             qty_delta: number;
             /** Format: uuid */
             source_document_id: string;
             source_document_type: string;
+            to_location_code?: string | null;
+            /** Format: int64 */
+            volume_delta_cm3?: number | null;
         };
         InventoryStatusChange: {
             approval_id: string;
@@ -5486,6 +5515,36 @@ export interface components {
             warehouse_id: string;
             /** Format: uuid */
             zone_id: string;
+        };
+        LocationHistoryProductShare: {
+            /** Format: int64 */
+            event_count: number;
+            product_code: string;
+            product_name?: string | null;
+            /** Format: int64 */
+            total_qty_delta: number;
+        };
+        LocationHistoryQuery: {
+            batch_no?: string | null;
+            /** Format: int64 */
+            days?: number | null;
+            from?: string | null;
+            location_code?: string | null;
+            movement_type?: string | null;
+            product_code?: string | null;
+            to?: string | null;
+        };
+        LocationHistoryResponse: {
+            data: components["schemas"]["InventoryMovement"][];
+            location_code: string;
+            page: components["schemas"]["PageMeta"];
+            product_shares: components["schemas"]["LocationHistoryProductShare"][];
+            risks: components["schemas"]["LocationHistoryRisk"][];
+        };
+        LocationHistoryRisk: {
+            message: string;
+            risk_code: string;
+            severity: string;
         };
         LocationListResponse: {
             data: components["schemas"]["Location"][];
@@ -13909,6 +13968,68 @@ export interface operations {
                 };
             };
             /** @description 数量或盘点状态非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_location_history: {
+        parameters: {
+            query?: {
+                /** @description 库位编码，必填 */
+                location_code?: string | null;
+                /** @description 开始时间，RFC3339 或 YYYY-MM-DD */
+                from?: string | null;
+                /** @description 结束时间，RFC3339 或 YYYY-MM-DD */
+                to?: string | null;
+                /** @description 操作类型精确匹配 */
+                movement_type?: string | null;
+                /** @description 商品编码模糊匹配 */
+                product_code?: string | null;
+                /** @description 批号模糊匹配 */
+                batch_no?: string | null;
+                /** @description 默认回溯天数，缺省 30，最大 3650 */
+                days?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 库位历史追踪 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationHistoryResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 库位不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 查询参数非法 */
             422: {
                 headers: {
                     [name: string]: unknown;

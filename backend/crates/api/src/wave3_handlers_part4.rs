@@ -200,6 +200,20 @@ async fn get_inventory_batch_trace_handler(
     Ok(Json(trace))
 }
 
+async fn list_location_history_handler(
+    ctx: AuthContext,
+    State(state): State<Wave3AppState>,
+    axum::extract::Query(query): axum::extract::Query<LocationHistoryQuery>,
+) -> Result<Json<LocationHistoryResponse>, Wave3HandlerError> {
+    require_any_permission(&ctx, &["m3.read", "m3.write"])?;
+    let repository = state.wave3_repository.as_ref().ok_or_else(|| {
+        Wave3HandlerError::Repository(Wave3RepositoryError::Database(
+            "库位历史查询需要 PostgreSQL repository".to_string(),
+        ))
+    })?;
+    Ok(Json(repository.list_location_history(&ctx, &query).await?))
+}
+
 fn parse_inventory_batch_date_filter(
     value: Option<&String>,
 ) -> Result<Option<NaiveDate>, Wave3HandlerError> {

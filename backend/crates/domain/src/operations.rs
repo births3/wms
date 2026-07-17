@@ -332,6 +332,28 @@ pub struct InventoryMovement {
     pub source_document_type: String,
     pub source_document_id: Uuid,
     pub occurred_at: DateTime<Utc>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub location_code: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from_location_code: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to_location_code: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lpn_code: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub operator_user_id: Option<Uuid>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub operator_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub volume_delta_cm3: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub product_code: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub product_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub batch_no: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expiry_date: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -352,4 +374,39 @@ pub struct InventoryBatchTrace {
     pub batch: InventoryBatch,
     pub movements: Vec<InventoryMovement>,
     pub status_changes: Vec<InventoryStatusChange>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
+pub struct LocationHistoryQuery {
+    pub location_code: Option<String>,
+    pub from: Option<String>,
+    pub to: Option<String>,
+    pub movement_type: Option<String>,
+    pub product_code: Option<String>,
+    pub batch_no: Option<String>,
+    pub days: Option<i64>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct LocationHistoryRisk {
+    pub risk_code: String,
+    pub severity: String,
+    pub message: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct LocationHistoryProductShare {
+    pub product_code: String,
+    pub product_name: Option<String>,
+    pub event_count: i64,
+    pub total_qty_delta: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct LocationHistoryResponse {
+    pub location_code: String,
+    pub data: Vec<InventoryMovement>,
+    pub risks: Vec<LocationHistoryRisk>,
+    pub product_shares: Vec<LocationHistoryProductShare>,
+    pub page: PageMeta,
 }

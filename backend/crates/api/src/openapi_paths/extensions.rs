@@ -243,6 +243,10 @@ pub(crate) fn near_expiry_report() {}
 #[allow(dead_code)]
 pub(crate) fn get_inventory_batch_trace() {}
 
+#[utoipa::path(get, path = "/api/v1/inventory/locations/history", tag = "inventory", params(("location_code" = Option<String>, Query, description = "库位编码，必填"), ("from" = Option<String>, Query, description = "开始时间，RFC3339 或 YYYY-MM-DD"), ("to" = Option<String>, Query, description = "结束时间，RFC3339 或 YYYY-MM-DD"), ("movement_type" = Option<String>, Query, description = "操作类型精确匹配"), ("product_code" = Option<String>, Query, description = "商品编码模糊匹配"), ("batch_no" = Option<String>, Query, description = "批号模糊匹配"), ("days" = Option<i64>, Query, description = "默认回溯天数，缺省 30，最大 3650")), responses((status = 200, description = "库位历史追踪", body = LocationHistoryResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 404, description = "库位不存在", body = ErrorResponse), (status = 422, description = "查询参数非法", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn list_location_history() {}
+
 #[utoipa::path(post, path = "/api/v1/inventory/batches/putaway", tag = "inventory", request_body = PutawayInventoryRequest, responses((status = 200, description = "入库上架增加库存", body = InventoryBatch), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn putaway_inventory_batch() {}

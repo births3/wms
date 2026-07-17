@@ -19,8 +19,9 @@ use wms_domain::{
     CreateReceivingOrderRequest, ErrorResponse, ExpireInventoryBatchesRequest,
     IngestTemperatureExcursionRequest, IngestTemperatureReadingRequest,
     InspectReceivingOrderRequest, InspectionSignatureRecord, InventoryBatch,
-    InventoryBatchListResponse, InventoryBatchQuery, InventoryBatchTrace,
-    MarkInventoryRecallRequest, PageMeta, PutawayInventoryRequest, PutawayRecord, PutawayRequest,
+    InventoryBatchListResponse, InventoryBatchQuery, InventoryBatchTrace, LocationHistoryQuery,
+    LocationHistoryResponse, MarkInventoryRecallRequest, PageMeta, PutawayInventoryRequest,
+    PutawayRecord, PutawayRequest,
     ReceiveReceivingOrderRequest, ReceivingDashboardQuery, ReceivingDashboardResponse,
     ReceivingInspectionRecord, ReceivingOrder, ReceivingOrderListResponse, ReceivingOrderPrintData,
     ReceivingOrderReceipt, RejectReceivingOrderRequest, TemperatureExcursionEvent,
@@ -400,6 +401,10 @@ pub fn wave3_router(state: Wave3AppState) -> Router {
         .route(
             "/api/v1/inventory/batches/:id/trace",
             get(get_inventory_batch_trace_handler),
+        )
+        .route(
+            "/api/v1/inventory/locations/history",
+            get(list_location_history_handler),
         )
         .route(
             "/api/v1/inventory/batches/putaway",

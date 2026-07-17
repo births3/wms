@@ -2484,8 +2484,8 @@
           }
         },
         "security": [],
-        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。",
-        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。"
+        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。",
+        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。"
       }
     },
     "/api/v1/auth/logout": {
@@ -9055,6 +9055,129 @@
           },
           "422": {
             "description": "数量或盘点状态非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/inventory/locations/history": {
+      "get": {
+        "tags": [
+          "inventory"
+        ],
+        "operationId": "list_location_history",
+        "parameters": [
+          {
+            "name": "location_code",
+            "in": "query",
+            "description": "库位编码，必填",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "开始时间，RFC3339 或 YYYY-MM-DD",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "结束时间，RFC3339 或 YYYY-MM-DD",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "movement_type",
+            "in": "query",
+            "description": "操作类型精确匹配",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "product_code",
+            "in": "query",
+            "description": "商品编码模糊匹配",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "batch_no",
+            "in": "query",
+            "description": "批号模糊匹配",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "description": "默认回溯天数，缺省 30，最大 3650",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "库位历史追踪",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationHistoryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "库位不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "查询参数非法",
             "content": {
               "application/json": {
                 "schema": {
@@ -24215,9 +24338,29 @@
             "type": "string",
             "format": "uuid"
           },
+          "batch_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "expiry_date": {
+            "type": "string",
+            "nullable": true
+          },
+          "from_location_code": {
+            "type": "string",
+            "nullable": true
+          },
           "id": {
             "type": "string",
             "format": "uuid"
+          },
+          "location_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "lpn_code": {
+            "type": "string",
+            "nullable": true
           },
           "movement_type": {
             "type": "string"
@@ -24226,9 +24369,26 @@
             "type": "string",
             "format": "date-time"
           },
+          "operator_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "operator_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
           "owner_id": {
             "type": "string",
             "format": "uuid"
+          },
+          "product_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "product_name": {
+            "type": "string",
+            "nullable": true
           },
           "qty_delta": {
             "type": "integer",
@@ -24240,6 +24400,15 @@
           },
           "source_document_type": {
             "type": "string"
+          },
+          "to_location_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "volume_delta_cm3": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
           }
         }
       },
@@ -24436,6 +24605,120 @@
           "zone_id": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "LocationHistoryProductShare": {
+        "type": "object",
+        "required": [
+          "product_code",
+          "event_count",
+          "total_qty_delta"
+        ],
+        "properties": {
+          "event_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "product_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "total_qty_delta": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "LocationHistoryQuery": {
+        "type": "object",
+        "properties": {
+          "batch_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "days": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "from": {
+            "type": "string",
+            "nullable": true
+          },
+          "location_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "movement_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "product_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "to": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "LocationHistoryResponse": {
+        "type": "object",
+        "required": [
+          "location_code",
+          "data",
+          "risks",
+          "product_shares",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventoryMovement"
+            }
+          },
+          "location_code": {
+            "type": "string"
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          },
+          "product_shares": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LocationHistoryProductShare"
+            }
+          },
+          "risks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LocationHistoryRisk"
+            }
+          }
+        }
+      },
+      "LocationHistoryRisk": {
+        "type": "object",
+        "required": [
+          "risk_code",
+          "severity",
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "risk_code": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
           }
         }
       },

@@ -663,14 +663,27 @@ impl PgWave3Repository {
             source_document_type: "receiving_order".to_string(),
             source_document_id: id,
             occurred_at: now,
+            location_code: Some(req.location_code.clone()),
+            from_location_code: None,
+            to_location_code: Some(req.location_code.clone()),
+            lpn_code: None,
+            operator_user_id: Some(ctx.user_id),
+            operator_name: Some(ctx.actor_name.clone()),
+            volume_delta_cm3: None,
+            product_code: Some(req.product_code.clone()),
+            product_name: None,
+            batch_no: Some(req.batch_no.clone()),
+            expiry_date: Some(inventory_batch.expiry_date.clone()),
         };
         sqlx::query(
             r#"
             INSERT INTO inventory_movements (
                 id, owner_id, batch_id, movement_type, qty_delta,
-                source_document_type, source_document_id, occurred_at
+                source_document_type, source_document_id, occurred_at,
+                location_code, from_location_code, to_location_code,
+                lpn_code, operator_user_id, operator_name, volume_delta_cm3
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
             "#,
         )
         .bind(movement.id)
@@ -681,6 +694,13 @@ impl PgWave3Repository {
         .bind(&movement.source_document_type)
         .bind(movement.source_document_id)
         .bind(movement.occurred_at)
+        .bind(&movement.location_code)
+        .bind(&movement.from_location_code)
+        .bind(&movement.to_location_code)
+        .bind(&movement.lpn_code)
+        .bind(movement.operator_user_id)
+        .bind(&movement.operator_name)
+        .bind(movement.volume_delta_cm3)
         .execute(&mut *tx)
         .await
         .map_err(map_db_error)?;
