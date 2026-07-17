@@ -2221,6 +2221,70 @@ governance = "verified"
 required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
 covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
 
+
+[[stories]]
+id = "US-M2-010"
+title = "上架策略配置"
+module = "M2"
+story_file = "docs/domain/user-stories-m2-inbound-verify.md"
+types = ["read_only", "write", "api_change", "config_rule", "frontend_interaction", "integration"]
+frontend_pages = ["m2-putaway-strategy"]
+navigation_checks = ["node apps/web-admin/self-checks/m2-putaway-strategy-self-check.mjs"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
+e2e_screenshots = [
+  { page = "m2-putaway-strategy", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/putaway-strategy-config.png" },
+]
+api_paths = [
+  "GET /api/v1/inbound/putaway-strategy-profiles",
+  "PUT /api/v1/inbound/putaway-strategy-profiles",
+  "GET /api/v1/inbound/receiving-orders/{id}/putaway-recommendations",
+]
+database_objects = ["putaway_strategy_profiles", "h4_notification_records", "warehouse_locations", "warehouse_zones", "inventory_batches", "products"]
+test_checks = [
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_smart_putaway_postgres -- --test-threads=1",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_deferred_closeout_postgres putaway_strategy_profile_drives_default_top_n -- --test-threads=1",
+  "node apps/web-admin/self-checks/m2-putaway-strategy-self-check.mjs",
+  "pnpm --dir apps/web-admin exec tsc --noEmit",
+]
+evidence_refs = [
+  "apps/web-admin/self-checks/m2-putaway-strategy-self-check.mjs",
+  "docs/domain/user-stories-m2-inbound-verify.md",
+  "backend/migrations/202607170006_m2_inbound_closeout.sql",
+  "backend/migrations/202607180001_m2_putaway_strategy_config.sql",
+  "backend/crates/domain/src/operations.rs",
+  "backend/crates/api/src/wave3_repository/putaway.rs",
+  "backend/crates/api/src/wave3_handlers/receiving_handlers.rs",
+  "backend/crates/api/tests/m2_deferred_closeout/closeout_actions.rs",
+  "apps/web-admin/src/pages/inbound/M2PutawayStrategyPage.tsx",
+  "apps/web-admin/src/features/inbound/putaway-strategy-queries.ts",
+  "apps/web-admin/src/app-shell/AdminViewRenderer.tsx",
+  "apps/web-admin/src/App.tsx",
+  "apps/web-admin/dev-mocks/admin-menu-dev-mock.ts",
+  "apps/web-admin/dev-mocks/web-admin-dev-mock-core.ts",
+  "apps/web-admin/src/pages/page-query-core-fields.json",
+  "prototypes/e2e/web-admin-m2-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/m2-inbound/putaway-strategy-config.png",
+  "artifacts/screenshot-portal/real-web/m2-inbound/putaway-recommendations.png",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+
 [[stories]]
 id = "US-M4-001"
 title = "出库订单管理"
@@ -3088,49 +3152,6 @@ module = "M10"
 reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
 owner = "M10 模块负责人"
 resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
-
-[[deferred_stories]]
-id = "US-M2-010"
-title = "上架策略配置"
-module = "M2"
-story_file = "docs/domain/user-stories-m2-inbound-verify.md"
-types = ["read_only", "write", "api_change", "config_rule", "frontend_interaction", "integration"]
-frontend_pages = ["m2-putaway"]
-e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
-e2e_screenshots = [
-  { page = "m2-putaway", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/putaway-recommendations.png" },
-]
-api_paths = [
-  "GET /api/v1/inbound/putaway-strategy-profiles",
-  "PUT /api/v1/inbound/putaway-strategy-profiles",
-  "GET /api/v1/inbound/receiving-orders/{id}/putaway-recommendations",
-]
-database_objects = ["putaway_strategy_profiles", "warehouse_locations", "warehouse_zones", "inventory_batches", "products"]
-test_checks = [
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_smart_putaway_postgres -- --test-threads=1",
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_deferred_closeout_postgres putaway_strategy_profile_drives_default_top_n -- --test-threads=1",
-  "pnpm --dir apps/web-admin exec tsc --noEmit",
-]
-evidence_refs = [
-  "docs/domain/user-stories-m2-inbound-verify.md",
-  "backend/migrations/202607170006_m2_inbound_closeout.sql",
-  "backend/crates/domain/src/operations.rs",
-  "backend/crates/api/src/m2_putaway.rs",
-  "backend/crates/api/src/wave3_repository/putaway.rs",
-  "backend/crates/api/src/wave3_handlers/receiving_handlers.rs",
-  "backend/crates/api/tests/m2_smart_putaway_postgres.rs",
-  "backend/crates/api/tests/m2_deferred_closeout/closeout_actions.rs",
-  "backend/crates/api/src/openapi_paths/extensions.rs",
-  "apps/web-admin/src/features/inbound/inbound-queries.ts",
-  "apps/web-admin/src/pages/inbound/M2InboundDialogs.tsx",
-  "prototypes/e2e/web-admin-m2-real.spec.ts",
-  "artifacts/screenshot-portal/real-web/m2-inbound/putaway-recommendations.png",
-]
-reason = "已补 putaway_strategy_profiles 方案模型、列表/幂等写入 API、默认方案 Top N 与 same_product_cluster 启停驱动推荐，PostgreSQL 回归已通过。故事仍不能整体关闭：尚无管理端策略配置页面、优先级拖拽 UI、商品类别/货主/仓库绑定多方案、ABC/品类/效期规则可视化配置和无库位 H4 通知。"
-owner = "M2 模块负责人"
-resume_when = "补齐管理端策略配置页、多方案绑定、完整规则可视化与 H4 无库位通知，并补真实 E2E 截图后再移入 stories。"
-
-
 
 
 [[deferred_stories]]
