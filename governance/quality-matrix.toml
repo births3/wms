@@ -2571,9 +2571,35 @@ resume_when = "补齐 M-VR 规则命中、LPN/任务引擎、全自动模式和 
 id = "US-M2-006"
 title = "收货异常处理"
 module = "M2"
-reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+story_file = "docs/domain/user-stories-m2-inbound-verify.md"
+types = ["write", "api_change", "frontend_interaction", "audit_compliance"]
+frontend_pages = ["m2-receiving"]
+navigation_checks = ["node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
+api_paths = [
+  "POST /api/v1/inbound/receiving-orders/{id}/receive",
+  "POST /api/v1/inbound/receiving-orders/{id}/reject",
+]
+database_objects = ["receiving_orders", "receiving_order_receipts", "idempotency_request", "audit_event"]
+test_checks = [
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave3_postgres receiving_order_reject_closes_order_and_replays_idempotently -- --test-threads=1",
+  "node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs",
+  "pnpm --dir apps/web-admin exec tsc --noEmit",
+]
+evidence_refs = [
+  "docs/domain/user-stories-m2-inbound-verify.md",
+  "backend/crates/api/src/inbound.rs",
+  "backend/crates/api/src/wave3_repository_part1.rs",
+  "backend/crates/api/src/wave3_handlers/receiving_handlers.rs",
+  "backend/crates/api/tests/wave3_postgres/wave3_postgres_part2.rs",
+  "backend/crates/api/src/openapi_paths/extensions.rs",
+  "apps/web-admin/src/features/inbound/inbound-queries.ts",
+  "apps/web-admin/src/pages/inbound/M2InboundDialogs.tsx",
+  "apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs",
+]
+reason = "已补收货数量闭合、短少/拒收数量与异常备注持久化，以及 released/receiving 状态整单拒收、关闭状态、货主隔离、幂等和审计；整单拒收审计现明确记录原因、拒收数量和状态变化，PC Web 已接真实拒收 API。故事仍不能整体关闭：销售退货逐批部分拒收、短少强制关闭、温度超标稳定性报告附件、质量联系单/H4 通知、异常统计及拒收专属真实 E2E 截图尚未闭环。"
 owner = "M2 模块负责人"
-resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+resume_when = "补齐逐批部分拒收、短少强制关闭、附件、M-QL/H4、异常统计和拒收专属真实 E2E 后复核。"
 
 [[deferred_stories]]
 id = "US-M2-007"
@@ -2592,7 +2618,7 @@ e2e_screenshots = [
 ]
 database_objects = ["receiving_order_receipts", "receiving_inspections", "receiving_inspection_signatures", "print_records"]
 test_checks = [
-    "cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_deferred_closeout_postgres print_data_reads_receipt_inspection_and_dual_signature",
+    "cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_deferred_closeout_postgres print_data_reads_receipt_inspection_and_dual_signature -- --test-threads=1",
     "pnpm --dir apps/web-admin run test:e2e:m2-real",
 ]
 evidence_refs = [
@@ -2615,9 +2641,33 @@ resume_when = "该故事进入已批准实施波次，并具备前端、API、�
 id = "US-M2-010"
 title = "上架策略配置"
 module = "M2"
-reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+story_file = "docs/domain/user-stories-m2-inbound-verify.md"
+types = ["read_only", "write", "api_change", "config_rule", "frontend_interaction", "integration"]
+frontend_pages = ["m2-putaway"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
+e2e_screenshots = [
+  { page = "m2-putaway", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/putaway-recommendations.png" },
+]
+api_paths = ["GET /api/v1/inbound/receiving-orders/{id}/putaway-recommendations"]
+database_objects = ["warehouse_locations", "warehouse_zones", "inventory_batches", "products"]
+test_checks = [
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_smart_putaway_postgres -- --test-threads=1",
+  "pnpm --dir apps/web-admin exec tsc --noEmit",
+]
+evidence_refs = [
+  "docs/domain/user-stories-m2-inbound-verify.md",
+  "backend/crates/api/src/m2_putaway.rs",
+  "backend/crates/api/src/wave3_repository/putaway.rs",
+  "backend/crates/api/tests/m2_smart_putaway_postgres.rs",
+  "backend/crates/api/src/openapi_paths/extensions.rs",
+  "apps/web-admin/src/features/inbound/inbound-queries.ts",
+  "apps/web-admin/src/pages/inbound/M2InboundDialogs.tsx",
+  "prototypes/e2e/web-admin-m2-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/m2-inbound/putaway-recommendations.png",
+]
+reason = "已具备真实 PostgreSQL 库位推荐切片：按货主、仓库、温区/质量色标、容量、SKU 数量和同品聚集过滤排序，PC Web 可读取 Top N 推荐并有真实 E2E 截图。故事仍不能整体关闭：当前是固定推荐算法，尚无多策略方案、优先级拖拽、规则启停、商品类别/货主/仓库绑定、ABC/品类/效期规则配置和无库位 H4 通知。"
 owner = "M2 模块负责人"
-resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+resume_when = "补齐可审计策略方案模型、配置 API/页面、动态规则执行和 H4 通知后复核。"
 
 [[deferred_stories]]
 id = "US-M3-004"
@@ -2640,7 +2690,6 @@ database_objects = [
 ]
 test_checks = [
   "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_maintenance_postgres -- --test-threads=1",
-  "cargo test --manifest-path backend/Cargo.toml -p wms-domain maintenance --lib",
 ]
 evidence_refs = [
   "docs/domain/user-stories-m3-inventory-operation.md",
@@ -2660,41 +2709,96 @@ resume_when = "补齐计划生成与调度、M-TE 下发、异常照片/M-QL 闭
 id = "US-M3-005"
 title = "库存盘点"
 module = "M3"
-reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+story_file = "docs/domain/user-stories-m3-inventory-operation.md"
+types = ["write", "api_change", "inventory_change", "concurrent_resource", "audit_compliance", "pda_runtime"]
+api_paths = [
+  "POST /api/v1/inventory/counts",
+  "GET /api/v1/inventory/counts/{id}",
+  "POST /api/v1/inventory/counts/{id}/lines/{line_id}/submit",
+  "POST /api/v1/inventory/counts/{id}/approve",
+]
+database_objects = ["inventory_counts", "inventory_count_lines", "inventory_batches", "inventory_movements", "inventory_allocations", "idempotency_request", "audit_event", "auth_permissions"]
+test_checks = [
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_inventory_count_postgres -- --test-threads=1",
+]
+evidence_refs = [
+  "docs/domain/user-stories-m3-inventory-operation.md",
+  "backend/crates/domain/src/inventory_count.rs",
+  "backend/crates/api/src/wave3_repository/inventory_count.rs",
+  "backend/crates/api/src/wave3_handlers/inventory_count.rs",
+  "backend/crates/api/src/openapi_paths/inventory_count.rs",
+  "backend/crates/api/tests/m3_inventory_count_postgres.rs",
+  "backend/migrations/202607140008_m3_inventory_counts.sql",
+  "shared/openapi/openapi.json",
+  "packages/api-client/src/schema.ts",
+]
+reason = "已补 cycle/full/blind 盘点单创建、库存快照、盲盘数量提交、差异计算、主管权限审批、盘盈盘亏原子调整、库存流水、货主隔离、盘点锁、幂等与审计，真实 PostgreSQL 覆盖成功、跨货主、新分配拦截和重放。故事仍不能整体关闭：范围选择前端、PDA 扫码与离线冲突、盘点期间已下发任务账面、差异金额/比例升级审批、盘点报告打印和真实设备/E2E 尚未闭环。"
 owner = "M3 模块负责人"
-resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+resume_when = "补齐 PC/PDA 执行面、离线冲突、在途任务账面、阈值升级审批、打印及真实设备证据后复核。"
 
 [[deferred_stories]]
 id = "US-M3-006"
 title = "库内移库"
 module = "M3"
-reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+story_file = "docs/domain/user-stories-m3-inventory-operation.md"
+types = ["write", "inventory_change", "concurrent_resource", "audit_compliance", "pda_runtime", "integration"]
+reason = "M-TE 已有 relocation 任务类型和源/目标库位字段，但尚未形成 M3 移库业务闭环；缺移库单/API、源减目标增同事务、状态/温区/容量门禁、整托 LPN 与逐件追溯码分支、PC/PDA、幂等审计和真实 PostgreSQL/PDA 证据，不能标记完成。"
 owner = "M3 模块负责人"
-resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+resume_when = "先实现直接移库最小事务切片及 PostgreSQL 测试，再接 M-TE、LPN/M-TC 和 PDA 离线。"
 
 [[deferred_stories]]
 id = "US-M3-009"
 title = "库存预警"
 module = "M3"
-reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+story_file = "docs/domain/user-stories-m3-inventory-operation.md"
+types = ["read_only", "write", "integration", "audit_compliance"]
+api_paths = ["GET /api/v1/inventory/batches/near-expiry-report"]
+database_objects = ["inventory_batches", "system_dictionary_items"]
+test_checks = [
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_expiry_report_postgres -- --test-threads=1",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_expiry_scheduler_postgres -- --test-threads=1",
+]
+evidence_refs = [
+  "docs/domain/user-stories-m3-inventory-operation.md",
+  "backend/crates/api/src/inventory_expiry_job.rs",
+  "backend/crates/api/tests/m3_expiry_report_postgres.rs",
+  "backend/crates/api/tests/m3_expiry_scheduler_postgres.rs",
+  "backend/crates/api/src/openapi_paths/extensions.rs",
+]
+reason = "已具备货主级近效期阈值、近效期报表和到期批次自动隔离调度切片。故事仍不能整体关闭：安全库存/超储/养护逾期/温湿度统一预警事件、待处理/已处理/已忽略生命周期、系统消息与可选渠道、审计和统计看板尚未形成 M3 业务闭环。"
 owner = "M3 模块负责人"
-resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+resume_when = "补齐统一预警事件模型、五类触发器、处理生命周期、渠道接线和统计看板后复核。"
 
 [[deferred_stories]]
 id = "US-M3-010"
 title = "ABC 分类管理"
 module = "M3"
-reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+story_file = "docs/domain/user-stories-m3-inventory-operation.md"
+types = ["write", "config_rule", "integration", "audit_compliance"]
+reason = "当前尚无 ABC 分类持久化、出库统计任务、阈值配置、人工覆盖、报表和审计实现；M2 上架推荐也未消费 ABC 分类，不能以商品 attrs 或固定排序替代完整故事。"
 owner = "M3 模块负责人"
-resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+resume_when = "先确认统计口径与分类阈值事实源，再实现月度计算、人工覆盖、审计和 M2-010 消费链路。"
 
 [[deferred_stories]]
 id = "US-M3-011"
 title = "库位历史追踪"
 module = "M3"
-reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+story_file = "docs/domain/user-stories-m3-inventory-operation.md"
+types = ["read_only", "api_change", "frontend_interaction", "integration"]
+api_paths = ["GET /api/v1/inventory/batches/{id}/trace"]
+database_objects = ["inventory_batches", "inventory_movements", "inventory_status_changes"]
+test_checks = [
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_trace_postgres -- --test-threads=1",
+]
+evidence_refs = [
+  "docs/domain/user-stories-m3-inventory-operation.md",
+  "backend/crates/api/src/wave3_repository/trace.rs",
+  "backend/crates/api/tests/m3_trace_postgres.rs",
+  "backend/crates/api/src/openapi_paths/extensions.rs",
+]
+reason = "已有按库存批次查询库存流水和状态变更的货主隔离追溯接口，可复用部分流水事实；但 inventory_movements 尚无源/目标库位、操作人、LPN 和容积变化字段，也没有按库位/时间/操作类型查询、风险识别、时间轴/图表、导出打印和入口页面，不能标记完成。"
 owner = "M3 模块负责人"
-resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+resume_when = "先补可兼容的库位流水事实字段与写入链路，再实现库位查询 API、风险计算、页面和导出打印证据。"
 
 [[deferred_stories]]
 id = "US-M3-001"
