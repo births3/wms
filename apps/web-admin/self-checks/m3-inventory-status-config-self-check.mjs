@@ -3,8 +3,12 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const root = resolve(new URL("..", import.meta.url).pathname);
+const appShell = readFileSync(resolve(root, "src/App.tsx"), "utf8");
+const viewRenderer = readFileSync(resolve(root, "src/app-shell/AdminViewRenderer.tsx"), "utf8");
 const page = readFileSync(resolve(root, "src/pages/inventory/M3InventoryStatusConfigPage.tsx"), "utf8");
 const queries = readFileSync(resolve(root, "src/features/inventory/inventory-status-config-queries.ts"), "utf8");
+assert.match(appShell, /id:\s*"m3-status-config"/, "菜单应登记 m3-status-config");
+assert.match(viewRenderer, /m3-status-config/, "视图渲染器应覆盖 m3-status-config");
 assert.match(page, /<DataGrid\b/, "M3 状态配置必须使用公共 DataGrid");
 assert.match(page, /<QueryPanel\b/, "M3 状态配置必须使用公共 QueryPanel");
 assert.match(page, /<Dialog\b/, "M3 状态配置写操作必须使用 Dialog");

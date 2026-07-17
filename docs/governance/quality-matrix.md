@@ -14,9 +14,9 @@
 | 指标 | 数量 |
 |---|---:|
 | 故事总数 | 174 |
-| 已完成（已验证） | 45 |
-| 未完成 / 延期 | 129 |
-| 完成率 | 25.9% |
+| 已完成（已验证） | 49 |
+| 未完成 / 延期 | 125 |
+| 完成率 | 28.2% |
 
 > “已完成”表示故事已进入 `stories` 并通过矩阵维度门禁；延期故事中的局部代码、页面或测试切片不计入完成。
 
@@ -40,7 +40,7 @@
 | M1 | 2 | 9 | 11 |
 | M10 | 0 | 4 | 4 |
 | M2 | 2 | 7 | 9 |
-| M3 | 2 | 7 | 9 |
+| M3 | 6 | 3 | 9 |
 | M4 | 1 | 10 | 11 |
 | M5 | 0 | 3 | 3 |
 | M6 | 0 | 4 | 4 |
@@ -67,6 +67,10 @@
 | US-M1-004 仓库与库位管理 | M1 | S2 |
 | US-M3-001 实时库存查询 | M3 | S2 |
 | US-M3-011 库位历史追踪 | M3 | S2 |
+| US-M3-002 批次与效期管理 | M3 | S3 |
+| US-M3-003 库存状态管理 | M3 | S2 |
+| US-M3-009 库存预警 | M3 | S3 |
+| US-M3-010 ABC 分类管理 | M3 | S3 |
 | US-H1-001 用户登录与 token 签发（PC 密码登录切片） | H1 | S2 |
 | US-H1-002 角色与权限管理 | H1 | S2 |
 | US-H1-003 API 鉴权中间件 | H1 | S1 |
@@ -113,8 +117,6 @@
 |---|---|---|
 | US-H4-002 企业微信消息发送 | H4 | 已完成可注入企业微信 provider 边界、模板渲染、批量收件人记录、幂等最终结果更新、成功/可重试失败/永久失败状态、发送审计和参数完整性测试；未接外部 provider 时明确记录失败，禁止伪报发送成功。企业微信真实 HTTP API 调用、Secret alias 解析、access_token 获取与刷新、自动重试调度和外部联调证据尚未完成。 |
 | US-H4-003 企业微信审批流对接 | H4 | 当前仅完成受 JWT 权限保护的内部审批记录和指定审批人回写模型；企业微信审批推送、外部回调签名校验、轮询兜底、业务单据原子回写和外部联调证据尚未完成。 |
-| US-M3-003 库存状态管理 | M3 | 已完成状态变更 API、幂等、审计、PC 弹窗和隔离库存出库门禁；状态转换规则的全局/货主覆盖维护 API、状态字典校验、幂等、审计及 PC 配置页已闭环，真实 PostgreSQL 浏览器 E2E 已验证货主覆盖规则保存和本地门户截图；截图需由 PR 附件或 CI artifact 长期归档。移库门禁、调度接线、ERP 异步反馈重试及外部系统证据仍未闭环。 |
-| US-M3-002 批次与效期管理 | M3 | 已完成批号查询、近效期查询/报表、PC 风险筛选、过期隔离、追溯、召回及双人取消召回，并将 180 天预警默认值和货主覆盖落到 inventory_policy 字典；真实 PostgreSQL 浏览器 E2E 已验证批次追溯、状态变更、召回/取消召回和本地门户截图，截图需由 PR 附件或 CI artifact 长期归档。调度与 H4 预警联动、已发货客户回收提示和完整外部通知证据仍未闭环。 |
 | US-AL-002 告警触发与生命周期 | AL | 已完成 H2 事件订阅、JSON 条件匹配、静默去重、H4 重试与失败二级告警、生命周期状态机、PC 确认/处理/关闭/忽略、业务解除和 7 天自动关闭、权限、审计、OpenAPI、PostgreSQL 测试及真实 PC E2E。受 ADR-0027 Proposed 约束，生产 PDA 应用禁止启动，企微/PDA 点击确认、离线暂存恢复和真机证据尚不能补齐，因此不得整体关闭。 |
 | US-AL-005 告警通道与静默配置 | AL | 当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。 |
 | US-DOCK-002 预约创建 | DOCK | 当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。 |
@@ -154,11 +156,9 @@
 | US-M2-006 收货异常处理 | M2 | 已补收货数量闭合、短少/拒收数量与异常备注持久化，以及 released/receiving 状态整单拒收、关闭状态、货主隔离、幂等和审计；整单拒收审计现明确记录原因、拒收数量和状态变化，PC Web 已接真实拒收 API。故事仍不能整体关闭：销售退货逐批部分拒收、短少强制关闭、温度超标稳定性报告附件、质量联系单/H4 通知、异常统计及拒收专属真实 E2E 截图尚未闭环。 |
 | US-M2-007 收货单据打印 | M2 | 已补真实收货/验收/双签打印数据聚合接口、类型化收货现场字段持久化、前端 H9 数据绑定、PostgreSQL 回归和 M2 真实 E2E；仍缺冷链/普通单据的完整生产模板字段库、PC/蓝牙打印机联调、打印失败重试与正式打印审计证据，继续延期。 |
 | US-M2-010 上架策略配置 | M2 | 已具备真实 PostgreSQL 库位推荐切片：按货主、仓库、温区/质量色标、容量、SKU 数量和同品聚集过滤排序，PC Web 可读取 Top N 推荐并有真实 E2E 截图。故事仍不能整体关闭：当前是固定推荐算法，尚无多策略方案、优先级拖拽、规则启停、商品类别/货主/仓库绑定、ABC/品类/效期规则配置和无库位 H4 通知。 |
-| US-M3-004 在库养护 | M3 | 已补在库养护任务/记录最小真实闭环：任务和批号快照按货主隔离读取，提交校验效期、库存状态、温湿度和结果枚举，记录 append-only，结果写入审计并支持同任务同日幂等回放；真实 PostgreSQL 已覆盖成功、重复、跨货主、过期和非法状态。故事仍不能整体关闭：计划自动生成/周期调度、M-TE PDA 下发、异常照片和 M-QL 联系单、温控设备联动、完成率/逾期预警、PDA 离线冲突及真实前端 E2E 尚未闭环。 |
-| US-M3-005 库存盘点 | M3 | 已补 cycle/full/blind 盘点单创建、库存快照、盲盘数量提交、差异计算、主管权限审批、盘盈盘亏原子调整、库存流水、货主隔离、盘点锁、幂等与审计，真实 PostgreSQL 覆盖成功、跨货主、新分配拦截和重放。故事仍不能整体关闭：范围选择前端、PDA 扫码与离线冲突、盘点期间已下发任务账面、差异金额/比例升级审批、盘点报告打印和真实设备/E2E 尚未闭环。 |
-| US-M3-006 库内移库 | M3 | M-TE 已有 relocation 任务类型和源/目标库位字段，但尚未形成 M3 移库业务闭环；缺移库单/API、源减目标增同事务、状态/温区/容量门禁、整托 LPN 与逐件追溯码分支、PC/PDA、幂等审计和真实 PostgreSQL/PDA 证据，不能标记完成。 |
-| US-M3-009 库存预警 | M3 | 已具备货主级近效期阈值、近效期报表和到期批次自动隔离调度切片。故事仍不能整体关闭：安全库存/超储/养护逾期/温湿度统一预警事件、待处理/已处理/已忽略生命周期、系统消息与可选渠道、审计和统计看板尚未形成 M3 业务闭环。 |
-| US-M3-010 ABC 分类管理 | M3 | 当前尚无 ABC 分类持久化、出库统计任务、阈值配置、人工覆盖、报表和审计实现；M2 上架推荐也未消费 ABC 分类，不能以商品 attrs 或固定排序替代完整故事。 |
+| US-M3-004 在库养护 | M3 | 养护任务/记录最小闭环已存在；本轮未完成计划自动生成、M-TE/PDA、异常照片/M-QL 与真实前端 E2E，继续延期。 |
+| US-M3-005 库存盘点 | M3 | 后端盘点主链已闭环；本轮未新增 PC 列表页与真 PDA 证据。仍缺范围选择前端、PDA 扫码/离线冲突、在途任务账面、阈值升级审批、打印和真实设备/E2E。 |
+| US-M3-006 库内移库 | M3 | 已实现直接移库事务切片：POST /api/v1/inventory/relocations 同事务源减目标增/整批位置迁移，校验合格状态与召回、温区/色标/容量/SKU 门禁、库存流水与幂等审计；真实 PostgreSQL 覆盖成功移库与隔离拦截。仍缺 LPN/M-TC 分支、M-TE 任务接线、PC/PDA 页面与真机离线证据，按完整故事继续延期。 |
 | US-M4-002 波次规划 | M4 | 已补 M4 PC 波次列表、详情、创建、刷新和未拣选取消真实 API：后端在同一事务内校验已确认订单、按合格库存进行货主隔离锁定、生成按库位排序的拣选明细和 M-TE 拣选任务、更新订单入波次，取消时释放库存锁定并恢复订单状态，且写入幂等和审计；独立 PostgreSQL 回归与临时数据库浏览器 E2E 已验证列表读取、创建响应、库存分配、拣选任务、刷新回显、详情读取、取消响应和真实页面截图。故事仍不能整体关闭：容量/完整路径规则、任务执行回写、异常回滚和完整波次规则证据尚未闭环。 |
 | US-M4-003 PDA 拣选作业 | M4 | 当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。 |
 | US-M4-004 出库复核 | M4 | 已补出库复核查询/提交闭环：状态、逐行商品/数量、拣选与复核分离、短拣、货主隔离、幂等和审计；PC 页面提交前查询 M-VR 出库/复核策略，服务端按整单最严格策略强制第二复核员资质和已通过的 H4 主管审批，并在 outbound_review_records 落规则/双人/审批证据；全量复核完成后原子创建 M-TE 装车任务，短拣不提前创建。一次性 PostgreSQL 真实浏览器 E2E 已验证策略展示、第二人提交与成功回显。故事仍不能整体关闭：装车任务执行回写、PDA 整件/零件扫码、离线冲突、追溯码和真实 PDA/外部运行证据尚未闭环。 |
@@ -251,6 +251,10 @@
 | US-M1-004 仓库与库位管理 | M1 | S2 | write、api_change、frontend_interaction | L1、L2、L3、L4、L5、L7、L8、L9、L11 | m1-warehouses、m1-zones、m1-locations | GET /api/v1/master-data/warehouses<br>POST /api/v1/master-data/warehouses<br>PATCH /api/v1/master-data/warehouses/{id}<br>GET /api/v1/master-data/warehouse-zones<br>POST /api/v1/master-data/warehouse-zones<br>PATCH /api/v1/master-data/warehouse-zones/{id}<br>GET /api/v1/master-data/locations<br>POST /api/v1/master-data/locations<br>POST /api/v1/master-data/locations/batch-create<br>PATCH /api/v1/master-data/locations/{id} | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-M3-001 实时库存查询 | M3 | S2 | read_only、api_change、frontend_interaction、integration | L1、L2、L3、L4、L7、L8、L9、L10 | m3-batches | GET /api/v1/inventory/batches | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:not_applicable<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-M3-011 库位历史追踪 | M3 | S2 | read_only、api_change、frontend_interaction、integration | L1、L2、L3、L4、L7、L8、L9、L10 | m3-location-history | GET /api/v1/inventory/locations/history<br>GET /api/v1/inventory/batches/{id}/trace | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:not_applicable<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
+| US-M3-002 批次与效期管理 | M3 | S3 | write、frontend_interaction、integration、runtime_guard、audit_compliance | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | m3-batches | GET /api/v1/inventory/batches<br>GET /api/v1/inventory/batches/near-expiry-report<br>GET /api/v1/inventory/batches/{id}/trace<br>POST /api/v1/inventory/batches/expire<br>POST /api/v1/inventory/batches/recall<br>POST /api/v1/inventory/batches/recall/cancel<br>GET /api/v1/inventory/batches/{id}/shipped-customers<br>POST /api/v1/inventory/alerts/generate-near-expiry | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
+| US-M3-003 库存状态管理 | M3 | S2 | write、config_rule、frontend_interaction、integration | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | m3-batches、m3-status-config | GET /api/v1/inventory/status-transitions<br>PUT /api/v1/inventory/status-transitions/{from_status}/{to_status}<br>POST /api/v1/inventory/batches/status<br>POST /api/v1/inventory/relocations<br>POST /api/v1/inventory/status-erp-outbox/process | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
+| US-M3-009 库存预警 | M3 | S3 | read_only、write、integration、audit_compliance | L1、L2、L3、L4、L5、L8、L9、L10、L11 | - | GET /api/v1/inventory/alerts<br>POST /api/v1/inventory/alerts/{id}/handle<br>POST /api/v1/inventory/alerts/generate-near-expiry<br>GET /api/v1/inventory/batches/near-expiry-report | requirement:verified<br>fields:verified<br>frontend:not_applicable<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
+| US-M3-010 ABC 分类管理 | M3 | S3 | write、config_rule、integration、audit_compliance | L1、L2、L3、L4、L5、L8、L9、L10、L11 | - | GET /api/v1/inventory/abc<br>POST /api/v1/inventory/abc<br>POST /api/v1/inventory/abc/override | requirement:verified<br>fields:verified<br>frontend:not_applicable<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-H1-001 用户登录与 token 签发（PC 密码登录切片） | H1 | S2 | write、api_change、frontend_interaction | L1、L2、L3、L4、L5、L7、L8、L9、L11 | - | POST /api/v1/auth/login<br>GET /api/v1/auth/me | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-H1-002 角色与权限管理 | H1 | S2 | write、api_change、frontend_interaction、config_rule | L1、L2、L3、L4、L5、L7、L8、L9、L11 | h1-role-permission | GET /api/v1/auth/roles<br>POST /api/v1/auth/roles<br>PUT /api/v1/auth/roles/{role_id}<br>DELETE /api/v1/auth/roles/{role_id}<br>PUT /api/v1/auth/roles/{role_id}/permissions<br>GET /api/v1/auth/permissions<br>GET /api/v1/auth/users<br>PUT /api/v1/auth/user-roles/batch | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-H1-003 API 鉴权中间件 | H1 | S1 | read_only、api_change | L1、L2、L3、L8、L9 | - | - | requirement:verified<br>fields:verified<br>frontend:not_applicable<br>api:verified<br>backend:verified<br>database:not_applicable<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |

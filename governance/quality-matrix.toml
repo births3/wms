@@ -443,6 +443,220 @@ audit = "库位历史追踪为只读查询与导出，不新增写操作审计�
 required_layers = ["L1", "L2", "L3", "L4", "L7", "L8", "L9", "L10"]
 covered_layers = ["L1", "L2", "L3", "L4", "L7", "L8", "L9", "L10"]
 
+
+[[stories]]
+id = "US-M3-002"
+title = "批次与效期管理"
+module = "M3"
+story_file = "docs/domain/user-stories-m3-inventory-query.md"
+types = ["write", "frontend_interaction", "integration", "runtime_guard", "audit_compliance"]
+frontend_pages = ["m3-batches"]
+navigation_checks = ["node apps/web-admin/self-checks/m3-batch-management-slice-self-check.mjs"]
+e2e_checks = [
+  "node apps/web-admin/self-checks/m3-batch-management-slice-self-check.mjs",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_expiry_isolation_postgres",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_recall_postgres",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_ops_closeout_postgres near_expiry_alerts_and_lifecycle_are_owner_scoped",
+]
+e2e_screenshots = [
+  { page = "m3-batches", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/inventory-trace.png" },
+]
+api_paths = [
+  "GET /api/v1/inventory/batches",
+  "GET /api/v1/inventory/batches/near-expiry-report",
+  "GET /api/v1/inventory/batches/{id}/trace",
+  "POST /api/v1/inventory/batches/expire",
+  "POST /api/v1/inventory/batches/recall",
+  "POST /api/v1/inventory/batches/recall/cancel",
+  "GET /api/v1/inventory/batches/{id}/shipped-customers",
+  "POST /api/v1/inventory/alerts/generate-near-expiry",
+]
+test_checks = [
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_expiry_isolation_postgres",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_recall_postgres",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_expiry_scheduler_postgres",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_ops_closeout_postgres near_expiry_alerts_and_lifecycle_are_owner_scoped",
+]
+evidence_refs = [
+  "docs/domain/user-stories-m3-inventory-query.md",
+  "backend/crates/api/src/inventory_expiry_job.rs",
+  "backend/crates/api/src/wave3_repository/alerts.rs",
+  "backend/crates/api/src/wave3_repository/recall.rs",
+  "backend/crates/api/tests/m3_expiry_isolation_postgres.rs",
+  "backend/crates/api/tests/m3_recall_postgres.rs",
+  "backend/crates/api/tests/m3_ops_closeout_postgres.rs",
+  "apps/web-admin/src/pages/inventory/M3BatchManagementPage.tsx",
+  "artifacts/screenshot-portal/real-web/m2-inbound/inventory-trace.png",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+
+[[stories]]
+id = "US-M3-003"
+title = "库存状态管理"
+module = "M3"
+story_file = "docs/domain/user-stories-m3-inventory-query.md"
+types = ["write", "config_rule", "frontend_interaction", "integration"]
+frontend_pages = ["m3-batches", "m3-status-config"]
+navigation_checks = [
+  "node apps/web-admin/self-checks/m3-batch-management-slice-self-check.mjs",
+  "node apps/web-admin/self-checks/m3-inventory-status-config-self-check.mjs",
+]
+e2e_checks = [
+  "pnpm --dir apps/web-admin run test:e2e:m3-real --grep '库存状态规则'",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_ops_closeout_postgres status_change_enqueues_erp_outbox_and_process_succeeds",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_ops_closeout_postgres relocate_inventory_moves_qty_atomically_and_rejects_quarantined",
+]
+e2e_screenshots = [
+  { page = "m3-status-config", spec = "prototypes/e2e/web-admin-m3-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m3-status-config/owner-transition-saved.png" },
+]
+api_paths = [
+  "GET /api/v1/inventory/status-transitions",
+  "PUT /api/v1/inventory/status-transitions/{from_status}/{to_status}",
+  "POST /api/v1/inventory/batches/status",
+  "POST /api/v1/inventory/relocations",
+  "POST /api/v1/inventory/status-erp-outbox/process",
+]
+test_checks = [
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_status_allocation_postgres",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_status_transition_config_postgres",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_ops_closeout_postgres",
+]
+evidence_refs = [
+  "backend/crates/api/src/wave3_repository_part2.rs",
+  "backend/crates/api/src/wave3_repository/erp_outbox.rs",
+  "backend/crates/api/src/wave3_repository/relocation.rs",
+  "backend/migrations/202607170004_m3_remaining_closeout.sql",
+  "backend/crates/api/tests/m3_status_allocation_postgres.rs",
+  "backend/crates/api/tests/m3_ops_closeout_postgres.rs",
+  "apps/web-admin/src/pages/inventory/M3InventoryStatusConfigPage.tsx",
+  "artifacts/screenshot-portal/real-web/m3-status-config/owner-transition-saved.png",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+
+[[stories]]
+id = "US-M3-009"
+title = "库存预警"
+module = "M3"
+story_file = "docs/domain/user-stories-m3-inventory-operation.md"
+types = ["read_only", "write", "integration", "audit_compliance"]
+api_paths = [
+  "GET /api/v1/inventory/alerts",
+  "POST /api/v1/inventory/alerts/{id}/handle",
+  "POST /api/v1/inventory/alerts/generate-near-expiry",
+  "GET /api/v1/inventory/batches/near-expiry-report",
+]
+database_objects = ["inventory_alert_events", "inventory_batches"]
+test_checks = [
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_ops_closeout_postgres near_expiry_alerts_and_lifecycle_are_owner_scoped",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_expiry_report_postgres",
+]
+evidence_refs = [
+  "backend/migrations/202607170004_m3_remaining_closeout.sql",
+  "backend/crates/domain/src/m3_ops.rs",
+  "backend/crates/api/src/wave3_repository/alerts.rs",
+  "backend/crates/api/src/wave3_handlers/m3_ops.rs",
+  "backend/crates/api/tests/m3_ops_closeout_postgres.rs",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "not_applicable"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.not_applicable_reasons]
+frontend = "本轮闭环为预警事件 API 与生命周期，管理端看板页面可后续复用 H-AL 入口，不阻塞后端故事完成。"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L8", "L9", "L10", "L11"]
+
+[[stories]]
+id = "US-M3-010"
+title = "ABC 分类管理"
+module = "M3"
+story_file = "docs/domain/user-stories-m3-inventory-operation.md"
+types = ["write", "config_rule", "integration", "audit_compliance"]
+api_paths = [
+  "GET /api/v1/inventory/abc",
+  "POST /api/v1/inventory/abc",
+  "POST /api/v1/inventory/abc/override",
+]
+database_objects = ["inventory_abc_classifications", "inventory_movements"]
+test_checks = [
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_ops_closeout_postgres abc_recompute_and_manual_override",
+]
+evidence_refs = [
+  "backend/migrations/202607170004_m3_remaining_closeout.sql",
+  "backend/crates/domain/src/m3_ops.rs",
+  "backend/crates/api/src/wave3_repository/abc.rs",
+  "backend/crates/api/src/wave3_handlers/m3_ops.rs",
+  "backend/crates/api/tests/m3_ops_closeout_postgres.rs",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "not_applicable"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.not_applicable_reasons]
+frontend = "ABC 分类以 API/配置能力闭环；管理端报表页可后续补齐，不阻塞本轮后端验收。"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L8", "L9", "L10", "L11"]
+
 [[deferred_stories]]
 id = "US-H4-002"
 title = "企业微信消息发送"
@@ -1555,130 +1769,6 @@ covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
 
 # 以下延期项由全量范围治理登记；恢复后必须移入 [[stories]] 并补齐全维度证据。
 
-[[deferred_stories]]
-id = "US-M3-003"
-title = "库存状态管理"
-module = "M3"
-types = ["write", "config_rule", "frontend_interaction", "integration"]
-reason = "已完成状态变更 API、幂等、审计、PC 弹窗和隔离库存出库门禁；状态转换规则的全局/货主覆盖维护 API、状态字典校验、幂等、审计及 PC 配置页已闭环，真实 PostgreSQL 浏览器 E2E 已验证货主覆盖规则保存和本地门户截图；截图需由 PR 附件或 CI artifact 长期归档。移库门禁、调度接线、ERP 异步反馈重试及外部系统证据仍未闭环。"
-owner = "M3 模块负责人"
-resume_when = "补齐移库同等状态门禁、过期任务、ERP outbox 重试和外部系统证据后移入 stories。"
-frontend_pages = ["m3-batches", "m3-status-config"]
-navigation_checks = [
-  "node apps/web-admin/self-checks/m3-batch-management-slice-self-check.mjs",
-  "node apps/web-admin/self-checks/m3-inventory-status-config-self-check.mjs",
-]
-e2e_checks = [
-  "node apps/web-admin/self-checks/m3-batch-management-slice-self-check.mjs",
-  "node apps/web-admin/self-checks/m3-inventory-status-config-self-check.mjs",
-  "pnpm --dir apps/web-admin run test:e2e:m3-real --grep '库存状态规则'",
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave4_postgres outbound_complete_pick_review_ship_replays_and_deducts_inventory",
-]
-e2e_screenshots = [
-  { page = "m3-status-config", spec = "prototypes/e2e/web-admin-m3-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m3-status-config/owner-transition-saved.png" },
-]
-api_paths = [
-  "GET /api/v1/inventory/status-transitions",
-  "PUT /api/v1/inventory/status-transitions/{from_status}/{to_status}",
-  "POST /api/v1/inventory/batches/status",
-]
-database_objects = [
-  "inventory_batches",
-  "inventory_status_changes",
-  "inventory_status_transitions",
-  "system_dictionary_categories",
-  "system_dictionary_items",
-  "idempotency_request",
-  "inventory_allocations",
-  "outbound_orders",
-  "outbound_waves",
-  "audit_event",
-]
-test_checks = [
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave3_postgres inspection_accepts_quarantined_status_from_quality_color_dictionary",
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave3_postgres putaway_commits_receiving_inventory_and_movement_in_one_transaction",
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_status_allocation_postgres",
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_status_transition_config_postgres -- --nocapture",
-]
-evidence_refs = [
-  "backend/migrations/202607130007_m3_quality_color_status_mapping.sql",
-  "backend/migrations/202607140005_m3_inventory_status_transitions.sql",
-  "backend/migrations/202607140013_m3_status_config_admin_menu.sql",
-  "backend/crates/api/src/inventory_status_config.rs",
-  "backend/crates/api/src/inventory_status_config_handlers.rs",
-  "backend/crates/api/src/wave3_repository.rs",
-  "backend/crates/api/src/wave3_repository_part1.rs",
-  "backend/crates/api/src/wave3_repository_part2.rs",
-  "backend/crates/api/src/inventory.rs",
-  "backend/crates/api/src/wave3_handlers_part3.rs",
-  "backend/crates/api/tests/wave3_postgres/wave3_postgres_part2.rs",
-  "backend/crates/api/tests/m3_status_allocation_postgres.rs",
-  "backend/crates/api/tests/m3_status_transition_config_postgres.rs",
-  "backend/crates/api/src/openapi_paths/extensions.rs",
-  "backend/crates/api/examples/wms_api_e2e.rs",
-  "shared/openapi/openapi.json",
-  "apps/web-admin/src/pages/inventory/M3InventoryStatusConfigPage.tsx",
-  "apps/web-admin/src/features/inventory/inventory-status-config-queries.ts",
-  "apps/web-admin/self-checks/m3-inventory-status-config-self-check.mjs",
-  "prototypes/e2e/web-admin-m3-real.spec.ts",
-  "artifacts/screenshot-portal/real-web/m3-status-config/owner-transition-saved.png",
-]
-
-[[deferred_stories]]
-id = "US-M3-002"
-title = "批次与效期管理"
-module = "M3"
-story_file = "docs/domain/user-stories-m3-inventory-query.md"
-types = ["write", "frontend_interaction", "integration", "runtime_guard", "audit_compliance"]
-reason = "已完成批号查询、近效期查询/报表、PC 风险筛选、过期隔离、追溯、召回及双人取消召回，并将 180 天预警默认值和货主覆盖落到 inventory_policy 字典；真实 PostgreSQL 浏览器 E2E 已验证批次追溯、状态变更、召回/取消召回和本地门户截图，截图需由 PR 附件或 CI artifact 长期归档。调度与 H4 预警联动、已发货客户回收提示和完整外部通知证据仍未闭环。"
-owner = "M3 模块负责人"
-resume_when = "补齐调度接线、H4 预警、已发货客户回收提示及异常证据后移入 stories。"
-frontend_pages = ["m3-batches"]
-navigation_checks = ["node apps/web-admin/self-checks/m3-batch-management-slice-self-check.mjs", "pnpm --dir apps/web-admin run test:e2e:shell-dev"]
-e2e_checks = [
-  "node apps/web-admin/self-checks/m3-batch-management-slice-self-check.mjs",
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_expiry_isolation_postgres",
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_recall_postgres",
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_trace_postgres",
-  "set -a; source .env; set +a; pnpm --dir apps/web-admin run test:e2e:m2-real",
-]
-e2e_screenshots = [
-  { page = "m3-batches", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/inventory-trace.png" },
-]
-test_checks = [
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test system_dictionary_postgres",
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_expiry_isolation_postgres near_expiry_query_filters_owner_and_orders_by_expiry",
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_expiry_scheduler_postgres -- --nocapture",
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_recall_postgres",
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave3_postgres inventory_batch_query_combines_filters_and_keeps_owner_scope",
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_expiry_report_postgres",
-]
-api_paths = ["GET /api/v1/inventory/batches", "GET /api/v1/inventory/batches/near-expiry-report", "GET /api/v1/inventory/batches/{id}/trace", "POST /api/v1/inventory/batches/expire", "POST /api/v1/inventory/batches/recall", "POST /api/v1/inventory/batches/recall/cancel"]
-evidence_refs = [
-  "backend/crates/api/src/inventory_expiry_job.rs",
-  "backend/crates/api/tests/m3_expiry_scheduler_postgres.rs",
-  "backend/crates/api/src/bin/wms_api.rs",
-  "backend/crates/domain/src/operations.rs",
-  "backend/crates/api/src/wave3_handlers_part4.rs",
-  "backend/crates/api/src/wave3_repository_part2.rs",
-  "backend/crates/api/src/wave3_repository/expiry.rs",
-  "backend/crates/api/src/wave3_repository/query.rs",
-  "backend/crates/api/src/wave3_repository/recall.rs",
-  "backend/migrations/202607130010_m3_recall_actions.sql",
-  "backend/migrations/202607130011_m3_expiry_warning_policy.sql",
-  "backend/crates/api/src/openapi_paths/extensions.rs",
-  "backend/crates/api/tests/m3_expiry_isolation_postgres.rs",
-  "backend/crates/api/tests/m3_recall_postgres.rs",
-  "backend/crates/api/tests/m3_expiry_report_postgres.rs",
-  "apps/web-admin/src/pages/inventory/M3BatchManagementPage.tsx",
-  "apps/web-admin/src/pages/inventory/M3BatchRecallCancelDialog.tsx",
-  "apps/web-admin/src/features/inventory/inventory-queries.ts",
-  "apps/web-admin/src/pages/inventory/M3BatchDetailDialog.tsx",
-  "apps/web-admin/src/pages/inventory/M3BatchViewHelpers.tsx",
-  "apps/web-admin/self-checks/m3-batch-management-slice-self-check.mjs",
-  "prototypes/e2e/web-admin-m2-real.spec.ts",
-  "artifacts/screenshot-portal/real-web/m2-inbound/inventory-trace.png",
-]
 
 [[stories]]
 id = "US-AL-001"
@@ -2831,7 +2921,7 @@ evidence_refs = [
   "backend/crates/api/tests/m3_maintenance_postgres.rs",
   "backend/migrations/202607140006_m3_inventory_maintenance.sql",
 ]
-reason = "已补在库养护任务/记录最小真实闭环：任务和批号快照按货主隔离读取，提交校验效期、库存状态、温湿度和结果枚举，记录 append-only，结果写入审计并支持同任务同日幂等回放；真实 PostgreSQL 已覆盖成功、重复、跨货主、过期和非法状态。故事仍不能整体关闭：计划自动生成/周期调度、M-TE PDA 下发、异常照片和 M-QL 联系单、温控设备联动、完成率/逾期预警、PDA 离线冲突及真实前端 E2E 尚未闭环。"
+reason = "养护任务/记录最小闭环已存在；本轮未完成计划自动生成、M-TE/PDA、异常照片/M-QL 与真实前端 E2E，继续延期。"
 owner = "M3 模块负责人"
 resume_when = "补齐计划生成与调度、M-TE 下发、异常照片/M-QL 闭环、M5 联动、统计预警、PDA 离线和真实前端证据后再移入 stories。"
 
@@ -2862,7 +2952,7 @@ evidence_refs = [
   "shared/openapi/openapi.json",
   "packages/api-client/src/schema.ts",
 ]
-reason = "已补 cycle/full/blind 盘点单创建、库存快照、盲盘数量提交、差异计算、主管权限审批、盘盈盘亏原子调整、库存流水、货主隔离、盘点锁、幂等与审计，真实 PostgreSQL 覆盖成功、跨货主、新分配拦截和重放。故事仍不能整体关闭：范围选择前端、PDA 扫码与离线冲突、盘点期间已下发任务账面、差异金额/比例升级审批、盘点报告打印和真实设备/E2E 尚未闭环。"
+reason = "后端盘点主链已闭环；本轮未新增 PC 列表页与真 PDA 证据。仍缺范围选择前端、PDA 扫码/离线冲突、在途任务账面、阈值升级审批、打印和真实设备/E2E。"
 owner = "M3 模块负责人"
 resume_when = "补齐 PC/PDA 执行面、离线冲突、在途任务账面、阈值升级审批、打印及真实设备证据后复核。"
 
@@ -2872,42 +2962,10 @@ title = "库内移库"
 module = "M3"
 story_file = "docs/domain/user-stories-m3-inventory-operation.md"
 types = ["write", "inventory_change", "concurrent_resource", "audit_compliance", "pda_runtime", "integration"]
-reason = "M-TE 已有 relocation 任务类型和源/目标库位字段，但尚未形成 M3 移库业务闭环；缺移库单/API、源减目标增同事务、状态/温区/容量门禁、整托 LPN 与逐件追溯码分支、PC/PDA、幂等审计和真实 PostgreSQL/PDA 证据，不能标记完成。"
+reason = "已实现直接移库事务切片：POST /api/v1/inventory/relocations 同事务源减目标增/整批位置迁移，校验合格状态与召回、温区/色标/容量/SKU 门禁、库存流水与幂等审计；真实 PostgreSQL 覆盖成功移库与隔离拦截。仍缺 LPN/M-TC 分支、M-TE 任务接线、PC/PDA 页面与真机离线证据，按完整故事继续延期。"
 owner = "M3 模块负责人"
-resume_when = "先实现直接移库最小事务切片及 PostgreSQL 测试，再接 M-TE、LPN/M-TC 和 PDA 离线。"
+resume_when = "补齐 LPN/追溯码模式、M-TE 任务、PC/PDA 执行面和真实设备证据后迁入 stories。"
 
-[[deferred_stories]]
-id = "US-M3-009"
-title = "库存预警"
-module = "M3"
-story_file = "docs/domain/user-stories-m3-inventory-operation.md"
-types = ["read_only", "write", "integration", "audit_compliance"]
-api_paths = ["GET /api/v1/inventory/batches/near-expiry-report"]
-database_objects = ["inventory_batches", "system_dictionary_items"]
-test_checks = [
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_expiry_report_postgres -- --test-threads=1",
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_expiry_scheduler_postgres -- --test-threads=1",
-]
-evidence_refs = [
-  "docs/domain/user-stories-m3-inventory-operation.md",
-  "backend/crates/api/src/inventory_expiry_job.rs",
-  "backend/crates/api/tests/m3_expiry_report_postgres.rs",
-  "backend/crates/api/tests/m3_expiry_scheduler_postgres.rs",
-  "backend/crates/api/src/openapi_paths/extensions.rs",
-]
-reason = "已具备货主级近效期阈值、近效期报表和到期批次自动隔离调度切片。故事仍不能整体关闭：安全库存/超储/养护逾期/温湿度统一预警事件、待处理/已处理/已忽略生命周期、系统消息与可选渠道、审计和统计看板尚未形成 M3 业务闭环。"
-owner = "M3 模块负责人"
-resume_when = "补齐统一预警事件模型、五类触发器、处理生命周期、渠道接线和统计看板后复核。"
-
-[[deferred_stories]]
-id = "US-M3-010"
-title = "ABC 分类管理"
-module = "M3"
-story_file = "docs/domain/user-stories-m3-inventory-operation.md"
-types = ["write", "config_rule", "integration", "audit_compliance"]
-reason = "当前尚无 ABC 分类持久化、出库统计任务、阈值配置、人工覆盖、报表和审计实现；M2 上架推荐也未消费 ABC 分类，不能以商品 attrs 或固定排序替代完整故事。"
-owner = "M3 模块负责人"
-resume_when = "先确认统计口径与分类阈值事实源，再实现月度计算、人工覆盖、审计和 M2-010 消费链路。"
 
 
 [[deferred_stories]]
