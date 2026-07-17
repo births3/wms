@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 
-const artifactsDir = path.resolve("../apps/web-admin/.e2e-artifacts/m4-real/screenshots");
+const artifactsDir = path.resolve("../artifacts/screenshot-portal/real-web/m4-outbound");
 
 test("M4 PC 新建出库单使用真实 API 返回单据类型和自动单号", async ({ page }) => {
   fs.mkdirSync(artifactsDir, { recursive: true });

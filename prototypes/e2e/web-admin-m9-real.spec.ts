@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const apiURL = process.env.WMS_WEB_ADMIN_E2E_API_URL ?? "http://127.0.0.1:19189";
-const artifactsDir = path.resolve("../apps/web-admin/.e2e-artifacts/m9-real/screenshots");
+const artifactsDir = path.resolve("../artifacts/screenshot-portal/real-web/m9-billing-rules");
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type BillingContract = { id: string; account_id: string; contract_no: string };

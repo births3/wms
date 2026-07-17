@@ -6,6 +6,7 @@ const artifactsDir = path.resolve("../apps/web-admin/.e2e-artifacts/m1-real/scre
 const productEvidenceDir = path.resolve("../artifacts/screenshot-portal/real-web/m1-products");
 const businessPartnerEvidenceDir = path.resolve("../artifacts/screenshot-portal/real-web/m1-business-partners");
 const featureFlagEvidenceDir = path.resolve("../artifacts/screenshot-portal/real-web/m1-feature-flags");
+const systemDictionaryEvidenceDir = path.resolve("../artifacts/screenshot-portal/real-web/m1-system-dictionary");
 
 test("M1 管理端读取真实后端数据", async ({ page }) => {
   fs.mkdirSync(artifactsDir, { recursive: true });
@@ -57,12 +58,13 @@ test("M1 管理端读取真实后端数据", async ({ page }) => {
       const policyResponseValue = await policyResponse;
       expect(policyResponseValue.status(), await policyResponseValue.text()).toBe(200);
       await expect(policySelect).toHaveValue("dual_scan");
+      fs.mkdirSync(systemDictionaryEvidenceDir, { recursive: true });
       await page.screenshot({
-        path: path.join(artifactsDir, "dictionary-special-drug.png"),
+        path: path.join(systemDictionaryEvidenceDir, "special-drug-category.png"),
         fullPage: false,
       });
       await page.screenshot({
-        path: path.join(artifactsDir, "dual-person-policy-matrix.png"),
+        path: path.join(systemDictionaryEvidenceDir, "dual-person-policy-matrix.png"),
         fullPage: false,
       });
     }
@@ -504,7 +506,8 @@ test("M-VR 双人策略矩阵真实保存", async ({ page }) => {
   const responseValue = await response;
   expect(responseValue.status(), await responseValue.text()).toBe(200);
   await expect(policySelect).toHaveValue("dual_scan");
-  await page.screenshot({ path: path.join(artifactsDir, "dual-person-policy-matrix.png"), fullPage: true });
+  fs.mkdirSync(systemDictionaryEvidenceDir, { recursive: true });
+  await page.screenshot({ path: path.join(systemDictionaryEvidenceDir, "dual-person-policy-matrix.png"), fullPage: true });
 });
 
 function pad2(value: string) {
