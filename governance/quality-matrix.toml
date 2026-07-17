@@ -1629,6 +1629,9 @@ owner = "AL 模块负责人"
 resume_when = "ADR-0027 Accepted 并具备真 PDA 后，实现 PDA 未读告警、离线确认重放和真机证据；同时完成企微点击确认回调的真实外部链路证据。"
 frontend_pages = ["hal-alert-dashboard"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:hal-real"]
+e2e_screenshots = [
+  { page = "hal-alert-dashboard", spec = "prototypes/e2e/web-admin-hal-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h-al-alert-dashboard/active-alerts.png" },
+]
 api_paths = [
   "GET /api/v1/alerts",
   "GET /api/v1/alerts/{id}",
@@ -1655,6 +1658,7 @@ evidence_refs = [
   "apps/web-admin/src/features/alert-engine/alert-runtime-queries.ts",
   "apps/web-admin/src/pages/alert-engine/AlertDashboardPage.tsx",
   "prototypes/e2e/web-admin-hal-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/h-al-alert-dashboard/active-alerts.png",
   "docs/adr/0027-pda-offline-model.md",
 ]
 
@@ -2256,6 +2260,9 @@ navigation_checks = [
   "pnpm --dir apps/web-admin run test:e2e:shell-dev",
 ]
 e2e_checks = ["just web-admin-m1-real-e2e"]
+e2e_screenshots = [
+  { page = "m1-system-dictionary", spec = "prototypes/e2e/web-admin-m1-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m1-system-dictionary/special-drug-category.png" },
+]
 api_paths = [
   "GET /api/v1/system-dictionaries/{dict_code}/items",
   "PUT /api/v1/system-dictionaries/{dict_code}/items/{item_code}",
@@ -2280,6 +2287,8 @@ evidence_refs = [
   "backend/crates/api/tests/master_data_postgres/master_data_postgres_part1.rs",
   "apps/web-admin/src/pages/master-data/SystemDictionaryPage.tsx",
   "apps/web-admin/self-checks/m1-special-drug-system-dictionary-self-check.mjs",
+  "prototypes/e2e/web-admin-m1-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/m1-system-dictionary/special-drug-category.png",
   "docs/compliance/gsp-special-drugs.md",
 ]
 reason = "已补齐特殊药品字典 8 类预置、合规属性矩阵、通用字典维护、自定义分类消费，并由数据库触发器与 M-VR 双人策略规则双向同步，矩阵 UI 已通过真实浏览器 E2E；仍缺分类字段/合规属性修改的仓库主管+质量负责人审批、M-PM 枚举同步、专用台账与专柜专库运行联动及完整 GSP 回查证据，禁止标记完成。"
@@ -2561,6 +2570,10 @@ api_paths = [
     "POST /api/v1/print-templates/print",
 ]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
+e2e_screenshots = [
+  { page = "m2-receiving", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/receiving-print-preview.png" },
+  { page = "m2-inspecting", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/inspection-print-preview.png" },
+]
 database_objects = ["receiving_order_receipts", "receiving_inspections", "receiving_inspection_signatures", "print_records"]
 test_checks = [
     "cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_deferred_closeout_postgres print_data_reads_receipt_inspection_and_dual_signature",
@@ -2575,6 +2588,8 @@ evidence_refs = [
     "apps/web-admin/dev-mocks/web-admin-dev-mock-core-common.ts",
     "apps/web-admin/src/pages/inbound/M2InboundPrintDialog.tsx",
     "prototypes/e2e/web-admin-m2-real.spec.ts",
+    "artifacts/screenshot-portal/real-web/m2-inbound/receiving-print-preview.png",
+    "artifacts/screenshot-portal/real-web/m2-inbound/inspection-print-preview.png",
 ]
 reason = "已补真实收货/验收/双签打印数据聚合接口、类型化收货现场字段持久化、前端 H9 数据绑定、PostgreSQL 回归和 M2 真实 E2E；仍缺冷链/普通单据的完整生产模板字段库、PC/蓝牙打印机联调、打印失败重试与正式打印审计证据，继续延期。"
 owner = "M2 模块负责人"
@@ -2674,6 +2689,9 @@ types = ["read_only", "api_change", "integration"]
 frontend_pages = ["m3-batches"]
 navigation_checks = ["node apps/web-admin/self-checks/m3-batch-management-slice-self-check.mjs"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m3-real"]
+e2e_screenshots = [
+  { page = "m3-batches", spec = "prototypes/e2e/web-admin-m3-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m3-batches/inventory-query.png" },
+]
 test_checks = [
   "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_expiry_isolation_postgres inventory_query_combines_filters_without_cross_owner_rows",
   "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_expiry_isolation_postgres inventory_query_filters_location_type_and_zone_without_cross_owner_rows",
@@ -2697,9 +2715,9 @@ evidence_refs = [
   "apps/web-admin/self-checks/m3-batch-management-slice-self-check.mjs",
   "prototypes/e2e/web-admin-m3-real.spec.ts",
   "prototypes/playwright-web-admin-m3-real-config.ts",
-  "apps/web-admin/.e2e-artifacts/m3-real/screenshots/inventory-query.png",
-  "apps/web-admin/.e2e-artifacts/m3-real/screenshots/inventory-export-dialog.png",
-  "apps/web-admin/.e2e-artifacts/m3-real/screenshots/inventory-exported.png",
+  "artifacts/screenshot-portal/real-web/m3-batches/inventory-query.png",
+  "artifacts/screenshot-portal/real-web/m3-batches/inventory-export-dialog.png",
+  "artifacts/screenshot-portal/real-web/m3-batches/inventory-exported.png",
 ]
 reason = "已补实时库存查询的库位类型 location_type、库区编码 zone_code 过滤、库位/库区关联查询和货主隔离，并以真实 PostgreSQL 覆盖组合条件、空值条件、未知条件和跨货主数据；管理端已复用 DataGrid 标准 Excel 导出，真实 PostgreSQL 浏览器 E2E 验证组合筛选仅导出当前 1 条结果，下载文件为非空 .xlsx 且具有 ZIP 文件头。故事仍不能整体关闭：内存 mock 没有库位主数据、库位专项视图及温区/库位元信息、批次专项视图、剩余筛选参数和开放 API 调用凭据尚未闭环。"
 owner = "M3 模块负责人"
@@ -2714,6 +2732,9 @@ navigation_checks = ["node apps/web-admin/self-checks/m4-outbound-create-api-sel
 e2e_checks = [
   "node apps/web-admin/self-checks/m4-outbound-create-api-self-check.mjs",
   "set -a; source .env; set +a; pnpm --dir apps/web-admin run test:e2e:m4-real",
+]
+e2e_screenshots = [
+  { page = "m4-waves", spec = "prototypes/e2e/web-admin-m4-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m4-outbound/outbound-wave-created.png" },
 ]
 test_checks = [
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave4_postgres outbound_wave_reads_are_owner_scoped_filterable_and_include_orders",
@@ -2739,9 +2760,9 @@ evidence_refs = [
   "apps/web-admin/dev-mocks/outbound-dev-mock.ts",
   "apps/web-admin/self-checks/m4-outbound-create-api-self-check.mjs",
   "prototypes/e2e/web-admin-m4-real.spec.ts",
-  "apps/web-admin/.e2e-artifacts/m4-real/screenshots/outbound-wave-created.png",
-  "apps/web-admin/.e2e-artifacts/m4-real/screenshots/outbound-wave-detail.png",
-  "apps/web-admin/.e2e-artifacts/m4-real/screenshots/outbound-wave-cancelled.png",
+  "artifacts/screenshot-portal/real-web/m4-outbound/outbound-wave-created.png",
+  "artifacts/screenshot-portal/real-web/m4-outbound/outbound-wave-detail.png",
+  "artifacts/screenshot-portal/real-web/m4-outbound/outbound-wave-cancelled.png",
 ]
 reason = "已补 M4 PC 波次列表、详情、创建、刷新和未拣选取消真实 API：后端在同一事务内校验已确认订单、按合格库存进行货主隔离锁定、生成按库位排序的拣选明细和 M-TE 拣选任务、更新订单入波次，取消时释放库存锁定并恢复订单状态，且写入幂等和审计；独立 PostgreSQL 回归与临时数据库浏览器 E2E 已验证列表读取、创建响应、库存分配、拣选任务、刷新回显、详情读取、取消响应和真实页面截图。故事仍不能整体关闭：容量/完整路径规则、任务执行回写、异常回滚和完整波次规则证据尚未闭环。"
 owner = "M4 模块负责人"
@@ -2769,6 +2790,9 @@ api_paths = [
 e2e_checks = [
   "pnpm --dir apps/web-admin run test:e2e:m4-real",
   "pnpm --dir apps/web-admin run test:e2e:shell-dev",
+]
+e2e_screenshots = [
+  { page = "m4-review", spec = "prototypes/e2e/web-admin-m4-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m4-outbound/outbound-review-detail.png" },
 ]
 database_objects = [
   "outbound_orders",
@@ -2809,8 +2833,8 @@ evidence_refs = [
   "apps/web-admin/src/pages/outbound/m4-outbound-page-model.ts",
   "apps/web-admin/src/pages/outbound/M4OutboundActionDialog.tsx",
   "prototypes/e2e/web-admin-m4-real.spec.ts",
-  "apps/web-admin/.e2e-artifacts/m4-real/screenshots/outbound-review-detail.png",
-  "apps/web-admin/.e2e-artifacts/m4-real/screenshots/outbound-review-submitted.png",
+  "artifacts/screenshot-portal/real-web/m4-outbound/outbound-review-detail.png",
+  "artifacts/screenshot-portal/real-web/m4-outbound/outbound-review-submitted.png",
   "shared/openapi/openapi.json",
   "packages/api-client/src/schema.ts",
 ]
@@ -3023,6 +3047,9 @@ e2e_checks = [
   "node apps/web-admin/self-checks/m9-billing-rule-page-self-check.mjs",
   "DATABASE_URL=<隔离临时数据库> pnpm --dir prototypes exec playwright test --config=playwright-web-admin-m9-real-config.ts",
 ]
+e2e_screenshots = [
+  { page = "m9-billing-rules", spec = "prototypes/e2e/web-admin-m9-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m9-billing-rules/rule-created.png" },
+]
 api_paths = ["POST /api/v1/billing/rules"]
 database_objects = ["billing_rules", "billing_contracts", "idempotency_request", "audit_event"]
 test_checks = [
@@ -3053,14 +3080,14 @@ evidence_refs = [
   "apps/web-admin/dev-mocks/admin-menu-dev-mock.ts",
   "prototypes/e2e/web-admin-m9-real.spec.ts",
   "prototypes/playwright-web-admin-m9-real-config.ts",
-  "apps/web-admin/.e2e-artifacts/m9-real/screenshots/page-loaded.png",
-  "apps/web-admin/.e2e-artifacts/m9-real/screenshots/invalid-rate.png",
-  "apps/web-admin/.e2e-artifacts/m9-real/screenshots/invalid-date-window.png",
-  "apps/web-admin/.e2e-artifacts/m9-real/screenshots/rule-created.png",
+  "artifacts/screenshot-portal/real-web/m9-billing-rules/page-loaded.png",
+  "artifacts/screenshot-portal/real-web/m9-billing-rules/invalid-rate.png",
+  "artifacts/screenshot-portal/real-web/m9-billing-rules/invalid-date-window.png",
+  "artifacts/screenshot-portal/real-web/m9-billing-rules/rule-created.png",
 ]
 reason = "已补计费规则的计费项、计量单位、周期、非负费率、生效窗口与合同窗口校验、同货主合同隔离、并发窗口冲突、Idempotency-Key 幂等回放/冲突、规则写入与审计同事务 PostgreSQL 证据，并新增正式菜单迁移、PC 配置页面、页面级 self-check 和真实浏览器 E2E/截图。仍缺阶梯价格、H-APV 配置审批、真实 GET 历史查询和正式发布证据，不能标记完成。"
 owner = "M9 模块负责人"
-resume_when = "补齐阶梯价格、H-APV 审批、管理端页面/API 真实接线、浏览器 E2E/截图及正式发布证据后复核。"
+resume_when = "补齐阶梯价格、H-APV 审批、真实 GET 历史查询及正式发布证据后复核。"
 
 [[deferred_stories]]
 id = "US-M9-002"
@@ -3152,13 +3179,19 @@ frontend_pages = ["mcg-numbering"]
 navigation_checks = ["node apps/web-admin/self-checks/mcg-document-numbering-slice-self-check.mjs", "node apps/web-admin/self-checks/m4-outbound-create-api-self-check.mjs"]
 e2e_checks = [
     "node apps/web-admin/self-checks/mcg-document-numbering-slice-self-check.mjs",
+    "DATABASE_URL=<隔离临时数据库> pnpm --dir prototypes exec playwright test --config=playwright-web-admin-mcg-real-config.ts",
     "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave4_postgres outbound_order_generates_number_when_request_omits_wms_number",
     "set -a; source .env; set +a; pnpm --dir apps/web-admin run test:e2e:m4-real",
 ]
+e2e_screenshots = [
+  { page = "mcg-numbering", spec = "prototypes/e2e/web-admin-mcg-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/mcg-numbering/rule-created.png" },
+]
 api_paths = ["GET /api/v1/code-generator/document-number-allocations", "GET /api/v1/outbound/orders", "POST /api/v1/outbound/orders", "POST /api/v1/outbound/waves", "GET /api/v1/outbound/waves", "GET /api/v1/outbound/waves/{wave_id}", "PgDocumentNumberingService::generate_in_tx"]
 evidence_refs = [
-  "apps/web-admin/.e2e-artifacts/m4-real/screenshots/outbound-wave-created.png",
-  "apps/web-admin/.e2e-artifacts/m4-real/screenshots/outbound-wave-detail.png",
+  "prototypes/e2e/web-admin-mcg-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/mcg-numbering/rule-created.png",
+  "artifacts/screenshot-portal/real-web/m4-outbound/outbound-wave-created.png",
+  "artifacts/screenshot-portal/real-web/m4-outbound/outbound-wave-detail.png",
 ]
 
 [[deferred_stories]]
@@ -3932,6 +3965,9 @@ types = ["read_only", "frontend_interaction", "monitoring"]
 frontend_pages = ["mte-task-dispatch"]
 navigation_checks = ["node apps/web-admin/self-checks/mte-task-execution-slice-self-check.mjs"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:mte-real --grep '任务组和调度'"]
+e2e_screenshots = [
+  { page = "mte-task-dispatch", spec = "prototypes/e2e/web-admin-te-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m-te-task-execution/task-dispatched.png" },
+]
 api_paths = ["GET /api/v1/task-engine/tasks"]
 database_objects = ["warehouse_tasks"]
 test_checks = [
@@ -4016,6 +4052,9 @@ types = ["read_only", "write", "api_change", "integration", "runtime_guard", "au
 frontend_pages = ["m1-system-dictionary"]
 api_paths = ["GET /api/v1/m-vr/dual-person-policy", "GET /api/v1/m-vr/dual-person-policy/rules", "PUT /api/v1/m-vr/dual-person-policy/rules", "POST /api/v1/quality-liaisons/{id}/approval-callback", "POST /api/v1/stock-adjustments/loss-orders/{id}/execute", "POST /api/v1/stock-adjustments/surplus-orders/{id}/execute"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:mvr-real", "pnpm --dir apps/web-admin run test:e2e:m2-real", "pnpm --dir apps/web-admin run test:e2e:m4-real"]
+e2e_screenshots = [
+  { page = "m1-system-dictionary", spec = "prototypes/e2e/web-admin-m1-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m1-system-dictionary/dual-person-policy-matrix.png" },
+]
 database_objects = ["system_dictionary_items", "dual_person_policy_rules", "receiving_inspection_signatures", "outbound_review_records", "stock_adjustment_execution_records", "h4_approval_records", "audit_event", "idempotency_request"]
 test_checks = [
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test dual_person_policy_postgres -- --test-threads=1",
@@ -4049,9 +4088,9 @@ evidence_refs = [
   "prototypes/e2e/web-admin-m1-real.spec.ts",
   "prototypes/e2e/web-admin-m2-real.spec.ts",
   "prototypes/e2e/web-admin-m4-real.spec.ts",
-  "apps/web-admin/.e2e-artifacts/m1-real/screenshots/dual-person-policy-matrix.png",
-  "apps/web-admin/.e2e-artifacts/m2-real/screenshots/inspection.png",
-  "apps/web-admin/.e2e-artifacts/m4-real/screenshots/outbound-review-submitted.png",
+  "artifacts/screenshot-portal/real-web/m1-system-dictionary/dual-person-policy-matrix.png",
+  "artifacts/screenshot-portal/real-web/m2-inbound/inspection.png",
+  "artifacts/screenshot-portal/real-web/m4-outbound/outbound-review-submitted.png",
 ]
 reason = "已完成 6 流程 12 节点、8 类默认模板、全局/货主/仓库优先级、双人确认、M1 字典双向同步、幂等、审计、权限、查询缓存与变更失效；PC 矩阵、M2 验收、M4 复核及 M-SA 报损/报溢/销毁执行均已接入三档策略，M-QL 审批通过可同事务创建销毁报损单并进入该执行链，规则/第二人/H4 审批证据可回查。仍缺正式环境 P95 指标，以及 ADR-0027 解禁后的 PDA 离线 24 小时缓存/恢复校验和真实 PDA 证据，故不得整体关闭。"
 owner = "VR 模块负责人"
