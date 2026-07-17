@@ -408,6 +408,7 @@ function AppShell({
   const [menuFilterOpen, setMenuFilterOpen] = React.useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
   const [expandedMenuKeys, setExpandedMenuKeys] = React.useState<string[]>(readExpandedMenuKeys);
+  const expandedForActiveViewRef = React.useRef<AdminView | null>(null);
   const sidebarRef = React.useRef<HTMLElement | null>(null);
   const publishedMenuQuery = usePublishedAdminMenuQuery(true);
   const menuTree = React.useMemo(() => {
@@ -434,18 +435,26 @@ function AppShell({
   );
   const expandedMenuKeySet = React.useMemo(() => new Set(expandedMenuKeys), [expandedMenuKeys]);
   const toggleMenuKey = React.useCallback((key: string) => {
-    setExpandedMenuKeys((current) => current.includes(key)
-      ? current.filter((item) => item !== key)
-      : [...current, key]);
+    setExpandedMenuKeys((current) => {
+      if (current.includes(key)) {
+        const groupPrefix = key.startsWith("section:") ? `group:${key.slice("section:".length)}:` : "";
+        return current.filter((item) => item !== key && (!groupPrefix || !item.startsWith(groupPrefix)));
+      }
+      if (key.startsWith("section:")) return [key];
+      return [...current.filter((item) => !item.startsWith("group:")), key];
+    });
   }, []);
 
   React.useEffect(() => {
+    if (expandedForActiveViewRef.current === activeView) return;
     const activeKeys = menuKeysForActiveView(menuTree, activeView);
     if (activeKeys.length === 0) return;
-    setExpandedMenuKeys((current) => {
-      const missingKeys = activeKeys.filter((key) => !current.includes(key));
-      return missingKeys.length > 0 ? [...current, ...missingKeys] : current;
-    });
+    expandedForActiveViewRef.current = activeView;
+    setExpandedMenuKeys((current) => (
+      current.length === activeKeys.length && activeKeys.every((key) => current.includes(key))
+        ? current
+        : activeKeys
+    ));
   }, [activeView, menuTree]);
 
   React.useEffect(() => {
@@ -621,8 +630,6 @@ function readExpandedMenuKeys() {
   const defaultKeys = [
     menuSectionKey("工作台"),
     menuGroupKey("工作台", "工作台概览"),
-    menuSectionKey("入库业务"),
-    menuGroupKey("入库业务", "入库作业"),
   ];
   if (typeof window === "undefined") return defaultKeys;
   try {

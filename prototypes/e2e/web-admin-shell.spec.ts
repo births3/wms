@@ -316,6 +316,34 @@ test("侧边栏筛选菜单支持 Escape 和点击页面内容关闭", async ({ 
   await expect(page.getByRole("button", { name: "筛选菜单" })).toBeVisible();
 });
 
+test("展开菜单时折叠同级其他菜单", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "登录" }).click();
+  await expect(page.getByRole("heading", { name: "运营总览" })).toBeVisible();
+
+  const dashboardSection = page.getByRole("button", { name: "工作台", exact: true });
+  const inboundSection = page.getByRole("button", { name: "入库业务", exact: true });
+  const masterSection = page.getByRole("button", { name: "基础档案", exact: true });
+  await expect(dashboardSection).toHaveAttribute("aria-expanded", "true");
+  await expect(inboundSection).toHaveAttribute("aria-expanded", "false");
+  await inboundSection.click();
+  await expect(dashboardSection).toHaveAttribute("aria-expanded", "false");
+  await page.getByRole("button", { name: "入库作业", exact: true }).click();
+  await masterSection.click();
+  await expect(masterSection).toHaveAttribute("aria-expanded", "true");
+  await expect(inboundSection).toHaveAttribute("aria-expanded", "false");
+  await inboundSection.click();
+  await expect(page.getByRole("button", { name: "入库作业", exact: true })).toHaveAttribute("aria-expanded", "false");
+  await masterSection.click();
+
+  const masterGroup = page.getByRole("button", { name: "主数据", exact: true });
+  const storageGroup = page.getByRole("button", { name: "仓储资料", exact: true });
+  await masterGroup.click();
+  await storageGroup.click();
+  await expect(storageGroup).toHaveAttribute("aria-expanded", "true");
+  await expect(masterGroup).toHaveAttribute("aria-expanded", "false");
+});
+
 for (const target of [
   { section: "基础档案", group: "系统配置", id: "m1-system-dictionary", heading: "M1 系统字典" },
   { section: "入库业务", group: "入库作业", id: "m2-receiving", heading: "M2 收货管理" },
