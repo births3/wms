@@ -11225,6 +11225,16 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "统一社会信用代码非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "x-idempotency-exempt-reason": "M1 基础档案 CRUD 旧契约未接入 L11 幂等，本轮不扩大调用侧 header 面。"
@@ -11303,6 +11313,16 @@
           },
           "409": {
             "description": "供应商编码或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "统一社会信用代码非法",
             "content": {
               "application/json": {
                 "schema": {
@@ -11414,6 +11434,16 @@
           },
           "401": {
             "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "统一社会信用代码非法",
             "content": {
               "application/json": {
                 "schema": {

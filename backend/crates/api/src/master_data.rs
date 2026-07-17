@@ -25,6 +25,7 @@ pub enum MasterDataError {
     InvalidWarehouseType,
     InvalidStorageCondition,
     InvalidSpecialDrugCategory,
+    InvalidSupplierUscc,
     InvalidCustomerAddress,
     InvalidCustomerProfile,
     InvalidLocationBatchRange,
@@ -217,12 +218,13 @@ impl MasterDataStore {
         req: CreateSupplierRequest,
         now: DateTime<Utc>,
     ) -> Result<Supplier, MasterDataError> {
+        let license_no = normalize_supplier_uscc(req.license_no)?;
         self.suppliers.create(Supplier {
             id: Uuid::new_v4(),
             owner_id: ctx.owner_id,
             supplier_code: req.supplier_code,
             supplier_name: req.supplier_name,
-            license_no: req.license_no,
+            license_no,
             contact_name: req.contact_name,
             source: req.source.unwrap_or_else(|| "api_import".to_string()),
             status: "active".to_string(),
@@ -246,11 +248,12 @@ impl MasterDataStore {
         req: UpdateSupplierRequest,
         now: DateTime<Utc>,
     ) -> Result<Supplier, MasterDataError> {
+        let license_no = normalize_supplier_uscc(req.license_no)?;
         self.suppliers.update(ctx.owner_id, id, now, |supplier| {
             if let Some(value) = req.supplier_name {
                 supplier.supplier_name = value;
             }
-            if let Some(value) = req.license_no {
+            if let Some(value) = license_no {
                 supplier.license_no = Some(value);
             }
             if let Some(value) = req.contact_name {
@@ -574,6 +577,40 @@ pub(crate) fn validate_special_drug_category(category: &str) -> Result<(), Maste
     } else {
         Err(MasterDataError::InvalidSpecialDrugCategory)
     }
+}
+
+pub(crate) fn normalize_supplier_uscc(
+    value: Option<String>,
+) -> Result<Option<String>, MasterDataError> {
+    const CHARACTERS: &[u8] = b"0123456789ABCDEFGHJKLMNPQRTUWXY";
+    const WEIGHTS: [usize; 17] = [
+        1, 3, 9, 27, 19, 26, 16, 17, 20, 29, 25, 13, 8, 24, 10, 30, 28,
+    ];
+    let Some(value) = value
+        .map(|item| item.trim().to_ascii_uppercase())
+        .filter(|item| !item.is_empty())
+    else {
+        return Ok(None);
+    };
+    let bytes = value.as_bytes();
+    if bytes.len() != 18 || bytes.iter().any(|item| !CHARACTERS.contains(item)) {
+        return Err(MasterDataError::InvalidSupplierUscc);
+    }
+    let checksum = WEIGHTS
+        .iter()
+        .zip(bytes)
+        .map(|(weight, item)| {
+            weight
+                * CHARACTERS
+                    .iter()
+                    .position(|candidate| candidate == item)
+                    .unwrap_or_default()
+        })
+        .sum::<usize>();
+    if CHARACTERS[(31 - checksum % 31) % 31] != bytes[17] {
+        return Err(MasterDataError::InvalidSupplierUscc);
+    }
+    Ok(Some(value))
 }
 
 pub(crate) fn validate_location_code(

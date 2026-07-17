@@ -1,6 +1,6 @@
 use axum::{
     body::{to_bytes, Body},
-    http::Request,
+    http::{Request, StatusCode},
     middleware::from_fn_with_state,
 };
 use chrono::{Duration, Utc};
@@ -30,10 +30,66 @@ fn request(code: &str) -> CreateSupplierRequest {
     CreateSupplierRequest {
         supplier_code: code.to_string(),
         supplier_name: format!("供应商 {code}"),
-        license_no: Some(format!("USCC-{code}")),
+        license_no: Some(valid_uscc(code)),
         contact_name: Some("测试联系人".to_string()),
         source: Some("api_import".to_string()),
     }
+}
+
+fn valid_uscc(seed: &str) -> String {
+    const CHARACTERS: &[u8] = b"0123456789ABCDEFGHJKLMNPQRTUWXY";
+    const WEIGHTS: [usize; 17] = [
+        1, 3, 9, 27, 19, 26, 16, 17, 20, 29, 25, 13, 8, 24, 10, 30, 28,
+    ];
+    let mut code = *b"91350100M000100Y0";
+    code[16] = CHARACTERS[seed.bytes().map(usize::from).sum::<usize>() % CHARACTERS.len()];
+    let checksum = WEIGHTS
+        .iter()
+        .zip(code)
+        .map(|(weight, item)| {
+            weight
+                * CHARACTERS
+                    .iter()
+                    .position(|candidate| *candidate == item)
+                    .unwrap_or_default()
+        })
+        .sum::<usize>();
+    format!(
+        "{}{}",
+        String::from_utf8_lossy(&code),
+        CHARACTERS[(31 - checksum % 31) % 31] as char
+    )
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn supplier_batch_sync_rejects_invalid_uscc(pool: PgPool) {
+    let owner = context(Uuid::new_v4());
+    let app = master_data_router(MasterDataAppState::with_postgres(pool.clone()));
+    let mut invalid_request = request("INVALID-USCC");
+    invalid_request.license_no = Some("INVALID-USCC".to_string());
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/master-data/suppliers/batch-sync")
+                .header("content-type", "application/json")
+                .header("Idempotency-Key", "supplier-batch-invalid-uscc")
+                .extension(owner.clone())
+                .body(Body::from(
+                    serde_json::to_vec(&vec![invalid_request])
+                        .expect("invalid USCC request should serialize"),
+                ))
+                .expect("invalid USCC request should build"),
+        )
+        .await
+        .expect("invalid USCC request should respond");
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM suppliers WHERE owner_id = $1")
+        .bind(owner.owner_id)
+        .fetch_one(&pool)
+        .await
+        .expect("supplier count should query");
+    assert_eq!(count, 0);
 }
 
 async fn seed_owner_and_user(pool: &PgPool, owner_id: Uuid, user_id: Uuid) {

@@ -87,6 +87,13 @@ impl PgMasterDataReadRepository {
         now: DateTime<Utc>,
         idempotency_key: &str,
     ) -> Result<Vec<Supplier>, MasterDataError> {
+        let requests = requests
+            .into_iter()
+            .map(|mut request| {
+                request.license_no = normalize_supplier_uscc(request.license_no)?;
+                Ok(request)
+            })
+            .collect::<Result<Vec<_>, MasterDataError>>()?;
         let request_hash = request_hash(&json!({
             "path": "/api/v1/master-data/suppliers/batch-sync",
             "request": &requests,

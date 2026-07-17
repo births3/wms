@@ -1284,10 +1284,10 @@ error_codes:
     detail: FORMAT_INVALID
     http_status: 422
     severity: error
-    message_zh: '统一社会信用代码格式错误（应为 18 位）'
-    message_en: 'USCC format invalid (must be 18 chars)'
+    message_zh: '统一社会信用代码格式或校验码错误'
+    message_en: 'USCC format or checksum invalid'
     related_fields: [delivery_org_uscc, shipper_org_uscc, receiver_org_uscc]
-    related_stories: [US-M1-005]
+    related_stories: [US-M1-002, US-M1-005]
     introduced_in: v3.1
 
   - code: M1_INVOICE_DEFAULT_NOT_UNIQUE

@@ -1,5 +1,5 @@
 const USCC_CHARACTERS = "0123456789ABCDEFGHJKLMNPQRTUWXY";
-const USCC_WEIGHTS = [1, 3, 9, 7, 1, 3, 9, 7, 1, 3, 9, 7, 1, 3, 9, 7, 1];
+const USCC_WEIGHTS = [1, 3, 9, 27, 19, 26, 16, 17, 20, 29, 25, 13, 8, 24, 10, 30, 28];
 
 export function isValidUnifiedSocialCreditCode(value: string): boolean {
   const code = value.trim().toUpperCase();

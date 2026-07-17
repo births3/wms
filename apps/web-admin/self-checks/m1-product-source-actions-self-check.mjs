@@ -221,11 +221,12 @@ try {
   );
   assert.equal(crudTargetForRow("m1-business-partners", supplier).kind, "supplier");
   assert.equal(crudTargetForRow("m1-business-partners", customer).kind, "customer");
-  assert.equal(isValidUnifiedSocialCreditCode("91350211M000100Y49"), true);
+  assert.equal(isValidUnifiedSocialCreditCode("91350100M000100Y43"), true);
+  assert.equal(isValidUnifiedSocialCreditCode("91350100M000100Y49"), false);
   assert.equal(isValidUnifiedSocialCreditCode("INVALID-USCC"), false);
   assert.equal(
-    parseSupplierImportText("supplier_code,supplier_name,license_no,contact_name\nS-001,供应商A,91350211M000100Y49,王供应")[0].license_no,
-    "91350211M000100Y49",
+    parseSupplierImportText("supplier_code,supplier_name,license_no,contact_name\nS-001,供应商A,91350100M000100Y43,王供应")[0].license_no,
+    "91350100M000100Y43",
   );
   assert.throws(
     () => parseSupplierImportText("supplier_code,supplier_name,license_no,contact_name\nS-001,供应商A,INVALID-USCC,王供应"),

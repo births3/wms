@@ -18,8 +18,9 @@ use crate::{
     audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
     auth::AuthContext,
     master_data::{
-        product_attrs_with_default_source, validate_location_capacity, validate_location_code,
-        validate_product_storage_condition, validate_warehouse_type, MasterDataError,
+        normalize_supplier_uscc, product_attrs_with_default_source, validate_location_capacity,
+        validate_location_code, validate_product_storage_condition, validate_warehouse_type,
+        MasterDataError,
     },
 };
 
@@ -410,6 +411,8 @@ impl PgMasterDataReadRepository {
         now: DateTime<Utc>,
         idempotency_key: &str,
     ) -> Result<Supplier, MasterDataError> {
+        let mut req = req;
+        req.license_no = normalize_supplier_uscc(req.license_no)?;
         let request_hash = request_hash(&json!({
             "path": "/api/v1/master-data/suppliers",
             "request": &req,

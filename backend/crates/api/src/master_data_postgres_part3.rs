@@ -104,6 +104,8 @@ impl PgMasterDataReadRepository {
         now: DateTime<Utc>,
         idempotency_key: &str,
     ) -> Result<Supplier, MasterDataError> {
+        let mut req = req;
+        req.license_no = normalize_supplier_uscc(req.license_no)?;
         let request_hash = request_hash(&json!({
             "path": format!("/api/v1/master-data/suppliers/{id}"),
             "request": &req,

@@ -75,7 +75,7 @@ const copy: Record<
     importTitle: "批量导入供应商",
     importPlaceholder: [
       "supplier_code,supplier_name,license_no,contact_name",
-      "S-001,配送供应商A,91350211M000100Y49,王供应",
+      "S-001,配送供应商A,91350100M000100Y43,王供应",
       "S-002,配送供应商B,,",
     ].join("\n"),
   },

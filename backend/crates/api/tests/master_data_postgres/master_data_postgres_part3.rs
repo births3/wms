@@ -223,7 +223,7 @@ async fn product_supplier_customer_updates_persist_and_append_audit(pool: PgPool
         "manufacturer":null, "special_drug_category_code":"none", "attrs":{"storage_condition":"normal","source":"manual"}
     }))).await;
     let supplier_body = json!({
-        "supplier_code":"S-LIFE-01", "supplier_name":"原供应商", "license_no":"USCC-LIFE-01", "contact_name":null, "source":"manual"
+        "supplier_code":"S-LIFE-01", "supplier_name":"原供应商", "license_no":"91310110666007217T", "contact_name":null, "source":"manual"
     });
     let supplier: Supplier = json_response(
         app.clone(),

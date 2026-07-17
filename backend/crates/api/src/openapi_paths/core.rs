@@ -507,7 +507,7 @@ pub(crate) fn delete_product() {}
 #[allow(dead_code)]
 pub(crate) fn list_suppliers() {}
 
-#[utoipa::path(post, path = "/api/v1/master-data/suppliers", tag = "master-data", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = CreateSupplierRequest, responses((status = 200, description = "创建供应商", body = Supplier), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(post, path = "/api/v1/master-data/suppliers", tag = "master-data", params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = CreateSupplierRequest, responses((status = 200, description = "创建供应商", body = Supplier), (status = 401, description = "未登录", body = ErrorResponse), (status = 422, description = "统一社会信用代码非法", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn create_supplier() {}
 
@@ -523,12 +523,13 @@ pub(crate) fn create_supplier() {}
         (status = 401, description = "未登录", body = ErrorResponse),
         (status = 403, description = "权限不足", body = ErrorResponse),
         (status = 409, description = "供应商编码或幂等冲突", body = ErrorResponse),
+        (status = 422, description = "统一社会信用代码非法", body = ErrorResponse),
     ),
 )]
 #[allow(dead_code)]
 pub(crate) fn batch_create_suppliers() {}
 
-#[utoipa::path(patch, path = "/api/v1/master-data/suppliers/{id}", tag = "master-data", params(("id" = uuid::Uuid, Path, description = "供应商 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = UpdateSupplierRequest, responses((status = 200, description = "更新供应商", body = Supplier), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(patch, path = "/api/v1/master-data/suppliers/{id}", tag = "master-data", params(("id" = uuid::Uuid, Path, description = "供应商 ID"), ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")), request_body = UpdateSupplierRequest, responses((status = 200, description = "更新供应商", body = Supplier), (status = 401, description = "未登录", body = ErrorResponse), (status = 422, description = "统一社会信用代码非法", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn update_supplier() {}
 

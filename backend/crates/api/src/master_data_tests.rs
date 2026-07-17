@@ -3,6 +3,7 @@
     use uuid::Uuid;
     use wms_domain::{
         CreateLocationRequest, CreateProductRequest, CreateSupplierRequest, UpdateProductRequest,
+        UpdateSupplierRequest,
     };
 
     use super::{MasterDataError, MasterDataStore};
@@ -95,7 +96,7 @@
         let req = CreateSupplierRequest {
             supplier_code: "S-001".to_string(),
             supplier_name: "国药控股".to_string(),
-            license_no: Some("LIC-001".to_string()),
+            license_no: Some("91350100M000100Y43".to_string()),
             contact_name: Some("张三".to_string()),
             source: Some("manual".to_string()),
         };
@@ -107,6 +108,59 @@
         let duplicate = store.create_supplier(&ctx, req, now);
 
         assert!(matches!(duplicate, Err(MasterDataError::DuplicateCode(code)) if code == "S-001"));
+    }
+
+    #[test]
+    fn supplier_uscc_is_normalized_and_rejected_on_create_and_update() {
+        let now = Utc
+            .with_ymd_and_hms(2026, 6, 4, 9, 0, 0)
+            .single()
+            .expect("valid time");
+        let ctx = ctx(Uuid::new_v4());
+        let mut store = MasterDataStore::default();
+        let invalid = store.create_supplier(
+            &ctx,
+            CreateSupplierRequest {
+                supplier_code: "S-BAD".to_string(),
+                supplier_name: "非法供应商".to_string(),
+                license_no: Some("91350100M000100Y49".to_string()),
+                contact_name: None,
+                source: None,
+            },
+            now,
+        );
+        assert!(matches!(invalid, Err(MasterDataError::InvalidSupplierUscc)));
+
+        let created = store
+            .create_supplier(
+                &ctx,
+                CreateSupplierRequest {
+                    supplier_code: "S-USCC".to_string(),
+                    supplier_name: "合法供应商".to_string(),
+                    license_no: Some(" 91350100m000100y43 ".to_string()),
+                    contact_name: None,
+                    source: None,
+                },
+                now,
+            )
+            .expect("valid USCC should create supplier");
+        assert_eq!(created.license_no.as_deref(), Some("91350100M000100Y43"));
+
+        let invalid_update = store.update_supplier(
+            &ctx,
+            created.id,
+            UpdateSupplierRequest {
+                supplier_name: None,
+                license_no: Some("INVALID-USCC".to_string()),
+                contact_name: None,
+                status: None,
+            },
+            now,
+        );
+        assert!(matches!(
+            invalid_update,
+            Err(MasterDataError::InvalidSupplierUscc)
+        ));
     }
 
     #[test]

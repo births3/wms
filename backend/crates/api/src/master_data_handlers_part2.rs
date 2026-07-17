@@ -52,6 +52,11 @@ impl IntoResponse for MasterDataHandlerError {
                 "M1_INVALID_SPECIAL_DRUG_CATEGORY",
                 "特殊药品分类必须使用已启用字典项",
             ),
+            MasterDataHandlerError::MasterData(MasterDataError::InvalidSupplierUscc) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M1_USCC_FORMAT_INVALID",
+                "统一社会信用代码格式或校验码错误",
+            ),
             MasterDataHandlerError::MasterData(MasterDataError::InvalidCustomerAddress) => (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "M1_CUSTOMER_ADDRESS_INVALID",

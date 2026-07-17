@@ -15517,6 +15517,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description 统一社会信用代码非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     batch_create_suppliers: {
@@ -15573,6 +15582,15 @@ export interface operations {
             };
             /** @description 供应商编码或幂等冲突 */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 统一社会信用代码非法 */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -15647,6 +15665,15 @@ export interface operations {
             };
             /** @description 未登录 */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 统一社会信用代码非法 */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -390,7 +390,7 @@ async fn supplier_and_customer_create_routes_write_source_and_audit(pool: PgPool
                     json!({
                         "supplier_code": "S-M1-CREATE",
                         "supplier_name": "新建供应商",
-                        "license_no": "USCC-CREATE",
+                        "license_no": "91350100M000100Y43",
                         "contact_name": "王供应",
                         "source": "manual"
                     })
