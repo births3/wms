@@ -28,8 +28,11 @@ use crate::{
     inventory::STATUS_QUALIFIED,
 };
 
+mod abc;
+mod alerts;
 mod billing;
 mod cold_chain;
+mod erp_outbox;
 mod expiry;
 mod integrations;
 mod inventory_count;
@@ -40,6 +43,7 @@ mod query;
 mod recall;
 mod receiving_read;
 mod receiving_update;
+mod relocation;
 mod trace;
 
 use mappings::{
@@ -89,6 +93,7 @@ pub enum Wave3RepositoryError {
     ActiveMonitoring,
     DuplicateTraceCode,
     InvalidLocation,
+    InsufficientQuantity,
     LocationQualityMismatch,
     LocationTemperatureMismatch,
     LocationCapacityExceeded,

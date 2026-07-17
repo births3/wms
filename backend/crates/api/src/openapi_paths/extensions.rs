@@ -247,6 +247,42 @@ pub(crate) fn get_inventory_batch_trace() {}
 #[allow(dead_code)]
 pub(crate) fn list_location_history() {}
 
+#[utoipa::path(post, path = "/api/v1/inventory/relocations", tag = "inventory", params(("Idempotency-Key" = String, Header, description = "幂等键")), request_body = RelocateInventoryRequest, responses((status = 200, description = "库内移库完成", body = InventoryRelocation), (status = 401, description = "未登录", body = ErrorResponse), (status = 422, description = "移库校验失败", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn relocate_inventory() {}
+
+#[utoipa::path(get, path = "/api/v1/inventory/alerts", tag = "inventory", params(("alert_type" = Option<String>, Query, description = "预警类型"), ("lifecycle_status" = Option<String>, Query, description = "生命周期状态"), ("product_code" = Option<String>, Query, description = "商品编码")), responses((status = 200, description = "库存预警事件列表", body = InventoryAlertListResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn list_inventory_alerts() {}
+
+#[utoipa::path(post, path = "/api/v1/inventory/alerts/{id}/handle", tag = "inventory", params(("id" = uuid::Uuid, Path, description = "预警 ID")), request_body = HandleInventoryAlertRequest, responses((status = 200, description = "预警已处理", body = InventoryAlertEvent), (status = 401, description = "未登录", body = ErrorResponse), (status = 404, description = "预警不存在", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn handle_inventory_alert() {}
+
+#[utoipa::path(post, path = "/api/v1/inventory/alerts/generate-near-expiry", tag = "inventory", responses((status = 200, description = "近效期预警已生成"), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn generate_near_expiry_alerts() {}
+
+#[utoipa::path(get, path = "/api/v1/inventory/abc", tag = "inventory", params(("abc_class" = Option<String>, Query, description = "ABC 分类"), ("product_code" = Option<String>, Query, description = "商品编码")), responses((status = 200, description = "ABC 分类列表", body = InventoryAbcListResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn list_inventory_abc() {}
+
+#[utoipa::path(post, path = "/api/v1/inventory/abc", tag = "inventory", request_body = RecomputeInventoryAbcRequest, responses((status = 200, description = "ABC 重算结果", body = InventoryAbcListResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn recompute_inventory_abc() {}
+
+#[utoipa::path(post, path = "/api/v1/inventory/abc/override", tag = "inventory", request_body = OverrideInventoryAbcRequest, responses((status = 200, description = "ABC 人工覆盖", body = InventoryAbcClassification), (status = 401, description = "未登录", body = ErrorResponse), (status = 422, description = "参数非法", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn override_inventory_abc() {}
+
+#[utoipa::path(get, path = "/api/v1/inventory/batches/{id}/shipped-customers", tag = "inventory", params(("id" = uuid::Uuid, Path, description = "库存批次 ID")), responses((status = 200, description = "召回已发货客户提示", body = InventoryRecallImpact), (status = 401, description = "未登录", body = ErrorResponse), (status = 404, description = "批次不存在", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn list_shipped_customers_for_batch() {}
+
+#[utoipa::path(post, path = "/api/v1/inventory/status-erp-outbox/process", tag = "inventory", responses((status = 200, description = "ERP 反馈 outbox 处理结果"), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn process_status_erp_outbox() {}
+
 #[utoipa::path(post, path = "/api/v1/inventory/batches/putaway", tag = "inventory", request_body = PutawayInventoryRequest, responses((status = 200, description = "入库上架增加库存", body = InventoryBatch), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn putaway_inventory_batch() {}

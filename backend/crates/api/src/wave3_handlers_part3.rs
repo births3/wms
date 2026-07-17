@@ -306,6 +306,7 @@ impl IntoResponse for Wave3HandlerError {
             | Wave3HandlerError::Billing(BillingError::InvalidEffectiveWindow)
             | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidStatus { .. })
             | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidQuantity)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::InsufficientQuantity)
             | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidDeviceType)
             | Wave3HandlerError::Repository(Wave3RepositoryError::ActiveMonitoring)
             | Wave3HandlerError::Repository(Wave3RepositoryError::MissingSupplier)
@@ -384,12 +385,12 @@ impl IntoResponse for Wave3HandlerError {
 }
 
 pub fn wave3_router(state: Wave3AppState) -> Router {
-    apply_inventory_count_routes(apply_maintenance_routes(
+    apply_m3_ops_routes(apply_inventory_count_routes(apply_maintenance_routes(
         apply_receiving_order_routes().route(
             "/api/v1/inbound/receiving-orders/:id/putaway-recommendations",
             get(m2_putaway::recommend_putaway_locations_handler),
         ),
-    ))
+    )))
         .route(
             "/api/v1/inventory/batches",
             get(list_inventory_batches_handler),

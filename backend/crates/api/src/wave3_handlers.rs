@@ -3,8 +3,10 @@
 mod inventory_count;
 #[path = "m2_putaway.rs"]
 mod m2_putaway;
+mod m3_ops;
 mod maintenance;
 use inventory_count::apply_inventory_count_routes;
+use m3_ops::apply_m3_ops_routes;
 use maintenance::apply_maintenance_routes;
 
 include!("wave3_handlers_part3.rs");

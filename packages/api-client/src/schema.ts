@@ -1652,6 +1652,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/inventory/abc": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_inventory_abc"];
+        put?: never;
+        post: operations["recompute_inventory_abc"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/abc/override": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["override_inventory_abc"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_inventory_alerts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/alerts/generate-near-expiry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["generate_near_expiry_alerts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/alerts/{id}/handle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["handle_inventory_alert"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/inventory/batches": {
         parameters: {
             query?: never;
@@ -1758,6 +1838,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["change_inventory_batch_status"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/batches/{id}/shipped-customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_shipped_customers_for_batch"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1886,6 +1982,38 @@ export interface paths {
         get: operations["list_maintenance_tasks"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/relocations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["relocate_inventory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/status-erp-outbox/process": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["process_status_erp_outbox"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5237,6 +5365,9 @@ export interface components {
             message: string;
             status: string;
         };
+        HandleInventoryAlertRequest: {
+            lifecycle_status: string;
+        };
         /** @description 健康检查响应。 */
         HealthzResponse: {
             /**
@@ -5316,6 +5447,69 @@ export interface components {
             signed_at: string;
             /** Format: uuid */
             strategy_rule_id?: string | null;
+        };
+        InventoryAbcClassification: {
+            abc_class: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: int64 */
+            outbound_qty: number;
+            override_reason?: string | null;
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: date */
+            period_end: string;
+            /** Format: date */
+            period_start: string;
+            product_code: string;
+            /** Format: double */
+            score: number;
+            source: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        InventoryAbcListResponse: {
+            data: components["schemas"]["InventoryAbcClassification"][];
+            page: components["schemas"]["PageMeta"];
+        };
+        InventoryAbcQuery: {
+            abc_class?: string | null;
+            product_code?: string | null;
+        };
+        InventoryAlertEvent: {
+            alert_type: string;
+            /** Format: uuid */
+            batch_id?: string | null;
+            batch_no?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            handled_at?: string | null;
+            /** Format: uuid */
+            handled_by?: string | null;
+            /** Format: uuid */
+            id: string;
+            lifecycle_status: string;
+            location_code?: string | null;
+            message: string;
+            /** Format: uuid */
+            owner_id: string;
+            product_code?: string | null;
+            severity: string;
+            title: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        InventoryAlertListResponse: {
+            data: components["schemas"]["InventoryAlertEvent"][];
+            page: components["schemas"]["PageMeta"];
+        };
+        InventoryAlertQuery: {
+            alert_type?: string | null;
+            lifecycle_status?: string | null;
+            product_code?: string | null;
         };
         InventoryBatch: {
             batch_no: string;
@@ -5450,6 +5644,42 @@ export interface components {
             to_location_code?: string | null;
             /** Format: int64 */
             volume_delta_cm3?: number | null;
+        };
+        InventoryRecallImpact: {
+            /** Format: uuid */
+            batch_id: string;
+            batch_no: string;
+            product_code: string;
+            shipped_customers: components["schemas"]["ShippedCustomerHint"][];
+        };
+        InventoryRelocation: {
+            /** Format: uuid */
+            batch_id: string;
+            batch_no: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            created_by: string;
+            from_location_code: string;
+            /** Format: uuid */
+            from_location_id: string;
+            /** Format: uuid */
+            id: string;
+            lpn_code?: string | null;
+            /** Format: uuid */
+            owner_id: string;
+            product_code: string;
+            /** Format: int64 */
+            qty: number;
+            quality_status: string;
+            reason?: string | null;
+            relocation_mode: string;
+            status: string;
+            to_location_code: string;
+            /** Format: uuid */
+            to_location_id: string;
+            /** Format: date-time */
+            updated_at: string;
         };
         InventoryStatusChange: {
             approval_id: string;
@@ -5755,6 +5985,11 @@ export interface components {
         OutboundWaveListResponse: {
             data: components["schemas"]["OutboundWave"][];
             page: components["schemas"]["PageMeta"];
+        };
+        OverrideInventoryAbcRequest: {
+            abc_class: string;
+            product_code: string;
+            reason: string;
         };
         PackJob: {
             actual_box_type: string;
@@ -6347,8 +6582,24 @@ export interface components {
             transport_mode?: string | null;
             vehicle_no?: string | null;
         };
+        RecomputeInventoryAbcRequest: {
+            /** Format: int64 */
+            period_days?: number | null;
+        };
         RejectReceivingOrderRequest: {
             reason: string;
+        };
+        RelocateInventoryRequest: {
+            /** Format: uuid */
+            batch_id: string;
+            lpn_code?: string | null;
+            /** Format: int64 */
+            qty: number;
+            reason?: string | null;
+            relocation_mode?: string | null;
+            to_location_code: string;
+            /** Format: uuid */
+            to_location_id: string;
         };
         ReplaceRolePermissionsRequest: {
             permission_codes: string[];
@@ -6532,6 +6783,15 @@ export interface components {
             package_count: number;
             /** Format: date-time */
             shipped_at?: string | null;
+        };
+        ShippedCustomerHint: {
+            /** Format: uuid */
+            customer_id: string;
+            /** Format: uuid */
+            order_id: string;
+            /** Format: int64 */
+            shipped_qty: number;
+            wms_order_no?: string | null;
         };
         SignInspectionRequest: {
             dual_required: boolean;
@@ -13313,6 +13573,223 @@ export interface operations {
             };
         };
     };
+    list_inventory_abc: {
+        parameters: {
+            query?: {
+                /** @description ABC 分类 */
+                abc_class?: string | null;
+                /** @description 商品编码 */
+                product_code?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ABC 分类列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryAbcListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    recompute_inventory_abc: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecomputeInventoryAbcRequest"];
+            };
+        };
+        responses: {
+            /** @description ABC 重算结果 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryAbcListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    override_inventory_abc: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OverrideInventoryAbcRequest"];
+            };
+        };
+        responses: {
+            /** @description ABC 人工覆盖 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryAbcClassification"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 参数非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_inventory_alerts: {
+        parameters: {
+            query?: {
+                /** @description 预警类型 */
+                alert_type?: string | null;
+                /** @description 生命周期状态 */
+                lifecycle_status?: string | null;
+                /** @description 商品编码 */
+                product_code?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 库存预警事件列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryAlertListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    generate_near_expiry_alerts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 近效期预警已生成 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    handle_inventory_alert: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 预警 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HandleInventoryAlertRequest"];
+            };
+        };
+        responses: {
+            /** @description 预警已处理 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryAlertEvent"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 预警不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     list_inventory_batches: {
         parameters: {
             query?: {
@@ -13654,6 +14131,47 @@ export interface operations {
             };
             /** @description 未登录 */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_shipped_customers_for_batch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 库存批次 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 召回已发货客户提示 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryRecallImpact"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 批次不存在 */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -14200,6 +14718,78 @@ export interface operations {
             };
             /** @description 权限不足 */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    relocate_inventory: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RelocateInventoryRequest"];
+            };
+        };
+        responses: {
+            /** @description 库内移库完成 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryRelocation"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 移库校验失败 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    process_status_erp_outbox: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ERP 反馈 outbox 处理结果 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 未登录 */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

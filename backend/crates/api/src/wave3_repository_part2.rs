@@ -533,6 +533,7 @@ impl PgWave3Repository {
                 });
             }
 
+            let status_change_id = Uuid::new_v4();
             sqlx::query(
                 r#"
                 INSERT INTO inventory_status_changes (
@@ -542,7 +543,7 @@ impl PgWave3Repository {
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                 "#,
             )
-            .bind(Uuid::new_v4())
+            .bind(status_change_id)
             .bind(ctx.owner_id)
             .bind(req.batch_id)
             .bind(&from_status)
@@ -574,6 +575,21 @@ impl PgWave3Repository {
             .fetch_one(&mut *tx)
             .await
             .map_err(map_db_error)?;
+
+            Self::enqueue_status_erp_feedback_in_tx(
+                &mut tx,
+                ctx.owner_id,
+                req.batch_id,
+                Some(status_change_id),
+                &from_status,
+                &req.target_status,
+                &updated.product_code,
+                &updated.batch_no,
+                updated.qty_on_hand,
+                &req.reason,
+                now,
+            )
+            .await?;
 
             let batch = map_inventory_batch(updated);
             if let Some(audit) = audit {

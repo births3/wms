@@ -2484,8 +2484,8 @@
           }
         },
         "security": [],
-        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。",
-        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。"
+        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。",
+        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。"
       }
     },
     "/api/v1/auth/logout": {
@@ -8089,6 +8089,293 @@
         }
       }
     },
+    "/api/v1/inventory/abc": {
+      "get": {
+        "tags": [
+          "inventory"
+        ],
+        "operationId": "list_inventory_abc",
+        "parameters": [
+          {
+            "name": "abc_class",
+            "in": "query",
+            "description": "ABC 分类",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "product_code",
+            "in": "query",
+            "description": "商品编码",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ABC 分类列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryAbcListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "inventory"
+        ],
+        "operationId": "recompute_inventory_abc",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecomputeInventoryAbcRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "ABC 重算结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryAbcListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/inventory/abc/override": {
+      "post": {
+        "tags": [
+          "inventory"
+        ],
+        "operationId": "override_inventory_abc",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OverrideInventoryAbcRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "ABC 人工覆盖",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryAbcClassification"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "参数非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/inventory/alerts": {
+      "get": {
+        "tags": [
+          "inventory"
+        ],
+        "operationId": "list_inventory_alerts",
+        "parameters": [
+          {
+            "name": "alert_type",
+            "in": "query",
+            "description": "预警类型",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "lifecycle_status",
+            "in": "query",
+            "description": "生命周期状态",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "product_code",
+            "in": "query",
+            "description": "商品编码",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "库存预警事件列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryAlertListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/inventory/alerts/generate-near-expiry": {
+      "post": {
+        "tags": [
+          "inventory"
+        ],
+        "operationId": "generate_near_expiry_alerts",
+        "responses": {
+          "200": {
+            "description": "近效期预警已生成"
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/inventory/alerts/{id}/handle": {
+      "post": {
+        "tags": [
+          "inventory"
+        ],
+        "operationId": "handle_inventory_alert",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "预警 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandleInventoryAlertRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "预警已处理",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryAlertEvent"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "预警不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/inventory/batches": {
       "get": {
         "tags": [
@@ -8638,6 +8925,58 @@
           },
           "401": {
             "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/inventory/batches/{id}/shipped-customers": {
+      "get": {
+        "tags": [
+          "inventory"
+        ],
+        "operationId": "list_shipped_customers_for_batch",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "库存批次 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "召回已发货客户提示",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryRecallImpact"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "批次不存在",
             "content": {
               "application/json": {
                 "schema": {
@@ -9415,6 +9754,90 @@
           },
           "403": {
             "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/inventory/relocations": {
+      "post": {
+        "tags": [
+          "inventory"
+        ],
+        "operationId": "relocate_inventory",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RelocateInventoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "库内移库完成",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryRelocation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "移库校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/inventory/status-erp-outbox/process": {
+      "post": {
+        "tags": [
+          "inventory"
+        ],
+        "operationId": "process_status_erp_outbox",
+        "responses": {
+          "200": {
+            "description": "ERP 反馈 outbox 处理结果"
+          },
+          "401": {
+            "description": "未登录",
             "content": {
               "application/json": {
                 "schema": {
@@ -23758,6 +24181,17 @@
           }
         }
       },
+      "HandleInventoryAlertRequest": {
+        "type": "object",
+        "required": [
+          "lifecycle_status"
+        ],
+        "properties": {
+          "lifecycle_status": {
+            "type": "string"
+          }
+        }
+      },
       "HealthzResponse": {
         "type": "object",
         "description": "健康检查响应。",
@@ -23989,6 +24423,209 @@
           "strategy_rule_id": {
             "type": "string",
             "format": "uuid",
+            "nullable": true
+          }
+        }
+      },
+      "InventoryAbcClassification": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "product_code",
+          "abc_class",
+          "score",
+          "outbound_qty",
+          "period_start",
+          "period_end",
+          "source",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "abc_class": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "outbound_qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "override_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "period_end": {
+            "type": "string",
+            "format": "date"
+          },
+          "period_start": {
+            "type": "string",
+            "format": "date"
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number",
+            "format": "double"
+          },
+          "source": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "InventoryAbcListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventoryAbcClassification"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "InventoryAbcQuery": {
+        "type": "object",
+        "properties": {
+          "abc_class": {
+            "type": "string",
+            "nullable": true
+          },
+          "product_code": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "InventoryAlertEvent": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "alert_type",
+          "severity",
+          "title",
+          "message",
+          "lifecycle_status",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "alert_type": {
+            "type": "string"
+          },
+          "batch_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "batch_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "handled_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "handled_by": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lifecycle_status": {
+            "type": "string"
+          },
+          "location_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "severity": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "InventoryAlertListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventoryAlertEvent"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "InventoryAlertQuery": {
+        "type": "object",
+        "properties": {
+          "alert_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "lifecycle_status": {
+            "type": "string",
+            "nullable": true
+          },
+          "product_code": {
+            "type": "string",
             "nullable": true
           }
         }
@@ -24409,6 +25046,121 @@
             "type": "integer",
             "format": "int64",
             "nullable": true
+          }
+        }
+      },
+      "InventoryRecallImpact": {
+        "type": "object",
+        "required": [
+          "batch_id",
+          "batch_no",
+          "product_code",
+          "shipped_customers"
+        ],
+        "properties": {
+          "batch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "batch_no": {
+            "type": "string"
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "shipped_customers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShippedCustomerHint"
+            }
+          }
+        }
+      },
+      "InventoryRelocation": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "batch_id",
+          "product_code",
+          "batch_no",
+          "qty",
+          "from_location_id",
+          "from_location_code",
+          "to_location_id",
+          "to_location_code",
+          "relocation_mode",
+          "quality_status",
+          "status",
+          "created_by",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "batch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "batch_no": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "created_by": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "from_location_code": {
+            "type": "string"
+          },
+          "from_location_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lpn_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "quality_status": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "relocation_mode": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "to_location_code": {
+            "type": "string"
+          },
+          "to_location_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -25360,6 +26112,25 @@
           },
           "page": {
             "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "OverrideInventoryAbcRequest": {
+        "type": "object",
+        "required": [
+          "product_code",
+          "abc_class",
+          "reason"
+        ],
+        "properties": {
+          "abc_class": {
+            "type": "string"
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
           }
         }
       },
@@ -27193,6 +27964,16 @@
           }
         }
       },
+      "RecomputeInventoryAbcRequest": {
+        "type": "object",
+        "properties": {
+          "period_days": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          }
+        }
+      },
       "RejectReceivingOrderRequest": {
         "type": "object",
         "required": [
@@ -27201,6 +27982,44 @@
         "properties": {
           "reason": {
             "type": "string"
+          }
+        }
+      },
+      "RelocateInventoryRequest": {
+        "type": "object",
+        "required": [
+          "batch_id",
+          "qty",
+          "to_location_id",
+          "to_location_code"
+        ],
+        "properties": {
+          "batch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lpn_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "relocation_mode": {
+            "type": "string",
+            "nullable": true
+          },
+          "to_location_code": {
+            "type": "string"
+          },
+          "to_location_id": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },
@@ -27739,6 +28558,32 @@
           "shipped_at": {
             "type": "string",
             "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "ShippedCustomerHint": {
+        "type": "object",
+        "required": [
+          "customer_id",
+          "order_id",
+          "shipped_qty"
+        ],
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "order_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "shipped_qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "wms_order_no": {
+            "type": "string",
             "nullable": true
           }
         }
