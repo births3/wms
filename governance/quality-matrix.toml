@@ -317,12 +317,20 @@ e2e_checks = ["just web-admin-m1-real-e2e"]
 id = "US-H4-002"
 title = "企业微信消息发送"
 module = "H4"
+story_file = "docs/domain/user-stories-h4-wechat-notify.md"
+types = ["write", "api_change", "integration", "audit_compliance", "external_runtime"]
+api_paths = [
+  "POST /api/v1/wechat-notify/send",
+  "GET /api/v1/wechat-notify/records",
+  "POST /api/v1/wechat-notify/records/{record_id}/resend",
+]
+database_objects = ["h4_notification_configs", "h4_notification_records", "idempotency_request", "audit_event"]
 reason = "已完成可注入企业微信 provider 边界、模板渲染、批量收件人记录、幂等最终结果更新、成功/可重试失败/永久失败状态、发送审计和参数完整性测试；未接外部 provider 时明确记录失败，禁止伪报发送成功。企业微信真实 HTTP API 调用、Secret alias 解析、access_token 获取与刷新、自动重试调度和外部联调证据尚未完成。"
 owner = "H4 企业微信通知模块负责人"
 resume_when = "取得企业微信测试凭据和可访问的 dev/staging 回调地址后恢复实施。"
 test_checks = [
-  "set -a; source /home/test1/workspace/wms/.env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test h4_wechat_notify_postgres -- --nocapture",
-  "set -a; source /home/test1/workspace/wms/.env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test h4_permissions_postgres -- --nocapture",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test h4_wechat_notify_postgres -- --test-threads=1",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test h4_permissions_postgres -- --test-threads=1",
 ]
 evidence_refs = [
   "backend/crates/api/src/wechat_notify_service.rs",
@@ -2623,7 +2631,7 @@ database_objects = [
   "auth_permissions",
 ]
 test_checks = [
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_maintenance_postgres -- --nocapture",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_maintenance_postgres -- --test-threads=1",
   "cargo test --manifest-path backend/Cargo.toml -p wms-domain maintenance --lib",
 ]
 evidence_refs = [
@@ -2929,7 +2937,7 @@ evidence_refs = [
 ]
 reason = "已补冷链设备台账的 PostgreSQL 创建、列表、更新和停用切片：设备类型受控、同货主编码唯一、货主隔离、监控中停用门禁、幂等重放和审计均有真实数据库测试及 OpenAPI 契约；故事仍不能整体关闭，校准到期预警/企业微信通知、验证报告附件、外部冷链同步、前端台账和真实浏览器证据尚未闭环。"
 owner = "M5 模块负责人"
-resume_when = "补齐设备更新/停用与活跃监控门禁、校准预警通知、验证报告附件、外部同步、前端真实 API 和 E2E 截图后再移入 stories。"
+resume_when = "补齐校准预警通知、验证报告附件、外部同步、前端真实 API 和 E2E 截图后再移入 stories。"
 
 [[deferred_stories]]
 id = "US-M5-002"
@@ -3008,9 +3016,9 @@ evidence_refs = [
   "backend/crates/api/tests/reports_postgres.rs",
   "shared/openapi/openapi.json",
 ]
-reason = "已补 POST /api/v1/reports/query 的 m6_outbound_summary 真实 PostgreSQL 查询，按货主统计 outbound_orders，保持入库汇总和未知报表错误契约，并以两个货主的真实数据库测试覆盖隔离；故事仍不能整体关闭：前端报表菜单/页面、完整日报月报与周转率/岗位绩效/合规维度、图表、Excel/PDF、定时邮件/企业微信推送、导出审计和正式 E2E/截图证据尚未闭环。"
+reason = "已补 POST /api/v1/reports/query 的出入库汇总真实 PostgreSQL 查询，按货主统计 receiving_orders/outbound_orders，并覆盖未知报表错误契约和两个货主的数据隔离；故事仍不能整体关闭：前端报表菜单/页面、完整日报月报与周转率/岗位绩效/合规维度、图表、Excel/PDF、定时邮件/企业微信推送、导出审计和正式 E2E/截图证据尚未闭环。"
 owner = "M6 模块负责人"
-resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+resume_when = "补齐报表页面、剩余统计维度、受审计导出、定时推送和真实 E2E 截图后再移入 stories。"
 
 [[deferred_stories]]
 id = "US-M6-004"
@@ -3201,7 +3209,10 @@ module = "DI"
 types = ["write", "config_rule", "integration", "frontend_interaction"]
 frontend_pages = ["m-di-platforms"]
 navigation_checks = ["node apps/web-admin/self-checks/di-drug-inspection-slice-self-check.mjs"]
-e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:h1-real"]
+e2e_checks = ["pnpm --dir prototypes exec playwright test --config=playwright-web-admin-h1-real-config.ts --grep 'M-DI 药检平台配置'"]
+e2e_screenshots = [
+  { page = "m-di-platforms", spec = "prototypes/e2e/web-admin-di-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m-di-platforms/platform-config.png" },
+]
 api_paths = [
   "GET /api/v1/drug-inspection/platforms",
   "POST /api/v1/drug-inspection/platforms",
@@ -3363,17 +3374,20 @@ title = "质量联系单类型与审批模板配置"
 module = "QL"
 story_file = "docs/domain/user-stories-mql-quality-liaison.md"
 types = ["write", "api_change", "audit_compliance"]
-api_paths = ["PUT /api/v1/quality-liaisons/types/{type_code}"]
+api_paths = ["GET /api/v1/quality-liaisons/types/{type_code}", "PUT /api/v1/quality-liaisons/types/{type_code}"]
 database_objects = ["quality_liaison_types", "idempotency_request", "audit_event"]
-test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test quality_liaison_postgres -- --test-threads=1"]
+test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test quality_liaison_postgres quality_liaison_api_enforces_permissions_and_designated_approver -- --test-threads=1"]
 evidence_refs = [
   "backend/crates/domain/src/quality_liaison.rs",
   "backend/crates/api/src/quality_liaison.rs",
   "backend/crates/api/src/quality_liaison_handlers.rs",
+  "backend/crates/api/src/openapi_paths/quality_liaison.rs",
   "backend/crates/api/tests/quality_liaison_postgres.rs",
   "backend/migrations/202607150010_mql_quality_liaison.sql",
+  "shared/openapi/openapi.json",
+  "packages/api-client/src/schema.ts",
 ]
-reason = "已实现货主级类型、指定审批人、H4 模板、超时时长、启停、权限、审计与幂等配置后端；仍缺预置类型及默认时长、按角色/按货主审批人规则、PC 配置页和超时提醒执行器，故不得整体关闭。"
+reason = "已实现货主级类型读取/写入、指定审批人、H4 模板、超时时长、启停、权限、审计与幂等配置后端；仍缺预置类型及默认时长、按角色/按货主审批人规则、PC 配置页和超时提醒执行器，故不得整体关闭。"
 owner = "QL 模块负责人"
 resume_when = "补齐预置类型、角色/货主审批规则、PC 配置页、超时提醒执行器及对应 E2E 证据。"
 
@@ -3385,7 +3399,7 @@ story_file = "docs/domain/user-stories-mql-quality-liaison.md"
 types = ["read_only", "write", "api_change", "integration", "audit_compliance"]
 api_paths = ["POST /api/v1/quality-liaisons", "GET /api/v1/quality-liaisons/{id}"]
 database_objects = ["quality_liaison_orders", "quality_liaison_types", "h4_approval_records", "document_number_allocations", "idempotency_request", "audit_event"]
-test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test quality_liaison_postgres -- --test-threads=1"]
+test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test quality_liaison_postgres quality_liaison_api_enforces_permissions_and_designated_approver -- --test-threads=1"]
 evidence_refs = [
   "backend/crates/domain/src/quality_liaison.rs",
   "backend/crates/api/src/quality_liaison.rs",
@@ -3405,7 +3419,7 @@ story_file = "docs/domain/user-stories-mql-quality-liaison.md"
 types = ["write", "api_change", "integration", "audit_compliance"]
 api_paths = ["POST /api/v1/quality-liaisons/{id}/approval-callback"]
 database_objects = ["quality_liaison_orders", "h4_approval_records", "idempotency_request", "audit_event"]
-test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test quality_liaison_postgres -- --test-threads=1"]
+test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test quality_liaison_postgres type_config_create_and_approval_callback_are_atomic_and_idempotent -- --test-threads=1"]
 evidence_refs = [
   "backend/crates/api/src/quality_liaison.rs",
   "backend/crates/api/src/quality_liaison_handlers.rs",
@@ -3424,8 +3438,8 @@ types = ["write", "api_change", "integration", "runtime_guard", "audit_complianc
 api_paths = ["POST /api/v1/quality-liaisons/{id}/approval-callback", "POST /api/v1/stock-adjustments/loss-orders/{id}/execute"]
 database_objects = ["quality_liaison_orders", "h4_approval_records", "stock_adjustment_orders", "stock_adjustment_execution_records", "audit_event", "idempotency_request"]
 test_checks = [
-  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test quality_liaison_postgres -- --test-threads=1",
-  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test stock_adjustment_postgres -- --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test quality_liaison_postgres approved_destruction_disposition_creates_msa_order_with_quality_source -- --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test stock_adjustment_postgres destruction_requires_quality_approval_second_operator_and_h4_approval -- --test-threads=1",
 ]
 evidence_refs = [
   "backend/crates/api/src/quality_liaison/actions.rs",
