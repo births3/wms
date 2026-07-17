@@ -251,6 +251,7 @@ use wms_domain::{
         approve_stock_surplus_order,
         start_stock_surplus_order,
         execute_stock_surplus_order,
+        get_quality_liaison_type,
         upsert_quality_liaison_type,
         create_quality_liaison,
         get_quality_liaison,

@@ -27,6 +27,7 @@ pub struct PgQualityLiaisonRepository {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum QualityLiaisonError {
     NotFound,
+    TypeConfigNotFound,
     TypeNotFound,
     InvalidRequest,
     ApprovalOpinionRequired,
@@ -88,6 +89,28 @@ struct QualityLiaisonOrderRow {
 impl PgQualityLiaisonRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
+    }
+
+    pub async fn get_type(
+        &self,
+        ctx: &AuthContext,
+        type_code: &str,
+    ) -> Result<QualityLiaisonTypeConfig, QualityLiaisonError> {
+        sqlx::query_as::<_, QualityLiaisonTypeRow>(
+            r#"
+            SELECT id, owner_id, type_code, type_name, approval_template_id,
+                   approver_user_id, timeout_seconds, enabled, created_at, updated_at, version
+              FROM quality_liaison_types
+             WHERE owner_id = $1 AND type_code = $2
+            "#,
+        )
+        .bind(ctx.owner_id)
+        .bind(type_code.trim())
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(map_database_error)?
+        .map(Into::into)
+        .ok_or(QualityLiaisonError::TypeConfigNotFound)
     }
 
     pub async fn upsert_type(

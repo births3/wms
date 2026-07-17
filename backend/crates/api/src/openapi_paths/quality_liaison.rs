@@ -2,6 +2,21 @@
 use super::*;
 
 #[utoipa::path(
+    get,
+    path = "/api/v1/quality-liaisons/types/{type_code}",
+    tag = "quality-liaison",
+    params(("type_code" = String, Path, description = "质量联系单类型编码")),
+    responses(
+        (status = 200, description = "当前货主的类型与 H4 审批模板配置", body = QualityLiaisonTypeConfig),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+        (status = 404, description = "类型不存在或不属于当前货主", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn get_quality_liaison_type() {}
+
+#[utoipa::path(
     put,
     path = "/api/v1/quality-liaisons/types/{type_code}",
     tag = "quality-liaison",

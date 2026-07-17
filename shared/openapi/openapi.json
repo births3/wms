@@ -2484,8 +2484,8 @@
           }
         },
         "security": [],
-        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。",
-        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。"
+        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。",
+        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。"
       }
     },
     "/api/v1/auth/logout": {
@@ -13576,6 +13576,65 @@
       }
     },
     "/api/v1/quality-liaisons/types/{type_code}": {
+      "get": {
+        "tags": [
+          "quality-liaison"
+        ],
+        "operationId": "get_quality_liaison_type",
+        "parameters": [
+          {
+            "name": "type_code",
+            "in": "path",
+            "description": "质量联系单类型编码",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "当前货主的类型与 H4 审批模板配置",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QualityLiaisonTypeConfig"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "类型不存在或不属于当前货主",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
       "put": {
         "tags": [
           "quality-liaison"

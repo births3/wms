@@ -2635,7 +2635,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["get_quality_liaison_type"];
         put: operations["upsert_quality_liaison_type"];
         post?: never;
         delete?: never;
@@ -17278,6 +17278,56 @@ export interface operations {
             };
             /** @description 类型未启用或必填字段缺失 */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_quality_liaison_type: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 质量联系单类型编码 */
+                type_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前货主的类型与 H4 审批模板配置 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QualityLiaisonTypeConfig"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 类型不存在或不属于当前货主 */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

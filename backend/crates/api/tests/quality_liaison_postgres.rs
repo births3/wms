@@ -13,7 +13,7 @@ use wms_api::{
 };
 use wms_domain::{
     CreateQualityLiaisonRequest, QualityLiaisonApprovalCallbackRequest, QualityLiaisonOrder,
-    UpsertQualityLiaisonTypeRequest,
+    QualityLiaisonTypeConfig, UpsertQualityLiaisonTypeRequest,
 };
 
 fn ctx(owner_id: Uuid, user_id: Uuid) -> AuthContext {
@@ -261,6 +261,59 @@ async fn quality_liaison_api_enforces_permissions_and_designated_approver(pool: 
         .await
         .expect("quality liaison API type should seed");
     let app = quality_liaison_router(QualityLiaisonAppState::with_postgres(pool));
+    let type_response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/api/v1/quality-liaisons/types/validation_override")
+                .extension(creator.clone())
+                .body(Body::empty())
+                .expect("quality liaison type request should build"),
+        )
+        .await
+        .expect("quality liaison type should respond");
+    assert_eq!(type_response.status(), StatusCode::OK);
+    let type_config: QualityLiaisonTypeConfig = serde_json::from_slice(
+        &to_bytes(type_response.into_body(), usize::MAX)
+            .await
+            .expect("quality liaison type response body should read"),
+    )
+    .expect("quality liaison type response should deserialize");
+    assert_eq!(type_config.type_code, "validation_override");
+    let type_forbidden = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/api/v1/quality-liaisons/types/validation_override")
+                .extension(AuthContext {
+                    permissions: vec!["mql.quality-liaison.read".to_string()],
+                    ..creator.clone()
+                })
+                .body(Body::empty())
+                .expect("forbidden quality liaison type request should build"),
+        )
+        .await
+        .expect("forbidden quality liaison type should respond");
+    assert_eq!(type_forbidden.status(), StatusCode::FORBIDDEN);
+    let cross_owner_type = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/api/v1/quality-liaisons/types/validation_override")
+                .extension(AuthContext {
+                    owner_id: Uuid::new_v4(),
+                    ..creator.clone()
+                })
+                .body(Body::empty())
+                .expect("cross-owner quality liaison type request should build"),
+        )
+        .await
+        .expect("cross-owner quality liaison type should respond");
+    assert_eq!(cross_owner_type.status(), StatusCode::NOT_FOUND);
+
     let create_body = serde_json::to_vec(&CreateQualityLiaisonRequest {
         type_code: "validation_override".to_string(),
         related_document_type: "outbound_order".to_string(),

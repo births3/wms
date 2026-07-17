@@ -2,7 +2,7 @@ use axum::{
     extract::{Path, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
-    routing::{get, post, put},
+    routing::{get, post},
     Json, Router,
 };
 use chrono::Utc;
@@ -69,6 +69,11 @@ impl IntoResponse for QualityLiaisonHandlerError {
             Self::QualityLiaison(QualityLiaisonError::NotFound) => {
                 (StatusCode::NOT_FOUND, "QL_NOT_FOUND", "质量联系单不存在")
             }
+            Self::QualityLiaison(QualityLiaisonError::TypeConfigNotFound) => (
+                StatusCode::NOT_FOUND,
+                "QL_NOT_FOUND",
+                "质量联系单类型配置不存在",
+            ),
             Self::QualityLiaison(QualityLiaisonError::TypeNotFound) => (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "QL_INVALID_TYPE",
@@ -140,7 +145,7 @@ pub fn quality_liaison_router(state: QualityLiaisonAppState) -> Router {
     Router::new()
         .route(
             "/api/v1/quality-liaisons/types/:type_code",
-            put(upsert_type_handler),
+            get(get_type_handler).put(upsert_type_handler),
         )
         .route("/api/v1/quality-liaisons", post(create_handler))
         .route("/api/v1/quality-liaisons/:id", get(get_handler))
@@ -149,6 +154,15 @@ pub fn quality_liaison_router(state: QualityLiaisonAppState) -> Router {
             post(approval_callback_handler),
         )
         .with_state(state)
+}
+
+async fn get_type_handler(
+    ctx: AuthContext,
+    State(state): State<QualityLiaisonAppState>,
+    Path(type_code): Path<String>,
+) -> Result<Json<QualityLiaisonTypeConfig>, QualityLiaisonHandlerError> {
+    ctx.require_permission(CONFIG_PERMISSION)?;
+    Ok(Json(state.repository.get_type(&ctx, &type_code).await?))
 }
 
 async fn upsert_type_handler(
