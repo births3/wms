@@ -237,6 +237,7 @@ pub(super) async fn reject_receiving_order_handler(
     ctx.require_permission("m2.write")?;
     let idempotency_key = idempotency_key_from_headers(&headers)?;
     let now = Utc::now();
+    let reason = req.reason.trim().to_string();
     if let Some(repository) = &state.wave3_repository {
         let audit = AuditWriteRequest::from_auth_context(
             &ctx,
@@ -255,13 +256,21 @@ pub(super) async fn reject_receiving_order_handler(
         let mut store = state.inbound_store.lock().await;
         store.reject(&ctx, id, req, now)?
     };
-    append_audit(
+    append_audit_with_diff(
         &state,
         &ctx,
         "reject",
         "M2",
         "receiving_order",
         id.to_string(),
+        Some(AuditDiff::compute(
+            serde_json::json!({}),
+            serde_json::json!({
+                "status": "closed_rejected",
+                "reason": reason,
+                "rejected_qty": receipt.rejected_qty,
+            }),
+        )),
     )
     .await;
     Ok(Json(receipt))

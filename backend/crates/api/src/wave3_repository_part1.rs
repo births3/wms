@@ -334,7 +334,15 @@ impl PgWave3Repository {
             now,
         )
         .await?;
-        if let Some(audit) = audit {
+        if let Some(mut audit) = audit {
+            audit.diff = Some(AuditDiff::compute(
+                serde_json::json!({ "status": &order.status }),
+                serde_json::json!({
+                    "status": "closed_rejected",
+                    "reason": &reason,
+                    "rejected_qty": expected_qty,
+                }),
+            ));
             append_event_in_tx(&mut tx, &audit)
                 .await
                 .map_err(|error| Wave3RepositoryError::Audit(format!("{error:?}")))?;

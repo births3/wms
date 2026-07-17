@@ -120,15 +120,38 @@ async fn receiving_order_reject_closes_order_and_replays_idempotently(pool: PgPo
     let req = RejectReceivingOrderRequest {
         reason: "外包装严重破损，整单拒收".to_string(),
     };
+    let audit = AuditWriteRequest::from_auth_context(
+        &ctx,
+        "reject",
+        "M2",
+        "receiving_order",
+        order.id.to_string(),
+        None,
+    );
     let first = repo
-        .reject_receiving_order(&ctx, order.id, req.clone(), now, "idem-reject-1")
+        .reject_receiving_order_with_audit(
+            &ctx,
+            order.id,
+            req.clone(),
+            now,
+            "idem-reject-1",
+            Some(audit.clone()),
+        )
         .await
         .expect("first reject should insert");
     let replay = repo
-        .reject_receiving_order(&ctx, order.id, req, now, "idem-reject-1")
+        .reject_receiving_order_with_audit(
+            &ctx,
+            order.id,
+            req,
+            now,
+            "idem-reject-1",
+            Some(audit),
+        )
         .await
         .expect("same idempotency key should replay first reject");
-    assert_eq!(first.id, replay.id);
+    assert_eq!(first.value.id, replay.value.id);
+    assert!(replay.replayed);
 
     let closed: (i64, i64, i64, Option<String>, String, i64) = sqlx::query_as(
         r#"
@@ -160,6 +183,20 @@ async fn receiving_order_reject_closes_order_and_replays_idempotently(pool: PgPo
             1,
         )
     );
+    let audit_diff: serde_json::Value = sqlx::query_scalar(
+        "SELECT diff FROM audit_event WHERE owner_id = $1 AND action = 'reject' AND resource_id = $2",
+    )
+    .bind(owner_id)
+    .bind(order.id.to_string())
+    .fetch_one(&pool)
+    .await
+    .expect("reject audit diff");
+    assert_eq!(
+        audit_diff["after"]["reason"],
+        "外包装严重破损，整单拒收"
+    );
+    assert_eq!(audit_diff["after"]["status"], "closed_rejected");
+    assert_eq!(audit_diff["after"]["rejected_qty"], 10);
 
     let receiving_order = repo
         .create_receiving_order(
