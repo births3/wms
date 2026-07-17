@@ -22,6 +22,10 @@ pub(super) fn apply_maintenance_routes(router: Router<Wave3AppState>) -> Router<
             get(list_maintenance_tasks_handler),
         )
         .route(
+            "/api/v1/inventory/maintenance/tasks/generate",
+            post(generate_maintenance_tasks_handler),
+        )
+        .route(
             "/api/v1/inventory/maintenance/records",
             get(list_maintenance_records_handler),
         )
@@ -46,6 +50,17 @@ async fn list_maintenance_tasks_handler(
         },
         data,
     }))
+}
+
+async fn generate_maintenance_tasks_handler(
+    ctx: AuthContext,
+    State(state): State<Wave3AppState>,
+) -> Result<Json<serde_json::Value>, Wave3HandlerError> {
+    ctx.require_permission("m3.maintenance.write")?;
+    let created = maintenance_repository(&state)?
+        .generate_maintenance_tasks(&ctx, Utc::now(), 180)
+        .await?;
+    Ok(Json(serde_json::json!({ "created": created })))
 }
 
 async fn list_maintenance_records_handler(

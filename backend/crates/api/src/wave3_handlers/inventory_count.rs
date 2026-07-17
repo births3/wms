@@ -20,7 +20,7 @@ pub(super) fn apply_inventory_count_routes(router: Router<Wave3AppState>) -> Rou
     router
         .route(
             "/api/v1/inventory/counts",
-            post(create_inventory_count_handler),
+            get(list_inventory_counts_handler).post(create_inventory_count_handler),
         )
         .route(
             "/api/v1/inventory/counts/:id",
@@ -34,6 +34,27 @@ pub(super) fn apply_inventory_count_routes(router: Router<Wave3AppState>) -> Rou
             "/api/v1/inventory/counts/:id/approve",
             post(approve_inventory_count_handler),
         )
+}
+
+async fn list_inventory_counts_handler(
+    ctx: AuthContext,
+    State(state): State<Wave3AppState>,
+) -> Result<Json<serde_json::Value>, Wave3HandlerError> {
+    require_any_permission(
+        &ctx,
+        &[
+            "m3.read",
+            "m3.inventory_count.write",
+            "m3.inventory_count.approve",
+        ],
+    )?;
+    let data = inventory_count_repository(&state)?
+        .list_inventory_counts(&ctx)
+        .await?;
+    Ok(Json(serde_json::json!({
+        "data": data,
+        "page": { "count": data.len(), "next_cursor": null }
+    })))
 }
 
 async fn create_inventory_count_handler(

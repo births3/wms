@@ -2484,8 +2484,8 @@
           }
         },
         "security": [],
-        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。",
-        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。"
+        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。",
+        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。"
       }
     },
     "/api/v1/auth/logout": {
@@ -9041,6 +9041,27 @@
       }
     },
     "/api/v1/inventory/counts": {
+      "get": {
+        "tags": [
+          "inventory"
+        ],
+        "operationId": "list_inventory_counts",
+        "responses": {
+          "200": {
+            "description": "盘点单列表"
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "tags": [
           "inventory-count"
@@ -9765,7 +9786,51 @@
         }
       }
     },
+    "/api/v1/inventory/maintenance/tasks/generate": {
+      "post": {
+        "tags": [
+          "inventory"
+        ],
+        "operationId": "generate_maintenance_tasks",
+        "responses": {
+          "200": {
+            "description": "生成养护计划"
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/inventory/relocations": {
+      "get": {
+        "tags": [
+          "inventory"
+        ],
+        "operationId": "list_inventory_relocations",
+        "responses": {
+          "200": {
+            "description": "移库记录列表"
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "tags": [
           "inventory"

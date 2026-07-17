@@ -22,7 +22,7 @@ pub(super) fn apply_m3_ops_routes(router: Router<Wave3AppState>) -> Router<Wave3
     router
         .route(
             "/api/v1/inventory/relocations",
-            post(relocate_inventory_handler),
+            get(list_inventory_relocations_handler).post(relocate_inventory_handler),
         )
         .route(
             "/api/v1/inventory/alerts",
@@ -49,6 +49,20 @@ pub(super) fn apply_m3_ops_routes(router: Router<Wave3AppState>) -> Router<Wave3
             "/api/v1/inventory/status-erp-outbox/process",
             post(process_status_erp_outbox_handler),
         )
+}
+
+async fn list_inventory_relocations_handler(
+    ctx: AuthContext,
+    State(state): State<Wave3AppState>,
+) -> Result<Json<serde_json::Value>, Wave3HandlerError> {
+    require_any_permission(&ctx, &["m3.read", "m3.relocation.write"])?;
+    let data = ops_repository(&state)?
+        .list_inventory_relocations(&ctx)
+        .await?;
+    Ok(Json(serde_json::json!({
+        "data": data,
+        "page": { "count": data.len(), "next_cursor": null }
+    })))
 }
 
 async fn relocate_inventory_handler(

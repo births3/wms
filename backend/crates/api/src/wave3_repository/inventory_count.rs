@@ -253,6 +253,46 @@ impl PgWave3Repository {
         load_inventory_count(&self.pool, ctx.owner_id, count_id).await
     }
 
+    pub async fn list_inventory_counts(
+        &self,
+        ctx: &AuthContext,
+    ) -> Result<Vec<InventoryCount>, Wave3RepositoryError> {
+        let rows = sqlx::query_as::<_, InventoryCountRow>(
+            r#"
+            SELECT id, owner_id, count_type, warehouse_id, zone_id, product_code, status,
+                   started_at, created_by, approved_by, approved_at, approval_source, approval_id,
+                   created_at, updated_at
+              FROM inventory_counts
+             WHERE owner_id = $1
+             ORDER BY started_at DESC, id DESC
+             LIMIT 100
+            "#,
+        )
+        .bind(ctx.owner_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_db_error)?;
+        let mut counts = Vec::with_capacity(rows.len());
+        for row in rows {
+            let lines = sqlx::query_as::<_, InventoryCountLineRow>(
+                r#"
+                SELECT id, count_id, owner_id, inventory_batch_id, location_id, location_code,
+                       product_code, batch_no, book_qty, physical_qty, variance_qty, variance_type
+                  FROM inventory_count_lines
+                 WHERE owner_id = $1 AND count_id = $2
+                 ORDER BY location_code, product_code, batch_no, id
+                "#,
+            )
+            .bind(ctx.owner_id)
+            .bind(row.id)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(map_db_error)?;
+            counts.push(map_inventory_count(row, lines));
+        }
+        Ok(counts)
+    }
+
     pub async fn submit_inventory_count_line_with_audit(
         &self,
         ctx: &AuthContext,

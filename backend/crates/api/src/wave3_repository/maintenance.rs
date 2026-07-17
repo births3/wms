@@ -103,6 +103,56 @@ impl PgWave3Repository {
         Ok(rows.into_iter().map(map_maintenance_task).collect())
     }
 
+    pub async fn generate_maintenance_tasks(
+        &self,
+        ctx: &AuthContext,
+        now: DateTime<Utc>,
+        horizon_days: i64,
+    ) -> Result<usize, Wave3RepositoryError> {
+        let until = now.date_naive() + chrono::Duration::days(horizon_days.clamp(1, 365));
+        let batches: Vec<(Uuid,)> = sqlx::query_as(
+            r#"
+            SELECT id
+              FROM inventory_batches
+             WHERE owner_id = $1
+               AND quality_status = $2
+               AND qty_on_hand > 0
+               AND expiry_date <= $3
+               AND NOT EXISTS (
+                    SELECT 1 FROM inventory_maintenance_tasks task
+                     WHERE task.owner_id = $1
+                       AND task.inventory_batch_id = inventory_batches.id
+                       AND task.status = 'pending'
+               )
+            "#,
+        )
+        .bind(ctx.owner_id)
+        .bind(STATUS_QUALIFIED)
+        .bind(until)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_db_error)?;
+        let mut created = 0;
+        for (batch_id,) in batches {
+            sqlx::query(
+                r#"
+                INSERT INTO inventory_maintenance_tasks (
+                    id, owner_id, inventory_batch_id, planned_at, status, created_at
+                ) VALUES ($1,$2,$3,$4,'pending',$4)
+                "#,
+            )
+            .bind(Uuid::new_v4())
+            .bind(ctx.owner_id)
+            .bind(batch_id)
+            .bind(now)
+            .execute(&self.pool)
+            .await
+            .map_err(map_db_error)?;
+            created += 1;
+        }
+        Ok(created)
+    }
+
     pub async fn list_maintenance_records(
         &self,
         ctx: &AuthContext,

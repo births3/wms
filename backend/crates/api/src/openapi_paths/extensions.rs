@@ -283,6 +283,18 @@ pub(crate) fn list_shipped_customers_for_batch() {}
 #[allow(dead_code)]
 pub(crate) fn process_status_erp_outbox() {}
 
+#[utoipa::path(get, path = "/api/v1/inventory/counts", tag = "inventory", responses((status = 200, description = "盘点单列表"), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn list_inventory_counts() {}
+
+#[utoipa::path(post, path = "/api/v1/inventory/maintenance/tasks/generate", tag = "inventory", responses((status = 200, description = "生成养护计划"), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn generate_maintenance_tasks() {}
+
+#[utoipa::path(get, path = "/api/v1/inventory/relocations", tag = "inventory", responses((status = 200, description = "移库记录列表"), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[allow(dead_code)]
+pub(crate) fn list_inventory_relocations() {}
+
 #[utoipa::path(post, path = "/api/v1/inventory/batches/putaway", tag = "inventory", request_body = PutawayInventoryRequest, responses((status = 200, description = "入库上架增加库存", body = InventoryBatch), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn putaway_inventory_batch() {}

@@ -363,6 +363,29 @@ impl PgWave3Repository {
             replayed: false,
         })
     }
+
+    pub async fn list_inventory_relocations(
+        &self,
+        ctx: &AuthContext,
+    ) -> Result<Vec<InventoryRelocation>, Wave3RepositoryError> {
+        let rows = sqlx::query_as::<_, RelocationRow>(
+            r#"
+            SELECT id, owner_id, batch_id, product_code, batch_no, qty,
+                   from_location_id, from_location_code, to_location_id, to_location_code,
+                   relocation_mode, lpn_code, quality_status, status, reason,
+                   created_by, created_at, updated_at
+              FROM inventory_relocations
+             WHERE owner_id = $1
+             ORDER BY created_at DESC, id DESC
+             LIMIT 200
+            "#,
+        )
+        .bind(ctx.owner_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_db_error)?;
+        Ok(rows.into_iter().map(map_relocation).collect())
+    }
 }
 
 fn map_relocation(row: RelocationRow) -> InventoryRelocation {

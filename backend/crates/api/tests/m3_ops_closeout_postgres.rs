@@ -353,3 +353,43 @@ async fn abc_recompute_and_manual_override(pool: sqlx::PgPool) {
         .expect("list");
     assert!(!listed.data.is_empty());
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn generate_maintenance_tasks_for_near_expiry_batches(pool: sqlx::PgPool) {
+    let owner_id = Uuid::new_v4();
+    let batch_id = Uuid::new_v4();
+    let soon = Utc::now().date_naive() + chrono::Duration::days(20);
+    sqlx::query(
+        r#"
+        INSERT INTO inventory_batches (
+            id, owner_id, product_code, batch_no, production_date, expiry_date,
+            qty_on_hand, qty_locked, quality_status, location_id, location_code
+        ) VALUES ($1,$2,'P-MAIN-001','B-MAIN-001',$3,$4,5,0,'qualified',$5,'L-MAIN')
+        "#,
+    )
+    .bind(batch_id)
+    .bind(owner_id)
+    .bind(NaiveDate::from_ymd_opt(2026, 1, 1).unwrap())
+    .bind(soon)
+    .bind(Uuid::new_v4())
+    .execute(&pool)
+    .await
+    .expect("batch");
+    let repository = PgWave3Repository::new(pool);
+    let created = repository
+        .generate_maintenance_tasks(&ctx(owner_id), Utc::now(), 180)
+        .await
+        .expect("generate");
+    assert!(created >= 1);
+    let tasks = repository
+        .list_maintenance_tasks(
+            &ctx(owner_id),
+            wms_domain::MaintenanceTaskQuery {
+                status: Some("pending".to_string()),
+                ..wms_domain::MaintenanceTaskQuery::default()
+            },
+        )
+        .await
+        .expect("list");
+    assert!(!tasks.is_empty());
+}
