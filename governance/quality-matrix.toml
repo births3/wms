@@ -313,6 +313,136 @@ covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
 frontend_pages = ["m1-warehouses", "m1-zones", "m1-locations"]
 e2e_checks = ["just web-admin-m1-real-e2e"]
 
+
+[[stories]]
+id = "US-M3-001"
+title = "实时库存查询"
+module = "M3"
+story_file = "docs/domain/user-stories-m3-inventory-query.md"
+types = ["read_only", "api_change", "frontend_interaction", "integration"]
+frontend_pages = ["m3-batches"]
+navigation_checks = ["node apps/web-admin/self-checks/m3-batch-management-slice-self-check.mjs"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m3-real"]
+e2e_screenshots = [
+  { page = "m3-batches", spec = "prototypes/e2e/web-admin-m3-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m3-batches/inventory-query.png" },
+]
+test_checks = [
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_expiry_isolation_postgres inventory_query_combines_filters_without_cross_owner_rows",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_expiry_isolation_postgres inventory_query_filters_location_type_and_zone_without_cross_owner_rows",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_expiry_isolation_postgres inventory_query_filters_production_and_created_date_ranges",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_expiry_isolation_postgres inventory_query_returns_location_snapshot_and_supports_product_and_temperature_search",
+  "node apps/web-admin/self-checks/m3-batch-management-slice-self-check.mjs",
+  "pnpm --dir apps/web-admin exec tsc --noEmit",
+]
+api_paths = ["GET /api/v1/inventory/batches"]
+database_objects = ["inventory_batches", "products", "warehouse_locations", "warehouse_zones"]
+evidence_refs = [
+  "docs/domain/user-stories-m3-inventory-query.md",
+  "backend/crates/domain/src/operations.rs",
+  "backend/crates/api/src/wave3_handlers_part4.rs",
+  "backend/crates/api/src/wave3_repository/query.rs",
+  "backend/crates/api/src/openapi_paths/extensions.rs",
+  "backend/crates/api/tests/m3_expiry_isolation_postgres.rs",
+  "backend/migrations/202607170001_m3_inventory_query_snapshot.sql",
+  "apps/web-admin/src/features/inventory/inventory-queries.ts",
+  "apps/web-admin/src/pages/inventory/M3BatchManagementPage.tsx",
+  "packages/api-client/src/schema.ts",
+  "shared/openapi/openapi.json",
+  "apps/web-admin/self-checks/m3-batch-management-slice-self-check.mjs",
+  "prototypes/e2e/web-admin-m3-real.spec.ts",
+  "prototypes/playwright-web-admin-m3-real-config.ts",
+  "artifacts/screenshot-portal/real-web/m3-batches/inventory-query.png",
+  "artifacts/screenshot-portal/real-web/m3-batches/inventory-export-dialog.png",
+  "artifacts/screenshot-portal/real-web/m3-batches/inventory-exported.png",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "not_applicable"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.not_applicable_reasons]
+audit = "实时库存查询为只读查询与导出，不产生库存状态写操作审计事件。"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L7", "L8", "L9", "L10"]
+covered_layers = ["L1", "L2", "L3", "L4", "L7", "L8", "L9", "L10"]
+
+
+[[stories]]
+id = "US-M3-011"
+title = "库位历史追踪"
+module = "M3"
+story_file = "docs/domain/user-stories-m3-inventory-operation.md"
+types = ["read_only", "api_change", "frontend_interaction", "integration"]
+frontend_pages = ["m3-location-history"]
+navigation_checks = ["node apps/web-admin/self-checks/m3-location-history-slice-self-check.mjs"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m3-real"]
+e2e_screenshots = [
+  { page = "m3-location-history", spec = "prototypes/e2e/web-admin-m3-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m3-location-history/location-history.png" },
+]
+test_checks = [
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_location_history_postgres -- --test-threads=1",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_trace_postgres -- --test-threads=1",
+  "node apps/web-admin/self-checks/m3-location-history-slice-self-check.mjs",
+  "pnpm --dir apps/web-admin exec tsc --noEmit",
+  "just openapi-check",
+]
+api_paths = ["GET /api/v1/inventory/locations/history", "GET /api/v1/inventory/batches/{id}/trace"]
+database_objects = ["inventory_batches", "inventory_movements", "inventory_status_changes", "warehouse_locations", "warehouse_zones", "products"]
+evidence_refs = [
+  "docs/domain/user-stories-m3-inventory-operation.md",
+  "backend/migrations/202607170002_m3_location_history.sql",
+  "backend/migrations/202607170003_m3_location_history_admin_menu.sql",
+  "backend/crates/domain/src/operations.rs",
+  "backend/crates/api/src/wave3_repository/trace.rs",
+  "backend/crates/api/src/wave3_handlers_part3.rs",
+  "backend/crates/api/src/wave3_handlers_part4.rs",
+  "backend/crates/api/src/openapi_paths/extensions.rs",
+  "backend/crates/api/tests/m3_location_history_postgres.rs",
+  "backend/crates/api/tests/m3_trace_postgres.rs",
+  "apps/web-admin/src/pages/inventory/M3LocationHistoryPage.tsx",
+  "apps/web-admin/src/pages/inventory/M3BatchManagementPage.tsx",
+  "apps/web-admin/src/features/inventory/inventory-queries.ts",
+  "apps/web-admin/self-checks/m3-location-history-slice-self-check.mjs",
+  "apps/web-admin/dev-mocks/web-admin-dev-mock-print-inventory.ts",
+  "apps/web-admin/dev-mocks/admin-menu-dev-mock.ts",
+  "packages/api-client/src/schema.ts",
+  "shared/openapi/openapi.json",
+  "prototypes/e2e/web-admin-m3-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/m3-location-history/location-history.png",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "not_applicable"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.not_applicable_reasons]
+audit = "库位历史追踪为只读查询与导出，不新增写操作审计事件。"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L7", "L8", "L9", "L10"]
+covered_layers = ["L1", "L2", "L3", "L4", "L7", "L8", "L9", "L10"]
+
 [[deferred_stories]]
 id = "US-H4-002"
 title = "企业微信消息发送"
@@ -2779,71 +2909,6 @@ reason = "当前尚无 ABC 分类持久化、出库统计任务、阈值配置�
 owner = "M3 模块负责人"
 resume_when = "先确认统计口径与分类阈值事实源，再实现月度计算、人工覆盖、审计和 M2-010 消费链路。"
 
-[[deferred_stories]]
-id = "US-M3-011"
-title = "库位历史追踪"
-module = "M3"
-story_file = "docs/domain/user-stories-m3-inventory-operation.md"
-types = ["read_only", "api_change", "frontend_interaction", "integration"]
-api_paths = ["GET /api/v1/inventory/batches/{id}/trace"]
-database_objects = ["inventory_batches", "inventory_movements", "inventory_status_changes"]
-test_checks = [
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_trace_postgres -- --test-threads=1",
-]
-evidence_refs = [
-  "docs/domain/user-stories-m3-inventory-operation.md",
-  "backend/crates/api/src/wave3_repository/trace.rs",
-  "backend/crates/api/tests/m3_trace_postgres.rs",
-  "backend/crates/api/src/openapi_paths/extensions.rs",
-]
-reason = "已有按库存批次查询库存流水和状态变更的货主隔离追溯接口，可复用部分流水事实；但 inventory_movements 尚无源/目标库位、操作人、LPN 和容积变化字段，也没有按库位/时间/操作类型查询、风险识别、时间轴/图表、导出打印和入口页面，不能标记完成。"
-owner = "M3 模块负责人"
-resume_when = "先补可兼容的库位流水事实字段与写入链路，再实现库位查询 API、风险计算、页面和导出打印证据。"
-
-[[deferred_stories]]
-id = "US-M3-001"
-title = "实时库存查询"
-module = "M3"
-story_file = "docs/domain/user-stories-m3-inventory-query.md"
-types = ["read_only", "api_change", "frontend_interaction", "integration"]
-frontend_pages = ["m3-batches"]
-navigation_checks = ["node apps/web-admin/self-checks/m3-batch-management-slice-self-check.mjs"]
-e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m3-real"]
-e2e_screenshots = [
-  { page = "m3-batches", spec = "prototypes/e2e/web-admin-m3-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m3-batches/inventory-query.png" },
-]
-test_checks = [
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_expiry_isolation_postgres inventory_query_combines_filters_without_cross_owner_rows",
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_expiry_isolation_postgres inventory_query_filters_location_type_and_zone_without_cross_owner_rows",
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_expiry_isolation_postgres inventory_query_filters_production_and_created_date_ranges",
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_expiry_isolation_postgres inventory_query_returns_location_snapshot_and_supports_product_and_temperature_search",
-  "node apps/web-admin/self-checks/m3-batch-management-slice-self-check.mjs",
-  "pnpm --dir apps/web-admin exec tsc --noEmit",
-]
-api_paths = ["GET /api/v1/inventory/batches"]
-database_objects = ["inventory_batches", "products", "warehouse_locations", "warehouse_zones"]
-evidence_refs = [
-  "docs/domain/user-stories-m3-inventory-query.md",
-  "backend/crates/domain/src/operations.rs",
-  "backend/crates/api/src/wave3_handlers_part4.rs",
-  "backend/crates/api/src/wave3_repository/query.rs",
-  "backend/crates/api/src/openapi_paths/extensions.rs",
-  "backend/crates/api/tests/m3_expiry_isolation_postgres.rs",
-  "backend/migrations/202607170001_m3_inventory_query_snapshot.sql",
-  "apps/web-admin/src/features/inventory/inventory-queries.ts",
-  "apps/web-admin/src/pages/inventory/M3BatchManagementPage.tsx",
-  "packages/api-client/src/schema.ts",
-  "shared/openapi/openapi.json",
-  "apps/web-admin/self-checks/m3-batch-management-slice-self-check.mjs",
-  "prototypes/e2e/web-admin-m3-real.spec.ts",
-  "prototypes/playwright-web-admin-m3-real-config.ts",
-  "artifacts/screenshot-portal/real-web/m3-batches/inventory-query.png",
-  "artifacts/screenshot-portal/real-web/m3-batches/inventory-export-dialog.png",
-  "artifacts/screenshot-portal/real-web/m3-batches/inventory-exported.png",
-]
-reason = "已补生产查询的商品名称/规格/厂家、容器 LPN、排-列-层、库区/温区/色标、容积和当前 SKU 数，支持商品名称/编码、批号、库位、容器模糊检索与温区组合过滤；PC 已展示库位/批次专项汇总、Excel 导出，并由真实 PostgreSQL 和全新临时库浏览器 E2E 截图证明。仍缺从库位专项视图跳转到真正的 US-M3-011 库位历史页，因此按完整故事口径继续延期。"
-owner = "M3 模块负责人"
-resume_when = "完成 US-M3-011 库位历史查询页与从库位专项视图的一键跳转，复跑真实 E2E 后再迁入 stories。"
 
 [[deferred_stories]]
 id = "US-M4-002"

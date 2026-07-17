@@ -37,6 +37,8 @@ NAVIGATION_CHECK_SOURCES = {
     / "apps/web-admin/self-checks/h1-api-key-slice-self-check.mjs",
     "node apps/web-admin/self-checks/m3-batch-management-slice-self-check.mjs": REPO_ROOT
     / "apps/web-admin/self-checks/m3-batch-management-slice-self-check.mjs",
+    "node apps/web-admin/self-checks/m3-location-history-slice-self-check.mjs": REPO_ROOT
+    / "apps/web-admin/self-checks/m3-location-history-slice-self-check.mjs",
     "node apps/web-admin/self-checks/m1-product-source-actions-self-check.mjs": REPO_ROOT
     / "apps/web-admin/self-checks/m1-product-source-actions-self-check.mjs",
     "node apps/web-admin/self-checks/m1-zone-real-api-self-check.mjs": REPO_ROOT

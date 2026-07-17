@@ -14,9 +14,9 @@
 | 指标 | 数量 |
 |---|---:|
 | 故事总数 | 174 |
-| 已完成（已验证） | 43 |
-| 未完成 / 延期 | 131 |
-| 完成率 | 24.7% |
+| 已完成（已验证） | 45 |
+| 未完成 / 延期 | 129 |
+| 完成率 | 25.9% |
 
 > “已完成”表示故事已进入 `stories` 并通过矩阵维度门禁；延期故事中的局部代码、页面或测试切片不计入完成。
 
@@ -40,7 +40,7 @@
 | M1 | 2 | 9 | 11 |
 | M10 | 0 | 4 | 4 |
 | M2 | 2 | 7 | 9 |
-| M3 | 0 | 9 | 9 |
+| M3 | 2 | 7 | 9 |
 | M4 | 1 | 10 | 11 |
 | M5 | 0 | 3 | 3 |
 | M6 | 0 | 4 | 4 |
@@ -65,6 +65,8 @@
 | US-H1-005 Token 失效与登出 | H1 | S2 |
 | US-H1-006 API Key 生命周期管理 | H1 | S2 |
 | US-M1-004 仓库与库位管理 | M1 | S2 |
+| US-M3-001 实时库存查询 | M3 | S2 |
+| US-M3-011 库位历史追踪 | M3 | S2 |
 | US-H1-001 用户登录与 token 签发（PC 密码登录切片） | H1 | S2 |
 | US-H1-002 角色与权限管理 | H1 | S2 |
 | US-H1-003 API 鉴权中间件 | H1 | S1 |
@@ -157,8 +159,6 @@
 | US-M3-006 库内移库 | M3 | M-TE 已有 relocation 任务类型和源/目标库位字段，但尚未形成 M3 移库业务闭环；缺移库单/API、源减目标增同事务、状态/温区/容量门禁、整托 LPN 与逐件追溯码分支、PC/PDA、幂等审计和真实 PostgreSQL/PDA 证据，不能标记完成。 |
 | US-M3-009 库存预警 | M3 | 已具备货主级近效期阈值、近效期报表和到期批次自动隔离调度切片。故事仍不能整体关闭：安全库存/超储/养护逾期/温湿度统一预警事件、待处理/已处理/已忽略生命周期、系统消息与可选渠道、审计和统计看板尚未形成 M3 业务闭环。 |
 | US-M3-010 ABC 分类管理 | M3 | 当前尚无 ABC 分类持久化、出库统计任务、阈值配置、人工覆盖、报表和审计实现；M2 上架推荐也未消费 ABC 分类，不能以商品 attrs 或固定排序替代完整故事。 |
-| US-M3-011 库位历史追踪 | M3 | 已有按库存批次查询库存流水和状态变更的货主隔离追溯接口，可复用部分流水事实；但 inventory_movements 尚无源/目标库位、操作人、LPN 和容积变化字段，也没有按库位/时间/操作类型查询、风险识别、时间轴/图表、导出打印和入口页面，不能标记完成。 |
-| US-M3-001 实时库存查询 | M3 | 已补生产查询的商品名称/规格/厂家、容器 LPN、排-列-层、库区/温区/色标、容积和当前 SKU 数，支持商品名称/编码、批号、库位、容器模糊检索与温区组合过滤；PC 已展示库位/批次专项汇总、Excel 导出，并由真实 PostgreSQL 和全新临时库浏览器 E2E 截图证明。仍缺从库位专项视图跳转到真正的 US-M3-011 库位历史页，因此按完整故事口径继续延期。 |
 | US-M4-002 波次规划 | M4 | 已补 M4 PC 波次列表、详情、创建、刷新和未拣选取消真实 API：后端在同一事务内校验已确认订单、按合格库存进行货主隔离锁定、生成按库位排序的拣选明细和 M-TE 拣选任务、更新订单入波次，取消时释放库存锁定并恢复订单状态，且写入幂等和审计；独立 PostgreSQL 回归与临时数据库浏览器 E2E 已验证列表读取、创建响应、库存分配、拣选任务、刷新回显、详情读取、取消响应和真实页面截图。故事仍不能整体关闭：容量/完整路径规则、任务执行回写、异常回滚和完整波次规则证据尚未闭环。 |
 | US-M4-003 PDA 拣选作业 | M4 | 当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。 |
 | US-M4-004 出库复核 | M4 | 已补出库复核查询/提交闭环：状态、逐行商品/数量、拣选与复核分离、短拣、货主隔离、幂等和审计；PC 页面提交前查询 M-VR 出库/复核策略，服务端按整单最严格策略强制第二复核员资质和已通过的 H4 主管审批，并在 outbound_review_records 落规则/双人/审批证据；全量复核完成后原子创建 M-TE 装车任务，短拣不提前创建。一次性 PostgreSQL 真实浏览器 E2E 已验证策略展示、第二人提交与成功回显。故事仍不能整体关闭：装车任务执行回写、PDA 整件/零件扫码、离线冲突、追溯码和真实 PDA/外部运行证据尚未闭环。 |
@@ -249,6 +249,8 @@
 | US-H1-005 Token 失效与登出 | H1 | S2 | write、api_change、frontend_interaction | L1、L2、L3、L4、L5、L7、L8、L9、L11 | h1-session-management | POST /api/v1/auth/logout<br>PUT /api/v1/auth/me/password<br>GET /api/v1/auth/sessions<br>POST /api/v1/auth/sessions/{session_id}/revoke<br>POST /api/v1/auth/sessions/revoke-others<br>POST /api/v1/auth/users/{user_id}/kick<br>PUT /api/v1/auth/users/{user_id}/status | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-H1-006 API Key 生命周期管理 | H1 | S2 | write、api_change、frontend_interaction、integration | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | h1-api-keys | GET /api/v1/auth/api-keys<br>POST /api/v1/auth/api-keys<br>POST /api/v1/auth/api-keys/{api_key_id}/rotate<br>POST /api/v1/auth/api-keys/{api_key_id}/revoke | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-M1-004 仓库与库位管理 | M1 | S2 | write、api_change、frontend_interaction | L1、L2、L3、L4、L5、L7、L8、L9、L11 | m1-warehouses、m1-zones、m1-locations | GET /api/v1/master-data/warehouses<br>POST /api/v1/master-data/warehouses<br>PATCH /api/v1/master-data/warehouses/{id}<br>GET /api/v1/master-data/warehouse-zones<br>POST /api/v1/master-data/warehouse-zones<br>PATCH /api/v1/master-data/warehouse-zones/{id}<br>GET /api/v1/master-data/locations<br>POST /api/v1/master-data/locations<br>POST /api/v1/master-data/locations/batch-create<br>PATCH /api/v1/master-data/locations/{id} | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
+| US-M3-001 实时库存查询 | M3 | S2 | read_only、api_change、frontend_interaction、integration | L1、L2、L3、L4、L7、L8、L9、L10 | m3-batches | GET /api/v1/inventory/batches | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:not_applicable<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
+| US-M3-011 库位历史追踪 | M3 | S2 | read_only、api_change、frontend_interaction、integration | L1、L2、L3、L4、L7、L8、L9、L10 | m3-location-history | GET /api/v1/inventory/locations/history<br>GET /api/v1/inventory/batches/{id}/trace | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:not_applicable<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-H1-001 用户登录与 token 签发（PC 密码登录切片） | H1 | S2 | write、api_change、frontend_interaction | L1、L2、L3、L4、L5、L7、L8、L9、L11 | - | POST /api/v1/auth/login<br>GET /api/v1/auth/me | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-H1-002 角色与权限管理 | H1 | S2 | write、api_change、frontend_interaction、config_rule | L1、L2、L3、L4、L5、L7、L8、L9、L11 | h1-role-permission | GET /api/v1/auth/roles<br>POST /api/v1/auth/roles<br>PUT /api/v1/auth/roles/{role_id}<br>DELETE /api/v1/auth/roles/{role_id}<br>PUT /api/v1/auth/roles/{role_id}/permissions<br>GET /api/v1/auth/permissions<br>GET /api/v1/auth/users<br>PUT /api/v1/auth/user-roles/batch | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-H1-003 API 鉴权中间件 | H1 | S1 | read_only、api_change | L1、L2、L3、L8、L9 | - | - | requirement:verified<br>fields:verified<br>frontend:not_applicable<br>api:verified<br>backend:verified<br>database:not_applicable<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
