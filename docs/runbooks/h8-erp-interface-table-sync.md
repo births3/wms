@@ -29,6 +29,8 @@ export WMS_DB_URL='postgres://...'   # 出站读 outbox
 export H8_OUTBOUND_TRANSPORT=table
 # 通道 A 回调根 URL（transport=http；本地 both 联调也需要）
 export ERP_CALLBACK_BASE=http://127.0.0.1:18091
+# both 仅本地联调：H8_ALLOW_LOCAL_DUAL_TRANSPORT=1
+# 生产 channel_mode 见 US-H8-001（rest_primary_table_fallback=主备降级，非双写）
 ```
 
 权限：`m2.write`、`m4.write`、商品写；缺 `m4.write` 跑 `202607180004_m4_write_permission.sql` 后重登。

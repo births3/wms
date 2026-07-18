@@ -701,6 +701,15 @@ def main(argv: list[str] | None = None) -> int:
     need_out = args.direction in ("out", "both")
     transport = args.transport or resolve_outbound_transport()
     callback_base = resolve_callback_base()
+    # US-H8-001：生产 channel_mode 禁止同时双写；both 仅本地联调
+    if transport == "both" and os.environ.get("H8_ALLOW_LOCAL_DUAL_TRANSPORT", "0") != "1":
+        print(
+            "transport=both is local dual-channel probe only; "
+            "set H8_ALLOW_LOCAL_DUAL_TRANSPORT=1 to override "
+            "(production uses rest_primary_table_fallback failover, not dual write)",
+            file=sys.stderr,
+        )
+        return 2
     if need_in and not args.dry_run and not settings.api_token:
         print("WMS_API_TOKEN is required for inbound unless --dry-run", file=sys.stderr)
         return 2

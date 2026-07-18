@@ -5,6 +5,8 @@
 | **B 接口表** | MSSQL `if_in_*` → WMS OpenAPI | WMS outbox → `if_out_message` |
 | **A HTTP** | ERP 直调 WMS OpenAPI | WMS outbox → `ERP_CALLBACK_BASE` + path |
 
+US-H8-001：生产 `channel_mode` 为 `rest` / `interface_table` / `rest_primary_table_fallback`（主备降级，**非**同时双写）。Worker 的 `--transport both` 仅本地联调，需 `H8_ALLOW_LOCAL_DUAL_TRANSPORT=1`。
+
 ```bash
 export WMS_API_TOKEN=...
 export WMS_DB_URL=postgres://...
