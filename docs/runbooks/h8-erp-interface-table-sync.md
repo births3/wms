@@ -19,18 +19,35 @@ docker compose -f docker-compose.h8-erp-if.yml up -d
 H8_APPLY_SEED=1 ./h8-erp-if/wait-and-init.sh
 ```
 
-## 2. 准备 WMS 与令牌
+### 1.1 镜像拉取（daemon 代理故障时）
 
-1. 启动 WMS API（PostgreSQL 已迁移）。
-2. 准备货主下真实的：`owner` 上下文由 JWT 决定；接口表中的 `warehouse_id` / `supplier_id` / `customer_id` 必须是该货主下已有 UUID。
-3. 导出 Bearer：
+若 `docker pull mcr.microsoft.com/mssql/server:2022-latest` 因 daemon 代理不可达失败，可用本机可用代理 + crane 拉取后 load：
 
 ```bash
-export WMS_API_BASE=http://127.0.0.1:8080
-export WMS_API_TOKEN='<access_token>'
+# 示例：HTTPS_PROXY=http://127.0.0.1:7894 crane pull mcr.microsoft.com/mssql/server:2022-latest /tmp/mssql.tar
+# docker load -i /tmp/mssql.tar
 ```
 
-权限建议含：`m2.write` 或 ASN 创建所需、`m4.write`、`m1.write` / 商品创建权限。
+当前用户不在 `docker` 组时，`docker exec` / compose 需 `sudo`，或用包装脚本把 `docker` 指到 `sudo docker`。
+
+## 2. 准备 WMS 与令牌
+
+1. 启动 **当前代码** 的 WMS API（PostgreSQL 已 `wms-db-migrate`；旧 staging 镜像可能仅有 healthz、无业务路由）。
+2. 货主下必须已有：`warehouse_id` / `supplier_id`（ASN）/ `customer_id`（出库）UUID。
+3. 登录需带 `owner_code`：
+
+```bash
+export WMS_API_BASE=http://127.0.0.1:18090   # 按实际端口
+export WMS_API_TOKEN="$(
+  curl -s -X POST "$WMS_API_BASE/api/v1/auth/login" \
+    -H 'Content-Type: application/json' \
+    -d '{"username":"<user>","password":"<pass>","owner_code":"<owner_code>"}' \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])'
+)"
+```
+
+权限建议：`m2.write`（ASN）、`m4.write`（出库）、`m1.master_data.*` / 商品创建相关权限。
+若库中缺 `m4.write` 权限码，执行迁移 `202607180004_m4_write_permission.sql` 后重新登录刷新 JWT。
 
 ## 3. 写入待同步行
 
@@ -47,6 +64,11 @@ INSERT INTO dbo.if_in_product_master (
 );
 ```
 
+- `storage_condition` 枚举：`frozen` / `cold` / `cool` / `normal`（worker 映射到商品 `attrs.storage_condition`）。
+- ASN 需 `warehouse_id`、`supplier_id`、`product_code`、`expected_qty`、`expected_arrival_at`。
+- 出库需 `customer_id`、`warehouse_id`、`product_code`、`planned_qty` 等。
+- 同一 `idempotency_key` 在接口表有唯一约束，不可重复插入。
+
 ASN / 出库表字段见 `deploy/h8-erp-if/init/01_schema.sql`。
 
 ## 4. 启动 Worker
@@ -62,7 +84,7 @@ python3 scripts/h8_erp_interface_sync/sync_worker.py
 python3 scripts/h8_erp_interface_sync/sync_worker.py --once --types asn
 ```
 
-Worker 通过 `docker exec … sqlcmd` 访问容器内 MSSQL（无需本机装 ODBC）。
+Worker 通过 `docker exec … sqlcmd` 访问容器内 MSSQL（无需本机装 ODBC）。认领使用 CTE + `UPDATE`（不可 `UPDATE TOP … ORDER BY`）。
 
 ## 5. 验收清单（S0–S2）
 
@@ -75,16 +97,30 @@ Worker 通过 `docker exec … sqlcmd` 访问容器内 MSSQL（无需本机装 O
 | S2.1 | ASN 同步后 WMS 存在收货单 |
 | S2.2 | 出库同步后 WMS 存在出库单 |
 | S2.3 | 商品同步后 WMS 存在商品 |
-| 幂等 | 同一 `idempotency_key` 再跑不重复建单 |
+| 幂等 | 同一 `idempotency_key` 在接口表唯一；WMS API Idempotency-Key 防重复建单 |
+
+### 5.1 本机 E2E 记录（2026-07-18）
+
+在独立库 `wms_h8_e2e` + 本机 `wms-api:18090` + 容器 `wms-mssql-erp-if` 上验证：
+
+| 类型 | 接口表状态 | WMS 资源 |
+|------|------------|----------|
+| product_master | success | products.product_code=`P-H8-001` |
+| asn | success | receiving_orders.receipt_no=`RCV-H8-001` |
+| outbound_order | success | outbound_orders.wms_order_no=`WMS-OB-H8-1` |
+
+修通过程要点：claim SQL 去掉非法 `ORDER BY`；商品 `storage_condition` 写入 `attrs`；补 `m4.write` 权限后出库 403 解除。
 
 ## 6. 故障
 
 | 现象 | 处理 |
 |------|------|
-| sqlcmd 失败 | 确认容器名 `wms-mssql-erp-if`、密码、tools18 路径 |
-| API 401 | 检查 `WMS_API_TOKEN` |
+| sqlcmd 失败 | 确认容器名 `wms-mssql-erp-if`、密码、tools18 路径、`docker` 权限 |
+| API 401 | 检查 `WMS_API_TOKEN`、登录是否带 `owner_code` |
+| API 403 AUTH-005 | JWT 缺 `m4.write` / `m2.write` 等，补权限后重新登录 |
 | API 400 引用不存在 | 接口表 UUID 未对齐 WMS 主数据 |
-| 一直 pending | worker 未跑或认领失败看 worker 日志 |
+| 一直 pending 且 processed=0 | 认领 SQL 失败（历史 bug）或 docker 权限；看 worker 是否抛错 |
+| mcr 镜像 pull 失败 | 见 §1.1 crane load |
 
 ## 7. 非目标
 
