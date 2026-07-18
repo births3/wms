@@ -517,6 +517,12 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
           expiry_date: inspectForm.expiryDate,
           quality_status: inspectForm.qualityStatus.trim(),
           trace_codes: splitCodes(inspectForm.traceCodes),
+          appearance_check: inspectForm.appearanceCheck.trim() || null,
+          package_check: inspectForm.packageCheck.trim() || null,
+          instruction_check: inspectForm.instructionCheck.trim() || null,
+          label_check: inspectForm.labelCheck.trim() || null,
+          sampling_qty: null,
+          approval_no: null,
         },
       });
     }
