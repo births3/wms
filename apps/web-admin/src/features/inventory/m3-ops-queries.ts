@@ -138,6 +138,7 @@ export function useApproveInventoryCountMutation() {
         },
         credentials: "include",
         body: JSON.stringify({
+          // 默认普通审批源；超阈值时服务端要求「盘点-高级」，由调用方覆盖。
           approval_source: input.approval_source ?? "盘点",
           approval_id: input.approval_id ?? input.countId,
         }),
@@ -166,6 +167,43 @@ export function useGenerateMaintenanceTasksMutation() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: async () => authFetch("/api/v1/inventory/maintenance/tasks/generate", { method: "POST", body: "{}" }),
+    onSuccess: () => void client.invalidateQueries({ queryKey: ["inventory", "maintenance-tasks"] }),
+  });
+}
+
+export function useCreateMaintenanceRecordMutation() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: {
+      task_id: string;
+      temperature_celsius: number;
+      humidity_percent: number;
+      appearance: string;
+      packaging: string;
+      pest: string;
+      rodent: string;
+      mildew: string;
+      conclusion: string;
+      exception_type?: string | null;
+      notes?: string | null;
+    }) => {
+      const token = readAccessToken();
+      const response = await fetch(`${apiBaseUrl}/api/v1/inventory/maintenance/records`, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "Idempotency-Key": `web-m3-maint-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        credentials: "include",
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) {
+        throw new ApiError(await response.json().catch(() => null), "提交养护结果失败", response.status);
+      }
+      return response.json();
+    },
     onSuccess: () => void client.invalidateQueries({ queryKey: ["inventory", "maintenance-tasks"] }),
   });
 }

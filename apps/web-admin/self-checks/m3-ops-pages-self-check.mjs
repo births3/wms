@@ -25,6 +25,8 @@ assert.match(renderer, /M3MaintenancePage/, "应渲染养护页");
 assert.match(renderer, /M3RelocationPage/, "应渲染移库页");
 assert.match(countPage, /<DataGrid\b/, "盘点页 DataGrid");
 assert.match(maintPage, /生成计划/, "养护页生成计划");
+assert.match(maintPage, /提交养护结果|提交结果/, "养护页应可提交结果");
+assert.match(queries, /\/api\/v1\/inventory\/maintenance\/records/, "养护记录 API");
 assert.match(relocPage, /发起移库/, "移库页发起移库");
 assert.match(queries, /\/api\/v1\/inventory\/counts/, "盘点 API");
 assert.match(queries, /\/lines\/\$\{input\.lineId\}\/submit|\/lines\/.*\/submit/, "盘点实盘提交 API");

@@ -10,6 +10,13 @@ import {
   Card,
   CardContent,
   DataGrid,
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Input,
   PageHeader,
   QueryPanel,
   buildQueryPanelSummaryItems,
@@ -21,6 +28,7 @@ import {
 } from "@wms/ui";
 
 import {
+  useCreateMaintenanceRecordMutation,
   useGenerateMaintenanceTasksMutation,
   useMaintenanceTasksQuery,
   type MaintenanceTask,
@@ -44,8 +52,15 @@ export const m3MaintenanceCoreQueryFieldKeys = ["keyword", "status"];
 export function M3MaintenancePage() {
   const [draft, setDraft] = React.useState<QueryPanelValue>({ keyword: "", status: "" });
   const [applied, setApplied] = React.useState<QueryPanelValue>({ keyword: "", status: "" });
+  const [selected, setSelected] = React.useState<MaintenanceTask | null>(null);
+  const [temperature, setTemperature] = React.useState("22");
+  const [humidity, setHumidity] = React.useState("45");
+  const [conclusion, setConclusion] = React.useState("normal");
+  const [exceptionType, setExceptionType] = React.useState("package_damage");
+  const [notes, setNotes] = React.useState("");
   const query = useMaintenanceTasksQuery();
   const generate = useGenerateMaintenanceTasksMutation();
+  const createRecord = useCreateMaintenanceRecordMutation();
   const rows = React.useMemo(() => {
     const keyword = String(applied.keyword ?? "").toLowerCase();
     const status = String(applied.status ?? "");
@@ -63,6 +78,19 @@ export function M3MaintenancePage() {
       { key: "location_code", header: "库位", width: 140, mono: true, render: (row) => row.location_code },
       { key: "planned_at", header: "计划时间", width: 180, render: (row) => formatTime(row.planned_at) },
       { key: "status", header: "状态", width: 100, render: (row) => row.status },
+      {
+        key: "actions",
+        header: "操作",
+        width: 120,
+        render: (row) =>
+          row.status === "pending" ? (
+            <Button type="button" size="sm" variant="outline" onClick={() => setSelected(row)}>
+              提交结果
+            </Button>
+          ) : (
+            <span className="text-sm text-muted-foreground">—</span>
+          ),
+      },
     ],
     [],
   );
@@ -76,7 +104,7 @@ export function M3MaintenancePage() {
   const generateAction: DataGridToolbarAction = {
     key: "generate",
     label: generate.isPending ? "生成中..." : "生成计划",
-    description: "按近效期批次生成养护任务",
+    description: "按重点/一般周期与近效期窗口生成养护任务",
     disabled: generate.isPending,
     onClick: () => {
       void generate.mutateAsync();
@@ -85,7 +113,7 @@ export function M3MaintenancePage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="M3 在库养护" subtitle="近效期计划生成与养护任务执行" />
+      <PageHeader title="M3 在库养护" subtitle="计划生成、现场结果提交与异常隔离" />
       <QueryPanel
         fields={m3MaintenanceQueryFields}
         defaultVisibleFieldKeys={m3MaintenanceCoreQueryFieldKeys}
@@ -98,9 +126,9 @@ export function M3MaintenancePage() {
           setApplied(next);
         }}
       />
-      {(generate.error || query.error) && (
+      {(generate.error || query.error || createRecord.error) && (
         <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {generate.error?.message ?? query.error?.message}
+          {generate.error?.message ?? query.error?.message ?? createRecord.error?.message}
         </div>
       )}
       <Card>
@@ -111,7 +139,7 @@ export function M3MaintenancePage() {
             data={rows}
             rowKey={(row) => row.id}
             emptyTitle={query.isError ? "读取养护任务失败" : "暂无养护任务"}
-            emptyDescription="可点击生成计划，基于近效期库存创建待执行任务"
+            emptyDescription="可点击生成计划：重点品种约每月、一般品种约每季，并含近效期窗口"
             exportFileBaseName="M3-在库养护"
             refreshAction={refreshAction}
             toolbarActions={[generateAction]}
@@ -130,6 +158,98 @@ export function M3MaintenancePage() {
           />
         </CardContent>
       </Card>
+
+      <Dialog
+        open={selected != null}
+        onOpenChange={(next) => {
+          if (!next) setSelected(null);
+        }}
+      >
+        <DialogContent>
+          <form
+            className="grid gap-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!selected) return;
+              const temp = Number(temperature);
+              const hum = Number(humidity);
+              if (!Number.isFinite(temp) || !Number.isFinite(hum)) return;
+              void createRecord
+                .mutateAsync({
+                  task_id: selected.id,
+                  temperature_celsius: temp,
+                  humidity_percent: hum,
+                  appearance: "intact",
+                  packaging: "intact",
+                  pest: "none",
+                  rodent: "none",
+                  mildew: "none",
+                  conclusion,
+                  exception_type: conclusion === "abnormal" ? exceptionType : null,
+                  notes: notes.trim() || null,
+                })
+                .then(() => setSelected(null));
+            }}
+          >
+            <DialogHeader>
+              <DialogTitle>
+                提交养护结果 · {selected?.product_code} / {selected?.batch_no}
+              </DialogTitle>
+            </DialogHeader>
+            <label className="grid gap-1 text-sm">
+              库区温度（℃）
+              <Input aria-label="库区温度" value={temperature} onChange={(e) => setTemperature(e.target.value)} />
+            </label>
+            <label className="grid gap-1 text-sm">
+              库区湿度（%）
+              <Input aria-label="库区湿度" value={humidity} onChange={(e) => setHumidity(e.target.value)} />
+            </label>
+            <label className="grid gap-1 text-sm">
+              养护结论
+              <select
+                aria-label="养护结论"
+                className="h-10 rounded-md border px-3"
+                value={conclusion}
+                onChange={(e) => setConclusion(e.target.value)}
+              >
+                <option value="normal">正常</option>
+                <option value="abnormal">异常</option>
+              </select>
+            </label>
+            {conclusion === "abnormal" && (
+              <label className="grid gap-1 text-sm">
+                异常类型
+                <select
+                  aria-label="异常类型"
+                  className="h-10 rounded-md border px-3"
+                  value={exceptionType}
+                  onChange={(e) => setExceptionType(e.target.value)}
+                >
+                  <option value="quality_change">质量变化</option>
+                  <option value="package_damage">包装破损</option>
+                  <option value="temperature_excursion">温湿度超标</option>
+                  <option value="pest_rodent_mildew">虫鼠霉害</option>
+                  <option value="other">其他</option>
+                </select>
+              </label>
+            )}
+            <label className="grid gap-1 text-sm">
+              备注
+              <Input aria-label="养护备注" value={notes} onChange={(e) => setNotes(e.target.value)} />
+            </label>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button type="button" variant="outline">
+                  取消
+                </Button>
+              </DialogClose>
+              <Button type="submit" disabled={createRecord.isPending}>
+                {createRecord.isPending ? "提交中..." : "提交养护结果"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

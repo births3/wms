@@ -291,9 +291,21 @@ export function M3InventoryCountPage() {
               disabled={!canApprove || approve.isPending}
               onClick={() => {
                 if (!selected) return;
-                void approve.mutateAsync({ countId: selected.id }).then(() => {
-                  setSelected(null);
+                const elevated = (selected.lines ?? []).some((line) => {
+                  const book = Number(line.book_qty ?? 0);
+                  const variance = Number(line.variance_qty ?? 0);
+                  if (variance === 0) return false;
+                  if (book <= 0) return true;
+                  return Math.abs(variance) * 100 > book * 10;
                 });
+                void approve
+                  .mutateAsync({
+                    countId: selected.id,
+                    approval_source: elevated ? "盘点-高级" : "盘点",
+                  })
+                  .then(() => {
+                    setSelected(null);
+                  });
               }}
             >
               {approve.isPending ? "审批中..." : "审批差异并调账"}
