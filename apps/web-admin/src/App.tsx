@@ -87,7 +87,7 @@ const menuSections: Array<{ label: string; items: SidebarMenuItem<AdminView>[] }
       { id: "m1-locations", title: "M1 库位管理", subtitle: "库位 / 容量", icon: MapPinned },
       { id: "dock-management", title: "M1 月台管理", subtitle: "月台 / 作业类型 / 温区", icon: MapPinned },
       { id: "m1-system-dictionary", title: "M1 系统字典", subtitle: "单据类型 / 特殊药品分类", icon: BookOpen },
-      { id: "m1-feature-flags", title: "M1 功能开关", subtitle: "配置中心 / Feature Flag", icon: KeyRound },
+      { id: "m1-feature-flags", title: "M1 功能开关", subtitle: "配置中心 / Feature Flag / ERP 连接", icon: KeyRound },
     ],
   },
   {

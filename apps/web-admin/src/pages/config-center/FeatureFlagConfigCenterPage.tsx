@@ -34,10 +34,13 @@ import {
   useSwitchFeatureFlagSourceMutation,
   type FeatureFlagConfig,
 } from "@/features/config-center/feature-flag-queries";
+import { ErpConnectorConfigPanel } from "@/pages/config-center/ErpConnectorConfigPage";
 
 interface FeatureFlagConfigCenterPageProps {
   onBack: () => void;
 }
+
+type ConfigDomain = "feature-flags" | "erp-connectors";
 
 type Notice = { type: "success" | "error"; text: string } | null;
 
@@ -96,7 +99,8 @@ const columns: DataGridColumn<FeatureFlagConfig>[] = [
   textColumn("cleanup_by", "清理期限", 140),
 ];
 
-export function FeatureFlagConfigCenterPage({}: FeatureFlagConfigCenterPageProps) {
+export function FeatureFlagConfigCenterPage({ onBack }: FeatureFlagConfigCenterPageProps) {
+  const [domain, setDomain] = React.useState<ConfigDomain>("feature-flags");
   const flagsQuery = useFeatureFlagsQuery();
   const migrateMutation = useMigrateFeatureFlagsMutation();
   const importMutation = useImportFeatureFlagsMutation();
@@ -190,9 +194,36 @@ export function FeatureFlagConfigCenterPage({}: FeatureFlagConfigCenterPageProps
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
       <PageHeader
-        title="功能开关 / 配置中心"
-        subtitle={`Feature Flag · 读取源：${sourceLabel(flagsQuery.data?.source ?? "unknown")} · ${filteredFlags.length}/${flags.length} 条`}
+        title="配置中心"
+        subtitle={
+          domain === "feature-flags"
+            ? `Feature Flag · 读取源：${sourceLabel(flagsQuery.data?.source ?? "unknown")} · ${filteredFlags.length}/${flags.length} 条`
+            : "ERP 连接（US-H8-001）· H8 专用表 · 不落明文凭据"
+        }
+        actions={
+          <Button variant="outline" onClick={onBack}>
+            返回
+          </Button>
+        }
       />
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant={domain === "feature-flags" ? "default" : "outline"}
+          onClick={() => setDomain("feature-flags")}
+        >
+          功能开关
+        </Button>
+        <Button
+          variant={domain === "erp-connectors" ? "default" : "outline"}
+          onClick={() => setDomain("erp-connectors")}
+        >
+          ERP 连接
+        </Button>
+      </div>
+      {domain === "erp-connectors" ? (
+        <ErpConnectorConfigPanel />
+      ) : (
+        <>
       <NoticePanel notice={notice} />
 
       <QueryPanel
@@ -282,6 +313,8 @@ export function FeatureFlagConfigCenterPage({}: FeatureFlagConfigCenterPageProps
           </form>
         </DialogContent>
       </Dialog>
+        </>
+      )}
     </section>
   );
 }
