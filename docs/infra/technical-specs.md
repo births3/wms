@@ -146,17 +146,18 @@ Wave 2（基础 Excel 导入导出）→ Wave 4（PDF 台账 + 复杂报表）
 | 项 | 说明 |
 |----|------|
 | Compose | `deploy/docker-compose.h8-erp-if.yml`（MSSQL 模拟 ERP 接口库） |
-| 入站表 | `01_schema.sql`：`if_in_asn` / `if_in_outbound_order` / `if_in_product_master`；`03_if_out_and_return.sql`：`if_in_return_order`（销退） |
-| 出站表 | `if_out_message`（统一 WMS→ERP：event_type + payload_json；同源 outbox 幂等） |
-| Worker | `scripts/h8_erp_interface_sync/sync_worker.py`（`--direction in\|out\|both`） |
-| 出站源 | WMS PG：`receiving_putaway_erp_feedback_outbox` / `inventory_status_erp_feedback_outbox` / `stock_adjustment_erp_feedback_outbox` → worker 投递 `if_out_message` 后标记 outbox `succeeded` |
+| 入站表 | `if_in_asn` / `if_in_outbound_order` / `if_in_product_master` / `if_in_return_order` / `if_in_product_change` |
+| 出站表 | `if_out_message`（通道 B）；通道 A 为 HTTP 回调（`ERP_CALLBACK_BASE` + path） |
+| Worker | `sync_worker.py`：`--direction` + `--transport table\|http\|both` |
+| 出站源 | putaway / inventory_status / stock_adjustment / **archive_revision** / **reconciliation** / **shipment_confirm** / **inventory_snapshot** outbox |
+| 通道 A Mock | `channel_a_callback_mock.py`；确认工具 `ack_if_out.py` |
 | Runbook | `docs/runbooks/h8-erp-interface-table-sync.md` |
 
-控制列约定：`sync_status`（入站 pending/processing/success/failed/dead；出站另含 acked）、`retry_count`、`last_error`、`idempotency_key`、`wms_resource_id`。
+控制列约定：`sync_status`（入站 pending/processing/success/failed/dead；出站另含 acked）、`retry_count`、`last_error`、`idempotency_key`、`wms_resource_id`。档案补录 outbox 另有 `max_attempts`/`deadline_at`（5 次 / 5 分钟 / 24h）。
 
 新增 ERP 单据类型 = 新接口表（或统一 staging + type 列）+ 新 handler，不改 M2/M3/M4 域模型。
 
-**通道 B 本地闭环状态（2026-07）**：入站四类（商品/ASN/出库/销退）+ 出站统一消息表 + outbox 投递 worker 已交付；产线真实 ERP 实例、档案补录专用重试与对账差异表仍按模块 S4/联调补证。
+**本地闭环状态（2026-07 补全）**：通道 B 入站五类 + 出站七源；通道 A 出站 HTTP mock 联调；业务模块自动入队档案/对账/发货 outbox 与产线 S4 仍待接线/联调。
 
 ### 消费方
 
@@ -183,7 +184,7 @@ trait ErpAdapter {
     fn parse_asn(raw: &RawMessage) -> Result<AsnCommand>;
     fn parse_outbound_order(raw: &RawMessage) -> Result<OutboundOrderCommand>;
     fn parse_product_master_change(raw: &RawMessage) -> Result<ProductChangeEvent>;  // 主数据变更回写
-    
+
     // 发送
     fn send_inbound_complete(event: &InboundCompleteEvent) -> Result<()>;
     fn send_shipment_confirm(event: &ShipmentConfirmEvent) -> Result<()>;
