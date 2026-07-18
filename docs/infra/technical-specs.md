@@ -132,6 +132,28 @@ Wave 2（基础 Excel 导入导出）→ Wave 4（PDF 台账 + 复杂报表）
 
 统一管理与外部 ERP 系统的所有交互，隔离 ERP 的数据格式和协议差异，使业务模块不直接依赖 ERP 接口细节。
 
+### 双通道（2026-07 确认）
+
+| 通道 | 适用 | 机制 |
+|------|------|------|
+| **A. REST 实时推送 + 回调** | 具备接口开发能力的 ERP | ERP 调 WMS OpenAPI（如 `inbound:push` 创建 ASN）；WMS 回调 ERP URL（clarifications #23） |
+| **B. 接口表 + H8 Worker** | **不具备接口开发能力**的 ERP | 在 **ERP 库或约定接口库**落地接口表；实施/DBA/SQL 作业写入；**独立进程 `scripts/h8_erp_interface_sync`** 连接接口库，认领 `pending` 行并调用 WMS API，回写 `success/failed` |
+
+两条通道最终都进入同一 WMS 业务 API（M2/M4/M1…），禁止业务模块直连 ERP 库。
+
+#### 接口表通道（通道 B）本地联调
+
+| 项 | 说明 |
+|----|------|
+| Compose | `deploy/docker-compose.h8-erp-if.yml`（MSSQL 模拟 ERP 接口库） |
+| 建表 | `deploy/h8-erp-if/init/01_schema.sql`：`if_in_asn` / `if_in_outbound_order` / `if_in_product_master` |
+| Worker | `scripts/h8_erp_interface_sync/sync_worker.py`（独立进程，按 `interface_type` 注册 handler） |
+| Runbook | `docs/runbooks/h8-erp-interface-table-sync.md` |
+
+控制列约定：`sync_status`（pending/processing/success/failed/dead）、`retry_count`、`last_error`、`idempotency_key`、`wms_resource_id`。
+
+新增 ERP 单据类型 = 新接口表（或统一 staging + type 列）+ 新 handler，不改 M2/M3/M4 域模型。
+
 ### 消费方
 
 | 交互方向 | 场景 | 模块 |
@@ -151,6 +173,7 @@ Wave 2（基础 Excel 导入导出）→ Wave 4（PDF 台账 + 复杂报表）
 
 ```rust
 // ERP 适配器 trait（每种 ERP 实现一个）
+// 通道 A：parse 来自 HTTP body；通道 B：parse 来自接口表行
 trait ErpAdapter {
     // 接收
     fn parse_asn(raw: &RawMessage) -> Result<AsnCommand>;
