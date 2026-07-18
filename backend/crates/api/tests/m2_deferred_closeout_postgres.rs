@@ -734,6 +734,7 @@ async fn putaway_is_partial_until_all_accepted_quantity_is_committed(pool: PgPoo
                     .await
                     .expect("read location code"),
                     quality_status: STATUS_QUALIFIED.to_string(),
+                    lpn_code: None,
                 },
                 chrono::Utc::now(),
                 key,

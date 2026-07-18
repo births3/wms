@@ -401,6 +401,7 @@ fn receiving_workflow_enforces_quantity_closure_and_dual_signature() {
                 location_id: Uuid::new_v4(),
                 location_code: "A-01-01".to_string(),
                 quality_status: "qualified".to_string(),
+                lpn_code: None,
             },
             now,
         )

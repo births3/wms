@@ -614,6 +614,7 @@ async fn postgres_putaway_handler_commits_inventory_and_audit(pool: PgPool) {
             location_id,
             location_code,
             quality_status: crate::inventory::STATUS_QUALIFIED.to_string(),
+                    lpn_code: None,
         }),
     )
     .await

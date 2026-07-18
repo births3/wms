@@ -617,6 +617,12 @@ impl PgWave3Repository {
             }
         }
 
+        let lpn_code = req
+            .lpn_code
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string);
         let putaway = PutawayRecord {
             id: Uuid::new_v4(),
             receiving_order_id: id,
@@ -626,15 +632,16 @@ impl PgWave3Repository {
             qty: req.qty,
             location_id: req.location_id,
             location_code: req.location_code.clone(),
+            lpn_code: lpn_code.clone(),
             occurred_at: now,
         };
         sqlx::query(
             r#"
             INSERT INTO receiving_putaways (
                 id, receiving_order_id, owner_id, batch_no, product_code,
-                qty, location_id, location_code, quality_status, occurred_at
+                qty, location_id, location_code, quality_status, lpn_code, occurred_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             "#,
         )
         .bind(putaway.id)
@@ -646,6 +653,7 @@ impl PgWave3Repository {
         .bind(putaway.location_id)
         .bind(&putaway.location_code)
         .bind(&req.quality_status)
+        .bind(&putaway.lpn_code)
         .bind(putaway.occurred_at)
         .execute(&mut *tx)
         .await
@@ -701,7 +709,7 @@ impl PgWave3Repository {
             location_code: Some(req.location_code.clone()),
             from_location_code: None,
             to_location_code: Some(req.location_code.clone()),
-            lpn_code: None,
+            lpn_code: lpn_code.clone(),
             operator_user_id: Some(ctx.user_id),
             operator_name: Some(ctx.actor_name.clone()),
             volume_delta_cm3: None,
@@ -736,6 +744,37 @@ impl PgWave3Repository {
         .bind(movement.operator_user_id)
         .bind(&movement.operator_name)
         .bind(movement.volume_delta_cm3)
+        .execute(&mut *tx)
+        .await
+        .map_err(map_db_error)?;
+
+        // M2 上架完成 → ERP 反馈 outbox（本地闭环标记；外部投递仍待 S4）
+        sqlx::query(
+            r#"
+            INSERT INTO receiving_putaway_erp_feedback_outbox (
+                id, owner_id, putaway_id, receiving_order_id, batch_id,
+                event_type, payload, status, attempt_count, next_attempt_at,
+                created_at, updated_at
+            ) VALUES (
+                $1, $2, $3, $4, $5, 'inbound_putaway_completed', $6,
+                'pending', 0, $7, $7, $7
+            )
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(ctx.owner_id)
+        .bind(putaway.id)
+        .bind(id)
+        .bind(inventory_batch.id)
+        .bind(serde_json::json!({
+            "product_code": req.product_code,
+            "batch_no": req.batch_no,
+            "qty": req.qty,
+            "location_code": req.location_code,
+            "lpn_code": lpn_code,
+            "quality_status": req.quality_status,
+        }))
+        .bind(now)
         .execute(&mut *tx)
         .await
         .map_err(map_db_error)?;

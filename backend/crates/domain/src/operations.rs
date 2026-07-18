@@ -225,6 +225,9 @@ pub struct PutawayRequest {
     pub location_id: Uuid,
     pub location_code: String,
     pub quality_status: String,
+    /// 可选容器/托盘 LPN（整托上架）。
+    #[serde(default)]
+    pub lpn_code: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -268,6 +271,8 @@ pub struct PutawayRecord {
     pub qty: i64,
     pub location_id: Uuid,
     pub location_code: String,
+    #[serde(default)]
+    pub lpn_code: Option<String>,
     pub occurred_at: DateTime<Utc>,
 }
 

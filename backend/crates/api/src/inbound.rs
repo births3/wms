@@ -595,6 +595,7 @@ impl ReceivingOrderStore {
             location_id: req.location_id,
             location_code: req.location_code,
             occurred_at: now,
+            lpn_code: None,
         };
         order.status = "completed".to_string();
         order.updated_at = now;

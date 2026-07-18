@@ -118,4 +118,51 @@ impl PgWave3Repository {
         .map_err(map_db_error)?;
         Ok(())
     }
+
+    /// 处理上架 ERP 反馈 outbox（本地闭环：无外部 ERP 时标记成功）。
+    pub async fn process_putaway_erp_feedback_outbox(
+        &self,
+        now: DateTime<Utc>,
+        limit: i64,
+    ) -> Result<usize, Wave3RepositoryError> {
+        let mut tx = self.begin().await?;
+        let ids: Vec<Uuid> = sqlx::query_scalar(
+            r#"
+            SELECT id
+              FROM receiving_putaway_erp_feedback_outbox
+             WHERE status IN ('pending', 'failed')
+               AND next_attempt_at <= $1
+             ORDER BY next_attempt_at ASC
+             LIMIT $2
+             FOR UPDATE SKIP LOCKED
+            "#,
+        )
+        .bind(now)
+        .bind(limit)
+        .fetch_all(&mut *tx)
+        .await
+        .map_err(map_db_error)?;
+
+        let mut processed = 0;
+        for id in ids {
+            sqlx::query(
+                r#"
+                UPDATE receiving_putaway_erp_feedback_outbox
+                   SET status = 'succeeded',
+                       attempt_count = attempt_count + 1,
+                       last_error = NULL,
+                       updated_at = $2
+                 WHERE id = $1
+                "#,
+            )
+            .bind(id)
+            .bind(now)
+            .execute(&mut *tx)
+            .await
+            .map_err(map_db_error)?;
+            processed += 1;
+        }
+        tx.commit().await.map_err(map_db_error)?;
+        Ok(processed)
+    }
 }

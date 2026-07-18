@@ -190,6 +190,7 @@ async fn smart_putaway_recommends_and_commits_owner_scoped_inventory_atomically(
         location_id: fixture.same_product_location_id,
         location_code: fixture.same_product_location_code,
         quality_status: STATUS_QUALIFIED.to_string(),
+        lpn_code: Some("LPN-M2-PUT-001".to_string()),
     };
     let audit = AuditWriteRequest::from_auth_context(
         &ctx,
@@ -235,6 +236,47 @@ async fn smart_putaway_recommends_and_commits_owner_scoped_inventory_atomically(
     .await
     .expect("putaway state should be readable");
     assert_eq!(state, (50, 4, 1, "putaway".to_string()));
+
+    let lpn: Option<String> = sqlx::query_scalar(
+        "SELECT lpn_code FROM receiving_putaways WHERE receiving_order_id = $1 AND owner_id = $2",
+    )
+    .bind(fixture.order_id)
+    .bind(fixture.owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("lpn on putaway");
+    assert_eq!(lpn.as_deref(), Some("LPN-M2-PUT-001"));
+    let movement_lpn: Option<String> = sqlx::query_scalar(
+        "SELECT lpn_code FROM inventory_movements WHERE owner_id = $1 AND source_document_id = $2 AND movement_type = 'inbound_putaway'",
+    )
+    .bind(fixture.owner_id)
+    .bind(fixture.order_id)
+    .fetch_one(&pool)
+    .await
+    .expect("lpn on movement");
+    assert_eq!(movement_lpn.as_deref(), Some("LPN-M2-PUT-001"));
+
+    let pending: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM receiving_putaway_erp_feedback_outbox WHERE owner_id = $1 AND status = 'pending'",
+    )
+    .bind(fixture.owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("putaway erp outbox pending");
+    assert_eq!(pending, 1);
+    let processed = repository
+        .process_putaway_erp_feedback_outbox(Utc::now(), 10)
+        .await
+        .expect("process putaway erp outbox");
+    assert_eq!(processed, 1);
+    let succeeded: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM receiving_putaway_erp_feedback_outbox WHERE owner_id = $1 AND status = 'succeeded'",
+    )
+    .bind(fixture.owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("putaway erp outbox succeeded");
+    assert_eq!(succeeded, 1);
 }
 
 #[sqlx::test(migrations = "../../migrations")]

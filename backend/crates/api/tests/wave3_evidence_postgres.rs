@@ -454,6 +454,7 @@ async fn inbound_chain_persists_inventory_movement_and_audit_end_to_end(pool: Pg
             location_id,
             location_code,
             quality_status: STATUS_QUALIFIED.into(),
+            lpn_code: None,
         },
         now,
         "chain-putaway",

@@ -475,7 +475,8 @@ async fn putaway_commits_receiving_inventory_and_movement_in_one_transaction(poo
         location_id,
         location_code,
         quality_status: STATUS_QUALIFIED.to_string(),
-    };
+                lpn_code: None,
+        };
     let first = repo
         .putaway_receiving_order_and_inventory_with_audit(
             &ctx,
@@ -729,7 +730,8 @@ async fn putaway_audit_failure_rolls_back_all_business_writes(pool: PgPool) {
                 location_id,
                 location_code,
                 quality_status: STATUS_QUALIFIED.into(),
-            },
+                        lpn_code: None,
+        },
             now,
             "idem-putaway-rollback",
             Some(invalid_audit),

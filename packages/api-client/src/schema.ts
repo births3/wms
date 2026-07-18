@@ -6423,6 +6423,7 @@ export interface components {
             location_code: string;
             /** Format: uuid */
             location_id: string;
+            lpn_code?: string | null;
             /** Format: date-time */
             occurred_at: string;
             /** Format: uuid */
@@ -6438,6 +6439,8 @@ export interface components {
             location_code: string;
             /** Format: uuid */
             location_id: string;
+            /** @description 可选容器/托盘 LPN（整托上架）。 */
+            lpn_code?: string | null;
             product_code: string;
             /** Format: int64 */
             qty: number;

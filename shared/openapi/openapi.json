@@ -2484,8 +2484,8 @@
           }
         },
         "security": [],
-        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。",
-        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。"
+        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。",
+        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。"
       }
     },
     "/api/v1/auth/logout": {
@@ -27627,6 +27627,10 @@
             "type": "string",
             "format": "uuid"
           },
+          "lpn_code": {
+            "type": "string",
+            "nullable": true
+          },
           "occurred_at": {
             "type": "string",
             "format": "date-time"
@@ -27668,6 +27672,11 @@
           "location_id": {
             "type": "string",
             "format": "uuid"
+          },
+          "lpn_code": {
+            "type": "string",
+            "description": "可选容器/托盘 LPN（整托上架）。",
+            "nullable": true
           },
           "product_code": {
             "type": "string"

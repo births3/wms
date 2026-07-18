@@ -15,8 +15,7 @@ struct PutawayLocationRow {
     quality_color: String,
     available_volume_cm3: i64,
     same_product: bool,
-    #[sqlx(rename = "same_product_distance")]
-    _same_product_distance: Option<i64>,
+    same_product_distance: Option<i64>,
 }
 
 #[derive(FromRow)]
@@ -513,26 +512,26 @@ impl PgWave3Repository {
         }
 
         let mut locations = locations;
-        if !same_product_enabled || empty_location_first {
-            locations.sort_by(|left, right| {
-                let empty_cmp = if empty_location_first {
-                    // 空库位（非同品占用）优先
-                    (!left.same_product).cmp(&(!right.same_product)).reverse()
-                } else {
-                    std::cmp::Ordering::Equal
-                };
-                empty_cmp
-                    .then_with(|| {
-                        if same_product_enabled {
-                            right.same_product.cmp(&left.same_product)
-                        } else {
-                            std::cmp::Ordering::Equal
-                        }
-                    })
-                    .then_with(|| left.available_volume_cm3.cmp(&right.available_volume_cm3))
-                    .then_with(|| left.location_code.cmp(&right.location_code))
-            });
-        }
+        let priority_keys = profile
+            .as_ref()
+            .and_then(|row| row.rule_priority.as_array())
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(|item| item.as_str().map(str::to_string))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        // rule_priority 驱动排序；空则回退 enabled_rules 布尔开关。
+        locations.sort_by(|left, right| {
+            apply_putaway_rule_priority(
+                left,
+                right,
+                &priority_keys,
+                same_product_enabled,
+                empty_location_first,
+            )
+        });
 
         let data = locations
             .into_iter()
@@ -566,4 +565,54 @@ pub(super) fn product_unit_volume_cm3(attrs: &Value) -> Result<i64, Wave3Reposit
         .filter(|value| *value > 0)
         .ok_or(Wave3RepositoryError::InvalidProductVolume)?;
     Ok(value)
+}
+
+/// 按策略 `rule_priority` 比较库位；未配置时按 enabled_rules 回退。
+fn apply_putaway_rule_priority(
+    left: &PutawayLocationRow,
+    right: &PutawayLocationRow,
+    priority_keys: &[String],
+    same_product_enabled: bool,
+    empty_location_first: bool,
+) -> std::cmp::Ordering {
+    let keys: Vec<&str> = if priority_keys.is_empty() {
+        let mut defaults = Vec::new();
+        if empty_location_first {
+            defaults.push("empty_location_first");
+        }
+        if same_product_enabled {
+            defaults.push("same_product_cluster");
+        }
+        defaults.push("available_volume");
+        defaults
+    } else {
+        priority_keys.iter().map(String::as_str).collect()
+    };
+    for key in keys {
+        let ordering = match key {
+            "empty_location_first" => {
+                // 空库位（非同品）优先
+                (!left.same_product).cmp(&(!right.same_product)).reverse()
+            }
+            "same_product_cluster" if same_product_enabled || !priority_keys.is_empty() => {
+                right.same_product.cmp(&left.same_product).then_with(|| {
+                    match (left.same_product_distance, right.same_product_distance) {
+                        (Some(a), Some(b)) => a.cmp(&b),
+                        (Some(_), None) => std::cmp::Ordering::Less,
+                        (None, Some(_)) => std::cmp::Ordering::Greater,
+                        (None, None) => std::cmp::Ordering::Equal,
+                    }
+                })
+            }
+            "available_volume" | "capacity_match" => {
+                left.available_volume_cm3.cmp(&right.available_volume_cm3)
+            }
+            // temperature_match / quality_color_match / owner_isolation 已在 SQL WHERE 过滤
+            _ => std::cmp::Ordering::Equal,
+        };
+        if ordering != std::cmp::Ordering::Equal {
+            return ordering;
+        }
+    }
+    left.location_code.cmp(&right.location_code)
 }

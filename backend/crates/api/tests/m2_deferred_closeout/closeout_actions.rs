@@ -238,6 +238,19 @@ async fn putaway_strategy_profile_drives_default_top_n(pool: PgPool) {
         listed.data[0].product_category.as_deref(),
         Some("western_medicine")
     );
+    // rule_priority 持久化并可被推荐排序读取（数组顺序即执行优先级）
+    assert_eq!(
+        listed.data[0].rule_priority.as_array().map(|a| a.len()),
+        Some(5)
+    );
+    assert_eq!(
+        listed.data[0].rule_priority[0].as_str(),
+        Some("temperature_match")
+    );
+    assert_eq!(
+        listed.data[0].rule_priority[3].as_str(),
+        Some("empty_location_first")
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]
