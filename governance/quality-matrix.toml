@@ -1837,9 +1837,9 @@ e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
 api_paths = [
   "POST /api/v1/inbound/receiving-orders/{id}/receive",
 ]
-reason = "PC 数量闭环和基础收货落库已有真实 E2E；但 GSP 必填现场字段仍可为空，温度超标处置/稳定性报告、收货节点 M-VR 双人策略、追溯码与容器绑定、PDA 扫码离线重放及真机证据未闭环，不能标记完成。"
+reason = "PC 数量闭环、GSP 现场字段、cool/冷冻/冷藏温区按储存条件校验与超温备注已有；但稳定性报告附件未强制、收货节点 M-VR 双人策略、追溯码/LPN、PDA 扫码离线重放及真机证据未闭环。"
 owner = "M2 入库模块负责人"
-resume_when = "补齐服务端必填/温控校验、收货节点双人策略和审计字段，完成追溯码/LPN、PDA 离线冲突链及真机验收后重新执行完整故事验收。"
+resume_when = "强制超温稳定性报告附件（H-FILE），完成收货节点双人策略、追溯码/LPN、PDA 离线冲突链及真机验收后重新执行完整故事验收。"
 evidence_refs = ["docs/reviews/m2-overall-review-2026-07-18.md"]
 
 [[stories]]
@@ -1894,6 +1894,7 @@ api_paths = [
 ]
 database_objects = ["receiving_orders", "receiving_order_lines", "suppliers", "products", "audit_event", "idempotency_request"]
 test_checks = [
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test api_key_postgres -- --test-threads=1",
   "cargo test --manifest-path backend/Cargo.toml -p wms-domain receiving_outbound --lib",
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_asn_reference_validation_postgres -- --test-threads=1",
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_deferred_closeout_postgres create_asn_rejects_expired_supplier_qualification -- --test-threads=1",
@@ -1908,6 +1909,8 @@ evidence_refs = [
   "backend/crates/api/src/wave3_repository_part1.rs",
   "backend/crates/api/src/wave3_repository/receiving_read.rs",
   "backend/crates/api/src/wave3_handlers/receiving_handlers.rs",
+  "backend/crates/api/src/api_key_auth.rs",
+  "backend/crates/api/tests/api_key_postgres.rs",
   "backend/crates/api/tests/m2_asn_reference_validation_postgres.rs",
   "backend/crates/api/tests/m2_deferred_closeout_postgres.rs",
   "backend/crates/api/tests/m2_deferred_closeout/closeout_actions.rs",
@@ -1917,9 +1920,9 @@ evidence_refs = [
   "artifacts/screenshot-portal/real-web/m2-inbound/receiving.png",
   "docs/reviews/m2-overall-review-2026-07-18.md",
 ]
-reason = "ASN 自动编号、引用校验、审计、作废入口和 PC 真实 E2E 已有；但创建后 M-VR 自动校验/状态流转未闭环，inbound:push API Key 可获得整个 M2 读写权限且仓库范围未传入业务上下文，真实 ERP 推送与回执证据也未完成。"
+reason = "ASN 自动编号、引用校验、审计和作废入口已有；inbound:push 已收敛到 ASN 创建路径，仓库范围进入认证上下文，api_key_postgres 7/7 覆盖同仓成功/跨仓拒绝/作业路径拒绝；创建后 M-VR 自动校验/状态流转及真实 ERP 推送回执仍未完成。"
 owner = "M2 入库模块负责人"
-resume_when = "收敛外部 API Key 到 ASN 推送最小权限并强制仓库范围，接通创建后 M-VR 自动校验和状态迁移，取得 dev/staging ERP 推送、失败重试与审计证据后重新验收。"
+resume_when = "接通创建后 M-VR 自动校验和状态迁移，取得 dev/staging ERP 推送、失败重试与审计证据后重新验收。"
 
 [[deferred_stories]]
 id = "US-M2-003"
@@ -1964,9 +1967,9 @@ evidence_refs = [
   "artifacts/screenshot-portal/real-web/m2-inbound/inspection-dual-sign-validation.png",
   "docs/reviews/m2-overall-review-2026-07-18.md",
 ]
-reason = "批号、数量、日期、质量状态和追溯码的基础验收链已有 PostgreSQL/E2E；但页面必填的外观、包装、说明书、标签未进入 API/数据库，抽验数量、批准文号、不合格自动 M-QL、近效期/过期判定、档案补录审批/ERP 恢复、PDA 离线及真机证据未闭环。"
+reason = "批号、数量、日期、质量状态、追溯码、外观等四项核对、抽验数量必填与批准文号主数据比对已贯通；不合格 M-QL/H4 仍仅在预配置类型存在时创建，近效期/过期判定、档案补录审批/ERP 恢复、PDA 离线及真机证据未闭环。"
 owner = "M2 入库模块负责人"
-resume_when = "补齐验收 DTO/数据库/审计字段和服务端规则，接通 M-QL/H4/ERP 档案补录与不合格闭环，并完成 PDA 扫码、离线冲突和真机验收后重新验收。"
+resume_when = "可靠接通默认 M-QL 类型与 H4/ERP 档案补录不合格闭环，并完成近效期规则、PDA 扫码、离线冲突和真机验收后重新验收。"
 
 [[deferred_stories]]
 id = "US-M2-004"
@@ -1999,9 +2002,9 @@ evidence_refs = [
   "artifacts/screenshot-portal/real-web/m2-inbound/inspection-dual-sign-submitted.png",
   "docs/reviews/m2-overall-review-2026-07-18.md",
 ]
-reason = "服务端已解析 M-VR 策略并校验两个用户 ID 的角色与差异性，但 PostgreSQL 路径未校验第一签字人等于当前认证用户，PC/E2E 由同一管理员一次提交两个收货员 ID；缺少待第二人状态、第二人独立认证/扫码、附件及真实双人/PDA/审批证据，存在 GSP 代签风险。"
+reason = "第一签名绑定当前用户、待第二人状态、第二步 append-only 追加完整双签记录与前端第二签契约已修复；附件、审批链路及真实双人/PDA 设备证据仍缺失。"
 owner = "M2 入库模块负责人"
-resume_when = "先封堵代签：第一人必须绑定当前认证主体，第二人通过独立认证动作完成签字；再补待第二人状态、审批/附件、并发幂等和真实双人设备验收。"
+resume_when = "补审批/附件、并发幂等和真实双人设备验收后重新验收。"
 
 [[deferred_stories]]
 id = "US-M2-005"
@@ -2082,9 +2085,9 @@ evidence_refs = [
   "artifacts/screenshot-portal/real-web/m2-inbound/m2-receiving-reject-dialog-current.png",
   "docs/reviews/m2-overall-review-2026-07-18.md",
 ]
-reason = "整单拒收、数量闭环和短少强制关闭已有实现与测试；但销售退货批号级部分拒收、破损/温度/资质异常结构化处置、稳定性报告、不合格自动 M-QL、企业微信通知以及按供应商/商品/类型/批号统计未闭环。"
+reason = "整单拒收、数量闭环、短少强制关闭以及条件式 M-QL/H4 记录已有实现与测试；但联络类型未配置时会静默跳过，且 M2 repository 直接写跨上下文表，销售退货批号级部分拒收、结构化异常、稳定性报告、真实企业微信通知和按供应商/商品/类型/批号统计仍未闭环。"
 owner = "M2 入库模块负责人"
-resume_when = "补齐批号级异常数据模型与数量约束，接通附件、M-QL/H4 和异常统计查询，并取得企业微信 dev/staging 回执证据后重新验收。"
+resume_when = "补齐批号级异常数据模型与数量约束，通过既有服务边界可靠接通附件、M-QL/H4 和异常统计查询，并取得企业微信 dev/staging 回执证据后重新验收。"
 
 [[deferred_stories]]
 id = "US-M2-007"
