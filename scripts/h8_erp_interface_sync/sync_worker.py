@@ -40,6 +40,8 @@ if _sys_path not in sys.path:
     sys.path.insert(0, _sys_path)
 from outbound_publish import (  # noqa: E402
     process_outbound_once,
+    resolve_callback_base,
+    resolve_outbound_transport,
     resolve_wms_db_url,
 )
 
@@ -284,6 +286,34 @@ FROM dbo.if_in_return_order WHERE id IN (SELECT id FROM @claimed);
             "idempotency_key",
             "retry_count",
         ]
+    elif table == "if_in_product_change":
+        select_sql = (
+            claim_cte.format(table="if_in_product_change")
+            + """
+SELECT
+  CONVERT(NVARCHAR(36), id), external_doc_no,
+  CONVERT(NVARCHAR(36), owner_id), product_code,
+  ISNULL(CONVERT(NVARCHAR(36), product_id),N''),
+  field_name, new_value,
+  ISNULL(CONVERT(NVARCHAR(36), liaison_id),N''),
+  ISNULL(CONVERT(NVARCHAR(36), asn_id),N''),
+  idempotency_key, CONVERT(NVARCHAR(16), retry_count)
+FROM dbo.if_in_product_change WHERE id IN (SELECT id FROM @claimed);
+"""
+        )
+        cols = [
+            "id",
+            "external_doc_no",
+            "owner_id",
+            "product_code",
+            "product_id",
+            "field_name",
+            "new_value",
+            "liaison_id",
+            "asn_id",
+            "idempotency_key",
+            "retry_count",
+        ]
     else:
         raise ValueError(table)
 
@@ -341,9 +371,10 @@ def http_json(
     data = None if body is None else json.dumps(body).encode("utf-8")
     headers = {
         "Accept": "application/json",
-        "Content-Type": "application/json",
         "Idempotency-Key": idempotency_key,
     }
+    if body is not None:
+        headers["Content-Type"] = "application/json"
     if settings.api_token:
         headers["Authorization"] = f"Bearer {settings.api_token}"
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
@@ -523,11 +554,70 @@ def handle_return(settings: Settings, row: dict[str, str]) -> str:
     raise RuntimeError(f"Return ASN API {status}: {raw[:500]}")
 
 
+def handle_product_change(settings: Settings, row: dict[str, str]) -> str:
+    """档案补录/主数据变更回写：按 product_id 或 list 匹配 product_code 后 PATCH。"""
+    product_id = (row.get("product_id") or "").strip()
+    if not product_id:
+        status, parsed, raw = http_json(
+            settings,
+            "GET",
+            "/api/v1/master-data/products",
+            None,
+            row["idempotency_key"] + "-list",
+        )
+        if status != 200 or not isinstance(parsed, dict):
+            raise RuntimeError(f"list products {status}: {raw[:300]}")
+        items = parsed.get("data") or parsed.get("items") or []
+        if not isinstance(items, list):
+            raise RuntimeError("products list shape unexpected")
+        code = row["product_code"]
+        match = next(
+            (
+                p
+                for p in items
+                if isinstance(p, dict) and p.get("product_code") == code
+            ),
+            None,
+        )
+        if not match or not match.get("id"):
+            raise RuntimeError(f"product_code {code} not found")
+        product_id = str(match["id"])
+
+    field = (row.get("field_name") or "").strip()
+    new_value = row.get("new_value") or ""
+    body: dict[str, Any] = {}
+    # 常见字段映射到 UpdateProductRequest
+    if field in (
+        "product_name",
+        "approval_no",
+        "spec",
+        "dosage_form",
+        "manufacturer",
+        "status",
+        "special_drug_category_code",
+    ):
+        body[field] = new_value
+    else:
+        body["attrs"] = {field: new_value}
+
+    status, parsed, raw = http_json(
+        settings,
+        "PATCH",
+        f"/api/v1/master-data/products/{product_id}",
+        body,
+        row["idempotency_key"],
+    )
+    if status in (200, 201) and isinstance(parsed, dict) and parsed.get("id"):
+        return str(parsed["id"])
+    raise RuntimeError(f"Product change API {status}: {raw[:500]}")
+
+
 HANDLERS: dict[str, tuple[str, Callable[[Settings, dict[str, str]], str]]] = {
     "asn": ("if_in_asn", handle_asn),
     "outbound_order": ("if_in_outbound_order", handle_outbound),
     "product_master": ("if_in_product_master", handle_product),
     "return_order": ("if_in_return_order", handle_return),
+    "product_change": ("if_in_product_change", handle_product_change),
 }
 
 
@@ -596,13 +686,21 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--types",
-        default="asn,outbound_order,product_master,return_order",
-        help="入站类型：asn,outbound_order,product_master,return_order",
+        default="asn,outbound_order,product_master,return_order,product_change",
+        help="入站类型：asn,outbound_order,product_master,return_order,product_change",
+    )
+    parser.add_argument(
+        "--transport",
+        choices=("table", "http", "both"),
+        default=None,
+        help="出站通道：table=B 接口表, http=A 回调, both=双写；默认读 H8_OUTBOUND_TRANSPORT",
     )
     args = parser.parse_args(argv)
     settings = Settings.from_env()
     need_in = args.direction in ("in", "both")
     need_out = args.direction in ("out", "both")
+    transport = args.transport or resolve_outbound_transport()
+    callback_base = resolve_callback_base()
     if need_in and not args.dry_run and not settings.api_token:
         print("WMS_API_TOKEN is required for inbound unless --dry-run", file=sys.stderr)
         return 2
@@ -610,6 +708,12 @@ def main(argv: list[str] | None = None) -> int:
     if need_out and not wms_db and not args.dry_run:
         print(
             "WMS_DB_URL (or DATABASE_URL) is required for outbound publish",
+            file=sys.stderr,
+        )
+        return 2
+    if need_out and transport in ("http", "both") and not callback_base and not args.dry_run:
+        print(
+            "ERP_CALLBACK_BASE required for http/both transport",
             file=sys.stderr,
         )
         return 2
@@ -621,7 +725,7 @@ def main(argv: list[str] | None = None) -> int:
 
     print(
         f"[h8] worker start api={settings.api_base} direction={args.direction} "
-        f"types={types} once={args.once}",
+        f"transport={transport} types={types} once={args.once}",
         flush=True,
     )
     while True:
@@ -631,9 +735,15 @@ def main(argv: list[str] | None = None) -> int:
         if need_out and wms_db:
             n += process_outbound_once(
                 database_url=wms_db,
-                sqlcmd_exec=lambda sql: sqlcmd_query(settings, sql),
+                sqlcmd_exec=(
+                    (lambda sql: sqlcmd_query(settings, sql))
+                    if transport in ("table", "both")
+                    else None
+                ),
                 batch_size=settings.batch_size,
                 dry_run=args.dry_run,
+                transport=transport,
+                callback_base=callback_base,
             )
         if args.once:
             print(f"[h8] done processed={n}", flush=True)

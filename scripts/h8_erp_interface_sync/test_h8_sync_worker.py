@@ -5,7 +5,12 @@ from __future__ import annotations
 import json
 import unittest
 
-from outbound_publish import OutboxRow, insert_if_out_sql, sql_escape_mssql
+from outbound_publish import (
+    OUTBOX_SOURCES,
+    OutboxRow,
+    insert_if_out_sql,
+    sql_escape_mssql,
+)
 
 
 class TestInsertIfOutSql(unittest.TestCase):
@@ -18,6 +23,9 @@ class TestInsertIfOutSql(unittest.TestCase):
             payload={"qty": 1, "note": "it's ok"},
             external_ref="rcv-1",
             attempt_count=1,
+            max_attempts=5,
+            deadline_at=None,
+            callback_path="/inbound-complete",
         )
         sql = insert_if_out_sql(row)
         self.assertIn("if_out_message", sql)
@@ -28,6 +36,12 @@ class TestInsertIfOutSql(unittest.TestCase):
 
     def test_escape_mssql(self) -> None:
         self.assertEqual(sql_escape_mssql("a'b"), "a''b")
+
+    def test_outbox_sources_include_archive_and_recon(self) -> None:
+        tables = {s["table"] for s in OUTBOX_SOURCES}
+        self.assertIn("archive_revision_erp_feedback_outbox", tables)
+        self.assertIn("reconciliation_erp_feedback_outbox", tables)
+        self.assertIn("shipment_confirm_erp_feedback_outbox", tables)
 
 
 class TestPayloadJson(unittest.TestCase):
