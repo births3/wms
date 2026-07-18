@@ -30,6 +30,7 @@ run_sql() {
 
 # init 目录已挂载到容器 /docker-init
 run_sql "${ROOT}/h8-erp-if/init/01_schema.sql"
+run_sql "${ROOT}/h8-erp-if/init/03_if_out_and_return.sql"
 if [[ "${H8_APPLY_SEED:-0}" == "1" ]]; then
   run_sql "${ROOT}/h8-erp-if/init/02_seed_example.sql"
 fi
