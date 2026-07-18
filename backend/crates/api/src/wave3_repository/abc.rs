@@ -155,6 +155,18 @@ impl PgWave3Repository {
             .await
             .map_err(map_db_error)?;
         }
+        let mut audit_event = crate::audit::AuditWriteRequest::from_auth_context(
+            ctx,
+            "recompute_inventory_abc",
+            "M3",
+            "inventory_abc_classification",
+            period_end.to_string(),
+            None,
+        );
+        audit_event.occurred_at = now;
+        crate::audit::append_event_in_tx(&mut tx, &audit_event)
+            .await
+            .map_err(|error| Wave3RepositoryError::Audit(format!("{error:?}")))?;
         tx.commit().await.map_err(map_db_error)?;
         self.list_abc_classifications(ctx, &InventoryAbcQuery::default())
             .await
@@ -175,6 +187,7 @@ impl PgWave3Repository {
         }
         let period_end = now.date_naive();
         let period_start = period_end - chrono::Duration::days(30);
+        let mut tx = self.begin().await?;
         let row = sqlx::query_as::<_, AbcRow>(
             r#"
             INSERT INTO inventory_abc_classifications (
@@ -198,10 +211,24 @@ impl PgWave3Repository {
         .bind(period_end)
         .bind(req.reason.trim())
         .bind(now)
-        .fetch_one(&self.pool)
+        .fetch_one(&mut *tx)
         .await
         .map_err(map_db_error)?;
-        Ok(map_abc(row))
+        let value = map_abc(row);
+        let mut audit_event = crate::audit::AuditWriteRequest::from_auth_context(
+            ctx,
+            "override_inventory_abc",
+            "M3",
+            "inventory_abc_classification",
+            value.id.to_string(),
+            None,
+        );
+        audit_event.occurred_at = now;
+        crate::audit::append_event_in_tx(&mut tx, &audit_event)
+            .await
+            .map_err(|error| Wave3RepositoryError::Audit(format!("{error:?}")))?;
+        tx.commit().await.map_err(map_db_error)?;
+        Ok(value)
     }
 }
 

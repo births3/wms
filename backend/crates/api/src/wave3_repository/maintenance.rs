@@ -350,6 +350,17 @@ impl PgWave3Repository {
         .await
         .map_err(map_db_error)?;
 
+        if record.conclusion == "abnormal" {
+            enqueue_maintenance_abnormal_workflow(
+                &mut tx,
+                ctx,
+                &record,
+                task.quality_status.as_str(),
+                now,
+            )
+            .await?;
+        }
+
         let mut audit_event = audit.unwrap_or_else(|| {
             AuditWriteRequest::from_auth_context(
                 ctx,
@@ -387,6 +398,145 @@ impl PgWave3Repository {
             replayed: false,
         })
     }
+}
+
+/// 养护异常：隔离批次（系统触发审批源）+ H4 通知 + 可选质量联系单。
+async fn enqueue_maintenance_abnormal_workflow(
+    tx: &mut Transaction<'_, Postgres>,
+    ctx: &AuthContext,
+    record: &MaintenanceRecord,
+    current_status: &str,
+    now: DateTime<Utc>,
+) -> Result<(), Wave3RepositoryError> {
+    let exception = record
+        .exception_type
+        .as_deref()
+        .map(str::trim)
+        .filter(|item| !item.is_empty())
+        .unwrap_or("养护异常");
+    if current_status == STATUS_QUALIFIED {
+        let updated = sqlx::query(
+            r#"
+            UPDATE inventory_batches
+               SET quality_status = $3,
+                   updated_at = $4,
+                   version = version + 1
+             WHERE id = $1 AND owner_id = $2 AND quality_status = $5
+            "#,
+        )
+        .bind(record.batch_id)
+        .bind(ctx.owner_id)
+        .bind(STATUS_QUARANTINED)
+        .bind(now)
+        .bind(STATUS_QUALIFIED)
+        .execute(&mut **tx)
+        .await
+        .map_err(map_db_error)?;
+        if updated.rows_affected() == 1 {
+            sqlx::query(
+                r#"
+                INSERT INTO inventory_status_changes (
+                    id, owner_id, batch_id, from_status, to_status,
+                    reason, approval_source, approval_id, occurred_at
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                "#,
+            )
+            .bind(Uuid::new_v4())
+            .bind(ctx.owner_id)
+            .bind(record.batch_id)
+            .bind(STATUS_QUALIFIED)
+            .bind(STATUS_QUARANTINED)
+            .bind(format!("养护异常：{exception}"))
+            .bind("养护异常")
+            .bind(record.id.to_string())
+            .bind(now)
+            .execute(&mut **tx)
+            .await
+            .map_err(map_db_error)?;
+        }
+    }
+
+    let content = format!(
+        "养护异常：任务 {} 商品 {} 批号 {} 类型 {}，已隔离/待质量处置。",
+        record.task_id, record.product_code, record.batch_no, exception
+    );
+    let dedupe_key = format!("m3-maint-abnormal:{}:{}", record.task_id, record.id);
+    sqlx::query(
+        r#"
+        INSERT INTO h4_notification_records (
+            id, owner_id, config_id, event_type, dedupe_key, recipient, channel,
+            content, content_summary, status, retry_count, failure_reason, sent_at,
+            created_at, updated_at
+        ) VALUES (
+            $1, $2, NULL, 'm3.maintenance.abnormal', $3, 'warehouse_manager', 'wechat',
+            $4, $5, 'retrying', 0, 'awaiting_wechat_delivery', NULL, $6, $6
+        )
+        ON CONFLICT (owner_id, event_type, recipient, dedupe_key) DO UPDATE
+           SET content = EXCLUDED.content,
+               content_summary = EXCLUDED.content_summary,
+               updated_at = EXCLUDED.updated_at
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(ctx.owner_id)
+    .bind(&dedupe_key)
+    .bind(&content)
+    .bind(&content)
+    .bind(now)
+    .execute(&mut **tx)
+    .await
+    .map_err(map_db_error)?;
+
+    let type_exists: bool = sqlx::query_scalar(
+        r#"
+        SELECT EXISTS (
+            SELECT 1 FROM quality_liaison_types
+             WHERE owner_id = $1 AND type_code = 'maintenance_abnormal' AND enabled
+        )
+        "#,
+    )
+    .bind(ctx.owner_id)
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(map_db_error)?;
+    if type_exists {
+        let liaison_id = Uuid::new_v4();
+        let liaison_no = format!("QL-M3-{}", &liaison_id.to_string()[..8]);
+        let payload = serde_json::json!({
+            "maintenance_record_id": record.id,
+            "task_id": record.task_id,
+            "batch_id": record.batch_id,
+            "batch_no": record.batch_no,
+            "exception_type": exception,
+            "action": "maintenance_abnormal_isolation",
+        });
+        sqlx::query(
+            r#"
+            INSERT INTO quality_liaison_orders (
+                id, owner_id, liaison_no, type_code, related_document_type, related_document_no,
+                problem_description, disposition_suggestion, trigger_source, business_payload,
+                status, created_by, created_at, updated_at
+            ) VALUES (
+                $1, $2, $3, 'maintenance_abnormal', 'maintenance_record', $4,
+                $5, '隔离后按质量联系单处置', 'm3.maintenance', $6,
+                'pending_approval', $7, $8, $8
+            )
+            ON CONFLICT DO NOTHING
+            "#,
+        )
+        .bind(liaison_id)
+        .bind(ctx.owner_id)
+        .bind(&liaison_no)
+        .bind(record.id.to_string())
+        .bind(&content)
+        .bind(payload)
+        .bind(ctx.user_id)
+        .bind(now)
+        .execute(&mut **tx)
+        .await
+        .map_err(map_db_error)?;
+    }
+    Ok(())
 }
 
 async fn load_maintenance_record(

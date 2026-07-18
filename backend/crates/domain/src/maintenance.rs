@@ -96,7 +96,11 @@ pub enum MaintenanceRecordValidationError {
     InvalidPest,
     InvalidRodent,
     InvalidMildew,
-    AbnormalRequiresQualityWorkflow,
+    InvalidConclusion,
+    /// 异常结论必须带 exception_type，才能进入质量联系/隔离闭环。
+    AbnormalRequiresExceptionType,
+    /// 正常结论不得附带 exception_type。
+    NormalMustNotHaveExceptionType,
 }
 
 pub fn validate_create_maintenance_record_request(
@@ -131,8 +135,80 @@ pub fn validate_create_maintenance_record_request(
     if !matches!(request.mildew.as_str(), "none" | "present") {
         return Err(MaintenanceRecordValidationError::InvalidMildew);
     }
-    if request.conclusion != "normal" || request.exception_type.is_some() {
-        return Err(MaintenanceRecordValidationError::AbnormalRequiresQualityWorkflow);
+    match request.conclusion.as_str() {
+        "normal" => {
+            if request
+                .exception_type
+                .as_deref()
+                .map(str::trim)
+                .filter(|item| !item.is_empty())
+                .is_some()
+            {
+                return Err(MaintenanceRecordValidationError::NormalMustNotHaveExceptionType);
+            }
+        }
+        "abnormal" => {
+            let exception = request
+                .exception_type
+                .as_deref()
+                .map(str::trim)
+                .filter(|item| !item.is_empty());
+            let Some(exception) = exception else {
+                return Err(MaintenanceRecordValidationError::AbnormalRequiresExceptionType);
+            };
+            if !matches!(
+                exception,
+                "quality_change"
+                    | "package_damage"
+                    | "temperature_excursion"
+                    | "pest_rodent_mildew"
+                    | "other"
+            ) {
+                return Err(MaintenanceRecordValidationError::AbnormalRequiresExceptionType);
+            }
+        }
+        _ => return Err(MaintenanceRecordValidationError::InvalidConclusion),
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use uuid::Uuid;
+
+    fn base_request() -> CreateMaintenanceRecordRequest {
+        CreateMaintenanceRecordRequest {
+            task_id: Uuid::new_v4(),
+            temperature_celsius: 5.0,
+            humidity_percent: 40.0,
+            appearance: "intact".to_string(),
+            packaging: "intact".to_string(),
+            pest: "none".to_string(),
+            rodent: "none".to_string(),
+            mildew: "none".to_string(),
+            conclusion: "normal".to_string(),
+            exception_type: None,
+            notes: None,
+        }
+    }
+
+    #[test]
+    fn accepts_normal_and_abnormal_with_exception_type() {
+        assert!(validate_create_maintenance_record_request(&base_request()).is_ok());
+        let mut abnormal = base_request();
+        abnormal.conclusion = "abnormal".to_string();
+        abnormal.exception_type = Some("package_damage".to_string());
+        assert!(validate_create_maintenance_record_request(&abnormal).is_ok());
+    }
+
+    #[test]
+    fn rejects_abnormal_without_exception_type() {
+        let mut abnormal = base_request();
+        abnormal.conclusion = "abnormal".to_string();
+        assert_eq!(
+            validate_create_maintenance_record_request(&abnormal),
+            Err(MaintenanceRecordValidationError::AbnormalRequiresExceptionType)
+        );
+    }
 }

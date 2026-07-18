@@ -525,6 +525,16 @@ async fn allocate_inventory_for_outbound(
            AND quality_status = $4
            AND recall_flag = FALSE
            AND qty_on_hand - qty_locked > 0
+           AND NOT EXISTS (
+                SELECT 1
+                  FROM inventory_count_lines line
+                  JOIN inventory_counts count_sheet
+                    ON count_sheet.id = line.count_id
+                   AND count_sheet.owner_id = line.owner_id
+                 WHERE line.owner_id = inventory_batches.owner_id
+                   AND line.inventory_batch_id = inventory_batches.id
+                   AND count_sheet.status = 'in_progress'
+           )
          ORDER BY location_code ASC, id ASC
          FOR UPDATE
         "#,

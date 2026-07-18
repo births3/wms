@@ -75,6 +75,7 @@ impl PgWave3Repository {
         if !matches!(status, "handled" | "ignored" | "open") {
             return Err(Wave3RepositoryError::InvalidReason);
         }
+        let mut tx = self.begin().await?;
         let row = sqlx::query_as::<_, AlertRow>(
             r#"
             UPDATE inventory_alert_events
@@ -93,11 +94,25 @@ impl PgWave3Repository {
         .bind(status)
         .bind(ctx.user_id)
         .bind(now)
-        .fetch_optional(&self.pool)
+        .fetch_optional(&mut *tx)
         .await
         .map_err(map_db_error)?
         .ok_or(Wave3RepositoryError::NotFound)?;
-        Ok(map_alert(row))
+        let event = map_alert(row);
+        let mut audit_event = AuditWriteRequest::from_auth_context(
+            ctx,
+            "handle_inventory_alert",
+            "M3",
+            "inventory_alert_event",
+            event.id.to_string(),
+            None,
+        );
+        audit_event.occurred_at = now;
+        append_event_in_tx(&mut tx, &audit_event)
+            .await
+            .map_err(|error| Wave3RepositoryError::Audit(format!("{error:?}")))?;
+        tx.commit().await.map_err(map_db_error)?;
+        Ok(event)
     }
 
     pub async fn generate_near_expiry_alerts(

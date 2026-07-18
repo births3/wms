@@ -312,3 +312,71 @@ async fn maintenance_submission_rejects_expired_and_unqualified_batches(pool: Pg
         .expect_err("unqualified batch must not be maintained");
     assert_eq!(status_error, Wave3RepositoryError::InvalidInventoryState);
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn maintenance_abnormal_isolates_batch_and_writes_notification(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let batch_id = seed_batch(
+        &pool,
+        owner_id,
+        "B-M3-MAINT-ABN",
+        NaiveDate::from_ymd_opt(2028, 6, 1).expect("valid expiry date"),
+        "qualified",
+    )
+    .await;
+    let task_id = seed_task(&pool, owner_id, batch_id).await;
+    let context = ctx(owner_id);
+    let repository = PgWave3Repository::new(pool.clone());
+    let mut req = request(task_id);
+    req.conclusion = "abnormal".to_string();
+    req.exception_type = Some("package_damage".to_string());
+    req.notes = Some("发现外包装破损".to_string());
+
+    let result = repository
+        .create_maintenance_record_with_audit(
+            &context,
+            req,
+            Utc::now(),
+            "m3-maintenance-abnormal-001",
+            None,
+        )
+        .await
+        .expect("abnormal maintenance should persist and quarantine");
+
+    assert_eq!(result.value.conclusion, "abnormal");
+    let status: String = sqlx::query_scalar(
+        "SELECT quality_status FROM inventory_batches WHERE id = $1 AND owner_id = $2",
+    )
+    .bind(batch_id)
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("batch status");
+    assert_eq!(status, "quarantined");
+
+    let status_change: i64 = sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*) FROM inventory_status_changes
+         WHERE owner_id = $1 AND batch_id = $2
+           AND approval_source = '养护异常' AND to_status = 'quarantined'
+        "#,
+    )
+    .bind(owner_id)
+    .bind(batch_id)
+    .fetch_one(&pool)
+    .await
+    .expect("status change count");
+    assert_eq!(status_change, 1);
+
+    let notify: i64 = sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*) FROM h4_notification_records
+         WHERE owner_id = $1 AND event_type = 'm3.maintenance.abnormal'
+        "#,
+    )
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("notification count");
+    assert_eq!(notify, 1);
+}
