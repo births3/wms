@@ -154,6 +154,21 @@ pub struct InspectReceivingOrderRequest {
     pub expiry_date: String,
     pub quality_status: String,
     pub trace_codes: Vec<String>,
+    /// GSP 外观/包装/说明书/标签核对（必填）。
+    #[serde(default)]
+    pub appearance_check: Option<String>,
+    #[serde(default)]
+    pub package_check: Option<String>,
+    #[serde(default)]
+    pub instruction_check: Option<String>,
+    #[serde(default)]
+    pub label_check: Option<String>,
+    /// 抽验数量。
+    #[serde(default)]
+    pub sampling_qty: Option<i64>,
+    /// 批准文号核对值。
+    #[serde(default)]
+    pub approval_no: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -165,6 +180,12 @@ pub struct ReceivingInspectionRecord {
     pub accepted_qty: i64,
     pub rejected_qty: i64,
     pub quality_status: String,
+    #[serde(default)]
+    pub quality_checks: Option<serde_json::Value>,
+    #[serde(default)]
+    pub sampling_qty: Option<i64>,
+    #[serde(default)]
+    pub approval_no: Option<String>,
     pub occurred_at: DateTime<Utc>,
 }
 

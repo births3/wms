@@ -125,7 +125,21 @@ async fn postgres_inspect_and_sign_handlers_write_idempotency_and_audit(pool: Pg
                 rejected_qty: 0,
                 arrival_temperature_celsius: None,
                 exception_note: None,
-                details: None,
+                details: Some(ReceivingReceiptDetails {
+                    temperature_control_method: Some("普通".to_string()),
+                    vehicle_no: Some("沪A00000".to_string()),
+                    origin: Some("发运地".to_string()),
+                    departure_at: Some(chrono::Utc::now()),
+                    arrival_at: Some(chrono::Utc::now()),
+                    storage_at: Some(chrono::Utc::now()),
+                    transport_mode: Some("公路".to_string()),
+                    carrier: Some("承运商".to_string()),
+                    contact_name: Some("送货人".to_string()),
+                    contact_phone: Some("13800000000".to_string()),
+                    contact_id_no: Some("310101199001011234".to_string()),
+                    seal_checked: Some("已核对".to_string()),
+                    filing_checked: Some("已核对".to_string()),
+                }),
             },
             now,
             "handler-receive-before-inspect",
@@ -142,7 +156,14 @@ async fn postgres_inspect_and_sign_handlers_write_idempotency_and_audit(pool: Pg
         expiry_date: "2028-01-01".to_string(),
         quality_status: crate::inventory::STATUS_QUALIFIED.to_string(),
         trace_codes: vec!["TRACE-001".to_string()],
-    };
+
+                appearance_check: Some("完好".to_string()),
+                package_check: Some("完好".to_string()),
+                instruction_check: Some("有".to_string()),
+                label_check: Some("清晰".to_string()),
+                sampling_qty: Some(1),
+                approval_no: None,
+            };
     let Json(inspection) = inspect_receiving_order_handler(
         authorized.clone(),
         State(state.clone()),

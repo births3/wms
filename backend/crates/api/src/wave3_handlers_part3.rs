@@ -330,6 +330,10 @@ impl IntoResponse for Wave3HandlerError {
             | Wave3HandlerError::Repository(Wave3RepositoryError::OverReceiptNotAllowed)
             | Wave3HandlerError::Repository(Wave3RepositoryError::DuplicateTraceCode)
             | Wave3HandlerError::Repository(Wave3RepositoryError::InvalidReason)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::MissingRequiredField(_))
+            | Wave3HandlerError::Repository(
+                Wave3RepositoryError::TemperatureExcursionRequiresDisposition,
+            )
             | Wave3HandlerError::Repository(Wave3RepositoryError::SupplierQualificationExpired)
             | Wave3HandlerError::Repository(Wave3RepositoryError::MissingApprovalSource)
             | Wave3HandlerError::Repository(Wave3RepositoryError::RecallNotActive)

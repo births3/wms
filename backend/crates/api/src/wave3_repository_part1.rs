@@ -149,6 +149,40 @@ impl PgWave3Repository {
             return Err(Wave3RepositoryError::QuantityClosureMismatch);
         }
 
+        validate_receiving_gsp_fields(&req)?;
+        let cold_chain = order_requires_cold_chain(&mut tx, ctx.owner_id, id).await?;
+        if cold_chain {
+            if req.arrival_temperature_celsius.is_none() {
+                return Err(Wave3RepositoryError::MissingRequiredField(
+                    "arrival_temperature_celsius".to_string(),
+                ));
+            }
+            let control = req
+                .details
+                .as_ref()
+                .and_then(|details| details.temperature_control_method.as_deref())
+                .map(str::trim)
+                .filter(|value| !value.is_empty());
+            if control.is_none() {
+                return Err(Wave3RepositoryError::MissingRequiredField(
+                    "temperature_control_method".to_string(),
+                ));
+            }
+            if let Some(temperature) = req.arrival_temperature_celsius {
+                // 冷藏默认 2~8℃；超范围必须填写异常备注（稳定性报告/处置说明）。
+                if !(2.0..=8.0).contains(&temperature)
+                    && req
+                        .exception_note
+                        .as_deref()
+                        .map(str::trim)
+                        .filter(|value| !value.is_empty())
+                        .is_none()
+                {
+                    return Err(Wave3RepositoryError::TemperatureExcursionRequiresDisposition);
+                }
+            }
+        }
+
         let receipt = ReceivingOrderReceipt {
             id: Uuid::new_v4(),
             receiving_order_id: id,

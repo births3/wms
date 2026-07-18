@@ -11,7 +11,8 @@ use wms_api::{
 use wms_domain::{
     CreateBillingAccountRequest, CreateBillingContractRequest, CreateBillingRuleRequest,
     CreateReceivingOrderRequest, InventoryBatchQuery, PutawayRequest, ReceiveReceivingOrderRequest,
-    ReceivingOrderLine, RejectReceivingOrderRequest, UpdateReceivingOrderRequest,
+    ReceivingOrderLine, ReceivingReceiptDetails, RejectReceivingOrderRequest,
+    UpdateReceivingOrderRequest,
 };
 
 fn ctx(owner_id: Uuid) -> AuthContext {

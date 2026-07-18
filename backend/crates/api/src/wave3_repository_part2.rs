@@ -20,6 +20,11 @@ impl PgWave3Repository {
         if req.batch_no.trim().is_empty() {
             return Err(Wave3RepositoryError::InvalidBatchPolicy);
         }
+        let quality_checks = validate_inspection_quality_checks(&req)?;
+        let sampling_qty = req.sampling_qty.unwrap_or(0);
+        if sampling_qty < 0 {
+            return Err(Wave3RepositoryError::InvalidQuantity);
+        }
         let mut unique_trace_codes = req.trace_codes.clone();
         unique_trace_codes.sort_unstable();
         unique_trace_codes.dedup();
@@ -142,6 +147,14 @@ impl PgWave3Repository {
             accepted_qty: req.accepted_qty,
             rejected_qty: req.rejected_qty,
             quality_status: req.quality_status.clone(),
+            quality_checks: Some(quality_checks.clone()),
+            sampling_qty: Some(sampling_qty),
+            approval_no: req
+                .approval_no
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string),
             occurred_at: now,
         };
         sqlx::query(
@@ -149,9 +162,9 @@ impl PgWave3Repository {
             INSERT INTO receiving_inspections (
                 id, receiving_order_id, owner_id, batch_no, accepted_qty,
                 rejected_qty, production_date, expiry_date, quality_status,
-                trace_codes, occurred_at
+                trace_codes, quality_checks, sampling_qty, approval_no, occurred_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
             "#,
         )
         .bind(inspection.id)
@@ -164,10 +177,27 @@ impl PgWave3Repository {
         .bind(expiry_date)
         .bind(&inspection.quality_status)
         .bind(&req.trace_codes)
+        .bind(sqlx::types::Json(quality_checks.clone()))
+        .bind(sampling_qty)
+        .bind(&inspection.approval_no)
         .bind(inspection.occurred_at)
         .execute(&mut *tx)
         .await
         .map_err(map_db_error)?;
+
+        if req.quality_status.eq_ignore_ascii_case("unqualified")
+            || req.quality_status.eq_ignore_ascii_case("不合格")
+        {
+            enqueue_unqualified_quality_liaison(
+                &mut tx,
+                ctx,
+                order.id,
+                &order.receipt_no,
+                &inspection,
+                now,
+            )
+            .await?;
+        }
 
         let updated_line = sqlx::query(
             r#"

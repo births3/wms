@@ -1,7 +1,7 @@
 use super::*;
 use chrono::{TimeZone, Utc};
 use uuid::Uuid;
-use wms_domain::ReceivingOrderLine;
+use wms_domain::{ReceivingOrderLine, ReceivingReceiptDetails};
 
 use crate::auth::AuthContext;
 
@@ -62,7 +62,21 @@ fn receiving_inspection_rejects_expired_batch() {
                 rejected_qty: 0,
                 arrival_temperature_celsius: None,
                 exception_note: None,
-                details: None,
+                details: Some(ReceivingReceiptDetails {
+                    temperature_control_method: Some("普通".to_string()),
+                    vehicle_no: Some("沪A00000".to_string()),
+                    origin: Some("发运地".to_string()),
+                    departure_at: Some(chrono::Utc::now()),
+                    arrival_at: Some(chrono::Utc::now()),
+                    storage_at: Some(chrono::Utc::now()),
+                    transport_mode: Some("公路".to_string()),
+                    carrier: Some("承运商".to_string()),
+                    contact_name: Some("送货人".to_string()),
+                    contact_phone: Some("13800000000".to_string()),
+                    contact_id_no: Some("310101199001011234".to_string()),
+                    seal_checked: Some("已核对".to_string()),
+                    filing_checked: Some("已核对".to_string()),
+                }),
             },
             now,
         )
@@ -79,6 +93,13 @@ fn receiving_inspection_rejects_expired_batch() {
             expiry_date: "2026-01-01".to_string(),
             quality_status: "qualified".to_string(),
             trace_codes: vec![],
+
+            appearance_check: Some("完好".to_string()),
+            package_check: Some("完好".to_string()),
+            instruction_check: Some("有".to_string()),
+            label_check: Some("清晰".to_string()),
+            sampling_qty: Some(1),
+            approval_no: None,
         },
         chrono::NaiveDate::from_ymd_opt(2026, 6, 4).expect("valid date"),
         now,

@@ -407,6 +407,14 @@ impl ReceivingOrderStore {
             accepted_qty: req.accepted_qty,
             rejected_qty: req.rejected_qty,
             quality_status: req.quality_status,
+            quality_checks: Some(serde_json::json!({
+                "appearance": req.appearance_check,
+                "package": req.package_check,
+                "instruction": req.instruction_check,
+                "label": req.label_check,
+            })),
+            sampling_qty: req.sampling_qty,
+            approval_no: req.approval_no,
             occurred_at: now,
         };
         self.inspections.insert(inspection.id, inspection.clone());

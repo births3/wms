@@ -67,6 +67,13 @@ async fn print_data_reads_receipt_inspection_and_dual_signature(pool: PgPool) {
                 expiry_date: "2028-01-01".to_string(),
                 quality_status: STATUS_QUALIFIED.to_string(),
                 trace_codes: vec!["TRACE-PRINT-001".to_string()],
+
+                appearance_check: Some("完好".to_string()),
+                package_check: Some("完好".to_string()),
+                instruction_check: Some("有".to_string()),
+                label_check: Some("清晰".to_string()),
+                sampling_qty: Some(1),
+                approval_no: None,
             },
             chrono::NaiveDate::from_ymd_opt(2026, 7, 12).expect("valid date"),
             chrono::Utc::now(),

@@ -111,6 +111,8 @@ pub enum Wave3RepositoryError {
     SameSigner,
     UnauthorizedSigner,
     InvalidReason,
+    MissingRequiredField(String),
+    TemperatureExcursionRequiresDisposition,
     SupplierQualificationExpired,
     MissingApprovalSource,
     RecallAlreadyActive,
@@ -767,6 +769,203 @@ fn map_receipt_insert_error(error: sqlx::Error) -> Wave3RepositoryError {
         }
     }
     map_db_error(error)
+}
+
+fn validate_receiving_gsp_fields(
+    req: &ReceiveReceivingOrderRequest,
+) -> Result<(), Wave3RepositoryError> {
+    let details = req
+        .details
+        .as_ref()
+        .ok_or_else(|| Wave3RepositoryError::MissingRequiredField("details".to_string()))?;
+    let required = [
+        ("vehicle_no", details.vehicle_no.as_deref()),
+        ("origin", details.origin.as_deref()),
+        ("transport_mode", details.transport_mode.as_deref()),
+        ("carrier", details.carrier.as_deref()),
+        ("contact_name", details.contact_name.as_deref()),
+        ("contact_phone", details.contact_phone.as_deref()),
+        ("contact_id_no", details.contact_id_no.as_deref()),
+        ("seal_checked", details.seal_checked.as_deref()),
+        ("filing_checked", details.filing_checked.as_deref()),
+    ];
+    for (field, value) in required {
+        if value
+            .map(str::trim)
+            .filter(|item| !item.is_empty())
+            .is_none()
+        {
+            return Err(Wave3RepositoryError::MissingRequiredField(
+                field.to_string(),
+            ));
+        }
+    }
+    if details.departure_at.is_none() {
+        return Err(Wave3RepositoryError::MissingRequiredField(
+            "departure_at".to_string(),
+        ));
+    }
+    if details.arrival_at.is_none() {
+        return Err(Wave3RepositoryError::MissingRequiredField(
+            "arrival_at".to_string(),
+        ));
+    }
+    if details.storage_at.is_none() {
+        return Err(Wave3RepositoryError::MissingRequiredField(
+            "storage_at".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+async fn order_requires_cold_chain(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    receiving_order_id: Uuid,
+) -> Result<bool, Wave3RepositoryError> {
+    let cold: bool = sqlx::query_scalar(
+        r#"
+        SELECT EXISTS (
+            SELECT 1
+              FROM receiving_order_lines line
+              JOIN products product
+                ON product.owner_id = line.owner_id
+               AND product.product_code = line.product_code
+             WHERE line.receiving_order_id = $1
+               AND line.owner_id = $2
+               AND (
+                    product.storage_condition ILIKE '%cold%'
+                    OR product.storage_condition ILIKE '%冻%'
+                    OR product.storage_condition ILIKE '%冷%'
+                    OR product.storage_condition IN ('cold', 'frozen', 'refrigerated')
+               )
+        )
+        "#,
+    )
+    .bind(receiving_order_id)
+    .bind(owner_id)
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(map_db_error)?;
+    Ok(cold)
+}
+
+fn validate_inspection_quality_checks(
+    req: &InspectReceivingOrderRequest,
+) -> Result<serde_json::Value, Wave3RepositoryError> {
+    let required = [
+        ("appearance", req.appearance_check.as_deref()),
+        ("package", req.package_check.as_deref()),
+        ("instruction", req.instruction_check.as_deref()),
+        ("label", req.label_check.as_deref()),
+    ];
+    let mut checks = serde_json::Map::new();
+    for (field, value) in required {
+        let trimmed = value
+            .map(str::trim)
+            .filter(|item| !item.is_empty())
+            .ok_or_else(|| Wave3RepositoryError::MissingRequiredField(field.to_string()))?;
+        checks.insert(
+            field.to_string(),
+            serde_json::Value::String(trimmed.to_string()),
+        );
+    }
+    Ok(serde_json::Value::Object(checks))
+}
+
+async fn enqueue_unqualified_quality_liaison(
+    tx: &mut Transaction<'_, Postgres>,
+    ctx: &AuthContext,
+    receiving_order_id: Uuid,
+    receipt_no: &str,
+    inspection: &ReceivingInspectionRecord,
+    now: DateTime<Utc>,
+) -> Result<(), Wave3RepositoryError> {
+    let content = format!(
+        "入库验收不合格：ASN {} 批号 {} 拒收数量 {}，已触发质量联系单/通知。",
+        receipt_no, inspection.batch_no, inspection.rejected_qty
+    );
+    let dedupe_key = format!(
+        "m2-inspect-unqualified:{}:{}:{}",
+        receiving_order_id, inspection.batch_no, inspection.id
+    );
+    sqlx::query(
+        r#"
+        INSERT INTO h4_notification_records (
+            id, owner_id, config_id, event_type, dedupe_key, recipient, channel,
+            content, content_summary, status, retry_count, failure_reason, sent_at,
+            created_at, updated_at
+        ) VALUES (
+            $1, $2, NULL, 'm2.inspect.unqualified', $3, 'warehouse_manager', 'wechat',
+            $4, $5, 'retrying', 0, 'awaiting_wechat_delivery', NULL, $6, $6
+        )
+        ON CONFLICT (owner_id, event_type, recipient, dedupe_key) DO UPDATE
+           SET content = EXCLUDED.content,
+               content_summary = EXCLUDED.content_summary,
+               updated_at = EXCLUDED.updated_at
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(ctx.owner_id)
+    .bind(&dedupe_key)
+    .bind(&content)
+    .bind(&content)
+    .bind(now)
+    .execute(&mut **tx)
+    .await
+    .map_err(map_db_error)?;
+
+    // 若货主已配置 inbound_unqualified 质量联系单类型，则直接建单（审批链路沿用 M-QL）。
+    let type_exists: bool = sqlx::query_scalar(
+        r#"
+        SELECT EXISTS (
+            SELECT 1 FROM quality_liaison_types
+             WHERE owner_id = $1 AND type_code = 'inbound_unqualified' AND enabled
+        )
+        "#,
+    )
+    .bind(ctx.owner_id)
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(map_db_error)?;
+    if type_exists {
+        let liaison_id = Uuid::new_v4();
+        let liaison_no = format!("QL-M2-{}", &liaison_id.to_string()[..8]);
+        let payload = serde_json::json!({
+            "receiving_order_id": receiving_order_id,
+            "receipt_no": receipt_no,
+            "batch_no": inspection.batch_no,
+            "inspection_id": inspection.id,
+            "rejected_qty": inspection.rejected_qty,
+            "action": "create_stock_loss_pending",
+        });
+        sqlx::query(
+            r#"
+            INSERT INTO quality_liaison_orders (
+                id, owner_id, liaison_no, type_code, related_document_type, related_document_no,
+                problem_description, disposition_suggestion, trigger_source, business_payload,
+                status, created_by, created_at, updated_at
+            ) VALUES (
+                $1, $2, $3, 'inbound_unqualified', 'receiving_order', $4,
+                $5, '报损或采退', 'm2.inspect', $6,
+                'pending_approval', $7, $8, $8
+            )
+            ON CONFLICT DO NOTHING
+            "#,
+        )
+        .bind(liaison_id)
+        .bind(ctx.owner_id)
+        .bind(&liaison_no)
+        .bind(receipt_no)
+        .bind(&content)
+        .bind(payload)
+        .bind(ctx.user_id)
+        .bind(now)
+        .execute(&mut **tx)
+        .await
+        .map_err(map_db_error)?;
+    }
+    Ok(())
 }
 
 async fn ensure_receiving_clerk_signer(

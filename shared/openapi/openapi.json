@@ -2484,8 +2484,8 @@
           }
         },
         "security": [],
-        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。",
-        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。"
+        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。",
+        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。"
       }
     },
     "/api/v1/auth/logout": {
@@ -24751,11 +24751,33 @@
             "type": "integer",
             "format": "int64"
           },
+          "appearance_check": {
+            "type": "string",
+            "description": "GSP 外观/包装/说明书/标签核对（必填）。",
+            "nullable": true
+          },
+          "approval_no": {
+            "type": "string",
+            "description": "批准文号核对值。",
+            "nullable": true
+          },
           "batch_no": {
             "type": "string"
           },
           "expiry_date": {
             "type": "string"
+          },
+          "instruction_check": {
+            "type": "string",
+            "nullable": true
+          },
+          "label_check": {
+            "type": "string",
+            "nullable": true
+          },
+          "package_check": {
+            "type": "string",
+            "nullable": true
           },
           "production_date": {
             "type": "string"
@@ -24766,6 +24788,12 @@
           "rejected_qty": {
             "type": "integer",
             "format": "int64"
+          },
+          "sampling_qty": {
+            "type": "integer",
+            "format": "int64",
+            "description": "抽验数量。",
+            "nullable": true
           },
           "trace_codes": {
             "type": "array",
@@ -28133,6 +28161,10 @@
             "type": "integer",
             "format": "int64"
           },
+          "approval_no": {
+            "type": "string",
+            "nullable": true
+          },
           "batch_no": {
             "type": "string"
           },
@@ -28148,6 +28180,9 @@
             "type": "string",
             "format": "uuid"
           },
+          "quality_checks": {
+            "nullable": true
+          },
           "quality_status": {
             "type": "string"
           },
@@ -28158,6 +28193,11 @@
           "rejected_qty": {
             "type": "integer",
             "format": "int64"
+          },
+          "sampling_qty": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
           }
         }
       },

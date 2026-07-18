@@ -5496,12 +5496,24 @@ export interface components {
         InspectReceivingOrderRequest: {
             /** Format: int64 */
             accepted_qty: number;
+            /** @description GSP 外观/包装/说明书/标签核对（必填）。 */
+            appearance_check?: string | null;
+            /** @description 批准文号核对值。 */
+            approval_no?: string | null;
             batch_no: string;
             expiry_date: string;
+            instruction_check?: string | null;
+            label_check?: string | null;
+            package_check?: string | null;
             production_date: string;
             quality_status: string;
             /** Format: int64 */
             rejected_qty: number;
+            /**
+             * Format: int64
+             * @description 抽验数量。
+             */
+            sampling_qty?: number | null;
             trace_codes: string[];
         };
         InspectionSignatureRecord: {
@@ -6584,6 +6596,7 @@ export interface components {
         ReceivingInspectionRecord: {
             /** Format: int64 */
             accepted_qty: number;
+            approval_no?: string | null;
             batch_no: string;
             /** Format: uuid */
             id: string;
@@ -6591,11 +6604,14 @@ export interface components {
             occurred_at: string;
             /** Format: uuid */
             owner_id: string;
+            quality_checks?: unknown;
             quality_status: string;
             /** Format: uuid */
             receiving_order_id: string;
             /** Format: int64 */
             rejected_qty: number;
+            /** Format: int64 */
+            sampling_qty?: number | null;
         };
         /** @description 收货单。 */
         ReceivingOrder: {

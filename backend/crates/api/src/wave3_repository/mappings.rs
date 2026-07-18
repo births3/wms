@@ -56,6 +56,9 @@ pub(super) fn map_receiving_inspection(row: ReceivingInspectionRow) -> Receiving
         accepted_qty: row.accepted_qty,
         rejected_qty: row.rejected_qty,
         quality_status: row.quality_status,
+        quality_checks: None,
+        sampling_qty: None,
+        approval_no: None,
         occurred_at: row.occurred_at,
     }
 }
