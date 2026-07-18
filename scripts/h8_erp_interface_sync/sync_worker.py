@@ -100,6 +100,7 @@ def sqlcmd_query(settings: Settings, sql: str) -> str:
         "-P",
         settings.mssql_password,
         "-C",
+        "-b",  # 遇错误非零退出
         "-d",
         settings.mssql_database,
         "-s",
@@ -115,6 +116,9 @@ def sqlcmd_query(settings: Settings, sql: str) -> str:
         raise RuntimeError(
             f"sqlcmd failed rc={proc.returncode}: {proc.stderr or proc.stdout}"
         )
+    # 部分版本仍把 Msg 写到 stdout 且 rc=0
+    if "Msg " in proc.stdout and "Level" in proc.stdout:
+        raise RuntimeError(f"sqlcmd logical error: {proc.stdout[:800]}")
     return proc.stdout
 
 
@@ -123,59 +127,31 @@ def sql_escape(value: str) -> str:
 
 
 def claim_rows(settings: Settings, table: str) -> list[dict[str, str]]:
-    """认领一批 pending 行，置为 processing，返回字段字典列表。"""
-    # OUTPUT 在同一语句内认领
-    sql = f"""
+    """认领一批 pending 行，置为 processing，返回字段字典列表。
+
+    SQL Server 不允许 ``UPDATE TOP ... ORDER BY``；用 CTE 排序后更新。
+    """
+    batch = int(settings.batch_size)
+    claim_cte = f"""
 SET NOCOUNT ON;
 DECLARE @claimed TABLE (id UNIQUEIDENTIFIER);
-UPDATE TOP ({settings.batch_size}) t
-   SET sync_status = N'processing',
-       updated_at = SYSUTCDATETIME()
+;WITH cte AS (
+  SELECT TOP ({batch}) id
+    FROM dbo.{{table}} WITH (ROWLOCK, READPAST)
+   WHERE sync_status = N'pending'
+   ORDER BY updated_at ASC
+)
+UPDATE t
+   SET sync_status = N'processing', updated_at = SYSUTCDATETIME()
 OUTPUT inserted.id INTO @claimed
-  FROM dbo.{table} t WITH (ROWLOCK, READPAST)
- WHERE sync_status = N'pending'
- ORDER BY updated_at ASC;
-
-SELECT
-  CONVERT(NVARCHAR(36), id),
-  external_doc_no,
-  CONVERT(NVARCHAR(36), owner_id),
-  CONVERT(NVARCHAR(36), warehouse_id),
-  CONVERT(NVARCHAR(36), supplier_id),
-  CONVERT(NVARCHAR(36), customer_id),
-  product_code,
-  product_name,
-  CONVERT(NVARCHAR(32), expected_qty),
-  CONVERT(NVARCHAR(32), planned_qty),
-  CONVERT(NVARCHAR(33), expected_arrival_at, 126),
-  CONVERT(NVARCHAR(33), required_ship_at, 126),
-  document_type,
-  external_ref,
-  receipt_no,
-  erp_order_no,
-  wms_order_no,
-  batch_no,
-  approval_no,
-  spec,
-  dosage_form,
-  manufacturer,
-  storage_condition,
-  idempotency_key,
-  CONVERT(NVARCHAR(16), retry_count)
-FROM dbo.{table}
-WHERE id IN (SELECT id FROM @claimed);
+  FROM dbo.{{table}} t
+  INNER JOIN cte ON cte.id = t.id;
 """
     # 不同表列不同：用动态列集合查询
     if table == "if_in_asn":
-        select_sql = f"""
-SET NOCOUNT ON;
-DECLARE @claimed TABLE (id UNIQUEIDENTIFIER);
-UPDATE TOP ({settings.batch_size}) t
-   SET sync_status = N'processing', updated_at = SYSUTCDATETIME()
-OUTPUT inserted.id INTO @claimed
-  FROM dbo.if_in_asn t WITH (ROWLOCK, READPAST)
- WHERE sync_status = N'pending'
- ORDER BY updated_at ASC;
+        select_sql = (
+            claim_cte.format(table="if_in_asn")
+            + """
 SELECT
   CONVERT(NVARCHAR(36), id), external_doc_no,
   CONVERT(NVARCHAR(36), owner_id), CONVERT(NVARCHAR(36), warehouse_id),
@@ -186,6 +162,7 @@ SELECT
   idempotency_key, CONVERT(NVARCHAR(16), retry_count)
 FROM dbo.if_in_asn WHERE id IN (SELECT id FROM @claimed);
 """
+        )
         cols = [
             "id",
             "external_doc_no",
@@ -202,15 +179,9 @@ FROM dbo.if_in_asn WHERE id IN (SELECT id FROM @claimed);
             "retry_count",
         ]
     elif table == "if_in_outbound_order":
-        select_sql = f"""
-SET NOCOUNT ON;
-DECLARE @claimed TABLE (id UNIQUEIDENTIFIER);
-UPDATE TOP ({settings.batch_size}) t
-   SET sync_status = N'processing', updated_at = SYSUTCDATETIME()
-OUTPUT inserted.id INTO @claimed
-  FROM dbo.if_in_outbound_order t WITH (ROWLOCK, READPAST)
- WHERE sync_status = N'pending'
- ORDER BY updated_at ASC;
+        select_sql = (
+            claim_cte.format(table="if_in_outbound_order")
+            + """
 SELECT
   CONVERT(NVARCHAR(36), id), external_doc_no,
   CONVERT(NVARCHAR(36), owner_id), CONVERT(NVARCHAR(36), warehouse_id),
@@ -221,6 +192,7 @@ SELECT
   idempotency_key, CONVERT(NVARCHAR(16), retry_count)
 FROM dbo.if_in_outbound_order WHERE id IN (SELECT id FROM @claimed);
 """
+        )
         cols = [
             "id",
             "external_doc_no",
@@ -238,15 +210,9 @@ FROM dbo.if_in_outbound_order WHERE id IN (SELECT id FROM @claimed);
             "retry_count",
         ]
     elif table == "if_in_product_master":
-        select_sql = f"""
-SET NOCOUNT ON;
-DECLARE @claimed TABLE (id UNIQUEIDENTIFIER);
-UPDATE TOP ({settings.batch_size}) t
-   SET sync_status = N'processing', updated_at = SYSUTCDATETIME()
-OUTPUT inserted.id INTO @claimed
-  FROM dbo.if_in_product_master t WITH (ROWLOCK, READPAST)
- WHERE sync_status = N'pending'
- ORDER BY updated_at ASC;
+        select_sql = (
+            claim_cte.format(table="if_in_product_master")
+            + """
 SELECT
   CONVERT(NVARCHAR(36), id), external_doc_no,
   CONVERT(NVARCHAR(36), owner_id), product_code, product_name,
@@ -255,6 +221,7 @@ SELECT
   idempotency_key, CONVERT(NVARCHAR(16), retry_count)
 FROM dbo.if_in_product_master WHERE id IN (SELECT id FROM @claimed);
 """
+        )
         cols = [
             "id",
             "external_doc_no",
@@ -431,10 +398,14 @@ def handle_outbound(settings: Settings, row: dict[str, str]) -> str:
 
 
 def handle_product(settings: Settings, row: dict[str, str]) -> str:
-    attrs: dict[str, Any] = {}
-    if row.get("storage_condition"):
-        # 商品创建 attrs 里可带 unit_volume 等；storage 多在表字段
-        attrs["storage_condition_hint"] = row["storage_condition"]
+    # 与 master-data CreateProduct 契约一致：storage_condition 走 attrs 枚举
+    storage = (row.get("storage_condition") or "normal").strip().lower()
+    if storage not in ("frozen", "cold", "cool", "normal"):
+        storage = "normal"
+    attrs: dict[str, Any] = {
+        "storage_condition": storage,
+        "source": "erp_interface",
+    }
     body = {
         "product_code": row["product_code"],
         "product_name": row["product_name"],
@@ -442,8 +413,8 @@ def handle_product(settings: Settings, row: dict[str, str]) -> str:
         "spec": row.get("spec") or None,
         "dosage_form": row.get("dosage_form") or None,
         "manufacturer": row.get("manufacturer") or None,
-        "special_drug_category_code": None,
-        "attrs": attrs or {},
+        "special_drug_category_code": "none",
+        "attrs": attrs,
     }
     # 空串转 null
     for key in ("approval_no", "spec", "dosage_form", "manufacturer"):
@@ -499,31 +470,16 @@ def process_once(settings: Settings, types: list[str], dry_run: bool) -> int:
                 print(f"[h8] success {type_name} -> {wms_id}", flush=True)
             except Exception as exc:  # noqa: BLE001 — worker 边界
                 retry += 1
-                status = "dead" if retry >= settings.max_retry else "failed"
-                # failed 可再次人工改 pending；此处 failed 保留便于观察
-                if status == "failed":
-                    # 自动重回 pending 以便重试（简单退避：直接 pending）
-                    next_status = "pending"
-                else:
-                    next_status = "dead"
+                # 未达上限：回 pending 便于下一轮；达上限：dead
+                next_status = "dead" if retry >= settings.max_retry else "pending"
                 mark_row(
                     settings,
                     table,
                     row_id,
-                    next_status if next_status != "pending" else "failed",
+                    next_status,
                     error=str(exc),
                     retry_count=retry,
                 )
-                if next_status == "pending":
-                    # 显式回到 pending
-                    mark_row(
-                        settings,
-                        table,
-                        row_id,
-                        "pending",
-                        error=str(exc),
-                        retry_count=retry,
-                    )
                 print(f"[h8] error {type_name}: {exc}", flush=True)
     return processed
 
