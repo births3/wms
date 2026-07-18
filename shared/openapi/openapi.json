@@ -5221,6 +5221,601 @@
         "x-idempotency-exempt-reason": "配置中心迁移类受控运维动作后续补运行时幂等证据。"
       }
     },
+    "/api/v1/config/erp-connectors": {
+      "get": {
+        "tags": [
+          "h8-erp"
+        ],
+        "operationId": "list_h8_erp_connectors",
+        "responses": {
+          "200": {
+            "description": "ERP 连接列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H8ErpConnectorListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "h8-erp"
+        ],
+        "operationId": "create_h8_erp_connector",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateH8ErpConnectorRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "新建 ERP 连接（testing）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H8ErpConnector"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "校验失败或缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "编码冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/config/erp-connectors/{id}": {
+      "get": {
+        "tags": [
+          "h8-erp"
+        ],
+        "operationId": "get_h8_erp_connector",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "连接 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "连接详情",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H8ErpConnector"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "h8-erp"
+        ],
+        "operationId": "delete_h8_erp_connector",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "连接 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "物理删除（仅从未启用且无引用）"
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "不允许删除",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "h8-erp"
+        ],
+        "operationId": "update_h8_erp_connector",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "连接 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateH8ErpConnectorRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "更新连接",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H8ErpConnector"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/config/erp-connectors/{id}/activate": {
+      "post": {
+        "tags": [
+          "h8-erp"
+        ],
+        "operationId": "activate_h8_erp_connector",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "连接 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "启用连接",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H8ErpConnector"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "路由重叠",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "需先通过当前版本测试",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/config/erp-connectors/{id}/disable": {
+      "post": {
+        "tags": [
+          "h8-erp"
+        ],
+        "operationId": "disable_h8_erp_connector",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "连接 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "停用连接",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H8ErpConnector"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "状态非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/config/erp-connectors/{id}/test": {
+      "post": {
+        "tags": [
+          "h8-erp"
+        ],
+        "operationId": "test_h8_erp_connector",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "连接 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "连接测试结果（不写业务单据）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H8ErpConnectorTestResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/dock-appointments": {
       "get": {
         "tags": [
@@ -21638,6 +22233,81 @@
           }
         }
       },
+      "CreateH8ErpConnectorRequest": {
+        "type": "object",
+        "required": [
+          "connector_code",
+          "connector_name",
+          "warehouse_ids",
+          "directions",
+          "message_types",
+          "channel_mode"
+        ],
+        "properties": {
+          "api_base_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "api_key_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "bearer_secret_alias": {
+            "type": "string",
+            "nullable": true
+          },
+          "channel_mode": {
+            "type": "string"
+          },
+          "connector_code": {
+            "type": "string"
+          },
+          "connector_name": {
+            "type": "string"
+          },
+          "directions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "interface_db_host": {
+            "type": "string",
+            "nullable": true
+          },
+          "interface_db_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "interface_db_password_alias": {
+            "type": "string",
+            "nullable": true
+          },
+          "interface_db_port": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "interface_db_username": {
+            "type": "string",
+            "nullable": true
+          },
+          "message_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "warehouse_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
       "CreateInventoryCountRequest": {
         "type": "object",
         "required": [
@@ -24573,6 +25243,176 @@
           },
           "status": {
             "type": "string"
+          }
+        }
+      },
+      "H8ErpConnector": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "connector_code",
+          "connector_name",
+          "warehouse_ids",
+          "directions",
+          "message_types",
+          "channel_mode",
+          "status",
+          "config_version",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "api_base_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "api_key_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "bearer_secret_alias": {
+            "type": "string",
+            "nullable": true
+          },
+          "channel_mode": {
+            "type": "string"
+          },
+          "config_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "connector_code": {
+            "type": "string"
+          },
+          "connector_name": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "directions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "first_activated_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "interface_db_host": {
+            "type": "string",
+            "nullable": true
+          },
+          "interface_db_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "interface_db_password_alias": {
+            "type": "string",
+            "nullable": true
+          },
+          "interface_db_port": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "interface_db_username": {
+            "type": "string",
+            "nullable": true
+          },
+          "last_tested_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "last_tested_error_summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "last_tested_succeeded": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "last_tested_version": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "message_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "warehouse_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
+      "H8ErpConnectorListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/H8ErpConnector"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "H8ErpConnectorTestResult": {
+        "type": "object",
+        "required": [
+          "succeeded",
+          "tested_version",
+          "tested_at"
+        ],
+        "properties": {
+          "error_summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "succeeded": {
+            "type": "boolean"
+          },
+          "tested_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "tested_version": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -31026,6 +31866,82 @@
           }
         }
       },
+      "UpdateH8ErpConnectorRequest": {
+        "type": "object",
+        "required": [
+          "expected_config_version"
+        ],
+        "properties": {
+          "api_base_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "api_key_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "bearer_secret_alias": {
+            "type": "string",
+            "nullable": true
+          },
+          "channel_mode": {
+            "type": "string",
+            "nullable": true
+          },
+          "connector_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "directions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "expected_config_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "interface_db_host": {
+            "type": "string",
+            "nullable": true
+          },
+          "interface_db_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "interface_db_password_alias": {
+            "type": "string",
+            "nullable": true
+          },
+          "interface_db_port": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "interface_db_username": {
+            "type": "string",
+            "nullable": true
+          },
+          "message_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "warehouse_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nullable": true
+          }
+        }
+      },
       "UpdateLocationRequest": {
         "type": "object",
         "properties": {
@@ -32404,6 +33320,10 @@
     {
       "name": "config-center",
       "description": "M1-008 配置中心"
+    },
+    {
+      "name": "h8-erp",
+      "description": "US-H8-001 ERP 连接配置"
     },
     {
       "name": "cold-chain",

@@ -3,8 +3,9 @@ use crate::openapi_paths::*;
 use utoipa::OpenApi;
 use wms_domain::{
     ArriveDockAppointmentRequest, ChangeDrugInspectionPlatformStatusRequest,
-    DrugInspectionPlatform, DrugInspectionPlatformListResponse, TaskReleaseStrategy,
-    UpsertDrugInspectionPlatformRequest,
+    CreateH8ErpConnectorRequest, DrugInspectionPlatform, DrugInspectionPlatformListResponse,
+    H8ErpConnector, H8ErpConnectorListResponse, H8ErpConnectorTestResult, TaskReleaseStrategy,
+    UpdateH8ErpConnectorRequest, UpsertDrugInspectionPlatformRequest,
 };
 #[derive(OpenApi)]
 #[openapi(
@@ -37,6 +38,14 @@ use wms_domain::{
         list_drug_inspection_platforms,
         upsert_drug_inspection_platform,
         change_drug_inspection_platform_status,
+        list_h8_erp_connectors,
+        create_h8_erp_connector,
+        get_h8_erp_connector,
+        update_h8_erp_connector,
+        test_h8_erp_connector,
+        activate_h8_erp_connector,
+        disable_h8_erp_connector,
+        delete_h8_erp_connector,
         list_roles,
         create_role,
         update_role,
@@ -380,6 +389,11 @@ use wms_domain::{
         ApiKeyRotationResponse,
         DrugInspectionPlatform,
         DrugInspectionPlatformListResponse,
+        H8ErpConnector,
+        H8ErpConnectorListResponse,
+        H8ErpConnectorTestResult,
+        CreateH8ErpConnectorRequest,
+        UpdateH8ErpConnectorRequest,
         UpsertDrugInspectionPlatformRequest,
         ChangeDrugInspectionPlatformStatusRequest,
         Customer,
@@ -691,6 +705,7 @@ use wms_domain::{
         (name = "store", description = "H-Store 门店端"),
         (name = "parameter-mapping", description = "M-PM 参数对照"),
         (name = "config-center", description = "M1-008 配置中心"),
+        (name = "h8-erp", description = "US-H8-001 ERP 连接配置"),
         (name = "cold-chain", description = "M5 外部冷链数据接入"),
         (name = "billing", description = "M9 计费账户、规则与月结"),
         (name = "packing", description = "M-PK 包装站"),
