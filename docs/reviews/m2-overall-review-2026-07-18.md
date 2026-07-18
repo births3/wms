@@ -193,3 +193,12 @@ M2 的 PC 标准入库链路可以运行，但模块不能声明完成。9 个�
 | `inbound` 双签单测 | 通过 |
 
 **完成口径仍为 1/9（US-M2-008）**；本轮仅消除第 7.2 节列出的 P0 与部分 P1，不宣称模块 complete。
+
+## 9. M2-005 / M2-010 软件切片（2026-07-18）
+
+| 故事 | 本轮实现 | 仍缺 |
+|---|---|---|
+| US-M2-005 | `PutawayRequest.lpn_code` 写入 putaway/流水；`receiving_putaway_erp_feedback_outbox` 入队 + `process_putaway_erp_feedback_outbox` 本地闭环；PC 提交 LPN | 全自动模式、上架双人、外部 ERP 真投递、PDA |
+| US-M2-010 | 推荐排序读取 `rule_priority` 数组（empty/same_product/volume 等）；配置持久化断言 | ABC/品类/效期独立规则实现、企微真通知 |
+
+验证：`m2_smart_putaway_postgres` 3/3；`putaway_strategy_*` 2/2。

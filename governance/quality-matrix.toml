@@ -2050,9 +2050,9 @@ evidence_refs = [
   "artifacts/screenshot-portal/real-web/m2-inbound/putaway-recommendations.png",
   "docs/reviews/m2-overall-review-2026-07-18.md",
 ]
-reason = "PC 推荐库位、合法性校验、部分上架、库存/库位原子更新、幂等审计和真实 E2E 已通过；但全自动模式、容器 LPN/整托上架、上架节点 M-VR 双人/审批、完成后 M2 ERP 反馈 outbox 与重试、PDA 离线冲突及真机证据未闭环。"
+reason = "PC 推荐、合法性校验、部分上架、LPN 落库、上架 ERP outbox 本地闭环与真实 E2E 切片已有；全自动模式、上架节点 M-VR 双人/审批、外部 ERP 真投递、PDA 离线冲突及真机证据未闭环。"
 owner = "M2 入库模块负责人"
-resume_when = "补齐 LPN/任务字段、全自动和半自动两种模式、上架节点双人策略、M2 ERP outbox/worker，并完成并发、PDA 离线和真实 ERP/设备验收后重新验收。"
+resume_when = "补全自动模式与上架双人策略，接通外部 ERP 投递/重试，并完成 PDA 离线冲突与真机验收后重新验收。"
 
 [[deferred_stories]]
 id = "US-M2-006"
@@ -2172,9 +2172,9 @@ evidence_refs = [
   "artifacts/screenshot-portal/real-web/m2-inbound/putaway-recommendations.png",
   "docs/reviews/m2-overall-review-2026-07-18.md",
 ]
-reason = "多方案、仓库/品类绑定、Top N、启停/优先级配置、同品/空库位和无库位通知开关已有存储与 PC E2E；但运行时未执行 rule_priority，ABC 分类、品类分区和效期隔离仅被保存未参与推荐，企业微信真实通知证据也未完成。"
+reason = "多方案、绑定、Top N、启停与 rule_priority 已参与推荐排序（同品/空库位/容量等）；ABC 分类、品类分区、效期隔离等规则仅部分落库未完整计算，企业微信真实通知证据也未完成。"
 owner = "M2 入库模块负责人"
-resume_when = "让配置的规则优先级和全部已声明规则真实参与过滤/排序，补规则启停/组合/变更即时生效测试及企业微信通知证据后重新验收。"
+resume_when = "补齐 ABC/品类/效期规则在推荐中的可验证效果，并取得企业微信 dev/staging 通知回执后重新验收。"
 
 [[stories]]
 id = "US-M4-001"
