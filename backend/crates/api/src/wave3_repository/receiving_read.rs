@@ -70,7 +70,8 @@ impl PgWave3Repository {
                    second_signer_id, strategy_rule_id, approval_record_id, signed_at
               FROM receiving_inspection_signatures
              WHERE receiving_order_id = $1 AND owner_id = $2
-             ORDER BY signed_at, id
+             -- append-only：完整双签排前，便于打印取最新有效记录
+             ORDER BY (second_signer_id IS NULL), signed_at DESC, id DESC
             "#,
         )
         .bind(id)

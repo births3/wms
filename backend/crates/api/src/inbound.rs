@@ -433,43 +433,55 @@ impl ReceivingOrderStore {
             return Err(ReceivingOrderError::NotFound);
         }
 
-        // 第二人独立签字
+        // 第二人独立签字（append-only：追加完整双签记录）
         if order.status == "awaiting_second_sign" {
-            let second = req
-                .second_signer_id
-                .ok_or(ReceivingOrderError::MissingSecondSigner)?;
+            let second = req.second_signer_id.unwrap_or(ctx.user_id);
             if second != ctx.user_id {
                 return Err(ReceivingOrderError::UnauthorizedSigner);
             }
-            let mut signature = self
+            let first_record = self
                 .signatures
                 .values()
-                .find(|item| item.receiving_order_id == id && item.owner_id == ctx.owner_id)
+                .filter(|item| item.receiving_order_id == id && item.owner_id == ctx.owner_id)
+                .max_by_key(|item| item.signed_at)
                 .cloned()
                 .ok_or(ReceivingOrderError::NotFound)?;
-            if signature.second_signer_id.is_some() {
+            if first_record.second_signer_id.is_some() {
                 return Err(ReceivingOrderError::InvalidStatus {
                     expected: "awaiting_second_sign",
                     actual: "already_fully_signed".to_string(),
                 });
             }
-            if second == signature.first_signer_id {
+            if second == first_record.first_signer_id {
                 return Err(ReceivingOrderError::SameSigner);
             }
-            signature.second_signer_id = Some(second);
-            signature.signed_at = now;
-            self.signatures.insert(signature.id, signature.clone());
+            let complete = InspectionSignatureRecord {
+                id: Uuid::new_v4(),
+                receiving_order_id: id,
+                owner_id: ctx.owner_id,
+                first_signer_id: first_record.first_signer_id,
+                second_signer_id: Some(second),
+                strategy_rule_id: first_record.strategy_rule_id,
+                approval_record_id: first_record.approval_record_id,
+                signed_at: now,
+            };
+            self.signatures.insert(complete.id, complete.clone());
             let order = self
                 .orders
                 .get_mut(&id)
                 .ok_or(ReceivingOrderError::NotFound)?;
             order.status = "putaway".to_string();
             order.updated_at = now;
-            return Ok(signature);
+            return Ok(complete);
         }
 
         if req.first_signer_id != ctx.user_id {
             return Err(ReceivingOrderError::UnauthorizedSigner);
+        }
+        if let Some(second) = req.second_signer_id {
+            if second == req.first_signer_id {
+                return Err(ReceivingOrderError::SameSigner);
+            }
         }
         let received_qty = self
             .receipts

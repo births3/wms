@@ -31,7 +31,13 @@ impl ReceivingOrderStore {
             })
             .cloned()
             .collect();
-        signatures.sort_by_key(|signature| (signature.signed_at, signature.id));
+        signatures.sort_by_key(|signature| {
+            (
+                signature.second_signer_id.is_none(),
+                std::cmp::Reverse(signature.signed_at),
+                std::cmp::Reverse(signature.id),
+            )
+        });
         Ok(ReceivingOrderPrintData {
             order,
             receipts,

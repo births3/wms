@@ -360,9 +360,13 @@ async fn external_owner_handler(ctx: AuthContext) -> Json<serde_json::Value> {
     }))
 }
 
+/// 与生产 `required_scope` 对齐：仅 ASN 创建路径 `POST/GET /api/v1/inbound/receiving-orders`
+/// 接受 `inbound:push`；测试用 GET 探针验证鉴权注入与仓库范围。
+const ASN_PUSH_PATH: &str = "/api/v1/inbound/receiving-orders";
+
 fn external_app(pool: PgPool) -> Router {
     Router::new()
-        .route("/api/v1/inbound/external-test", get(external_owner_handler))
+        .route(ASN_PUSH_PATH, get(external_owner_handler))
         .layer(from_fn_with_state(
             ApiKeyAuthState::new(pool),
             api_key_auth_middleware,
@@ -384,7 +388,7 @@ fn external_resilience_app(pool: PgPool) -> Router {
         })
         .with_audit_pool(pool.clone());
     Router::new()
-        .route("/api/v1/inbound/external-test", get(external_owner_handler))
+        .route(ASN_PUSH_PATH, get(external_owner_handler))
         .layer(from_fn_with_state(
             resilience,
             wms_api::resilience::resilience_middleware,
@@ -422,7 +426,7 @@ async fn external_api_key_auth_injects_owner_and_audits_request(pool: PgPool) {
     let response = external_app(pool.clone())
         .oneshot(
             Request::builder()
-                .uri("/api/v1/inbound/external-test")
+                .uri(ASN_PUSH_PATH)
                 .header("X-WMS-API-Key", &key)
                 .header("X-Forwarded-For", "10.0.0.8, 10.0.0.9")
                 .header("User-Agent", "external-test")
@@ -443,8 +447,30 @@ async fn external_api_key_auth_injects_owner_and_audits_request(pool: PgPool) {
     .expect("request audit should exist");
     assert_eq!(audit.0, "auth.api_key.request");
     assert_eq!(audit.1, "api_key_request");
-    assert_eq!(audit.2, "/api/v1/inbound/external-test");
+    assert_eq!(audit.2, ASN_PUSH_PATH);
     assert_eq!(audit.3.as_deref(), Some("10.0.0.8"));
+
+    // 作业路径不得再映射 inbound:push（中间件不认证 → 无 AuthContext → 401）
+    let receive_path = format!(
+        "/api/v1/inbound/receiving-orders/{}/receive",
+        Uuid::new_v4()
+    );
+    let blocked = Router::new()
+        .route(&receive_path, get(external_owner_handler))
+        .layer(from_fn_with_state(
+            ApiKeyAuthState::new(pool.clone()),
+            api_key_auth_middleware,
+        ))
+        .oneshot(
+            Request::builder()
+                .uri(&receive_path)
+                .header("X-WMS-API-Key", &key)
+                .body(Body::empty())
+                .expect("request should build"),
+        )
+        .await
+        .expect("router should respond");
+    assert_eq!(blocked.status(), StatusCode::UNAUTHORIZED);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -477,7 +503,7 @@ async fn external_api_key_resilience_audit_uses_real_key_context(pool: PgPool) {
         .clone()
         .oneshot(
             Request::builder()
-                .uri("/api/v1/inbound/external-test")
+                .uri(ASN_PUSH_PATH)
                 .header("X-WMS-API-Key", &secret)
                 .header("X-Forwarded-For", "10.0.0.8, 10.0.0.9")
                 .header("User-Agent", "resilience-e2e")
@@ -491,7 +517,7 @@ async fn external_api_key_resilience_audit_uses_real_key_context(pool: PgPool) {
     let rejected = app
         .oneshot(
             Request::builder()
-                .uri("/api/v1/inbound/external-test")
+                .uri(ASN_PUSH_PATH)
                 .header("X-WMS-API-Key", &secret)
                 .header("X-Forwarded-For", "10.0.0.8, 10.0.0.9")
                 .header("User-Agent", "resilience-e2e")
@@ -513,7 +539,7 @@ async fn external_api_key_resilience_audit_uses_real_key_context(pool: PgPool) {
     assert_eq!(audit.0, key_id);
     assert_eq!(audit.1, "API Key / ERP 测试系统");
     assert_eq!(audit.2, format!("api-key:{key_id}"));
-    assert_eq!(audit.3, "/api/v1/inbound/external-test");
+    assert_eq!(audit.3, ASN_PUSH_PATH);
     assert_eq!(audit.4, "429");
     assert_eq!(audit.5, "10.0.0.8");
     assert_eq!(audit.6, "resilience-e2e");
@@ -606,7 +632,7 @@ async fn external_api_key_enforces_configured_warehouse_scope(pool: PgPool) {
     let missing_header = external_app(pool.clone())
         .oneshot(
             Request::builder()
-                .uri("/api/v1/inbound/external-test")
+                .uri(ASN_PUSH_PATH)
                 .header("X-WMS-API-Key", &key)
                 .body(Body::empty())
                 .expect("request should build"),
@@ -615,10 +641,24 @@ async fn external_api_key_enforces_configured_warehouse_scope(pool: PgPool) {
         .expect("router should respond");
     assert_eq!(missing_header.status(), StatusCode::FORBIDDEN);
 
+    let foreign_warehouse = Uuid::new_v4();
+    let cross_warehouse = external_app(pool.clone())
+        .oneshot(
+            Request::builder()
+                .uri(ASN_PUSH_PATH)
+                .header("X-WMS-API-Key", &key)
+                .header("X-WMS-Warehouse-ID", foreign_warehouse.to_string())
+                .body(Body::empty())
+                .expect("request should build"),
+        )
+        .await
+        .expect("router should respond");
+    assert_eq!(cross_warehouse.status(), StatusCode::FORBIDDEN);
+
     let allowed = external_app(pool)
         .oneshot(
             Request::builder()
-                .uri("/api/v1/inbound/external-test")
+                .uri(ASN_PUSH_PATH)
                 .header("X-WMS-API-Key", &key)
                 .header("X-WMS-Warehouse-ID", warehouse_id.to_string())
                 .body(Body::empty())
@@ -627,4 +667,6 @@ async fn external_api_key_enforces_configured_warehouse_scope(pool: PgPool) {
         .await
         .expect("router should respond");
     assert_eq!(allowed.status(), StatusCode::OK);
+    let allowed_body: serde_json::Value = json_body(allowed).await;
+    assert_eq!(allowed_body["owner_id"], owner_id.to_string());
 }

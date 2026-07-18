@@ -251,8 +251,8 @@ async fn postgres_inspect_and_sign_handlers_write_idempotency_and_audit(pool: Pg
         .fetch_one(&pool)
         .await
         .expect("counts");
-    // inspect + 第一签字 + 第二签字 → 3 条幂等；inspect + 两次 sign 审计。
-    assert_eq!(counts, (1, 1, 4, 3, "putaway".to_string()));
+    // inspect + 第一签字 + 第二签字 → 签名 append-only 2 条；幂等 4；审计 inspect+2×sign。
+    assert_eq!(counts, (1, 2, 4, 3, "putaway".to_string()));
 }
 
 #[sqlx::test(migrations = "../../migrations")]

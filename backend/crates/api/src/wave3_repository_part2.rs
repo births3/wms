@@ -22,8 +22,10 @@ impl PgWave3Repository {
         }
         let quality_checks = validate_inspection_quality_checks(&req)?;
         let sampling_qty = req.sampling_qty.unwrap_or(0);
-        if sampling_qty < 0 {
-            return Err(Wave3RepositoryError::InvalidQuantity);
+        if sampling_qty <= 0 {
+            return Err(Wave3RepositoryError::MissingRequiredField(
+                "sampling_qty".to_string(),
+            ));
         }
         let mut unique_trace_codes = req.trace_codes.clone();
         unique_trace_codes.sort_unstable();
@@ -136,6 +138,33 @@ impl PgWave3Repository {
             .map_err(map_db_error)?;
             if trace_exists {
                 return Err(Wave3RepositoryError::DuplicateTraceCode);
+            }
+        }
+        if let Some(approval_no) = req
+            .approval_no
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            let product_approval: Option<String> = sqlx::query_scalar(
+                r#"
+                SELECT NULLIF(TRIM(product.approval_no), '')
+                  FROM products product
+                 WHERE product.owner_id = $1 AND product.product_code = $2
+                "#,
+            )
+            .bind(ctx.owner_id)
+            .bind(&line.product_code)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(map_db_error)?
+            .flatten();
+            if let Some(expected) = product_approval {
+                if expected != approval_no {
+                    return Err(Wave3RepositoryError::MissingRequiredField(
+                        "approval_no_mismatch".to_string(),
+                    ));
+                }
             }
         }
 
@@ -253,11 +282,6 @@ impl PgWave3Repository {
         idempotency_key: &str,
         audit: Option<AuditWriteRequest>,
     ) -> Result<IdempotentMutation<InspectionSignatureRecord>, Wave3RepositoryError> {
-        if let Some(second_signer_id) = req.second_signer_id {
-            if second_signer_id == req.first_signer_id {
-                return Err(Wave3RepositoryError::SameSigner);
-            }
-        }
         let request_hash = request_hash(&serde_json::json!({
             "receiving_order_id": id,
             "request": req,
@@ -275,13 +299,14 @@ impl PgWave3Repository {
         }
 
         let order = lock_receiving_order(&mut tx, ctx.owner_id, id).await?;
+        // 取最近一条未完成双签的第一签字记录；已完整双签则拒绝。
         let existing_signature = sqlx::query_as::<_, InspectionSignatureRow>(
             r#"
             SELECT id, receiving_order_id, owner_id, first_signer_id,
                    second_signer_id, strategy_rule_id, approval_record_id, signed_at
               FROM receiving_inspection_signatures
              WHERE receiving_order_id = $1 AND owner_id = $2
-             ORDER BY signed_at DESC
+             ORDER BY signed_at DESC, id DESC
              LIMIT 1
             "#,
         )
@@ -292,6 +317,7 @@ impl PgWave3Repository {
         .map_err(map_db_error)?;
 
         // 第二人独立签字：订单处于待第二人，当前用户必须是第二签字人。
+        // append-only：追加一条完整双签记录，禁止 UPDATE 第一条签名。
         if order.status == "awaiting_second_sign" {
             let Some(existing) = existing_signature else {
                 return Err(Wave3RepositoryError::InvalidStatus {
@@ -305,9 +331,8 @@ impl PgWave3Repository {
                     actual: "already_fully_signed".to_string(),
                 });
             }
-            let second_signer_id = req
-                .second_signer_id
-                .ok_or(Wave3RepositoryError::MissingSecondSigner)?;
+            // 第二步只认当前认证主体为第二人；请求体 first_signer_id 忽略。
+            let second_signer_id = req.second_signer_id.unwrap_or(ctx.user_id);
             if second_signer_id != ctx.user_id {
                 return Err(Wave3RepositoryError::UnauthorizedSigner);
             }
@@ -316,16 +341,23 @@ impl PgWave3Repository {
             }
             ensure_receiving_clerk_signer(&mut tx, ctx.owner_id, second_signer_id).await?;
 
+            let complete_id = Uuid::new_v4();
             sqlx::query(
                 r#"
-                UPDATE receiving_inspection_signatures
-                   SET second_signer_id = $3, signed_at = $4
-                 WHERE id = $1 AND owner_id = $2
+                INSERT INTO receiving_inspection_signatures (
+                    id, receiving_order_id, owner_id, dual_required,
+                    first_signer_id, second_signer_id, strategy_rule_id,
+                    approval_record_id, signed_at
+                ) VALUES ($1, $2, $3, TRUE, $4, $5, $6, $7, $8)
                 "#,
             )
-            .bind(existing.id)
+            .bind(complete_id)
+            .bind(id)
             .bind(ctx.owner_id)
+            .bind(existing.first_signer_id)
             .bind(second_signer_id)
+            .bind(existing.strategy_rule_id)
+            .bind(existing.approval_record_id)
             .bind(now)
             .execute(&mut *tx)
             .await
@@ -344,7 +376,7 @@ impl PgWave3Repository {
                 .await?;
 
             let signature = InspectionSignatureRecord {
-                id: existing.id,
+                id: complete_id,
                 receiving_order_id: id,
                 owner_id: ctx.owner_id,
                 first_signer_id: existing.first_signer_id,

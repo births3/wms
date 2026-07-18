@@ -169,8 +169,9 @@ impl PgWave3Repository {
                 ));
             }
             if let Some(temperature) = req.arrival_temperature_celsius {
-                // 冷藏默认 2~8℃；超范围必须填写异常备注（稳定性报告/处置说明）。
-                if !(2.0..=8.0).contains(&temperature)
+                let (lo, hi) = receiving_temperature_band(&mut tx, ctx.owner_id, id).await?;
+                // 超出商品温区必须填写异常备注（稳定性报告/处置说明占位，附件链路仍待 H-FILE）。
+                if !(lo..=hi).contains(&temperature)
                     && req
                         .exception_note
                         .as_deref()

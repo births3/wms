@@ -262,6 +262,6 @@ async fn inspect_and_sign_receiving_order_replay_without_duplicate_audit(pool: P
     .fetch_one(&pool)
     .await
     .expect("inspection evidence counts");
-    // 双人分次签字：第一人 + 第二人各写一次 sign 审计。
-    assert_eq!(counts, (1, 1, 1, 1, 1, 2));
+    // 双人分次签字：append-only 两条签名 + 各写一次 sign 审计。
+    assert_eq!(counts, (1, 2, 1, 1, 1, 2));
 }

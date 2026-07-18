@@ -100,6 +100,8 @@ const emptyInspectForm: InspectFormState = {
   packageCheck: "",
   instructionCheck: "",
   labelCheck: "",
+  samplingQty: "1",
+  approvalNo: "",
   note: "",
 };
 const emptySignForm: SignFormState = {
@@ -494,10 +496,11 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
     const currentUserId = currentUser.user_id;
     // 双人验收必须分两次独立认证：当前登录用户作为本步签字主体，禁止代填他人 ID。
     if (order.status === "awaiting_second_sign") {
+      // 第二步只声明当前用户为第二人；第一人 ID 由服务端从既有签名记录读取。
       await signMutation.mutateAsync({
         id: order.id,
         request: {
-          first_signer_id: currentUserId,
+          first_signer_id: "00000000-0000-0000-0000-000000000000",
           second_signer_id: currentUserId,
           dual_required: true,
         },
@@ -521,8 +524,8 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
           package_check: inspectForm.packageCheck.trim() || null,
           instruction_check: inspectForm.instructionCheck.trim() || null,
           label_check: inspectForm.labelCheck.trim() || null,
-          sampling_qty: null,
-          approval_no: null,
+          sampling_qty: toInteger(inspectForm.samplingQty || "0"),
+          approval_no: inspectForm.approvalNo.trim() || null,
         },
       });
     }

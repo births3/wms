@@ -87,6 +87,8 @@ export interface InspectFormState {
   packageCheck: string;
   instructionCheck: string;
   labelCheck: string;
+  samplingQty: string;
+  approvalNo: string;
   note: string;
 }
 
@@ -392,6 +394,8 @@ export function M2InboundDialogs({
             <TextField label="包装核对" required placeholder={inspectExamples.packageCheck} value={inspectForm.packageCheck} onChange={(packageCheck) => setInspectForm((value) => ({ ...value, packageCheck }))} />
             <TextField label="说明书核对" required placeholder={inspectExamples.instructionCheck} value={inspectForm.instructionCheck} onChange={(instructionCheck) => setInspectForm((value) => ({ ...value, instructionCheck }))} />
             <TextField label="标签核对" required placeholder={inspectExamples.labelCheck} value={inspectForm.labelCheck} onChange={(labelCheck) => setInspectForm((value) => ({ ...value, labelCheck }))} />
+            <TextField label="抽验数量" type="number" required placeholder="例如 1" value={inspectForm.samplingQty} onChange={(samplingQty) => setInspectForm((value) => ({ ...value, samplingQty }))} />
+            <TextField label="批准文号" placeholder="与档案核对" value={inspectForm.approvalNo} onChange={(approvalNo) => setInspectForm((value) => ({ ...value, approvalNo }))} />
             <section className="grid gap-3 rounded-md border bg-muted/20 p-3 md:col-span-2 md:grid-cols-2">
               <div className="text-xs font-medium text-muted-foreground md:col-span-2">验收复核</div>
               <TextField label="第一签字人" required placeholder={inspectExamples.firstSignerId} value={signForm.firstSignerId} onChange={(firstSignerId) => setSignForm((value) => ({ ...value, firstSignerId }))} />

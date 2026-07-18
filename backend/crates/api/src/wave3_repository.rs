@@ -835,9 +835,10 @@ async fn order_requires_cold_chain(
                AND line.owner_id = $2
                AND (
                     product.storage_condition ILIKE '%cold%'
+                    OR product.storage_condition ILIKE '%cool%'
                     OR product.storage_condition ILIKE '%冻%'
                     OR product.storage_condition ILIKE '%冷%'
-                    OR product.storage_condition IN ('cold', 'frozen', 'refrigerated')
+                    OR product.storage_condition IN ('cold', 'cool', 'frozen', 'refrigerated')
                )
         )
         "#,
@@ -848,6 +849,51 @@ async fn order_requires_cold_chain(
     .await
     .map_err(map_db_error)?;
     Ok(cold)
+}
+
+/// 按商品储存条件汇总到货温度允许区间（最严格取交集的近似：冷冻最严）。
+async fn receiving_temperature_band(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    receiving_order_id: Uuid,
+) -> Result<(f64, f64), Wave3RepositoryError> {
+    let conditions: Vec<String> = sqlx::query_scalar(
+        r#"
+        SELECT DISTINCT COALESCE(product.storage_condition, 'normal')
+          FROM receiving_order_lines line
+          JOIN products product
+            ON product.owner_id = line.owner_id
+           AND product.product_code = line.product_code
+         WHERE line.receiving_order_id = $1
+           AND line.owner_id = $2
+        "#,
+    )
+    .bind(receiving_order_id)
+    .bind(owner_id)
+    .fetch_all(&mut **tx)
+    .await
+    .map_err(map_db_error)?;
+    let mut min_t = f64::NEG_INFINITY;
+    let mut max_t = f64::INFINITY;
+    for condition in conditions {
+        let lower = condition.to_ascii_lowercase();
+        let (lo, hi) = if lower.contains("frozen") || lower.contains('冻') {
+            (-25.0, -15.0)
+        } else if lower.contains("cool") {
+            (8.0, 15.0)
+        } else if lower.contains("cold") || lower.contains("refrigerat") || lower.contains('冷') {
+            (2.0, 8.0)
+        } else {
+            continue;
+        };
+        min_t = min_t.max(lo);
+        max_t = max_t.min(hi);
+    }
+    if !min_t.is_finite() || !max_t.is_finite() || min_t > max_t {
+        // 默认冷藏带
+        return Ok((2.0, 8.0));
+    }
+    Ok((min_t, max_t))
 }
 
 fn validate_inspection_quality_checks(
