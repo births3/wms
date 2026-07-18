@@ -12,12 +12,17 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
+  PageHeader,
+  QueryPanel,
   StatusBadge,
+  buildQueryPanelSummaryItems,
   cn,
   type DataGridColumn,
   type DataGridCreateAction,
   type DataGridRefreshAction,
   type DataGridToolbarAction,
+  type QueryPanelField,
+  type QueryPanelValue,
 } from "@wms/ui";
 import { Play, Power, PowerOff, Trash2 } from "lucide-react";
 
@@ -34,6 +39,27 @@ import {
 
 type Notice = { type: "success" | "error"; text: string } | null;
 type ConfirmAction = "test" | "activate" | "disable" | "delete" | null;
+
+export const h8ErpConnectorQueryFields: QueryPanelField[] = [
+  {
+    key: "keyword",
+    label: "关键字",
+    type: "text",
+    placeholder: "连接编码 / 名称",
+    ariaLabel: "搜索 ERP 连接",
+  },
+  {
+    key: "status",
+    label: "状态",
+    type: "multiSelect",
+    options: [
+      { label: "testing", value: "testing" },
+      { label: "active", value: "active" },
+      { label: "disabled", value: "disabled" },
+    ],
+  },
+];
+export const h8ErpConnectorCoreQueryFieldKeys = ["keyword", "status"];
 
 const columns: DataGridColumn<H8ErpConnector>[] = [
   textColumn("connector_code", "连接编码", 140),
@@ -99,8 +125,37 @@ function emptyForm(): CreateH8ErpConnectorRequest {
   };
 }
 
-/** 嵌在 M1 配置中心（功能开关页）内的 ERP 连接配置域，不新增独立菜单。 */
-export function ErpConnectorConfigPanel() {
+function defaultQuery(): QueryPanelValue {
+  return { keyword: "", status: [] };
+}
+
+function normalizeQuery(value: QueryPanelValue): QueryPanelValue {
+  const status = value.status;
+  return {
+    keyword: typeof value.keyword === "string" ? value.keyword : "",
+    status: Array.isArray(status) ? status.map(String) : [],
+  };
+}
+
+function filterConnectors(rows: H8ErpConnector[], query: QueryPanelValue): H8ErpConnector[] {
+  const keyword = String(query.keyword ?? "")
+    .trim()
+    .toLowerCase();
+  const statuses = Array.isArray(query.status) ? query.status.map(String) : [];
+  return rows.filter((row) => {
+    if (statuses.length > 0 && !statuses.includes(row.status)) return false;
+    if (!keyword) return true;
+    const haystack = `${row.connector_code} ${row.connector_name} ${row.channel_mode}`.toLowerCase();
+    return haystack.includes(keyword);
+  });
+}
+
+interface ErpConnectorConfigPageProps {
+  onBack?: () => void;
+}
+
+/** H8 集成中心 · ERP 连接配置页（US-H8-001，独立菜单 h8-erp-connectors） */
+export function ErpConnectorConfigPage({ onBack }: ErpConnectorConfigPageProps = {}) {
   const listQuery = useErpConnectorsQuery();
   const createMutation = useCreateErpConnectorMutation();
   const testMutation = useTestErpConnectorMutation();
@@ -112,9 +167,17 @@ export function ErpConnectorConfigPanel() {
   const [confirmAction, setConfirmAction] = React.useState<ConfirmAction>(null);
   const [form, setForm] = React.useState<CreateH8ErpConnectorRequest>(() => emptyForm());
   const [notice, setNotice] = React.useState<Notice>(null);
+  const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(() => defaultQuery());
+  const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(() => defaultQuery());
 
   const rows = listQuery.data ?? [];
-  const selected = rows.find((row) => row.id === selectedRowKeys[0]);
+  const filteredRows = React.useMemo(() => filterConnectors(rows, appliedQuery), [rows, appliedQuery]);
+  const querySummaryItems = React.useMemo(
+    () => buildQueryPanelSummaryItems(h8ErpConnectorQueryFields, appliedQuery),
+    [appliedQuery],
+  );
+  const selected = filteredRows.find((row) => row.id === selectedRowKeys[0])
+    ?? rows.find((row) => row.id === selectedRowKeys[0]);
   const busy =
     createMutation.isPending ||
     testMutation.isPending ||
@@ -218,7 +281,18 @@ export function ErpConnectorConfigPanel() {
   }
 
   return (
-    <div className="flex w-full flex-col gap-4">
+    <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
+      <PageHeader
+        title="H8 ERP 连接"
+        subtitle={`集成中心 · US-H8-001 · ${filteredRows.length}/${rows.length} 条 · 不落明文凭据`}
+        actions={
+          onBack ? (
+            <Button variant="outline" onClick={onBack}>
+              返回
+            </Button>
+          ) : undefined
+        }
+      />
       {notice && (
         <div
           className={cn(
@@ -232,12 +306,24 @@ export function ErpConnectorConfigPanel() {
           {notice.text}
         </div>
       )}
+      <QueryPanel
+        fields={h8ErpConnectorQueryFields}
+        defaultVisibleFieldKeys={h8ErpConnectorCoreQueryFieldKeys}
+        value={draftQuery}
+        onValueChange={(next) => setDraftQuery(normalizeQuery(next))}
+        onQuery={() => setAppliedQuery(normalizeQuery(draftQuery))}
+        onReset={() => {
+          const next = defaultQuery();
+          setDraftQuery(next);
+          setAppliedQuery(next);
+        }}
+      />
       <Card className="rounded-lg shadow-sm">
         <CardContent className="p-5">
           <DataGrid
-            storageKey="m1.config-center.erp-connectors"
+            storageKey="h8.erp-connectors"
             columns={columns}
-            data={rows}
+            data={filteredRows}
             rowKey={(row) => row.id}
             selectable
             selectedRowKeys={selectedRowKeys}
@@ -248,6 +334,18 @@ export function ErpConnectorConfigPanel() {
             refreshAction={refreshAction}
             createAction={createAction}
             toolbarActions={toolbarActions}
+            queryState={appliedQuery}
+            querySummaryItems={querySummaryItems}
+            onApplyQueryState={(queryState) => {
+              const next = normalizeQuery(queryState as QueryPanelValue);
+              setDraftQuery(next);
+              setAppliedQuery(next);
+            }}
+            onClearQueryState={() => {
+              const next = defaultQuery();
+              setDraftQuery(next);
+              setAppliedQuery(next);
+            }}
           />
         </CardContent>
       </Card>
@@ -344,9 +442,12 @@ export function ErpConnectorConfigPanel() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </section>
   );
 }
+
+/** @deprecated 使用 ErpConnectorConfigPage；保留别名避免旧 import 瞬时失败 */
+export const ErpConnectorConfigPanel = ErpConnectorConfigPage;
 
 function textColumn(
   key: keyof H8ErpConnector,

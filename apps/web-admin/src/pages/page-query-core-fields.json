@@ -84,6 +84,16 @@
       "more": []
     },
     {
+      "id": "h8-erp-connectors",
+      "title": "H8 ERP 连接",
+      "required": true,
+      "source": "apps/web-admin/src/pages/config-center/ErpConnectorConfigPage.tsx",
+      "fieldConstant": "h8ErpConnectorQueryFields",
+      "coreConstant": "h8ErpConnectorCoreQueryFieldKeys",
+      "core": ["keyword", "status"],
+      "more": []
+    },
+    {
       "id": "h1-menu-management",
       "title": "H1 菜单管理",
       "required": false,

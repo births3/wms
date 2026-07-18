@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { FeatureFlagConfigCenterPage } from "@/pages/config-center/FeatureFlagConfigCenterPage";
+import { ErpConnectorConfigPage } from "@/pages/config-center/ErpConnectorConfigPage";
 import { H1AdminMenuPage } from "@/pages/admin-menu/H1AdminMenuPage";
 import { H1RolePermissionPage } from "@/pages/auth/H1RolePermissionPage";
 import { H1SessionPage } from "@/pages/auth/H1SessionPage";
@@ -45,6 +46,9 @@ export function renderAdminView(
 
   if (view === "m1-feature-flags") {
     return <FeatureFlagConfigCenterPage onBack={() => navigateTo("dashboard")} />;
+  }
+  if (view === "h8-erp-connectors") {
+    return <ErpConnectorConfigPage onBack={() => navigateTo("dashboard")} />;
   }
   if (masterDataViewId) {
     return <M1MasterDataPage currentUser={currentUser} viewId={masterDataViewId} onBack={() => navigateTo("dashboard")} />;

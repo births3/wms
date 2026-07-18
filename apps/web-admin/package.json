@@ -18,7 +18,8 @@
     "test:e2e:h9-dev": "pnpm --dir ../../prototypes exec playwright test --config=playwright-web-admin-h9-dev-config.ts",
     "test:e2e:h1-real": "pnpm --dir ../../prototypes exec playwright test --config=playwright-web-admin-h1-real-config.ts",
     "test:e2e:mte-real": "pnpm --dir ../../prototypes exec playwright test --config=playwright-web-admin-mte-real-config.ts",
-    "test:e2e:hal-real": "pnpm --dir ../../prototypes exec playwright test --config=playwright-web-admin-hal-real-config.ts"
+    "test:e2e:hal-real": "pnpm --dir ../../prototypes exec playwright test --config=playwright-web-admin-hal-real-config.ts",
+    "test:e2e:h8-real": "pnpm --dir ../../prototypes exec playwright test --config=playwright-web-admin-h8-real-config.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.0",

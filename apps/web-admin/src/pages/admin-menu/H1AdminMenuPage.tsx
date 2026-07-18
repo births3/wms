@@ -78,6 +78,7 @@ const viewIdOptions = [
   "h4-notify-configs",
   "h4-notify-records",
   "h5-express",
+  "h8-erp-connectors",
   "h9-print-templates",
 ];
 
