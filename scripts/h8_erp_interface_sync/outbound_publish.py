@@ -126,9 +126,11 @@ def claim_wms_outbox(
         if has_ref
         else "''"
     )
-    max_expr = "o.max_attempts::text" if has_max else "5"
+    max_expr = "o.max_attempts" if has_max else "5"
     deadline_expr = (
-        "COALESCE(o.deadline_at::text, '')" if has_deadline else "''"
+        "to_char(o.deadline_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')"
+        if has_deadline
+        else "NULL"
     )
 
     extra_where = ""
@@ -151,6 +153,7 @@ UPDATE {table}
 """,
         )
 
+    # 用 json_build_object 单行 JSON，避免 payload 含 | 时字段切割错误
     sql = f"""
 WITH cte AS (
   SELECT id
@@ -172,14 +175,23 @@ upd AS (
     o.id::text AS id,
     o.owner_id::text AS owner_id,
     o.event_type AS event_type,
-    o.payload::text AS payload,
+    o.payload AS payload,
     {ref_expr} AS external_ref,
-    o.attempt_count::text AS attempt_count,
-    {max_expr} AS max_attempts,
+    o.attempt_count AS attempt_count,
+    ({max_expr})::int AS max_attempts,
     {deadline_expr} AS deadline_at
 )
-SELECT id, owner_id, event_type, payload, external_ref, attempt_count,
-       max_attempts, deadline_at FROM upd;
+SELECT json_build_object(
+  'id', id,
+  'owner_id', owner_id,
+  'event_type', event_type,
+  'payload', payload,
+  'external_ref', external_ref,
+  'attempt_count', attempt_count,
+  'max_attempts', max_attempts,
+  'deadline_at', deadline_at
+)::text
+FROM upd;
 """
     out = psql_query(database_url, sql)
     rows: list[OutboxRow] = []
@@ -187,26 +199,31 @@ SELECT id, owner_id, event_type, payload, external_ref, attempt_count,
         line = line.strip()
         if not line:
             continue
-        parts = line.split("|")
-        if len(parts) < 8:
-            continue
         try:
-            payload = json.loads(parts[3]) if parts[3] else {}
+            obj = json.loads(line)
         except json.JSONDecodeError:
-            payload = {"raw": parts[3]}
+            continue
+        if not isinstance(obj, dict):
+            continue
+        payload = obj.get("payload") or {}
+        if isinstance(payload, str):
+            try:
+                payload = json.loads(payload)
+            except json.JSONDecodeError:
+                payload = {"raw": payload}
         if not isinstance(payload, dict):
             payload = {"value": payload}
         rows.append(
             OutboxRow(
                 table=table,
-                id=parts[0],
-                owner_id=parts[1],
-                event_type=parts[2],
+                id=str(obj.get("id") or ""),
+                owner_id=str(obj.get("owner_id") or ""),
+                event_type=str(obj.get("event_type") or ""),
                 payload=payload,
-                external_ref=parts[4],
-                attempt_count=int(parts[5] or "0"),
-                max_attempts=int(parts[6] or "5"),
-                deadline_at=parts[7] or None,
+                external_ref=str(obj.get("external_ref") or ""),
+                attempt_count=int(obj.get("attempt_count") or 0),
+                max_attempts=int(obj.get("max_attempts") or 5),
+                deadline_at=(str(obj["deadline_at"]) if obj.get("deadline_at") else None),
                 callback_path=callback_path,
             )
         )
@@ -223,7 +240,21 @@ def mark_wms_outbox(
     special_retry: str | None = None,
     attempt_count: int = 0,
     max_attempts: int = 5,
+    release_dry_run: bool = False,
 ) -> None:
+    if release_dry_run:
+        # 认领已 +1 attempt，dry-run 回退并保持 pending
+        sql = f"""
+UPDATE {table}
+   SET status = 'pending',
+       attempt_count = GREATEST(attempt_count - 1, 0),
+       last_error = NULL,
+       next_attempt_at = now(),
+       updated_at = now()
+ WHERE id = '{sql_escape_pg(row_id)}'::uuid;
+"""
+        psql_query(database_url, sql)
+        return
     if succeeded:
         sql = f"""
 UPDATE {table}
@@ -234,19 +265,17 @@ UPDATE {table}
 """
     else:
         err = sql_escape_pg((error or "h8 publish failed")[:900])
-        # 档案补录：5 分钟退避；普通：5 分钟
         interval = "5 minutes"
-        dead = ""
         if special_retry == "archive" and attempt_count >= max_attempts:
-            dead = ", status = 'dead'"
+            status_sql = "status = 'dead'"
         else:
-            dead = ", status = 'failed'"
+            status_sql = "status = 'failed'"
         sql = f"""
 UPDATE {table}
    SET last_error = '{err}',
        next_attempt_at = now() + interval '{interval}',
-       updated_at = now()
-       {dead}
+       updated_at = now(),
+       {status_sql}
  WHERE id = '{sql_escape_pg(row_id)}'::uuid;
 """
     psql_query(database_url, sql)
@@ -254,7 +283,9 @@ UPDATE {table}
 
 def insert_if_out_sql(row: OutboxRow) -> str:
     idem = f"out:{row.table}:{row.id}"
-    payload = sql_escape_mssql(json.dumps(row.payload, ensure_ascii=False))
+    # 单行 JSON，避免 T-SQL 字面量换行
+    payload_raw = json.dumps(row.payload, ensure_ascii=False, separators=(",", ":"))
+    payload = sql_escape_mssql(payload_raw)
     event = sql_escape_mssql(row.event_type)
     owner = sql_escape_mssql(row.owner_id)
     table = sql_escape_mssql(row.table)
@@ -363,23 +394,31 @@ def process_outbound_once(
                     table,
                     row.id,
                     succeeded=False,
-                    error="dry-run",
-                    special_retry=special,
-                    attempt_count=row.attempt_count,
-                    max_attempts=row.max_attempts,
+                    release_dry_run=True,
                 )
+                print(f"[h8-out] dry-run release {table}/{row.id}", flush=True)
                 continue
+            errors: list[str] = []
             try:
                 if transport in ("table", "both"):
                     if sqlcmd_exec is None:
                         raise RuntimeError("sqlcmd_exec required for table transport")
-                    sqlcmd_exec(insert_if_out_sql(row))
+                    try:
+                        sqlcmd_exec(insert_if_out_sql(row))
+                    except Exception as exc:  # noqa: BLE001
+                        errors.append(f"table:{exc}")
                 if transport in ("http", "both"):
                     if not callback_base:
                         raise RuntimeError(
                             "ERP_CALLBACK_BASE required for http transport"
                         )
-                    http_callback_publish(callback_base, row)
+                    try:
+                        http_callback_publish(callback_base, row)
+                    except Exception as exc:  # noqa: BLE001
+                        errors.append(f"http:{exc}")
+                if errors:
+                    # both：任一失败整单失败，便于重试补齐（if_out 幂等）
+                    raise RuntimeError("; ".join(errors))
                 mark_wms_outbox(database_url, table, row.id, succeeded=True)
                 print(
                     f"[h8-out] published {table}/{row.id} via {transport}",

@@ -3,7 +3,7 @@
 
 双向：
   入站：MSSQL if_in_* pending → WMS HTTP API → success/failed
-  出站：WMS PG *erp_feedback_outbox → MSSQL if_out_message → WMS outbox succeeded
+  出站：WMS PG *erp_feedback_outbox → 通道 B(if_out_message) 和/或 通道 A(HTTP 回调)
 
 环境变量：
   H8_MSSQL_HOST          默认 127.0.0.1
@@ -635,16 +635,16 @@ def process_once(settings: Settings, types: list[str], dry_run: bool) -> int:
                 flush=True,
             )
             if dry_run:
-                mark_row(settings, table, row_id, "pending", error="dry-run-release")
-                # dry-run 不真正调 API：退回 pending 不方便，标记 failed 说明
+                # 认领已置 processing：释放回 pending，不调 API、不记失败
                 mark_row(
                     settings,
                     table,
                     row_id,
-                    "failed",
-                    error="dry-run: claimed only",
+                    "pending",
+                    error=None,
                     retry_count=retry,
                 )
+                print(f"[h8] dry-run release {type_name} id={row_id}", flush=True)
                 continue
             try:
                 wms_id = handler(settings, row)
