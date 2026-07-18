@@ -146,13 +146,17 @@ Wave 2（基础 Excel 导入导出）→ Wave 4（PDF 台账 + 复杂报表）
 | 项 | 说明 |
 |----|------|
 | Compose | `deploy/docker-compose.h8-erp-if.yml`（MSSQL 模拟 ERP 接口库） |
-| 建表 | `deploy/h8-erp-if/init/01_schema.sql`：`if_in_asn` / `if_in_outbound_order` / `if_in_product_master` |
-| Worker | `scripts/h8_erp_interface_sync/sync_worker.py`（独立进程，按 `interface_type` 注册 handler） |
+| 入站表 | `01_schema.sql`：`if_in_asn` / `if_in_outbound_order` / `if_in_product_master`；`03_if_out_and_return.sql`：`if_in_return_order`（销退） |
+| 出站表 | `if_out_message`（统一 WMS→ERP：event_type + payload_json；同源 outbox 幂等） |
+| Worker | `scripts/h8_erp_interface_sync/sync_worker.py`（`--direction in\|out\|both`） |
+| 出站源 | WMS PG：`receiving_putaway_erp_feedback_outbox` / `inventory_status_erp_feedback_outbox` / `stock_adjustment_erp_feedback_outbox` → worker 投递 `if_out_message` 后标记 outbox `succeeded` |
 | Runbook | `docs/runbooks/h8-erp-interface-table-sync.md` |
 
-控制列约定：`sync_status`（pending/processing/success/failed/dead）、`retry_count`、`last_error`、`idempotency_key`、`wms_resource_id`。
+控制列约定：`sync_status`（入站 pending/processing/success/failed/dead；出站另含 acked）、`retry_count`、`last_error`、`idempotency_key`、`wms_resource_id`。
 
 新增 ERP 单据类型 = 新接口表（或统一 staging + type 列）+ 新 handler，不改 M2/M3/M4 域模型。
+
+**通道 B 本地闭环状态（2026-07）**：入站四类（商品/ASN/出库/销退）+ 出站统一消息表 + outbox 投递 worker 已交付；产线真实 ERP 实例、档案补录专用重试与对账差异表仍按模块 S4/联调补证。
 
 ### 消费方
 
