@@ -21,6 +21,7 @@ fn ctx() -> AuthContext {
         owner_id: Uuid::new_v4(),
         actor_name: "h4-tester".to_string(),
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
         permissions: vec![
             "h4.notify.read".to_string(),
             "h4.notify.write".to_string(),
@@ -36,6 +37,7 @@ fn read_only_ctx(owner_id: Uuid, actor_name: &str) -> AuthContext {
         owner_id,
         actor_name: actor_name.to_string(),
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
         permissions: vec!["h4.notify.read".to_string()],
     }
 }

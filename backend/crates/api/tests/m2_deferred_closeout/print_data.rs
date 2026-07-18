@@ -81,15 +81,32 @@ async fn print_data_reads_receipt_inspection_and_dual_signature(pool: PgPool) {
             order.id,
             SignInspectionRequest {
                 first_signer_id,
+                second_signer_id: None,
+                dual_required: true,
+            },
+            chrono::Utc::now(),
+            "print-data-sign-first",
+            None,
+        )
+        .await
+        .expect("first sign print-data order");
+    let mut second_ctx = ctx.clone();
+    second_ctx.user_id = second_signer_id;
+    repository
+        .sign_receiving_order_with_audit(
+            &second_ctx,
+            order.id,
+            SignInspectionRequest {
+                first_signer_id,
                 second_signer_id: Some(second_signer_id),
                 dual_required: true,
             },
             chrono::Utc::now(),
-            "print-data-sign",
+            "print-data-sign-second",
             None,
         )
         .await
-        .expect("sign print-data order");
+        .expect("second sign print-data order");
 
     let print_data = repository
         .get_receiving_order_print_data(&ctx, order.id)

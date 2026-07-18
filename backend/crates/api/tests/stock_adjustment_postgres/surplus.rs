@@ -275,6 +275,7 @@ async fn stock_surplus_api_requires_write_permission_and_idempotency_key(pool: P
         actor_name: "read-only".to_string(),
         permissions: vec!["msa.stock-adjustment.read".to_string()],
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     };
     let forbidden = app
         .clone()

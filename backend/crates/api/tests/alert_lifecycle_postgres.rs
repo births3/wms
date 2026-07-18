@@ -200,6 +200,7 @@ async fn recipient_acknowledges_handles_closes_ignores_and_stale_alerts_auto_clo
         actor_name: "仓库主管".to_string(),
         permissions: vec!["hal.alert.handle".to_string()],
         jti: "hal-lifecycle-test".to_string(),
+        warehouse_scope: None,
     };
     let service = PgAlertLifecycleService::new(pool.clone());
 

@@ -28,6 +28,7 @@ fn ctx(owner_id: Uuid, user_id: Uuid) -> AuthContext {
             "msa.stock-adjustment.quality-approve".to_string(),
         ],
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     }
 }
 
@@ -514,6 +515,7 @@ async fn stock_loss_api_requires_write_permission_and_idempotency_key(pool: PgPo
         actor_name: "read-only".to_string(),
         permissions: vec!["msa.stock-adjustment.read".to_string()],
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     };
     let forbidden = app
         .clone()

@@ -235,47 +235,6 @@ impl PgWave3Repository {
 
         let mut tx = self.begin().await?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        let unauthorized_signers: i64 = sqlx::query_scalar(
-            r#"
-            WITH requested_signers(user_id) AS (
-                VALUES ($1::uuid), ($2::uuid)
-            )
-            SELECT COUNT(*)::BIGINT
-              FROM requested_signers signer
-             WHERE signer.user_id IS NOT NULL
-               AND NOT EXISTS (
-                   SELECT 1
-                     FROM auth_user_owner_bindings binding
-                     JOIN auth_users user_row
-                       ON user_row.id = binding.user_id
-                     JOIN auth_user_roles user_role
-                       ON user_role.user_id = binding.user_id
-                      AND user_role.owner_id = binding.owner_id
-                     JOIN auth_roles role
-                       ON role.id = user_role.role_id
-                      AND role.owner_id = binding.owner_id
-                     JOIN auth_role_permissions role_permission
-                       ON role_permission.role_id = role.id
-                     JOIN auth_permissions permission
-                       ON permission.id = role_permission.permission_id
-                      AND permission.permission_code = 'm2.write'
-                    WHERE binding.user_id = signer.user_id
-                      AND binding.owner_id = $3
-                      AND binding.is_active
-                      AND user_row.status = 'active'
-                      AND role.role_code = 'receiving_clerk'
-               )
-            "#,
-        )
-        .bind(req.first_signer_id)
-        .bind(req.second_signer_id)
-        .bind(ctx.owner_id)
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(map_db_error)?;
-        if unauthorized_signers > 0 {
-            return Err(Wave3RepositoryError::UnauthorizedSigner);
-        }
         if let Some(replay) =
             replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash, now).await?
         {
@@ -286,12 +245,128 @@ impl PgWave3Repository {
         }
 
         let order = lock_receiving_order(&mut tx, ctx.owner_id, id).await?;
+        let existing_signature = sqlx::query_as::<_, InspectionSignatureRow>(
+            r#"
+            SELECT id, receiving_order_id, owner_id, first_signer_id,
+                   second_signer_id, strategy_rule_id, approval_record_id, signed_at
+              FROM receiving_inspection_signatures
+             WHERE receiving_order_id = $1 AND owner_id = $2
+             ORDER BY signed_at DESC
+             LIMIT 1
+            "#,
+        )
+        .bind(id)
+        .bind(ctx.owner_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(map_db_error)?;
+
+        // 第二人独立签字：订单处于待第二人，当前用户必须是第二签字人。
+        if order.status == "awaiting_second_sign" {
+            let Some(existing) = existing_signature else {
+                return Err(Wave3RepositoryError::InvalidStatus {
+                    expected: "awaiting_second_sign with first signature".to_string(),
+                    actual: order.status,
+                });
+            };
+            if existing.second_signer_id.is_some() {
+                return Err(Wave3RepositoryError::InvalidStatus {
+                    expected: "awaiting_second_sign".to_string(),
+                    actual: "already_fully_signed".to_string(),
+                });
+            }
+            let second_signer_id = req
+                .second_signer_id
+                .ok_or(Wave3RepositoryError::MissingSecondSigner)?;
+            if second_signer_id != ctx.user_id {
+                return Err(Wave3RepositoryError::UnauthorizedSigner);
+            }
+            if second_signer_id == existing.first_signer_id {
+                return Err(Wave3RepositoryError::SameSigner);
+            }
+            ensure_receiving_clerk_signer(&mut tx, ctx.owner_id, second_signer_id).await?;
+
+            sqlx::query(
+                r#"
+                UPDATE receiving_inspection_signatures
+                   SET second_signer_id = $3, signed_at = $4
+                 WHERE id = $1 AND owner_id = $2
+                "#,
+            )
+            .bind(existing.id)
+            .bind(ctx.owner_id)
+            .bind(second_signer_id)
+            .bind(now)
+            .execute(&mut *tx)
+            .await
+            .map_err(map_db_error)?;
+
+            sqlx::query(
+                "UPDATE receiving_orders SET status = 'putaway', updated_at = $3, version = version + 1 WHERE id = $1 AND owner_id = $2",
+            )
+            .bind(id)
+            .bind(ctx.owner_id)
+            .bind(now)
+            .execute(&mut *tx)
+            .await
+            .map_err(map_db_error)?;
+            integrations::create_putaway_tasks_for_receiving_order(&mut tx, ctx, &order, now)
+                .await?;
+
+            let signature = InspectionSignatureRecord {
+                id: existing.id,
+                receiving_order_id: id,
+                owner_id: ctx.owner_id,
+                first_signer_id: existing.first_signer_id,
+                second_signer_id: Some(second_signer_id),
+                strategy_rule_id: existing.strategy_rule_id,
+                approval_record_id: existing.approval_record_id,
+                signed_at: now,
+            };
+            store_idempotency_success(
+                &mut tx,
+                ctx.owner_id,
+                idempotency_key,
+                &request_hash,
+                "POST",
+                "/api/v1/inbound/receiving-orders/{id}/sign",
+                "receiving_inspection_signature",
+                signature.id.to_string(),
+                &signature,
+                now,
+            )
+            .await?;
+            if let Some(mut audit) = audit {
+                audit.diff = Some(AuditDiff::compute(
+                    serde_json::json!({ "status": "awaiting_second_sign" }),
+                    serde_json::json!({
+                        "status": "putaway",
+                        "second_signer_id": second_signer_id,
+                    }),
+                ));
+                append_event_in_tx(&mut tx, &audit)
+                    .await
+                    .map_err(|error| Wave3RepositoryError::Audit(format!("{error:?}")))?;
+            }
+            tx.commit().await.map_err(map_db_error)?;
+            return Ok(IdempotentMutation {
+                value: signature,
+                replayed: false,
+            });
+        }
+
         if order.status != "inspecting" {
             return Err(Wave3RepositoryError::InvalidStatus {
                 expected: "inspecting".to_string(),
                 actual: order.status,
             });
         }
+        // 第一签字人必须是当前认证用户，禁止代签。
+        if req.first_signer_id != ctx.user_id {
+            return Err(Wave3RepositoryError::UnauthorizedSigner);
+        }
+        ensure_receiving_clerk_signer(&mut tx, ctx.owner_id, req.first_signer_id).await?;
+
         let product_codes: Vec<String> = sqlx::query_scalar(
             "SELECT DISTINCT product_code FROM receiving_order_lines WHERE receiving_order_id = $1 AND owner_id = $2 ORDER BY product_code",
         )
@@ -311,8 +386,9 @@ impl PgWave3Repository {
         .await
         .map_err(|error| Wave3RepositoryError::Database(format!("M-VR 双人策略解析失败: {error:?}")))?;
         let dual_required = strategy.policy != wms_domain::DualPersonPolicy::Single;
-        if dual_required && req.second_signer_id.is_none() {
-            return Err(Wave3RepositoryError::MissingSecondSigner);
+        // 双人策略禁止一次请求提交两名签字人。
+        if dual_required && req.second_signer_id.is_some() {
+            return Err(Wave3RepositoryError::UnauthorizedSigner);
         }
         let approval_record_id = if strategy.policy
             == wms_domain::DualPersonPolicy::DualScanWithApproval
@@ -380,7 +456,7 @@ impl PgWave3Repository {
             receiving_order_id: id,
             owner_id: ctx.owner_id,
             first_signer_id: req.first_signer_id,
-            second_signer_id: req.second_signer_id,
+            second_signer_id: None,
             strategy_rule_id: strategy.source_rule_id,
             approval_record_id,
             signed_at: now,
@@ -408,17 +484,26 @@ impl PgWave3Repository {
         .await
         .map_err(map_db_error)?;
 
+        let next_status = if dual_required {
+            "awaiting_second_sign"
+        } else {
+            "putaway"
+        };
         sqlx::query(
-            "UPDATE receiving_orders SET status = 'putaway', updated_at = $3, version = version + 1 WHERE id = $1 AND owner_id = $2",
+            "UPDATE receiving_orders SET status = $3, updated_at = $4, version = version + 1 WHERE id = $1 AND owner_id = $2",
         )
         .bind(id)
         .bind(ctx.owner_id)
+        .bind(next_status)
         .bind(now)
         .execute(&mut *tx)
         .await
         .map_err(map_db_error)?;
 
-        integrations::create_putaway_tasks_for_receiving_order(&mut tx, ctx, &order, now).await?;
+        if next_status == "putaway" {
+            integrations::create_putaway_tasks_for_receiving_order(&mut tx, ctx, &order, now)
+                .await?;
+        }
 
         store_idempotency_success(
             &mut tx,
@@ -439,6 +524,7 @@ impl PgWave3Repository {
                 serde_json::json!({
                     "first_signer_id": signature.first_signer_id,
                     "second_signer_id": signature.second_signer_id,
+                    "status": next_status,
                     "strategy_rule_id": signature.strategy_rule_id,
                     "approval_record_id": signature.approval_record_id,
                 }),

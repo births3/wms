@@ -23,6 +23,7 @@ fn context(owner_id: Uuid) -> AuthContext {
         actor_name: "m1-supplier-batch-test".to_string(),
         permissions: vec!["m1.master_data.write".to_string()],
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     }
 }
 
@@ -221,6 +222,7 @@ async fn supplier_batch_sync_accepts_shared_api_key_middleware(pool: PgPool) {
                 actor_name: "供应商批量同步 API Key 测试".to_string(),
                 permissions: vec!["h1.api_keys.manage".to_string()],
                 jti: Uuid::new_v4().to_string(),
+                warehouse_scope: None,
             },
             CreateApiKeyRequest {
                 caller_name: "ERP 供应商同步".to_string(),

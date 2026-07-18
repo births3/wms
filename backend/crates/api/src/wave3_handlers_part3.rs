@@ -524,6 +524,13 @@ async fn create_receiving_order_handler(
     Json(req): Json<CreateReceivingOrderRequest>,
 ) -> Result<Json<ReceivingOrder>, Wave3HandlerError> {
     ctx.require_permission("m2.write")?;
+    if let Some(warehouse_scope) = ctx.warehouse_scope {
+        if req.warehouse_id != warehouse_scope {
+            return Err(Wave3HandlerError::Repository(
+                crate::wave3_repository::Wave3RepositoryError::NotFound,
+            ));
+        }
+    }
     let idempotency_key = idempotency_key_from_headers(&headers)?;
     let now = Utc::now();
     let order = if let Some(repository) = &state.wave3_repository {

@@ -16,6 +16,7 @@ fn ctx(owner_id: Uuid) -> AuthContext {
         actor_name: "tester".to_string(),
         permissions: vec!["m2.write".to_string()],
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     }
 }
 
@@ -299,31 +300,60 @@ fn receiving_workflow_enforces_quantity_closure_and_dual_signature() {
         Err(ReceivingOrderError::UnauthorizedSigner)
     ));
 
-    let same_signer = store.sign_inspection(
+    let proxy_both = store.sign_inspection(
         &ctx,
         created.id,
         wms_domain::SignInspectionRequest {
             first_signer_id: ctx.user_id,
-            second_signer_id: Some(ctx.user_id),
+            second_signer_id: Some(Uuid::new_v4()),
             dual_required: true,
         },
         now,
     );
-    assert!(matches!(same_signer, Err(ReceivingOrderError::SameSigner)));
+    assert!(matches!(
+        proxy_both,
+        Err(ReceivingOrderError::UnauthorizedSigner)
+    ));
 
-    let signature = store
+    let first_signature = store
         .sign_inspection(
             &ctx,
             created.id,
             wms_domain::SignInspectionRequest {
                 first_signer_id: ctx.user_id,
-                second_signer_id: Some(Uuid::new_v4()),
+                second_signer_id: None,
                 dual_required: true,
             },
             now,
         )
-        .expect("sign");
-    assert_eq!(signature.owner_id, ctx.owner_id);
+        .expect("first sign");
+    assert_eq!(first_signature.owner_id, ctx.owner_id);
+    assert_eq!(
+        store.get(&ctx, created.id).expect("order").status,
+        "awaiting_second_sign"
+    );
+
+    let second_ctx = AuthContext {
+        user_id: Uuid::new_v4(),
+        owner_id: ctx.owner_id,
+        actor_name: "second-signer".to_string(),
+        permissions: ctx.permissions.clone(),
+        jti: "second-jti".to_string(),
+        warehouse_scope: None,
+    };
+    let signature = store
+        .sign_inspection(
+            &second_ctx,
+            created.id,
+            wms_domain::SignInspectionRequest {
+                first_signer_id: ctx.user_id,
+                second_signer_id: Some(second_ctx.user_id),
+                dual_required: true,
+            },
+            now,
+        )
+        .expect("second sign");
+    assert_eq!(signature.second_signer_id, Some(second_ctx.user_id));
 
     let putaway = store
         .putaway(
@@ -429,7 +459,7 @@ fn receiving_inspection_cannot_exceed_actual_receipt_or_sign_early() {
         created.id,
         wms_domain::SignInspectionRequest {
             first_signer_id: ctx.user_id,
-            second_signer_id: Some(Uuid::new_v4()),
+            second_signer_id: None,
             dual_required: true,
         },
         now,

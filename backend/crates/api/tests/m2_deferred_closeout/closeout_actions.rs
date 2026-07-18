@@ -162,6 +162,7 @@ async fn putaway_strategy_profile_drives_default_top_n(pool: PgPool) {
         actor_name: "m2-putaway-strategy".to_string(),
         permissions: vec!["m2.putaway.write".to_string()],
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     };
     let repository = PgWave3Repository::new(pool.clone());
     let profile = repository
@@ -234,6 +235,7 @@ async fn putaway_strategy_rejects_foreign_warehouse_binding(pool: PgPool) {
         actor_name: "m2-putaway-strategy-bind".to_string(),
         permissions: vec!["m2.putaway.write".to_string()],
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     };
     let repository = PgWave3Repository::new(pool.clone());
     let foreign_warehouse = Uuid::new_v4();

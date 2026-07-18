@@ -185,6 +185,7 @@ fn system_context(job: &ExportJobRow) -> AuthContext {
         actor_name: "system-alert-export".to_string(),
         permissions: Vec::new(),
         jti: format!("hal-export:{}", job.id),
+        warehouse_scope: None,
     }
 }
 

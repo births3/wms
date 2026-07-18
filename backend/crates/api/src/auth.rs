@@ -43,6 +43,8 @@ pub struct AuthContext {
     pub actor_name: String,
     pub permissions: Vec<String>,
     pub jti: String,
+    /// 外部 API Key 绑定的仓库范围；JWT 会话为 None。
+    pub warehouse_scope: Option<Uuid>,
 }
 
 /// 登出专用上下文：验签但不检查撤销状态，保证重复登出仍然幂等。
@@ -254,6 +256,7 @@ impl AuthContext {
             actor_name: claims.user_name,
             permissions: claims.permissions,
             jti: claims.jti,
+            warehouse_scope: None,
         }
     }
 
@@ -647,6 +650,7 @@ mod tests {
             actor_name: "alice".to_string(),
             permissions: vec!["inventory:read".to_string()],
             jti: "jti-1".to_string(),
+            warehouse_scope: None,
         };
 
         assert!(ctx.require_owner(Uuid::new_v4()).is_err());

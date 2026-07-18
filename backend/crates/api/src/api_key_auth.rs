@@ -65,7 +65,9 @@ pub async fn api_key_auth_middleware(
         Ok(context) => context,
         Err(error) => return api_key_error_response(error),
     };
-    if !context.warehouse_ids.is_empty() {
+    let warehouse_scope = if context.warehouse_ids.is_empty() {
+        None
+    } else {
         let Some(warehouse_id) = request
             .headers()
             .get(API_KEY_WAREHOUSE_HEADER)
@@ -77,13 +79,15 @@ pub async fn api_key_auth_middleware(
         if !context.warehouse_ids.contains(&warehouse_id) {
             return warehouse_scope_response();
         }
-    }
+        Some(warehouse_id)
+    };
     let auth_context = AuthContext {
         user_id: context.key_id,
         owner_id: context.owner_id,
         actor_name: format!("API Key / {}", context.caller_name),
         permissions: permissions_for_scope(scope),
         jti: format!("api-key:{}", context.key_id),
+        warehouse_scope,
     };
     request.extensions_mut().insert(auth_context);
 
@@ -110,7 +114,8 @@ pub fn required_scope(path: &str) -> Option<&'static str> {
     if path.starts_with("/api/v1/master-data/") || path.starts_with("/api/v1/system-dictionaries/")
     {
         Some("master-data:write")
-    } else if path.starts_with("/api/v1/inbound/") {
+    } else if path == "/api/v1/inbound/receiving-orders" {
+        // 外部 ERP 仅允许 ASN 推送创建，禁止用同一 Key 访问收货/验收/签字/上架等作业接口。
         Some("inbound:push")
     } else if path.starts_with("/api/v1/tms/") || path.starts_with("/api/v1/traceability/") {
         Some("tms:callback")
@@ -127,7 +132,8 @@ fn permissions_for_scope(scope: &str) -> Vec<String> {
             "m1.system_dictionary.write",
         ]
         .as_slice(),
-        "inbound:push" => ["m2.read", "m2.write"].as_slice(),
+        // 仅 ASN 创建写权限；不授予 m2.read 与作业写扩展。
+        "inbound:push" => ["m2.write"].as_slice(),
         "tms:callback" => ["m10.write", "m5.write", "m-tc.write"].as_slice(),
         _ => &[],
     };
@@ -225,6 +231,11 @@ mod tests {
             Some("inbound:push")
         );
         assert_eq!(
+            required_scope("/api/v1/inbound/receiving-orders/abc/receive"),
+            None
+        );
+        assert_eq!(required_scope("/api/v1/inbound/receiving-dashboard"), None);
+        assert_eq!(
             required_scope("/api/v1/tms/dispatches"),
             Some("tms:callback")
         );
@@ -235,6 +246,7 @@ mod tests {
     fn maps_scope_to_handler_permissions_without_admin_access() {
         let permissions = permissions_for_scope("inbound:push");
         assert!(permissions.iter().any(|value| value == "m2.write"));
+        assert!(!permissions.iter().any(|value| value == "m2.read"));
         assert!(!permissions
             .iter()
             .any(|value| value == "h1.api_keys.manage"));

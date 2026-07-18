@@ -420,6 +420,46 @@ impl ReceivingOrderStore {
         req: wms_domain::SignInspectionRequest,
         now: DateTime<Utc>,
     ) -> Result<InspectionSignatureRecord, ReceivingOrderError> {
+        let order = self.orders.get(&id).ok_or(ReceivingOrderError::NotFound)?;
+        if order.owner_id != ctx.owner_id {
+            return Err(ReceivingOrderError::NotFound);
+        }
+
+        // 第二人独立签字
+        if order.status == "awaiting_second_sign" {
+            let second = req
+                .second_signer_id
+                .ok_or(ReceivingOrderError::MissingSecondSigner)?;
+            if second != ctx.user_id {
+                return Err(ReceivingOrderError::UnauthorizedSigner);
+            }
+            let mut signature = self
+                .signatures
+                .values()
+                .find(|item| item.receiving_order_id == id && item.owner_id == ctx.owner_id)
+                .cloned()
+                .ok_or(ReceivingOrderError::NotFound)?;
+            if signature.second_signer_id.is_some() {
+                return Err(ReceivingOrderError::InvalidStatus {
+                    expected: "awaiting_second_sign",
+                    actual: "already_fully_signed".to_string(),
+                });
+            }
+            if second == signature.first_signer_id {
+                return Err(ReceivingOrderError::SameSigner);
+            }
+            signature.second_signer_id = Some(second);
+            signature.signed_at = now;
+            self.signatures.insert(signature.id, signature.clone());
+            let order = self
+                .orders
+                .get_mut(&id)
+                .ok_or(ReceivingOrderError::NotFound)?;
+            order.status = "putaway".to_string();
+            order.updated_at = now;
+            return Ok(signature);
+        }
+
         if req.first_signer_id != ctx.user_id {
             return Err(ReceivingOrderError::UnauthorizedSigner);
         }
@@ -470,22 +510,15 @@ impl ReceivingOrderStore {
             .orders
             .get_mut(&id)
             .ok_or(ReceivingOrderError::NotFound)?;
-        if order.owner_id != ctx.owner_id {
-            return Err(ReceivingOrderError::NotFound);
-        }
         if order.status != "inspecting" {
             return Err(ReceivingOrderError::InvalidStatus {
                 expected: "inspecting",
                 actual: order.status.clone(),
             });
         }
-        if req.dual_required {
-            let second = req
-                .second_signer_id
-                .ok_or(ReceivingOrderError::MissingSecondSigner)?;
-            if second == req.first_signer_id {
-                return Err(ReceivingOrderError::SameSigner);
-            }
+        // 双人策略禁止一次提交两名签字人。
+        if req.dual_required && req.second_signer_id.is_some() {
+            return Err(ReceivingOrderError::UnauthorizedSigner);
         }
 
         let signature = InspectionSignatureRecord {
@@ -493,12 +526,16 @@ impl ReceivingOrderStore {
             receiving_order_id: id,
             owner_id: ctx.owner_id,
             first_signer_id: req.first_signer_id,
-            second_signer_id: req.second_signer_id,
+            second_signer_id: None,
             strategy_rule_id: None,
             approval_record_id: None,
             signed_at: now,
         };
-        order.status = "putaway".to_string();
+        order.status = if req.dual_required {
+            "awaiting_second_sign".to_string()
+        } else {
+            "putaway".to_string()
+        };
         order.updated_at = now;
         self.signatures.insert(signature.id, signature.clone());
         Ok(signature)

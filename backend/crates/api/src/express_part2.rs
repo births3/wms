@@ -446,6 +446,7 @@ mod tests {
             actor_name: "h5-express-test".to_string(),
             permissions: permissions.iter().map(|item| item.to_string()).collect(),
             jti: Uuid::new_v4().to_string(),
+            warehouse_scope: None,
         }
     }
 

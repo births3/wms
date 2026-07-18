@@ -124,6 +124,7 @@ pub async fn run_once(pool: &PgPool, now: DateTime<Utc>) -> Result<usize, TaskRe
             actor_name: ACTOR.to_string(),
             permissions: vec!["mte.task.assign".to_string()],
             jti: format!("{ACTOR}:mte-release:{task_id}"),
+            warehouse_scope: None,
         };
         repository
             .transition_task(
@@ -189,6 +190,7 @@ pub async fn run_once(pool: &PgPool, now: DateTime<Utc>) -> Result<usize, TaskRe
             actor_name: ACTOR.to_string(),
             permissions: vec!["mte.task.assign".to_string()],
             jti: format!("{ACTOR}:mte-timeout:{task_id}:{version}"),
+            warehouse_scope: None,
         };
         match repository
             .transition_task(

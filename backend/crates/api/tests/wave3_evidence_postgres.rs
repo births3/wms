@@ -27,6 +27,7 @@ fn ctx(owner_id: Uuid) -> AuthContext {
         actor_name: "postgres-test".to_string(),
         permissions: vec!["m2.write".to_string(), "m3.write".to_string()],
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     }
 }
 
@@ -392,15 +393,36 @@ async fn inbound_chain_persists_inventory_movement_and_audit_end_to_end(pool: Pg
         order.id,
         SignInspectionRequest {
             first_signer_id: ctx.user_id,
+            second_signer_id: None,
+            dual_required: true,
+        },
+        now,
+        "chain-sign-first",
+        Some(audit(&ctx, "sign", "M2", "receiving_inspection_signature")),
+    )
+    .await
+    .expect("first sign ASN");
+    let mut second_ctx = ctx.clone();
+    second_ctx.user_id = second_signer_id;
+    repo.sign_receiving_order_with_audit(
+        &second_ctx,
+        order.id,
+        SignInspectionRequest {
+            first_signer_id: ctx.user_id,
             second_signer_id: Some(second_signer_id),
             dual_required: true,
         },
         now,
-        "chain-sign",
-        Some(audit(&ctx, "sign", "M2", "receiving_inspection_signature")),
+        "chain-sign-second",
+        Some(audit(
+            &second_ctx,
+            "sign",
+            "M2",
+            "receiving_inspection_signature",
+        )),
     )
     .await
-    .expect("dual sign ASN");
+    .expect("second sign ASN");
     repo.putaway_receiving_order_and_inventory_with_audit(
         &ctx,
         order.id,
@@ -426,7 +448,8 @@ async fn inbound_chain_persists_inventory_movement_and_audit_end_to_end(pool: Pg
         (SELECT COUNT(*) FROM audit_event WHERE owner_id=$1 AND action IN ('release','receive','inspect','sign','putaway')),
         (SELECT COUNT(*) FROM idempotency_request WHERE owner_id=$1 AND idempotency_key LIKE 'chain-%')"#)
         .bind(owner_id).bind(order.id).fetch_one(&pool).await.expect("query complete chain");
-    assert_eq!(result, ("completed".into(), 10, 1, 5, 5));
+    // release/receive/inspect/sign×2/putaway → 6 审计与 6 幂等键。
+    assert_eq!(result, ("completed".into(), 10, 1, 6, 6));
 }
 
 #[sqlx::test(migrations = "../../migrations")]

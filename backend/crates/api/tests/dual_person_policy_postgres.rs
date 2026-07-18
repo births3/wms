@@ -60,6 +60,7 @@ fn ctx(owner_id: Uuid) -> AuthContext {
         actor_name: "dual-person-policy-test".to_string(),
         permissions: vec!["mvr.dual_person.read".to_string()],
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     }
 }
 
@@ -73,6 +74,7 @@ fn write_ctx(owner_id: Uuid, user_id: Uuid) -> AuthContext {
             "mvr.dual_person.write".to_string(),
         ],
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     }
 }
 

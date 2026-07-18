@@ -211,6 +211,7 @@ mod tests {
             actor_name: "status-config-test".to_string(),
             permissions: permissions.iter().map(|value| value.to_string()).collect(),
             jti: "status-config-test-jti".to_string(),
+            warehouse_scope: None,
         }
     }
 

@@ -64,6 +64,7 @@ pub async fn notify_expiring_api_keys(
             actor_name: "H1 API Key 到期任务".to_string(),
             permissions: vec!["h4.notify.send".to_string()],
             jti: format!("api-key-expiry:{}", key.key_id),
+            warehouse_scope: None,
         };
         let request = SendH4NotificationRequest {
             event_type: EXPIRY_EVENT.to_string(),

@@ -24,6 +24,7 @@ fn ctx(owner_id: Uuid) -> AuthContext {
         actor_name: "m3-status-allocation-test".to_string(),
         permissions: vec!["m3.write".to_string(), "m4.write".to_string()],
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     }
 }
 

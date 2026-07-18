@@ -294,6 +294,7 @@ async fn h3_resilience_rejections_write_h2_audit_for_api_key(pool: PgPool) {
         actor_name: "api-key-test".to_string(),
         permissions: vec!["m2.write".to_string()],
         jti: format!("api-key:{key_id}"),
+        warehouse_scope: None,
     };
 
     for expected in [StatusCode::OK, StatusCode::TOO_MANY_REQUESTS] {

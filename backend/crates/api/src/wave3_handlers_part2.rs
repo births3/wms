@@ -163,29 +163,56 @@ async fn postgres_inspect_and_sign_handlers_write_idempotency_and_audit(pool: Pg
     .expect("same inspect idempotency key should replay");
     assert_eq!(inspection.id, inspection_replay.id);
 
-    let sign_req = SignInspectionRequest {
+    let first_sign_req = SignInspectionRequest {
+        first_signer_id: authorized.user_id,
+        second_signer_id: None,
+        dual_required: true,
+    };
+    let Json(first_signature) = sign_receiving_order_handler(
+        authorized.clone(),
+        State(state.clone()),
+        Path(order.id),
+        idempotency_headers("handler-sign-1"),
+        Json(first_sign_req.clone()),
+    )
+    .await
+    .expect("first sign should succeed");
+    let Json(first_signature_replay) = sign_receiving_order_handler(
+        authorized.clone(),
+        State(state.clone()),
+        Path(order.id),
+        idempotency_headers("handler-sign-1"),
+        Json(first_sign_req),
+    )
+    .await
+    .expect("same first-sign idempotency key should replay");
+    assert_eq!(first_signature.id, first_signature_replay.id);
+
+    let mut second_ctx = authorized.clone();
+    second_ctx.user_id = second_signer_id;
+    let second_sign_req = SignInspectionRequest {
         first_signer_id: authorized.user_id,
         second_signer_id: Some(second_signer_id),
         dual_required: true,
     };
     let Json(signature) = sign_receiving_order_handler(
-        authorized.clone(),
+        second_ctx.clone(),
         State(state.clone()),
         Path(order.id),
-        idempotency_headers("handler-sign-1"),
-        Json(sign_req.clone()),
+        idempotency_headers("handler-sign-2"),
+        Json(second_sign_req.clone()),
     )
     .await
-    .expect("postgres sign should succeed");
+    .expect("second sign should succeed");
     let Json(signature_replay) = sign_receiving_order_handler(
-        authorized,
+        second_ctx,
         State(state),
         Path(order.id),
-        idempotency_headers("handler-sign-1"),
-        Json(sign_req),
+        idempotency_headers("handler-sign-2"),
+        Json(second_sign_req),
     )
     .await
-    .expect("same sign idempotency key should replay");
+    .expect("same second-sign idempotency key should replay");
     assert_eq!(signature.id, signature_replay.id);
 
     let counts: (i64, i64, i64, i64, String) = sqlx::query_as(
@@ -203,7 +230,8 @@ async fn postgres_inspect_and_sign_handlers_write_idempotency_and_audit(pool: Pg
         .fetch_one(&pool)
         .await
         .expect("counts");
-    assert_eq!(counts, (1, 1, 3, 2, "putaway".to_string()));
+    // inspect + 第一签字 + 第二签字 → 3 条幂等；inspect + 两次 sign 审计。
+    assert_eq!(counts, (1, 1, 4, 3, "putaway".to_string()));
 }
 
 #[sqlx::test(migrations = "../../migrations")]

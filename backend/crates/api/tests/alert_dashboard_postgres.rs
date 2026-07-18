@@ -86,6 +86,7 @@ async fn dashboard_statistics_gsp_report_and_excel_pdf_exports_are_audited(pool:
             "hal.alert.report".to_string(),
         ],
         jti: "hal-dashboard-test".to_string(),
+        warehouse_scope: None,
     };
     let service = PgAlertDashboardService::new(pool.clone());
 

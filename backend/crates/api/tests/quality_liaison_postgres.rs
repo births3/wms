@@ -28,6 +28,7 @@ fn ctx(owner_id: Uuid, user_id: Uuid) -> AuthContext {
             "mql.quality-liaison.approve".to_string(),
         ],
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     }
 }
 

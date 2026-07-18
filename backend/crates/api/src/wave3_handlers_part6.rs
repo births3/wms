@@ -58,6 +58,7 @@ fn cold_chain_external_context(
             actor_name: config.actor_name.clone(),
             permissions: vec!["m5.write".to_string()],
             jti: format!("m5-cold-chain:{idempotency_key}"),
+            warehouse_scope: None,
         },
         idempotency_key,
     ))

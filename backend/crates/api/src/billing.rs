@@ -246,6 +246,7 @@ mod tests {
             actor_name: "tester".to_string(),
             permissions: vec!["m9.write".to_string()],
             jti: Uuid::new_v4().to_string(),
+            warehouse_scope: None,
         }
     }
 

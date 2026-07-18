@@ -23,6 +23,7 @@ fn ctx(owner_id: Uuid) -> AuthContext {
         actor_name: "m2-smart-putaway-test".to_string(),
         permissions: vec!["m2.putaway.write".to_string()],
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     }
 }
 

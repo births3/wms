@@ -768,3 +768,45 @@ fn map_receipt_insert_error(error: sqlx::Error) -> Wave3RepositoryError {
     }
     map_db_error(error)
 }
+
+async fn ensure_receiving_clerk_signer(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    user_id: Uuid,
+) -> Result<(), Wave3RepositoryError> {
+    let authorized: bool = sqlx::query_scalar(
+        r#"
+        SELECT EXISTS (
+            SELECT 1
+              FROM auth_user_owner_bindings binding
+              JOIN auth_users user_row
+                ON user_row.id = binding.user_id
+              JOIN auth_user_roles user_role
+                ON user_role.user_id = binding.user_id
+               AND user_role.owner_id = binding.owner_id
+              JOIN auth_roles role
+                ON role.id = user_role.role_id
+               AND role.owner_id = binding.owner_id
+              JOIN auth_role_permissions role_permission
+                ON role_permission.role_id = role.id
+              JOIN auth_permissions permission
+                ON permission.id = role_permission.permission_id
+               AND permission.permission_code = 'm2.write'
+             WHERE binding.user_id = $1
+               AND binding.owner_id = $2
+               AND binding.is_active
+               AND user_row.status = 'active'
+               AND role.role_code = 'receiving_clerk'
+        )
+        "#,
+    )
+    .bind(user_id)
+    .bind(owner_id)
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(map_db_error)?;
+    if !authorized {
+        return Err(Wave3RepositoryError::UnauthorizedSigner);
+    }
+    Ok(())
+}

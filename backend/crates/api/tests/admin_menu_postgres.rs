@@ -34,6 +34,7 @@ fn ctx_with_permissions(owner_id: Uuid, permissions: &[&str]) -> AuthContext {
             .map(|permission| (*permission).to_string())
             .collect(),
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     }
 }
 

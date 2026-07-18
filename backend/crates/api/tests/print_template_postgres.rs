@@ -18,6 +18,7 @@ fn ctx(owner_id: Uuid) -> AuthContext {
         actor_name: "print-template-test".to_string(),
         permissions: vec!["h9.print_template.write".to_string()],
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     }
 }
 

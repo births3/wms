@@ -308,6 +308,7 @@ async fn api_key_authentication_uses_postgres_failures_rate_limit_owner_and_scop
         actor_name: "system-admin".to_string(),
         permissions: vec!["h1.api_keys.manage".to_string()],
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     };
     let created = service
         .create(&context, create_request(user_id, None), "test-create")
@@ -406,6 +407,7 @@ async fn external_api_key_auth_injects_owner_and_audits_request(pool: PgPool) {
         actor_name: "system-admin".to_string(),
         permissions: vec!["h1.api_keys.manage".to_string()],
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     };
     let key = service
         .create(
@@ -457,6 +459,7 @@ async fn external_api_key_resilience_audit_uses_real_key_context(pool: PgPool) {
         actor_name: "system-admin".to_string(),
         permissions: vec!["h1.api_keys.manage".to_string()],
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     };
     let created = service
         .create(
@@ -529,6 +532,7 @@ async fn api_key_expiry_reminder_is_deduplicated_through_h4(pool: PgPool) {
         actor_name: "system-admin".to_string(),
         permissions: vec!["h1.api_keys.manage".to_string()],
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     };
     let key = service
         .create(
@@ -588,6 +592,7 @@ async fn external_api_key_enforces_configured_warehouse_scope(pool: PgPool) {
         actor_name: "system-admin".to_string(),
         permissions: vec!["h1.api_keys.manage".to_string()],
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     };
     let mut request = create_request(user_id, None);
     request.warehouse_ids = vec![warehouse_id];

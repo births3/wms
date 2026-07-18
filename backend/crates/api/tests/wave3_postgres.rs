@@ -21,6 +21,7 @@ fn ctx(owner_id: Uuid) -> AuthContext {
         actor_name: "postgres-test".to_string(),
         permissions: vec!["m2.write".to_string(), "m3.write".to_string()],
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     }
 }
 

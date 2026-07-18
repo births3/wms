@@ -14,6 +14,7 @@ fn context(owner_id: Uuid) -> AuthContext {
         actor_name: "expiry-report-test".into(),
         permissions: vec!["m3.read".into()],
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     }
 }
 

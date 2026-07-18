@@ -15,6 +15,7 @@ fn ctx(owner_id: Uuid) -> AuthContext {
         actor_name: "dock-test".to_string(),
         permissions: Vec::new(),
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     }
 }
 

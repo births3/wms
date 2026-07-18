@@ -436,6 +436,7 @@ async fn process_candidate(
         actor_name: "system-alert-escalation".to_string(),
         permissions: Vec::new(),
         jti: format!("hal-escalation:{}:{repeat_key}", candidate.alert_id),
+        warehouse_scope: None,
     };
     PgWechatNotifyService::new()
         .send_notification_with_provider(
@@ -553,6 +554,7 @@ async fn append_runtime_audit(
         actor_name: "system-alert-escalation".to_string(),
         permissions: Vec::new(),
         jti: format!("hal-escalation:{}:{action}", candidate.alert_id),
+        warehouse_scope: None,
     };
     append_audit(
         tx,

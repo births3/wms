@@ -140,6 +140,7 @@ fn request_owner_scope_rejects_cross_owner_write() {
         actor_name: "system-dictionary-test".to_string(),
         permissions: vec![],
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     };
 
     ensure_request_owner(&ctx, None).expect("global scope is allowed by repository");
@@ -159,6 +160,7 @@ async fn mutations_reject_cross_owner_before_database() {
         actor_name: "system-dictionary-test".to_string(),
         permissions: vec![],
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     };
     let repo = PgSystemDictionaryRepository::new(
         PgPool::connect_lazy("postgres://localhost/wms").expect("lazy pool"),

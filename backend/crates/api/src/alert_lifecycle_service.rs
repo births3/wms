@@ -129,6 +129,7 @@ impl PgAlertLifecycleService {
                 actor_name: "system-alert-engine".to_string(),
                 permissions: Vec::new(),
                 jti: format!("hal-auto-close:{alert_id}"),
+                warehouse_scope: None,
             };
             match self
                 .transition(
@@ -188,6 +189,7 @@ impl PgAlertLifecycleService {
                 actor_name: "system-alert-engine".to_string(),
                 permissions: Vec::new(),
                 jti: format!("hal-resolved:{alert_id}"),
+                warehouse_scope: None,
             };
             match self
                 .transition(

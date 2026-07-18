@@ -275,6 +275,7 @@ async fn notify(
         actor_name: "system-alert-engine".to_string(),
         permissions: Vec::new(),
         jti: format!("hal:{}", plan.instance_id),
+        warehouse_scope: None,
     };
     let retrying_provider = RetryingProvider {
         inner: provider,

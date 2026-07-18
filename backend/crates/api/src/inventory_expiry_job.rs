@@ -42,6 +42,7 @@ pub async fn run_once(pool: &PgPool, now: DateTime<Utc>) -> Result<usize, Invent
             actor_name: SCHEDULER_ACTOR.to_string(),
             permissions: vec!["m3.write".to_string()],
             jti: format!("{SCHEDULER_ACTOR}:m3-expiry:{owner_id}:{as_of}"),
+            warehouse_scope: None,
         };
         let idempotency_key = format!("m3-expiry-scheduler:{owner_id}:{as_of}");
         let result = repository

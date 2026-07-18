@@ -20,6 +20,7 @@ fn ctx(owner_id: Uuid) -> AuthContext {
         actor_name: "postgres-test".to_string(),
         permissions: vec!["m2.write".to_string(), "m3.write".to_string()],
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     }
 }
 
@@ -174,33 +175,55 @@ async fn inspect_and_sign_receiving_order_replay_without_duplicate_audit(pool: P
     assert_eq!(inspected_line.1, NaiveDate::from_ymd_opt(2026, 1, 1));
     assert_eq!(inspected_line.2, NaiveDate::from_ymd_opt(2028, 1, 1));
 
-    let sign_req = SignInspectionRequest {
+    let first_sign_req = SignInspectionRequest {
         first_signer_id: ctx.user_id,
-        second_signer_id: Some(second_signer_id),
+        second_signer_id: None,
         dual_required: true,
     };
     let first_sign = repo
         .sign_receiving_order_with_audit(
             &ctx,
             order.id,
-            sign_req.clone(),
+            first_sign_req.clone(),
             now,
             "idem-sign-1",
             Some(audit(&ctx, "sign", "M2", "receiving_inspection_signature")),
         )
         .await
-        .expect("sign receiving inspection");
+        .expect("first sign receiving inspection");
     let replay_sign = repo
         .sign_receiving_order_with_audit(
             &ctx,
             order.id,
-            sign_req,
+            first_sign_req,
             now,
             "idem-sign-1",
             Some(audit(&ctx, "sign", "M2", "receiving_inspection_signature")),
         )
         .await
-        .expect("replay signature");
+        .expect("replay first signature");
+    let mut second_ctx = ctx.clone();
+    second_ctx.user_id = second_signer_id;
+    let second_sign_req = SignInspectionRequest {
+        first_signer_id: ctx.user_id,
+        second_signer_id: Some(second_signer_id),
+        dual_required: true,
+    };
+    repo.sign_receiving_order_with_audit(
+        &second_ctx,
+        order.id,
+        second_sign_req,
+        now,
+        "idem-sign-2",
+        Some(audit(
+            &second_ctx,
+            "sign",
+            "M2",
+            "receiving_inspection_signature",
+        )),
+    )
+    .await
+    .expect("second sign receiving inspection");
     assert_eq!(first_sign.value.id, replay_sign.value.id);
     assert!(replay_sign.replayed);
 
@@ -218,5 +241,6 @@ async fn inspect_and_sign_receiving_order_replay_without_duplicate_audit(pool: P
     .fetch_one(&pool)
     .await
     .expect("inspection evidence counts");
-    assert_eq!(counts, (1, 1, 1, 1, 1, 1));
+    // 双人分次签字：第一人 + 第二人各写一次 sign 审计。
+    assert_eq!(counts, (1, 1, 1, 1, 1, 2));
 }

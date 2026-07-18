@@ -17,6 +17,7 @@ fn ctx(owner_id: Uuid) -> AuthContext {
         actor_name: "m9-rule-test".to_string(),
         permissions: vec!["m9.write".to_string()],
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     }
 }
 

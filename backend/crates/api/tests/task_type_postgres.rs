@@ -60,6 +60,7 @@ fn ctx(owner_id: Uuid) -> AuthContext {
             "mte.task_type.write".to_string(),
         ],
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     }
 }
 

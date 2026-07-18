@@ -19,6 +19,7 @@ fn ctx() -> AuthContext {
         actor_name: "alice".to_string(),
         permissions: vec!["demo:write".to_string()],
         jti: "jti-1".to_string(),
+        warehouse_scope: None,
     }
 }
 

@@ -83,6 +83,7 @@ fn ctx(owner_id: Uuid, user_id: Uuid) -> AuthContext {
             "mte.task.execute".to_string(),
         ],
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     }
 }
 
@@ -93,6 +94,7 @@ fn worker_ctx(owner_id: Uuid, user_id: Uuid) -> AuthContext {
         actor_name: format!("mte-worker-{user_id}"),
         permissions: vec!["mte.task.read".to_string(), "mte.task.execute".to_string()],
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     }
 }
 

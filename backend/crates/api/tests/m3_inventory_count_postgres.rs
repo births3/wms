@@ -26,6 +26,7 @@ fn ctx(owner_id: Uuid, permissions: &[&str]) -> AuthContext {
             .map(|value| (*value).to_string())
             .collect(),
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     }
 }
 

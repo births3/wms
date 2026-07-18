@@ -64,6 +64,7 @@ fn ctx(owner_id: Uuid) -> AuthContext {
         actor_name: "document-numbering-test".to_string(),
         permissions: vec![],
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     }
 }
 

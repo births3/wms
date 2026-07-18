@@ -42,6 +42,7 @@ async fn escalation_rule_limits_levels_and_job_escalates_once_then_stops_after_a
         actor_name: "告警管理员".to_string(),
         permissions: vec!["hal.escalation.write".to_string()],
         jti: "hal-escalation-test".to_string(),
+        warehouse_scope: None,
     };
     let repository = PgAlertEscalationRepository::new(pool.clone());
     let invalid = rule_request(
@@ -143,6 +144,7 @@ async fn l3_repeats_every_24_hours_and_empty_off_hours_route_falls_back_to_syste
         actor_name: "告警管理员".to_string(),
         permissions: vec!["hal.escalation.write".to_string()],
         jti: "hal-l3-repeat-test".to_string(),
+        warehouse_scope: None,
     };
     let mut request = rule_request(
         "l3-repeat",

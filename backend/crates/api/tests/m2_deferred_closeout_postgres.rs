@@ -24,6 +24,7 @@ fn context(owner_id: Uuid) -> AuthContext {
         actor_name: "m2-deferred-closeout-test".to_string(),
         permissions: vec!["m2.write".to_string()],
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     }
 }
 
@@ -309,7 +310,7 @@ async fn inspection_uses_actual_receipt_quantity_and_blocks_early_signature(pool
             order.id,
             SignInspectionRequest {
                 first_signer_id,
-                second_signer_id: Some(second_signer_id),
+                second_signer_id: None,
                 dual_required: true,
             },
             chrono::Utc::now(),
@@ -335,23 +336,24 @@ async fn inspection_uses_actual_receipt_quantity_and_blocks_early_signature(pool
         .await
         .expect("inspect second half");
 
-    let client_downgrade = repository
+    // 客户端 dual_required=false 不能绕过 M-VR 双人策略；一次提交两名签字人被拒。
+    let proxy_both = repository
         .sign_receiving_order_with_audit(
             &ctx,
             order.id,
             SignInspectionRequest {
                 first_signer_id,
-                second_signer_id: None,
+                second_signer_id: Some(second_signer_id),
                 dual_required: false,
             },
             chrono::Utc::now(),
-            "sign-client-downgrade",
+            "sign-client-proxy-both",
             None,
         )
         .await;
     assert!(matches!(
-        client_downgrade,
-        Err(Wave3RepositoryError::MissingSecondSigner)
+        proxy_both,
+        Err(Wave3RepositoryError::UnauthorizedSigner)
     ));
 
     sqlx::query(
@@ -367,7 +369,7 @@ async fn inspection_uses_actual_receipt_quantity_and_blocks_early_signature(pool
             order.id,
             SignInspectionRequest {
                 first_signer_id,
-                second_signer_id: Some(second_signer_id),
+                second_signer_id: None,
                 dual_required: false,
             },
             chrono::Utc::now(),
@@ -404,6 +406,23 @@ async fn inspection_uses_actual_receipt_quantity_and_blocks_early_signature(pool
     repository
         .sign_receiving_order_with_audit(
             &ctx,
+            order.id,
+            SignInspectionRequest {
+                first_signer_id,
+                second_signer_id: None,
+                dual_required: true,
+            },
+            chrono::Utc::now(),
+            "sign-first-after-approval",
+            None,
+        )
+        .await
+        .expect("first signature after approval");
+    let mut second_ctx = ctx.clone();
+    second_ctx.user_id = second_signer_id;
+    repository
+        .sign_receiving_order_with_audit(
+            &second_ctx,
             order.id,
             SignInspectionRequest {
                 first_signer_id,

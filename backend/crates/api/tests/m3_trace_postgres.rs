@@ -10,6 +10,7 @@ fn ctx(owner_id: Uuid) -> AuthContext {
         actor_name: "trace-test".to_string(),
         permissions: vec!["m3.read".to_string()],
         jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
     }
 }
 
