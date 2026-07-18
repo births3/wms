@@ -52,7 +52,7 @@ pub async fn run_once(pool: &PgPool, now: DateTime<Utc>) -> Result<usize, Invent
         isolated += result.value.len();
         // 近效期预警事件（供 H4 / 看板消费）
         let _ = repository
-            .generate_near_expiry_alerts(&context, now, 180)
+            .generate_near_expiry_alerts(&context, now, None)
             .await;
         // 状态 ERP 反馈 outbox 重试
         let _ = repository.process_status_erp_feedback_outbox(now, 50).await;

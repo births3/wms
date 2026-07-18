@@ -250,7 +250,7 @@ async fn near_expiry_alerts_and_lifecycle_are_owner_scoped(pool: sqlx::PgPool) {
 
     let repository = PgWave3Repository::new(pool);
     let created = repository
-        .generate_near_expiry_alerts(&ctx(owner_id), Utc::now(), 180)
+        .generate_near_expiry_alerts(&ctx(owner_id), Utc::now(), Some(180))
         .await
         .expect("generate");
     assert!(created >= 1);
@@ -378,7 +378,7 @@ async fn generate_maintenance_tasks_for_near_expiry_batches(pool: sqlx::PgPool) 
     .expect("batch");
     let repository = PgWave3Repository::new(pool);
     let created = repository
-        .generate_maintenance_tasks(&ctx(owner_id), Utc::now(), 180)
+        .generate_maintenance_tasks(&ctx(owner_id), Utc::now(), Some(180))
         .await
         .expect("generate");
     assert!(created >= 1);

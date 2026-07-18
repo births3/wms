@@ -121,7 +121,7 @@ async fn generate_near_expiry_alerts_handler(
 ) -> Result<Json<serde_json::Value>, Wave3HandlerError> {
     require_any_permission(&ctx, &["m3.alert.write", "m3.write"])?;
     let created = ops_repository(&state)?
-        .generate_near_expiry_alerts(&ctx, Utc::now(), 180)
+        .generate_near_expiry_alerts(&ctx, Utc::now(), None)
         .await?;
     Ok(Json(serde_json::json!({ "created": created })))
 }

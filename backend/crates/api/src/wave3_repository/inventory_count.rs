@@ -3,8 +3,9 @@ use serde_json::json;
 use sqlx::{FromRow, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{
-    calculate_variance, validate_approval, validate_count_type, validate_physical_quantity,
-    ApproveInventoryCountRequest, CreateInventoryCountRequest, InventoryCount, InventoryCountLine,
+    calculate_variance, count_requires_elevated_approval, validate_approval_for_variance,
+    validate_count_type, validate_physical_quantity, ApproveInventoryCountRequest,
+    CreateInventoryCountRequest, InventoryCount, InventoryCountLine,
     SubmitInventoryCountLineRequest,
 };
 
@@ -455,10 +456,6 @@ impl PgWave3Repository {
         idempotency_key: &str,
         audit: Option<AuditWriteRequest>,
     ) -> Result<IdempotentMutation<InventoryCount>, Wave3RepositoryError> {
-        validate_approval(&req).map_err(|_| Wave3RepositoryError::MissingApprovalSource)?;
-        if req.approval_source.trim() != "盘点" {
-            return Err(Wave3RepositoryError::MissingApprovalSource);
-        }
         let request_hash = request_hash(&json!({
             "count_id": count_id,
             "request": &req,
@@ -503,6 +500,17 @@ impl PgWave3Repository {
         if lines.is_empty() || lines.iter().any(|line| line.physical_qty.is_none()) {
             return Err(Wave3RepositoryError::InventoryCountNotReady);
         }
+        let requires_elevated = count_requires_elevated_approval(
+            lines
+                .iter()
+                .map(|line| (line.book_qty, line.variance_qty.unwrap_or_default())),
+        );
+        validate_approval_for_variance(&req, requires_elevated).map_err(|error| match error {
+            wms_domain::InventoryCountValidationError::ElevatedApprovalRequired => {
+                Wave3RepositoryError::MissingApprovalSource
+            }
+            _ => Wave3RepositoryError::MissingApprovalSource,
+        })?;
 
         let mut adjustments = Vec::new();
         for line in &lines {
@@ -744,6 +752,8 @@ fn map_inventory_count(
     count: InventoryCountRow,
     lines: Vec<InventoryCountLineRow>,
 ) -> InventoryCount {
+    let blind = count.count_type == "blind";
+    let redact_book = blind && matches!(count.status.as_str(), "in_progress" | "pending_approval");
     InventoryCount {
         id: count.id,
         owner_id: count.owner_id,
@@ -760,11 +770,16 @@ fn map_inventory_count(
         approval_id: count.approval_id,
         created_at: count.created_at,
         updated_at: count.updated_at,
-        lines: lines.into_iter().map(map_inventory_count_line).collect(),
+        lines: lines
+            .into_iter()
+            .map(|line| map_inventory_count_line(line, redact_book))
+            .collect(),
     }
 }
 
-fn map_inventory_count_line(line: InventoryCountLineRow) -> InventoryCountLine {
+fn map_inventory_count_line(line: InventoryCountLineRow, redact_book: bool) -> InventoryCountLine {
+    // 盲盘在实盘提交前不回显账面数量（DB 仍保留 book_qty 用于差异计算）。
+    let hide = redact_book && line.physical_qty.is_none();
     InventoryCountLine {
         id: line.id,
         count_id: line.count_id,
@@ -774,9 +789,9 @@ fn map_inventory_count_line(line: InventoryCountLineRow) -> InventoryCountLine {
         location_code: line.location_code,
         product_code: line.product_code,
         batch_no: line.batch_no,
-        book_qty: line.book_qty,
+        book_qty: if hide { 0 } else { line.book_qty },
         physical_qty: line.physical_qty,
-        variance_qty: line.variance_qty,
-        variance_type: line.variance_type,
+        variance_qty: if hide { None } else { line.variance_qty },
+        variance_type: if hide { None } else { line.variance_type },
     }
 }

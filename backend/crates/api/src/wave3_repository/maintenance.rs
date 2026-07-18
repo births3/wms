@@ -107,28 +107,68 @@ impl PgWave3Repository {
         &self,
         ctx: &AuthContext,
         now: DateTime<Utc>,
-        horizon_days: i64,
+        horizon_days: Option<i64>,
     ) -> Result<usize, Wave3RepositoryError> {
-        let until = now.date_naive() + chrono::Duration::days(horizon_days.clamp(1, 365));
+        let as_of = now.date_naive();
+        let horizon = match horizon_days {
+            Some(days) => days.clamp(1, 365),
+            None => self
+                .resolve_expiry_warning_days(ctx, as_of)
+                .await
+                .unwrap_or(180)
+                .clamp(1, 365),
+        };
+        let near_expiry_until = as_of + chrono::Duration::days(horizon);
+        // 重点养护：每月；一般品种：每季度；另含近效期窗口内批次。
         let batches: Vec<(Uuid,)> = sqlx::query_as(
             r#"
-            SELECT id
-              FROM inventory_batches
-             WHERE owner_id = $1
-               AND quality_status = $2
-               AND qty_on_hand > 0
-               AND expiry_date <= $3
+            SELECT batch.id
+              FROM inventory_batches batch
+              LEFT JOIN products product
+                ON product.owner_id = batch.owner_id
+               AND product.product_code = batch.product_code
+             WHERE batch.owner_id = $1
+               AND batch.quality_status = $2
+               AND batch.qty_on_hand > 0
                AND NOT EXISTS (
                     SELECT 1 FROM inventory_maintenance_tasks task
-                     WHERE task.owner_id = $1
-                       AND task.inventory_batch_id = inventory_batches.id
+                     WHERE task.owner_id = batch.owner_id
+                       AND task.inventory_batch_id = batch.id
                        AND task.status = 'pending'
+               )
+               AND (
+                    batch.expiry_date <= $3
+                    OR (
+                        (
+                            COALESCE(product.storage_condition, 'normal') IN ('frozen', 'cold', 'cool')
+                            OR COALESCE(product.special_drug_category, 'none') NOT IN ('none', '')
+                        )
+                        AND NOT EXISTS (
+                            SELECT 1 FROM inventory_maintenance_tasks done
+                             WHERE done.owner_id = batch.owner_id
+                               AND done.inventory_batch_id = batch.id
+                               AND done.status = 'completed'
+                               AND done.completed_at >= ($4::timestamptz - INTERVAL '30 days')
+                        )
+                    )
+                    OR (
+                        COALESCE(product.storage_condition, 'normal') NOT IN ('frozen', 'cold', 'cool')
+                        AND COALESCE(product.special_drug_category, 'none') IN ('none', '')
+                        AND NOT EXISTS (
+                            SELECT 1 FROM inventory_maintenance_tasks done
+                             WHERE done.owner_id = batch.owner_id
+                               AND done.inventory_batch_id = batch.id
+                               AND done.status = 'completed'
+                               AND done.completed_at >= ($4::timestamptz - INTERVAL '90 days')
+                        )
+                    )
                )
             "#,
         )
         .bind(ctx.owner_id)
         .bind(STATUS_QUALIFIED)
-        .bind(until)
+        .bind(near_expiry_until)
+        .bind(now)
         .fetch_all(&self.pool)
         .await
         .map_err(map_db_error)?;

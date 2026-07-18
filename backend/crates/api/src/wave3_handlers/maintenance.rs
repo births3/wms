@@ -58,7 +58,7 @@ async fn generate_maintenance_tasks_handler(
 ) -> Result<Json<serde_json::Value>, Wave3HandlerError> {
     ctx.require_permission("m3.maintenance.write")?;
     let created = maintenance_repository(&state)?
-        .generate_maintenance_tasks(&ctx, Utc::now(), 180)
+        .generate_maintenance_tasks(&ctx, Utc::now(), None)
         .await?;
     Ok(Json(serde_json::json!({ "created": created })))
 }

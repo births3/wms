@@ -45,7 +45,8 @@ impl PgWave3Repository {
         Ok(data)
     }
 
-    async fn resolve_expiry_warning_days(
+    /// 读取货主生效的近效期预警天数（系统字典 inventory_policy.expiry_warning_days）。
+    pub(crate) async fn resolve_expiry_warning_days(
         &self,
         ctx: &AuthContext,
         as_of: NaiveDate,

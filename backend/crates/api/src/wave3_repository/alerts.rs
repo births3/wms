@@ -119,9 +119,16 @@ impl PgWave3Repository {
         &self,
         ctx: &AuthContext,
         now: DateTime<Utc>,
-        warning_days: i64,
+        warning_days: Option<i64>,
     ) -> Result<usize, Wave3RepositoryError> {
         let as_of = now.date_naive();
+        let warning_days = match warning_days {
+            Some(days) => days.clamp(1, 3650),
+            None => self
+                .resolve_expiry_warning_days(ctx, as_of)
+                .await
+                .unwrap_or(180),
+        };
         let until = as_of + chrono::Duration::days(warning_days);
         let rows: Vec<(Uuid, String, String, Option<String>, chrono::NaiveDate)> = sqlx::query_as(
             r#"

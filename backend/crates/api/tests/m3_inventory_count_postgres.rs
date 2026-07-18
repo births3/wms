@@ -125,7 +125,8 @@ async fn inventory_count_blind_submission_approves_atomic_adjustment_and_replays
         .expect("count should be created");
     assert_eq!(created.value.lines.len(), 1);
     assert_eq!(created.value.lines[0].inventory_batch_id, batch_id);
-    assert_eq!(created.value.lines[0].book_qty, 8);
+    // 盲盘在实盘提交前不得回显账面数量
+    assert_eq!(created.value.lines[0].book_qty, 0);
 
     let submitted = repository
         .submit_inventory_count_line_with_audit(
@@ -157,7 +158,8 @@ async fn inventory_count_blind_submission_approves_atomic_adjustment_and_replays
             &manager,
             created.value.id,
             ApproveInventoryCountRequest {
-                approval_source: "盘点".to_string(),
+                // |差异| 2 / 账面 8 = 25% > 10%，需高级审批源
+                approval_source: "盘点-高级".to_string(),
                 approval_id: "M3-COUNT-APPROVAL-1".to_string(),
             },
             Utc::now(),
@@ -193,7 +195,7 @@ async fn inventory_count_blind_submission_approves_atomic_adjustment_and_replays
             &manager,
             created.value.id,
             ApproveInventoryCountRequest {
-                approval_source: "盘点".to_string(),
+                approval_source: "盘点-高级".to_string(),
                 approval_id: "M3-COUNT-APPROVAL-1".to_string(),
             },
             Utc::now(),

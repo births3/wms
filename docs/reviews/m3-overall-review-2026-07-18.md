@@ -56,6 +56,15 @@
 - `cargo test -p wms-api --test m3_ops_closeout_postgres`
 - `node apps/web-admin/self-checks/m3-ops-pages-self-check.mjs`
 
-### 仍属 P1/S4（未宣称完成）
+### 本轮 P1 修复（续）
 
-养护计划规则细化、近效期可配天数、差异阈值、盲盘隐藏账面、移库 M-TC、真 PDA/企微/ERP。
+| 项 | 状态 |
+|----|------|
+| 近效期天数 | **已修**：alerts/job/handler 走 `resolve_expiry_warning_days`（字典缺失回退 180） |
+| 养护计划 | **已修**：冷链/特药约 30 天、一般约 90 天 + 近效期窗口；PC 可提交养护结果 |
+| 盘点盲盘 | **已修**：in_progress/pending 未交实盘前回显 book_qty=0 |
+| 盘点差异阈值 | **已修**：\|差异\|/账面>10% 需审批源「盘点-高级」；PC 自动选择 |
+
+### 仍属 P1 余量 / S4
+
+移库 M-TC 扫码、容积回写、真 PDA/企微/ERP、养护完成率统计与逾期预警看板。
