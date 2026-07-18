@@ -571,6 +571,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
         location_id: location.id,
         location_code: locationCode,
         quality_status: putawayForm.qualityStatus.trim(),
+        lpn_code: putawayForm.lpn.trim() || null,
       },
     });
     setActiveDialog(null);
