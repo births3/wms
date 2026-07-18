@@ -67,6 +67,8 @@ H8 ERP 防腐层是第一个落地的对接，承担"参考实现"职责：H8 �
 
 > 注：H8 目前仅在 architecture-dependencies.md 有一行定义，**尚无独立用户故事文档**。H8 在 Wave 2 前作为依赖就位（见依赖图 §5 W2.E），其用户故事应在 Wave 2 实施前补齐，并显式声明遵守本 ADR 契约。
 
+> 2026-07-19 进展：已补 [US-H8-001 ERP 连接配置与安全接入](../domain/user-stories-h8-erp-integration.md)，并显式复用 ADR-0018、M-PM、ADR-0013 与 H2；这是对实施状态的更新，不改变本 ADR“契约先行、引擎延后”的决策。
+
 ---
 
 ## 后果

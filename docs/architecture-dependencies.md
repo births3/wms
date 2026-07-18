@@ -37,7 +37,7 @@
 | H5 | 快递面单与运单 | express | 配送方路由 + 自有/第三方差异化（详见 user-stories-h5）|
 | H6 | 状态机引擎 | state-machine | 多业务模块状态机统一引擎（详见 infra/technical-specs.md）|
 | H7 | 导入导出引擎 | import-export | Excel/CSV 数据导入导出统一引擎 |
-| H8 | ERP 防腐层 | erp-acl | WMS↔ERP 接口表 + 反馈回写（含档案补录通道）|
+| H8 | ERP 防腐层 | erp-acl | WMS↔ERP 接口表 + 反馈回写（含档案补录通道），详见 [H8 用户故事](domain/user-stories-h8-erp-integration.md) |
 | H9 | 打印模板引擎 | print-template | 标签/单据模板统一能力；首期 hiprint WebComponent + 浏览器预览打印，详见 [ADR-0036](adr/0036-print-template-engine.md) 与 [H9 用户故事](domain/user-stories-h9-print-template.md) |
 | H10 | 数据库备份与恢复 | db-backup | 全量+WAL+异地 + 加密+演练；与 H2 共同保障 GSP 数据完整性（详见 infra/technical-specs.md）|
 | **H-DOCK** | **月台预约管理（v3.1 新增）** | **dock-management** | **月台档案 + 预约调度 + 实到对账；可启用开关（默认关闭，3PL/冷链优先仓启用）；GSP 6.83/8.116/9.121** |
