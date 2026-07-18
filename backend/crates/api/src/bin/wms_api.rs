@@ -31,6 +31,7 @@ use wms_api::{
     express::{express_router, ExpressAppState},
     feature_flags::FeatureFlagRegistry,
     h2_lifecycle_handlers::{h2_lifecycle_router, H2LifecycleAppState},
+    h8_erp_connectors::{h8_erp_connector_router, H8ErpConnectorAppState},
     inventory_status_config_handlers::{
         inventory_status_config_router, InventoryStatusConfigAppState,
     },
@@ -280,6 +281,9 @@ fn app(
         .merge(audit_query_router(audit_query_state))
         .merge(h2_lifecycle_router(h2_lifecycle_state))
         .merge(config_center_router(config_center_state))
+        .merge(h8_erp_connector_router(
+            H8ErpConnectorAppState::with_postgres(shared_pool.clone()),
+        ))
         .merge(drug_inspection_router(
             DrugInspectionAppState::with_postgres(shared_pool.clone()),
         ))
