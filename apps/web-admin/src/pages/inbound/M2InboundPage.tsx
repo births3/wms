@@ -488,45 +488,52 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
 
   async function submitInspect(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!order) return;
+    if (!order || !currentUser) return;
     // 策略要求时强制 dual_required，作业员不可关闭
     const dualRequired = dualSignRequiredByStrategy || signForm.dualRequired;
-    const firstSignerInput = signForm.firstSignerId.trim();
-    const firstSignerId = resolveSignerIdForSubmit(firstSignerInput, currentUser);
-    const secondSignerInput = signForm.secondSignerId.trim();
-    const secondSignerId = dualRequired
-      ? resolveSignerIdForSubmit(secondSignerInput, currentUser, { allowCurrentUser: false })
-      : null;
-    if (!isUuid(firstSignerId) || (secondSignerId !== null && !isUuid(secondSignerId))) {
-      setLastEvent("签字人必须填写有效的用户 ID");
+    const currentUserId = currentUser.user_id;
+    // 双人验收必须分两次独立认证：当前登录用户作为本步签字主体，禁止代填他人 ID。
+    if (order.status === "awaiting_second_sign") {
+      await signMutation.mutateAsync({
+        id: order.id,
+        request: {
+          first_signer_id: currentUserId,
+          second_signer_id: currentUserId,
+          dual_required: true,
+        },
+      });
+      setActiveDialog(null);
+      setLastEvent(`${order.receipt_no} 第二人签字已完成`);
       return;
     }
-    if (secondSignerId === firstSignerId) {
-      setLastEvent("第二签字人不能与第一签字人相同");
-      return;
+    if (order.status === "inspecting" || order.status === "receiving" || order.status === "received") {
+      await inspectMutation.mutateAsync({
+        id: order.id,
+        request: {
+          batch_no: inspectForm.batchNo.trim(),
+          accepted_qty: toInteger(inspectForm.acceptedQty),
+          rejected_qty: toInteger(inspectForm.rejectedQty),
+          production_date: inspectForm.productionDate,
+          expiry_date: inspectForm.expiryDate,
+          quality_status: inspectForm.qualityStatus.trim(),
+          trace_codes: splitCodes(inspectForm.traceCodes),
+        },
+      });
     }
-    await inspectMutation.mutateAsync({
-      id: order.id,
-      request: {
-        batch_no: inspectForm.batchNo.trim(),
-        accepted_qty: toInteger(inspectForm.acceptedQty),
-        rejected_qty: toInteger(inspectForm.rejectedQty),
-        production_date: inspectForm.productionDate,
-        expiry_date: inspectForm.expiryDate,
-        quality_status: inspectForm.qualityStatus.trim(),
-        trace_codes: splitCodes(inspectForm.traceCodes),
-      },
-    });
     await signMutation.mutateAsync({
       id: order.id,
       request: {
-        first_signer_id: firstSignerId,
-        second_signer_id: secondSignerId,
+        first_signer_id: currentUserId,
+        second_signer_id: null,
         dual_required: dualRequired,
       },
     });
     setActiveDialog(null);
-    setLastEvent(`${order.receipt_no} 验收已提交`);
+    setLastEvent(
+      dualRequired
+        ? `${order.receipt_no} 第一人已签字，待第二人独立登录签字`
+        : `${order.receipt_no} 验收已提交`,
+    );
   }
 
   async function submitPutaway(event: React.FormEvent<HTMLFormElement>) {

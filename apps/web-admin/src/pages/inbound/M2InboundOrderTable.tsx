@@ -283,8 +283,11 @@ function inboundPrivateActions(
     return [
       {
         key: "inspect",
-        label: "验收",
-        description: "验收操作",
+        label: selectedOrder?.status === "awaiting_second_sign" ? "第二签字" : "验收",
+        description:
+          selectedOrder?.status === "awaiting_second_sign"
+            ? "第二人独立登录后完成签字"
+            : "验收操作",
         icon: <ClipboardCheck className="size-4" aria-hidden />,
         disabled: !selectedOrder || !canInspect(selectedOrder.status),
         onClick: () => {

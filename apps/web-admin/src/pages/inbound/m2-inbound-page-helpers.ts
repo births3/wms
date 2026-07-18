@@ -174,14 +174,24 @@ export function canRelease(status: string) {
   return status === "draft";
 }
 
-/** 验收：仅收货中/已收/验收中等可作业状态；终态禁用。 */
+/** 验收：收货后验收；待第二人签字时也可打开签字动作。 */
 export function canInspect(status: string) {
-  return status === "receiving" || status === "received" || status === "inspecting";
+  return (
+    status === "receiving" ||
+    status === "received" ||
+    status === "inspecting" ||
+    status === "awaiting_second_sign"
+  );
 }
 
-/** 上架：仅验收中/已验/上架中等可作业状态；终态禁用。 */
+/** 第二签字：仅第一人已签、待第二人独立认证。 */
+export function canSecondSign(status: string) {
+  return status === "awaiting_second_sign";
+}
+
+/** 上架：仅双签完成进入上架中，或历史已验状态。 */
 export function canPutaway(status: string) {
-  return status === "inspecting" || status === "inspected" || status === "putaway";
+  return status === "putaway" || status === "inspected";
 }
 
 export function statusKey(status: string | null | undefined): StatusKey {
@@ -196,12 +206,16 @@ export function statusLabel(status: string | null | undefined) {
   if (!status) return "-";
   const labels: Record<string, string> = {
     pending: "待处理",
+    draft: "草稿",
     released: "待收货",
     receiving: "收货中",
     inspecting: "验收中",
+    awaiting_second_sign: "待第二人签字",
     putaway: "上架中",
     completed: "已完成",
     closed_rejected: "已关闭(拒收)",
+    closed_shortage: "已关闭(短少)",
+    cancelled: "已作废",
   };
   return labels[status] ?? status;
 }

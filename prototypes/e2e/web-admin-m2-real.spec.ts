@@ -170,40 +170,55 @@ test("M2 PC 真实入库链路落库并生成库存与审计", async ({ page }) 
   await page.getByLabel("追溯码").fill("TRACE-M2-E2E-001");
   await page.getByRole("dialog", { name: "验收" }).getByRole("combobox", { name: "质量状态" }).selectOption("qualified");
   for (const label of ["外观核对", "包装核对", "说明书核对", "标签核对"]) await page.getByLabel(label).fill("通过");
-  await page.getByLabel("第一签字人").fill(signerIds.firstSignerId);
-  await page.getByLabel("第二签字人 ID").fill(signerIds.firstSignerId);
-  await page.getByRole("button", { name: "提交验收" }).click();
-  await expect(page.getByText("第二签字人不能与第一签字人相同", { exact: true })).toBeVisible();
-  expect(inspectionRequests).toHaveLength(0);
-  expect(signatureRequests).toHaveLength(0);
+  // 第一人必须是当前登录用户；禁止一次提交两名签字人代签。
   await page.screenshot({ path: path.join(artifactsDir, "inspection-dual-sign-validation.png") });
-
-  await page.getByLabel("第二签字人 ID").fill(signerIds.secondSignerId);
   const inspectionResponsePromise = page.waitForResponse(
     (response) => response.url().endsWith(`/api/v1/inbound/receiving-orders/${receivingOrderId}/inspect`) && response.request().method() === "POST",
   );
-  const signatureResponsePromise = page.waitForResponse(
+  const firstSignatureResponsePromise = page.waitForResponse(
     (response) => response.url().endsWith(`/api/v1/inbound/receiving-orders/${receivingOrderId}/sign`) && response.request().method() === "POST",
   );
   await page.getByRole("button", { name: "提交验收" }).click();
   const inspectionResponse = await inspectionResponsePromise;
-  const signatureResponse = await signatureResponsePromise;
+  const firstSignatureResponse = await firstSignatureResponsePromise;
   expect(inspectionResponse.status()).toBe(200);
-  expect(signatureResponse.status()).toBe(200);
+  expect(firstSignatureResponse.status()).toBe(200);
   expect(JSON.parse(signatureRequests[0]?.postData() ?? "{}")).toMatchObject({
-    first_signer_id: signerIds.firstSignerId,
-    second_signer_id: signerIds.secondSignerId,
+    first_signer_id: adminUserId,
+    second_signer_id: null,
     dual_required: true,
   });
-  expect(await signatureResponse.json()).toMatchObject({
+  expect(await firstSignatureResponse.json()).toMatchObject({
     receiving_order_id: receivingOrderId,
-    first_signer_id: signerIds.firstSignerId,
+    first_signer_id: adminUserId,
+    second_signer_id: null,
+  });
+  await expect(page.getByText(`${receiptNo} 第一人已签字，待第二人独立登录签字`)).toBeVisible();
+  await page.screenshot({ path: path.join(artifactsDir, "inspection.png") });
+  page.off("request", trackAcceptanceRequests);
+
+  // 第二人独立登录并完成签字。
+  await page.evaluate(() => window.localStorage.clear());
+  await loginAs(page, "m2-e2e-receiving-clerk");
+  await openMenu(page, "入库业务", "入库作业", /M2 验收管理/);
+  await page.locator("table").getByText(receiptNo, { exact: true }).click();
+  const secondSignatureResponsePromise = page.waitForResponse(
+    (response) => response.url().endsWith(`/api/v1/inbound/receiving-orders/${receivingOrderId}/sign`) && response.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "第二签字", exact: true }).click();
+  await page.getByRole("button", { name: "提交验收" }).click();
+  const secondSignatureResponse = await secondSignatureResponsePromise;
+  expect(secondSignatureResponse.status()).toBe(200);
+  expect(await secondSignatureResponse.json()).toMatchObject({
+    receiving_order_id: receivingOrderId,
+    first_signer_id: adminUserId,
     second_signer_id: signerIds.secondSignerId,
   });
-  await expect(page.getByText(`${receiptNo} 验收已提交`)).toBeVisible();
-  await page.screenshot({ path: path.join(artifactsDir, "inspection.png") });
+  await expect(page.getByText(`${receiptNo} 第二人签字已完成`)).toBeVisible();
   await page.screenshot({ path: path.join(artifactsDir, "inspection-dual-sign-submitted.png") });
-  page.off("request", trackAcceptanceRequests);
+
+  await page.evaluate(() => window.localStorage.clear());
+  await login(page);
 
   await openMenu(page, "入库业务", "入库作业", /M2 上架管理/);
   await expect(page.locator("table").getByText(receiptNo, { exact: true })).toBeVisible();
@@ -300,9 +315,13 @@ test("M2 PC 真实入库链路落库并生成库存与审计", async ({ page }) 
 });
 
 async function login(page: import("@playwright/test").Page) {
+  await loginAs(page, "admin");
+}
+
+async function loginAs(page: import("@playwright/test").Page, username: string) {
   await page.goto("/");
   await page.getByLabel("货主编码").fill("PY_OWNER");
-  await page.getByLabel("登录账号").fill("admin");
+  await page.getByLabel("登录账号").fill(username);
   await page.getByRole("textbox", { name: "密码", exact: true }).fill("CorrectHorse1!");
   await page.getByRole("button", { name: "登录" }).click();
   await expect(page.getByRole("heading", { name: "运营总览" })).toBeVisible();
