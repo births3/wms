@@ -4438,6 +4438,6 @@ types = [
   "audit_compliance",
   "external_runtime",
 ]
-reason = "已冻结 H-INT 通用契约、H8 ERP 专用防腐层、连接配置和安全接入规则；现有本地 Worker/Mock 只覆盖传输切片，尚无配置中心前后端、H8 专用表、权限审计、完整路由和真实 ERP dev/staging S4 证据。"
+reason = "已补 H8 专用表、领域规则、配置 API、OpenAPI/api-client、H2 审计摘要、M1 配置中心 ERP 连接页与 Worker 非双写对齐；本地传输切片仍在。尚无真实浏览器 E2E/截图、正式 secret 解析、主备降级运行时与真实 ERP dev/staging S4 证据，不得标记完成。"
 owner = "H8 模块负责人"
-resume_when = "按 US-H8-001 完成配置中心、OpenAPI、H8 service/repository、PostgreSQL、权限审计、真实浏览器 E2E，并取得真实 ERP dev/staging 请求、回执、重试和审计证据。"
+resume_when = "补真实浏览器 E2E（新建/测试/启用/重叠拒绝/停用/只读）与启用成功截图；接通 secrets 解析与主备降级运行时；取得真实 ERP dev/staging 请求、回执、重试和审计证据。"
