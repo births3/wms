@@ -28,8 +28,10 @@ import {
 } from "@wms/ui";
 
 import {
+  useApproveInventoryCountMutation,
   useCreateInventoryCountMutation,
   useInventoryCountsQuery,
+  useSubmitInventoryCountLineMutation,
   type InventoryCountSummary,
 } from "@/features/inventory/m3-ops-queries";
 
@@ -55,8 +57,12 @@ export function M3InventoryCountPage() {
   const [open, setOpen] = React.useState(false);
   const [countType, setCountType] = React.useState("cycle");
   const [productCode, setProductCode] = React.useState("");
+  const [selected, setSelected] = React.useState<InventoryCountSummary | null>(null);
+  const [physicalQtyByLine, setPhysicalQtyByLine] = React.useState<Record<string, string>>({});
   const query = useInventoryCountsQuery();
   const create = useCreateInventoryCountMutation();
+  const submitLine = useSubmitInventoryCountLineMutation();
+  const approve = useApproveInventoryCountMutation();
   const rows = React.useMemo(() => {
     const keyword = String(applied.keyword ?? "").toLowerCase();
     const status = String(applied.status ?? "");
@@ -79,6 +85,31 @@ export function M3InventoryCountPage() {
       { key: "product_code", header: "商品范围", width: 140, render: (row) => row.product_code ?? "全部" },
       { key: "lines", header: "明细数", width: 90, render: (row) => row.lines?.length ?? 0 },
       { key: "started_at", header: "开始时间", width: 180, render: (row) => formatTime(row.started_at) },
+      {
+        key: "actions",
+        header: "操作",
+        width: 120,
+        render: (row) => (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setSelected(row);
+              const next: Record<string, string> = {};
+              for (const line of row.lines ?? []) {
+                next[line.id] =
+                  line.physical_qty != null && line.physical_qty !== undefined
+                    ? String(line.physical_qty)
+                    : "";
+              }
+              setPhysicalQtyByLine(next);
+            }}
+          >
+            明细
+          </Button>
+        ),
+      },
     ],
     [],
   );
@@ -94,6 +125,12 @@ export function M3InventoryCountPage() {
     description: "创建盘点单",
     onClick: () => setOpen(true),
   };
+
+  const canSubmitLines = selected?.status === "in_progress";
+  const canApprove =
+    selected?.status === "pending_approval" ||
+    (selected?.status === "in_progress" &&
+      (selected.lines ?? []).every((line) => line.physical_qty != null && line.physical_qty !== undefined));
 
   return (
     <div className="space-y-4">
@@ -174,6 +211,94 @@ export function M3InventoryCountPage() {
               <Button type="submit" disabled={create.isPending}>{create.isPending ? "创建中..." : "创建"}</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={selected != null}
+        onOpenChange={(next) => {
+          if (!next) setSelected(null);
+        }}
+      >
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>盘点明细 · {selected?.id.slice(0, 8)}</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[50vh] space-y-3 overflow-y-auto">
+            {(selected?.lines ?? []).length === 0 ? (
+              <p className="text-sm text-muted-foreground">暂无明细行</p>
+            ) : (
+              (selected?.lines ?? []).map((line) => (
+                <div key={line.id} className="grid gap-2 rounded-md border p-3 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end">
+                  <div className="text-sm">
+                    <div className="font-medium">{line.product_code}</div>
+                    <div className="text-muted-foreground">批号 {line.batch_no}</div>
+                  </div>
+                  <div className="text-sm">
+                    账面
+                    <div className="font-medium">
+                      {selected?.count_type === "blind" && line.physical_qty == null ? "盲盘隐藏" : line.book_qty}
+                    </div>
+                  </div>
+                  <label className="grid gap-1 text-sm">
+                    实盘数量
+                    <Input
+                      aria-label={`实盘数量-${line.batch_no}`}
+                      type="number"
+                      min={0}
+                      value={physicalQtyByLine[line.id] ?? ""}
+                      disabled={!canSubmitLines || submitLine.isPending}
+                      onChange={(event) =>
+                        setPhysicalQtyByLine((prev) => ({ ...prev, [line.id]: event.target.value }))
+                      }
+                    />
+                  </label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={!canSubmitLines || submitLine.isPending || physicalQtyByLine[line.id] === ""}
+                    onClick={() => {
+                      if (!selected) return;
+                      const qty = Number(physicalQtyByLine[line.id]);
+                      if (!Number.isFinite(qty) || qty < 0) return;
+                      void submitLine.mutateAsync({
+                        countId: selected.id,
+                        lineId: line.id,
+                        physical_qty: Math.trunc(qty),
+                      }).then(() => query.refetch().then((result) => {
+                        const next = (result.data ?? []).find((item) => item.id === selected.id) ?? null;
+                        setSelected(next);
+                      }));
+                    }}
+                  >
+                    提交实盘
+                  </Button>
+                </div>
+              ))
+            )}
+          </div>
+          {(submitLine.error || approve.error) && (
+            <p className="text-sm text-destructive">
+              {submitLine.error?.message ?? approve.error?.message}
+            </p>
+          )}
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="outline">关闭</Button>
+            </DialogClose>
+            <Button
+              type="button"
+              disabled={!canApprove || approve.isPending}
+              onClick={() => {
+                if (!selected) return;
+                void approve.mutateAsync({ countId: selected.id }).then(() => {
+                  setSelected(null);
+                });
+              }}
+            >
+              {approve.isPending ? "审批中..." : "审批差异并调账"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

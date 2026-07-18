@@ -95,6 +95,62 @@ export function useCreateInventoryCountMutation() {
   });
 }
 
+export function useSubmitInventoryCountLineMutation() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { countId: string; lineId: string; physical_qty: number }) => {
+      const token = readAccessToken();
+      const response = await fetch(
+        `${apiBaseUrl}/api/v1/inventory/counts/${input.countId}/lines/${input.lineId}/submit`,
+        {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            "Idempotency-Key": `web-m3-count-line-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          credentials: "include",
+          body: JSON.stringify({ physical_qty: input.physical_qty }),
+        },
+      );
+      if (!response.ok) {
+        throw new ApiError(await response.json().catch(() => null), "提交实盘数量失败", response.status);
+      }
+      return response.json();
+    },
+    onSuccess: () => void client.invalidateQueries({ queryKey: ["inventory", "counts"] }),
+  });
+}
+
+export function useApproveInventoryCountMutation() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { countId: string; approval_source?: string; approval_id?: string }) => {
+      const token = readAccessToken();
+      const response = await fetch(`${apiBaseUrl}/api/v1/inventory/counts/${input.countId}/approve`, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "Idempotency-Key": `web-m3-count-approve-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          approval_source: input.approval_source ?? "盘点",
+          approval_id: input.approval_id ?? input.countId,
+        }),
+      });
+      if (!response.ok) {
+        throw new ApiError(await response.json().catch(() => null), "审批盘点差异失败", response.status);
+      }
+      return response.json();
+    },
+    onSuccess: () => void client.invalidateQueries({ queryKey: ["inventory", "counts"] }),
+  });
+}
+
 export function useMaintenanceTasksQuery() {
   return useQuery<MaintenanceTask[], ApiError>({
     queryKey: ["inventory", "maintenance-tasks"],
