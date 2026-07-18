@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """H8 ERP 接口表同步 Worker（独立进程）。
 
-连接 MSSQL 接口库，认领 pending 行，调用 WMS HTTP API，回写 success/failed。
+双向：
+  入站：MSSQL if_in_* pending → WMS HTTP API → success/failed
+  出站：WMS PG *erp_feedback_outbox → MSSQL if_out_message → WMS outbox succeeded
 
 环境变量：
   H8_MSSQL_HOST          默认 127.0.0.1
@@ -11,7 +13,8 @@
   H8_MSSQL_DATABASE      默认 wms_erp_if
   H8_MSSQL_CONTAINER     默认 wms-mssql-erp-if（sqlcmd 回退用）
   WMS_API_BASE           默认 http://127.0.0.1:8080
-  WMS_API_TOKEN          Bearer token（必填，除 --dry-run）
+  WMS_API_TOKEN          Bearer token（入站必填，除 --dry-run）
+  WMS_DB_URL / DATABASE_URL  出站读 WMS outbox（PostgreSQL）
   H8_POLL_INTERVAL_SEC   默认 5
   H8_MAX_RETRY           默认 5
   H8_BATCH_SIZE          默认 10
@@ -28,7 +31,17 @@ import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Callable
+
+# 同目录 outbound_publish
+_sys_path = str(Path(__file__).resolve().parent)
+if _sys_path not in sys.path:
+    sys.path.insert(0, _sys_path)
+from outbound_publish import (  # noqa: E402
+    process_outbound_once,
+    resolve_wms_db_url,
+)
 
 # ---------------------------------------------------------------------------
 # 配置
@@ -236,6 +249,41 @@ FROM dbo.if_in_product_master WHERE id IN (SELECT id FROM @claimed);
             "idempotency_key",
             "retry_count",
         ]
+    elif table == "if_in_return_order":
+        select_sql = (
+            claim_cte.format(table="if_in_return_order")
+            + """
+SELECT
+  CONVERT(NVARCHAR(36), id), external_doc_no,
+  CONVERT(NVARCHAR(36), owner_id), CONVERT(NVARCHAR(36), warehouse_id),
+  CONVERT(NVARCHAR(36), customer_id),
+  CONVERT(NVARCHAR(36), ISNULL(supplier_id, customer_id)),
+  product_code,
+  CONVERT(NVARCHAR(32), expected_qty),
+  CONVERT(NVARCHAR(33), expected_arrival_at, 126),
+  document_type, ISNULL(external_ref,N''), ISNULL(receipt_no,N''),
+  ISNULL(batch_no,N''),
+  idempotency_key, CONVERT(NVARCHAR(16), retry_count)
+FROM dbo.if_in_return_order WHERE id IN (SELECT id FROM @claimed);
+"""
+        )
+        cols = [
+            "id",
+            "external_doc_no",
+            "owner_id",
+            "warehouse_id",
+            "customer_id",
+            "supplier_id",
+            "product_code",
+            "expected_qty",
+            "expected_arrival_at",
+            "document_type",
+            "external_ref",
+            "receipt_no",
+            "batch_no",
+            "idempotency_key",
+            "retry_count",
+        ]
     else:
         raise ValueError(table)
 
@@ -432,10 +480,54 @@ def handle_product(settings: Settings, row: dict[str, str]) -> str:
     raise RuntimeError(f"Product API {status}: {raw[:500]}")
 
 
+def handle_return(settings: Settings, row: dict[str, str]) -> str:
+    """销退入库：走收货单 API，document_type 默认 sales_return（必填原批号）。"""
+    receipt_no = row.get("receipt_no") or ""
+    if not receipt_no.strip():
+        receipt_no = f"ERP-RET-{row['external_doc_no']}"
+    arrival = row["expected_arrival_at"]
+    if arrival and not arrival.endswith("Z") and "+" not in arrival:
+        arrival = arrival + "Z"
+    batch_no = (row.get("batch_no") or "").strip()
+    if not batch_no:
+        raise RuntimeError("sales_return requires batch_no (original batch)")
+    supplier_id = (row.get("supplier_id") or "").strip() or row["customer_id"]
+    body = {
+        "receipt_no": receipt_no,
+        "document_type": row.get("document_type") or "sales_return",
+        "supplier_id": supplier_id,
+        "warehouse_id": row["warehouse_id"],
+        "external_ref": row.get("external_ref") or row["external_doc_no"],
+        "expected_arrival_at": arrival,
+        "lines": [
+            {
+                "line_no": 1,
+                "product_id": None,
+                "product_code": row["product_code"],
+                "expected_qty": int(row["expected_qty"]),
+                "batch_no": batch_no,
+                "production_date": None,
+                "expiry_date": None,
+            }
+        ],
+    }
+    status, parsed, raw = http_json(
+        settings,
+        "POST",
+        "/api/v1/inbound/receiving-orders",
+        body,
+        row["idempotency_key"],
+    )
+    if status in (200, 201) and isinstance(parsed, dict) and parsed.get("id"):
+        return str(parsed["id"])
+    raise RuntimeError(f"Return ASN API {status}: {raw[:500]}")
+
+
 HANDLERS: dict[str, tuple[str, Callable[[Settings, dict[str, str]], str]]] = {
     "asn": ("if_in_asn", handle_asn),
     "outbound_order": ("if_in_outbound_order", handle_outbound),
     "product_master": ("if_in_product_master", handle_product),
+    "return_order": ("if_in_return_order", handle_return),
 }
 
 
@@ -494,17 +586,32 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="认领但不调用 WMS（标记 failed/dry-run）",
+        help="认领但不调用 WMS / 不投递出站",
+    )
+    parser.add_argument(
+        "--direction",
+        choices=("in", "out", "both"),
+        default="both",
+        help="in=仅入站, out=仅出站(WMS outbox→if_out), both=双向",
     )
     parser.add_argument(
         "--types",
-        default="asn,outbound_order,product_master",
-        help="逗号分隔：asn,outbound_order,product_master",
+        default="asn,outbound_order,product_master,return_order",
+        help="入站类型：asn,outbound_order,product_master,return_order",
     )
     args = parser.parse_args(argv)
     settings = Settings.from_env()
-    if not args.dry_run and not settings.api_token:
-        print("WMS_API_TOKEN is required unless --dry-run", file=sys.stderr)
+    need_in = args.direction in ("in", "both")
+    need_out = args.direction in ("out", "both")
+    if need_in and not args.dry_run and not settings.api_token:
+        print("WMS_API_TOKEN is required for inbound unless --dry-run", file=sys.stderr)
+        return 2
+    wms_db = resolve_wms_db_url()
+    if need_out and not wms_db and not args.dry_run:
+        print(
+            "WMS_DB_URL (or DATABASE_URL) is required for outbound publish",
+            file=sys.stderr,
+        )
         return 2
     types = [t.strip() for t in args.types.split(",") if t.strip()]
     for t in types:
@@ -513,11 +620,21 @@ def main(argv: list[str] | None = None) -> int:
             return 2
 
     print(
-        f"[h8] worker start api={settings.api_base} types={types} once={args.once}",
+        f"[h8] worker start api={settings.api_base} direction={args.direction} "
+        f"types={types} once={args.once}",
         flush=True,
     )
     while True:
-        n = process_once(settings, types, dry_run=args.dry_run)
+        n = 0
+        if need_in:
+            n += process_once(settings, types, dry_run=args.dry_run)
+        if need_out and wms_db:
+            n += process_outbound_once(
+                database_url=wms_db,
+                sqlcmd_exec=lambda sql: sqlcmd_query(settings, sql),
+                batch_size=settings.batch_size,
+                dry_run=args.dry_run,
+            )
         if args.once:
             print(f"[h8] done processed={n}", flush=True)
             return 0
