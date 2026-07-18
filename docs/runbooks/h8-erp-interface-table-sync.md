@@ -3,6 +3,9 @@
 > 对应：`docs/infra/technical-specs.md` H8
 > **通道 B**：接口表 + Worker
 > **通道 A**：WMS OpenAPI 入站 + ERP HTTP 回调出站
+>
+> “双通道”表示本地可分别验证两种通道，不表示生产双写；生产按 US-H8-001 选择唯一
+> 路由，主备切换沿用同一 Idempotency-Key。
 
 ## 1. 启动接口库（通道 B）
 
@@ -22,9 +25,9 @@ export WMS_API_BASE=http://127.0.0.1:18090
 export WMS_API_TOKEN='...'   # login 需 owner_code
 export WMS_DB_URL='postgres://...'   # 出站读 outbox
 
-# 出站传输：table | http | both
+# 出站传输：生产使用 table | http；both 只用于本地双写联调
 export H8_OUTBOUND_TRANSPORT=table
-# 通道 A 回调根 URL（transport=http|both）
+# 通道 A 回调根 URL（transport=http；本地 both 联调也需要）
 export ERP_CALLBACK_BASE=http://127.0.0.1:18091
 ```
 

@@ -148,6 +148,30 @@ auth.rs               # JWT/AuthContext runtime contract
 | 前端 token 保存与注入 | `apps/web-admin/src/lib/auth-session.ts` + `src/lib/api.ts` |
 | 登录页面 | `apps/web-admin/src/pages/auth/LoginPage.tsx` |
 
+### 3.8 外部集成与防腐层
+
+外部集成采用“通用契约 + 领域专用防腐层 + 通道适配器”三级边界。H-INT 当前是所有
+外部对接必须遵守的契约，不是共享运行时代码层；H8 是 ERP 专用防腐层，也是 H-INT 的
+首个参考实现。
+
+```text
+M1/M2/M3/M4 等业务模块
+  -> WMS 业务 API / H8 端口（只使用 WMS 命令和事件）
+  -> H8 ERP 防腐层（路由、配置、幂等、ERP 与 WMS 语义转换）
+  -> REST / 接口表适配器（协议、连接和外部报文）
+  -> ERP
+```
+
+| 边界 | 通用范围 | 不可做 |
+|---|---|---|
+| H-INT 契约 | 外部集成共用的弹性、规整、凭证、审计、幂等和契约测试 | 在触发 ADR-0030 第二段前建设连接器平台或共享引擎 |
+| H8 ERP 防腐层 | 多 ERP、多货主、多仓、消息方向、消息类型和主备通道 | 承载快递、冷链、TMS、企业微信等非 ERP 业务语义 |
+| 通道适配器 | REST 或接口表的连接、协议和外部 DTO | 把外部 DTO 传入业务 domain，或决定 WMS 业务流程 |
+| 业务模块 | WMS 业务规则和 canonical 命令/事件 | 读取 H8 连接表、直连 ERP 或依赖 ERP 字段 |
+
+只有 ADR-0030 的共享运行时启动条件全部满足后，才能从 H8、H5 和第三个真实对接中提取
+已被生产证据证明的共性；不得为了代码形式统一提前新增框架、插件注册或协议 DSL。
+
 ---
 
 ## 4. 前端分层
@@ -314,3 +338,4 @@ business 不依赖 page / feature / api-client
 - [ ] `packages/ui` 没有依赖 app/page/feature/api-client。
 - [ ] 原型代码没有直接复制进生产 app。
 - [ ] 页面达到 600 行已拆分或有治理豁免说明。
+- [ ] 外部系统 DTO、协议和连接信息止于对应防腐层/适配器，业务 domain 只使用 WMS 语义。

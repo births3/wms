@@ -4423,3 +4423,21 @@ evidence_refs = [
 reason = "已完成 6 流程 12 节点、8 类默认模板、全局/货主/仓库优先级、双人确认、M1 字典双向同步、幂等、审计、权限、查询缓存与变更失效；PC 矩阵、M2 验收、M4 复核及 M-SA 报损/报溢/销毁执行均已接入三档策略，M-QL 审批通过可同事务创建销毁报损单并进入该执行链，规则/第二人/H4 审批证据可回查。仍缺正式环境 P95 指标，以及 ADR-0027 解禁后的 PDA 离线 24 小时缓存/恢复校验和真实 PDA 证据，故不得整体关闭。"
 owner = "VR 模块负责人"
 resume_when = "补齐正式环境 P95 证据，并在 ADR-0027 解禁后完成 PDA 离线缓存、恢复校验与真机证据。"
+
+[[deferred_stories]]
+id = "US-H8-001"
+title = "ERP 连接配置与安全接入"
+module = "H8"
+story_file = "docs/domain/user-stories-h8-erp-integration.md"
+types = [
+  "write",
+  "api_change",
+  "frontend_interaction",
+  "integration",
+  "runtime_guard",
+  "audit_compliance",
+  "external_runtime",
+]
+reason = "已冻结 H-INT 通用契约、H8 ERP 专用防腐层、连接配置和安全接入规则；现有本地 Worker/Mock 只覆盖传输切片，尚无配置中心前后端、H8 专用表、权限审计、完整路由和真实 ERP dev/staging S4 证据。"
+owner = "H8 模块负责人"
+resume_when = "按 US-H8-001 完成配置中心、OpenAPI、H8 service/repository、PostgreSQL、权限审计、真实浏览器 E2E，并取得真实 ERP dev/staging 请求、回执、重试和审计证据。"

@@ -132,6 +132,18 @@ Wave 2（基础 Excel 导入导出）→ Wave 4（PDF 台账 + 复杂报表）
 
 统一管理与外部 ERP 系统的所有交互，隔离 ERP 的数据格式和协议差异，使业务模块不直接依赖 ERP 接口细节。
 
+### 能力分层与通用性边界
+
+| 层级 | 职责 | 通用范围 |
+|---|---|---|
+| H-INT 契约 | 统一弹性、字段规整、凭证、审计、幂等和契约测试要求 | 所有外部系统；当前不提供共享运行时 |
+| H8 ERP 防腐层 | ERP 连接配置、运行路由、主备切换和 ERP↔WMS 语义转换 | 多 ERP、多货主、多仓、方向和消息类型 |
+| 通道适配器 | REST/接口表连接、协议、外部 DTO 的收发 | 单一通道或 ERP 协议，不包含 WMS 业务规则 |
+
+业务模块只调用 WMS 业务 API 或 H8 端口；ERP DTO、接口表行和认证/连接细节必须止于
+H8。H8 是 ADR-0030 的首个参考实现，但不得承载冷链、TMS、快递或企业微信语义；这些
+对接只复用 H-INT 契约。共享运行时仍按 ADR-0030 第二段的生产证据条件延后。
+
 ### 双通道（2026-07 确认）
 
 | 通道 | 适用 | 机制 |
@@ -148,14 +160,14 @@ Wave 2（基础 Excel 导入导出）→ Wave 4（PDF 台账 + 复杂报表）
 | Compose | `deploy/docker-compose.h8-erp-if.yml`（MSSQL 模拟 ERP 接口库） |
 | 入站表 | `if_in_asn` / `if_in_outbound_order` / `if_in_product_master` / `if_in_return_order` / `if_in_product_change` |
 | 出站表 | `if_out_message`（通道 B）；通道 A 为 HTTP 回调（`ERP_CALLBACK_BASE` + path） |
-| Worker | `sync_worker.py`：`--direction` + `--transport table\|http\|both` |
+| Worker | `sync_worker.py`：`--direction` + `--transport table\|http\|both`；`both` 仅用于本地双通道联调，不是生产路由模式 |
 | 出站源 | putaway / inventory_status / stock_adjustment / **archive_revision** / **reconciliation** / **shipment_confirm** / **inventory_snapshot** outbox |
 | 通道 A Mock | `channel_a_callback_mock.py`；确认工具 `ack_if_out.py` |
 | Runbook | `docs/runbooks/h8-erp-interface-table-sync.md` |
 
 控制列约定：`sync_status`（入站 pending/processing/success/failed/dead；出站另含 acked）、`retry_count`、`last_error`、`idempotency_key`、`wms_resource_id`。档案补录 outbox 另有 `max_attempts`/`deadline_at`（5 次 / 5 分钟 / 24h）。
 
-新增 ERP 单据类型 = 新接口表（或统一 staging + type 列）+ 新 handler，不改 M2/M3/M4 域模型。
+新增 ERP 单据类型 = 新接口表（或统一 staging + type 列）+ H8 映射/handler；ERP DTO 不进入 M2/M3/M4 域模型。只有 WMS 业务语义本身变化时，才修改对应业务 domain。
 
 **本地闭环状态（2026-07 补全）**：通道 B 入站五类 + 出站七源；通道 A 出站 HTTP mock 联调；业务模块自动入队档案/对账/发货 outbox 与产线 S4 仍待接线/联调。
 
@@ -193,7 +205,10 @@ REST 按 ADR-0018 重试和熔断，满足降级条件后把同一消息及原 I
 | WMS → ERP | 报损报溢反馈 | M-SA |
 | WMS → ERP | **档案补录推送**（PDA 验收触发，含商品编码/字段名/新值/拍照证据 URL/ASN 号） | M-QL / M2 |
 
-### 接口契约
+### H8 防腐层契约
+
+下列 `ErpAdapter` 是 ERP 专用逻辑端口示例，不是 H-INT 通用运行时。实现时可由 ERP
+报文映射与 REST/接口表通道适配组合完成；业务模块不得实现该端口或依赖外部 DTO。
 
 ```rust
 // ERP 适配器 trait（每种 ERP 实现一个）
