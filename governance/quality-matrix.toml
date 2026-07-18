@@ -4438,6 +4438,17 @@ types = [
   "audit_compliance",
   "external_runtime",
 ]
-reason = "已补 H8 专用表、领域规则、配置 API、OpenAPI/api-client、H2 审计摘要、M1 配置中心 ERP 连接页与 Worker 非双写对齐；本地传输切片仍在。尚无真实浏览器 E2E/截图、正式 secret 解析、主备降级运行时与真实 ERP dev/staging S4 证据，不得标记完成。"
+frontend_pages = ["h8-erp-connectors"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:h8-real"]
+e2e_screenshots = [
+  { page = "h8-erp-connectors", spec = "prototypes/e2e/web-admin-h8-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-connectors/connector-list.png" },
+]
+evidence_refs = [
+  "apps/web-admin/src/pages/config-center/ErpConnectorConfigPage.tsx",
+  "backend/migrations/202607190003_h8_erp_connectors_admin_menu.sql",
+  "prototypes/e2e/web-admin-h8-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/h8-erp-connectors/connector-list.png",
+]
+reason = "已补 H8 专用表、领域规则、配置 API、OpenAPI/api-client、H2 审计摘要、基础能力/H8 集成中心独立菜单（h8-erp-connectors）与 Worker 非双写对齐；本地传输切片仍在。尚无全动作真实浏览器 E2E、正式 secret 解析、主备降级运行时与真实 ERP dev/staging S4 证据，不得标记完成。"
 owner = "H8 模块负责人"
 resume_when = "补真实浏览器 E2E（新建/测试/启用/重叠拒绝/停用/只读）与启用成功截图；接通 secrets 解析与主备降级运行时；取得真实 ERP dev/staging 请求、回执、重试和审计证据。"
