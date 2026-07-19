@@ -9,8 +9,8 @@ use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use uuid::Uuid;
 use wms_domain::{
-    H8ErpMessageDetail, H8ErpMessageListResponse, H8ErpMessageStats, PageMeta,
-    ReplayH8ErpMessageRequest,
+    ClaimH8ErpMessageRequest, H8ErpMessageDetail, H8ErpMessageListResponse, H8ErpMessageStats,
+    PageMeta, PurgeH8ErpMessagesRequest, PurgeH8ErpMessagesResponse, ReplayH8ErpMessageRequest,
 };
 
 use crate::auth::AuthContext;
@@ -22,10 +22,18 @@ pub fn h8_erp_message_router(state: H8ErpMessageAppState) -> Router {
     Router::new()
         .route("/api/v1/integration/erp-messages", get(list_messages))
         .route("/api/v1/integration/erp-messages/stats", get(message_stats))
+        .route(
+            "/api/v1/integration/erp-messages/purge",
+            post(purge_messages),
+        )
         .route("/api/v1/integration/erp-messages/:id", get(get_message))
         .route(
             "/api/v1/integration/erp-messages/:id/replay",
             post(replay_message),
+        )
+        .route(
+            "/api/v1/integration/erp-messages/:id/claim",
+            post(claim_message),
         )
         .with_state(state)
 }
@@ -106,4 +114,41 @@ async fn replay_message(
         .replay(ctx.owner_id, id, body.reason.trim(), &actor, Utc::now())
         .await?;
     Ok(Json(message))
+}
+
+async fn claim_message(
+    ctx: AuthContext,
+    State(state): State<H8ErpMessageAppState>,
+    Path(id): Path<Uuid>,
+    Json(body): Json<ClaimH8ErpMessageRequest>,
+) -> Result<Json<wms_domain::H8ErpMessage>, H8ErpMessageHandlerError> {
+    // Worker 使用 write 权限或系统主体；管理端运维也可
+    ctx.require_permission(H8_MSG_WRITE)?;
+    let lease = body.lease_seconds.unwrap_or(300);
+    let message = state
+        .repository
+        .claim(ctx.owner_id, id, body.worker_id.trim(), lease, Utc::now())
+        .await?;
+    Ok(Json(message))
+}
+
+async fn purge_messages(
+    ctx: AuthContext,
+    State(state): State<H8ErpMessageAppState>,
+    Json(body): Json<PurgeH8ErpMessagesRequest>,
+) -> Result<Json<PurgeH8ErpMessagesResponse>, H8ErpMessageHandlerError> {
+    ctx.require_permission(H8_MSG_WRITE)?;
+    if !body.confirmed {
+        return Err(H8ErpMessageHandlerError::BadRequest(
+            "confirmed must be true",
+        ));
+    }
+    let (deleted, retention_days) = state
+        .repository
+        .purge_terminal(ctx.owner_id, None, Utc::now())
+        .await?;
+    Ok(Json(PurgeH8ErpMessagesResponse {
+        deleted,
+        retention_days,
+    }))
 }

@@ -3,11 +3,12 @@ use crate::openapi_paths::*;
 use utoipa::OpenApi;
 use wms_domain::{
     ArriveDockAppointmentRequest, ChangeDrugInspectionPlatformStatusRequest,
-    CreateH8ErpConnectorRequest, DrugInspectionPlatform, DrugInspectionPlatformListResponse,
-    H8ErpConnector, H8ErpConnectorListResponse, H8ErpConnectorTestResult, H8ErpMessage,
-    H8ErpMessageAttempt, H8ErpMessageDetail, H8ErpMessageListResponse, H8ErpMessageStats,
-    ReplayH8ErpMessageRequest, TaskReleaseStrategy, UpdateH8ErpConnectorRequest,
-    UpsertDrugInspectionPlatformRequest,
+    ClaimH8ErpMessageRequest, CreateH8ErpConnectorRequest, DrugInspectionPlatform,
+    DrugInspectionPlatformListResponse, H8ErpConnector, H8ErpConnectorListResponse,
+    H8ErpConnectorTestResult, H8ErpMessage, H8ErpMessageAttempt, H8ErpMessageDetail,
+    H8ErpMessageListResponse, H8ErpMessageStats, PurgeH8ErpMessagesRequest,
+    PurgeH8ErpMessagesResponse, ReplayH8ErpMessageRequest, TaskReleaseStrategy,
+    UpdateH8ErpConnectorRequest, UpsertDrugInspectionPlatformRequest,
 };
 #[derive(OpenApi)]
 #[openapi(
@@ -52,6 +53,8 @@ use wms_domain::{
         stats_h8_erp_messages,
         get_h8_erp_message,
         replay_h8_erp_message,
+        claim_h8_erp_message,
+        purge_h8_erp_messages,
         list_roles,
         create_role,
         update_role,
@@ -406,6 +409,9 @@ use wms_domain::{
         H8ErpMessageListResponse,
         H8ErpMessageStats,
         ReplayH8ErpMessageRequest,
+        ClaimH8ErpMessageRequest,
+        PurgeH8ErpMessagesRequest,
+        PurgeH8ErpMessagesResponse,
         UpsertDrugInspectionPlatformRequest,
         ChangeDrugInspectionPlatformStatusRequest,
         Customer,

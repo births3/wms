@@ -1796,6 +1796,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/integration/erp-messages/purge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["purge_h8_erp_messages"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/integration/erp-messages/stats": {
         parameters: {
             query?: never;
@@ -1822,6 +1838,22 @@ export interface paths {
         get: operations["get_h8_erp_message"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integration/erp-messages/{id}/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["claim_h8_erp_message"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4461,6 +4493,14 @@ export interface components {
             reason: string;
             target_status: string;
         };
+        ClaimH8ErpMessageRequest: {
+            /**
+             * Format: int64
+             * @description 租约秒数，默认 300。
+             */
+            lease_seconds?: number | null;
+            worker_id: string;
+        };
         ColdChainDevice: {
             /** Format: date-time */
             calibration_due_at?: string | null;
@@ -5720,6 +5760,11 @@ export interface components {
             failed: number;
             /** Format: uuid */
             owner_id: string;
+            /**
+             * Format: int64
+             * @description 处理时延 P95（毫秒），来自尝试 finished-started；无样本时为 0。
+             */
+            p95_latency_ms: number;
             /** Format: int64 */
             pending: number;
             /** Format: int64 */
@@ -6660,6 +6705,16 @@ export interface components {
         };
         PublishAdminMenuRequest: {
             note?: string | null;
+        };
+        PurgeH8ErpMessagesRequest: {
+            /** @description 必须为 true；且货主已配置 retention_days 才允许清理终态消息。 */
+            confirmed: boolean;
+        };
+        PurgeH8ErpMessagesResponse: {
+            /** Format: int64 */
+            deleted: number;
+            /** Format: int32 */
+            retention_days: number;
         };
         PutawayInventoryRequest: {
             batch_no: string;
@@ -14776,6 +14831,39 @@ export interface operations {
             };
         };
     };
+    purge_h8_erp_messages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PurgeH8ErpMessagesRequest"];
+            };
+        };
+        responses: {
+            /** @description 按保留策略清理终态消息 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurgeH8ErpMessagesResponse"];
+                };
+            };
+            /** @description 未配置保留策略 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     stats_h8_erp_messages: {
         parameters: {
             query?: never;
@@ -14855,6 +14943,42 @@ export interface operations {
             };
             /** @description 不存在 */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    claim_h8_erp_message: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 消息 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClaimH8ErpMessageRequest"];
+            };
+        };
+        responses: {
+            /** @description 认领成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H8ErpMessage"];
+                };
+            };
+            /** @description 租约冲突 */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

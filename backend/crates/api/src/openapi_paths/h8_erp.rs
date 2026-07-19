@@ -1,8 +1,9 @@
 #[allow(unused_imports)]
 use wms_domain::{
-    CreateH8ErpConnectorRequest, ErrorResponse, H8ErpConnector, H8ErpConnectorListResponse,
-    H8ErpConnectorTestResult, H8ErpMessage, H8ErpMessageDetail, H8ErpMessageListResponse,
-    H8ErpMessageStats, ReplayH8ErpMessageRequest, UpdateH8ErpConnectorRequest,
+    ClaimH8ErpMessageRequest, CreateH8ErpConnectorRequest, ErrorResponse, H8ErpConnector,
+    H8ErpConnectorListResponse, H8ErpConnectorTestResult, H8ErpMessage, H8ErpMessageDetail,
+    H8ErpMessageListResponse, H8ErpMessageStats, PurgeH8ErpMessagesRequest,
+    PurgeH8ErpMessagesResponse, ReplayH8ErpMessageRequest, UpdateH8ErpConnectorRequest,
 };
 
 #[utoipa::path(
@@ -211,3 +212,30 @@ pub(crate) fn get_h8_erp_message() {}
 )]
 #[allow(dead_code)]
 pub(crate) fn replay_h8_erp_message() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/integration/erp-messages/{id}/claim",
+    tag = "h8-erp",
+    params(("id" = uuid::Uuid, Path, description = "消息 ID")),
+    request_body = ClaimH8ErpMessageRequest,
+    responses(
+        (status = 200, description = "认领成功", body = H8ErpMessage),
+        (status = 409, description = "租约冲突", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn claim_h8_erp_message() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/integration/erp-messages/purge",
+    tag = "h8-erp",
+    request_body = PurgeH8ErpMessagesRequest,
+    responses(
+        (status = 200, description = "按保留策略清理终态消息", body = PurgeH8ErpMessagesResponse),
+        (status = 400, description = "未配置保留策略", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn purge_h8_erp_messages() {}

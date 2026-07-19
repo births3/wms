@@ -2,6 +2,7 @@
 
 mod error;
 mod handlers;
+mod pg_repository;
 mod repository;
 mod state;
 

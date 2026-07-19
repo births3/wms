@@ -9077,6 +9077,46 @@
         }
       }
     },
+    "/api/v1/integration/erp-messages/purge": {
+      "post": {
+        "tags": [
+          "h8-erp"
+        ],
+        "operationId": "purge_h8_erp_messages",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PurgeH8ErpMessagesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "按保留策略清理终态消息",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurgeH8ErpMessagesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "未配置保留策略",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/integration/erp-messages/stats": {
       "get": {
         "tags": [
@@ -9168,6 +9208,58 @@
           },
           "404": {
             "description": "不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/integration/erp-messages/{id}/claim": {
+      "post": {
+        "tags": [
+          "h8-erp"
+        ],
+        "operationId": "claim_h8_erp_message",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "消息 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimH8ErpMessageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "认领成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H8ErpMessage"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "租约冲突",
             "content": {
               "application/json": {
                 "schema": {
@@ -21807,6 +21899,23 @@
           }
         }
       },
+      "ClaimH8ErpMessageRequest": {
+        "type": "object",
+        "required": [
+          "worker_id"
+        ],
+        "properties": {
+          "lease_seconds": {
+            "type": "integer",
+            "format": "int64",
+            "description": "租约秒数，默认 300。",
+            "nullable": true
+          },
+          "worker_id": {
+            "type": "string"
+          }
+        }
+      },
       "ColdChainDevice": {
         "type": "object",
         "required": [
@@ -25902,7 +26011,8 @@
           "dead",
           "processing",
           "pending",
-          "retry_total"
+          "retry_total",
+          "p95_latency_ms"
         ],
         "properties": {
           "dead": {
@@ -25916,6 +26026,11 @@
           "owner_id": {
             "type": "string",
             "format": "uuid"
+          },
+          "p95_latency_ms": {
+            "type": "integer",
+            "format": "int64",
+            "description": "处理时延 P95（毫秒），来自尝试 finished-started；无样本时为 0。"
           },
           "pending": {
             "type": "integer",
@@ -28804,6 +28919,35 @@
           "note": {
             "type": "string",
             "nullable": true
+          }
+        }
+      },
+      "PurgeH8ErpMessagesRequest": {
+        "type": "object",
+        "required": [
+          "confirmed"
+        ],
+        "properties": {
+          "confirmed": {
+            "type": "boolean",
+            "description": "必须为 true；且货主已配置 retention_days 才允许清理终态消息。"
+          }
+        }
+      },
+      "PurgeH8ErpMessagesResponse": {
+        "type": "object",
+        "required": [
+          "deleted",
+          "retention_days"
+        ],
+        "properties": {
+          "deleted": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "retention_days": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
