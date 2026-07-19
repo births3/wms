@@ -366,7 +366,12 @@ def process_outbound_once(
       both     — 先 table 再 http（双写联调，需 H8_ALLOW_LOCAL_DUAL_TRANSPORT）
       failover — REST 主用失败后转接口表（rest_primary_table_fallback）
     """
-    from channel_failover import publish_with_failover
+    try:
+        from channel_failover import publish_with_failover
+    except ImportError:  # 允许从仓库根以 package 路径运行
+        from scripts.h8_erp_interface_sync.channel_failover import (  # type: ignore
+            publish_with_failover,
+        )
 
     attempts = http_max_attempts
     if attempts is None:
@@ -406,17 +411,18 @@ def process_outbound_once(
                 print(f"[h8-out] dry-run release {table}/{row.id}", flush=True)
                 continue
             try:
-                def _http() -> None:
+                # 默认参数绑定当前 row，避免循环闭包误用末行
+                def _http(active: OutboxRow = row) -> None:
                     if not callback_base:
                         raise RuntimeError(
                             "ERP_CALLBACK_BASE required for http transport"
                         )
-                    http_callback_publish(callback_base, row)
+                    http_callback_publish(callback_base, active)
 
-                def _table() -> None:
+                def _table(active: OutboxRow = row) -> None:
                     if sqlcmd_exec is None:
                         raise RuntimeError("sqlcmd_exec required for table transport")
-                    sqlcmd_exec(insert_if_out_sql(row))
+                    sqlcmd_exec(insert_if_out_sql(active))
 
                 result = publish_with_failover(
                     transport=transport,

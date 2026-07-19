@@ -25,6 +25,8 @@ DATA_DIR = Path(os.environ.get("ERP_VENDOR_DATA", "/data"))
 LOG_PATH = DATA_DIR / "receipts.jsonl"
 FAIL_COUNT = int(os.environ.get("ERP_FAIL_COUNT", "0"))
 VENDOR_CODE = os.environ.get("ERP_VENDOR_CODE", "container-erp-vendor-a")
+# 可选：设置后 /_admin/* 需带 Header X-ERP-Admin-Token
+ADMIN_TOKEN = os.environ.get("ERP_VENDOR_ADMIN_TOKEN", "").strip()
 
 _lock = threading.Lock()
 _fail_remaining = FAIL_COUNT
@@ -114,8 +116,13 @@ class Handler(BaseHTTPRequestHandler):
         global _fail_remaining
         path = urlparse(self.path).path
         body = self._read_json()
-        # 运维探针：不经业务 fail 计数
+        # 运维探针：不经业务 fail 计数（生产镜像务必配置 ERP_VENDOR_ADMIN_TOKEN）
         if path == "/_admin/fail-count":
+            if ADMIN_TOKEN:
+                got = (self.headers.get("X-ERP-Admin-Token") or "").strip()
+                if got != ADMIN_TOKEN:
+                    self._json(401, {"error": "admin token required"})
+                    return
             with _lock:
                 n = int(body.get("count") or 0)
                 _fail_remaining = max(0, n)

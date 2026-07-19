@@ -38,11 +38,15 @@ BASE = os.environ.get("ERP_CALLBACK_BASE", "http://127.0.0.1:18092").rstrip("/")
 
 def http_json(method: str, url: str, body: dict | None = None, timeout: float = 5.0) -> tuple[int, dict]:
     data = None if body is None else json.dumps(body).encode("utf-8")
+    headers = {"Content-Type": "application/json", "Accept": "application/json"}
+    admin = os.environ.get("ERP_VENDOR_ADMIN_TOKEN", "").strip()
+    if admin and "/_admin/" in url:
+        headers["X-ERP-Admin-Token"] = admin
     req = urllib.request.Request(
         url,
         data=data,
         method=method,
-        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        headers=headers,
     )
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:

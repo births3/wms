@@ -39,11 +39,16 @@ OUTBOX = "receiving_putaway_erp_feedback_outbox"
 
 def http_json(method: str, url: str, body: dict | None = None) -> tuple[int, dict]:
     data = None if body is None else json.dumps(body).encode("utf-8")
+    headers = {"Content-Type": "application/json", "Accept": "application/json"}
+    # 与厂商容器可选 ERP_VENDOR_ADMIN_TOKEN 对齐
+    admin = os.environ.get("ERP_VENDOR_ADMIN_TOKEN", "").strip()
+    if admin and "/_admin/" in url:
+        headers["X-ERP-Admin-Token"] = admin
     req = urllib.request.Request(
         url,
         data=data,
         method=method,
-        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        headers=headers,
     )
     try:
         with urllib.request.urlopen(req, timeout=8) as resp:

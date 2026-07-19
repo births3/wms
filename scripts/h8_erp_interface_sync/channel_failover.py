@@ -59,7 +59,7 @@ def publish_with_failover(
         publish_http()
         return PublishResult(channel="http", attempts_http=1, fallback_used=False)
     if t == "both":
-        # 本地双写联调：顺序执行，任一失败抛错
+        # 本地双写联调：顺序执行，任一失败抛错；成功表示 table+http 均已写（error 保持 None）
         publish_table()
         publish_http()
         return PublishResult(channel="http", attempts_http=1, fallback_used=False)
