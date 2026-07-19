@@ -180,10 +180,8 @@ export function ErpConnectorConfigPage({
   const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(() => defaultQuery());
   const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(() => defaultQuery());
 
-  const canWrite =
-    currentUser?.permissions.includes(H8_ERP_CONNECTOR_WRITE) ??
-    // 未注入用户时（仅 dev 兜底）按可写展示，真实壳层始终注入 currentUser
-    true;
+  // 无 currentUser 时默认不可写，避免权限未就绪时露出写操作
+  const canWrite = Boolean(currentUser?.permissions.includes(H8_ERP_CONNECTOR_WRITE));
 
   const rows = listQuery.data ?? [];
   const filteredRows = React.useMemo(() => filterConnectors(rows, appliedQuery), [rows, appliedQuery]);
