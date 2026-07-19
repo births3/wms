@@ -28,6 +28,7 @@ use wms_api::{
     drug_inspection_handlers::{drug_inspection_router, DrugInspectionAppState},
     dual_person_policy_handlers::{dual_person_policy_router, DualPersonPolicyAppState},
     feature_flags::FeatureFlagRegistry,
+    h8_erp_connectors::{h8_erp_connector_router, H8ErpConnectorAppState},
     inventory_status_config_handlers::{
         inventory_status_config_router, InventoryStatusConfigAppState,
     },
@@ -124,6 +125,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .map_err(|error| io::Error::other(format!("feature flags: {error:?}")))?,
             pool.clone(),
         )))
+        .merge(h8_erp_connector_router(
+            H8ErpConnectorAppState::with_postgres(pool.clone()),
+        ))
         .merge(drug_inspection_router(
             DrugInspectionAppState::with_postgres(pool.clone()),
         ))

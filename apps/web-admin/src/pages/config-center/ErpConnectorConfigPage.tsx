@@ -261,6 +261,7 @@ export function ErpConnectorConfigPage({
       setSelectedRowKeys([]);
       setConfirmAction(null);
     } catch (error) {
+      setConfirmAction(null);
       setNotice({
         type: "error",
         text: error instanceof Error ? error.message : "操作失败",
