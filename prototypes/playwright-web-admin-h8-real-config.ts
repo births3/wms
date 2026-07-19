@@ -43,6 +43,12 @@ export default defineConfig({
         WMS_BIND_ADDR: bindAddr(apiURL),
         WMS_E2E_SEED: "1",
         WMS_JWT_SECRET: jwtSigningKey,
+        // ADR-0013 local secrets map：模拟 Vault alias 解析（不落明文到代码库）
+        WMS_H8_SECRET_ALIASES: JSON.stringify({
+          "vault://wms/e2e/h8/bearer": "e2e-bearer-token",
+          "vault://wms/e2e/h8/if-db": "e2e-if-db-pass",
+        }),
+        WMS_SECRETS_REQUIRE_RESOLVE: "1",
       },
     },
     {

@@ -126,6 +126,8 @@ function emptyForm(): CreateH8ErpConnectorRequest {
     channel_mode: "rest",
     api_base_url: "https://erp.example.com",
     api_key_id: crypto.randomUUID(),
+    bearer_secret_alias: null,
+    interface_db_password_alias: null,
   };
 }
 
@@ -405,6 +407,23 @@ export function ErpConnectorConfigPage({
               />
             </label>
             <label className="grid gap-1 text-sm">
+              方向
+              <select
+                className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                value={form.directions[0] ?? "inbound"}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    directions: [e.target.value],
+                    message_types: e.target.value === "outbound" ? ["outbound_order"] : ["asn"],
+                  }))
+                }
+              >
+                <option value="inbound">inbound</option>
+                <option value="outbound">outbound</option>
+              </select>
+            </label>
+            <label className="grid gap-1 text-sm">
               通道模式
               <select
                 className="h-10 rounded-md border border-input bg-background px-3 text-sm"
@@ -421,6 +440,19 @@ export function ErpConnectorConfigPage({
               <Input
                 value={form.api_base_url ?? ""}
                 onChange={(e) => setForm((f) => ({ ...f, api_base_url: e.target.value }))}
+              />
+            </label>
+            <label className="grid gap-1 text-sm">
+              Bearer secret alias（出站）
+              <Input
+                placeholder="vault://wms/.../bearer"
+                value={form.bearer_secret_alias ?? ""}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    bearer_secret_alias: e.target.value.trim() ? e.target.value.trim() : null,
+                  }))
+                }
               />
             </label>
             <DialogFooter>

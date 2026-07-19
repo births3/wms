@@ -421,3 +421,89 @@ pub async fn seed_hal_alert_capabilities(pool: &PgPool) -> Result<(), sqlx::Erro
     .await?;
     Ok(())
 }
+
+/// US-H8-001：仓库主管仅具备 h8.erp_connector.read，用于只读 E2E。
+pub async fn seed_h8_warehouse_manager(
+    pool: &PgPool,
+    password_hash: &str,
+) -> Result<(), sqlx::Error> {
+    let owner_id = Uuid::from_u128(1);
+    let user_id = Uuid::from_u128(0x130);
+    sqlx::query(
+        r#"
+        INSERT INTO auth_users (id, username, display_name, password_hash, status)
+        VALUES ($1, 'wh-manager', '仓库主管', $2, 'active')
+        ON CONFLICT (id) DO UPDATE
+        SET username = EXCLUDED.username,
+            display_name = EXCLUDED.display_name,
+            password_hash = EXCLUDED.password_hash,
+            status = 'active',
+            updated_at = now()
+        "#,
+    )
+    .bind(user_id)
+    .bind(password_hash)
+    .execute(pool)
+    .await?;
+    sqlx::query(
+        r#"
+        INSERT INTO auth_user_owner_bindings (user_id, owner_id, is_active, is_primary)
+        VALUES ($1, $2, TRUE, TRUE)
+        ON CONFLICT (user_id, owner_id) DO UPDATE
+        SET is_active = TRUE, is_primary = TRUE
+        "#,
+    )
+    .bind(user_id)
+    .bind(owner_id)
+    .execute(pool)
+    .await?;
+    sqlx::query(
+        r#"
+        INSERT INTO auth_permissions (id, permission_code, permission_name)
+        VALUES
+            (md5('auth_permission:h8.erp_connector.read')::uuid, 'h8.erp_connector.read', 'H8 ERP 连接只读'),
+            (md5('auth_permission:h8.erp_connector.write')::uuid, 'h8.erp_connector.write', 'H8 ERP 连接维护')
+        ON CONFLICT DO NOTHING
+        "#,
+    )
+    .execute(pool)
+    .await?;
+    let role_id: Uuid = sqlx::query_scalar(
+        r#"
+        INSERT INTO auth_roles (id, owner_id, role_code, role_name)
+        VALUES ($1, $2, 'warehouse_manager', '仓库主管')
+        ON CONFLICT (owner_id, lower(role_code)) DO UPDATE
+        SET role_name = EXCLUDED.role_name
+        RETURNING id
+        "#,
+    )
+    .bind(Uuid::from_u128(0x131))
+    .bind(owner_id)
+    .fetch_one(pool)
+    .await?;
+    sqlx::query(
+        r#"
+        INSERT INTO auth_user_roles (user_id, owner_id, role_id)
+        VALUES ($1, $2, $3)
+        ON CONFLICT DO NOTHING
+        "#,
+    )
+    .bind(user_id)
+    .bind(owner_id)
+    .bind(role_id)
+    .execute(pool)
+    .await?;
+    // 仅读权限（写权限不得授予仓库主管）
+    sqlx::query(
+        r#"
+        INSERT INTO auth_role_permissions (role_id, permission_id)
+        SELECT $1, id FROM auth_permissions
+         WHERE permission_code = 'h8.erp_connector.read'
+        ON CONFLICT DO NOTHING
+        "#,
+    )
+    .bind(role_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}

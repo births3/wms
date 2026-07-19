@@ -180,6 +180,7 @@ ERP 连接通过管理端「基础能力 / H8 集成中心 / H8 ERP 连接」独
 | 通道 | `rest`、`interface_table`、`rest_primary_table_fallback`；双通道固定 REST 主用、接口表备用，不双写 |
 | 入站认证 | REST 使用 H1 `X-WMS-API-Key`，scope 按消息类型最小授权 |
 | 出站认证 | REST 使用独立 Bearer secret alias；接口表使用独立最小权限数据库账号和密码 secret alias |
+| Secrets 解析 | 连接测试按 ADR-0013：`WMS_H8_SECRET_ALIASES`/`WMS_SECRETS_MAP`（local/e2e）→ `WMS_VAULT_ADDR`+`WMS_VAULT_TOKEN`（KV v2）；`WMS_SECRETS_REQUIRE_RESOLVE=1` 时强制可解析 |
 | 配置状态 | `testing` → `active` ↔ `disabled`；有效连接关键配置变化后回到 `testing`；运行健康单独记录，不反写配置状态 |
 | 启用门槛 | 当前配置版本通过 secret、TLS/认证、接口表结构/权限和路由重叠测试 |
 | 变更 | 有效连接的端点、路由或 secret alias 变化后回到 `testing`；旧测试结果失效 |

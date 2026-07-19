@@ -68,6 +68,7 @@ pub mod resilience;
 pub mod retail_chain;
 pub mod role_management;
 mod role_management_models;
+pub mod secrets;
 pub mod state_machine;
 pub mod stock_adjustment;
 pub mod stock_adjustment_handlers;

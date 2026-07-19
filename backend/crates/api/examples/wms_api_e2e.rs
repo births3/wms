@@ -430,6 +430,7 @@ async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
 
     wms_api_e2e_seed::seed_mvr_matrix_approver(pool, &password_hash, system_admin_role_id).await?;
     wms_api_e2e_seed::seed_quality_approver(pool, &password_hash).await?;
+    wms_api_e2e_seed::seed_h8_warehouse_manager(pool, &password_hash).await?;
     wms_api_e2e_seed::seed_m9_m10_capabilities(pool).await?;
     wms_api_e2e_seed::seed_m4_review_data(pool).await?;
 

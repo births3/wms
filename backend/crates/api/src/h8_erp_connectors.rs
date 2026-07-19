@@ -702,7 +702,9 @@ async fn run_connection_probe(connector: &H8ErpConnector) -> (bool, Option<Strin
                 return (false, Some("api_key_id required for inbound REST".into()));
             }
             if connector.directions.iter().any(|d| d == "outbound") {
-                match resolve_secret_alias_probe(connector.bearer_secret_alias.as_deref()) {
+                match crate::secrets::resolve_secret_alias_for_probe(
+                    connector.bearer_secret_alias.as_deref(),
+                ) {
                     Ok(()) => {}
                     Err(msg) => return (false, Some(msg)),
                 }
@@ -732,40 +734,15 @@ async fn run_connection_probe(connector: &H8ErpConnector) -> (bool, Option<Strin
             {
                 return (false, Some("interface table fields incomplete".into()));
             }
-            match resolve_secret_alias_probe(connector.interface_db_password_alias.as_deref()) {
+            match crate::secrets::resolve_secret_alias_for_probe(
+                connector.interface_db_password_alias.as_deref(),
+            ) {
                 Ok(()) => (true, None),
                 Err(msg) => (false, Some(msg)),
             }
         }
         _ => (false, Some("invalid channel_mode".into())),
     }
-}
-
-/// 连接测试阶段的 secret alias 探测：
-/// 1) alias 形态校验；2) 若配置了 `WMS_H8_SECRET_ALIASES`（JSON 对象 alias→值）则要求可解析；
-/// 正式 Vault 解析与 S4 外部证据仍独立验收。
-fn resolve_secret_alias_probe(alias: Option<&str>) -> Result<(), String> {
-    let alias = alias
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .ok_or_else(|| "secret alias missing".to_string())?;
-    if alias.len() < 3 || alias.contains(' ') {
-        return Err("invalid secret alias shape".into());
-    }
-    if let Ok(raw) = std::env::var("WMS_H8_SECRET_ALIASES") {
-        let map: serde_json::Value = serde_json::from_str(&raw)
-            .map_err(|_| "WMS_H8_SECRET_ALIASES invalid JSON".to_string())?;
-        let resolved = map
-            .as_object()
-            .and_then(|o| o.get(alias))
-            .and_then(|v| v.as_str())
-            .map(str::trim)
-            .filter(|s| !s.is_empty());
-        if resolved.is_none() {
-            return Err(format!("secret alias not resolvable: {alias}"));
-        }
-    }
-    Ok(())
 }
 
 async fn reqwest_get_status(url: &str) -> Result<u16, String> {
@@ -1018,23 +995,5 @@ mod tests {
         assert_eq!(H8_CONFIG_WRITE, "h8.erp_connector.write");
         assert!(!H8_CONFIG_READ.starts_with("m1."));
         assert!(!H8_CONFIG_WRITE.starts_with("m1."));
-    }
-
-    #[test]
-    fn secret_alias_probe_requires_shape() {
-        assert!(resolve_secret_alias_probe(None).is_err());
-        assert!(resolve_secret_alias_probe(Some("ab")).is_err());
-        assert!(resolve_secret_alias_probe(Some("vault://wms/erp/bearer")).is_ok());
-    }
-
-    #[test]
-    fn secret_alias_probe_resolves_from_env_map() {
-        std::env::set_var(
-            "WMS_H8_SECRET_ALIASES",
-            r#"{"vault://wms/erp/bearer":"token-value"}"#,
-        );
-        assert!(resolve_secret_alias_probe(Some("vault://wms/erp/bearer")).is_ok());
-        assert!(resolve_secret_alias_probe(Some("vault://missing")).is_err());
-        std::env::remove_var("WMS_H8_SECRET_ALIASES");
     }
 }
