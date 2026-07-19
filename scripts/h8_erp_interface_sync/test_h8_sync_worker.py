@@ -5,6 +5,11 @@ from __future__ import annotations
 import json
 import unittest
 
+from channel_failover import (
+    map_channel_mode_to_transport,
+    production_allows_simultaneous_dual_write,
+    publish_with_failover,
+)
 from outbound_publish import (
     OUTBOX_SOURCES,
     OutboxRow,
@@ -67,6 +72,75 @@ class TestPayloadJson(unittest.TestCase):
         sql = insert_if_out_sql(row)
         self.assertIn("a|b", sql)
         self.assertNotIn("\n  INSERT", sql.split("IF NOT EXISTS")[0])  # payload line compact
+
+
+class TestChannelFailover(unittest.TestCase):
+    def test_map_modes(self) -> None:
+        self.assertEqual(map_channel_mode_to_transport("rest"), "http")
+        self.assertEqual(map_channel_mode_to_transport("interface_table"), "table")
+        self.assertEqual(
+            map_channel_mode_to_transport("rest_primary_table_fallback"),
+            "failover",
+        )
+        self.assertFalse(production_allows_simultaneous_dual_write("rest_primary_table_fallback"))
+
+    def test_failover_uses_table_after_http_fail(self) -> None:
+        calls: list[str] = []
+
+        def http() -> None:
+            calls.append("http")
+            raise RuntimeError("erp down")
+
+        def table() -> None:
+            calls.append("table")
+
+        result = publish_with_failover(
+            transport="failover",
+            publish_http=http,
+            publish_table=table,
+            http_max_attempts=2,
+        )
+        self.assertEqual(result.channel, "table_fallback")
+        self.assertTrue(result.fallback_used)
+        self.assertEqual(result.attempts_http, 2)
+        self.assertEqual(calls, ["http", "http", "table"])
+
+    def test_failover_http_success_skips_table(self) -> None:
+        calls: list[str] = []
+
+        def http() -> None:
+            calls.append("http")
+
+        def table() -> None:
+            calls.append("table")
+
+        result = publish_with_failover(
+            transport="failover",
+            publish_http=http,
+            publish_table=table,
+            http_max_attempts=2,
+        )
+        self.assertEqual(result.channel, "http")
+        self.assertFalse(result.fallback_used)
+        self.assertEqual(calls, ["http"])
+
+    def test_not_dual_write_on_failover_success_paths(self) -> None:
+        """成功走 HTTP 时不得再写 table（非双写）。"""
+        table_calls = 0
+
+        def http() -> None:
+            return None
+
+        def table() -> None:
+            nonlocal table_calls
+            table_calls += 1
+
+        publish_with_failover(
+            transport="failover",
+            publish_http=http,
+            publish_table=table,
+        )
+        self.assertEqual(table_calls, 0)
 
 
 if __name__ == "__main__":

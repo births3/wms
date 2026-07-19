@@ -691,15 +691,19 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--transport",
-        choices=("table", "http", "both"),
+        choices=("table", "http", "both", "failover"),
         default=None,
-        help="出站通道：table=B 接口表, http=A 回调, both=双写；默认读 H8_OUTBOUND_TRANSPORT",
+        help=(
+            "出站：table=B, http=A, failover=REST失败转表, both=本地双写；"
+            "默认 H8_OUTBOUND_TRANSPORT / H8_CHANNEL_MODE / DB channel_mode"
+        ),
     )
     args = parser.parse_args(argv)
     settings = Settings.from_env()
     need_in = args.direction in ("in", "both")
     need_out = args.direction in ("out", "both")
-    transport = args.transport or resolve_outbound_transport()
+    wms_db = resolve_wms_db_url()
+    transport = args.transport or resolve_outbound_transport(database_url=wms_db)
     callback_base = resolve_callback_base()
     # US-H8-001：生产 channel_mode 禁止同时双写；both 仅本地联调
     if transport == "both" and os.environ.get("H8_ALLOW_LOCAL_DUAL_TRANSPORT", "0") != "1":
@@ -713,19 +717,26 @@ def main(argv: list[str] | None = None) -> int:
     if need_in and not args.dry_run and not settings.api_token:
         print("WMS_API_TOKEN is required for inbound unless --dry-run", file=sys.stderr)
         return 2
-    wms_db = resolve_wms_db_url()
     if need_out and not wms_db and not args.dry_run:
         print(
             "WMS_DB_URL (or DATABASE_URL) is required for outbound publish",
             file=sys.stderr,
         )
         return 2
-    if need_out and transport in ("http", "both") and not callback_base and not args.dry_run:
+    if (
+        need_out
+        and transport in ("http", "both", "failover")
+        and not callback_base
+        and not args.dry_run
+    ):
         print(
-            "ERP_CALLBACK_BASE required for http/both transport",
+            "ERP_CALLBACK_BASE required for http/both/failover transport",
             file=sys.stderr,
         )
         return 2
+    if need_out and transport in ("table", "both", "failover") and not args.dry_run:
+        # failover 需要 table 后备；table 接口由 sqlcmd 提供
+        pass
     types = [t.strip() for t in args.types.split(",") if t.strip()]
     for t in types:
         if t not in HANDLERS:
@@ -746,7 +757,7 @@ def main(argv: list[str] | None = None) -> int:
                 database_url=wms_db,
                 sqlcmd_exec=(
                     (lambda sql: sqlcmd_query(settings, sql))
-                    if transport in ("table", "both")
+                    if transport in ("table", "both", "failover")
                     else None
                 ),
                 batch_size=settings.batch_size,

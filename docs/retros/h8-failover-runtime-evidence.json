@@ -1,0 +1,45 @@
+{
+  "collected_at": "2026-07-19T01:53:14.781390+00:00",
+  "story": "US-H8-001",
+  "scope": "rest_primary_table_fallback runtime + local ERP mock",
+  "environment": {
+    "erp_mock": "http://127.0.0.1:18191",
+    "note": "S4 real ERP host can replace mock; same Idempotency-Key on fallback"
+  },
+  "scenarios": [
+    {
+      "name": "channel_mode_mapping",
+      "ok": true,
+      "transport": "failover"
+    },
+    {
+      "name": "unit_http_fail_then_table",
+      "ok": true,
+      "channel": "table_fallback",
+      "calls": [
+        "http",
+        "http",
+        "table"
+      ],
+      "fallback_used": true,
+      "idempotency_note": "if_out_message uses out:{table}:{id}; HTTP body carries same source_outbox_id"
+    },
+    {
+      "name": "live_erp_mock_recovery",
+      "ok": true,
+      "attempts": 3,
+      "response": "{\"accepted\":true}",
+      "erp_accepted_count": 1
+    },
+    {
+      "name": "live_rest_fail_table_fallback",
+      "ok": true,
+      "channel": "table_fallback",
+      "fallback_used": true,
+      "table_idempotency_key": "out:shipment_confirm_erp_feedback_outbox:e2e-failover-2",
+      "http_error": "HTTP Error 503: Service Unavailable; HTTP Error 503: Service Unavailable",
+      "not_dual_write": true
+    }
+  ],
+  "ok": true
+}

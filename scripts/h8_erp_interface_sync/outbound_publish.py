@@ -357,13 +357,20 @@ def process_outbound_once(
     dry_run: bool,
     transport: str = "table",
     callback_base: str | None = None,
+    http_max_attempts: int | None = None,
 ) -> int:
     """
     transport:
-      table — 通道 B，写入 MSSQL if_out_message（需 sqlcmd_exec）
-      http  — 通道 A，POST ERP_CALLBACK_BASE
-      both  — 先 table 再 http（双写联调）
+      table    — 通道 B，写入 MSSQL if_out_message（需 sqlcmd_exec）
+      http     — 通道 A，POST ERP_CALLBACK_BASE
+      both     — 先 table 再 http（双写联调，需 H8_ALLOW_LOCAL_DUAL_TRANSPORT）
+      failover — REST 主用失败后转接口表（rest_primary_table_fallback）
     """
+    from channel_failover import publish_with_failover
+
+    attempts = http_max_attempts
+    if attempts is None:
+        attempts = int(os.environ.get("H8_HTTP_MAX_ATTEMPTS", "2"))
     processed = 0
     for src in OUTBOX_SOURCES:
         table = src["table"]
@@ -398,30 +405,35 @@ def process_outbound_once(
                 )
                 print(f"[h8-out] dry-run release {table}/{row.id}", flush=True)
                 continue
-            errors: list[str] = []
             try:
-                if transport in ("table", "both"):
-                    if sqlcmd_exec is None:
-                        raise RuntimeError("sqlcmd_exec required for table transport")
-                    try:
-                        sqlcmd_exec(insert_if_out_sql(row))
-                    except Exception as exc:  # noqa: BLE001
-                        errors.append(f"table:{exc}")
-                if transport in ("http", "both"):
+                def _http() -> None:
                     if not callback_base:
                         raise RuntimeError(
                             "ERP_CALLBACK_BASE required for http transport"
                         )
-                    try:
-                        http_callback_publish(callback_base, row)
-                    except Exception as exc:  # noqa: BLE001
-                        errors.append(f"http:{exc}")
-                if errors:
-                    # both：任一失败整单失败，便于重试补齐（if_out 幂等）
-                    raise RuntimeError("; ".join(errors))
+                    http_callback_publish(callback_base, row)
+
+                def _table() -> None:
+                    if sqlcmd_exec is None:
+                        raise RuntimeError("sqlcmd_exec required for table transport")
+                    sqlcmd_exec(insert_if_out_sql(row))
+
+                result = publish_with_failover(
+                    transport=transport,
+                    publish_http=_http,
+                    publish_table=_table,
+                    http_max_attempts=attempts,
+                )
                 mark_wms_outbox(database_url, table, row.id, succeeded=True)
+                note = (
+                    f" fallback_from_http={result.error}"
+                    if result.fallback_used
+                    else ""
+                )
                 print(
-                    f"[h8-out] published {table}/{row.id} via {transport}",
+                    f"[h8-out] published {table}/{row.id} via {result.channel}"
+                    f" (transport={transport} http_attempts={result.attempts_http})"
+                    f"{note}",
                     flush=True,
                 )
             except Exception as exc:  # noqa: BLE001
@@ -443,8 +455,36 @@ def resolve_wms_db_url() -> str | None:
     return os.environ.get("WMS_DB_URL") or os.environ.get("DATABASE_URL") or None
 
 
-def resolve_outbound_transport() -> str:
-    return os.environ.get("H8_OUTBOUND_TRANSPORT", "table").strip().lower()
+def resolve_channel_mode_from_db(database_url: str) -> str | None:
+    """读取货主下一条 active 连接的 channel_mode（多连接时取最早启用）。"""
+    if not table_has_column(database_url, "h8_erp_connectors", "channel_mode"):
+        return None
+    sql = """
+SELECT channel_mode FROM h8_erp_connectors
+ WHERE status = 'active'
+ ORDER BY first_activated_at NULLS LAST, created_at
+ LIMIT 1;
+"""
+    try:
+        raw = psql_query(database_url, sql).strip()
+    except Exception:  # noqa: BLE001
+        return None
+    return raw or None
+
+
+def resolve_outbound_transport(*, database_url: str | None = None) -> str:
+    """优先级：H8_OUTBOUND_TRANSPORT > H8_CHANNEL_MODE / DB channel_mode > table。"""
+    env_t = os.environ.get("H8_OUTBOUND_TRANSPORT", "").strip().lower()
+    if env_t:
+        return env_t
+    mode = os.environ.get("H8_CHANNEL_MODE", "").strip().lower()
+    if not mode and database_url:
+        mode = (resolve_channel_mode_from_db(database_url) or "").strip().lower()
+    if mode:
+        from channel_failover import map_channel_mode_to_transport
+
+        return map_channel_mode_to_transport(mode)
+    return "table"
 
 
 def resolve_callback_base() -> str | None:

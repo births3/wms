@@ -31,6 +31,8 @@ export H8_OUTBOUND_TRANSPORT=table
 export ERP_CALLBACK_BASE=http://127.0.0.1:18091
 # both 仅本地联调：H8_ALLOW_LOCAL_DUAL_TRANSPORT=1
 # 生产 channel_mode 见 US-H8-001（rest_primary_table_fallback=主备降级，非双写）
+# 主备：H8_CHANNEL_MODE=rest_primary_table_fallback 或 H8_OUTBOUND_TRANSPORT=failover
+#       REST 连续失败（H8_HTTP_MAX_ATTEMPTS，默认 2）后写入 if_out_message，不双写
 ```
 
 权限：`m2.write`、`m4.write`、商品写；缺 `m4.write` 跑 `202607180004_m4_write_permission.sql` 后重登。

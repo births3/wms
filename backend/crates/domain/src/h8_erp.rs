@@ -397,6 +397,16 @@ pub fn production_allows_simultaneous_dual_write(channel_mode: &str) -> bool {
     false
 }
 
+/// 配置 channel_mode → worker 出站 transport（与 Python channel_failover 对齐）。
+pub fn outbound_transport_for_channel_mode(channel_mode: &str) -> &'static str {
+    match channel_mode {
+        "rest" => "http",
+        "interface_table" => "table",
+        "rest_primary_table_fallback" => "failover",
+        _ => "table",
+    }
+}
+
 fn validate_text(
     value: &str,
     field: &'static str,
@@ -610,6 +620,19 @@ mod tests {
             "rest_primary_table_fallback"
         ));
         assert!(!production_allows_simultaneous_dual_write("both"));
+    }
+
+    #[test]
+    fn channel_mode_maps_to_outbound_transport() {
+        assert_eq!(outbound_transport_for_channel_mode("rest"), "http");
+        assert_eq!(
+            outbound_transport_for_channel_mode("interface_table"),
+            "table"
+        );
+        assert_eq!(
+            outbound_transport_for_channel_mode("rest_primary_table_fallback"),
+            "failover"
+        );
     }
 
     #[test]
