@@ -5,7 +5,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 use wms_domain::{
     can_claim_message, can_replay_message, can_transition_message_status, estimate_p95_latency_ms,
-    may_auto_purge, H8ErpMessage, H8ErpMessageAttempt, H8ErpMessageStats, H8MessageError,
+    may_auto_purge, sanitize_error_summary, H8ErpMessage, H8ErpMessageAttempt, H8ErpMessageStats,
+    H8MessageError,
 };
 
 use super::error::H8ErpMessageRepoError;
@@ -332,6 +333,166 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
         .bind(&row.channel)
         .bind(now)
         .bind(worker_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| H8ErpMessageRepoError::Db(e.to_string()))?;
+        tx.commit()
+            .await
+            .map_err(|e| H8ErpMessageRepoError::Db(e.to_string()))?;
+        self.get(owner_id, id).await
+    }
+
+    async fn mark_dead(
+        &self,
+        owner_id: Uuid,
+        id: Uuid,
+        error_summary: &str,
+        actor: &str,
+        now: DateTime<Utc>,
+    ) -> Result<H8ErpMessage, H8ErpMessageRepoError> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| H8ErpMessageRepoError::Db(e.to_string()))?;
+        let row = sqlx::query_as::<_, MessageRow>(
+            r#"
+            SELECT id, owner_id, warehouse_id, connector_id, connector_code, config_version,
+                   direction, message_type, channel, external_ref, wms_resource_id,
+                   idempotency_key, correlation_id, sync_status, retry_count, next_retry_at,
+                   last_error_summary, payload_digest, claimed_by, lease_expires_at,
+                   created_at, updated_at, completed_at, acked_at
+            FROM h8_erp_messages
+            WHERE owner_id = $1 AND id = $2
+            FOR UPDATE
+            "#,
+        )
+        .bind(owner_id)
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(|e| H8ErpMessageRepoError::Db(e.to_string()))?
+        .ok_or(H8ErpMessageRepoError::NotFound)?;
+        can_transition_message_status(&row.sync_status, "dead")
+            .map_err(H8ErpMessageRepoError::Domain)?;
+        let summary = sanitize_error_summary(error_summary);
+        let attempt_no: i32 = sqlx::query_scalar(
+            r#"SELECT COALESCE(MAX(attempt_no), 0) + 1 FROM h8_erp_message_attempts WHERE message_id = $1"#,
+        )
+        .bind(id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(|e| H8ErpMessageRepoError::Db(e.to_string()))?;
+        sqlx::query(
+            r#"
+            UPDATE h8_erp_messages
+               SET sync_status = 'dead',
+                   last_error_summary = $3,
+                   claimed_by = NULL,
+                   lease_expires_at = NULL,
+                   completed_at = $4,
+                   updated_at = $4
+             WHERE owner_id = $1 AND id = $2
+            "#,
+        )
+        .bind(owner_id)
+        .bind(id)
+        .bind(&summary)
+        .bind(now)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| H8ErpMessageRepoError::Db(e.to_string()))?;
+        sqlx::query(
+            r#"
+            INSERT INTO h8_erp_message_attempts (
+              id, message_id, owner_id, attempt_no, channel, started_at, finished_at,
+              result, error_summary, actor
+            ) VALUES ($1,$2,$3,$4,$5,$6,$6,'dead',$7,$8)
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(id)
+        .bind(owner_id)
+        .bind(attempt_no)
+        .bind(&row.channel)
+        .bind(now)
+        .bind(format!("from {}; {summary}", row.sync_status))
+        .bind(actor)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| H8ErpMessageRepoError::Db(e.to_string()))?;
+        tx.commit()
+            .await
+            .map_err(|e| H8ErpMessageRepoError::Db(e.to_string()))?;
+        self.get(owner_id, id).await
+    }
+
+    async fn mark_archived(
+        &self,
+        owner_id: Uuid,
+        id: Uuid,
+        actor: &str,
+        now: DateTime<Utc>,
+    ) -> Result<H8ErpMessage, H8ErpMessageRepoError> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| H8ErpMessageRepoError::Db(e.to_string()))?;
+        let row = sqlx::query_as::<_, MessageRow>(
+            r#"
+            SELECT id, owner_id, warehouse_id, connector_id, connector_code, config_version,
+                   direction, message_type, channel, external_ref, wms_resource_id,
+                   idempotency_key, correlation_id, sync_status, retry_count, next_retry_at,
+                   last_error_summary, payload_digest, claimed_by, lease_expires_at,
+                   created_at, updated_at, completed_at, acked_at
+            FROM h8_erp_messages
+            WHERE owner_id = $1 AND id = $2
+            FOR UPDATE
+            "#,
+        )
+        .bind(owner_id)
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(|e| H8ErpMessageRepoError::Db(e.to_string()))?
+        .ok_or(H8ErpMessageRepoError::NotFound)?;
+        if !matches!(row.sync_status.as_str(), "succeeded" | "acked" | "dead") {
+            return Err(H8ErpMessageRepoError::Domain(
+                H8MessageError::IllegalTransition,
+            ));
+        }
+        let attempt_no: i32 = sqlx::query_scalar(
+            r#"SELECT COALESCE(MAX(attempt_no), 0) + 1 FROM h8_erp_message_attempts WHERE message_id = $1"#,
+        )
+        .bind(id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(|e| H8ErpMessageRepoError::Db(e.to_string()))?;
+        sqlx::query(
+            r#"
+            INSERT INTO h8_erp_message_attempts (
+              id, message_id, owner_id, attempt_no, channel, started_at, finished_at,
+              result, error_summary, actor
+            ) VALUES ($1,$2,$3,$4,$5,$6,$6,'archived',NULL,$7)
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(id)
+        .bind(owner_id)
+        .bind(attempt_no)
+        .bind(&row.channel)
+        .bind(now)
+        .bind(actor)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| H8ErpMessageRepoError::Db(e.to_string()))?;
+        sqlx::query(
+            r#"UPDATE h8_erp_messages SET updated_at = $3 WHERE owner_id = $1 AND id = $2"#,
+        )
+        .bind(owner_id)
+        .bind(id)
+        .bind(now)
         .execute(&mut *tx)
         .await
         .map_err(|e| H8ErpMessageRepoError::Db(e.to_string()))?;

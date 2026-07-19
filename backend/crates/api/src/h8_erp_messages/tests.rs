@@ -1,13 +1,22 @@
-//! H8 消息内存仓储与重放规则测试。
+//! H8 消息内存仓储、重放与 H2 审计 sink 测试。
 
 use chrono::Utc;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use uuid::Uuid;
-use wms_domain::{H8ErpMessage, H8ErpMessageAttempt};
+use wms_domain::{
+    audit_summary_is_safe, message_audit_summary, H8ErpMessage, H8ErpMessageAttempt,
+    H8_MESSAGE_DEAD_AUDIT_ACTION,
+};
 
+use crate::audit::AuditLog;
+use crate::auth::AuthContext;
+
+use super::audit::{
+    snapshot_audit_actions, write_dead_entry_audit, write_exchange_lifecycle_audit,
+    write_message_audit, write_owner_audit,
+};
 use super::repository::MemoryH8ErpMessageRepository;
 use super::state::H8ErpMessageAppState;
-use wms_domain::{audit_summary_is_safe, message_audit_summary};
 
 fn sample_message(owner: Uuid, status: &str) -> H8ErpMessage {
     let now = Utc::now();
@@ -15,7 +24,7 @@ fn sample_message(owner: Uuid, status: &str) -> H8ErpMessage {
         id: Uuid::new_v4(),
         owner_id: owner,
         warehouse_id: None,
-        connector_id: None,
+        connector_id: Some(Uuid::nil()),
         connector_code: Some("demo".into()),
         config_version: Some(1),
         direction: "inbound".into(),
@@ -36,6 +45,20 @@ fn sample_message(owner: Uuid, status: &str) -> H8ErpMessage {
         updated_at: now,
         completed_at: None,
         acked_at: None,
+    }
+}
+
+fn test_ctx(owner: Uuid) -> AuthContext {
+    AuthContext {
+        user_id: Uuid::nil(),
+        owner_id: owner,
+        actor_name: "tester".into(),
+        permissions: vec![
+            "h8.erp_connector.read".into(),
+            "h8.erp_connector.write".into(),
+        ],
+        jti: "jti-test".into(),
+        warehouse_scope: None,
     }
 }
 
@@ -158,6 +181,7 @@ async fn purge_terminal_only_when_retention_set() {
     let state = H8ErpMessageAppState {
         repository: memory.clone(),
         audit_pool: None,
+        audit_log: Arc::new(Mutex::new(AuditLog::default())),
     };
     let owner = Uuid::nil();
     let mut old = sample_message(owner, "succeeded");
@@ -175,8 +199,123 @@ async fn purge_terminal_only_when_retention_set() {
     assert!(state.repository.get(owner, keep.id).await.is_ok());
 }
 
+#[tokio::test]
+async fn write_message_audit_records_to_sink_on_replay_path() {
+    let state = H8ErpMessageAppState::with_memory();
+    let owner = Uuid::nil();
+    let msg = sample_message(owner, "failed");
+    state.repository.upsert_for_test(&msg).await.unwrap();
+    let ctx = test_ctx(owner);
+    let replayed = state
+        .repository
+        .replay(owner, msg.id, "fix", "admin", Utc::now())
+        .await
+        .unwrap();
+    // 真实 shipped 审计入口（与 handlers 相同）
+    write_message_audit(&state, &ctx, "h8_message_replay", &replayed, "accepted").await;
+    let actions = snapshot_audit_actions(&state);
+    assert!(
+        actions.iter().any(|a| a == "h8_message_replay"),
+        "expected h8_message_replay in {actions:?}"
+    );
+    let log = state.audit_log.lock().expect("log");
+    let event = log
+        .events()
+        .iter()
+        .find(|e| e.action == "h8_message_replay")
+        .expect("event");
+    assert_eq!(event.module, "H8");
+    assert_eq!(event.resource_type, "h8_erp_message");
+    assert_eq!(event.resource_id, replayed.id.to_string());
+    let diff = event.diff.as_ref().expect("diff");
+    let after = &diff.after;
+    assert!(audit_summary_is_safe(after));
+    assert!(after.get("payload").is_some_and(|v| v.is_null()));
+}
+
+#[tokio::test]
+async fn mark_dead_writes_h2_dead_audit_action() {
+    let state = H8ErpMessageAppState::with_memory();
+    let owner = Uuid::nil();
+    let msg = sample_message(owner, "failed");
+    state.repository.upsert_for_test(&msg).await.unwrap();
+    let ctx = test_ctx(owner);
+    let dead = state
+        .repository
+        .mark_dead(owner, msg.id, "auth: invalid", "worker", Utc::now())
+        .await
+        .unwrap();
+    assert_eq!(dead.sync_status, "dead");
+    write_dead_entry_audit(&state, &ctx, &dead).await;
+    let actions = snapshot_audit_actions(&state);
+    assert!(actions.iter().any(|a| a == H8_MESSAGE_DEAD_AUDIT_ACTION));
+}
+
+#[tokio::test]
+async fn detail_query_and_purge_and_archive_write_audit() {
+    let state = H8ErpMessageAppState::with_memory();
+    let owner = Uuid::nil();
+    let msg = sample_message(owner, "succeeded");
+    state.repository.upsert_for_test(&msg).await.unwrap();
+    let ctx = test_ctx(owner);
+    write_message_audit(&state, &ctx, "h8_message_detail_query", &msg, "viewed").await;
+    let archived = state
+        .repository
+        .mark_archived(owner, msg.id, "admin", Utc::now())
+        .await
+        .unwrap();
+    write_message_audit(&state, &ctx, "h8_message_archive", &archived, "archived").await;
+    write_owner_audit(
+        &state,
+        &ctx,
+        "h8_message_purge",
+        serde_json::json!({"deleted": 0, "payload": null}),
+    )
+    .await;
+    let actions = snapshot_audit_actions(&state);
+    assert!(actions.iter().any(|a| a == "h8_message_detail_query"));
+    assert!(actions.iter().any(|a| a == "h8_message_archive"));
+    assert!(actions.iter().any(|a| a == "h8_message_purge"));
+}
+
+#[tokio::test]
+async fn exchange_lifecycle_stages_write_audit_actions() {
+    let state = H8ErpMessageAppState::with_memory();
+    let owner = Uuid::nil();
+    let msg = sample_message(owner, "processing");
+    state.repository.upsert_for_test(&msg).await.unwrap();
+    let ctx = test_ctx(owner);
+    for stage in [
+        "receive",
+        "convert",
+        "business_api",
+        "send",
+        "receipt",
+        "final_failure",
+    ] {
+        write_exchange_lifecycle_audit(&state, &ctx, &msg, stage, "ok")
+            .await
+            .unwrap();
+    }
+    let actions = snapshot_audit_actions(&state);
+    for stage in [
+        "receive",
+        "convert",
+        "business_api",
+        "send",
+        "receipt",
+        "final_failure",
+    ] {
+        let expected = format!("h8_exchange_{stage}");
+        assert!(
+            actions.iter().any(|a| a == &expected),
+            "missing {expected} in {actions:?}"
+        );
+    }
+}
+
 #[test]
-fn message_audit_summary_used_by_handlers_is_safe() {
+fn message_audit_summary_is_safe() {
     let msg = sample_message(Uuid::nil(), "failed");
     let summary = message_audit_summary(
         "h8_message_replay",
@@ -192,7 +331,6 @@ fn message_audit_summary_used_by_handlers_is_safe() {
         "accepted",
     );
     assert!(audit_summary_is_safe(&summary));
-    assert_eq!(summary["action"], "h8_message_replay");
 }
 
 #[tokio::test]

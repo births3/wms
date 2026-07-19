@@ -8,7 +8,8 @@ use std::sync::Mutex;
 use uuid::Uuid;
 use wms_domain::{
     can_claim_message, can_replay_message, can_transition_message_status, estimate_p95_latency_ms,
-    may_auto_purge, H8ErpMessage, H8ErpMessageAttempt, H8ErpMessageStats, H8MessageError,
+    may_auto_purge, sanitize_error_summary, H8ErpMessage, H8ErpMessageAttempt, H8ErpMessageStats,
+    H8MessageError,
 };
 
 use super::error::H8ErpMessageRepoError;
@@ -51,6 +52,25 @@ pub trait H8ErpMessageRepository: Send + Sync {
         id: Uuid,
         worker_id: &str,
         lease_seconds: i64,
+        now: DateTime<Utc>,
+    ) -> Result<H8ErpMessage, H8ErpMessageRepoError>;
+
+    /// 进入 dead（AC6）；调用方须写 H2 审计。
+    async fn mark_dead(
+        &self,
+        owner_id: Uuid,
+        id: Uuid,
+        error_summary: &str,
+        actor: &str,
+        now: DateTime<Utc>,
+    ) -> Result<H8ErpMessage, H8ErpMessageRepoError>;
+
+    /// 归档终态消息（不删除，保留策略清理另走 purge）。
+    async fn mark_archived(
+        &self,
+        owner_id: Uuid,
+        id: Uuid,
+        actor: &str,
         now: DateTime<Utc>,
     ) -> Result<H8ErpMessage, H8ErpMessageRepoError>;
 
@@ -286,6 +306,107 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
                 error_summary: None,
                 actor: worker_id.into(),
             });
+        guard.messages.insert(id, next.clone());
+        Ok(next)
+    }
+
+    async fn mark_dead(
+        &self,
+        owner_id: Uuid,
+        id: Uuid,
+        error_summary: &str,
+        actor: &str,
+        now: DateTime<Utc>,
+    ) -> Result<H8ErpMessage, H8ErpMessageRepoError> {
+        let mut guard = self.inner.lock().expect("lock");
+        let Some(msg) = guard
+            .messages
+            .get(&id)
+            .filter(|m| m.owner_id == owner_id)
+            .cloned()
+        else {
+            return Err(H8ErpMessageRepoError::NotFound);
+        };
+        can_transition_message_status(&msg.sync_status, "dead")
+            .map_err(H8ErpMessageRepoError::Domain)?;
+        let mut next = msg;
+        let prev = next.sync_status.clone();
+        next.sync_status = "dead".into();
+        next.last_error_summary = Some(sanitize_error_summary(error_summary));
+        next.updated_at = now;
+        next.completed_at = Some(now);
+        next.claimed_by = None;
+        next.lease_expires_at = None;
+        let attempt_no = guard
+            .attempts
+            .get(&id)
+            .map(|a| a.len() as i32 + 1)
+            .unwrap_or(1);
+        guard
+            .attempts
+            .entry(id)
+            .or_default()
+            .push(H8ErpMessageAttempt {
+                id: Uuid::new_v4(),
+                message_id: id,
+                attempt_no,
+                channel: next.channel.clone(),
+                started_at: now,
+                finished_at: Some(now),
+                result: "dead".into(),
+                error_summary: Some(format!(
+                    "from {prev}; {}",
+                    sanitize_error_summary(error_summary)
+                )),
+                actor: actor.into(),
+            });
+        guard.messages.insert(id, next.clone());
+        Ok(next)
+    }
+
+    async fn mark_archived(
+        &self,
+        owner_id: Uuid,
+        id: Uuid,
+        actor: &str,
+        now: DateTime<Utc>,
+    ) -> Result<H8ErpMessage, H8ErpMessageRepoError> {
+        let mut guard = self.inner.lock().expect("lock");
+        let Some(msg) = guard
+            .messages
+            .get(&id)
+            .filter(|m| m.owner_id == owner_id)
+            .cloned()
+        else {
+            return Err(H8ErpMessageRepoError::NotFound);
+        };
+        if !matches!(msg.sync_status.as_str(), "succeeded" | "acked" | "dead") {
+            return Err(H8ErpMessageRepoError::Domain(
+                H8MessageError::IllegalTransition,
+            ));
+        }
+        let mut next = msg;
+        let attempt_no = guard
+            .attempts
+            .get(&id)
+            .map(|a| a.len() as i32 + 1)
+            .unwrap_or(1);
+        guard
+            .attempts
+            .entry(id)
+            .or_default()
+            .push(H8ErpMessageAttempt {
+                id: Uuid::new_v4(),
+                message_id: id,
+                attempt_no,
+                channel: next.channel.clone(),
+                started_at: now,
+                finished_at: Some(now),
+                result: "archived".into(),
+                error_summary: None,
+                actor: actor.into(),
+            });
+        next.updated_at = now;
         guard.messages.insert(id, next.clone());
         Ok(next)
     }

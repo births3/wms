@@ -348,7 +348,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | AC8 至少一次/非双投递 | `PASS` | failover/circuit 单测 |
 | AC9 错误分类 | `PASS` | retryable/non-retryable + 脱敏 |
 | AC10 货主仓隔离 | `PASS` | warehouse_in_scope |
-| AC11 审计引用 | `PASS` | 消息 replay/claim/purge 写 H2 脱敏摘要（无 payload/secret） |
+| AC11 审计引用 | `PASS` | 交换 lifecycle 六阶段 + detail/replay/claim/dead/archive/purge 写 H2 脱敏摘要（无 payload） |
 | AC12 档案补录边界 | `PASS` | H8 不得直接改 ASN domain 断言 |
 | AC13 S4 | `NEEDS_WORK` | 客户正式 ERP |
 
@@ -361,12 +361,12 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | AC3 状态机 | `PASS` | domain + 测试 |
 | AC4 并发认领 | `PASS` | claim/lease API + 测试 |
 | AC5 失败重试记录 | `PASS` | attempts 追加 |
-| AC6 死信条件 | `PASS` | should_enter_dead |
+| AC6 死信条件 | `PASS` | should_enter_dead + mark_dead + h8_message_dead H2 审计 |
 | AC7 人工重放 | `PASS` | API + E2E + 不换业务 id |
 | AC8 查询详情 | `PASS` | list/detail QueryPanel |
 | AC9 监控指标 | `PASS` | stats + p95_latency_ms |
-| AC10 分区与保留 | `PARTIAL` | 索引+分区准备函数+purge；未切生产 RANGE 父表 |
-| AC11 权限审计 | `PASS` | 复用 h8.erp_connector.read/write |
+| AC10 分区与保留 | `PARTIAL` | 索引+分区准备+archive 不删+purge 需 retention；未切生产 RANGE 父表 |
+| AC11 权限审计 | `PASS` | read/write 权限 + detail/replay/archive/purge/dead H2 审计 |
 | AC12 查询裁剪 | `PASS` | 默认时间窗 + 货主索引 |
 | AC13 页面证据 | `PASS` | Playwright 3 条 + 矩阵截图登记 |
 | AC14 S4 | `NEEDS_WORK` | 客户正式 ERP |

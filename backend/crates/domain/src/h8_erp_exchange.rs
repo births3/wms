@@ -269,6 +269,23 @@ pub fn message_audit_summary(
     })
 }
 
+/// US-H8-002 AC11：交换生命周期审计动作（receive→…→final_failure）。
+pub const H8_EXCHANGE_AUDIT_STAGES: [&str; 6] = [
+    "receive",
+    "convert",
+    "business_api",
+    "send",
+    "receipt",
+    "final_failure",
+];
+
+pub fn is_exchange_audit_stage(stage: &str) -> bool {
+    H8_EXCHANGE_AUDIT_STAGES.contains(&stage)
+}
+
+/// US-H8-003 AC6：进入 dead 时必须产生的审计 action 名。
+pub const H8_MESSAGE_DEAD_AUDIT_ACTION: &str = "h8_message_dead";
+
 /// 审计摘要不得携带敏感载荷键。
 pub fn audit_summary_is_safe(summary: &serde_json::Value) -> bool {
     let forbidden = [
@@ -413,6 +430,18 @@ mod tests {
         assert_eq!(H8_INBOUND_PIPELINE_STEPS[0], "auth_scope");
         assert_eq!(H8_INBOUND_PIPELINE_STEPS[5], "mpm_normalize");
         assert_eq!(H8_INBOUND_PIPELINE_STEPS[7], "ack_success");
+    }
+
+    #[test]
+    fn exchange_audit_stages_cover_story_ac11() {
+        assert!(is_exchange_audit_stage("receive"));
+        assert!(is_exchange_audit_stage("convert"));
+        assert!(is_exchange_audit_stage("business_api"));
+        assert!(is_exchange_audit_stage("send"));
+        assert!(is_exchange_audit_stage("receipt"));
+        assert!(is_exchange_audit_stage("final_failure"));
+        assert!(!is_exchange_audit_stage("free_text"));
+        assert_eq!(H8_MESSAGE_DEAD_AUDIT_ACTION, "h8_message_dead");
     }
 
     #[test]
