@@ -38,7 +38,7 @@ T4 = ["main", "release", "runtime"]
 [[rules]]
 match = "governance/source-size-baseline.toml"
 checks = ["check_page_size"]
-tier = "T2"
+tier = "T1"
 rule_ids = ["GOV-SOURCE-PAGE-SIZE"]
 source = "AGENTS.md#数字门禁"
 
@@ -502,7 +502,7 @@ tier = "T1"
 [[rules]]
 match = "backend/**"
 checks = ["check_page_size"]
-tier = "T2"
+tier = "T1"
 rule_ids = ["GOV-SOURCE-PAGE-SIZE"]
 source = "AGENTS.md#数字门禁"
 
@@ -519,21 +519,21 @@ tier = "T1"
 [[rules]]
 match = "apps/**"
 checks = ["check_page_size"]
-tier = "T2"
+tier = "T1"
 rule_ids = ["GOV-SOURCE-PAGE-SIZE"]
 source = "AGENTS.md#数字门禁"
 
 [[rules]]
 match = "packages/**"
 checks = ["check_page_size"]
-tier = "T2"
+tier = "T1"
 rule_ids = ["GOV-SOURCE-PAGE-SIZE"]
 source = "AGENTS.md#数字门禁"
 
 [[rules]]
 match = "scripts/**"
 checks = ["check_page_size"]
-tier = "T2"
+tier = "T1"
 rule_ids = ["GOV-SOURCE-PAGE-SIZE"]
 source = "AGENTS.md#数字门禁"
 
@@ -559,7 +559,7 @@ tier = "T1"
 [[rules]]
 match = "prototypes/**"
 checks = ["check_page_size"]
-tier = "T2"
+tier = "T1"
 rule_ids = ["GOV-SOURCE-PAGE-SIZE"]
 source = "AGENTS.md#数字门禁"
 
@@ -572,7 +572,7 @@ tier = "T1"
 [[rules]]
 match = "packages/ui/src/business/**"
 checks = ["check_page_size"]
-tier = "T2"
+tier = "T1"
 rule_ids = ["GOV-SOURCE-PAGE-SIZE"]
 source = "AGENTS.md#数字门禁"
 
@@ -594,7 +594,7 @@ tier = "T1"
 [[rules]]
 match = "prototypes/src/pages/**"
 checks = ["check_page_size"]
-tier = "T2"
+tier = "T1"
 rule_ids = ["GOV-SOURCE-PAGE-SIZE"]
 source = "AGENTS.md#数字门禁"
 
@@ -606,7 +606,7 @@ tier = "T1"
 [[rules]]
 match = "prototypes/src/prototype-kit/**"
 checks = ["check_page_size"]
-tier = "T2"
+tier = "T1"
 rule_ids = ["GOV-SOURCE-PAGE-SIZE"]
 source = "AGENTS.md#数字门禁"
 
@@ -618,7 +618,7 @@ tier = "T1"
 [[rules]]
 match = "apps/web-admin/src/pages/**"
 checks = ["check_page_size"]
-tier = "T2"
+tier = "T1"
 rule_ids = ["GOV-SOURCE-PAGE-SIZE"]
 source = "AGENTS.md#数字门禁"
 
@@ -645,7 +645,7 @@ tier = "T1"
 [[rules]]
 match = "apps/pda-mobile/src/pages/**"
 checks = ["check_page_size"]
-tier = "T2"
+tier = "T1"
 rule_ids = ["GOV-SOURCE-PAGE-SIZE"]
 source = "AGENTS.md#数字门禁"
 

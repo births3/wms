@@ -51,14 +51,16 @@ def test_higher_contexts_keep_lower_tier_diff_gates():
 
     rules = load_gate_rules()
 
+    # page size 属 T1，main/release 场景仍应命中
     assert any(
         "check_page_size" in rule.checks
-        for rule in rules_for_execution(rules, tier="T2", context="main")
+        for rule in rules_for_execution(rules, tier="T1", context="main")
     )
     assert any(
         "check_page_size" in rule.checks
-        for rule in rules_for_execution(rules, tier="T2", context="release")
+        for rule in rules_for_execution(rules, tier="T1", context="release")
     )
+    assert rules_for_execution(rules, tier="T2", context="main")
     assert rules_for_execution(rules, tier="T3", context="release")
 
 
@@ -236,16 +238,17 @@ def test_supplied_invalid_external_evidence_reports_failed(tmp_path, capsys, mon
     assert json.loads(capsys.readouterr().out)["status"] == "failed"
 
 
-def test_page_size_is_not_part_of_t1_budget():
+def test_page_size_is_part_of_t1_budget():
     from _diff import load_gate_rules
     from governance_checks import expand_tier_scripts
 
-    assert "check_page_size.py" not in expand_tier_scripts("T1")
+    assert "check_page_size.py" in expand_tier_scripts("T1")
+    # T2 累积 T1，仍应包含
     assert "check_page_size.py" in expand_tier_scripts("T2")
 
     page_size_rules = [rule for rule in load_gate_rules() if "check_page_size" in rule.checks]
     assert page_size_rules
-    assert {rule.tier for rule in page_size_rules} == {"T2"}
+    assert {rule.tier for rule in page_size_rules} == {"T1"}
 
 
 def test_touched_and_external_rules_have_explicit_traceability():
@@ -343,7 +346,7 @@ def test_governance_docs_only_name_existing_t4_checks():
     assert "check_observability.py" in governance
     assert "check_perf_baseline.py" not in test_layers
     assert "check_observability_test.py" not in test_layers
-    assert "| `check_page_size.py` | T2 |" in frontend
+    assert "| `check_page_size.py` | T1 |" in frontend
     assert non_diff_doc_script_issues(governance, (REPO_ROOT / "justfile").read_text()) == []
 
 

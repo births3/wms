@@ -570,3 +570,4 @@ G4 证据，在提交和推送发生前状态必须保持 `blocked`。
 | 2026-06-28 | v0.6.1 | 新增项目级 RTM 缺口说明约束与仓储层 SQL 货主隔离静态门禁；同步 T1、gate-rules 和 smoke 覆盖 |
 | 2026-06-28 | v0.6.2 | 新增 US-M1-011 系统字典中心静态对齐门禁 `check_system_dictionary_alignment.py`；覆盖 M2/M4 单据类型 RTM、项目级 RTM、T1、gate-rules 和 smoke |
 | 2026-07-14 | v0.7 | 接受 ADR-0037：增加 G1-G4 轻量治理控制链、权威顺序、Tier×context、二值规则与四态执行结果；Gitea CI 分场景编排；`check_page_size` 后移 T2 以恢复 T1 `<10s` 预算 |
+| 2026-07-19 | v0.7.1 | `check_page_size` 重新纳入 T1：`gov-t1` / pre-commit 即拦截 ≥800 行源码与页面，避免超长文件拖到 T2 才发现 |
