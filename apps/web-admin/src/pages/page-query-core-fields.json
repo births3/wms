@@ -94,6 +94,16 @@
       "more": []
     },
     {
+      "id": "h8-erp-messages",
+      "title": "H8 ERP 消息",
+      "required": true,
+      "source": "apps/web-admin/src/pages/config-center/ErpMessageLogPage.tsx",
+      "fieldConstant": "h8ErpMessageQueryFields",
+      "coreConstant": "h8ErpMessageCoreQueryFieldKeys",
+      "core": ["direction", "message_type", "status"],
+      "more": ["connector_code", "external_ref", "idempotency_key", "correlation_id"]
+    },
+    {
       "id": "h1-menu-management",
       "title": "H1 菜单管理",
       "required": false,

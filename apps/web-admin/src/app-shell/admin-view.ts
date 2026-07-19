@@ -39,5 +39,6 @@ export type AdminView =
   | "hal-alert-escalations"
   | "h5-express"
   | "h8-erp-connectors"
+  | "h8-erp-messages"
   | "h9-print-templates"
   | "mcg-numbering";

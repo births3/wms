@@ -269,6 +269,7 @@ function devAdminMenuSeed(): DevAdminMenuNode[] {
       ]),
       group(parent, "h8-integration", "H8 集成中心", "KeyRound", 55, [
         ["h8-erp-connectors", "H8 ERP 连接", "KeyRound"],
+        ["h8-erp-messages", "H8 ERP 消息", "Inbox"],
       ]),
       group(parent, "h9-print", "H9 打印能力", "Printer", 90, [["h9-print-templates", "H9 打印模板", "Printer"]]),
       group(parent, "mcg-numbering", "M-CG 编码能力", "KeyRound", 100, [["mcg-numbering", "M-CG 单据号规则", "KeyRound"]]),
@@ -370,6 +371,7 @@ function devViewPermissionKey(viewId: string) {
     "hal-alert-definitions": "hal.alert-definition.read",
     "hal-alert-escalations": "hal.escalation.read",
     "h8-erp-connectors": "h8.erp_connector.read",
+    "h8-erp-messages": "h8.erp_connector.read",
     "h9-print-templates": "h9.print_template.read",
     "mcg-numbering": "mcg.document_numbering.read",
   };
