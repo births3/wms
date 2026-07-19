@@ -122,3 +122,54 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | 2026-07-19 | 首轮评审 | 发现独立故事、澄清记录、配置模型、RTM 和质量矩阵状态缺失；按用户确认的 14 项决策补齐规格。 |
 | 2026-07-19 | 二轮评审 | 修正“创建即产生审计、审计引用又阻止删除”的自相矛盾；删除只受首次启用和消息/业务引用约束，H2 审计独立保留。文档级业务语义已闭合，实施与 S4 证据仍待补。 |
 | 2026-07-19 | 三轮评审 | 明确 H-INT 通用契约、H8 ERP 专用防腐层和通道适配器的三级边界；修正 M5/M10/M-VR 误用 H8 及 `both` 本地联调被误读为生产双写的风险，实施与 S4 证据状态不变。 |
+
+## 验收记录
+
+- 故事：`US-H8-001`
+- 验收基线：`f890528`
+- 验收层级：`S4`（`external_runtime`）
+- 质量矩阵状态：`deferred_stories`
+- 验收日期：`2026-07-19`
+- 整体结论：`NEEDS_WORK`
+
+### 验收命令与证据包
+
+| ID | 命令或证据 |
+|---|---|
+| H8-U1 | `cargo test --manifest-path backend/Cargo.toml -p wms-domain --lib h8_erp` |
+| H8-U2 | `cargo test --manifest-path backend/Cargo.toml -p wms-api --lib h8_erp_connectors` |
+| H8-E2E | `just web-admin-h8-real-e2e`；`prototypes/e2e/web-admin-h8-real.spec.ts` |
+| H8-LOCAL | `just h8-local-integration`；`docs/retros/h8-local-integration-evidence.json` |
+| H8-S4 | `just h8-container-erp-s4-evidence`；`docs/retros/h8-container-erp-s4-evidence.json` |
+| H8-FAILOVER | `docs/retros/h8-failover-runtime-evidence.json` |
+
+| AC | 验证命令或方式 | 证据 | 结果 | 缺口 / 恢复条件 |
+|---|---|---|---|---|
+| AC-1 | H8-U2、H8-E2E | H8 专用菜单/权限迁移、连接页面、列表截图 | `PASS` | - |
+| AC-2 | H8-U1、H8-U2、H8-E2E | 多连接、仓库范围与 route-resolve 证据 | `PASS` | - |
+| AC-3 | H8-U1、H8-E2E | `secrets.rs`、Vault alias 与脱敏页面证据 | `PASS` | - |
+| AC-4 | H8-U1、H8-LOCAL、H8-S4 | 三种通道模式、主备切换且不双写 | `PASS` | - |
+| AC-5 | H8-U1、H8-U2、H8-E2E | 路由重叠拒绝与唯一解析截图 | `PASS` | - |
+| AC-6 | H8-U1、H8-U2、H8-E2E | `testing/active/disabled` 状态转换 | `PASS` | - |
+| AC-7 | H8-E2E、H8-S4 | 连接测试与容器厂商回执 | `NEEDS_WORK` | 尚无客户指定厂商正式 ERP dev/staging 回执；替换 `ERP_CALLBACK_BASE` 后归档 |
+| AC-8 | H8-U2、H8-E2E | H8 专用权限、API Key、secret alias 与只读 403 | `PASS` | - |
+| AC-9 | H8-U1、H8-U2 | 入站消息最小 scope 覆盖测试 | `PASS` | - |
+| AC-10 | H8-LOCAL、H8-S4、H8-FAILOVER | REST 失败转接口表、半开恢复和非双投递 | `PASS` | - |
+| AC-11 | H8-U1、H8-U2、H8-E2E | 编辑后回到 `testing` 截图 | `PASS` | - |
+| AC-12 | H8-U1、H8-U2 | 在途消息 pause/resume 测试 | `PASS` | - |
+| AC-13 | H8-U1、H8-U2 | 删除限制与引用保护测试 | `PASS` | - |
+| AC-14 | H8-U2、H8-E2E | 专用读写权限、只读拒绝和 H2 审计 | `PASS` | - |
+| AC-15 | H8-U1、H8-U2 | Idempotency-Key、重复动作和乐观锁测试 | `PASS` | - |
+| AC-16 | H8-E2E | 真实浏览器流程和质量矩阵登记的 7 张截图 | `PASS` | - |
+
+### 聚合验证
+
+- 质量矩阵：`python3 scripts/governance/check_quality_matrix.py --json`
+- 范围检查：`python3 scripts/governance/check_scope_gap_discovery.py --strict --module H8 --json`
+- 证据索引：`governance/quality-matrix.toml` 中 `US-H8-001`
+
+### 验收结论
+
+- 已证明：AC1-6、AC8-16 的软件主链、真实浏览器 E2E、容器厂商回执和主备切换证据。
+- 未完成：AC7 的客户指定厂商正式 ERP dev/staging 回执。
+- 恢复条件：使用客户正式 `ERP_CALLBACK_BASE` 运行同一 S4 契约并归档厂商侧回执；完成前保持 `deferred_stories`，不得宣称故事整体完成。
