@@ -324,7 +324,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 ## 验收记录（US-H8-002 / US-H8-003 软件切片）
 
 - 故事：`US-H8-002` / `US-H8-003`
-- 验收基线：`950b24e`（后续提交可叠加）
+- 验收基线：本轮 H8 软件路径收口提交（含消息 H2 审计摘要）
 - 验收日期：`2026-07-19`
 - 质量矩阵状态：`deferred_stories`（S4 未齐）
 - 整体结论：`SOFTWARE_PATH_PASS`（软件 AC 可验证通过）；**不得**因本记录宣称 S4 故事整体关闭
@@ -348,7 +348,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | AC8 至少一次/非双投递 | `PASS` | failover/circuit 单测 |
 | AC9 错误分类 | `PASS` | retryable/non-retryable + 脱敏 |
 | AC10 货主仓隔离 | `PASS` | warehouse_in_scope |
-| AC11 审计引用 | `PARTIAL` | 连接/重放侧有 H2 钩子；全消息路径按类型增量 |
+| AC11 审计引用 | `PASS` | 消息 replay/claim/purge 写 H2 脱敏摘要（无 payload/secret） |
 | AC12 档案补录边界 | `PASS` | H8 不得直接改 ASN domain 断言 |
 | AC13 S4 | `NEEDS_WORK` | 客户正式 ERP |
 
