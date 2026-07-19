@@ -1,7 +1,8 @@
 #[allow(unused_imports)]
 use wms_domain::{
     CreateH8ErpConnectorRequest, ErrorResponse, H8ErpConnector, H8ErpConnectorListResponse,
-    H8ErpConnectorTestResult, UpdateH8ErpConnectorRequest,
+    H8ErpConnectorTestResult, H8ErpMessage, H8ErpMessageDetail, H8ErpMessageListResponse,
+    H8ErpMessageStats, ReplayH8ErpMessageRequest, UpdateH8ErpConnectorRequest,
 };
 
 #[utoipa::path(
@@ -145,3 +146,68 @@ pub(crate) fn disable_h8_erp_connector() {}
 )]
 #[allow(dead_code)]
 pub(crate) fn delete_h8_erp_connector() {}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/integration/erp-messages",
+    tag = "h8-erp",
+    params(
+        ("direction" = Option<String>, Query, description = "inbound/outbound"),
+        ("message_type" = Option<String>, Query, description = "受控消息类型"),
+        ("status" = Option<String>, Query, description = "sync_status"),
+        ("created_from" = Option<String>, Query, description = "开始时间 ISO8601"),
+        ("created_to" = Option<String>, Query, description = "结束时间 ISO8601"),
+    ),
+    responses(
+        (status = 200, description = "ERP 消息列表", body = H8ErpMessageListResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn list_h8_erp_messages() {}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/integration/erp-messages/stats",
+    tag = "h8-erp",
+    responses(
+        (status = 200, description = "消息统计", body = H8ErpMessageStats),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn stats_h8_erp_messages() {}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/integration/erp-messages/{id}",
+    tag = "h8-erp",
+    params(("id" = uuid::Uuid, Path, description = "消息 ID")),
+    responses(
+        (status = 200, description = "消息详情与尝试", body = H8ErpMessageDetail),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+        (status = 404, description = "不存在", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn get_h8_erp_message() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/integration/erp-messages/{id}/replay",
+    tag = "h8-erp",
+    params(("id" = uuid::Uuid, Path, description = "消息 ID")),
+    request_body = ReplayH8ErpMessageRequest,
+    responses(
+        (status = 200, description = "已接受重放", body = H8ErpMessage),
+        (status = 400, description = "缺少原因或未确认", body = ErrorResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+        (status = 409, description = "状态不允许重放", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn replay_h8_erp_message() {}

@@ -46,6 +46,7 @@ pub mod feature_flags;
 pub mod h2_lifecycle;
 pub mod h2_lifecycle_handlers;
 pub mod h8_erp_connectors;
+pub mod h8_erp_messages;
 pub mod inbound;
 pub mod inventory;
 pub mod inventory_expiry_job;

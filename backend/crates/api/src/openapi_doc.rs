@@ -4,8 +4,10 @@ use utoipa::OpenApi;
 use wms_domain::{
     ArriveDockAppointmentRequest, ChangeDrugInspectionPlatformStatusRequest,
     CreateH8ErpConnectorRequest, DrugInspectionPlatform, DrugInspectionPlatformListResponse,
-    H8ErpConnector, H8ErpConnectorListResponse, H8ErpConnectorTestResult, TaskReleaseStrategy,
-    UpdateH8ErpConnectorRequest, UpsertDrugInspectionPlatformRequest,
+    H8ErpConnector, H8ErpConnectorListResponse, H8ErpConnectorTestResult, H8ErpMessage,
+    H8ErpMessageAttempt, H8ErpMessageDetail, H8ErpMessageListResponse, H8ErpMessageStats,
+    ReplayH8ErpMessageRequest, TaskReleaseStrategy, UpdateH8ErpConnectorRequest,
+    UpsertDrugInspectionPlatformRequest,
 };
 #[derive(OpenApi)]
 #[openapi(
@@ -46,6 +48,10 @@ use wms_domain::{
         activate_h8_erp_connector,
         disable_h8_erp_connector,
         delete_h8_erp_connector,
+        list_h8_erp_messages,
+        stats_h8_erp_messages,
+        get_h8_erp_message,
+        replay_h8_erp_message,
         list_roles,
         create_role,
         update_role,
@@ -394,6 +400,12 @@ use wms_domain::{
         H8ErpConnectorTestResult,
         CreateH8ErpConnectorRequest,
         UpdateH8ErpConnectorRequest,
+        H8ErpMessage,
+        H8ErpMessageAttempt,
+        H8ErpMessageDetail,
+        H8ErpMessageListResponse,
+        H8ErpMessageStats,
+        ReplayH8ErpMessageRequest,
         UpsertDrugInspectionPlatformRequest,
         ChangeDrugInspectionPlatformStatusRequest,
         Customer,

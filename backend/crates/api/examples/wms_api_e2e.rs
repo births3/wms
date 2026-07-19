@@ -29,6 +29,7 @@ use wms_api::{
     dual_person_policy_handlers::{dual_person_policy_router, DualPersonPolicyAppState},
     feature_flags::FeatureFlagRegistry,
     h8_erp_connectors::{h8_erp_connector_router, H8ErpConnectorAppState},
+    h8_erp_messages::{h8_erp_message_router, H8ErpMessageAppState},
     inventory_status_config_handlers::{
         inventory_status_config_router, InventoryStatusConfigAppState,
     },
@@ -130,6 +131,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .merge(h8_erp_connector_router(
             H8ErpConnectorAppState::with_postgres(pool.clone()),
         ))
+        .merge(h8_erp_message_router(H8ErpMessageAppState::with_postgres(
+            pool.clone(),
+        )))
         .merge(drug_inspection_router(
             DrugInspectionAppState::with_postgres(pool.clone()),
         ))

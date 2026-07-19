@@ -1780,6 +1780,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/integration/erp-messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_h8_erp_messages"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integration/erp-messages/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["stats_h8_erp_messages"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integration/erp-messages/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_h8_erp_message"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integration/erp-messages/{id}/replay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["replay_h8_erp_message"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/inventory/abc": {
         parameters: {
             query?: never;
@@ -5586,6 +5650,87 @@ export interface components {
             /** Format: int64 */
             tested_version: number;
         };
+        /** @description 消息主记录 API 视图（脱敏，不含完整报文）。 */
+        H8ErpMessage: {
+            /** Format: date-time */
+            acked_at?: string | null;
+            channel: string;
+            claimed_by?: string | null;
+            /** Format: date-time */
+            completed_at?: string | null;
+            /** Format: int64 */
+            config_version?: number | null;
+            connector_code?: string | null;
+            /** Format: uuid */
+            connector_id?: string | null;
+            correlation_id: string;
+            /** Format: date-time */
+            created_at: string;
+            direction: string;
+            external_ref: string;
+            /** Format: uuid */
+            id: string;
+            idempotency_key: string;
+            last_error_summary?: string | null;
+            /** Format: date-time */
+            lease_expires_at?: string | null;
+            message_type: string;
+            /** Format: date-time */
+            next_retry_at?: string | null;
+            /** Format: uuid */
+            owner_id: string;
+            payload_digest: string;
+            /** Format: int32 */
+            retry_count: number;
+            sync_status: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            warehouse_id?: string | null;
+            wms_resource_id?: string | null;
+        };
+        H8ErpMessageAttempt: {
+            actor: string;
+            /** Format: int32 */
+            attempt_no: number;
+            channel: string;
+            error_summary?: string | null;
+            /** Format: date-time */
+            finished_at?: string | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            message_id: string;
+            result: string;
+            /** Format: date-time */
+            started_at: string;
+        };
+        H8ErpMessageDetail: {
+            attempts: components["schemas"]["H8ErpMessageAttempt"][];
+            message: components["schemas"]["H8ErpMessage"];
+        };
+        H8ErpMessageListResponse: {
+            data: components["schemas"]["H8ErpMessage"][];
+            page: components["schemas"]["PageMeta"];
+        };
+        H8ErpMessageStats: {
+            /** Format: int64 */
+            dead: number;
+            /** Format: int64 */
+            failed: number;
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: int64 */
+            pending: number;
+            /** Format: int64 */
+            processing: number;
+            /** Format: int64 */
+            retry_total: number;
+            /** Format: int64 */
+            succeeded: number;
+            /** Format: int64 */
+            total: number;
+        };
         HandleInventoryAlertRequest: {
             lifecycle_status: string;
         };
@@ -6869,6 +7014,11 @@ export interface components {
         };
         ReplaceRolePermissionsRequest: {
             permission_codes: string[];
+        };
+        ReplayH8ErpMessageRequest: {
+            /** @description 客户端确认二次确认（true 才执行）。 */
+            confirmed: boolean;
+            reason: string;
         };
         ReportQueryRequest: {
             /** @description 自由结构 JSON 对象。 */
@@ -14568,6 +14718,206 @@ export interface operations {
             };
             /** @description 未登录 */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_h8_erp_messages: {
+        parameters: {
+            query?: {
+                /** @description inbound/outbound */
+                direction?: string | null;
+                /** @description 受控消息类型 */
+                message_type?: string | null;
+                /** @description sync_status */
+                status?: string | null;
+                /** @description 开始时间 ISO8601 */
+                created_from?: string | null;
+                /** @description 结束时间 ISO8601 */
+                created_to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ERP 消息列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H8ErpMessageListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    stats_h8_erp_messages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 消息统计 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H8ErpMessageStats"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_h8_erp_message: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 消息 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 消息详情与尝试 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H8ErpMessageDetail"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    replay_h8_erp_message: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 消息 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplayH8ErpMessageRequest"];
+            };
+        };
+        responses: {
+            /** @description 已接受重放 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H8ErpMessage"];
+                };
+            };
+            /** @description 缺少原因或未确认 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 状态不允许重放 */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

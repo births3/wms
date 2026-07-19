@@ -8985,6 +8985,282 @@
         }
       }
     },
+    "/api/v1/integration/erp-messages": {
+      "get": {
+        "tags": [
+          "h8-erp"
+        ],
+        "operationId": "list_h8_erp_messages",
+        "parameters": [
+          {
+            "name": "direction",
+            "in": "query",
+            "description": "inbound/outbound",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "message_type",
+            "in": "query",
+            "description": "受控消息类型",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "sync_status",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "created_from",
+            "in": "query",
+            "description": "开始时间 ISO8601",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "created_to",
+            "in": "query",
+            "description": "结束时间 ISO8601",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ERP 消息列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H8ErpMessageListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/integration/erp-messages/stats": {
+      "get": {
+        "tags": [
+          "h8-erp"
+        ],
+        "operationId": "stats_h8_erp_messages",
+        "responses": {
+          "200": {
+            "description": "消息统计",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H8ErpMessageStats"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/integration/erp-messages/{id}": {
+      "get": {
+        "tags": [
+          "h8-erp"
+        ],
+        "operationId": "get_h8_erp_message",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "消息 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "消息详情与尝试",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H8ErpMessageDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/integration/erp-messages/{id}/replay": {
+      "post": {
+        "tags": [
+          "h8-erp"
+        ],
+        "operationId": "replay_h8_erp_message",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "消息 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplayH8ErpMessageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "已接受重放",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H8ErpMessage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少原因或未确认",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态不允许重放",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/inventory/abc": {
       "get": {
         "tags": [
@@ -25416,6 +25692,253 @@
           }
         }
       },
+      "H8ErpMessage": {
+        "type": "object",
+        "description": "消息主记录 API 视图（脱敏，不含完整报文）。",
+        "required": [
+          "id",
+          "owner_id",
+          "direction",
+          "message_type",
+          "channel",
+          "external_ref",
+          "idempotency_key",
+          "correlation_id",
+          "sync_status",
+          "retry_count",
+          "payload_digest",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "acked_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "channel": {
+            "type": "string"
+          },
+          "claimed_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "completed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "config_version": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "connector_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "connector_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "correlation_id": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "external_ref": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "idempotency_key": {
+            "type": "string"
+          },
+          "last_error_summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "lease_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "message_type": {
+            "type": "string"
+          },
+          "next_retry_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payload_digest": {
+            "type": "string"
+          },
+          "retry_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sync_status": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "wms_resource_id": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "H8ErpMessageAttempt": {
+        "type": "object",
+        "required": [
+          "id",
+          "message_id",
+          "attempt_no",
+          "channel",
+          "started_at",
+          "result",
+          "actor"
+        ],
+        "properties": {
+          "actor": {
+            "type": "string"
+          },
+          "attempt_no": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "error_summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "finished_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "message_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "result": {
+            "type": "string"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "H8ErpMessageDetail": {
+        "type": "object",
+        "required": [
+          "message",
+          "attempts"
+        ],
+        "properties": {
+          "attempts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/H8ErpMessageAttempt"
+            }
+          },
+          "message": {
+            "$ref": "#/components/schemas/H8ErpMessage"
+          }
+        }
+      },
+      "H8ErpMessageListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/H8ErpMessage"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "H8ErpMessageStats": {
+        "type": "object",
+        "required": [
+          "owner_id",
+          "total",
+          "succeeded",
+          "failed",
+          "dead",
+          "processing",
+          "pending",
+          "retry_total"
+        ],
+        "properties": {
+          "dead": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "pending": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "processing": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "retry_total": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "succeeded": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "HandleInventoryAlertRequest": {
         "type": "object",
         "required": [
@@ -29397,6 +29920,22 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "ReplayH8ErpMessageRequest": {
+        "type": "object",
+        "required": [
+          "reason",
+          "confirmed"
+        ],
+        "properties": {
+          "confirmed": {
+            "type": "boolean",
+            "description": "客户端确认二次确认（true 才执行）。"
+          },
+          "reason": {
+            "type": "string"
           }
         }
       },
