@@ -11,5 +11,6 @@ use maintenance::apply_maintenance_routes;
 
 include!("wave3_handlers_part3.rs");
 include!("wave3_handlers_part4.rs");
+include!("wave3_handlers_part4b.rs");
 include!("wave3_handlers_part6.rs");
 include!("wave3_handlers_part5.rs");
