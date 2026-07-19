@@ -7,6 +7,7 @@ use wms_domain::{H8ErpMessage, H8ErpMessageAttempt};
 
 use super::repository::MemoryH8ErpMessageRepository;
 use super::state::H8ErpMessageAppState;
+use wms_domain::{audit_summary_is_safe, message_audit_summary};
 
 fn sample_message(owner: Uuid, status: &str) -> H8ErpMessage {
     let now = Utc::now();
@@ -156,6 +157,7 @@ async fn purge_terminal_only_when_retention_set() {
     memory.set_retention_for_test(Uuid::nil(), 7);
     let state = H8ErpMessageAppState {
         repository: memory.clone(),
+        audit_pool: None,
     };
     let owner = Uuid::nil();
     let mut old = sample_message(owner, "succeeded");
@@ -171,6 +173,26 @@ async fn purge_terminal_only_when_retention_set() {
     assert_eq!(days, 7);
     assert_eq!(deleted, 1);
     assert!(state.repository.get(owner, keep.id).await.is_ok());
+}
+
+#[test]
+fn message_audit_summary_used_by_handlers_is_safe() {
+    let msg = sample_message(Uuid::nil(), "failed");
+    let summary = message_audit_summary(
+        "h8_message_replay",
+        msg.id,
+        msg.owner_id,
+        &msg.message_type,
+        &msg.external_ref,
+        &msg.idempotency_key,
+        &msg.correlation_id,
+        &msg.sync_status,
+        msg.connector_id,
+        msg.config_version,
+        "accepted",
+    );
+    assert!(audit_summary_is_safe(&summary));
+    assert_eq!(summary["action"], "h8_message_replay");
 }
 
 #[tokio::test]

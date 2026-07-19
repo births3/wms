@@ -1,5 +1,6 @@
 //! US-H8-002/003：ERP 消息日志查询、统计与人工重放。
 
+mod audit;
 mod error;
 mod handlers;
 mod pg_repository;

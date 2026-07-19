@@ -13,18 +13,21 @@ pub const H8_MSG_WRITE: &str = "h8.erp_connector.write";
 #[derive(Clone)]
 pub struct H8ErpMessageAppState {
     pub repository: Arc<dyn H8ErpMessageRepository>,
+    pub audit_pool: Option<PgPool>,
 }
 
 impl H8ErpMessageAppState {
     pub fn with_memory() -> Self {
         Self {
             repository: Arc::new(MemoryH8ErpMessageRepository::default()),
+            audit_pool: None,
         }
     }
 
     pub fn with_postgres(pool: PgPool) -> Self {
         Self {
-            repository: Arc::new(PgH8ErpMessageRepository::new(pool)),
+            repository: Arc::new(PgH8ErpMessageRepository::new(pool.clone())),
+            audit_pool: Some(pool),
         }
     }
 }

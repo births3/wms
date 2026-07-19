@@ -236,6 +236,53 @@ pub fn may_return_success_ack(sync_status: &str) -> bool {
     sync_status == "succeeded" || sync_status == "acked"
 }
 
+/// H2 审计用脱敏摘要（AC11）：仅标识与结果，不含明文凭据或完整报文。
+pub fn message_audit_summary(
+    action: &str,
+    message_id: Uuid,
+    owner_id: Uuid,
+    message_type: &str,
+    external_ref: &str,
+    idempotency_key: &str,
+    correlation_id: &str,
+    sync_status: &str,
+    connector_id: Option<Uuid>,
+    config_version: Option<i64>,
+    result: &str,
+) -> serde_json::Value {
+    serde_json::json!({
+        "action": action,
+        "message_id": message_id,
+        "owner_id": owner_id,
+        "message_type": message_type,
+        "external_ref": external_ref,
+        "idempotency_key": idempotency_key,
+        "correlation_id": correlation_id,
+        "sync_status": sync_status,
+        "connector_id": connector_id,
+        "config_version": config_version,
+        "result": result,
+        // 显式禁止字段（审计消费者不得期望这些键）
+        "payload": null,
+        "secret": null,
+        "token": null,
+    })
+}
+
+/// 审计摘要不得携带敏感载荷键。
+pub fn audit_summary_is_safe(summary: &serde_json::Value) -> bool {
+    let forbidden = [
+        "password",
+        "bearer",
+        "api_key",
+        "raw_payload",
+        "token_value",
+    ];
+    let text = summary.to_string().to_ascii_lowercase();
+    !forbidden.iter().any(|f| text.contains(f))
+        && summary.get("payload").is_some_and(|v| v.is_null())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -366,5 +413,29 @@ mod tests {
         assert_eq!(H8_INBOUND_PIPELINE_STEPS[0], "auth_scope");
         assert_eq!(H8_INBOUND_PIPELINE_STEPS[5], "mpm_normalize");
         assert_eq!(H8_INBOUND_PIPELINE_STEPS[7], "ack_success");
+    }
+
+    #[test]
+    fn audit_summary_has_ids_without_payload_secrets() {
+        let summary = message_audit_summary(
+            "replay",
+            Uuid::nil(),
+            Uuid::nil(),
+            "asn",
+            "ERP-1",
+            "idem-1",
+            "corr-1",
+            "processing",
+            Some(Uuid::nil()),
+            Some(2),
+            "ok",
+        );
+        assert_eq!(summary["message_type"], "asn");
+        assert_eq!(summary["result"], "ok");
+        assert!(summary["payload"].is_null());
+        assert!(audit_summary_is_safe(&summary));
+        // 不得把疑似 token 塞进摘要字段名
+        let bad = serde_json::json!({"password": "x", "payload": {"a": 1}});
+        assert!(!audit_summary_is_safe(&bad));
     }
 }

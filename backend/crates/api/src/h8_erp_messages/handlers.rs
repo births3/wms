@@ -15,6 +15,7 @@ use wms_domain::{
 
 use crate::auth::AuthContext;
 
+use super::audit::write_message_audit;
 use super::error::H8ErpMessageHandlerError;
 use super::state::{H8ErpMessageAppState, H8_MSG_READ, H8_MSG_WRITE};
 
@@ -113,6 +114,7 @@ async fn replay_message(
         .repository
         .replay(ctx.owner_id, id, body.reason.trim(), &actor, Utc::now())
         .await?;
+    write_message_audit(&state, &ctx, "h8_message_replay", &message, "accepted").await;
     Ok(Json(message))
 }
 
@@ -129,6 +131,7 @@ async fn claim_message(
         .repository
         .claim(ctx.owner_id, id, body.worker_id.trim(), lease, Utc::now())
         .await?;
+    write_message_audit(&state, &ctx, "h8_message_claim", &message, "claimed").await;
     Ok(Json(message))
 }
 
@@ -147,6 +150,26 @@ async fn purge_messages(
         .repository
         .purge_terminal(ctx.owner_id, None, Utc::now())
         .await?;
+    // 清理无单条 message 时写货主级摘要审计
+    if let Some(pool) = &state.audit_pool {
+        use crate::audit::{append_event, AuditDiff, AuditWriteRequest};
+        let after = serde_json::json!({
+            "action": "h8_message_purge",
+            "deleted": deleted,
+            "retention_days": retention_days,
+            "payload": null,
+        });
+        let mut req = AuditWriteRequest::from_auth_context(
+            &ctx,
+            "h8_message_purge",
+            "H8",
+            "h8_erp_message",
+            ctx.owner_id.to_string(),
+            Some(AuditDiff::compute(serde_json::Value::Null, after)),
+        );
+        req.occurred_at = Utc::now();
+        let _ = append_event(pool, &req).await;
+    }
     Ok(Json(PurgeH8ErpMessagesResponse {
         deleted,
         retention_days,
