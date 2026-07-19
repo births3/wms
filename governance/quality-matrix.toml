@@ -4462,9 +4462,13 @@ evidence_refs = [
   "artifacts/screenshot-portal/real-web/h8-erp-connectors/readonly-manager.png",
   "artifacts/screenshot-portal/real-web/h8-erp-connectors/vault-alias-resolved.png",
   "docs/retros/h8-failover-runtime-evidence.json",
+  "docs/retros/h8-container-erp-s4-evidence.json",
+  "deploy/docker-compose.h8-erp-vendor.yml",
+  "deploy/h8-erp-vendor/server.py",
   "scripts/h8_erp_interface_sync/channel_failover.py",
   "scripts/h8_erp_interface_sync/run_failover_erp_evidence.py",
+  "scripts/h8_erp_interface_sync/run_container_erp_s4_evidence.py",
 ]
-reason = "已补 H8 专用表、领域规则、配置 API、OpenAPI/api-client、H2 审计、专用权限、集成中心菜单、secrets 解析、真实浏览器 E2E、主备降级 failover 运行时（REST 失败→接口表）与本地 ERP mock 证据 docs/retros/h8-failover-runtime-evidence.json。尚无外部真实 ERP 厂商 dev/staging 回执作为正式 S4，不得标记完成。"
+reason = "已补 H8 专用表、API/权限/菜单/secrets、浏览器 E2E、主备 failover、容器化外部 ERP 厂商（wms-h8-erp-vendor）与 S4 风格回执证据 docs/retros/h8-container-erp-s4-evidence.json。若客户要求对接指定厂商正式环境，仍需替换 ERP_CALLBACK_BASE 做厂商联调归档。"
 owner = "H8 模块负责人"
-resume_when = "取得真实 ERP 厂商 dev/staging 请求、回执、重试与审计引用后关闭 S4。"
+resume_when = "若需客户指定厂商正式环境：替换 ERP_CALLBACK_BASE 完成联调并归档厂商侧回执；否则容器厂商证据可作为开发/验收替代。"

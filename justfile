@@ -234,6 +234,20 @@ web-admin-m1-real-e2e:
 web-admin-m2-real-e2e:
     @pnpm --dir apps/web-admin run test:e2e:m2-real
 
+# 容器化外部 ERP 厂商 + S4 风格回执/主备证据
+h8-container-erp-s4-evidence:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd deploy
+    docker compose -f docker-compose.h8-erp-vendor.yml up -d --build
+    export ERP_CALLBACK_BASE="${ERP_CALLBACK_BASE:-http://127.0.0.1:18092}"
+    for i in $(seq 1 40); do
+      if curl -fsS "$ERP_CALLBACK_BASE/healthz" >/dev/null 2>&1; then break; fi
+      sleep 0.5
+    done
+    cd ..
+    python3 scripts/h8_erp_interface_sync/run_container_erp_s4_evidence.py
+
 # H8 ERP 连接真实后端 E2E；基于 DATABASE_URL / WMS_DB_URL 创建并回收一次性数据库
 web-admin-h8-real-e2e:
     #!/usr/bin/env bash

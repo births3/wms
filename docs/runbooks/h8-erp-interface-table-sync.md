@@ -7,16 +7,23 @@
 > “双通道”表示本地可分别验证两种通道，不表示生产双写；生产按 US-H8-001 选择唯一
 > 路由，主备切换沿用同一 Idempotency-Key。
 
-## 1. 启动接口库（通道 B）
+## 1. 启动接口库（通道 B）与容器 ERP 厂商（通道 A）
 
 ```bash
 cd deploy
+# 通道 B：MSSQL 接口表
 docker compose -f docker-compose.h8-erp-if.yml up -d
 ./h8-erp-if/wait-and-init.sh
+
+# 通道 A：容器化外部 ERP 厂商（独立进程/端口/回执存储）
+docker compose -f docker-compose.h8-erp-vendor.yml up -d --build
+export ERP_CALLBACK_BASE=http://127.0.0.1:18092
+curl -sS "$ERP_CALLBACK_BASE/healthz"
 ```
 
 应用：`01` 入站三表、`03` 出站+销退、`04` 商品变更回写。
 端口 **14333**，SA 默认 `Wms_Erp_If_Dev_2026!`（仅本地）。
+ERP 厂商容器端口 **18092**，厂商标识 `container-erp-vendor-a`；回执 `GET /receipts/{source_outbox_id}`。
 
 ## 2. WMS 与环境变量
 

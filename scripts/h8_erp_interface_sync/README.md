@@ -24,6 +24,11 @@ python3 scripts/h8_erp_interface_sync/sync_worker.py --once --direction out --tr
 python3 scripts/h8_erp_interface_sync/ack_if_out.py --all
 # 主备 + ERP mock 证据
 python3 scripts/h8_erp_interface_sync/run_failover_erp_evidence.py
+
+# 容器化外部 ERP 厂商（S4 风格回执证据）
+cd deploy && docker compose -f docker-compose.h8-erp-vendor.yml up -d --build
+export ERP_CALLBACK_BASE=http://127.0.0.1:18092
+python3 scripts/h8_erp_interface_sync/run_container_erp_s4_evidence.py
 ```
 
 详见 [docs/runbooks/h8-erp-interface-table-sync.md](../../docs/runbooks/h8-erp-interface-table-sync.md)。
