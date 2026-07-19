@@ -9,14 +9,8 @@ use crate::common::PageMeta;
 
 pub const H8_CHANNEL_MODES: [&str; 3] = ["rest", "interface_table", "rest_primary_table_fallback"];
 pub const H8_DIRECTIONS: [&str; 2] = ["inbound", "outbound"];
-pub const H8_MESSAGE_TYPES: [&str; 6] = [
-    "asn",
-    "outbound_order",
-    "product_master",
-    "return_order",
-    "product_change",
-    "archive_revision",
-];
+/// 连接路由消息类型：与 US-H8-002 受控目录一致（入站 ∪ 出站）。
+pub const H8_MESSAGE_TYPES: [&str; 12] = crate::h8_erp_message::H8_CATALOG_MESSAGE_TYPES;
 pub const H8_CONNECTOR_STATUSES: [&str; 3] = ["testing", "active", "disabled"];
 
 /// 入站 API Key scope（按消息类型最小授权）。
@@ -307,7 +301,7 @@ pub fn validate_message_types(types: &[String]) -> Result<(), H8ErpConnectorErro
         return Err(H8ErpConnectorError::FieldRequired("message_types"));
     }
     for t in types {
-        if !H8_MESSAGE_TYPES.contains(&t.as_str()) {
+        if crate::h8_erp_message::validate_message_type_in_catalog(t).is_err() {
             return Err(H8ErpConnectorError::InvalidMessageType);
         }
     }
