@@ -4463,11 +4463,13 @@ evidence_refs = [
   "artifacts/screenshot-portal/real-web/h8-erp-connectors/vault-alias-resolved.png",
   "docs/retros/h8-failover-runtime-evidence.json",
   "docs/retros/h8-container-erp-s4-evidence.json",
+  "docs/retros/h8-local-integration-evidence.json",
   "deploy/docker-compose.h8-erp-vendor.yml",
   "deploy/h8-erp-vendor/server.py",
   "scripts/h8_erp_interface_sync/channel_failover.py",
   "scripts/h8_erp_interface_sync/run_failover_erp_evidence.py",
   "scripts/h8_erp_interface_sync/run_container_erp_s4_evidence.py",
+  "scripts/h8_erp_interface_sync/run_local_integration.py",
 ]
 reason = "已补 H8 专用表、API/权限/菜单/secrets、浏览器 E2E、主备 failover、容器化外部 ERP 厂商（wms-h8-erp-vendor）与 S4 风格回执证据 docs/retros/h8-container-erp-s4-evidence.json。若客户要求对接指定厂商正式环境，仍需替换 ERP_CALLBACK_BASE 做厂商联调归档。"
 owner = "H8 模块负责人"

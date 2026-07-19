@@ -234,6 +234,22 @@ web-admin-m1-real-e2e:
 web-admin-m2-real-e2e:
     @pnpm --dir apps/web-admin run test:e2e:m2-real
 
+# H8 本地联调：outbox → 容器 ERP（A）/ MSSQL 接口表（B）主备
+h8-local-integration:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ -z "${DATABASE_URL:-}" && -z "${WMS_DB_URL:-}" && -f .env ]]; then
+      set -a; source .env; set +a
+    fi
+    export ERP_CALLBACK_BASE="${ERP_CALLBACK_BASE:-http://127.0.0.1:18092}"
+    export WMS_DB_URL="${WMS_DB_URL:-${DATABASE_URL:-}}"
+    cd deploy
+    docker compose -f docker-compose.h8-erp-vendor.yml up -d --build
+    docker compose -f docker-compose.h8-erp-if.yml up -d
+    bash h8-erp-if/wait-and-init.sh
+    cd ..
+    python3 scripts/h8_erp_interface_sync/run_local_integration.py
+
 # 容器化外部 ERP 厂商 + S4 风格回执/主备证据
 h8-container-erp-s4-evidence:
     #!/usr/bin/env bash

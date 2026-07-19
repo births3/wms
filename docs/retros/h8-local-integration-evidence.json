@@ -1,0 +1,98 @@
+{
+  "collected_at": "2026-07-19T02:28:07.474619+00:00",
+  "story": "US-H8-001",
+  "scope": "local integration: outbox + container ERP vendor + MSSQL interface table",
+  "ok": true,
+  "steps": [
+    {
+      "step": "vendor_up",
+      "ok": true,
+      "health": {
+        "status": "ok",
+        "vendor": "container-erp-vendor-a",
+        "receipt_count": 6,
+        "fail_remaining": 0
+      }
+    },
+    {
+      "step": "mssql_up",
+      "ok": true,
+      "db_name": "wms_erp_if",
+      "init_log": "==> waiting for wms-mssql-erp-if\n==> mssql ready\n==> apply 01_schema.sql\nChanged database context to 'wms_erp_if'.\n==> apply 03_if_out_and_return.sql\nChanged database context to 'wms_erp_if'.\n==> apply 04_product_change_and_ack.sql\nChanged database context to 'wms_erp_if'.\n==> H8 ERP interface schema OK\n",
+      "init_err": ""
+    },
+    {
+      "step": "outbox_table",
+      "ok": true,
+      "table": "receiving_putaway_erp_feedback_outbox"
+    },
+    {
+      "step": "channel_a_http",
+      "ok": true,
+      "processed": 1,
+      "outbox": {
+        "id": "c00a1322-f8a0-475f-9916-afa57029e03f",
+        "status": "succeeded",
+        "attempt_count": 1,
+        "last_error": null
+      },
+      "vendor_receipts": {
+        "vendor": "container-erp-vendor-a",
+        "receipts": [
+          {
+            "vendor": "container-erp-vendor-a",
+            "path": "/inbound-complete",
+            "received_at": "2026-07-19T02:28:05.236952+00:00",
+            "source_outbox_id": "c00a1322-f8a0-475f-9916-afa57029e03f",
+            "event_type": "inbound_putaway_completed",
+            "owner_id": "00000000-0000-0000-0000-000000000001",
+            "idempotency_hint": "out:receiving_putaway_erp_feedback_outbox:c00a1322-f8a0-475f-9916-afa57029e03f",
+            "body": {
+              "event_type": "inbound_putaway_completed",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "source_outbox_table": "receiving_putaway_erp_feedback_outbox",
+              "source_outbox_id": "c00a1322-f8a0-475f-9916-afa57029e03f",
+              "external_ref": "57e2b088-dadc-420a-8ae4-92fa8d4f7561",
+              "payload": {
+                "qty": 1,
+                "label": "lian-http",
+                "product_code": "H8-LIAN"
+              }
+            },
+            "status": "accepted"
+          }
+        ]
+      },
+      "source_outbox_id": "c00a1322-f8a0-475f-9916-afa57029e03f"
+    },
+    {
+      "step": "channel_failover_to_table",
+      "ok": true,
+      "processed": 1,
+      "outbox": {
+        "id": "4cfca88b-3761-4498-a29c-ad541214abb4",
+        "status": "succeeded",
+        "attempt_count": 1,
+        "last_error": null
+      },
+      "if_out_message_count": 1,
+      "source_outbox_id": "4cfca88b-3761-4498-a29c-ad541214abb4",
+      "note": "REST 失败后写入 dbo.if_out_message，幂等键 out:table:id"
+    },
+    {
+      "step": "channel_b_table",
+      "ok": true,
+      "processed": 1,
+      "outbox": {
+        "id": "4779519d-8ac3-4849-9e8a-025c2a1ca859",
+        "status": "succeeded",
+        "attempt_count": 1,
+        "last_error": null
+      },
+      "if_out_message_count": 1,
+      "source_outbox_id": "4779519d-8ac3-4849-9e8a-025c2a1ca859"
+    }
+  ],
+  "vendor": "http://127.0.0.1:18092",
+  "database_host": "127.0.0.1:5434/wms_test"
+}
