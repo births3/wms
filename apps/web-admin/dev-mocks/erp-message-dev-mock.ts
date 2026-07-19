@@ -136,6 +136,7 @@ export async function handleH8ErpMessageDevMock(
       processing: messages.filter((m) => m.sync_status === "processing").length,
       pending: messages.filter((m) => m.sync_status === "pending").length,
       retry_total: messages.reduce((sum, m) => sum + m.retry_count, 0),
+      p95_latency_ms: 120,
     });
     return true;
   }

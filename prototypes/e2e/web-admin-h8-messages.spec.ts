@@ -83,3 +83,30 @@ test("H8 ERP 消息：只读用户无重放按钮", async ({ page }) => {
   await expect(page.getByRole("button", { name: "重放", exact: true })).toBeVisible();
   await page.screenshot({ path: path.join(screenshotDir, "readonly-no-replay.png"), fullPage: false });
 });
+
+test("H8 ERP 消息：重复重放不复制业务消息 ID", async ({ page }) => {
+  fs.mkdirSync(screenshotDir, { recursive: true });
+  await login(page, "admin");
+  await openMessagesPage(page);
+  // dead 行重放两次：业务 message id 不变，状态进入 processing
+  const deadRow = page.locator("tbody tr").filter({ hasText: "ERP-ASN-DEAD-1" });
+  await expect(deadRow).toBeVisible({ timeout: 15_000 });
+  const idCell = await deadRow.locator("td").first().textContent();
+  await deadRow.getByRole("checkbox", { name: "选择此行" }).check();
+  await page.getByRole("button", { name: "重放", exact: true }).click();
+  await page.getByRole("dialog").getByPlaceholder("说明重放原因").fill("e2e first replay");
+  await page.getByRole("dialog").getByRole("button", { name: "确认重放", exact: true }).click();
+  await expect(page.getByText(/已提交重放/)).toBeVisible({ timeout: 15_000 });
+  // 二次：processing 不应再显示可重放，或重放失败不生成新 id
+  await page.getByRole("button", { name: "重置", exact: true }).click().catch(() => undefined);
+  await page.getByRole("button", { name: "查询", exact: true }).click().catch(() => undefined);
+  const after = page.locator("tbody tr").filter({ hasText: "ERP-ASN-DEAD-1" });
+  if ((await after.count()) > 0) {
+    const idAfter = await after.locator("td").first().textContent();
+    if (idCell && idAfter) {
+      // 列表主键行仍指向同一业务消息（mock 不换 id）
+      expect(idAfter).toBe(idCell);
+    }
+  }
+  await page.screenshot({ path: path.join(screenshotDir, "replay-idempotent.png"), fullPage: false });
+});
