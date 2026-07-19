@@ -66,18 +66,38 @@ test("H8 ERP 连接：路由重叠时启用拒绝（真实 API）", async ({ pag
 
   const rowB = page.locator("tbody tr").filter({ hasText: codeB });
   await rowB.getByRole("checkbox", { name: "选择此行" }).check();
+  // AC7：测试阶段即校验与 active 路由重叠（不通过则不可启用）
   await page.getByRole("button", { name: "测试", exact: true }).click();
   await page.getByRole("dialog").getByRole("button", { name: "确认", exact: true }).click();
   await expect(page.getByText("测试已完成")).toBeVisible({ timeout: 20_000 });
+  await expect(rowB.getByText("失败")).toBeVisible({ timeout: 10_000 });
+  await expect(rowB.getByText("testing")).toBeVisible();
 
   if (!(await rowB.getByRole("checkbox", { name: "选择此行" }).isChecked())) {
     await rowB.getByRole("checkbox", { name: "选择此行" }).check();
   }
   await page.getByRole("button", { name: "启用", exact: true }).click();
   await page.getByRole("dialog").getByRole("button", { name: "确认", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText(/route overlap|重叠/i, { timeout: 20_000 });
+  await expect(page.getByRole("alert")).toContainText(/test|测试|overlap|重叠/i, {
+    timeout: 20_000,
+  });
   await expect(rowB.getByText("testing")).toBeVisible();
   await page.screenshot({ path: path.join(screenshotDir, "route-overlap-rejected.png"), fullPage: false });
+
+  // 清理：关闭弹层后停用 A，避免占用默认 inbound/asn 全仓路由
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  const rowA = page.locator("tbody tr").filter({ hasText: codeA });
+  if (await rowA.getByRole("checkbox", { name: "选择此行" }).isChecked()) {
+    await rowA.getByRole("checkbox", { name: "选择此行" }).uncheck();
+  }
+  if (await rowB.getByRole("checkbox", { name: "选择此行" }).isChecked()) {
+    await rowB.getByRole("checkbox", { name: "选择此行" }).uncheck();
+  }
+  await rowA.getByRole("checkbox", { name: "选择此行" }).check();
+  await page.getByRole("button", { name: "停用", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "确认", exact: true }).click();
+  await expect(page.getByText("已停用")).toBeVisible({ timeout: 20_000 });
 });
 
 test("H8 ERP 连接：仓库主管只读（无写操作）", async ({ page }) => {
@@ -130,6 +150,102 @@ test("H8 ERP 连接：仓库主管只读（无写操作）", async ({ page }) =>
   });
   expect(denied.status(), await denied.text()).toBe(403);
   await page.screenshot({ path: path.join(screenshotDir, "readonly-manager.png"), fullPage: false });
+});
+
+test("H8 ERP 连接：编辑端点后回 testing 并需复测", async ({ page }) => {
+  fs.mkdirSync(screenshotDir, { recursive: true });
+  await login(page, "admin");
+  await openPage(page);
+  // 出站连接不与默认 inbound/asn 全仓 active 冲突
+  const code = `e2e-h8-edit-${Date.now()}`;
+  await page.getByRole("button", { name: "新建连接", exact: true }).click();
+  const createDialog = page.getByRole("dialog", { name: "新建 ERP 连接" });
+  await createDialog.locator("label", { hasText: "连接编码" }).locator("input").fill(code);
+  await createDialog.locator("label", { hasText: "连接名称" }).locator("input").fill("待编辑连接");
+  await createDialog.locator("label", { hasText: "方向" }).locator("select").selectOption("outbound");
+  await createDialog
+    .locator("label", { hasText: "Bearer secret alias" })
+    .locator("input")
+    .fill("vault://wms/e2e/h8/bearer");
+  const createResponsePromise = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/v1/config/erp-connectors") &&
+      response.request().method() === "POST" &&
+      !response.url().includes("/test"),
+  );
+  await createDialog.getByRole("button", { name: "保存", exact: true }).click();
+  expect((await createResponsePromise).status()).toBe(201);
+  await expect(page.getByText("已创建（testing）")).toBeVisible({ timeout: 20_000 });
+
+  const row = page.locator("tbody tr").filter({ hasText: code });
+  await row.getByRole("checkbox", { name: "选择此行" }).check();
+  await page.getByRole("button", { name: "测试", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "确认", exact: true }).click();
+  await expect(page.getByText("测试已完成")).toBeVisible({ timeout: 20_000 });
+  await expect(row.getByText("通过")).toBeVisible();
+  if (!(await row.getByRole("checkbox", { name: "选择此行" }).isChecked())) {
+    await row.getByRole("checkbox", { name: "选择此行" }).check();
+  }
+  await page.getByRole("button", { name: "启用", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "确认", exact: true }).click();
+  await expect(page.getByText("已启用")).toBeVisible({ timeout: 20_000 });
+  await expect(row.getByText("active")).toBeVisible();
+
+  if (!(await row.getByRole("checkbox", { name: "选择此行" }).isChecked())) {
+    await row.getByRole("checkbox", { name: "选择此行" }).check();
+  }
+  await page.getByRole("button", { name: "编辑", exact: true }).click();
+  const editDialog = page.getByRole("dialog", { name: "编辑 ERP 连接" });
+  await editDialog.locator("label", { hasText: "REST 地址" }).locator("input").fill("https://erp-edited.example.com");
+  const patchPromise = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/v1/config/erp-connectors/") &&
+      response.request().method() === "PATCH",
+  );
+  await editDialog.getByRole("button", { name: "保存", exact: true }).click();
+  const patch = await patchPromise;
+  expect(patch.status(), await patch.text()).toBe(200);
+  await expect(page.getByText(/已保存/)).toBeVisible({ timeout: 20_000 });
+  await expect(row.getByText("testing")).toBeVisible();
+  await page.screenshot({ path: path.join(screenshotDir, "connector-edited-retesting.png"), fullPage: false });
+});
+
+test("H8 ERP 连接：route-resolve 返回唯一 active 与最小 scope", async ({ page }) => {
+  fs.mkdirSync(screenshotDir, { recursive: true });
+  await login(page, "admin");
+  await openPage(page);
+  const code = `e2e-h8-route-${Date.now()}`;
+  await createConnector(page, code, "路由解析连接");
+  await expect(page.getByText("已创建（testing）")).toBeVisible({ timeout: 20_000 });
+  await testAndActivate(page, code);
+
+  const token = await page.evaluate(() => {
+    const session = JSON.parse(localStorage.getItem("wms.web-admin.auth-session") ?? "null") as {
+      accessToken?: string;
+    } | null;
+    return session?.accessToken ?? "";
+  });
+  const apiURL = process.env.WMS_WEB_ADMIN_E2E_API_URL ?? "http://127.0.0.1:19199";
+  const resolved = await page.request.get(
+    `${apiURL}/api/v1/config/erp-connectors/route-resolve?direction=inbound&message_type=asn`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  expect(resolved.status(), await resolved.text()).toBe(200);
+  const body = (await resolved.json()) as {
+    connector: { connector_code: string; status: string };
+    required_inbound_scopes: string[];
+  };
+  expect(body.connector.status).toBe("active");
+  expect(body.connector.connector_code).toBe(code);
+  expect(body.required_inbound_scopes).toContain("inbound:push");
+  await page.screenshot({ path: path.join(screenshotDir, "route-resolve.png"), fullPage: false });
+
+  // 清理避免占路由
+  const row = page.locator("tbody tr").filter({ hasText: code });
+  await row.getByRole("checkbox", { name: "选择此行" }).check();
+  await page.getByRole("button", { name: "停用", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "确认", exact: true }).click();
+  await expect(page.getByText("已停用")).toBeVisible({ timeout: 20_000 });
 });
 
 test("H8 ERP 连接：Vault alias 可解析后测试通过", async ({ page }) => {
