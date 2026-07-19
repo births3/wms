@@ -26,7 +26,7 @@ VALUES
         'H8 ERP 连接',
         'h8-erp-connectors',
         'KeyRound',
-        'm1.config.read',
+        'h8.erp_connector.read',
         10,
         TRUE
     )

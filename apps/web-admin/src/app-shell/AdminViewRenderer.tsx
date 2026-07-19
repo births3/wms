@@ -48,7 +48,12 @@ export function renderAdminView(
     return <FeatureFlagConfigCenterPage onBack={() => navigateTo("dashboard")} />;
   }
   if (view === "h8-erp-connectors") {
-    return <ErpConnectorConfigPage onBack={() => navigateTo("dashboard")} />;
+    return (
+      <ErpConnectorConfigPage
+        currentUser={currentUser}
+        onBack={() => navigateTo("dashboard")}
+      />
+    );
   }
   if (masterDataViewId) {
     return <M1MasterDataPage currentUser={currentUser} viewId={masterDataViewId} onBack={() => navigateTo("dashboard")} />;

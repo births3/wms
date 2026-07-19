@@ -4449,6 +4449,6 @@ evidence_refs = [
   "prototypes/e2e/web-admin-h8-real.spec.ts",
   "artifacts/screenshot-portal/real-web/h8-erp-connectors/connector-list.png",
 ]
-reason = "已补 H8 专用表、领域规则、配置 API、OpenAPI/api-client、H2 审计摘要、基础能力/H8 集成中心独立菜单（h8-erp-connectors）与 Worker 非双写对齐；本地传输切片仍在。尚无全动作真实浏览器 E2E、正式 secret 解析、主备降级运行时与真实 ERP dev/staging S4 证据，不得标记完成。"
+reason = "已补 H8 专用表、领域规则、配置 API、OpenAPI/api-client、H2 审计、专用权限 h8.erp_connector.read/write、集成中心独立菜单与 Worker 非双写对齐；本地传输切片与 alias 探测（WMS_H8_SECRET_ALIASES）已有。尚无全动作真实浏览器 E2E、正式 Vault secret 解析、主备降级运行时与真实 ERP dev/staging S4 证据，不得标记完成。"
 owner = "H8 模块负责人"
-resume_when = "补真实浏览器 E2E（新建/测试/启用/重叠拒绝/停用/只读）与启用成功截图；接通 secrets 解析与主备降级运行时；取得真实 ERP dev/staging 请求、回执、重试和审计证据。"
+resume_when = "补真实浏览器 E2E（新建/测试/启用/重叠拒绝/停用/只读）与启用成功截图；接通 Vault secrets 与主备降级运行时；取得真实 ERP dev/staging 请求、回执、重试和审计证据。"

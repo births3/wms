@@ -369,7 +369,7 @@ function devViewPermissionKey(viewId: string) {
     "hal-alert-dashboard": "hal.alert.read",
     "hal-alert-definitions": "hal.alert-definition.read",
     "hal-alert-escalations": "hal.escalation.read",
-    "h8-erp-connectors": "m1.config.read",
+    "h8-erp-connectors": "h8.erp_connector.read",
     "h9-print-templates": "h9.print_template.read",
     "mcg-numbering": "mcg.document_numbering.read",
   };

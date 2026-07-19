@@ -36,6 +36,10 @@ import {
   type CreateH8ErpConnectorRequest,
   type H8ErpConnector,
 } from "@/features/config-center/erp-connector-queries";
+import type { CurrentUser } from "@/features/auth/auth-queries";
+
+export const H8_ERP_CONNECTOR_READ = "h8.erp_connector.read";
+export const H8_ERP_CONNECTOR_WRITE = "h8.erp_connector.write";
 
 type Notice = { type: "success" | "error"; text: string } | null;
 type ConfirmAction = "test" | "activate" | "disable" | "delete" | null;
@@ -151,11 +155,15 @@ function filterConnectors(rows: H8ErpConnector[], query: QueryPanelValue): H8Erp
 }
 
 interface ErpConnectorConfigPageProps {
+  currentUser?: CurrentUser;
   onBack?: () => void;
 }
 
 /** H8 集成中心 · ERP 连接配置页（US-H8-001，独立菜单 h8-erp-connectors） */
-export function ErpConnectorConfigPage({ onBack }: ErpConnectorConfigPageProps = {}) {
+export function ErpConnectorConfigPage({
+  currentUser,
+  onBack,
+}: ErpConnectorConfigPageProps = {}) {
   const listQuery = useErpConnectorsQuery();
   const createMutation = useCreateErpConnectorMutation();
   const testMutation = useTestErpConnectorMutation();
@@ -169,6 +177,11 @@ export function ErpConnectorConfigPage({ onBack }: ErpConnectorConfigPageProps =
   const [notice, setNotice] = React.useState<Notice>(null);
   const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(() => defaultQuery());
   const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(() => defaultQuery());
+
+  const canWrite =
+    currentUser?.permissions.includes(H8_ERP_CONNECTOR_WRITE) ??
+    // 未注入用户时（仅 dev 兜底）按可写展示，真实壳层始终注入 currentUser
+    true;
 
   const rows = listQuery.data ?? [];
   const filteredRows = React.useMemo(() => filterConnectors(rows, appliedQuery), [rows, appliedQuery]);
@@ -191,50 +204,54 @@ export function ErpConnectorConfigPage({ onBack }: ErpConnectorConfigPageProps =
     disabled: listQuery.isFetching,
     onClick: () => void listQuery.refetch(),
   };
-  const createAction: DataGridCreateAction = {
-    label: "新建连接",
-    description: "创建 testing 状态的 ERP 连接",
-    disabled: busy,
-    onClick: () => {
-      setForm(emptyForm());
-      setCreateOpen(true);
-    },
-  };
-  const toolbarActions: DataGridToolbarAction[] = [
-    {
-      key: "test",
-      label: "测试",
-      description: "测试当前版本（不写业务单据）",
-      icon: <Play className="size-4" aria-hidden />,
-      disabled: (ctx) => ctx.selectedRowKeys.length !== 1 || busy,
-      onClick: () => setConfirmAction("test"),
-    },
-    {
-      key: "activate",
-      label: "启用",
-      description: "当前版本测试通过后启用",
-      icon: <Power className="size-4" aria-hidden />,
-      disabled: (ctx) => ctx.selectedRowKeys.length !== 1 || busy,
-      onClick: () => setConfirmAction("activate"),
-    },
-    {
-      key: "disable",
-      label: "停用",
-      description: "停用 active 连接并暂停在途",
-      icon: <PowerOff className="size-4" aria-hidden />,
-      disabled: (ctx) =>
-        ctx.selectedRowKeys.length !== 1 || selected?.status !== "active" || busy,
-      onClick: () => setConfirmAction("disable"),
-    },
-    {
-      key: "delete",
-      label: "删除",
-      description: "仅从未启用且无引用可删",
-      icon: <Trash2 className="size-4" aria-hidden />,
-      disabled: (ctx) => ctx.selectedRowKeys.length !== 1 || busy,
-      onClick: () => setConfirmAction("delete"),
-    },
-  ];
+  const createAction: DataGridCreateAction | undefined = canWrite
+    ? {
+        label: "新建连接",
+        description: "创建 testing 状态的 ERP 连接",
+        disabled: busy,
+        onClick: () => {
+          setForm(emptyForm());
+          setCreateOpen(true);
+        },
+      }
+    : undefined;
+  const toolbarActions: DataGridToolbarAction[] = canWrite
+    ? [
+        {
+          key: "test",
+          label: "测试",
+          description: "测试当前版本（不写业务单据）",
+          icon: <Play className="size-4" aria-hidden />,
+          disabled: (ctx) => ctx.selectedRowKeys.length !== 1 || busy,
+          onClick: () => setConfirmAction("test"),
+        },
+        {
+          key: "activate",
+          label: "启用",
+          description: "当前版本测试通过后启用",
+          icon: <Power className="size-4" aria-hidden />,
+          disabled: (ctx) => ctx.selectedRowKeys.length !== 1 || busy,
+          onClick: () => setConfirmAction("activate"),
+        },
+        {
+          key: "disable",
+          label: "停用",
+          description: "停用 active 连接并暂停在途",
+          icon: <PowerOff className="size-4" aria-hidden />,
+          disabled: (ctx) =>
+            ctx.selectedRowKeys.length !== 1 || selected?.status !== "active" || busy,
+          onClick: () => setConfirmAction("disable"),
+        },
+        {
+          key: "delete",
+          label: "删除",
+          description: "仅从未启用且无引用可删",
+          icon: <Trash2 className="size-4" aria-hidden />,
+          disabled: (ctx) => ctx.selectedRowKeys.length !== 1 || busy,
+          onClick: () => setConfirmAction("delete"),
+        },
+      ]
+    : [];
 
   async function run(action: () => Promise<unknown>, ok: string) {
     setNotice(null);
@@ -284,7 +301,9 @@ export function ErpConnectorConfigPage({ onBack }: ErpConnectorConfigPageProps =
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
       <PageHeader
         title="H8 ERP 连接"
-        subtitle={`集成中心 · US-H8-001 · ${filteredRows.length}/${rows.length} 条 · 不落明文凭据`}
+        subtitle={`集成中心 · US-H8-001 · ${filteredRows.length}/${rows.length} 条 · ${
+          canWrite ? "可维护" : "只读"
+        } · 不落明文凭据`}
         actions={
           onBack ? (
             <Button variant="outline" onClick={onBack}>

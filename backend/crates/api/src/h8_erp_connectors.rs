@@ -1,4 +1,4 @@
-//! US-H8-001：ERP 连接配置 API（m1.config.read / m1.config.write）。
+//! US-H8-001：ERP 连接配置 API（h8.erp_connector.read / h8.erp_connector.write）。
 
 use axum::{
     extract::{Path, State},
@@ -22,8 +22,8 @@ use crate::{
     auth::{AuthContext, AuthError},
 };
 
-pub const H8_CONFIG_READ: &str = "m1.config.read";
-pub const H8_CONFIG_WRITE: &str = "m1.config.write";
+pub const H8_CONFIG_READ: &str = "h8.erp_connector.read";
+pub const H8_CONFIG_WRITE: &str = "h8.erp_connector.write";
 
 #[derive(Clone)]
 pub struct H8ErpConnectorAppState {
@@ -701,26 +701,18 @@ async fn run_connection_probe(connector: &H8ErpConnector) -> (bool, Option<Strin
             {
                 return (false, Some("api_key_id required for inbound REST".into()));
             }
-            if connector.directions.iter().any(|d| d == "outbound")
-                && connector
-                    .bearer_secret_alias
-                    .as_deref()
-                    .is_none_or(|s| s.trim().is_empty())
-            {
-                return (
-                    false,
-                    Some("bearer_secret_alias required for outbound REST".into()),
-                );
+            if connector.directions.iter().any(|d| d == "outbound") {
+                match resolve_secret_alias_probe(connector.bearer_secret_alias.as_deref()) {
+                    Ok(()) => {}
+                    Err(msg) => return (false, Some(msg)),
+                }
             }
-            // 开发联调：对 base 做 HEAD/GET 探测；失败仍记录摘要，不写业务单据
+            // 开发联调：对 base 做形态/可达性探测；失败仍记录摘要，不写业务单据
             let probe_url = format!("{}/", url.trim_end_matches('/'));
             match reqwest_get_status(&probe_url).await {
                 Ok(code) if (200..500).contains(&code) => (true, None),
                 Ok(code) => (false, Some(format!("rest probe HTTP {code}"))),
-                Err(msg) => {
-                    // 允许仅校验字段通过：网络不可达时标记失败摘要
-                    (false, Some(format!("rest probe: {msg}")))
-                }
+                Err(msg) => (false, Some(format!("rest probe: {msg}"))),
             }
         }
         "interface_table" => {
@@ -737,18 +729,43 @@ async fn run_connection_probe(connector: &H8ErpConnector) -> (bool, Option<Strin
                     .interface_db_username
                     .as_deref()
                     .is_none_or(|s| s.is_empty())
-                || connector
-                    .interface_db_password_alias
-                    .as_deref()
-                    .is_none_or(|s| s.is_empty())
             {
                 return (false, Some("interface table fields incomplete".into()));
             }
-            // 密码仅 alias 校验形态；真实解析属 secrets 运行时，S4 证据另补
-            (true, None)
+            match resolve_secret_alias_probe(connector.interface_db_password_alias.as_deref()) {
+                Ok(()) => (true, None),
+                Err(msg) => (false, Some(msg)),
+            }
         }
         _ => (false, Some("invalid channel_mode".into())),
     }
+}
+
+/// 连接测试阶段的 secret alias 探测：
+/// 1) alias 形态校验；2) 若配置了 `WMS_H8_SECRET_ALIASES`（JSON 对象 alias→值）则要求可解析；
+/// 正式 Vault 解析与 S4 外部证据仍独立验收。
+fn resolve_secret_alias_probe(alias: Option<&str>) -> Result<(), String> {
+    let alias = alias
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "secret alias missing".to_string())?;
+    if alias.len() < 3 || alias.contains(' ') {
+        return Err("invalid secret alias shape".into());
+    }
+    if let Ok(raw) = std::env::var("WMS_H8_SECRET_ALIASES") {
+        let map: serde_json::Value = serde_json::from_str(&raw)
+            .map_err(|_| "WMS_H8_SECRET_ALIASES invalid JSON".to_string())?;
+        let resolved = map
+            .as_object()
+            .and_then(|o| o.get(alias))
+            .and_then(|v| v.as_str())
+            .map(str::trim)
+            .filter(|s| !s.is_empty());
+        if resolved.is_none() {
+            return Err(format!("secret alias not resolvable: {alias}"));
+        }
+    }
+    Ok(())
 }
 
 async fn reqwest_get_status(url: &str) -> Result<u16, String> {
@@ -993,5 +1010,31 @@ mod tests {
         c.first_activated_at = Some(now);
         state.repository.save(&c).await.expect("activate");
         assert_eq!(state.repository.list_active(owner).await.unwrap().len(), 1);
+    }
+
+    #[test]
+    fn dedicated_permissions_are_h8_scoped() {
+        assert_eq!(H8_CONFIG_READ, "h8.erp_connector.read");
+        assert_eq!(H8_CONFIG_WRITE, "h8.erp_connector.write");
+        assert!(!H8_CONFIG_READ.starts_with("m1."));
+        assert!(!H8_CONFIG_WRITE.starts_with("m1."));
+    }
+
+    #[test]
+    fn secret_alias_probe_requires_shape() {
+        assert!(resolve_secret_alias_probe(None).is_err());
+        assert!(resolve_secret_alias_probe(Some("ab")).is_err());
+        assert!(resolve_secret_alias_probe(Some("vault://wms/erp/bearer")).is_ok());
+    }
+
+    #[test]
+    fn secret_alias_probe_resolves_from_env_map() {
+        std::env::set_var(
+            "WMS_H8_SECRET_ALIASES",
+            r#"{"vault://wms/erp/bearer":"token-value"}"#,
+        );
+        assert!(resolve_secret_alias_probe(Some("vault://wms/erp/bearer")).is_ok());
+        assert!(resolve_secret_alias_probe(Some("vault://missing")).is_err());
+        std::env::remove_var("WMS_H8_SECRET_ALIASES");
     }
 }
