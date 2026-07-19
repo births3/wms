@@ -389,6 +389,39 @@ pub struct H8ErpMessageStats {
     pub processing: i64,
     pub pending: i64,
     pub retry_total: i64,
+    /// 处理时延 P95（毫秒），来自尝试 finished-started；无样本时为 0。
+    pub p95_latency_ms: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ClaimH8ErpMessageRequest {
+    pub worker_id: String,
+    /// 租约秒数，默认 300。
+    pub lease_seconds: Option<i64>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct PurgeH8ErpMessagesRequest {
+    /// 必须为 true；且货主已配置 retention_days 才允许清理终态消息。
+    pub confirmed: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct PurgeH8ErpMessagesResponse {
+    pub deleted: i64,
+    pub retention_days: i32,
+}
+
+/// 根据尝试样本估算 P95（最近似：排序后 95 分位）。
+pub fn estimate_p95_latency_ms(samples_ms: &[i64]) -> i64 {
+    if samples_ms.is_empty() {
+        return 0;
+    }
+    let mut sorted = samples_ms.to_vec();
+    sorted.sort_unstable();
+    let idx = ((sorted.len() as f64) * 0.95).ceil() as usize;
+    let i = idx.saturating_sub(1).min(sorted.len() - 1);
+    sorted[i]
 }
 
 #[cfg(test)]
@@ -478,6 +511,12 @@ mod tests {
         assert!(!may_auto_purge(None));
         assert!(!may_auto_purge(Some(0)));
         assert!(may_auto_purge(Some(30)));
+    }
+
+    #[test]
+    fn p95_estimation() {
+        assert_eq!(estimate_p95_latency_ms(&[]), 0);
+        assert_eq!(estimate_p95_latency_ms(&[10, 20, 30, 40, 100]), 100);
     }
 
     #[test]
