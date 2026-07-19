@@ -11,44 +11,71 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 # table + external_ref 列 + 可选档案补录专用
+# message_type 与 US-H8-002 受控出站目录对齐
 OUTBOX_SOURCES: list[dict[str, str]] = [
     {
         "table": "receiving_putaway_erp_feedback_outbox",
         "ref_col": "receiving_order_id",
         "callback_path": "/inbound-complete",
+        "message_type": "putaway_complete",
     },
     {
         "table": "inventory_status_erp_feedback_outbox",
         "ref_col": "batch_id",
         "callback_path": "/inventory-status",
+        "message_type": "inventory_status",
     },
     {
         "table": "stock_adjustment_erp_feedback_outbox",
         "ref_col": "order_id",
         "callback_path": "/stock-adjustment",
+        "message_type": "stock_adjustment",
     },
     {
         "table": "archive_revision_erp_feedback_outbox",
         "ref_col": "liaison_id",
         "callback_path": "/archive-revision",
         "special_retry": "archive",
+        "message_type": "archive_revision",
     },
     {
         "table": "reconciliation_erp_feedback_outbox",
         "ref_col": "recon_doc_no",
         "callback_path": "/reconciliation-diff",
+        "message_type": "reconciliation_diff",
     },
     {
         "table": "shipment_confirm_erp_feedback_outbox",
         "ref_col": "shipment_id",
         "callback_path": "/shipment-confirm",
+        "message_type": "shipment_confirm",
     },
     {
         "table": "inventory_snapshot_erp_feedback_outbox",
         "ref_col": "snapshot_no",
         "callback_path": "/inventory-snapshot",
+        "message_type": "inventory_snapshot",
     },
 ]
+
+H8_OUTBOUND_CATALOG = {
+    "putaway_complete",
+    "inventory_status",
+    "stock_adjustment",
+    "archive_revision",
+    "reconciliation_diff",
+    "shipment_confirm",
+    "inventory_snapshot",
+}
+
+
+def outbox_message_types() -> list[str]:
+    return [src["message_type"] for src in OUTBOX_SOURCES if "message_type" in src]
+
+
+def catalog_covers_outbox_sources() -> bool:
+    types = set(outbox_message_types())
+    return types == H8_OUTBOUND_CATALOG
 
 
 @dataclass

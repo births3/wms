@@ -13,6 +13,8 @@ from channel_failover import (
 from circuit_breaker import CircuitBreaker
 from outbound_publish import (
     OUTBOX_SOURCES,
+    catalog_covers_outbox_sources,
+    outbox_message_types,
     OutboxRow,
     insert_if_out_sql,
     sql_escape_mssql,
@@ -201,6 +203,13 @@ class TestChannelFailover(unittest.TestCase):
         self.assertEqual(result.channel, "http")
         self.assertEqual(circuit.state, "closed")
         self.assertGreater(http_calls, http_before_open)
+
+
+class TestOutboundCatalog(unittest.TestCase):
+    def test_outbox_message_types_match_h8_002_catalog(self) -> None:
+        self.assertTrue(catalog_covers_outbox_sources())
+        self.assertEqual(len(outbox_message_types()), 7)
+        self.assertEqual(len(OUTBOX_SOURCES), 7)
 
 
 if __name__ == "__main__":
