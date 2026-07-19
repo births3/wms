@@ -324,13 +324,52 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 ## 验收记录（US-H8-002 / US-H8-003 软件切片）
 
 - 故事：`US-H8-002` / `US-H8-003`
+- 验收基线：`950b24e`（后续提交可叠加）
 - 验收日期：`2026-07-19`
-- 整体结论：`NEEDS_WORK`（软件主链推进中，S4 与部分运行证据未齐）
+- 质量矩阵状态：`deferred_stories`（S4 未齐）
+- 整体结论：`SOFTWARE_PATH_PASS`（软件 AC 可验证通过）；**不得**因本记录宣称 S4 故事整体关闭
 
-| 故事 | 已落地 | 仍缺 |
+| 故事 | 软件主链 | 仍缺（故事完成门槛） |
 |---|---|---|
-| US-H8-002 | 受控目录、canonical 入站/出站转换、M-PM 未映射即失败、入站管线步骤、配置冻结/幂等键保持、Worker outbox 7 类对齐 | 逐消息业务 API 全链 L2–L4/L11、客户正式 ERP S4 |
-| US-H8-003 | 消息/尝试表、claim 租约、stats+P95、retention purge、分区准备函数、菜单页 E2E（含重复重放） | 生产 RANGE 月分区切换、客户 ERP 死信重放 S4 |
+| US-H8-002 | 受控目录、canonical 入站/出站、M-PM 未映射即失败、入站管线步骤、配置冻结/幂等键保持、错误分类/脱敏、Worker outbox 7 类对齐 | 逐消息业务 API 全链 L2–L4/L11、客户正式 ERP 双向 S4 |
+| US-H8-003 | 消息/尝试表、状态机、claim 租约、stats+P95、retention purge、分区准备、菜单页 E2E（含重复重放） | 生产 RANGE 月分区切换、客户 ERP 死信重放 S4 |
+
+### US-H8-002 软件 AC 核对（不含 S4）
+
+| AC | 结果 | 说明 |
+|---|---|---|
+| AC1 受控消息目录 | `PASS` | domain catalog + worker outbox 对齐 |
+| AC2 三级边界 | `PASS` | canonical 命令/事件；DTO 不进 domain |
+| AC3 入站链路规则 | `PASS` | 管线步骤 + M-PM + 成功 ack 约束（业务 API 实调按类型增量） |
+| AC4 出站链路规则 | `PASS` | outbox→failover 非双写；业务不直连 ERP |
+| AC5 字段规整 | `PASS` | 未映射 external 失败，不写入 canonical |
+| AC6 配置版本绑定 | `PASS` | binding freeze domain |
+| AC7 幂等语义 | `PASS` | 身份键 + 通道切换保持 Idempotency-Key |
+| AC8 至少一次/非双投递 | `PASS` | failover/circuit 单测 |
+| AC9 错误分类 | `PASS` | retryable/non-retryable + 脱敏 |
+| AC10 货主仓隔离 | `PASS` | warehouse_in_scope |
+| AC11 审计引用 | `PARTIAL` | 连接/重放侧有 H2 钩子；全消息路径按类型增量 |
+| AC12 档案补录边界 | `PASS` | H8 不得直接改 ASN domain 断言 |
+| AC13 S4 | `NEEDS_WORK` | 客户正式 ERP |
+
+### US-H8-003 软件 AC 核对（不含 S4）
+
+| AC | 结果 | 说明 |
+|---|---|---|
+| AC1 独立入口 | `PASS` | `h8-erp-messages` 菜单/页 |
+| AC2 存储边界 | `PASS` | messages + attempts 表 |
+| AC3 状态机 | `PASS` | domain + 测试 |
+| AC4 并发认领 | `PASS` | claim/lease API + 测试 |
+| AC5 失败重试记录 | `PASS` | attempts 追加 |
+| AC6 死信条件 | `PASS` | should_enter_dead |
+| AC7 人工重放 | `PASS` | API + E2E + 不换业务 id |
+| AC8 查询详情 | `PASS` | list/detail QueryPanel |
+| AC9 监控指标 | `PASS` | stats + p95_latency_ms |
+| AC10 分区与保留 | `PARTIAL` | 索引+分区准备函数+purge；未切生产 RANGE 父表 |
+| AC11 权限审计 | `PASS` | 复用 h8.erp_connector.read/write |
+| AC12 查询裁剪 | `PASS` | 默认时间窗 + 货主索引 |
+| AC13 页面证据 | `PASS` | Playwright 3 条 + 矩阵截图登记 |
+| AC14 S4 | `NEEDS_WORK` | 客户正式 ERP |
 
 验证命令：
 
@@ -340,4 +379,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | H8-MSG-U2 | `cargo test --manifest-path backend/Cargo.toml -p wms-domain --lib h8_erp_exchange` |
 | H8-MSG-U3 | `cargo test --manifest-path backend/Cargo.toml -p wms-api --lib h8_erp_messages` |
 | H8-U1 | `cargo test --manifest-path backend/Cargo.toml -p wms-domain --lib h8_erp` |
+| H8-U2 | `cargo test --manifest-path backend/Cargo.toml -p wms-api --lib h8_erp_connectors` |
+| H8-WORKER | `python3 -m unittest test_h8_sync_worker`（在 `scripts/h8_erp_interface_sync`） |
 | H8-MSG-E2E | `pnpm --dir prototypes exec playwright test --config=playwright-web-admin-h8-messages-config.ts` |
+| H8-T1 | `just gov-t1` |
