@@ -182,6 +182,49 @@ def scenario_live_failover_to_table(port: int) -> dict:
     }
 
 
+def scenario_circuit_half_open_recover() -> dict:
+    """AC10：熔断 open 后半开探测成功回主（不双写）。"""
+    from circuit_breaker import CircuitBreaker
+
+    circuit = CircuitBreaker(failure_threshold=2, half_open_after_failures=2)
+    table_n = 0
+
+    def fail() -> None:
+        raise RuntimeError("erp down")
+
+    def ok() -> None:
+        return None
+
+    def table() -> None:
+        nonlocal table_n
+        table_n += 1
+
+    publish_with_failover(
+        transport="failover", publish_http=fail, publish_table=table, http_max_attempts=1, circuit=circuit
+    )
+    publish_with_failover(
+        transport="failover", publish_http=fail, publish_table=table, http_max_attempts=1, circuit=circuit
+    )
+    open_state = circuit.state
+    # open 跳过一次 HTTP
+    publish_with_failover(
+        transport="failover", publish_http=fail, publish_table=table, http_max_attempts=1, circuit=circuit
+    )
+    # half_open 窗口成功回 closed
+    result = publish_with_failover(
+        transport="failover", publish_http=ok, publish_table=table, http_max_attempts=1, circuit=circuit
+    )
+    return {
+        "name": "circuit_half_open_recover",
+        "ok": open_state == "open" and result.channel == "http" and circuit.state == "closed",
+        "opened": open_state,
+        "recovered_channel": result.channel,
+        "final_state": circuit.state,
+        "table_calls": table_n,
+        "not_dual_write_on_recover": result.channel == "http",
+    }
+
+
 def main() -> int:
     port = int(os.environ.get("H8_ERP_MOCK_PORT", "18191"))
     server = _run_mock(port)
@@ -197,6 +240,7 @@ def main() -> int:
             "transport": map_channel_mode_to_transport("rest_primary_table_fallback"),
         },
         scenario_unit_failover(),
+        scenario_circuit_half_open_recover(),
         scenario_live_http_then_recovery(port),
         scenario_live_failover_to_table(port),
     ]

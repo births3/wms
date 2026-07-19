@@ -10,6 +10,7 @@ from channel_failover import (
     production_allows_simultaneous_dual_write,
     publish_with_failover,
 )
+from circuit_breaker import CircuitBreaker
 from outbound_publish import (
     OUTBOX_SOURCES,
     OutboxRow,
@@ -141,6 +142,65 @@ class TestChannelFailover(unittest.TestCase):
             publish_table=table,
         )
         self.assertEqual(table_calls, 0)
+
+    def test_circuit_open_skips_http_then_half_open_recovers(self) -> None:
+        circuit = CircuitBreaker(failure_threshold=2, half_open_after_failures=2)
+        http_calls = 0
+        table_calls = 0
+
+        def http_fail() -> None:
+            nonlocal http_calls
+            http_calls += 1
+            raise RuntimeError("down")
+
+        def table_ok() -> None:
+            nonlocal table_calls
+            table_calls += 1
+
+        # 两次失败 → open
+        publish_with_failover(
+            transport="failover",
+            publish_http=http_fail,
+            publish_table=table_ok,
+            http_max_attempts=1,
+            circuit=circuit,
+        )
+        publish_with_failover(
+            transport="failover",
+            publish_http=http_fail,
+            publish_table=table_ok,
+            http_max_attempts=1,
+            circuit=circuit,
+        )
+        self.assertEqual(circuit.state, "open")
+        http_before_open = http_calls
+
+        # open 首次调用：跳过 HTTP
+        publish_with_failover(
+            transport="failover",
+            publish_http=http_fail,
+            publish_table=table_ok,
+            http_max_attempts=1,
+            circuit=circuit,
+        )
+        self.assertEqual(http_calls, http_before_open)
+        self.assertEqual(circuit.state, "open")
+
+        # 第二次 open 窗口：进入 half_open 并允许一次 HTTP 探测
+        def http_ok() -> None:
+            nonlocal http_calls
+            http_calls += 1
+
+        result = publish_with_failover(
+            transport="failover",
+            publish_http=http_ok,
+            publish_table=table_ok,
+            http_max_attempts=1,
+            circuit=circuit,
+        )
+        self.assertEqual(result.channel, "http")
+        self.assertEqual(circuit.state, "closed")
+        self.assertGreater(http_calls, http_before_open)
 
 
 if __name__ == "__main__":

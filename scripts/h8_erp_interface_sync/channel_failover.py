@@ -11,6 +11,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Literal
 
+from circuit_breaker import CircuitBreaker
+
 ChannelMode = Literal["rest", "interface_table", "rest_primary_table_fallback"]
 Transport = Literal["http", "table", "both", "failover"]
 PublishChannel = Literal["http", "table", "table_fallback"]
@@ -47,9 +49,11 @@ def publish_with_failover(
     publish_http: Callable[[], None],
     publish_table: Callable[[], None],
     http_max_attempts: int = 2,
+    circuit: CircuitBreaker | None = None,
 ) -> PublishResult:
     """
     按 transport 投递；failover 时先 REST 再 table，禁止双成功双写。
+    AC10：可选 circuit 实现熔断 open / 半开探测后回主。
     """
     t = (transport or "table").strip().lower()
     if t == "table":
@@ -66,18 +70,26 @@ def publish_with_failover(
     if t == "failover":
         errors: list[str] = []
         attempts = 0
-        for _ in range(max(1, http_max_attempts)):
-            attempts += 1
-            try:
-                publish_http()
-                return PublishResult(
-                    channel="http",
-                    attempts_http=attempts,
-                    fallback_used=False,
-                )
-            except Exception as exc:  # noqa: BLE001
-                errors.append(str(exc))
-        # REST 失败 → 接口表备用，保持业务幂等键由调用方在 payload/if_out 中携带
+        allow_http = True if circuit is None else circuit.allow_http()
+        if allow_http:
+            for _ in range(max(1, http_max_attempts)):
+                attempts += 1
+                try:
+                    publish_http()
+                    if circuit is not None:
+                        circuit.on_http_success()
+                    return PublishResult(
+                        channel="http",
+                        attempts_http=attempts,
+                        fallback_used=False,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    errors.append(str(exc))
+                    if circuit is not None:
+                        circuit.on_http_failure()
+        else:
+            errors.append("circuit_open:skip_http")
+        # REST 失败或熔断 open → 接口表备用，保持业务幂等键由调用方携带
         try:
             publish_table()
         except Exception as exc:  # noqa: BLE001
