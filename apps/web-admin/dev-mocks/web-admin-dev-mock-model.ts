@@ -297,6 +297,8 @@ export const devUser = {
     "h4.approval.write",
     "h5.express.read",
     "h5.express.write",
+    "h8.erp_connector.read",
+    "h8.erp_connector.write",
     "hal.alert-definition.read",
     "hal.alert-definition.write",
     "hal.alert.read",

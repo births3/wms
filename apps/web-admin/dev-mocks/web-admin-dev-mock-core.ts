@@ -6,6 +6,7 @@ import { handleRolePermissionDevMock } from "./auth-role-permission-dev-mock";
 import { handleAuditDevMock } from "./audit-dev-mock";
 import { handleH4WechatNotifyDevMock } from "./wechat-notify-dev-mock";
 import { handleH5ExpressDevMock } from "./express-dev-mock";
+import { handleH8ErpConnectorDevMock } from "./erp-connector-dev-mock";
 import { handlePrintInventoryDevMock } from "./web-admin-dev-mock-print-inventory";
 import { handleDocumentNumberingDevMock } from "./document-numbering-dev-mock";
 import { handleOutboundDevMock } from "./outbound-dev-mock";
@@ -164,6 +165,9 @@ async function tryHandleDevMockRoute(
   if (pathname.startsWith("/api/v1/express")) {
     await handleH5ExpressDevMock(req, res, pathname);
     return true;
+  }
+  if (pathname.startsWith("/api/v1/config/erp-connectors")) {
+    return handleH8ErpConnectorDevMock(req, res, pathname);
   }
   if (pathname.startsWith("/api/v1/docks")) {
     await handleDockDevMock(req, res, pathname);

@@ -24,7 +24,7 @@ import {
   type QueryPanelField,
   type QueryPanelValue,
 } from "@wms/ui";
-import { Play, Power, PowerOff, Trash2 } from "lucide-react";
+import { Pencil, Play, Power, PowerOff, Trash2 } from "lucide-react";
 
 import {
   useActivateErpConnectorMutation,
@@ -33,6 +33,7 @@ import {
   useDisableErpConnectorMutation,
   useErpConnectorsQuery,
   useTestErpConnectorMutation,
+  useUpdateErpConnectorMutation,
   type CreateH8ErpConnectorRequest,
   type H8ErpConnector,
 } from "@/features/config-center/erp-connector-queries";
@@ -125,7 +126,8 @@ function emptyForm(): CreateH8ErpConnectorRequest {
     message_types: ["asn"],
     channel_mode: "rest",
     api_base_url: "https://erp.example.com",
-    api_key_id: crypto.randomUUID(),
+    // HTTP 局域网访问时 crypto.randomUUID 可能不可用
+    api_key_id: globalThis.crypto?.randomUUID?.() ?? `00000000-0000-4000-8000-${Date.now().toString(16).padStart(12, "0").slice(-12)}`,
     bearer_secret_alias: null,
     interface_db_password_alias: null,
   };
@@ -168,14 +170,23 @@ export function ErpConnectorConfigPage({
 }: ErpConnectorConfigPageProps = {}) {
   const listQuery = useErpConnectorsQuery();
   const createMutation = useCreateErpConnectorMutation();
+  const updateMutation = useUpdateErpConnectorMutation();
   const testMutation = useTestErpConnectorMutation();
   const activateMutation = useActivateErpConnectorMutation();
   const disableMutation = useDisableErpConnectorMutation();
   const deleteMutation = useDeleteErpConnectorMutation();
   const [selectedRowKeys, setSelectedRowKeys] = React.useState<string[]>([]);
   const [createOpen, setCreateOpen] = React.useState(false);
+  const [editOpen, setEditOpen] = React.useState(false);
   const [confirmAction, setConfirmAction] = React.useState<ConfirmAction>(null);
   const [form, setForm] = React.useState<CreateH8ErpConnectorRequest>(() => emptyForm());
+  const [editForm, setEditForm] = React.useState({
+    connector_name: "",
+    channel_mode: "rest",
+    api_base_url: "",
+    bearer_secret_alias: "",
+    expected_config_version: 1,
+  });
   const [notice, setNotice] = React.useState<Notice>(null);
   const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(() => defaultQuery());
   const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(() => defaultQuery());
@@ -193,6 +204,7 @@ export function ErpConnectorConfigPage({
     ?? rows.find((row) => row.id === selectedRowKeys[0]);
   const busy =
     createMutation.isPending ||
+    updateMutation.isPending ||
     testMutation.isPending ||
     activateMutation.isPending ||
     disableMutation.isPending ||
@@ -217,6 +229,24 @@ export function ErpConnectorConfigPage({
     : undefined;
   const toolbarActions: DataGridToolbarAction[] = canWrite
     ? [
+        {
+          key: "edit",
+          label: "编辑",
+          description: "修改端点/路由/secret 会使 active 回 testing",
+          icon: <Pencil className="size-4" aria-hidden />,
+          disabled: (ctx) => ctx.selectedRowKeys.length !== 1 || busy,
+          onClick: () => {
+            if (!selected) return;
+            setEditForm({
+              connector_name: selected.connector_name,
+              channel_mode: selected.channel_mode,
+              api_base_url: selected.api_base_url ?? "",
+              bearer_secret_alias: selected.bearer_secret_alias ?? "",
+              expected_config_version: selected.config_version,
+            });
+            setEditOpen(true);
+          },
+        },
         {
           key: "test",
           label: "测试",
@@ -460,6 +490,85 @@ export function ErpConnectorConfigPage({
                 </Button>
               </DialogClose>
               <Button type="submit" disabled={busy}>
+                {busy ? "保存中..." : "保存"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editOpen} onOpenChange={(open) => !busy && setEditOpen(open)}>
+        <DialogContent className="sm:max-w-lg">
+          <form
+            className="grid gap-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!selected) return;
+              void run(async () => {
+                await updateMutation.mutateAsync({
+                  id: selected.id,
+                  body: {
+                    expected_config_version: editForm.expected_config_version,
+                    connector_name: editForm.connector_name,
+                    channel_mode: editForm.channel_mode,
+                    api_base_url: editForm.api_base_url.trim() ? editForm.api_base_url.trim() : null,
+                    bearer_secret_alias: editForm.bearer_secret_alias.trim()
+                      ? editForm.bearer_secret_alias.trim()
+                      : null,
+                  },
+                });
+                setEditOpen(false);
+              }, "已保存（运行相关字段变更会回 testing 并需复测）");
+            }}
+          >
+            <DialogHeader>
+              <DialogTitle>编辑 ERP 连接</DialogTitle>
+              <DialogDescription>
+                编码不可改。修改端点/通道/secret 会使 active→testing，config_version 递增。
+                当前版本 {editForm.expected_config_version}。
+              </DialogDescription>
+            </DialogHeader>
+            <label className="grid gap-1 text-sm">
+              连接名称
+              <Input
+                required
+                value={editForm.connector_name}
+                onChange={(e) => setEditForm((f) => ({ ...f, connector_name: e.target.value }))}
+              />
+            </label>
+            <label className="grid gap-1 text-sm">
+              通道模式
+              <select
+                className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                value={editForm.channel_mode}
+                onChange={(e) => setEditForm((f) => ({ ...f, channel_mode: e.target.value }))}
+              >
+                <option value="rest">rest</option>
+                <option value="interface_table">interface_table</option>
+                <option value="rest_primary_table_fallback">rest_primary_table_fallback</option>
+              </select>
+            </label>
+            <label className="grid gap-1 text-sm">
+              REST 地址
+              <Input
+                value={editForm.api_base_url}
+                onChange={(e) => setEditForm((f) => ({ ...f, api_base_url: e.target.value }))}
+              />
+            </label>
+            <label className="grid gap-1 text-sm">
+              Bearer secret alias
+              <Input
+                value={editForm.bearer_secret_alias}
+                onChange={(e) => setEditForm((f) => ({ ...f, bearer_secret_alias: e.target.value }))}
+              />
+            </label>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button type="button" variant="outline">
+                  取消
+                </Button>
+              </DialogClose>
+              <Button type="submit" disabled={busy || !selected}>
                 {busy ? "保存中..." : "保存"}
               </Button>
             </DialogFooter>

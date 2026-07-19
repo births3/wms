@@ -6,12 +6,15 @@ import { api } from "@/lib/api";
 
 export type H8ErpConnector = components["schemas"]["H8ErpConnector"];
 export type CreateH8ErpConnectorRequest = components["schemas"]["CreateH8ErpConnectorRequest"];
+export type UpdateH8ErpConnectorRequest = components["schemas"]["UpdateH8ErpConnectorRequest"];
 export type H8ErpConnectorTestResult = components["schemas"]["H8ErpConnectorTestResult"];
 
 const key = ["config-center", "erp-connectors"] as const;
 
 function idempotencyKey(prefix: string): string {
-  return `${prefix}-${crypto.randomUUID()}`;
+  // HTTP 局域网 IP 非 secure context 时 crypto.randomUUID 不可用
+  const random = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+  return `${prefix}-${random}`;
 }
 
 export function useErpConnectorsQuery() {
@@ -37,6 +40,32 @@ export function useCreateErpConnectorMutation() {
       });
       if (!result.data) {
         throw new ApiError(result.error, "新建 ERP 连接失败", result.response.status);
+      }
+      return result.data;
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: key }),
+  });
+}
+
+export function useUpdateErpConnectorMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      body,
+    }: {
+      id: string;
+      body: UpdateH8ErpConnectorRequest;
+    }) => {
+      const result = await api.PATCH("/api/v1/config/erp-connectors/{id}", {
+        params: {
+          path: { id },
+          header: { "Idempotency-Key": idempotencyKey("h8-update") },
+        },
+        body,
+      });
+      if (!result.data) {
+        throw new ApiError(result.error, "更新 ERP 连接失败", result.response.status);
       }
       return result.data;
     },
