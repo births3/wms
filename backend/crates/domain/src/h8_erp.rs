@@ -30,6 +30,109 @@ pub fn inbound_scope_for_message_type(message_type: &str) -> Option<&'static str
     }
 }
 
+/// AC9：连接消息类型所需的最小入站 scope 集合（去重、保序）。
+pub fn required_inbound_scopes(message_types: &[String]) -> Vec<&'static str> {
+    let mut scopes = Vec::new();
+    for message_type in message_types {
+        if let Some(scope) = inbound_scope_for_message_type(message_type) {
+            if !scopes.contains(&scope) {
+                scopes.push(scope);
+            }
+        }
+    }
+    scopes
+}
+
+/// AC9：API Key 已授权 scope 必须覆盖连接消息类型所需最小集。
+pub fn api_key_scopes_cover_messages(
+    message_types: &[String],
+    granted_scopes: &[String],
+) -> Result<(), H8ErpConnectorError> {
+    for need in required_inbound_scopes(message_types) {
+        if !granted_scopes.iter().any(|granted| granted == need) {
+            return Err(H8ErpConnectorError::InsufficientApiKeyScope);
+        }
+    }
+    Ok(())
+}
+
+/// AC12：在途消息状态（与 `h8_erp_in_flight_messages.status` 对齐）。
+pub const H8_INFLIGHT_RUNNING: &str = "running";
+pub const H8_INFLIGHT_PAUSED: &str = "paused";
+
+/// AC7：接口表通道最小对象清单（探测时校验声明，不写业务单据）。
+pub const H8_INTERFACE_TABLE_REQUIRED_OBJECTS: [&str; 2] = ["if_out_message", "if_in_message"];
+
+/// AC5/7：启用或测试时相对已 active 连接的路由重叠检查。
+pub fn reject_route_overlap_with_actives(
+    candidate: &H8ErpConnector,
+    actives: &[H8ErpConnector],
+) -> Result<(), H8ErpConnectorError> {
+    for other in actives {
+        if routes_overlap(candidate, other) {
+            return Err(H8ErpConnectorError::RouteOverlap);
+        }
+    }
+    Ok(())
+}
+
+/// AC8 运行时：连接是否匹配仓库+方向+消息类型（空仓库白名单=全仓）。
+pub fn connector_matches_route(
+    connector: &H8ErpConnector,
+    warehouse_id: Option<Uuid>,
+    direction: &str,
+    message_type: &str,
+) -> bool {
+    if connector.status != "active" {
+        return false;
+    }
+    if !connector.directions.iter().any(|d| d == direction) {
+        return false;
+    }
+    if !connector.message_types.iter().any(|m| m == message_type) {
+        return false;
+    }
+    match warehouse_id {
+        None => true,
+        Some(wid) => connector.warehouse_ids.is_empty() || connector.warehouse_ids.contains(&wid),
+    }
+}
+
+/// AC8：在 active 集合中解析唯一路由；0 条 NotFound，>1 条 RouteOverlap。
+pub fn resolve_active_connector<'a>(
+    actives: &'a [H8ErpConnector],
+    warehouse_id: Option<Uuid>,
+    direction: &str,
+    message_type: &str,
+) -> Result<&'a H8ErpConnector, H8ErpConnectorError> {
+    let matched: Vec<_> = actives
+        .iter()
+        .filter(|c| connector_matches_route(c, warehouse_id, direction, message_type))
+        .collect();
+    match matched.as_slice() {
+        [] => Err(H8ErpConnectorError::NotFound),
+        [one] => Ok(*one),
+        _ => Err(H8ErpConnectorError::RouteOverlap),
+    }
+}
+
+/// AC12：停用后在途应变为 paused；再启用后 running 才可续传。
+pub fn inflight_status_after_disable(current: &str) -> Option<&'static str> {
+    if current == H8_INFLIGHT_RUNNING {
+        Some(H8_INFLIGHT_PAUSED)
+    } else {
+        None
+    }
+}
+
+pub fn inflight_status_after_activate(current: &str) -> Option<&'static str> {
+    if current == H8_INFLIGHT_PAUSED {
+        Some(H8_INFLIGHT_RUNNING)
+    } else {
+        None
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema, PartialEq, Eq)]
 pub struct H8ErpConnector {
     pub id: Uuid,
@@ -126,6 +229,8 @@ pub enum H8ErpConnectorError {
     NotFound,
     DeleteNotAllowed,
     IllegalTransition,
+    InsufficientApiKeyScope,
+    IdempotencyConflict,
 }
 
 /// 两连接在「货主+仓库+方向+消息类型」上是否路由重叠（仅用于 active 启用前检查）。
@@ -378,12 +483,7 @@ pub fn can_activate(
     if !test_ok {
         return Err(H8ErpConnectorError::TestRequired);
     }
-    for other in actives {
-        if routes_overlap(connector, other) {
-            return Err(H8ErpConnectorError::RouteOverlap);
-        }
-    }
-    Ok(())
+    reject_route_overlap_with_actives(connector, actives)
 }
 
 pub fn can_physically_delete(connector: &H8ErpConnector, has_business_refs: bool) -> bool {
@@ -642,5 +742,91 @@ mod tests {
             inbound_scope_for_message_type("outbound_order"),
             Some("outbound:push")
         );
+    }
+
+    #[test]
+    fn required_inbound_scopes_dedup_and_cover_check() {
+        let types = vec!["asn".into(), "asn".into(), "product_master".into()];
+        assert_eq!(
+            required_inbound_scopes(&types),
+            vec!["inbound:push", "master-data:write"]
+        );
+        assert_eq!(
+            api_key_scopes_cover_messages(
+                &types,
+                &["inbound:push".into(), "master-data:write".into()]
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            api_key_scopes_cover_messages(&types, &["inbound:push".into()]),
+            Err(H8ErpConnectorError::InsufficientApiKeyScope)
+        );
+    }
+
+    #[test]
+    fn version_conflict_on_stale_edit() {
+        let c = sample_connector(Uuid::new_v4(), vec![], "testing");
+        let req = UpdateH8ErpConnectorRequest {
+            expected_config_version: 99,
+            connector_name: Some("x".into()),
+            warehouse_ids: None,
+            directions: None,
+            message_types: None,
+            channel_mode: None,
+            api_base_url: None,
+            interface_db_host: None,
+            interface_db_port: None,
+            interface_db_name: None,
+            interface_db_username: None,
+            api_key_id: None,
+            bearer_secret_alias: None,
+            interface_db_password_alias: None,
+        };
+        assert_eq!(
+            apply_update(&c, &req, Utc::now()),
+            Err(H8ErpConnectorError::VersionConflict)
+        );
+    }
+
+    #[test]
+    fn resolve_active_route_unique_and_ambiguous() {
+        let mut a = sample_connector(Uuid::new_v4(), vec![], "active");
+        a.directions = vec!["inbound".into()];
+        a.message_types = vec!["asn".into()];
+        let mut b = sample_connector(Uuid::new_v4(), vec![], "active");
+        b.directions = vec!["inbound".into()];
+        b.message_types = vec!["asn".into()];
+        assert!(matches!(
+            resolve_active_connector(std::slice::from_ref(&a), None, "inbound", "asn"),
+            Ok(_)
+        ));
+        assert_eq!(
+            resolve_active_connector(&[a.clone(), b], None, "inbound", "asn"),
+            Err(H8ErpConnectorError::RouteOverlap)
+        );
+        assert_eq!(
+            resolve_active_connector(&[], None, "inbound", "asn"),
+            Err(H8ErpConnectorError::NotFound)
+        );
+    }
+
+    #[test]
+    fn inflight_disable_activate_transitions() {
+        assert_eq!(
+            inflight_status_after_disable(H8_INFLIGHT_RUNNING),
+            Some(H8_INFLIGHT_PAUSED)
+        );
+        assert_eq!(
+            inflight_status_after_activate(H8_INFLIGHT_PAUSED),
+            Some(H8_INFLIGHT_RUNNING)
+        );
+        assert_eq!(inflight_status_after_disable(H8_INFLIGHT_PAUSED), None);
+    }
+
+    #[test]
+    fn interface_table_required_objects_declared() {
+        assert!(H8_INTERFACE_TABLE_REQUIRED_OBJECTS.contains(&"if_out_message"));
+        assert!(H8_INTERFACE_TABLE_REQUIRED_OBJECTS.contains(&"if_in_message"));
     }
 }
