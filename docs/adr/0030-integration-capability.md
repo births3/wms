@@ -65,9 +65,9 @@ WMS 需要对接的外部系统在依赖图中已达 6 处，且后期持续增�
 
 H8 ERP 防腐层是第一个落地的对接，承担"参考实现"职责：H8 的接口表模型、重试/补录/死信处理、字段规整调用 M-PM 的方式，将作为后续 H5/M5/M10/M-TC 的 conform 范本。
 
-> 注：H8 目前仅在 architecture-dependencies.md 有一行定义，**尚无独立用户故事文档**。H8 在 Wave 2 前作为依赖就位（见依赖图 §5 W2.E），其用户故事应在 Wave 2 实施前补齐，并显式声明遵守本 ADR 契约。
+> 决策接受时，H8 仅在 architecture-dependencies.md 有一行定义，独立用户故事文档尚未建立。H8 在 Wave 2 前作为依赖就位（见依赖图 §5 W2.E），其用户故事应在 Wave 2 实施前补齐，并显式声明遵守本 ADR 契约。
 
-> 2026-07-19 进展：已补 [US-H8-001 ERP 连接配置与安全接入](../domain/user-stories-h8-erp-integration.md)，并显式复用 ADR-0018、M-PM、ADR-0013 与 H2；这是对实施状态的更新，不改变本 ADR“契约先行、引擎延后”的决策。
+> 2026-07-19 进展：已补 [H8 三个用户故事](../domain/user-stories-h8-erp-integration.md)，分别覆盖连接配置、ERP 消息语义转换和消息运行治理，并显式复用 ADR-0018、M-PM、ADR-0013 与 H2；这是对实施状态的更新，不改变本 ADR“契约先行、引擎延后”的决策。
 
 ---
 

@@ -169,7 +169,7 @@ H8。H8 是 ADR-0030 的首个参考实现，但不得承载冷链、TMS、快�
 
 新增 ERP 单据类型 = 新接口表（或统一 staging + type 列）+ H8 映射/handler；ERP DTO 不进入 M2/M3/M4 域模型。只有 WMS 业务语义本身变化时，才修改对应业务 domain。
 
-**本地闭环状态（2026-07 补全）**：通道 B 入站五类 + 出站七源；通道 A 出站 HTTP mock 联调；业务模块自动入队档案/对账/发货 outbox 与产线 S4 仍待接线/联调。
+**本地闭环状态（2026-07 补全）**：通道 B 入站五类 + 出站七源；通道 A 出站 HTTP mock 联调；业务模块自动入队档案/对账/发货 outbox 与产线 S4 仍待接线/联调。完整消息目录、canonical 转换和业务接线按 [H8 用户故事](../domain/user-stories-h8-erp-integration.md) 中的 US-H8-002 验收。
 
 #### ERP 连接配置（US-H8-001）
 
@@ -190,6 +190,8 @@ ERP 连接通过管理端「基础能力 / H8 集成中心 / H8 ERP 连接」独
 | 审计 | 配置、测试、启停、删除、自动主备切换全部写 H2 append-only 审计，禁止记录明文凭据 |
 
 REST 按 ADR-0018 重试和熔断，满足降级条件后把同一消息及原 Idempotency-Key 转入接口表；半开探测恢复后回到 REST。连接测试只做健康、认证、权限和结构探测，不写真实业务单据。完整字段、状态动作、权限和证据标准见 [US-H8-001](../domain/user-stories-h8-erp-integration.md)。
+
+消息日志、监控、死信、并发租约、人工重放、分区和保留边界见 [H8 用户故事](../domain/user-stories-h8-erp-integration.md) 中的 US-H8-003；本地 Worker 日志或 H2 审计均不能替代该故事的运行记录与故障恢复证据。
 
 ### 消费方
 

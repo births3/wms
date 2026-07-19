@@ -4478,6 +4478,42 @@ evidence_refs = [
   "backend/crates/domain/src/h8_erp.rs",
   "backend/crates/api/src/h8_erp_connectors/mod.rs",
 ]
-reason = "US-H8-001 AC1-16 配置/运行时主链已实现：route-resolve、scope、幂等/乐观锁、在途 pause/resume、测试重叠校验、熔断半开证据、E2E 6 条。唯一可选延期：客户指定厂商正式 ERP 回执（ERP_CALLBACK_BASE）。"
+reason = "US-H8-001 AC1-16 配置/运行时主链已实现：route-resolve、scope、幂等/乐观锁、在途 pause/resume、测试重叠校验、熔断半开证据、E2E 6 条。唯一未完成项是客户指定厂商正式 ERP 回执（ERP_CALLBACK_BASE）。"
 owner = "H8 模块负责人"
-resume_when = "若关闭延期：用客户正式 ERP_CALLBACK_BASE 归档回执；否则保持延期并认定容器厂商证据满足开发验收。"
+resume_when = "使用客户正式 ERP_CALLBACK_BASE 归档请求、回执、重试和审计关联后，复核 AC7 并关闭延期。"
+
+[[deferred_stories]]
+id = "US-H8-002"
+title = "ERP 消息交换与 WMS 语义转换"
+module = "H8"
+story_file = "docs/domain/user-stories-h8-erp-integration.md"
+types = [
+  "write",
+  "api_change",
+  "integration",
+  "runtime_guard",
+  "audit_compliance",
+  "external_runtime",
+]
+reason = "故事与验收边界已补齐；现有 Worker 只证明本地五类入站、七类出站和双通道切片，尚缺逐消息类型 canonical/M-PM 契约、完整 PostgreSQL 业务链、统一错误与客户正式 ERP S4 证据。"
+owner = "H8 模块负责人"
+resume_when = "按 US-H8-002 逐消息类型补 OpenAPI/适配器/业务 API 接线、PostgreSQL 与幂等测试，并取得客户正式 ERP 双向请求和回执。"
+
+[[deferred_stories]]
+id = "US-H8-003"
+title = "ERP 消息日志、监控与故障重放"
+module = "H8"
+story_file = "docs/domain/user-stories-h8-erp-integration.md"
+types = [
+  "read_only",
+  "write",
+  "api_change",
+  "frontend_interaction",
+  "concurrent_resource",
+  "runtime_guard",
+  "audit_compliance",
+  "external_runtime",
+]
+reason = "已补独立故事，但消息主记录/尝试记录、月分区、查询统计、并发租约、死信重放 API、H8 ERP 消息页面和真实浏览器/客户 ERP 故障恢复证据尚未实现。"
+owner = "H8 模块负责人"
+resume_when = "实现消息与尝试存储、状态机和租约，补 h8-erp-messages 页面/API/PostgreSQL/并发/E2E 证据，并完成客户 ERP 死信重放演练。"
