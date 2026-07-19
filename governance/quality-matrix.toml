@@ -4495,9 +4495,9 @@ types = [
   "audit_compliance",
   "external_runtime",
 ]
-reason = "已补受控消息目录/信封/错误分类/配置版本绑定 domain 与单测，Worker 本地入站五类+出站七类仍在；尚缺逐消息类型 M-PM 规整、完整业务 API 幂等链与客户正式 ERP 双向 S4。"
+reason = "已补受控目录、canonical 转换、M-PM 规整失败即拒、入站管线步骤、出站 outbox 类型对齐与 domain/Worker 单测；尚缺逐消息业务 API 全链 L2-L4 与客户正式 ERP 双向 S4。"
 owner = "H8 模块负责人"
-resume_when = "补齐各消息类型 M-PM/业务 API 接线与 L2-L4/L11 测试，并归档客户正式 ERP 双向请求回执后关闭延期。"
+resume_when = "补齐各消息类型业务 API 接线与 L2-L4/L11 证据，并归档客户正式 ERP 双向请求回执后关闭延期。"
 
 [[deferred_stories]]
 id = "US-H8-003"
@@ -4538,6 +4538,6 @@ evidence_refs = [
   "artifacts/screenshot-portal/real-web/h8-erp-messages/replay-success.png",
   "artifacts/screenshot-portal/real-web/h8-erp-messages/readonly-no-replay.png",
 ]
-reason = "已补消息主记录/尝试表迁移、状态机与租约 domain、list/detail/stats/replay API、h8-erp-messages 菜单页、mock 与 Playwright 截图；尚缺月分区挂载、P95 指标与客户 ERP 死信重放 S4。"
+reason = "已补消息/尝试存储、状态机、Worker claim 租约、stats P95、保留策略 purge、菜单页 E2E 与分区准备迁移；尚缺生产月分区切换与客户 ERP 死信重放 S4。"
 owner = "H8 模块负责人"
-resume_when = "补月分区/归档清理演练与客户 ERP 故障恢复证据后关闭延期。"
+resume_when = "生产库切换 RANGE 月分区、补归档清理演练与客户 ERP 故障恢复证据后关闭延期。"

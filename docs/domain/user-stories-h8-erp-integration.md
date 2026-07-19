@@ -329,13 +329,15 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 
 | 故事 | 已落地 | 仍缺 |
 |---|---|---|
-| US-H8-002 | 受控目录 5 入站 + 7 出站、信封校验、错误分类、配置版本绑定、仓库范围交集、domain 单测；Worker 本地切片 | 逐消息 M-PM 规整、业务 API 全链幂等、客户正式 ERP S4 |
-| US-H8-003 | `h8_erp_messages`/`attempts` 迁移、状态机/租约/重放 domain、API list/detail/stats/replay、菜单页 `h8-erp-messages`、dev mock、内存仓储测试 | 真实 Playwright/截图、月分区挂载、P95、客户 ERP 死信重放 S4 |
+| US-H8-002 | 受控目录、canonical 入站/出站转换、M-PM 未映射即失败、入站管线步骤、配置冻结/幂等键保持、Worker outbox 7 类对齐 | 逐消息业务 API 全链 L2–L4/L11、客户正式 ERP S4 |
+| US-H8-003 | 消息/尝试表、claim 租约、stats+P95、retention purge、分区准备函数、菜单页 E2E（含重复重放） | 生产 RANGE 月分区切换、客户 ERP 死信重放 S4 |
 
 验证命令：
 
 | ID | 命令 |
 |---|---|
 | H8-MSG-U1 | `cargo test --manifest-path backend/Cargo.toml -p wms-domain --lib h8_erp_message` |
-| H8-MSG-U2 | `cargo test --manifest-path backend/Cargo.toml -p wms-api --lib h8_erp_messages` |
+| H8-MSG-U2 | `cargo test --manifest-path backend/Cargo.toml -p wms-domain --lib h8_erp_exchange` |
+| H8-MSG-U3 | `cargo test --manifest-path backend/Cargo.toml -p wms-api --lib h8_erp_messages` |
 | H8-U1 | `cargo test --manifest-path backend/Cargo.toml -p wms-domain --lib h8_erp` |
+| H8-MSG-E2E | `pnpm --dir prototypes exec playwright test --config=playwright-web-admin-h8-messages-config.ts` |
