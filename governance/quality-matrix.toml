@@ -4495,9 +4495,9 @@ types = [
   "audit_compliance",
   "external_runtime",
 ]
-reason = "故事与验收边界已补齐；现有 Worker 只证明本地五类入站、七类出站和双通道切片，尚缺逐消息类型 canonical/M-PM 契约、完整 PostgreSQL 业务链、统一错误与客户正式 ERP S4 证据。"
+reason = "已补受控消息目录/信封/错误分类/配置版本绑定 domain 与单测，Worker 本地入站五类+出站七类仍在；尚缺逐消息类型 M-PM 规整、完整业务 API 幂等链与客户正式 ERP 双向 S4。"
 owner = "H8 模块负责人"
-resume_when = "按 US-H8-002 逐消息类型补 OpenAPI/适配器/业务 API 接线、PostgreSQL 与幂等测试，并取得客户正式 ERP 双向请求和回执。"
+resume_when = "补齐各消息类型 M-PM/业务 API 接线与 L2-L4/L11 测试，并归档客户正式 ERP 双向请求回执后关闭延期。"
 
 [[deferred_stories]]
 id = "US-H8-003"
@@ -4514,6 +4514,30 @@ types = [
   "audit_compliance",
   "external_runtime",
 ]
-reason = "已补独立故事，但消息主记录/尝试记录、月分区、查询统计、并发租约、死信重放 API、H8 ERP 消息页面和真实浏览器/客户 ERP 故障恢复证据尚未实现。"
+frontend_pages = ["h8-erp-messages"]
+e2e_checks = [
+  "pnpm --dir prototypes exec playwright test --config=playwright-web-admin-h8-messages-config.ts",
+]
+e2e_screenshots = [
+  { page = "h8-erp-messages", spec = "prototypes/e2e/web-admin-h8-messages.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-messages/message-list.png" },
+  { page = "h8-erp-messages", spec = "prototypes/e2e/web-admin-h8-messages.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-messages/failed-filter.png" },
+  { page = "h8-erp-messages", spec = "prototypes/e2e/web-admin-h8-messages.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-messages/dead-detail.png" },
+  { page = "h8-erp-messages", spec = "prototypes/e2e/web-admin-h8-messages.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-messages/replay-success.png" },
+  { page = "h8-erp-messages", spec = "prototypes/e2e/web-admin-h8-messages.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-messages/readonly-no-replay.png" },
+]
+evidence_refs = [
+  "apps/web-admin/src/pages/config-center/ErpMessageLogPage.tsx",
+  "backend/crates/domain/src/h8_erp_message.rs",
+  "backend/crates/api/src/h8_erp_messages/mod.rs",
+  "backend/migrations/202607190005_h8_erp_messages.sql",
+  "backend/migrations/202607190006_h8_erp_messages_admin_menu.sql",
+  "prototypes/e2e/web-admin-h8-messages.spec.ts",
+  "artifacts/screenshot-portal/real-web/h8-erp-messages/message-list.png",
+  "artifacts/screenshot-portal/real-web/h8-erp-messages/failed-filter.png",
+  "artifacts/screenshot-portal/real-web/h8-erp-messages/dead-detail.png",
+  "artifacts/screenshot-portal/real-web/h8-erp-messages/replay-success.png",
+  "artifacts/screenshot-portal/real-web/h8-erp-messages/readonly-no-replay.png",
+]
+reason = "已补消息主记录/尝试表迁移、状态机与租约 domain、list/detail/stats/replay API、h8-erp-messages 菜单页、mock 与 Playwright 截图；尚缺月分区挂载、P95 指标与客户 ERP 死信重放 S4。"
 owner = "H8 模块负责人"
-resume_when = "实现消息与尝试存储、状态机和租约，补 h8-erp-messages 页面/API/PostgreSQL/并发/E2E 证据，并完成客户 ERP 死信重放演练。"
+resume_when = "补月分区/归档清理演练与客户 ERP 故障恢复证据后关闭延期。"

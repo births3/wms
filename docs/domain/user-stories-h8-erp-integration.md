@@ -318,3 +318,24 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 - 已证明：AC1-6、AC8-16 的软件主链、真实浏览器 E2E、容器厂商回执和主备切换证据。
 - 未完成：AC7 的客户指定厂商正式 ERP dev/staging 回执。
 - 恢复条件：使用客户正式 `ERP_CALLBACK_BASE` 运行同一 S4 契约并归档厂商侧回执；完成前保持 `deferred_stories`，不得宣称故事整体完成。
+
+---
+
+## 验收记录（US-H8-002 / US-H8-003 软件切片）
+
+- 故事：`US-H8-002` / `US-H8-003`
+- 验收日期：`2026-07-19`
+- 整体结论：`NEEDS_WORK`（软件主链推进中，S4 与部分运行证据未齐）
+
+| 故事 | 已落地 | 仍缺 |
+|---|---|---|
+| US-H8-002 | 受控目录 5 入站 + 7 出站、信封校验、错误分类、配置版本绑定、仓库范围交集、domain 单测；Worker 本地切片 | 逐消息 M-PM 规整、业务 API 全链幂等、客户正式 ERP S4 |
+| US-H8-003 | `h8_erp_messages`/`attempts` 迁移、状态机/租约/重放 domain、API list/detail/stats/replay、菜单页 `h8-erp-messages`、dev mock、内存仓储测试 | 真实 Playwright/截图、月分区挂载、P95、客户 ERP 死信重放 S4 |
+
+验证命令：
+
+| ID | 命令 |
+|---|---|
+| H8-MSG-U1 | `cargo test --manifest-path backend/Cargo.toml -p wms-domain --lib h8_erp_message` |
+| H8-MSG-U2 | `cargo test --manifest-path backend/Cargo.toml -p wms-api --lib h8_erp_messages` |
+| H8-U1 | `cargo test --manifest-path backend/Cargo.toml -p wms-domain --lib h8_erp` |
