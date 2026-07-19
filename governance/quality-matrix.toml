@@ -4449,6 +4449,8 @@ e2e_screenshots = [
   { page = "h8-erp-connectors", spec = "prototypes/e2e/web-admin-h8-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-connectors/route-overlap-rejected.png" },
   { page = "h8-erp-connectors", spec = "prototypes/e2e/web-admin-h8-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-connectors/readonly-manager.png" },
   { page = "h8-erp-connectors", spec = "prototypes/e2e/web-admin-h8-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-connectors/vault-alias-resolved.png" },
+  { page = "h8-erp-connectors", spec = "prototypes/e2e/web-admin-h8-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-connectors/connector-edited-retesting.png" },
+  { page = "h8-erp-connectors", spec = "prototypes/e2e/web-admin-h8-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-connectors/route-resolve.png" },
 ]
 evidence_refs = [
   "apps/web-admin/src/pages/config-center/ErpConnectorConfigPage.tsx",
@@ -4461,16 +4463,21 @@ evidence_refs = [
   "artifacts/screenshot-portal/real-web/h8-erp-connectors/route-overlap-rejected.png",
   "artifacts/screenshot-portal/real-web/h8-erp-connectors/readonly-manager.png",
   "artifacts/screenshot-portal/real-web/h8-erp-connectors/vault-alias-resolved.png",
+  "artifacts/screenshot-portal/real-web/h8-erp-connectors/connector-edited-retesting.png",
+  "artifacts/screenshot-portal/real-web/h8-erp-connectors/route-resolve.png",
   "docs/retros/h8-failover-runtime-evidence.json",
   "docs/retros/h8-container-erp-s4-evidence.json",
   "docs/retros/h8-local-integration-evidence.json",
   "deploy/docker-compose.h8-erp-vendor.yml",
   "deploy/h8-erp-vendor/server.py",
   "scripts/h8_erp_interface_sync/channel_failover.py",
+  "scripts/h8_erp_interface_sync/circuit_breaker.py",
   "scripts/h8_erp_interface_sync/run_failover_erp_evidence.py",
   "scripts/h8_erp_interface_sync/run_container_erp_s4_evidence.py",
   "scripts/h8_erp_interface_sync/run_local_integration.py",
+  "backend/crates/domain/src/h8_erp.rs",
+  "backend/crates/api/src/h8_erp_connectors/mod.rs",
 ]
-reason = "已补 H8 专用表、API/权限/菜单/secrets、浏览器 E2E、主备 failover、容器化外部 ERP 厂商（wms-h8-erp-vendor）与 S4 风格回执证据 docs/retros/h8-container-erp-s4-evidence.json。若客户要求对接指定厂商正式环境，仍需替换 ERP_CALLBACK_BASE 做厂商联调归档。"
+reason = "US-H8-001 AC1-16 配置/运行时主链已实现：route-resolve、scope、幂等/乐观锁、在途 pause/resume、测试重叠校验、熔断半开证据、E2E 6 条。唯一可选延期：客户指定厂商正式 ERP 回执（ERP_CALLBACK_BASE）。"
 owner = "H8 模块负责人"
-resume_when = "若需客户指定厂商正式环境：替换 ERP_CALLBACK_BASE 完成联调并归档厂商侧回执；否则容器厂商证据可作为开发/验收替代。"
+resume_when = "若关闭延期：用客户正式 ERP_CALLBACK_BASE 归档回执；否则保持延期并认定容器厂商证据满足开发验收。"

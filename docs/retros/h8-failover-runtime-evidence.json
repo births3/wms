@@ -1,5 +1,5 @@
 {
-  "collected_at": "2026-07-19T01:53:14.781390+00:00",
+  "collected_at": "2026-07-19T06:56:53.688760+00:00",
   "story": "US-H8-001",
   "scope": "rest_primary_table_fallback runtime + local ERP mock",
   "environment": {
@@ -23,6 +23,15 @@
       ],
       "fallback_used": true,
       "idempotency_note": "if_out_message uses out:{table}:{id}; HTTP body carries same source_outbox_id"
+    },
+    {
+      "name": "circuit_half_open_recover",
+      "ok": true,
+      "opened": "open",
+      "recovered_channel": "http",
+      "final_state": "closed",
+      "table_calls": 3,
+      "not_dual_write_on_recover": true
     },
     {
       "name": "live_erp_mock_recovery",
