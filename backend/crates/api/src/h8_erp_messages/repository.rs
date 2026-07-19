@@ -82,6 +82,15 @@ pub trait H8ErpMessageRepository: Send + Sync {
         now: DateTime<Utc>,
     ) -> Result<(i64, i32), H8ErpMessageRepoError>;
 
+    /// 按幂等键查找消息（交换生命周期审计 upsert）。
+    async fn find_by_idempotency(
+        &self,
+        owner_id: Uuid,
+        message_type: &str,
+        external_ref: &str,
+        idempotency_key: &str,
+    ) -> Result<Option<H8ErpMessage>, H8ErpMessageRepoError>;
+
     /// 测试/Worker 写入入口。
     async fn upsert_for_test(&self, message: &H8ErpMessage) -> Result<(), H8ErpMessageRepoError>;
 
@@ -441,6 +450,26 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
             guard.attempts.remove(id);
         }
         Ok((to_delete.len() as i64, days))
+    }
+
+    async fn find_by_idempotency(
+        &self,
+        owner_id: Uuid,
+        message_type: &str,
+        external_ref: &str,
+        idempotency_key: &str,
+    ) -> Result<Option<H8ErpMessage>, H8ErpMessageRepoError> {
+        let guard = self.inner.lock().expect("lock");
+        Ok(guard
+            .messages
+            .values()
+            .find(|m| {
+                m.owner_id == owner_id
+                    && m.message_type == message_type
+                    && m.external_ref == external_ref
+                    && m.idempotency_key == idempotency_key
+            })
+            .cloned())
     }
 
     async fn upsert_for_test(&self, message: &H8ErpMessage) -> Result<(), H8ErpMessageRepoError> {

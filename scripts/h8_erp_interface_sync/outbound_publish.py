@@ -427,7 +427,30 @@ def process_outbound_once(
                 f"[h8-out] claim {table} id={row.id} event={row.event_type}",
                 flush=True,
             )
+            msg_type = src.get("message_type") or "putaway_complete"
+            idem = f"out:{table}:{row.id}"
+            life_settings = type(
+                "LifeSettings",
+                (),
+                {
+                    "api_base": os.environ.get("WMS_API_BASE", "http://127.0.0.1:8080"),
+                    "api_token": os.environ.get("WMS_API_TOKEN"),
+                },
+            )()
             if dry_run:
+                try:
+                    from exchange_lifecycle import run_outbound_pipeline
+
+                    run_outbound_pipeline(
+                        life_settings,
+                        msg_type,
+                        str(row.external_ref or row.id),
+                        idem,
+                        lambda: None,
+                        dry_run=True,
+                    )
+                except Exception as life_exc:  # noqa: BLE001
+                    print(f"[h8-out] lifecycle dry-run warn: {life_exc}", flush=True)
                 mark_wms_outbox(
                     database_url,
                     table,
@@ -451,22 +474,29 @@ def process_outbound_once(
                         raise RuntimeError("sqlcmd_exec required for table transport")
                     sqlcmd_exec(insert_if_out_sql(active))
 
-                result = publish_with_failover(
-                    transport=transport,
-                    publish_http=_http,
-                    publish_table=_table,
-                    http_max_attempts=attempts,
+                from exchange_lifecycle import run_outbound_pipeline
+
+                def _send() -> None:
+                    publish_with_failover(
+                        transport=transport,
+                        publish_http=_http,
+                        publish_table=_table,
+                        http_max_attempts=attempts,
+                    )
+
+                # US-H8-002 AC11：真实出站路径 receive→convert→send→receipt
+                run_outbound_pipeline(
+                    life_settings,
+                    msg_type,
+                    str(getattr(row, "external_ref", None) or row.id),
+                    idem,
+                    _send,
+                    dry_run=False,
                 )
                 mark_wms_outbox(database_url, table, row.id, succeeded=True)
-                note = (
-                    f" fallback_from_http={result.error}"
-                    if result.fallback_used
-                    else ""
-                )
                 print(
-                    f"[h8-out] published {table}/{row.id} via {result.channel}"
-                    f" (transport={transport} http_attempts={result.attempts_http})"
-                    f"{note}",
+                    f"[h8-out] published {table}/{row.id} "
+                    f"(transport={transport})",
                     flush=True,
                 )
             except Exception as exc:  # noqa: BLE001

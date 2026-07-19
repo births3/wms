@@ -38,6 +38,7 @@ from typing import Any, Callable
 _sys_path = str(Path(__file__).resolve().parent)
 if _sys_path not in sys.path:
     sys.path.insert(0, _sys_path)
+from exchange_lifecycle import run_inbound_pipeline  # noqa: E402
 from outbound_publish import (  # noqa: E402
     process_outbound_once,
     resolve_callback_base,
@@ -635,7 +636,17 @@ def process_once(settings: Settings, types: list[str], dry_run: bool) -> int:
                 flush=True,
             )
             if dry_run:
-                # 认领已置 processing：释放回 pending，不调 API、不记失败
+                # 认领已置 processing：释放回 pending；仍走 lifecycle receive/convert 审计
+                try:
+                    run_inbound_pipeline(
+                        settings,
+                        type_name,
+                        row,
+                        handler,
+                        dry_run=True,
+                    )
+                except Exception as life_exc:  # noqa: BLE001
+                    print(f"[h8] lifecycle dry-run warn: {life_exc}", flush=True)
                 mark_row(
                     settings,
                     table,
@@ -647,11 +658,19 @@ def process_once(settings: Settings, types: list[str], dry_run: bool) -> int:
                 print(f"[h8] dry-run release {type_name} id={row_id}", flush=True)
                 continue
             try:
-                wms_id = handler(settings, row)
+                # US-H8-002 AC11：真实路径 emit receive→convert→business_api→receipt
+                wms_id, _life = run_inbound_pipeline(
+                    settings,
+                    type_name,
+                    row,
+                    handler,
+                    dry_run=False,
+                )
                 mark_row(settings, table, row_id, "success", wms_id=wms_id)
                 print(f"[h8] success {type_name} -> {wms_id}", flush=True)
             except Exception as exc:  # noqa: BLE001 — worker 边界
                 retry += 1
+                # run_inbound_pipeline 已在 final_failure 阶段写审计
                 # 未达上限：回 pending 便于下一轮；达上限：dead
                 next_status = "dead" if retry >= settings.max_retry else "pending"
                 mark_row(

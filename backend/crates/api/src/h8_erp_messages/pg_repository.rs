@@ -564,6 +564,35 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
         Ok((ids.len() as i64, days))
     }
 
+    async fn find_by_idempotency(
+        &self,
+        owner_id: Uuid,
+        message_type: &str,
+        external_ref: &str,
+        idempotency_key: &str,
+    ) -> Result<Option<H8ErpMessage>, H8ErpMessageRepoError> {
+        let row = sqlx::query_as::<_, MessageRow>(
+            r#"
+            SELECT id, owner_id, warehouse_id, connector_id, connector_code, config_version,
+                   direction, message_type, channel, external_ref, wms_resource_id,
+                   idempotency_key, correlation_id, sync_status, retry_count, next_retry_at,
+                   last_error_summary, payload_digest, claimed_by, lease_expires_at,
+                   created_at, updated_at, completed_at, acked_at
+            FROM h8_erp_messages
+            WHERE owner_id = $1 AND message_type = $2 AND external_ref = $3 AND idempotency_key = $4
+            LIMIT 1
+            "#,
+        )
+        .bind(owner_id)
+        .bind(message_type)
+        .bind(external_ref)
+        .bind(idempotency_key)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| H8ErpMessageRepoError::Db(e.to_string()))?;
+        Ok(row.map(Into::into))
+    }
+
     async fn upsert_for_test(&self, message: &H8ErpMessage) -> Result<(), H8ErpMessageRepoError> {
         sqlx::query(
             r#"

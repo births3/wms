@@ -30,6 +30,11 @@ pub fn h8_erp_message_router(state: H8ErpMessageAppState) -> Router {
             "/api/v1/integration/erp-messages/purge",
             post(purge_messages),
         )
+        // Worker 真实交换路径：无 id 时按幂等键 upsert 并写 lifecycle 审计
+        .route(
+            "/api/v1/integration/erp-messages/lifecycle",
+            post(record_lifecycle_upsert),
+        )
         .route("/api/v1/integration/erp-messages/:id", get(get_message))
         .route(
             "/api/v1/integration/erp-messages/:id/replay",
@@ -72,6 +77,20 @@ struct MarkDeadRequest {
 struct LifecycleRequest {
     stage: String,
     result: String,
+}
+
+/// Worker 入站/出站共用：按幂等键定位或创建消息并写交换阶段审计。
+#[derive(Debug, Deserialize)]
+struct LifecycleUpsertRequest {
+    stage: String,
+    result: String,
+    direction: String,
+    message_type: String,
+    external_ref: String,
+    idempotency_key: String,
+    correlation_id: String,
+    channel: String,
+    message_id: Option<Uuid>,
 }
 
 async fn list_messages(
@@ -213,6 +232,69 @@ async fn record_lifecycle(
 ) -> Result<Json<H8ErpMessage>, H8ErpMessageHandlerError> {
     ctx.require_permission(H8_MSG_WRITE)?;
     let message = state.repository.get(ctx.owner_id, id).await?;
+    write_exchange_lifecycle_audit(
+        &state,
+        &ctx,
+        &message,
+        body.stage.trim(),
+        body.result.trim(),
+    )
+    .await?;
+    Ok(Json(message))
+}
+
+async fn record_lifecycle_upsert(
+    ctx: AuthContext,
+    State(state): State<H8ErpMessageAppState>,
+    Json(body): Json<LifecycleUpsertRequest>,
+) -> Result<Json<H8ErpMessage>, H8ErpMessageHandlerError> {
+    ctx.require_permission(H8_MSG_WRITE)?;
+    let now = Utc::now();
+    let message = if let Some(id) = body.message_id {
+        state.repository.get(ctx.owner_id, id).await?
+    } else {
+        let existing = state
+            .repository
+            .find_by_idempotency(
+                ctx.owner_id,
+                body.message_type.trim(),
+                body.external_ref.trim(),
+                body.idempotency_key.trim(),
+            )
+            .await?;
+        if let Some(m) = existing {
+            m
+        } else {
+            let m = H8ErpMessage {
+                id: Uuid::new_v4(),
+                owner_id: ctx.owner_id,
+                warehouse_id: None,
+                connector_id: None,
+                connector_code: None,
+                config_version: None,
+                direction: body.direction.trim().to_string(),
+                message_type: body.message_type.trim().to_string(),
+                channel: body.channel.trim().to_string(),
+                external_ref: body.external_ref.trim().to_string(),
+                wms_resource_id: None,
+                idempotency_key: body.idempotency_key.trim().to_string(),
+                correlation_id: body.correlation_id.trim().to_string(),
+                sync_status: "processing".into(),
+                retry_count: 0,
+                next_retry_at: None,
+                last_error_summary: None,
+                payload_digest: "worker-lifecycle".into(),
+                claimed_by: Some(format!("worker:{}", ctx.user_id)),
+                lease_expires_at: Some(now + chrono::Duration::minutes(10)),
+                created_at: now,
+                updated_at: now,
+                completed_at: None,
+                acked_at: None,
+            };
+            state.repository.upsert_for_test(&m).await?;
+            m
+        }
+    };
     write_exchange_lifecycle_audit(
         &state,
         &ctx,
