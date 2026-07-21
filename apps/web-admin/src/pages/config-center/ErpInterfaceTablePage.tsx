@@ -37,6 +37,36 @@ const TABLES = [
 
 const INBOUND_STATUSES = ["pending", "processing", "success", "failed", "dead"];
 const OUTBOUND_STATUSES = [...INBOUND_STATUSES, "acked"];
+const STATUS_LABELS: Record<string, string> = {
+  pending: "待处理",
+  processing: "处理中",
+  success: "成功",
+  failed: "失败",
+  dead: "死信",
+  acked: "已确认",
+  testing: "测试中",
+  active: "已启用",
+  disabled: "已停用",
+};
+const DETAIL_FIELD_LABELS: Record<string, string> = {
+  id: "记录 ID",
+  business_key: "业务键摘要",
+  event_type: "事件类型",
+  external_ref: "外部引用",
+  warehouse_id: "仓库 ID",
+  wms_resource_id: "WMS 资源 ID",
+  sync_status: "同步状态",
+  retry_count: "重试次数",
+  last_error: "错误摘要",
+  idempotency_key: "幂等键",
+  created_at: "创建时间",
+  updated_at: "更新时间",
+  payload_summary: "报文摘要",
+};
+
+function statusLabel(status: string | null | undefined): string {
+  return status ? STATUS_LABELS[status] ?? status : "—";
+}
 
 export const h8ErpInterfaceTableQueryFields: QueryPanelField[] = [
   { key: "connector_id", label: "连接", type: "select", options: [{ label: "请选择", value: "" }] },
@@ -46,14 +76,14 @@ export const h8ErpInterfaceTableQueryFields: QueryPanelField[] = [
     type: "select",
     options: TABLES.map(([value, label]) => ({ value, label: `${label}（${value}）` })),
   },
-  { key: "sync_status", label: "sync_status", type: "select", options: [{ label: "全部", value: "" }] },
-  { key: "updated_at", label: "updated_at（最近 7 天）", type: "dateRange" },
-  { key: "external_doc_no", label: "external_doc_no", type: "text" },
-  { key: "external_ref", label: "external_ref", type: "text" },
-  { key: "source_outbox_id", label: "source_outbox_id", type: "text" },
-  { key: "event_type", label: "event_type", type: "text" },
-  { key: "warehouse_id", label: "warehouse_id", type: "text" },
-  { key: "idempotency_key", label: "idempotency_key", type: "text" },
+  { key: "sync_status", label: "同步状态", type: "select", options: [{ label: "全部", value: "" }] },
+  { key: "updated_at", label: "更新时间（最近 7 天）", type: "dateRange" },
+  { key: "external_doc_no", label: "外部单据号", type: "text" },
+  { key: "external_ref", label: "外部引用", type: "text" },
+  { key: "source_outbox_id", label: "来源发件箱 ID", type: "text" },
+  { key: "event_type", label: "事件类型", type: "text" },
+  { key: "warehouse_id", label: "仓库 ID", type: "text" },
+  { key: "idempotency_key", label: "幂等键", type: "text" },
 ];
 const h8ErpInterfaceTableQueryFieldDefinitions = h8ErpInterfaceTableQueryFields;
 
@@ -65,11 +95,11 @@ export const h8ErpInterfaceTableCoreQueryFieldKeys = [
 ];
 
 const columns: DataGridColumn<H8ErpInterfaceTableRow>[] = [
-  { key: "row_id", header: "id", width: 230, mono: true },
+  { key: "row_id", header: "记录 ID", width: 230, mono: true },
   { key: "business_key", header: "业务键摘要", width: 180, render: (row) => row.business_key ?? "—" },
-  { key: "event_type", header: "event_type", width: 150, render: (row) => row.event_type ?? "—" },
-  { key: "sync_status", header: "sync_status", width: 110 },
-  { key: "retry_count", header: "重试", width: 70 },
+  { key: "event_type", header: "事件类型", width: 150, render: (row) => row.event_type ?? "—" },
+  { key: "sync_status", header: "同步状态", width: 110, render: (row) => statusLabel(row.sync_status) },
+  { key: "retry_count", header: "重试次数", width: 90 },
   { key: "last_error", header: "错误摘要", width: 220, render: (row) => row.last_error ?? "—" },
   { key: "idempotency_key", header: "幂等键", width: 180, render: (row) => row.idempotency_key ?? "—" },
   { key: "created_at", header: "创建时间", width: 175, render: (row) => new Date(row.created_at).toLocaleString() },
@@ -170,9 +200,9 @@ export function ErpInterfaceTablePage() {
     .filter((field) => h8ErpInterfaceTableCoreQueryFieldKeys.includes(field.key) || isApplicable(draftTableKey, field.key))
     .map((field) =>
       field.key === "connector_id"
-      ? { ...field, options: [{ label: "请选择", value: "" }, ...connectors.map((connector) => ({ label: connector.probe_credentials_configured ? `${connector.connector_name}（${connector.connector_code} · ${connector.status}）` : `${connector.connector_name}（${connector.connector_code} · 未配置独立探查凭据）`, value: connector.id, disabled: !connector.probe_credentials_configured }))] }
+      ? { ...field, options: [{ label: "请选择", value: "" }, ...connectors.map((connector) => ({ label: connector.probe_credentials_configured ? `${connector.connector_name}（${connector.connector_code} · ${statusLabel(connector.status)}）` : `${connector.connector_name}（${connector.connector_code} · 未配置独立探查凭据）`, value: connector.id, disabled: !connector.probe_credentials_configured }))] }
       : field.key === "sync_status"
-        ? { ...field, options: [{ label: "全部", value: "" }, ...draftStatusOptions.map((value) => ({ label: value, value }))] }
+        ? { ...field, options: [{ label: "全部", value: "" }, ...draftStatusOptions.map((value) => ({ label: statusLabel(value), value }))] }
       : field,
     );
   const toolbarActions: DataGridToolbarAction[] = [
@@ -185,7 +215,7 @@ export function ErpInterfaceTablePage() {
       <header className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h1 className="text-xl font-semibold">H8 接口表探查</h1>
-          <p className="text-sm text-muted-foreground">MSSQL SELECT-only · 最近 7 天 · 最大跨度 31 天 · 无写操作</p>
+          <p className="text-sm text-muted-foreground">MSSQL 只读查询 · 最近 7 天 · 最大跨度 31 天 · 无写操作</p>
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground"><Database className="size-4" aria-hidden />合计 {listQuery.data?.total ?? 0}</div>
       </header>
@@ -205,12 +235,12 @@ export function ErpInterfaceTablePage() {
       />
       {selectedConnector && !selectedConnectorReady ? (
         <div role="status" className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          当前连接未配置独立探查凭据；请由系统管理员在 H8 ERP 连接页维护成对的探查账号与密码 alias。
+          当前连接未配置独立探查凭据；请由系统管理员在 H8 ERP 连接页维护成对的探查账号与密码别名。
         </div>
       ) : null}
       {selectedConnector && selectedConnector.status !== "active" ? (
         <div role="status" className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          连接状态为 {selectedConnector.status}；探查仍允许用于排障，但请确认接口库只读凭据和网络状态。
+          连接状态为 {statusLabel(selectedConnector.status)}；探查仍允许用于排障，但请确认接口库只读凭据和网络状态。
         </div>
       ) : null}
       {listQuery.isError ? <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">接口表读取失败：请检查探查凭据、连接可达性或权限。</div> : null}
@@ -229,7 +259,7 @@ export function ErpInterfaceTablePage() {
       <Dialog open={detailId != null} onOpenChange={(open) => !open && setDetailId(null)}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader><DialogTitle>接口表行详情</DialogTitle><DialogDescription>联合身份：连接 + 表 + 行 ID；仅展示服务端生成的脱敏摘要。</DialogDescription></DialogHeader>
-          {detailQuery.data ? <div className="grid max-h-[60vh] gap-2 overflow-auto text-sm">{detailQuery.data.fields.map((field) => <div key={field.key} className="grid grid-cols-[10rem_1fr] gap-2 rounded border px-2 py-1"><span className="font-medium">{field.key === "payload_summary" ? "payload_summary" : field.key}</span><span className="break-all">{field.value ?? "—"}</span></div>)}</div> : detailQuery.isError ? <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">详情读取失败：请检查连接、权限或行是否仍存在。</div> : <p className="text-sm text-muted-foreground">加载中…</p>}
+          {detailQuery.data ? <div className="grid max-h-[60vh] gap-2 overflow-auto text-sm">{detailQuery.data.fields.map((field) => <div key={field.key} className="grid grid-cols-[10rem_1fr] gap-2 rounded border px-2 py-1"><span className="font-medium">{DETAIL_FIELD_LABELS[field.key] ?? "其他字段"}</span><span className="break-all">{field.key === "sync_status" ? statusLabel(field.value) : field.value ?? "—"}</span></div>)}</div> : detailQuery.isError ? <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">详情读取失败：请检查连接、权限或行是否仍存在。</div> : <p className="text-sm text-muted-foreground">加载中…</p>}
           <DialogFooter><DialogClose asChild><Button type="button" variant="outline">关闭</Button></DialogClose></DialogFooter>
         </DialogContent>
       </Dialog>

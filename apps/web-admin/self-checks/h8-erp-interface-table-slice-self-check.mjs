@@ -32,6 +32,17 @@ for (const token of [
   "probe_credentials_configured",
   "disabled: !connector.probe_credentials_configured",
 ]) assert.match(page, new RegExp(token));
+for (const label of [
+  "同步状态",
+  "更新时间（最近 7 天）",
+  "外部单据号",
+  "外部引用",
+  "来源发件箱 ID",
+  "事件类型",
+  "仓库 ID",
+  "记录 ID",
+  "报文摘要",
+]) assert.match(page, new RegExp(label));
 assert.doesNotMatch(page, /payload_json/);
 assert.match(connectorPage, /接口表探查账号（只读）/);
 assert.match(connectorPage, /expected_probe_config_version/);

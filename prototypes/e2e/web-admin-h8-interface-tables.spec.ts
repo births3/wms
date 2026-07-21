@@ -40,12 +40,12 @@ test("H8 接口表探查：列表、状态筛选、详情且无写操作", async
   await openInterfaceTables(page);
 
   await expect(page.getByText("ASN-20260719-001")).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText("MSSQL SELECT-only")).toBeVisible();
+  await expect(page.getByText("MSSQL 只读查询")).toBeVisible();
   await expect(page.getByRole("button", { name: "重放", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "新增", exact: true })).toHaveCount(0);
   await page.screenshot({ path: path.join(screenshotDir, "interface-table-list.png"), fullPage: false });
 
-  await page.getByLabel("sync_status", { exact: true }).selectOption("failed");
+  await page.getByLabel("同步状态", { exact: true }).selectOption("failed");
   await page.getByRole("button", { name: "查询", exact: true }).click();
   await expect(page.getByText("ASN-20260719-002")).toBeVisible();
   await expect(page.getByText("ASN-20260719-001")).toHaveCount(0);
@@ -55,7 +55,7 @@ test("H8 接口表探查：列表、状态筛选、详情且无写操作", async
   await row.getByRole("checkbox", { name: "选择此行" }).check();
   await page.getByRole("button", { name: "详情", exact: true }).click();
   await expect(page.getByRole("dialog").getByText("接口表行详情")).toBeVisible();
-  await expect(page.getByRole("dialog").getByText("payload_summary")).toBeVisible();
+  await expect(page.getByRole("dialog").getByText("报文摘要")).toBeVisible();
   await expect(page.getByRole("dialog")).not.toContainText("payload_json");
   await page.screenshot({ path: path.join(screenshotDir, "interface-table-detail.png"), fullPage: false });
 });

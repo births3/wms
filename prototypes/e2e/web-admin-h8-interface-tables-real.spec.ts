@@ -14,11 +14,11 @@ test("H8 接口表探查：真实 DEMO 列表、筛选、详情且无写操作",
   await openInterfaceTables(page);
 
   await expect(page.getByText("DEMO-ASN-001", { exact: true })).toBeVisible();
-  await expect(page.getByText("MSSQL SELECT-only")).toBeVisible();
+  await expect(page.getByText("MSSQL 只读查询")).toBeVisible();
   await assertNoWriteActions(page);
   await page.screenshot({ path: path.join(screenshotDir, "interface-table-list.png"), fullPage: false });
 
-  await page.getByLabel("sync_status", { exact: true }).selectOption("pending");
+  await page.getByLabel("同步状态", { exact: true }).selectOption("pending");
   await page.getByRole("button", { name: "查询", exact: true }).click();
   await expect(page.getByText("DEMO-ASN-001", { exact: true })).toBeVisible();
   await expect(page.getByText(/合计 1/)).toBeVisible();
@@ -29,7 +29,7 @@ test("H8 接口表探查：真实 DEMO 列表、筛选、详情且无写操作",
   await page.getByRole("button", { name: "详情", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByText("接口表行详情")).toBeVisible();
-  await expect(dialog.getByText("payload_summary")).toBeVisible();
+  await expect(dialog.getByText("报文摘要")).toBeVisible();
   await expect(dialog).not.toContainText("payload_json");
   await page.screenshot({ path: path.join(screenshotDir, "interface-table-detail.png"), fullPage: false });
 });
