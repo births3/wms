@@ -1,7 +1,7 @@
 # 错误码字典（Error Codes Dictionary）
 
-> 时间：2026-07-15
-> 版本：v3.9（当前 174 项）
+> 时间：2026-07-21
+> 版本：v3.10（当前 175 项）
 > 文档层级：L2 规范（必须遵守）
 > 关联：[ADR-0010](adr/0010-error-codes.md) / [coding-standards.md §4](coding-standards.md)
 
@@ -77,9 +77,9 @@
 |---|---|---|
 | info | 1 | 状态变更通知 / 数据已存在等正常路径 |
 | warning | 55 | 业务规则拦截（库存不足 / 资质过期等）|
-| error | 108 | 业务异常（数据冲突 / 校验失败）|
+| error | 109 | 业务异常（数据冲突 / 校验失败）|
 | critical | 10 | 合规/安全异常（跨货主访问 / 篡改尝试）|
-| **合计** | **174** | — |
+| **合计** | **175** | — |
 
 ---
 
@@ -92,6 +92,7 @@
 | H4 | 14 | 通知发送 / 审批 / 重发 |
 | H6 | 2 | 状态机查询与校验 |
 | H5 | 2 | 快递面单 |
+| H8 | 1 | ERP 接口表探查 |
 | H_DOCK | 11 | 月台预约 |
 | H_AL | 28 | 告警引擎 |
 | M1 | 12 | 主数据校验 / 配置中心 |
@@ -2259,6 +2260,19 @@ error_codes:
     related_fields: []
     related_stories: [US-TE-002, US-TE-003, US-TE-005, US-TE-008]
     introduced_in: v3.6
+
+  # ========== H8 ERP 防腐层 ==========
+  - code: H8_PROBE_CREDENTIAL_NOT_CONFIGURED
+    module: H8
+    category: PROBE
+    detail: CREDENTIAL_NOT_CONFIGURED
+    http_status: 409
+    severity: error
+    message_zh: '接口表探查凭据未配置'
+    message_en: 'Interface-table probe credentials are not configured'
+    related_fields: []
+    related_stories: [US-H8-004]
+    introduced_in: v3.10
 ```
 
 ---
@@ -2285,3 +2299,4 @@ error_codes:
 | 2026-07-15 | v3.6 | 登记 M-TE 任务组、创建、分派与执行主链 15 个错误码；脚本统计当前合计 137 项 |
 | 2026-07-15 | v3.7 | 补齐 M-VR 双人策略实际返回的 7 个错误码，并统一 M-TE 内部错误命名；脚本统计当前合计 144 项 |
 | 2026-07-15 | v3.8 | 登记 M-TE 任务释放条件未满足错误码；脚本统计当前合计 148 项 |
+| 2026-07-21 | v3.10 | 登记 US-H8-004 接口表探查凭据未配置错误码；脚本统计当前合计 175 项 |

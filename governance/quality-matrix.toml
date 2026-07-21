@@ -4541,3 +4541,25 @@ evidence_refs = [
 reason = "已补消息/尝试存储、状态机、Worker claim 租约、stats P95、保留策略 purge、菜单页 E2E 与分区准备迁移；尚缺生产月分区切换与客户 ERP 死信重放 S4。"
 owner = "H8 模块负责人"
 resume_when = "生产库切换 RANGE 月分区、补归档清理演练与客户 ERP 故障恢复证据后关闭延期。"
+
+[[deferred_stories]]
+id = "US-H8-004"
+title = "ERP 接口表只读探查"
+module = "H8"
+story_file = "docs/domain/user-stories-h8-erp-integration.md"
+types = [
+  "read_only",
+  "api_change",
+  "frontend_interaction",
+  "integration",
+  "runtime_guard",
+  "audit_compliance",
+]
+evidence_refs = [
+  "docs/domain/user-stories-h8-erp-integration.md",
+  "deploy/docker-compose.h8-erp-if.yml",
+  "deploy/h8-erp-if/init",
+]
+reason = "产品决策与十轮规格已闭合（专用权限、独立菜单、独立探查凭据及版本、SELECT-only 账号、无仓表全仓权限、脱敏限长摘要、详情联合键、updated_at、表级过滤 400、Docker 关软件路径）。连接字段迁移、API、权限迁移、页面 E2E 与截图均未落地；页面未实现前不预登记 frontend_pages 或空 E2E 证据。"
+owner = "H8 模块负责人"
+resume_when = "先以兼容迁移补 interface_probe_db_username/interface_probe_db_password_alias/interface_probe_config_version，再落地权限/菜单/API/页面并一次性登记 frontend_pages、Playwright 与截图；最后在 docker-compose.h8-erp-if 上完成查询、权限、审计和 SELECT-only DML 拒绝证据。"

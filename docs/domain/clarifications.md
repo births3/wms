@@ -536,3 +536,6 @@
 | 90 | H8 故事集范围 | 2026-07-19 用户确认按评审建议补齐故事：US-H8-001 连接配置、US-H8-002 消息交换与语义转换、US-H8-003 消息日志与故障重放；文档补齐不代表后两个故事实现完成。 |
 | 91 | 消息运维入口与权限 | US-H8-003 使用「H8 集成中心 / H8 ERP 消息」独立列表页；首版复用 `h8.erp_connector.read/write`，仓库主管只读、系统管理员重放，不新增角色或权限点。 |
 | 92 | 消息日志保留 | 不采用未经确认的固定 7 天默认值；保留策略必须受控配置，未配置时禁止自动删除，H2 审计和未终结消息不得随运行日志清理。 |
+| 93 | H8 接口表探查 | 2026-07-21 用户确认 US-H8-004：（1）新建权限 `h8.erp_interface_table.read`；（2）独立菜单页 `h8-erp-interface-tables`；（3）软件路径以 Docker MSSQL（`docker-compose.h8-erp-if`）证据可关闭，不强制客户正式接口库。只读、表白名单、禁止任意 SQL；不替代 US-H8-003。同日八轮评审补充：详情键 `connector_id+table_key+row_id`；时间过滤 `updated_at`；`testing/active/disabled` 均可探查；按表非法过滤/状态 400；有仓列时仓权∩连接白名单。 |
+| 94 | H8 接口表探查安全与查询契约 | 2026-07-21 九轮 review loop 确认：探查必须使用与 Worker 分离的 SELECT-only 账号，Docker 验收包含 DML 拒绝；无仓列只允许系统管理员或货主全仓数据范围；首版只返回服务端脱敏且最多 4096 UTF-8 字节的 payload 摘要；默认 7 天、最大 31 天、准确 total；限流复用 H3，超时复用 ADR-0018。 |
+| 95 | H8 探查凭据绑定 | 2026-07-21 十轮 review loop 确认：H8 连接新增可空 `interface_probe_db_username` / `interface_probe_db_password_alias`，历史连接兼容；仅 004 查询时成对必填，由 connector.write 维护，探查读权限不可见 alias，禁止回退 Worker 凭据。探查配置使用独立 `interface_probe_config_version` 做并发与审计，不递增传输 `config_version`、不使传输测试失效或改变消息通道状态。 |
