@@ -43,6 +43,12 @@ database_objects = ["auth_permissions"]
 test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test h6_state_machine_postgres"]
 evidence_refs = ["backend/crates/api/tests/h6_state_machine_postgres.rs"]
 
+[evidence_profiles.H8]
+backend_files = ["backend/crates/api/src/h8_erp_interface_tables"]
+database_objects = ["h8_erp_connectors", "audit_event", "dbo.if_in_asn", "dbo.if_in_product_master"]
+test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api h8_erp_interface_tables --lib", "pnpm --dir apps/web-admin run test:e2e:h8-interface-real", "scripts/h8_erp_interface_sync/check_probe_readonly.sh"]
+evidence_refs = ["prototypes/e2e/web-admin-h8-interface-tables-real.spec.ts", "docs/retros/h8-interface-table-software-path-evidence.json"]
+
 [evidence_profiles.H9]
 backend_files = ["backend/crates/api/src/print_template_handlers.rs"]
 database_objects = ["print_templates", "print_template_versions", "print_records"]
@@ -4542,7 +4548,7 @@ reason = "已补消息/尝试存储、状态机、Worker claim 租约、stats P9
 owner = "H8 模块负责人"
 resume_when = "生产库切换 RANGE 月分区、补归档清理演练与客户 ERP 故障恢复证据后关闭延期。"
 
-[[deferred_stories]]
+[[stories]]
 id = "US-H8-004"
 title = "ERP 接口表只读探查"
 module = "H8"
@@ -4556,13 +4562,43 @@ types = [
   "audit_compliance",
 ]
 frontend_pages = ["h8-erp-interface-tables"]
+navigation_checks = [
+  "node apps/web-admin/self-checks/h8-erp-interface-table-slice-self-check.mjs",
+]
 e2e_checks = [
   "pnpm --dir apps/web-admin run test:e2e:h8-interface-dev",
+  "pnpm --dir apps/web-admin run test:e2e:h8-interface-real",
 ]
 e2e_screenshots = [
-  { page = "h8-erp-interface-tables", spec = "prototypes/e2e/web-admin-h8-interface-tables.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-list.png" },
-  { page = "h8-erp-interface-tables", spec = "prototypes/e2e/web-admin-h8-interface-tables.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-failed-filter.png" },
-  { page = "h8-erp-interface-tables", spec = "prototypes/e2e/web-admin-h8-interface-tables.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-detail.png" },
+  { page = "h8-erp-interface-tables", spec = "prototypes/e2e/web-admin-h8-interface-tables-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-list.png" },
+  { page = "h8-erp-interface-tables", spec = "prototypes/e2e/web-admin-h8-interface-tables-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-pending-filter.png" },
+  { page = "h8-erp-interface-tables", spec = "prototypes/e2e/web-admin-h8-interface-tables-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-detail.png" },
+  { page = "h8-erp-interface-tables", spec = "prototypes/e2e/web-admin-h8-interface-tables-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-permission-denied.png" },
+]
+api_paths = [
+  "GET /api/v1/h8/erp-interface-tables/connectors",
+  "GET /api/v1/h8/erp-interface-tables/rows",
+  "GET /api/v1/h8/erp-interface-tables/rows/{row_id}",
+]
+database_objects = [
+  "h8_erp_connectors",
+  "auth_permissions",
+  "auth_role_permissions",
+  "admin_menu_draft_nodes",
+  "admin_menu_version_nodes",
+  "audit_event",
+  "dbo.if_in_asn",
+  "dbo.if_in_product_master",
+]
+test_checks = [
+  "cargo test --manifest-path backend/Cargo.toml -p wms-domain --test h8_erp_interface_table",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api h8_erp_interface_tables --lib",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api persistent_audit_failure_is_not_swallowed --lib",
+  "scripts/h8_erp_interface_sync/check_probe_readonly.sh",
+  "node apps/web-admin/self-checks/h8-erp-interface-table-slice-self-check.mjs",
+  "pnpm --dir apps/web-admin exec tsc --noEmit",
+  "pnpm --dir apps/web-admin run test:e2e:h8-interface-real",
+  "just openapi-check",
 ]
 evidence_refs = [
   "docs/domain/user-stories-h8-erp-integration.md",
@@ -4577,11 +4613,31 @@ evidence_refs = [
   "apps/web-admin/src/pages/config-center/ErpInterfaceTablePage.tsx",
   "apps/web-admin/self-checks/h8-erp-interface-table-slice-self-check.mjs",
   "prototypes/e2e/web-admin-h8-interface-tables.spec.ts",
+  "prototypes/e2e/web-admin-h8-interface-tables-real.spec.ts",
+  "prototypes/playwright-web-admin-h8-interface-real-config.ts",
   "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-list.png",
-  "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-failed-filter.png",
+  "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-pending-filter.png",
   "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-detail.png",
+  "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-permission-denied.png",
   "scripts/h8_erp_interface_sync/check_probe_readonly.sh",
+  "backend/crates/api/examples/h8_probe_readonly.rs",
+  "docs/retros/h8-interface-table-software-path-evidence.json",
 ]
-reason = "已完成首个软件切片：独立探查凭据/版本迁移、白名单结构化 SELECT API、owner/仓库范围、脱敏摘要、权限/菜单、带凭据可用性提示的 QueryPanel/DataGrid 页面、自检和 dev-mock 浏览器 E2E；当前 wms_h8_real 已验证 MSSQL DEMO-ASN-001 真实 API 列表→详情。仍未完成 SELECT-only DML 拒绝运行证据、真实 API 权限/审计 E2E 与真实截图；因此故事继续 deferred。"
-owner = "H8 模块负责人"
-resume_when = "启动 docker-compose.h8-erp-if 并配置探查 alias，复验并归档 DEMO-ASN-001/DEMO-PM-001 列表→详情真实 API；补齐 h8.erp_interface_table.read/connector.read 权限否定、H2 列表/详情审计、INSERT/UPDATE/DELETE 拒绝和真实 Playwright 截图后转入 stories。"
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]

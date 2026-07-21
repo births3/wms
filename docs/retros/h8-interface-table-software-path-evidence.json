@@ -1,0 +1,77 @@
+{
+  "collected_at": "2026-07-22T00:19:51+08:00",
+  "story": "US-H8-004",
+  "scope": "Docker MSSQL software path: SELECT-only database boundary, real API/browser authorization, H2 persistent audit and screenshots",
+  "ok": true,
+  "environment": {
+    "postgres_database": "wms_h8_real",
+    "mssql_database": "wms_erp_if",
+    "mssql_endpoint": "127.0.0.1:14333",
+    "web_admin": "http://127.0.0.1:9002",
+    "api": "http://127.0.0.1:18180",
+    "credentials_recorded": false
+  },
+  "checks": [
+    {
+      "name": "mssql_select_only",
+      "command": "H8_MSSQL_CHECK_MODE=tcp ... scripts/h8_erp_interface_sync/check_probe_readonly.sh",
+      "ok": true,
+      "assertions": [
+        "DEMO-ASN-001 pending is visible",
+        "DEMO-PM-001 pending is visible",
+        "UPDATE denied",
+        "DELETE denied",
+        "INSERT denied",
+        "no PROBE-DENY residue"
+      ]
+    },
+    {
+      "name": "real_browser_and_permission",
+      "command": "pnpm --dir apps/web-admin run test:e2e:h8-interface-real",
+      "ok": true,
+      "tests": 2,
+      "assertions": [
+        "admin sees DEMO-ASN-001 and filters sync_status=pending",
+        "detail exposes payload_summary without payload_json",
+        "page has no write actions",
+        "connector.read-only user has no menu after fresh login and refresh",
+        "connector.read-only user receives API 403"
+      ]
+    },
+    {
+      "name": "h2_persistent_audit",
+      "ok": true,
+      "resource_type": "h8_erp_interface_table",
+      "observed_actions": [
+        "h8_interface_table_list_query",
+        "h8_interface_table_detail_query"
+      ],
+      "assertions": [
+        "list audit records connector/table/filter/result_count",
+        "detail audit records hit=true and result_count=1",
+        "audit diff contains no password, secret, payload_json or login password marker",
+        "audit persistence error is propagated by unit test"
+      ]
+    }
+  ],
+  "screenshots": [
+    {
+      "path": "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-list.png",
+      "sha256": "f4bd4462c7ccdfeda92b25fbac288a601211f53a6af09ecd4066653a0e0aafe4"
+    },
+    {
+      "path": "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-pending-filter.png",
+      "sha256": "a2cb1e4d8384274b024be32dab30789cbb2f2b4751c29b5a3b782d7f9e5291dd"
+    },
+    {
+      "path": "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-detail.png",
+      "sha256": "0fa9caa509033bfcfde359789e17fb5a326a7b950ff299e6908eea82859cf594"
+    },
+    {
+      "path": "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-permission-denied.png",
+      "sha256": "a9da8698003b8cbd6fee43e4647033097c0c4822e09a4af3b76f8af3410e576d"
+    }
+  ],
+  "conclusion": "SOFTWARE_PATH_PASS",
+  "note": "客户正式接口库联调是可选增强，不影响 US-H8-004 软件路径关闭。"
+}

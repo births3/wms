@@ -416,18 +416,18 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 ## 验收记录（US-H8-004 软件切片）
 
 - 故事：`US-H8-004`
-- 验收日期：`2026-07-21`
-- 质量矩阵状态：`deferred_stories`
-- 证据层覆盖：`V0/V1=PASS`；`V2/V3=PARTIAL`；`V4=不适用（软件路径不要求客户正式接口库）`
-- 当前结论：`SOFTWARE_PATH_NEEDS_WORK`（真实 DEMO 查询已通过；完整 Docker DML、权限、审计和正式截图证据尚未执行）
+- 验收日期：`2026-07-22`
+- 质量矩阵状态：`stories`
+- 证据层覆盖：`V0/V1/V2/V3=PASS`；`V4=不适用（软件路径不要求客户正式接口库）`
+- 当前结论：`SOFTWARE_PATH_PASS`（Docker MSSQL 只读边界、真实 DEMO 查询、权限、H2 审计与截图证据完整）
 
 | 验收范围 | 证据层 | 当前结果 | 证据 / 说明 |
 |---|---|---|---|
-| AC1–AC12（入口、权限接线、连接选择、白名单 API、查询/详情、范围、分页、脱敏、审计代码、页面交互） | V0/V1 | `PASS（软件切片）` | 领域/API 单测、OpenAPI/api-client、权限/菜单迁移、self-check、dev-mock Playwright 与 3 张截图 |
-| MENU-VISIBILITY（发布版本、权限、真实页面可见、刷新后复验） | V0/V3 | `PARTIAL` | `wms_h8_real` 最新菜单 API、权限和 9002 真实页面已验证；现有自动化 spec 仍为 dev-mock，真实权限反向用例和真实页面截图待补 |
-| AC14（页面证据：列表/筛选/详情/无写控件） | V1/V3 | `PARTIAL` | dev-mock Playwright 已覆盖列表、状态筛选、详情与无写按钮；9002 真实页面已显示 `DEMO-ASN-001`，真实无权限 403/隐藏入口和正式截图仍待补 |
-| AC13（SELECT-only 账号与 DML 拒绝） | V2 | `NEEDS_WORK` | `scripts/h8_erp_interface_sync/check_probe_readonly.sh` 已包含 SELECT、DEMO-ASN-001/DEMO-PM-001 和 INSERT/UPDATE/DELETE 否定断言，尚未在 Docker MSSQL 执行 |
-| AC15（Docker DEMO 行列表→详情、真实权限/审计） | V2/V3 | `PARTIAL` | `wms_h8_real` 的 MSSQL `DEMO-ASN-001` 已完成真实 API 列表→详情；SELECT-only DML 拒绝、真实反向权限和 H2 持久化审计证据仍待补 |
+| AC1–AC12（入口、权限接线、连接选择、白名单 API、查询/详情、范围、分页、脱敏、审计代码、页面交互） | V0/V1/V2 | `PASS` | 领域/API 单测、OpenAPI/api-client、权限/菜单迁移、self-check；H2 持久化失败改为查询失败，不再静默丢审计 |
+| MENU-VISIBILITY（发布版本、权限、真实页面可见、刷新后复验） | V0/V3 | `PASS` | 管理员真实页面可见；仅有 `h8.erp_connector.read` 的新会话及刷新后均隐藏入口，直接 API 返回 403 |
+| AC14（页面证据：列表/筛选/详情/无写控件） | V1/V3 | `PASS` | 真实 Playwright 覆盖 `DEMO-ASN-001` 列表、`pending` 筛选、详情、无写按钮、反向权限与 4 张截图 |
+| AC13（SELECT-only 账号与 DML 拒绝） | V2 | `PASS` | TCP 证据工具验证 `DEMO-ASN-001`/`DEMO-PM-001` 可 SELECT；实际 UPDATE/DELETE/INSERT 均被 MSSQL 拒绝且无残留 |
+| AC15（Docker DEMO 行列表→详情、真实权限/审计） | V2/V3 | `PASS` | `wms_h8_real` + `wms_erp_if` 完成列表→筛选→详情；PostgreSQL H2 观察到列表/详情事件、结果数/命中与脱敏过滤摘要 |
 
 验证命令：
 
@@ -438,11 +438,14 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | `cargo test --manifest-path backend/Cargo.toml -p wms-api --lib h8_erp` | `PASS`（22） |
 | `pnpm --dir apps/web-admin run test:self-checks` | `PASS` |
 | `pnpm --dir apps/web-admin run test:e2e:h8-interface-dev` | `PASS`（1 条，3 张开发 E2E 截图） |
+| `pnpm --dir apps/web-admin run test:e2e:h8-interface-real` | `PASS`（2 条，4 张真实数据/权限截图） |
+| `H8_MSSQL_CHECK_MODE=tcp ... scripts/h8_erp_interface_sync/check_probe_readonly.sh` | `PASS`（SELECT + 2 条 DEMO 种子；UPDATE/DELETE/INSERT 拒绝；无残留） |
+| `cargo test --manifest-path backend/Cargo.toml -p wms-api persistent_audit_failure_is_not_swallowed --lib` | `PASS`（H2 持久化失败不得静默吞掉） |
 | `pnpm --dir apps/web-admin exec tsc --noEmit` / `pnpm --dir apps/web-admin run build` | `PASS`（仅既有依赖/产物体积警告） |
 | `just openapi-check` / `python3 scripts/governance/check_quality_matrix.py --json` / `python3 scripts/governance/check_scope_gap_discovery.py --strict --module H8 --json` | `PASS` |
 | `just gov-t1` | `PASS`（56/56） |
 
-关闭条件：在 Docker MSSQL 启动并执行 `H8_APPLY_SEED=1 deploy/h8-erp-if/wait-and-init.sh` 后，复验并归档 DEMO 行真实 API 列表→详情，补齐探查权限与 connector.read 权限否定、H2 持久化列表/详情审计及 SELECT-only DML 拒绝；完成前保持 `deferred_stories`。
+证据归档：`docs/retros/h8-interface-table-software-path-evidence.json`。US-H8-004 软件路径已关闭；客户正式接口库联调保留为可选增强，不回退故事状态。
 
 ## 验收记录
 
