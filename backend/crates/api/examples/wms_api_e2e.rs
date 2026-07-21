@@ -29,6 +29,7 @@ use wms_api::{
     dual_person_policy_handlers::{dual_person_policy_router, DualPersonPolicyAppState},
     feature_flags::FeatureFlagRegistry,
     h8_erp_connectors::{h8_erp_connector_router, H8ErpConnectorAppState},
+    h8_erp_interface_tables::{h8_erp_interface_table_router, H8ErpInterfaceTableAppState},
     h8_erp_messages::{h8_erp_message_router, H8ErpMessageAppState},
     inventory_status_config_handlers::{
         inventory_status_config_router, InventoryStatusConfigAppState,
@@ -98,6 +99,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         wms_api_e2e_seed_data::seed_e2e_data(&pool).await?;
     }
 
+    let h8_connector_state = H8ErpConnectorAppState::with_postgres(pool.clone());
     let app = Router::new()
         .route("/api/v1/healthz", get(healthz))
         .merge(auth_router(AuthAppState::new(pool.clone())))
@@ -128,8 +130,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .map_err(|error| io::Error::other(format!("feature flags: {error:?}")))?,
             pool.clone(),
         )))
-        .merge(h8_erp_connector_router(
-            H8ErpConnectorAppState::with_postgres(pool.clone()),
+        .merge(h8_erp_connector_router(h8_connector_state.clone()))
+        .merge(h8_erp_interface_table_router(
+            H8ErpInterfaceTableAppState::with_postgres(
+                pool.clone(),
+                h8_connector_state.repository.clone(),
+            ),
         ))
         .merge(h8_erp_message_router(H8ErpMessageAppState::with_postgres(
             pool.clone(),

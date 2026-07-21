@@ -160,6 +160,11 @@ pub async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
             "h8.erp_connector.write",
             "H8 ERP 连接维护",
         ),
+        (
+            "00000000-0000-0000-0000-00000000012b",
+            "h8.erp_interface_table.read",
+            "H8 ERP 接口表探查只读",
+        ),
     ] {
         let permission_id: Uuid = sqlx::query_scalar(
             r#"
