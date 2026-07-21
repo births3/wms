@@ -5,7 +5,7 @@ use axum::{
 };
 use wms_domain::ErrorResponse;
 
-use crate::auth::AuthError;
+use crate::{audit::AuditError, auth::AuthError};
 
 #[derive(Debug)]
 pub(crate) enum H8InterfaceTableRepoError {
@@ -21,6 +21,7 @@ pub(crate) enum H8InterfaceTableRepoError {
 pub(crate) enum H8InterfaceTableHandlerError {
     Auth(AuthError),
     BadRequest(String),
+    Audit,
     Repo(H8InterfaceTableRepoError),
 }
 
@@ -36,11 +37,23 @@ impl From<H8InterfaceTableRepoError> for H8InterfaceTableHandlerError {
     }
 }
 
+impl From<AuditError> for H8InterfaceTableHandlerError {
+    fn from(value: AuditError) -> Self {
+        tracing::error!(target: "h8.interface_table", error = ?value, "query audit persistence failed");
+        Self::Audit
+    }
+}
+
 impl IntoResponse for H8InterfaceTableHandlerError {
     fn into_response(self) -> Response {
         let (status, code, message) = match self {
             Self::Auth(err) => return err.into_response(),
             Self::BadRequest(message) => (StatusCode::BAD_REQUEST, "H8-400", message),
+            Self::Audit => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "H8-500",
+                "query audit persistence failed".into(),
+            ),
             Self::Repo(H8InterfaceTableRepoError::ProbeCredentialNotConfigured) => (
                 StatusCode::CONFLICT,
                 "H8_PROBE_CREDENTIAL_NOT_CONFIGURED",

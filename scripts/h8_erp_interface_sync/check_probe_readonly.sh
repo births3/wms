@@ -5,6 +5,14 @@ set -euo pipefail
 CONTAINER="${H8_MSSQL_CONTAINER:-wms-mssql-erp-if}"
 PROBE_USER="${H8_MSSQL_PROBE_USER:-wms_h8_probe}"
 PROBE_PASSWORD="${H8_MSSQL_PROBE_PASSWORD:-Wms_H8_Probe_Dev_2026!}"
+MODE="${H8_MSSQL_CHECK_MODE:-auto}"
+
+if [[ "${MODE}" == "tcp" ]] || { [[ "${MODE}" == "auto" ]] && ! docker inspect "${CONTAINER}" >/dev/null 2>&1; }; then
+  : "${H8_MSSQL_HOST:?H8_MSSQL_HOST is required for TCP mode}"
+  : "${H8_MSSQL_PROBE_PASSWORD:?H8_MSSQL_PROBE_PASSWORD is required for TCP mode}"
+  exec cargo run --quiet --manifest-path backend/Cargo.toml -p wms-api \
+    --example h8_probe_readonly
+fi
 
 sql_probe() {
   docker exec "${CONTAINER}" /opt/mssql-tools18/bin/sqlcmd \
@@ -21,8 +29,8 @@ sql_probe "IF NOT EXISTS (SELECT 1 FROM dbo.if_in_product_master WHERE external_
 echo "DEMO seed rows visible"
 
 for statement in \
-  "UPDATE TOP (0) dbo.if_in_asn SET sync_status = sync_status" \
-  "DELETE TOP (0) FROM dbo.if_in_asn" \
+  "BEGIN TRY BEGIN TRANSACTION; UPDATE dbo.if_in_asn SET sync_status = sync_status WHERE external_doc_no = N'DEMO-ASN-001'; ROLLBACK TRANSACTION; END TRY BEGIN CATCH IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION; THROW; END CATCH" \
+  "BEGIN TRY BEGIN TRANSACTION; DELETE FROM dbo.if_in_asn WHERE external_doc_no = N'DEMO-ASN-001'; ROLLBACK TRANSACTION; END TRY BEGIN CATCH IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION; THROW; END CATCH" \
   "BEGIN TRANSACTION; INSERT INTO dbo.if_in_asn (external_doc_no, owner_id, warehouse_id, supplier_id, product_code, expected_qty, expected_arrival_at, idempotency_key) VALUES (N'PROBE-DENY', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', N'PROBE', 1, SYSUTCDATETIME(), N'PROBE-DENY'); ROLLBACK TRANSACTION"; do
   if sql_probe "$statement" >/dev/null 2>&1; then
     echo "DML unexpectedly allowed: ${statement}" >&2

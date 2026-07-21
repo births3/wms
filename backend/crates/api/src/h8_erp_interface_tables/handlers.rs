@@ -158,7 +158,7 @@ async fn list_rows(
                 filter_summary(&query, table_spec.has_warehouse_id),
                 0,
             )
-            .await;
+            .await?;
             return Err(error.into());
         }
     };
@@ -171,7 +171,7 @@ async fn list_rows(
         filter_summary(&query, table_spec.has_warehouse_id),
         response.total,
     )
-    .await;
+    .await?;
     tracing::info!(
         target: "h8.interface_table",
         action = "list",
@@ -226,7 +226,7 @@ async fn detail_row(
             }),
             0,
         )
-        .await;
+        .await?;
         return Err(H8InterfaceTableHandlerError::Repo(
             H8InterfaceTableRepoError::NotFound,
         ));
@@ -251,7 +251,7 @@ async fn detail_row(
                 }),
                 0,
             )
-            .await;
+            .await?;
             return Err(error.into());
         }
     };
@@ -268,7 +268,7 @@ async fn detail_row(
         }),
         1,
     )
-    .await;
+    .await?;
     tracing::info!(
         target: "h8.interface_table",
         action = "detail",
