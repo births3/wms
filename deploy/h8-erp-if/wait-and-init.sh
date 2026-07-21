@@ -5,6 +5,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 COMPOSE_FILE="${ROOT}/docker-compose.h8-erp-if.yml"
 SA_PASSWORD="${H8_MSSQL_SA_PASSWORD:-Wms_Erp_If_Dev_2026!}"
+PROBE_USER="${H8_MSSQL_PROBE_USER:-wms_h8_probe}"
+PROBE_PASSWORD="${H8_MSSQL_PROBE_PASSWORD:-Wms_H8_Probe_Dev_2026!}"
 CONTAINER="${H8_MSSQL_CONTAINER:-wms-mssql-erp-if}"
 
 echo "==> waiting for ${CONTAINER}"
@@ -25,13 +27,16 @@ run_sql() {
   local file="$1"
   echo "==> apply $(basename "$file")"
   docker exec -i "${CONTAINER}" /opt/mssql-tools18/bin/sqlcmd \
-    -S localhost -U sa -P "${SA_PASSWORD}" -C -b -i "/docker-init/$(basename "$file")"
+    -S localhost -U sa -P "${SA_PASSWORD}" -C -b \
+    -v "PROBE_USER=${PROBE_USER}" -v "PROBE_PASSWORD=${PROBE_PASSWORD}" \
+    -i "/docker-init/$(basename "$file")"
 }
 
 # init 目录已挂载到容器 /docker-init
 run_sql "${ROOT}/h8-erp-if/init/01_schema.sql"
 run_sql "${ROOT}/h8-erp-if/init/03_if_out_and_return.sql"
 run_sql "${ROOT}/h8-erp-if/init/04_product_change_and_ack.sql"
+run_sql "${ROOT}/h8-erp-if/init/00_probe_account.sql"
 if [[ "${H8_APPLY_SEED:-0}" == "1" ]]; then
   run_sql "${ROOT}/h8-erp-if/init/02_seed_example.sql"
 fi

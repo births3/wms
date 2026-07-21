@@ -244,7 +244,7 @@
 | US-H8-001 ERP 连接配置与安全接入 | H8 | US-H8-001 AC1-16 配置/运行时主链已实现：route-resolve、scope、幂等/乐观锁、在途 pause/resume、测试重叠校验、熔断半开证据、E2E 6 条。唯一未完成项是客户指定厂商正式 ERP 回执（ERP_CALLBACK_BASE）。 |
 | US-H8-002 ERP 消息交换与 WMS 语义转换 | H8 | 软件 AC 主链已齐：受控目录、canonical/M-PM、管线/幂等/错误分类、outbox 对齐、H2 脱敏审计摘要；尚缺逐消息业务 API 全链 L2-L4 与客户正式 ERP 双向 S4。 |
 | US-H8-003 ERP 消息日志、监控与故障重放 | H8 | 已补消息/尝试存储、状态机、Worker claim 租约、stats P95、保留策略 purge、菜单页 E2E 与分区准备迁移；尚缺生产月分区切换与客户 ERP 死信重放 S4。 |
-| US-H8-004 ERP 接口表只读探查 | H8 | 产品决策与十轮规格已闭合（专用权限、独立菜单、独立探查凭据及版本、SELECT-only 账号、无仓表全仓权限、脱敏限长摘要、详情联合键、updated_at、表级过滤 400、Docker 关软件路径）。连接字段迁移、API、权限迁移、页面 E2E 与截图均未落地；页面未实现前不预登记 frontend_pages 或空 E2E 证据。 |
+| US-H8-004 ERP 接口表只读探查 | H8 | 已完成首个软件切片：独立探查凭据/版本迁移、白名单结构化 SELECT API、owner/仓库范围、脱敏摘要、权限/菜单、带凭据可用性提示的 QueryPanel/DataGrid 页面、自检和 dev-mock 浏览器 E2E。仍未完成 Docker MSSQL 真实接口库联调、SELECT-only DML 拒绝运行证据、真实 API 权限/审计 E2E 与截图；因此故事继续 deferred。 |
 
 ## 验证故事详细矩阵
 

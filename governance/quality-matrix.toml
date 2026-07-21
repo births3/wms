@@ -4555,11 +4555,32 @@ types = [
   "runtime_guard",
   "audit_compliance",
 ]
+frontend_pages = ["h8-erp-interface-tables"]
+e2e_checks = [
+  "pnpm --dir apps/web-admin run test:e2e:h8-interface-dev",
+]
+e2e_screenshots = [
+  { page = "h8-erp-interface-tables", spec = "prototypes/e2e/web-admin-h8-interface-tables.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-list.png" },
+  { page = "h8-erp-interface-tables", spec = "prototypes/e2e/web-admin-h8-interface-tables.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-failed-filter.png" },
+  { page = "h8-erp-interface-tables", spec = "prototypes/e2e/web-admin-h8-interface-tables.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-detail.png" },
+]
 evidence_refs = [
   "docs/domain/user-stories-h8-erp-integration.md",
   "deploy/docker-compose.h8-erp-if.yml",
   "deploy/h8-erp-if/init",
+  "backend/crates/domain/src/h8_erp_interface_table.rs",
+  "backend/crates/domain/tests/h8_erp_interface_table.rs",
+  "backend/crates/api/src/h8_erp_interface_tables",
+  "backend/migrations/202607210001_h8_erp_interface_probe_credentials.sql",
+  "backend/migrations/202607210002_h8_erp_interface_table_permissions_menu.sql",
+  "apps/web-admin/src/pages/config-center/ErpInterfaceTablePage.tsx",
+  "apps/web-admin/self-checks/h8-erp-interface-table-slice-self-check.mjs",
+  "prototypes/e2e/web-admin-h8-interface-tables.spec.ts",
+  "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-list.png",
+  "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-failed-filter.png",
+  "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-detail.png",
+  "scripts/h8_erp_interface_sync/check_probe_readonly.sh",
 ]
-reason = "产品决策与十轮规格已闭合（专用权限、独立菜单、独立探查凭据及版本、SELECT-only 账号、无仓表全仓权限、脱敏限长摘要、详情联合键、updated_at、表级过滤 400、Docker 关软件路径）。连接字段迁移、API、权限迁移、页面 E2E 与截图均未落地；页面未实现前不预登记 frontend_pages 或空 E2E 证据。"
+reason = "已完成首个软件切片：独立探查凭据/版本迁移、白名单结构化 SELECT API、owner/仓库范围、脱敏摘要、权限/菜单、带凭据可用性提示的 QueryPanel/DataGrid 页面、自检和 dev-mock 浏览器 E2E。仍未完成 Docker MSSQL 真实接口库联调、SELECT-only DML 拒绝运行证据、真实 API 权限/审计 E2E 与截图；因此故事继续 deferred。"
 owner = "H8 模块负责人"
-resume_when = "先以兼容迁移补 interface_probe_db_username/interface_probe_db_password_alias/interface_probe_config_version，再落地权限/菜单/API/页面并一次性登记 frontend_pages、Playwright 与截图；最后在 docker-compose.h8-erp-if 上完成查询、权限、审计和 SELECT-only DML 拒绝证据。"
+resume_when = "启动 docker-compose.h8-erp-if 并配置探查 alias，完成 DEMO-ASN-001/DEMO-PM-001 列表→详情真实 API、h8.erp_interface_table.read/connector.read 权限否定、H2 列表/详情审计和 INSERT/UPDATE/DELETE 拒绝证据；再补真实 Playwright 截图与权限路径证据后转入 stories。"

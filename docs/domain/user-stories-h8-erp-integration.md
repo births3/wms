@@ -285,9 +285,9 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 
 | `table_key`（物理表） | 方向 | 关联消息/用途摘要 | 适用过滤列 |
 |---|---|---|---|
-| `if_in_asn` | 入站 | ASN / 采购入库 | `external_doc_no`、`warehouse_id`、`idempotency_key`、`sync_status` |
+| `if_in_asn` | 入站 | ASN / 采购入库 | `external_doc_no`、`external_ref`、`warehouse_id`、`idempotency_key`、`sync_status` |
 | `if_in_outbound_order` | 入站 | 出库订单 | 同上 |
-| `if_in_return_order` | 入站 | 销退申请 | 同上 |
+| `if_in_return_order` | 入站 | 销退申请 | `external_doc_no`、`external_ref`、`warehouse_id`、`idempotency_key`、`sync_status` |
 | `if_in_product_master` | 入站 | 商品主数据 | `external_doc_no`、`idempotency_key`、`sync_status`（**无** `warehouse_id`） |
 | `if_in_product_change` | 入站 | 商品主数据变更 / 档案补录回写 | 同上（**无** `warehouse_id`） |
 | `if_out_message` | 出站 | 通道 B 出站报文 | `source_outbox_id`、`event_type`、`idempotency_key`、`sync_status`（**无** `external_doc_no` / 通常无业务 `warehouse_id` 列） |
@@ -330,7 +330,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | 页面类型 | 列表型 |
 | 主信息载体 | 页面上方公共 `QueryPanel`；主体公共 `DataGrid` |
 | 核心查询 | 连接、接口表、`sync_status`、时间范围（`updated_at`），首屏一行可见 |
-| 更多查询 | 按所选 `table_key` 动态显示适用字段：`external_doc_no` / `source_outbox_id` / `idempotency_key` / `warehouse_id` / `event_type`，默认折叠 |
+| 更多查询 | 按所选 `table_key` 动态显示适用字段：`external_doc_no` / `external_ref` / `source_outbox_id` / `idempotency_key` / `warehouse_id` / `event_type`，默认折叠 |
 | 标准动作入口 | 页头或 DataGrid 提供刷新、字段显示和视图；首版禁止无界导出 |
 | 私有动作入口 | 行内「详情」；首版无「重放」「改状态」 |
 | 详情展示方式 | Dialog 展示对象信息、控制列、错误摘要与服务端脱敏、限长的 payload 摘要；可选跳转 003 |
@@ -406,6 +406,38 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | 2026-07-21 | 八轮评审修复 | 按规格评审补齐：详情联合键、时间列 `updated_at`、任意配置状态可探查、表级过滤/`sync_status` 400、002 映射表、OpenAPI 路径、权限菜单种子、仓权隔离、QPS 与审计不合并、DEMO 种子断言与 L5/L7。 |
 | 2026-07-21 | 九轮评审修复 | 强制探查与 Worker 账号分离并由数据库拒绝 DML；无仓列收紧为货主全仓范围；首版只返回 4096 字节脱敏摘要；复用 H3/ADR-0018；固定准确 total；修正 L9/L10 维度，并移除未实现页面的虚假矩阵接线。 |
 | 2026-07-21 | 十轮评审修复 | 补齐独立探查凭据的连接绑定：新增两个可空兼容字段，仅 004 查询时成对必填；明确维护权限、读权限不可见 alias、禁止回退 Worker 凭据。复审发现复用传输 `config_version` 会破坏 active 当前版本已测通不变量，改为独立 `interface_probe_config_version`；同时冻结 API 路径、固定缺配置 409，并按实际接口表结构收紧出站列。 |
+| 2026-07-21 | 十一轮开发复审 | 修复 Docker 探查账号未切换到 `wms_erp_if`、系统管理员权限种子遗漏、无仓列审计摘要未标识、旧探查连接池缓存增长和 dev-mock 探查版本锁未对齐；补充非 active 连接排障提示与非法 `acked` 状态自动清理。真实 Docker/API/权限/持久化审计证据仍按 deferred 条件待执行。 |
+| 2026-07-21 | 十二轮开发复审 | 修复连接选择器未区分缺少独立探查凭据：API 只返回成对配置状态，前端对不可用连接禁选并提示维护入口；QueryPanel 原生支持禁用选项。补齐 ASN/销退表 `external_ref` 查询控件及参数透传。探查连接池缓存键同时绑定探查版本与传输配置版本，避免端点变更复用旧池；同步 RTM 的已实现/待证据描述。 |
+| 2026-07-21 | 十三轮开发复审 | 按“每次查询可追溯”补齐列表/详情失败与未命中也写入 H2 摘要（`hit=false`/结果 0）；接口库只读检查脚本补 DEMO-ASN-001、DEMO-PM-001 的 `pending` 断言；增加连接选择器成对凭据单测。真实 Docker/API/持久化证据仍保持 deferred。 |
+
+## 验收记录（US-H8-004 软件切片）
+
+- 故事：`US-H8-004`
+- 验收日期：`2026-07-21`
+- 质量矩阵状态：`deferred_stories`
+- 当前结论：`SOFTWARE_PATH_NEEDS_WORK`（代码与开发环境交互已通过；真实 Docker MSSQL 证据尚未执行）
+
+| 验收范围 | 当前结果 | 证据 / 说明 |
+|---|---|---|
+| AC1–AC12（入口、权限接线、连接选择、白名单 API、查询/详情、范围、分页、脱敏、审计代码、页面交互） | `PASS（软件切片）` | 领域/API 单测、OpenAPI/api-client、权限/菜单迁移、self-check、dev-mock Playwright 与 3 张截图 |
+| AC14（页面证据：列表/筛选/详情/无写控件） | `PARTIAL` | dev-mock Playwright 已覆盖列表、状态筛选、详情与无写按钮；真实无权限 403/隐藏入口和真实截图仍待 Docker/API 权限路径 |
+| AC13（SELECT-only 账号与 DML 拒绝） | `NEEDS_WORK` | `scripts/h8_erp_interface_sync/check_probe_readonly.sh` 已包含 SELECT、DEMO-ASN-001/DEMO-PM-001 和 INSERT/UPDATE/DELETE 否定断言，尚未在 Docker MSSQL 执行 |
+| AC15（Docker DEMO 行列表→详情、真实权限/审计） | `NEEDS_WORK` | 当前环境 `docker ps` 因 Docker socket 权限退出码 1；不可用 Mock 或静态文件替代真实证据 |
+
+验证命令：
+
+| 命令 | 结果 |
+|---|---|
+| `cargo test --manifest-path backend/Cargo.toml -p wms-domain --lib h8_erp` | `PASS`（40） |
+| `cargo test --manifest-path backend/Cargo.toml -p wms-domain --test h8_erp_interface_table` | `PASS`（3） |
+| `cargo test --manifest-path backend/Cargo.toml -p wms-api --lib h8_erp` | `PASS`（22） |
+| `pnpm --dir apps/web-admin run test:self-checks` | `PASS` |
+| `pnpm --dir apps/web-admin run test:e2e:h8-interface-dev` | `PASS`（1 条，3 张开发 E2E 截图） |
+| `pnpm --dir apps/web-admin exec tsc --noEmit` / `pnpm --dir apps/web-admin run build` | `PASS`（仅既有依赖/产物体积警告） |
+| `just openapi-check` / `python3 scripts/governance/check_quality_matrix.py --json` / `python3 scripts/governance/check_scope_gap_discovery.py --strict --module H8 --json` | `PASS` |
+| `just gov-t1` | `PASS`（56/56） |
+
+关闭条件：在 Docker MSSQL 启动并执行 `H8_APPLY_SEED=1 deploy/h8-erp-if/wait-and-init.sh` 后，归档 DEMO 行真实 API 列表→详情、探查权限与 connector.read 权限否定、H2 持久化列表/详情审计及 SELECT-only DML 拒绝；完成前保持 `deferred_stories`。
 
 ## 验收记录
 
