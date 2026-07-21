@@ -130,6 +130,8 @@ function emptyForm(): CreateH8ErpConnectorRequest {
     api_key_id: globalThis.crypto?.randomUUID?.() ?? `00000000-0000-4000-8000-${Date.now().toString(16).padStart(12, "0").slice(-12)}`,
     bearer_secret_alias: null,
     interface_db_password_alias: null,
+    interface_probe_db_username: null,
+    interface_probe_db_password_alias: null,
   };
 }
 
@@ -185,7 +187,10 @@ export function ErpConnectorConfigPage({
     channel_mode: "rest",
     api_base_url: "",
     bearer_secret_alias: "",
+    interface_probe_db_username: "",
+    interface_probe_db_password_alias: "",
     expected_config_version: 1,
+    expected_probe_config_version: 1,
   });
   const [notice, setNotice] = React.useState<Notice>(null);
   const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(() => defaultQuery());
@@ -242,7 +247,11 @@ export function ErpConnectorConfigPage({
               channel_mode: selected.channel_mode,
               api_base_url: selected.api_base_url ?? "",
               bearer_secret_alias: selected.bearer_secret_alias ?? "",
+              interface_probe_db_username: selected.interface_probe_db_username ?? "",
+              // GET 只返回 alias 是否已配置；旧 alias 不回显，留空表示保持现值。
+              interface_probe_db_password_alias: "",
               expected_config_version: selected.config_version,
+              expected_probe_config_version: selected.interface_probe_config_version,
             });
             setEditOpen(true);
           },
@@ -483,6 +492,34 @@ export function ErpConnectorConfigPage({
                 }
               />
             </label>
+            <label className="grid gap-1 text-sm">
+              接口表探查账号（只读）
+              <Input
+                placeholder="wms_h8_probe"
+                value={form.interface_probe_db_username ?? ""}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    interface_probe_db_username: e.target.value.trim() ? e.target.value.trim() : null,
+                  }))
+                }
+              />
+            </label>
+            <label className="grid gap-1 text-sm">
+              接口表探查密码 alias（只读）
+              <Input
+                placeholder="vault://wms/.../h8-probe"
+                value={form.interface_probe_db_password_alias ?? ""}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    interface_probe_db_password_alias: e.target.value.trim()
+                      ? e.target.value.trim()
+                      : null,
+                  }))
+                }
+              />
+            </label>
             <DialogFooter>
               <DialogClose asChild>
                 <Button type="button" variant="outline">
@@ -509,11 +546,18 @@ export function ErpConnectorConfigPage({
                   id: selected.id,
                   body: {
                     expected_config_version: editForm.expected_config_version,
+                    expected_probe_config_version: editForm.expected_probe_config_version,
                     connector_name: editForm.connector_name,
                     channel_mode: editForm.channel_mode,
                     api_base_url: editForm.api_base_url.trim() ? editForm.api_base_url.trim() : null,
                     bearer_secret_alias: editForm.bearer_secret_alias.trim()
                       ? editForm.bearer_secret_alias.trim()
+                      : null,
+                    interface_probe_db_username: editForm.interface_probe_db_username.trim()
+                      ? editForm.interface_probe_db_username.trim()
+                      : null,
+                    interface_probe_db_password_alias: editForm.interface_probe_db_password_alias.trim()
+                      ? editForm.interface_probe_db_password_alias.trim()
                       : null,
                   },
                 });
@@ -524,8 +568,7 @@ export function ErpConnectorConfigPage({
             <DialogHeader>
               <DialogTitle>编辑 ERP 连接</DialogTitle>
               <DialogDescription>
-                编码不可改。修改端点/通道/secret 会使 active→testing，config_version 递增。
-                当前版本 {editForm.expected_config_version}。
+                编码不可改。探查凭据使用独立版本，不会使传输测试失效；传输版本 {editForm.expected_config_version}，探查版本 {editForm.expected_probe_config_version}。
               </DialogDescription>
             </DialogHeader>
             <label className="grid gap-1 text-sm">
@@ -560,6 +603,21 @@ export function ErpConnectorConfigPage({
               <Input
                 value={editForm.bearer_secret_alias}
                 onChange={(e) => setEditForm((f) => ({ ...f, bearer_secret_alias: e.target.value }))}
+              />
+            </label>
+            <label className="grid gap-1 text-sm">
+              接口表探查账号（只读）
+              <Input
+                value={editForm.interface_probe_db_username}
+                onChange={(e) => setEditForm((f) => ({ ...f, interface_probe_db_username: e.target.value }))}
+              />
+            </label>
+            <label className="grid gap-1 text-sm">
+              接口表探查密码 alias（只读）
+              <Input
+                placeholder={selected?.interface_probe_db_password_alias_set ? "已配置（留空保持）" : "vault://wms/.../h8-probe"}
+                value={editForm.interface_probe_db_password_alias}
+                onChange={(e) => setEditForm((f) => ({ ...f, interface_probe_db_password_alias: e.target.value }))}
               />
             </label>
             <DialogFooter>

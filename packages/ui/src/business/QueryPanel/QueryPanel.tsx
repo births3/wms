@@ -23,6 +23,7 @@ export type QueryPanelFieldType = "text" | "select" | "multiSelect" | "dateRange
 export interface QueryPanelOption {
   label: string;
   value: string;
+  disabled?: boolean;
 }
 
 export interface QueryPanelRangeValue {
@@ -254,7 +255,7 @@ function QueryPanelFieldControl({
         >
           <option value="">全部</option>
           {(field.options ?? []).map((option) => (
-            <option key={option.value} value={option.value}>
+            <option key={option.value} value={option.value} disabled={option.disabled}>
               {option.label}
             </option>
           ))}

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { FeatureFlagConfigCenterPage } from "@/pages/config-center/FeatureFlagConfigCenterPage";
 import { ErpConnectorConfigPage } from "@/pages/config-center/ErpConnectorConfigPage";
 import { ErpMessageLogPage } from "@/pages/config-center/ErpMessageLogPage";
+import { ErpInterfaceTablePage } from "@/pages/config-center/ErpInterfaceTablePage";
 import { H1AdminMenuPage } from "@/pages/admin-menu/H1AdminMenuPage";
 import { H1RolePermissionPage } from "@/pages/auth/H1RolePermissionPage";
 import { H1SessionPage } from "@/pages/auth/H1SessionPage";
@@ -58,6 +59,9 @@ export function renderAdminView(
   }
   if (view === "h8-erp-messages") {
     return <ErpMessageLogPage />;
+  }
+  if (view === "h8-erp-interface-tables") {
+    return <ErpInterfaceTablePage />;
   }
   if (masterDataViewId) {
     return <M1MasterDataPage currentUser={currentUser} viewId={masterDataViewId} onBack={() => navigateTo("dashboard")} />;

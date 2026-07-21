@@ -21,6 +21,9 @@ interface DevH8ErpConnector {
   interface_db_name: string | null;
   interface_db_username: string | null;
   interface_db_password_alias: string | null;
+  interface_probe_db_username: string | null;
+  interface_probe_db_password_alias: string | null;
+  interface_probe_config_version: number;
   status: string;
   config_version: number;
   last_tested_at: string | null;
@@ -32,6 +35,14 @@ interface DevH8ErpConnector {
   updated_at: string;
 }
 
+function publicConnector(row: DevH8ErpConnector) {
+  const { interface_probe_db_password_alias, ...safe } = row;
+  return {
+    ...safe,
+    interface_probe_db_password_alias_set: Boolean(interface_probe_db_password_alias?.trim()),
+  };
+}
+
 const connectors: DevH8ErpConnector[] = [
   {
     id: "00000000-0000-0000-0000-00000000e801",
@@ -41,15 +52,18 @@ const connectors: DevH8ErpConnector[] = [
     warehouse_ids: [],
     directions: ["inbound", "outbound"],
     message_types: ["asn", "so"],
-    channel_mode: "rest",
-    api_base_url: "https://erp.example.test/api",
+    channel_mode: "interface_table",
+    api_base_url: null,
     api_key_id: null,
     bearer_secret_alias: "vault://wms/dev/h8/bearer",
-    interface_db_host: null,
-    interface_db_port: null,
-    interface_db_name: null,
-    interface_db_username: null,
-    interface_db_password_alias: null,
+    interface_db_host: "mssql",
+    interface_db_port: 1433,
+    interface_db_name: "wms_erp_if",
+    interface_db_username: "wms_h8_worker",
+    interface_db_password_alias: "vault://wms/dev/h8/worker",
+    interface_probe_db_username: "wms_h8_probe",
+    interface_probe_db_password_alias: "vault://wms/dev/h8/probe",
+    interface_probe_config_version: 1,
     status: "testing",
     config_version: 1,
     last_tested_at: null,
@@ -89,7 +103,7 @@ export async function handleH8ErpConnectorDevMock(
 
   if (req.method === "GET" && pathname === "/api/v1/config/erp-connectors") {
     sendJson(res, 200, {
-      data: connectors,
+      data: connectors.map(publicConnector),
       page: { count: connectors.length, next_cursor: null },
     });
     return true;
@@ -135,6 +149,13 @@ export async function handleH8ErpConnectorDevMock(
         body.interface_db_password_alias == null
           ? null
           : asString(body.interface_db_password_alias, ""),
+      interface_probe_db_username:
+        body.interface_probe_db_username == null ? null : asString(body.interface_probe_db_username, ""),
+      interface_probe_db_password_alias:
+        body.interface_probe_db_password_alias == null
+          ? null
+          : asString(body.interface_probe_db_password_alias, ""),
+      interface_probe_config_version: 1,
       status: "testing",
       config_version: 1,
       last_tested_at: null,
@@ -146,7 +167,7 @@ export async function handleH8ErpConnectorDevMock(
       updated_at: ts,
     };
     connectors.unshift(row);
-    sendJson(res, 201, row);
+    sendJson(res, 201, publicConnector(row));
     return true;
   }
 
@@ -163,7 +184,7 @@ export async function handleH8ErpConnectorDevMock(
   }
 
   if (req.method === "GET" && !parsed.action) {
-    sendJson(res, 200, row);
+    sendJson(res, 200, publicConnector(row));
     return true;
   }
 
@@ -173,6 +194,16 @@ export async function handleH8ErpConnectorDevMock(
     if (!Number.isFinite(expected) || expected !== row.config_version) {
       sendError(res, 409, "H8_ERP_CONNECTOR_VERSION_CONFLICT", "config_version conflict");
       return true;
+    }
+    const probeChanged =
+      body.interface_probe_db_username !== undefined ||
+      body.interface_probe_db_password_alias !== undefined;
+    if (probeChanged) {
+      const expectedProbe = Number(body.expected_probe_config_version);
+      if (!Number.isFinite(expectedProbe) || expectedProbe !== row.interface_probe_config_version) {
+        sendError(res, 409, "H8_ERP_CONNECTOR_PROBE_VERSION_CONFLICT", "probe config_version conflict");
+        return true;
+      }
     }
     if (typeof body.connector_name === "string" && body.connector_name.trim()) {
       row.connector_name = body.connector_name.trim();
@@ -184,6 +215,19 @@ export async function handleH8ErpConnectorDevMock(
       body.warehouse_ids != null ||
       body.directions != null ||
       body.message_types != null;
+    if (body.interface_probe_db_username !== undefined) {
+      row.interface_probe_db_username = body.interface_probe_db_username == null
+        ? null
+        : asString(body.interface_probe_db_username, "");
+    }
+    if (body.interface_probe_db_password_alias !== undefined) {
+      row.interface_probe_db_password_alias = body.interface_probe_db_password_alias == null
+        ? null
+        : asString(body.interface_probe_db_password_alias, "");
+    }
+    if (probeChanged) {
+      row.interface_probe_config_version += 1;
+    }
     if (typeof body.channel_mode === "string" && body.channel_mode.trim()) {
       row.channel_mode = body.channel_mode.trim();
     }
@@ -203,7 +247,7 @@ export async function handleH8ErpConnectorDevMock(
       if (row.status === "active") row.status = "testing";
     }
     row.updated_at = nowIso();
-    sendJson(res, 200, row);
+    sendJson(res, 200, publicConnector(row));
     return true;
   }
 
@@ -253,14 +297,14 @@ export async function handleH8ErpConnectorDevMock(
     row.status = "active";
     row.first_activated_at = row.first_activated_at ?? ts;
     row.updated_at = ts;
-    sendJson(res, 200, row);
+    sendJson(res, 200, publicConnector(row));
     return true;
   }
 
   if (req.method === "POST" && parsed.action === "disable") {
     row.status = "disabled";
     row.updated_at = nowIso();
-    sendJson(res, 200, row);
+    sendJson(res, 200, publicConnector(row));
     return true;
   }
 

@@ -8,6 +8,7 @@ import { handleH4WechatNotifyDevMock } from "./wechat-notify-dev-mock";
 import { handleH5ExpressDevMock } from "./express-dev-mock";
 import { handleH8ErpConnectorDevMock } from "./erp-connector-dev-mock";
 import { handleH8ErpMessageDevMock } from "./erp-message-dev-mock";
+import { handleH8ErpInterfaceTableDevMock } from "./erp-interface-table-dev-mock";
 import { handlePrintInventoryDevMock } from "./web-admin-dev-mock-print-inventory";
 import { handleDocumentNumberingDevMock } from "./document-numbering-dev-mock";
 import { handleOutboundDevMock } from "./outbound-dev-mock";
@@ -172,6 +173,9 @@ async function tryHandleDevMockRoute(
   }
   if (pathname.startsWith("/api/v1/integration/erp-messages")) {
     return handleH8ErpMessageDevMock(req, res, pathname);
+  }
+  if (pathname.startsWith("/api/v1/h8/erp-interface-tables")) {
+    return handleH8ErpInterfaceTableDevMock(req, res, pathname);
   }
   if (pathname.startsWith("/api/v1/docks")) {
     await handleDockDevMock(req, res, pathname);

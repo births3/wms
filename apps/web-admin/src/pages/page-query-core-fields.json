@@ -104,6 +104,16 @@
       "more": ["connector_code", "external_ref", "idempotency_key", "correlation_id"]
     },
     {
+      "id": "h8-erp-interface-tables",
+      "title": "H8 接口表探查",
+      "required": true,
+      "source": "apps/web-admin/src/pages/config-center/ErpInterfaceTablePage.tsx",
+      "fieldConstant": "h8ErpInterfaceTableQueryFields",
+      "coreConstant": "h8ErpInterfaceTableCoreQueryFieldKeys",
+      "core": ["connector_id", "table_key", "sync_status", "updated_at"],
+      "more": ["external_doc_no", "external_ref", "source_outbox_id", "event_type", "warehouse_id", "idempotency_key"]
+    },
+    {
       "id": "h1-menu-management",
       "title": "H1 菜单管理",
       "required": false,

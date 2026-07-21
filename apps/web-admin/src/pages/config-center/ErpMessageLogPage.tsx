@@ -71,7 +71,7 @@ export const h8ErpMessageQueryFields: QueryPanelField[] = [
   { key: "correlation_id", label: "correlation", type: "text" },
 ];
 
-export const h8ErpMessageCoreQueryFieldKeys = ["direction", "message_type", "status"] as const;
+export const h8ErpMessageCoreQueryFieldKeys = ["direction", "message_type", "status"];
 
 const columns: DataGridColumn<H8ErpMessage>[] = [
   { key: "direction", header: "方向", width: 90 },
