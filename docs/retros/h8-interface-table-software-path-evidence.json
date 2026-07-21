@@ -1,5 +1,5 @@
 {
-  "collected_at": "2026-07-22T00:19:51+08:00",
+  "collected_at": "2026-07-22T07:02:59+08:00",
   "story": "US-H8-004",
   "scope": "Docker MSSQL software path: SELECT-only database boundary, real API/browser authorization, H2 persistent audit and screenshots",
   "ok": true,
@@ -31,8 +31,9 @@
       "ok": true,
       "tests": 2,
       "assertions": [
-        "admin sees DEMO-ASN-001 and filters sync_status=pending",
-        "detail exposes payload_summary without payload_json",
+        "admin sees DEMO-ASN-001 and filters sync_status=pending through the Chinese label 同步状态",
+        "query, grid and detail field labels are displayed in Chinese",
+        "detail exposes the Chinese label 报文摘要 without payload_json",
         "page has no write actions",
         "connector.read-only user has no menu after fresh login and refresh",
         "connector.read-only user receives API 403"
@@ -57,19 +58,19 @@
   "screenshots": [
     {
       "path": "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-list.png",
-      "sha256": "f4bd4462c7ccdfeda92b25fbac288a601211f53a6af09ecd4066653a0e0aafe4"
+      "sha256": "b544aafbe9151d87585916b0a3defa54e3c48c99c11ae08a8ced11f295761bbc"
     },
     {
       "path": "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-pending-filter.png",
-      "sha256": "a2cb1e4d8384274b024be32dab30789cbb2f2b4751c29b5a3b782d7f9e5291dd"
+      "sha256": "5e39959452afa4b37b506eb0ffb65217cb59c10bdcebdda3e4ba15b4d1b4e242"
     },
     {
       "path": "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-detail.png",
-      "sha256": "0fa9caa509033bfcfde359789e17fb5a326a7b950ff299e6908eea82859cf594"
+      "sha256": "8e6e1d781a5611a4e38c3939d4ed622241bf33a0501568ca585bd99999c1f374"
     },
     {
       "path": "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-permission-denied.png",
-      "sha256": "a9da8698003b8cbd6fee43e4647033097c0c4822e09a4af3b76f8af3410e576d"
+      "sha256": "d8b4b392ba9d59c9ec9e712db9292e72b737da421e34b052a6ddb28af89d9036"
     }
   ],
   "conclusion": "SOFTWARE_PATH_PASS",
