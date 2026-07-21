@@ -410,20 +410,24 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | 2026-07-21 | 十二轮开发复审 | 修复连接选择器未区分缺少独立探查凭据：API 只返回成对配置状态，前端对不可用连接禁选并提示维护入口；QueryPanel 原生支持禁用选项。补齐 ASN/销退表 `external_ref` 查询控件及参数透传。探查连接池缓存键同时绑定探查版本与传输配置版本，避免端点变更复用旧池；同步 RTM 的已实现/待证据描述。 |
 | 2026-07-21 | 十三轮开发复审 | 按“每次查询可追溯”补齐列表/详情失败与未命中也写入 H2 摘要（`hit=false`/结果 0）；接口库只读检查脚本补 DEMO-ASN-001、DEMO-PM-001 的 `pending` 断言；增加连接选择器成对凭据单测。真实 Docker/API/持久化证据仍保持 deferred。 |
 | 2026-07-21 | 十四轮终审 | 对照实现与故事映射复核：补齐 ASN/销退 `external_ref` 过滤映射；详情失败显示明确错误而非无限加载；dev-mock 补齐外部引用、仓库、出站资源和 WMS 资源过滤。self-check、TypeScript、浏览器 E2E、T1 均通过；真实 Docker/API/权限/持久化审计证据继续阻塞。 |
+| 2026-07-21 | 十五轮运行复审 | 复现“前端页面不显示”：dev E2E 正常，真实菜单服务读取最新发布版本，而原迁移只写 `version_no=1`。新增兼容回填迁移，将 H8 菜单子树和按钮权限补入最新版本，并加入 self-check；当前 `wms_h8_real` 已执行迁移，真实菜单接口与 9002 页面均已验证可见。其他环境需运行迁移后刷新菜单。 |
+| 2026-07-21 | 十六轮运行复审 | 复现“查询无真实数据”：18180 E2E API 未挂载接口表路由且返回 404；补挂生产同款接口表路由与 H8 探查权限种子。当前 `wms_h8_real` 已配置接口表连接，MSSQL `wms_erp_if` 已准备 `DEMO-ASN-001`（`pending`），真实 API 列表/详情和 9002 页面均已返回该行。 |
 
 ## 验收记录（US-H8-004 软件切片）
 
 - 故事：`US-H8-004`
 - 验收日期：`2026-07-21`
 - 质量矩阵状态：`deferred_stories`
-- 当前结论：`SOFTWARE_PATH_NEEDS_WORK`（代码与开发环境交互已通过；真实 Docker MSSQL 证据尚未执行）
+- 证据层覆盖：`V0/V1=PASS`；`V2/V3=PARTIAL`；`V4=不适用（软件路径不要求客户正式接口库）`
+- 当前结论：`SOFTWARE_PATH_NEEDS_WORK`（真实 DEMO 查询已通过；完整 Docker DML、权限、审计和正式截图证据尚未执行）
 
-| 验收范围 | 当前结果 | 证据 / 说明 |
-|---|---|---|
-| AC1–AC12（入口、权限接线、连接选择、白名单 API、查询/详情、范围、分页、脱敏、审计代码、页面交互） | `PASS（软件切片）` | 领域/API 单测、OpenAPI/api-client、权限/菜单迁移、self-check、dev-mock Playwright 与 3 张截图 |
-| AC14（页面证据：列表/筛选/详情/无写控件） | `PARTIAL` | dev-mock Playwright 已覆盖列表、状态筛选、详情与无写按钮；真实无权限 403/隐藏入口和真实截图仍待 Docker/API 权限路径 |
-| AC13（SELECT-only 账号与 DML 拒绝） | `NEEDS_WORK` | `scripts/h8_erp_interface_sync/check_probe_readonly.sh` 已包含 SELECT、DEMO-ASN-001/DEMO-PM-001 和 INSERT/UPDATE/DELETE 否定断言，尚未在 Docker MSSQL 执行 |
-| AC15（Docker DEMO 行列表→详情、真实权限/审计） | `NEEDS_WORK` | 当前环境 `docker ps` 因 Docker socket 权限退出码 1；不可用 Mock 或静态文件替代真实证据 |
+| 验收范围 | 证据层 | 当前结果 | 证据 / 说明 |
+|---|---|---|---|
+| AC1–AC12（入口、权限接线、连接选择、白名单 API、查询/详情、范围、分页、脱敏、审计代码、页面交互） | V0/V1 | `PASS（软件切片）` | 领域/API 单测、OpenAPI/api-client、权限/菜单迁移、self-check、dev-mock Playwright 与 3 张截图 |
+| MENU-VISIBILITY（发布版本、权限、真实页面可见、刷新后复验） | V0/V3 | `PARTIAL` | `wms_h8_real` 最新菜单 API、权限和 9002 真实页面已验证；现有自动化 spec 仍为 dev-mock，真实权限反向用例和真实页面截图待补 |
+| AC14（页面证据：列表/筛选/详情/无写控件） | V1/V3 | `PARTIAL` | dev-mock Playwright 已覆盖列表、状态筛选、详情与无写按钮；9002 真实页面已显示 `DEMO-ASN-001`，真实无权限 403/隐藏入口和正式截图仍待补 |
+| AC13（SELECT-only 账号与 DML 拒绝） | V2 | `NEEDS_WORK` | `scripts/h8_erp_interface_sync/check_probe_readonly.sh` 已包含 SELECT、DEMO-ASN-001/DEMO-PM-001 和 INSERT/UPDATE/DELETE 否定断言，尚未在 Docker MSSQL 执行 |
+| AC15（Docker DEMO 行列表→详情、真实权限/审计） | V2/V3 | `PARTIAL` | `wms_h8_real` 的 MSSQL `DEMO-ASN-001` 已完成真实 API 列表→详情；SELECT-only DML 拒绝、真实反向权限和 H2 持久化审计证据仍待补 |
 
 验证命令：
 
@@ -438,7 +442,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | `just openapi-check` / `python3 scripts/governance/check_quality_matrix.py --json` / `python3 scripts/governance/check_scope_gap_discovery.py --strict --module H8 --json` | `PASS` |
 | `just gov-t1` | `PASS`（56/56） |
 
-关闭条件：在 Docker MSSQL 启动并执行 `H8_APPLY_SEED=1 deploy/h8-erp-if/wait-and-init.sh` 后，归档 DEMO 行真实 API 列表→详情、探查权限与 connector.read 权限否定、H2 持久化列表/详情审计及 SELECT-only DML 拒绝；完成前保持 `deferred_stories`。
+关闭条件：在 Docker MSSQL 启动并执行 `H8_APPLY_SEED=1 deploy/h8-erp-if/wait-and-init.sh` 后，复验并归档 DEMO 行真实 API 列表→详情，补齐探查权限与 connector.read 权限否定、H2 持久化列表/详情审计及 SELECT-only DML 拒绝；完成前保持 `deferred_stories`。
 
 ## 验收记录
 
