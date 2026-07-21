@@ -2484,8 +2484,8 @@
           }
         },
         "security": [],
-        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。",
-        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。"
+        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。",
+        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。"
       }
     },
     "/api/v1/auth/logout": {
@@ -7675,6 +7675,355 @@
           },
           "404": {
             "description": "运单不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/h8/erp-interface-tables/connectors": {
+      "get": {
+        "tags": [
+          "h8-erp"
+        ],
+        "operationId": "list_h8_erp_interface_table_connectors",
+        "responses": {
+          "200": {
+            "description": "当前货主可用于接口表探查的连接最小投影",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/H8ErpInterfaceTableConnectorOption"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "缺少接口表探查权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/h8/erp-interface-tables/rows": {
+      "get": {
+        "tags": [
+          "h8-erp"
+        ],
+        "operationId": "list_h8_erp_interface_table_rows",
+        "parameters": [
+          {
+            "name": "connector_id",
+            "in": "query",
+            "description": "当前货主的 H8 连接",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "table_key",
+            "in": "query",
+            "description": "受控接口表白名单",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sync_status",
+            "in": "query",
+            "description": "当前表允许的同步状态",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "time_from",
+            "in": "query",
+            "description": "updated_at 起始时间",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "time_to",
+            "in": "query",
+            "description": "updated_at 结束时间",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "warehouse_id",
+            "in": "query",
+            "description": "仓库精确匹配",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "external_doc_no",
+            "in": "query",
+            "description": "入站外部单号精确匹配",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "source_outbox_id",
+            "in": "query",
+            "description": "出站 outbox ID 精确匹配",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "event_type",
+            "in": "query",
+            "description": "出站事件类型精确匹配",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "external_ref",
+            "in": "query",
+            "description": "外部引用精确匹配",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "wms_resource_id",
+            "in": "query",
+            "description": "WMS 资源 ID 精确匹配",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "idempotency_key",
+            "in": "query",
+            "description": "幂等键精确匹配",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页 1..=100",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "接口表只读行列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H8ErpInterfaceTableListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "表名/过滤条件非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限或数据范围不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "探查凭据未配置",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/h8/erp-interface-tables/rows/{row_id}": {
+      "get": {
+        "tags": [
+          "h8-erp"
+        ],
+        "operationId": "get_h8_erp_interface_table_row",
+        "parameters": [
+          {
+            "name": "row_id",
+            "in": "path",
+            "description": "接口表行 ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "connector_id",
+            "in": "query",
+            "description": "当前货主的 H8 连接",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "table_key",
+            "in": "query",
+            "description": "受控接口表白名单",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "接口表只读行详情",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H8ErpInterfaceTableDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "联合身份参数缺失",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限或数据范围不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "行不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "探查凭据未配置",
             "content": {
               "application/json": {
                 "schema": {
@@ -22678,6 +23027,14 @@
             "type": "string",
             "nullable": true
           },
+          "interface_probe_db_password_alias": {
+            "type": "string",
+            "nullable": true
+          },
+          "interface_probe_db_username": {
+            "type": "string",
+            "nullable": true
+          },
           "message_types": {
             "type": "array",
             "items": {
@@ -25642,6 +25999,8 @@
           "directions",
           "message_types",
           "channel_mode",
+          "interface_probe_db_password_alias_set",
+          "interface_probe_config_version",
           "status",
           "config_version",
           "created_at",
@@ -25655,6 +26014,7 @@
           "api_key_id": {
             "type": "string",
             "format": "uuid",
+            "description": "Worker 传输账号；只用于出入站，不得用于 H8-004 探查。",
             "nullable": true
           },
           "bearer_secret_alias": {
@@ -25712,6 +26072,19 @@
           },
           "interface_db_username": {
             "type": "string",
+            "nullable": true
+          },
+          "interface_probe_config_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "interface_probe_db_password_alias_set": {
+            "type": "boolean",
+            "description": "连接配置响应只返回是否已设置，不返回 alias 内容。"
+          },
+          "interface_probe_db_username": {
+            "type": "string",
+            "description": "H8-004 只读探查账号，与 Worker 账号和版本独立。",
             "nullable": true
           },
           "last_tested_at": {
@@ -25798,6 +26171,262 @@
           "tested_version": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "H8ErpInterfaceTableConnectorOption": {
+        "type": "object",
+        "description": "004 页面连接选择器的最小安全投影，不包含任何传输/探查 secret。",
+        "required": [
+          "id",
+          "connector_code",
+          "connector_name",
+          "channel_mode",
+          "status",
+          "warehouse_ids",
+          "probe_credentials_configured"
+        ],
+        "properties": {
+          "channel_mode": {
+            "type": "string"
+          },
+          "connector_code": {
+            "type": "string"
+          },
+          "connector_name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "probe_credentials_configured": {
+            "type": "boolean",
+            "description": "仅表示独立探查账号的用户名与密码 alias 是否成对配置，不暴露 alias 内容。"
+          },
+          "status": {
+            "type": "string"
+          },
+          "warehouse_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
+      "H8ErpInterfaceTableDetail": {
+        "type": "object",
+        "required": [
+          "row",
+          "fields"
+        ],
+        "properties": {
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/H8ErpInterfaceTableField"
+            },
+            "description": "仅返回白名单字段，不返回原始 payload_json。"
+          },
+          "row": {
+            "$ref": "#/components/schemas/H8ErpInterfaceTableRow"
+          }
+        }
+      },
+      "H8ErpInterfaceTableField": {
+        "type": "object",
+        "required": [
+          "key"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "H8ErpInterfaceTableListResponse": {
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/H8ErpInterfaceTableRow"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "H8ErpInterfaceTableQuery": {
+        "type": "object",
+        "required": [
+          "connector_id",
+          "table_key",
+          "updated_from",
+          "updated_to",
+          "page",
+          "page_size"
+        ],
+        "properties": {
+          "connector_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "event_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "external_doc_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "external_ref": {
+            "type": "string",
+            "nullable": true
+          },
+          "idempotency_key": {
+            "type": "string",
+            "nullable": true
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "source_outbox_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "sync_status": {
+            "type": "string",
+            "nullable": true
+          },
+          "table_key": {
+            "type": "string"
+          },
+          "updated_from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_to": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "wms_resource_id": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "H8ErpInterfaceTableRow": {
+        "type": "object",
+        "required": [
+          "row_id",
+          "connector_id",
+          "table_key",
+          "owner_id",
+          "sync_status",
+          "retry_count",
+          "created_at",
+          "updated_at",
+          "payload_summary"
+        ],
+        "properties": {
+          "business_key": {
+            "type": "string",
+            "nullable": true
+          },
+          "connector_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "event_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "external_ref": {
+            "type": "string",
+            "nullable": true
+          },
+          "idempotency_key": {
+            "type": "string",
+            "nullable": true
+          },
+          "last_error": {
+            "type": "string",
+            "nullable": true
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payload_summary": {
+            "type": "string"
+          },
+          "retry_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "row_id": {
+            "type": "string"
+          },
+          "sync_status": {
+            "type": "string"
+          },
+          "table_key": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "wms_resource_id": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -32587,6 +33216,11 @@
             "type": "integer",
             "format": "int64"
           },
+          "expected_probe_config_version": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
           "interface_db_host": {
             "type": "string",
             "nullable": true
@@ -32605,6 +33239,14 @@
             "nullable": true
           },
           "interface_db_username": {
+            "type": "string",
+            "nullable": true
+          },
+          "interface_probe_db_password_alias": {
+            "type": "string",
+            "nullable": true
+          },
+          "interface_probe_db_username": {
             "type": "string",
             "nullable": true
           },

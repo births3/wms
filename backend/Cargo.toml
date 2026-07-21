@@ -15,6 +15,7 @@ publish = false
 axum = "0.7"
 bcrypt = "0.19.2"
 chrono = { version = "0.4", features = ["serde"] }
+deadpool-tiberius-rustls = { version = "0.1.12", default-features = false, features = ["rustls", "tds73", "chrono"] }
 hex = "0.4"
 jsonwebtoken = "9"
 redis = { version = "0.27", features = ["aio", "tokio-comp"] }

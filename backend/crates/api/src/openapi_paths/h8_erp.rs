@@ -1,10 +1,76 @@
 #[allow(unused_imports)]
 use wms_domain::{
     ClaimH8ErpMessageRequest, CreateH8ErpConnectorRequest, ErrorResponse, H8ErpConnector,
-    H8ErpConnectorListResponse, H8ErpConnectorTestResult, H8ErpMessage, H8ErpMessageDetail,
+    H8ErpConnectorListResponse, H8ErpConnectorTestResult, H8ErpInterfaceTableConnectorOption,
+    H8ErpInterfaceTableDetail, H8ErpInterfaceTableListResponse, H8ErpMessage, H8ErpMessageDetail,
     H8ErpMessageListResponse, H8ErpMessageStats, PurgeH8ErpMessagesRequest,
     PurgeH8ErpMessagesResponse, ReplayH8ErpMessageRequest, UpdateH8ErpConnectorRequest,
 };
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/h8/erp-interface-tables/connectors",
+    tag = "h8-erp",
+    responses(
+        (status = 200, description = "当前货主可用于接口表探查的连接最小投影", body = [H8ErpInterfaceTableConnectorOption]),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "缺少接口表探查权限", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn list_h8_erp_interface_table_connectors() {}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/h8/erp-interface-tables/rows",
+    tag = "h8-erp",
+    params(
+        ("connector_id" = uuid::Uuid, Query, description = "当前货主的 H8 连接"),
+        ("table_key" = String, Query, description = "受控接口表白名单"),
+        ("sync_status" = Option<String>, Query, description = "当前表允许的同步状态"),
+        ("time_from" = Option<String>, Query, description = "updated_at 起始时间"),
+        ("time_to" = Option<String>, Query, description = "updated_at 结束时间"),
+        ("warehouse_id" = Option<uuid::Uuid>, Query, description = "仓库精确匹配"),
+        ("external_doc_no" = Option<String>, Query, description = "入站外部单号精确匹配"),
+        ("source_outbox_id" = Option<String>, Query, description = "出站 outbox ID 精确匹配"),
+        ("event_type" = Option<String>, Query, description = "出站事件类型精确匹配"),
+        ("external_ref" = Option<String>, Query, description = "外部引用精确匹配"),
+        ("wms_resource_id" = Option<String>, Query, description = "WMS 资源 ID 精确匹配"),
+        ("idempotency_key" = Option<String>, Query, description = "幂等键精确匹配"),
+        ("page" = Option<u32>, Query, description = "页码"),
+        ("page_size" = Option<u32>, Query, description = "每页 1..=100"),
+    ),
+    responses(
+        (status = 200, description = "接口表只读行列表", body = H8ErpInterfaceTableListResponse),
+        (status = 400, description = "表名/过滤条件非法", body = ErrorResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限或数据范围不足", body = ErrorResponse),
+        (status = 409, description = "探查凭据未配置", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn list_h8_erp_interface_table_rows() {}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/h8/erp-interface-tables/rows/{row_id}",
+    tag = "h8-erp",
+    params(
+        ("row_id" = String, Path, description = "接口表行 ID"),
+        ("connector_id" = uuid::Uuid, Query, description = "当前货主的 H8 连接"),
+        ("table_key" = String, Query, description = "受控接口表白名单"),
+    ),
+    responses(
+        (status = 200, description = "接口表只读行详情", body = H8ErpInterfaceTableDetail),
+        (status = 400, description = "联合身份参数缺失", body = ErrorResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限或数据范围不足", body = ErrorResponse),
+        (status = 404, description = "行不存在", body = ErrorResponse),
+        (status = 409, description = "探查凭据未配置", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn get_h8_erp_interface_table_row() {}
 
 #[utoipa::path(
     get,

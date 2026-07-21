@@ -1,4 +1,5 @@
 //! US-H8-001：ERP 连接配置领域规则（纯 domain，无 IO）。
+// @governance: skip-page-size H8 connector domain keeps transport/probe version invariants together; split after H8 migration.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -142,9 +143,18 @@ pub struct H8ErpConnector {
     pub interface_db_port: Option<i32>,
     pub interface_db_name: Option<String>,
     pub interface_db_username: Option<String>,
+    /// Worker 传输账号；只用于出入站，不得用于 H8-004 探查。
     pub api_key_id: Option<Uuid>,
     pub bearer_secret_alias: Option<String>,
     pub interface_db_password_alias: Option<String>,
+    /// H8-004 只读探查账号，与 Worker 账号和版本独立。
+    pub interface_probe_db_username: Option<String>,
+    /// 仅在服务端内部保存 alias；对外序列化为“是否已设置”，绝不回显 alias。
+    #[serde(default, skip_serializing, skip_deserializing)]
+    pub interface_probe_db_password_alias: Option<String>,
+    /// 连接配置响应只返回是否已设置，不返回 alias 内容。
+    pub interface_probe_db_password_alias_set: bool,
+    pub interface_probe_config_version: i64,
     pub status: String,
     pub config_version: i64,
     pub first_activated_at: Option<DateTime<Utc>>,
@@ -178,11 +188,14 @@ pub struct CreateH8ErpConnectorRequest {
     pub api_key_id: Option<Uuid>,
     pub bearer_secret_alias: Option<String>,
     pub interface_db_password_alias: Option<String>,
+    pub interface_probe_db_username: Option<String>,
+    pub interface_probe_db_password_alias: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct UpdateH8ErpConnectorRequest {
     pub expected_config_version: i64,
+    pub expected_probe_config_version: Option<i64>,
     pub connector_name: Option<String>,
     pub warehouse_ids: Option<Vec<Uuid>>,
     pub directions: Option<Vec<String>>,
@@ -196,6 +209,8 @@ pub struct UpdateH8ErpConnectorRequest {
     pub api_key_id: Option<Uuid>,
     pub bearer_secret_alias: Option<String>,
     pub interface_db_password_alias: Option<String>,
+    pub interface_probe_db_username: Option<String>,
+    pub interface_probe_db_password_alias: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -225,6 +240,7 @@ pub enum H8ErpConnectorError {
     IllegalTransition,
     InsufficientApiKeyScope,
     IdempotencyConflict,
+    ProbeVersionConflict,
 }
 
 /// 两连接在「货主+仓库+方向+消息类型」上是否路由重叠（仅用于 active 启用前检查）。
@@ -271,6 +287,10 @@ impl CreateH8ErpConnectorRequest {
             self.bearer_secret_alias.as_deref(),
             self.interface_db_password_alias.as_deref(),
             &self.directions,
+        )?;
+        validate_probe_fields(
+            self.interface_probe_db_username.as_deref(),
+            self.interface_probe_db_password_alias.as_deref(),
         )?;
         Ok(())
     }
@@ -378,6 +398,13 @@ pub fn apply_update(
     if req.expected_config_version != current.config_version {
         return Err(H8ErpConnectorError::VersionConflict);
     }
+    let probe_changed = req.interface_probe_db_username.is_some()
+        || req.interface_probe_db_password_alias.is_some();
+    if probe_changed
+        && req.expected_probe_config_version != Some(current.interface_probe_config_version)
+    {
+        return Err(H8ErpConnectorError::ProbeVersionConflict);
+    }
     let mut next = current.clone();
     if let Some(name) = &req.connector_name {
         validate_text(name, "connector_name", 128)?;
@@ -437,6 +464,27 @@ pub fn apply_update(
             .clone()
             .filter(|s| !s.trim().is_empty());
     }
+    if req.interface_probe_db_username.is_some() {
+        next.interface_probe_db_username = req
+            .interface_probe_db_username
+            .clone()
+            .filter(|s| !s.trim().is_empty());
+    }
+    if req.interface_probe_db_password_alias.is_some() {
+        next.interface_probe_db_password_alias = req
+            .interface_probe_db_password_alias
+            .clone()
+            .filter(|s| !s.trim().is_empty());
+        next.interface_probe_db_password_alias_set = next
+            .interface_probe_db_password_alias
+            .as_deref()
+            .is_some_and(|alias| !alias.trim().is_empty());
+    }
+
+    validate_probe_fields(
+        next.interface_probe_db_username.as_deref(),
+        next.interface_probe_db_password_alias.as_deref(),
+    )?;
 
     validate_channel_fields(
         &next.channel_mode,
@@ -460,6 +508,9 @@ pub fn apply_update(
         if next.status == "active" {
             next.status = "testing".to_string();
         }
+    }
+    if probe_changed {
+        next.interface_probe_config_version += 1;
     }
     next.updated_at = now;
     Ok(next)
@@ -541,6 +592,17 @@ fn validate_secret_alias(
     Ok(())
 }
 
+fn validate_probe_fields(
+    username: Option<&str>,
+    password_alias: Option<&str>,
+) -> Result<(), H8ErpConnectorError> {
+    if username.is_none() && password_alias.is_none() {
+        return Ok(());
+    }
+    require_nonempty(username, "interface_probe_db_username")?;
+    validate_secret_alias(password_alias, "interface_probe_db_password_alias")
+}
+
 fn validate_api_url(url: &str) -> Result<(), H8ErpConnectorError> {
     let lower = url.to_ascii_lowercase();
     if !(lower.starts_with("https://")
@@ -572,6 +634,8 @@ mod tests {
             api_key_id: Some(Uuid::new_v4()),
             bearer_secret_alias: None,
             interface_db_password_alias: None,
+            interface_probe_db_username: None,
+            interface_probe_db_password_alias: None,
         }
     }
 
@@ -594,6 +658,10 @@ mod tests {
             api_key_id: Some(Uuid::new_v4()),
             bearer_secret_alias: None,
             interface_db_password_alias: None,
+            interface_probe_db_username: None,
+            interface_probe_db_password_alias: None,
+            interface_probe_db_password_alias_set: false,
+            interface_probe_config_version: 1,
             status: status.into(),
             config_version: 1,
             first_activated_at: None,
@@ -678,6 +746,7 @@ mod tests {
         c.last_tested_version = Some(2);
         let req = UpdateH8ErpConnectorRequest {
             expected_config_version: 2,
+            expected_probe_config_version: None,
             connector_name: None,
             warehouse_ids: Some(vec![Uuid::new_v4()]),
             directions: None,
@@ -691,6 +760,8 @@ mod tests {
             api_key_id: None,
             bearer_secret_alias: None,
             interface_db_password_alias: None,
+            interface_probe_db_username: None,
+            interface_probe_db_password_alias: None,
         };
         let next = apply_update(&c, &req, Utc::now()).expect("ok");
         assert_eq!(next.status, "testing");
@@ -763,6 +834,7 @@ mod tests {
         let c = sample_connector(Uuid::new_v4(), vec![], "testing");
         let req = UpdateH8ErpConnectorRequest {
             expected_config_version: 99,
+            expected_probe_config_version: None,
             connector_name: Some("x".into()),
             warehouse_ids: None,
             directions: None,
@@ -776,11 +848,83 @@ mod tests {
             api_key_id: None,
             bearer_secret_alias: None,
             interface_db_password_alias: None,
+            interface_probe_db_username: None,
+            interface_probe_db_password_alias: None,
         };
         assert_eq!(
             apply_update(&c, &req, Utc::now()),
             Err(H8ErpConnectorError::VersionConflict)
         );
+    }
+
+    #[test]
+    fn probe_edit_requires_independent_expected_version() {
+        let c = sample_connector(Uuid::new_v4(), vec![], "testing");
+        let req = UpdateH8ErpConnectorRequest {
+            expected_config_version: c.config_version,
+            expected_probe_config_version: None,
+            connector_name: None,
+            warehouse_ids: None,
+            directions: None,
+            message_types: None,
+            channel_mode: None,
+            api_base_url: None,
+            interface_db_host: None,
+            interface_db_port: None,
+            interface_db_name: None,
+            interface_db_username: None,
+            api_key_id: None,
+            bearer_secret_alias: None,
+            interface_db_password_alias: None,
+            interface_probe_db_username: Some("probe".into()),
+            interface_probe_db_password_alias: None,
+        };
+        assert_eq!(
+            apply_update(&c, &req, Utc::now()),
+            Err(H8ErpConnectorError::ProbeVersionConflict)
+        );
+    }
+
+    #[test]
+    fn probe_edit_increments_only_probe_version() {
+        let c = sample_connector(Uuid::new_v4(), vec![], "active");
+        let req = UpdateH8ErpConnectorRequest {
+            expected_config_version: c.config_version,
+            expected_probe_config_version: Some(c.interface_probe_config_version),
+            connector_name: None,
+            warehouse_ids: None,
+            directions: None,
+            message_types: None,
+            channel_mode: None,
+            api_base_url: None,
+            interface_db_host: None,
+            interface_db_port: None,
+            interface_db_name: None,
+            interface_db_username: None,
+            api_key_id: None,
+            bearer_secret_alias: None,
+            interface_db_password_alias: None,
+            interface_probe_db_username: Some("probe".into()),
+            interface_probe_db_password_alias: Some("vault://h8/probe".into()),
+        };
+        let next = apply_update(&c, &req, Utc::now()).expect("ok");
+        assert_eq!(next.config_version, c.config_version);
+        assert_eq!(
+            next.interface_probe_config_version,
+            c.interface_probe_config_version + 1
+        );
+        assert_eq!(next.status, "active");
+        assert_eq!(next.last_tested_succeeded, c.last_tested_succeeded);
+    }
+
+    #[test]
+    fn connector_response_only_exposes_probe_alias_configured_flag() {
+        let mut connector = sample_connector(Uuid::new_v4(), vec![], "testing");
+        connector.interface_probe_db_password_alias = Some("vault://secret/probe".into());
+        connector.interface_probe_db_password_alias_set = true;
+        let value = serde_json::to_value(&connector).expect("serialize connector");
+        assert!(value.get("interface_probe_db_password_alias").is_none());
+        assert_eq!(value["interface_probe_db_password_alias_set"], true);
     }
 
     #[test]

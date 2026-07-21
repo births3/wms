@@ -138,6 +138,10 @@ async fn create_connector(
     }
     req.validate().map_err(H8ErpConnectorRepoError::Domain)?;
     let now = Utc::now();
+    let probe_alias_set = req
+        .interface_probe_db_password_alias
+        .as_deref()
+        .is_some_and(|alias| !alias.trim().is_empty());
     let connector = H8ErpConnector {
         id: Uuid::new_v4(),
         owner_id: ctx.owner_id,
@@ -155,6 +159,10 @@ async fn create_connector(
         api_key_id: req.api_key_id,
         bearer_secret_alias: req.bearer_secret_alias,
         interface_db_password_alias: req.interface_db_password_alias,
+        interface_probe_db_username: req.interface_probe_db_username,
+        interface_probe_db_password_alias: req.interface_probe_db_password_alias,
+        interface_probe_db_password_alias_set: probe_alias_set,
+        interface_probe_config_version: 1,
         status: "testing".into(),
         config_version: 1,
         first_activated_at: None,
@@ -202,10 +210,14 @@ async fn update_connector(
     }
     let current = state.repository.get(ctx.owner_id, id).await?;
     let observed = current.config_version;
+    let observed_probe = current.interface_probe_config_version;
     let before = audit_snapshot(&current);
     let next = apply_update(&current, &req, Utc::now()).map_err(H8ErpConnectorRepoError::Domain)?;
     ensure_inbound_api_key_scopes(&state, ctx.owner_id, &next).await?;
-    let saved = state.repository.save(&next, observed).await?;
+    let saved = state
+        .repository
+        .save(&next, observed, observed_probe)
+        .await?;
     write_audit(&state, &ctx, "h8_connector_update", &saved, Some(before)).await;
     store_idempotent_response(
         &state,
@@ -240,6 +252,7 @@ async fn test_connector(
     }
     let mut connector = state.repository.get(ctx.owner_id, id).await?;
     let observed = connector.config_version;
+    let observed_probe = connector.interface_probe_config_version;
     // AC7：字段/alias、路由重叠、REST/接口表连通性；不写业务单据
     let (mut ok, mut err) = run_connection_probe(&connector).await;
     if ok {
@@ -264,7 +277,10 @@ async fn test_connector(
     connector.last_tested_succeeded = Some(ok);
     connector.last_tested_error_summary = err.clone();
     connector.updated_at = now;
-    let saved = state.repository.save(&connector, observed).await?;
+    let saved = state
+        .repository
+        .save(&connector, observed, observed_probe)
+        .await?;
     write_audit(&state, &ctx, "h8_connector_test", &saved, Some(before)).await;
     let result = H8ErpConnectorTestResult {
         succeeded: ok,
@@ -305,6 +321,7 @@ async fn activate_connector(
     }
     let mut connector = state.repository.get(ctx.owner_id, id).await?;
     let observed = connector.config_version;
+    let observed_probe = connector.interface_probe_config_version;
     let actives = state.repository.list_active(ctx.owner_id).await?;
     can_activate(&connector, &actives).map_err(H8ErpConnectorRepoError::Domain)?;
     ensure_inbound_api_key_scopes(&state, ctx.owner_id, &connector).await?;
@@ -315,7 +332,10 @@ async fn activate_connector(
     }
     connector.status = "active".into();
     connector.updated_at = now;
-    let saved = state.repository.save(&connector, observed).await?;
+    let saved = state
+        .repository
+        .save(&connector, observed, observed_probe)
+        .await?;
     // AC12：原连接重新启用后，paused 在途从原阶段续传（恢复 running）
     let resumed = state
         .repository
@@ -359,6 +379,7 @@ async fn disable_connector(
     }
     let mut connector = state.repository.get(ctx.owner_id, id).await?;
     let observed = connector.config_version;
+    let observed_probe = connector.interface_probe_config_version;
     if connector.status != "active" {
         return Err(H8ErpConnectorHandlerError::Repo(
             H8ErpConnectorRepoError::Domain(H8ErpConnectorError::IllegalTransition),
@@ -371,7 +392,10 @@ async fn disable_connector(
         .await?;
     connector.status = "disabled".into();
     connector.updated_at = Utc::now();
-    let saved = state.repository.save(&connector, observed).await?;
+    let saved = state
+        .repository
+        .save(&connector, observed, observed_probe)
+        .await?;
     write_audit(&state, &ctx, "h8_connector_disable", &saved, Some(before)).await;
     store_idempotent_response(
         &state,

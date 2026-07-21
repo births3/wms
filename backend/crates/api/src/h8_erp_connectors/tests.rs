@@ -36,6 +36,10 @@ async fn memory_create_test_activate_flow() {
         api_key_id: Some(Uuid::new_v4()),
         bearer_secret_alias: None,
         interface_db_password_alias: None,
+        interface_probe_db_username: None,
+        interface_probe_db_password_alias: None,
+        interface_probe_db_password_alias_set: false,
+        interface_probe_config_version: 1,
         status: "testing".into(),
         config_version: 1,
         first_activated_at: None,
@@ -61,6 +65,8 @@ async fn memory_create_test_activate_flow() {
         api_key_id: c.api_key_id,
         bearer_secret_alias: None,
         interface_db_password_alias: None,
+        interface_probe_db_username: None,
+        interface_probe_db_password_alias: None,
     }
     .validate()
     .expect("valid");
@@ -68,12 +74,12 @@ async fn memory_create_test_activate_flow() {
     c.last_tested_version = Some(1);
     c.last_tested_succeeded = Some(true);
     c.last_tested_at = Some(now);
-    state.repository.save(&c, 1).await.expect("save");
+    state.repository.save(&c, 1, 1).await.expect("save");
     let actives = state.repository.list_active(owner).await.unwrap();
     can_activate(&c, &actives).expect("can activate");
     c.status = "active".into();
     c.first_activated_at = Some(now);
-    state.repository.save(&c, 1).await.expect("activate");
+    state.repository.save(&c, 1, 1).await.expect("activate");
     assert_eq!(state.repository.list_active(owner).await.unwrap().len(), 1);
 }
 
@@ -162,6 +168,10 @@ async fn memory_optimistic_lock_rejects_stale_version() {
         api_key_id: Some(Uuid::new_v4()),
         bearer_secret_alias: None,
         interface_db_password_alias: None,
+        interface_probe_db_username: None,
+        interface_probe_db_password_alias: None,
+        interface_probe_db_password_alias_set: false,
+        interface_probe_config_version: 1,
         status: "testing".into(),
         config_version: 1,
         first_activated_at: None,
@@ -176,12 +186,18 @@ async fn memory_optimistic_lock_rejects_stale_version() {
     let mut next = c.clone();
     next.connector_name = "V2".into();
     next.config_version = 2;
-    let err = state.repository.save(&next, 99).await.unwrap_err();
+    let err = state.repository.save(&next, 99, 1).await.unwrap_err();
     assert!(matches!(
         err,
         H8ErpConnectorRepoError::Domain(H8ErpConnectorError::VersionConflict)
     ));
-    state.repository.save(&next, 1).await.unwrap();
+    next.interface_probe_config_version = 2;
+    let probe_err = state.repository.save(&next, 1, 99).await.unwrap_err();
+    assert!(matches!(
+        probe_err,
+        H8ErpConnectorRepoError::Domain(H8ErpConnectorError::ProbeVersionConflict)
+    ));
+    state.repository.save(&next, 1, 1).await.unwrap();
 }
 
 #[tokio::test]
@@ -206,6 +222,10 @@ async fn memory_route_resolve_unique() {
         api_key_id: Some(Uuid::new_v4()),
         bearer_secret_alias: None,
         interface_db_password_alias: None,
+        interface_probe_db_username: None,
+        interface_probe_db_password_alias: None,
+        interface_probe_db_password_alias_set: false,
+        interface_probe_config_version: 1,
         status: "active".into(),
         config_version: 1,
         first_activated_at: Some(now),

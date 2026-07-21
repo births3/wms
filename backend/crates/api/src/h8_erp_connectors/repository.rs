@@ -24,11 +24,12 @@ pub trait H8ErpConnectorRepository: Send + Sync {
         &self,
         connector: &H8ErpConnector,
     ) -> Result<H8ErpConnector, H8ErpConnectorRepoError>;
-    /// AC15：`observed_version` 为加载时的 config_version，用于乐观锁。
+    /// AC15：transport 与 probe 版本都必须匹配加载时版本，用于乐观锁。
     async fn save(
         &self,
         connector: &H8ErpConnector,
         observed_version: i64,
+        observed_probe_version: i64,
     ) -> Result<H8ErpConnector, H8ErpConnectorRepoError>;
     async fn delete(&self, owner_id: Uuid, id: Uuid) -> Result<(), H8ErpConnectorRepoError>;
     async fn list_active(
@@ -121,6 +122,7 @@ impl H8ErpConnectorRepository for MemoryH8ErpConnectorRepository {
         &self,
         connector: &H8ErpConnector,
         observed_version: i64,
+        observed_probe_version: i64,
     ) -> Result<H8ErpConnector, H8ErpConnectorRepoError> {
         let mut guard = self.inner.lock().expect("lock");
         let Some(slot) = guard
@@ -134,6 +136,11 @@ impl H8ErpConnectorRepository for MemoryH8ErpConnectorRepository {
         if slot.config_version != observed_version {
             return Err(H8ErpConnectorRepoError::Domain(
                 H8ErpConnectorError::VersionConflict,
+            ));
+        }
+        if slot.interface_probe_config_version != observed_probe_version {
+            return Err(H8ErpConnectorRepoError::Domain(
+                H8ErpConnectorError::ProbeVersionConflict,
             ));
         }
         *slot = connector.clone();
@@ -294,11 +301,13 @@ impl H8ErpConnectorRepository for PgH8ErpConnectorRepository {
                 id, owner_id, connector_code, connector_name, warehouse_ids, directions,
                 message_types, channel_mode, api_base_url, interface_db_host, interface_db_port,
                 interface_db_name, interface_db_username, api_key_id, bearer_secret_alias,
-                interface_db_password_alias, status, config_version, first_activated_at,
+                interface_db_password_alias, interface_probe_db_username,
+                interface_probe_db_password_alias, interface_probe_config_version,
+                status, config_version, first_activated_at,
                 last_tested_version, last_tested_at, last_tested_succeeded,
                 last_tested_error_summary, created_at, updated_at
             ) VALUES (
-                $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25
+                $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28
             )
             "#,
         )
@@ -318,6 +327,9 @@ impl H8ErpConnectorRepository for PgH8ErpConnectorRepository {
         .bind(connector.api_key_id)
         .bind(&connector.bearer_secret_alias)
         .bind(&connector.interface_db_password_alias)
+        .bind(&connector.interface_probe_db_username)
+        .bind(&connector.interface_probe_db_password_alias)
+        .bind(connector.interface_probe_config_version)
         .bind(&connector.status)
         .bind(connector.config_version)
         .bind(connector.first_activated_at)
@@ -344,6 +356,7 @@ impl H8ErpConnectorRepository for PgH8ErpConnectorRepository {
         &self,
         connector: &H8ErpConnector,
         observed_version: i64,
+        observed_probe_version: i64,
     ) -> Result<H8ErpConnector, H8ErpConnectorRepoError> {
         let result = sqlx::query(
             r#"
@@ -361,15 +374,19 @@ impl H8ErpConnectorRepository for PgH8ErpConnectorRepository {
                 api_key_id = $13,
                 bearer_secret_alias = $14,
                 interface_db_password_alias = $15,
-                status = $16,
-                config_version = $17,
-                first_activated_at = $18,
-                last_tested_version = $19,
-                last_tested_at = $20,
-                last_tested_succeeded = $21,
-                last_tested_error_summary = $22,
-                updated_at = $23
-             WHERE owner_id = $1 AND id = $2 AND config_version = $24
+                interface_probe_db_username = $16,
+                interface_probe_db_password_alias = $17,
+                interface_probe_config_version = $18,
+                status = $19,
+                config_version = $20,
+                first_activated_at = $21,
+                last_tested_version = $22,
+                last_tested_at = $23,
+                last_tested_succeeded = $24,
+                last_tested_error_summary = $25,
+                updated_at = $26
+             WHERE owner_id = $1 AND id = $2 AND config_version = $27
+               AND interface_probe_config_version = $28
             "#,
         )
         .bind(connector.owner_id)
@@ -387,6 +404,9 @@ impl H8ErpConnectorRepository for PgH8ErpConnectorRepository {
         .bind(connector.api_key_id)
         .bind(&connector.bearer_secret_alias)
         .bind(&connector.interface_db_password_alias)
+        .bind(&connector.interface_probe_db_username)
+        .bind(&connector.interface_probe_db_password_alias)
+        .bind(connector.interface_probe_config_version)
         .bind(&connector.status)
         .bind(connector.config_version)
         .bind(connector.first_activated_at)
@@ -396,23 +416,29 @@ impl H8ErpConnectorRepository for PgH8ErpConnectorRepository {
         .bind(&connector.last_tested_error_summary)
         .bind(connector.updated_at)
         .bind(observed_version)
+        .bind(observed_probe_version)
         .execute(&self.pool)
         .await
         .map_err(|e| H8ErpConnectorRepoError::Db(e.to_string()))?;
         if result.rows_affected() == 0 {
             // 区分「不存在」与「版本冲突」
-            let exists: bool = sqlx::query_scalar(
-                "SELECT EXISTS(SELECT 1 FROM h8_erp_connectors WHERE owner_id = $1 AND id = $2)",
+            let versions: Option<(i64, i64)> = sqlx::query_as(
+                "SELECT config_version, interface_probe_config_version FROM h8_erp_connectors WHERE owner_id = $1 AND id = $2",
             )
             .bind(connector.owner_id)
             .bind(connector.id)
-            .fetch_one(&self.pool)
+            .fetch_optional(&self.pool)
             .await
             .map_err(|e| H8ErpConnectorRepoError::Db(e.to_string()))?;
-            return Err(H8ErpConnectorRepoError::Domain(if exists {
-                H8ErpConnectorError::VersionConflict
-            } else {
-                H8ErpConnectorError::NotFound
+            return Err(H8ErpConnectorRepoError::Domain(match versions {
+                Some((config_version, _)) if config_version != observed_version => {
+                    H8ErpConnectorError::VersionConflict
+                }
+                Some((_, probe_version)) if probe_version != observed_probe_version => {
+                    H8ErpConnectorError::ProbeVersionConflict
+                }
+                Some(_) => H8ErpConnectorError::VersionConflict,
+                None => H8ErpConnectorError::NotFound,
             }));
         }
         Ok(connector.clone())

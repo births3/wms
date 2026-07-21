@@ -28,6 +28,7 @@ path = "src/bin/audit_maintenance.rs"
 axum.workspace = true
 bcrypt.workspace = true
 chrono.workspace = true
+deadpool-tiberius-rustls.workspace = true
 hex.workspace = true
 jsonwebtoken.workspace = true
 redis.workspace = true

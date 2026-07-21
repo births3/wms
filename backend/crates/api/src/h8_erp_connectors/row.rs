@@ -22,6 +22,9 @@ pub(crate) struct H8ErpConnectorRow {
     api_key_id: Option<Uuid>,
     bearer_secret_alias: Option<String>,
     interface_db_password_alias: Option<String>,
+    interface_probe_db_username: Option<String>,
+    interface_probe_db_password_alias: Option<String>,
+    interface_probe_config_version: i64,
     status: String,
     config_version: i64,
     first_activated_at: Option<chrono::DateTime<Utc>>,
@@ -52,6 +55,13 @@ impl From<H8ErpConnectorRow> for H8ErpConnector {
             api_key_id: r.api_key_id,
             bearer_secret_alias: r.bearer_secret_alias,
             interface_db_password_alias: r.interface_db_password_alias,
+            interface_probe_db_username: r.interface_probe_db_username,
+            interface_probe_db_password_alias_set: r
+                .interface_probe_db_password_alias
+                .as_deref()
+                .is_some_and(|alias| !alias.trim().is_empty()),
+            interface_probe_db_password_alias: r.interface_probe_db_password_alias,
+            interface_probe_config_version: r.interface_probe_config_version,
             status: r.status,
             config_version: r.config_version,
             first_activated_at: r.first_activated_at,

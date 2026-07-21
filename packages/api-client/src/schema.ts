@@ -1540,6 +1540,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/h8/erp-interface-tables/connectors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_h8_erp_interface_table_connectors"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/h8/erp-interface-tables/rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_h8_erp_interface_table_rows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/h8/erp-interface-tables/rows/{row_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_h8_erp_interface_table_row"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/healthz": {
         parameters: {
             query?: never;
@@ -4730,6 +4778,8 @@ export interface components {
             /** Format: int32 */
             interface_db_port?: number | null;
             interface_db_username?: string | null;
+            interface_probe_db_password_alias?: string | null;
+            interface_probe_db_username?: string | null;
             message_types: string[];
             warehouse_ids: string[];
         };
@@ -5643,7 +5693,10 @@ export interface components {
         };
         H8ErpConnector: {
             api_base_url?: string | null;
-            /** Format: uuid */
+            /**
+             * Format: uuid
+             * @description Worker 传输账号；只用于出入站，不得用于 H8-004 探查。
+             */
             api_key_id?: string | null;
             bearer_secret_alias?: string | null;
             channel_mode: string;
@@ -5664,6 +5717,12 @@ export interface components {
             /** Format: int32 */
             interface_db_port?: number | null;
             interface_db_username?: string | null;
+            /** Format: int64 */
+            interface_probe_config_version: number;
+            /** @description 连接配置响应只返回是否已设置，不返回 alias 内容。 */
+            interface_probe_db_password_alias_set: boolean;
+            /** @description H8-004 只读探查账号，与 Worker 账号和版本独立。 */
+            interface_probe_db_username?: string | null;
             /** Format: date-time */
             last_tested_at?: string | null;
             last_tested_error_summary?: string | null;
@@ -5689,6 +5748,82 @@ export interface components {
             tested_at: string;
             /** Format: int64 */
             tested_version: number;
+        };
+        /** @description 004 页面连接选择器的最小安全投影，不包含任何传输/探查 secret。 */
+        H8ErpInterfaceTableConnectorOption: {
+            channel_mode: string;
+            connector_code: string;
+            connector_name: string;
+            /** Format: uuid */
+            id: string;
+            /** @description 仅表示独立探查账号的用户名与密码 alias 是否成对配置，不暴露 alias 内容。 */
+            probe_credentials_configured: boolean;
+            status: string;
+            warehouse_ids: string[];
+        };
+        H8ErpInterfaceTableDetail: {
+            /** @description 仅返回白名单字段，不返回原始 payload_json。 */
+            fields: components["schemas"]["H8ErpInterfaceTableField"][];
+            row: components["schemas"]["H8ErpInterfaceTableRow"];
+        };
+        H8ErpInterfaceTableField: {
+            key: string;
+            value?: string | null;
+        };
+        H8ErpInterfaceTableListResponse: {
+            items: components["schemas"]["H8ErpInterfaceTableRow"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            page_size: number;
+            /** Format: int64 */
+            total: number;
+        };
+        H8ErpInterfaceTableQuery: {
+            /** Format: uuid */
+            connector_id: string;
+            event_type?: string | null;
+            external_doc_no?: string | null;
+            external_ref?: string | null;
+            idempotency_key?: string | null;
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            page_size: number;
+            source_outbox_id?: string | null;
+            sync_status?: string | null;
+            table_key: string;
+            /** Format: date-time */
+            updated_from: string;
+            /** Format: date-time */
+            updated_to: string;
+            /** Format: uuid */
+            warehouse_id?: string | null;
+            wms_resource_id?: string | null;
+        };
+        H8ErpInterfaceTableRow: {
+            business_key?: string | null;
+            /** Format: uuid */
+            connector_id: string;
+            /** Format: date-time */
+            created_at: string;
+            event_type?: string | null;
+            external_ref?: string | null;
+            idempotency_key?: string | null;
+            last_error?: string | null;
+            /** Format: uuid */
+            owner_id: string;
+            payload_summary: string;
+            /** Format: int32 */
+            retry_count: number;
+            row_id: string;
+            sync_status: string;
+            table_key: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            warehouse_id?: string | null;
+            wms_resource_id?: string | null;
         };
         /** @description 消息主记录 API 视图（脱敏，不含完整报文）。 */
         H8ErpMessage: {
@@ -7857,12 +7992,16 @@ export interface components {
             directions?: string[] | null;
             /** Format: int64 */
             expected_config_version: number;
+            /** Format: int64 */
+            expected_probe_config_version?: number | null;
             interface_db_host?: string | null;
             interface_db_name?: string | null;
             interface_db_password_alias?: string | null;
             /** Format: int32 */
             interface_db_port?: number | null;
             interface_db_username?: string | null;
+            interface_probe_db_password_alias?: string | null;
+            interface_probe_db_username?: string | null;
             message_types?: string[] | null;
             warehouse_ids?: string[] | null;
         };
@@ -13838,6 +13977,202 @@ export interface operations {
             };
             /** @description 运单不存在 */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_h8_erp_interface_table_connectors: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前货主可用于接口表探查的连接最小投影 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H8ErpInterfaceTableConnectorOption"][];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 缺少接口表探查权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_h8_erp_interface_table_rows: {
+        parameters: {
+            query: {
+                /** @description 当前货主的 H8 连接 */
+                connector_id: string;
+                /** @description 受控接口表白名单 */
+                table_key: string;
+                /** @description 当前表允许的同步状态 */
+                sync_status?: string | null;
+                /** @description updated_at 起始时间 */
+                time_from?: string | null;
+                /** @description updated_at 结束时间 */
+                time_to?: string | null;
+                /** @description 仓库精确匹配 */
+                warehouse_id?: string | null;
+                /** @description 入站外部单号精确匹配 */
+                external_doc_no?: string | null;
+                /** @description 出站 outbox ID 精确匹配 */
+                source_outbox_id?: string | null;
+                /** @description 出站事件类型精确匹配 */
+                event_type?: string | null;
+                /** @description 外部引用精确匹配 */
+                external_ref?: string | null;
+                /** @description WMS 资源 ID 精确匹配 */
+                wms_resource_id?: string | null;
+                /** @description 幂等键精确匹配 */
+                idempotency_key?: string | null;
+                /** @description 页码 */
+                page?: number | null;
+                /** @description 每页 1..=100 */
+                page_size?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 接口表只读行列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H8ErpInterfaceTableListResponse"];
+                };
+            };
+            /** @description 表名/过滤条件非法 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限或数据范围不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 探查凭据未配置 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_h8_erp_interface_table_row: {
+        parameters: {
+            query: {
+                /** @description 当前货主的 H8 连接 */
+                connector_id: string;
+                /** @description 受控接口表白名单 */
+                table_key: string;
+            };
+            header?: never;
+            path: {
+                /** @description 接口表行 ID */
+                row_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 接口表只读行详情 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H8ErpInterfaceTableDetail"];
+                };
+            };
+            /** @description 联合身份参数缺失 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限或数据范围不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 行不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 探查凭据未配置 */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

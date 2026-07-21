@@ -107,6 +107,11 @@ fn domain_error(err: H8ErpConnectorError) -> (StatusCode, &'static str, String) 
             "H8-409",
             "idempotency key reuse with different payload".into(),
         ),
+        H8ErpConnectorError::ProbeVersionConflict => (
+            StatusCode::CONFLICT,
+            "H8-409",
+            "probe credential config_version conflict".into(),
+        ),
         other => (StatusCode::BAD_REQUEST, "H8-400", format!("{other:?}")),
     }
 }

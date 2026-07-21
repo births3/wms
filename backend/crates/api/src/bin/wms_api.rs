@@ -32,6 +32,7 @@ use wms_api::{
     feature_flags::FeatureFlagRegistry,
     h2_lifecycle_handlers::{h2_lifecycle_router, H2LifecycleAppState},
     h8_erp_connectors::{h8_erp_connector_router, H8ErpConnectorAppState},
+    h8_erp_interface_tables::{h8_erp_interface_table_router, H8ErpInterfaceTableAppState},
     h8_erp_messages::{h8_erp_message_router, H8ErpMessageAppState},
     inventory_status_config_handlers::{
         inventory_status_config_router, InventoryStatusConfigAppState,
@@ -261,6 +262,7 @@ fn app(
         }
         None => DualPersonPolicyAppState::with_postgres(shared_pool.clone()),
     };
+    let h8_connector_state = H8ErpConnectorAppState::with_postgres(shared_pool.clone());
     Router::new()
         .route("/healthz", get(healthz))
         .route("/readyz", get(healthz))
@@ -282,8 +284,12 @@ fn app(
         .merge(audit_query_router(audit_query_state))
         .merge(h2_lifecycle_router(h2_lifecycle_state))
         .merge(config_center_router(config_center_state))
-        .merge(h8_erp_connector_router(
-            H8ErpConnectorAppState::with_postgres(shared_pool.clone()),
+        .merge(h8_erp_connector_router(h8_connector_state.clone()))
+        .merge(h8_erp_interface_table_router(
+            H8ErpInterfaceTableAppState::with_postgres(
+                shared_pool.clone(),
+                h8_connector_state.repository.clone(),
+            ),
         ))
         .merge(h8_erp_message_router(H8ErpMessageAppState::with_postgres(
             shared_pool.clone(),

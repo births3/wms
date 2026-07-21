@@ -27,15 +27,29 @@ pub(crate) async fn run_connection_probe(connector: &H8ErpConnector) -> (bool, O
                 }
             }
             if connector.channel_mode == "rest_primary_table_fallback" {
-                if let Err(msg) = crate::secrets::resolve_secret_alias_for_probe(
-                    connector.interface_db_password_alias.as_deref(),
-                ) {
-                    // 主备模式备用通道凭据也需可解析（字段未配时允许仅 REST 探测）
-                    if connector
-                        .interface_db_host
+                if connector
+                    .interface_db_host
+                    .as_deref()
+                    .is_some_and(|s| !s.is_empty())
+                    && (connector
+                        .interface_probe_db_username
                         .as_deref()
-                        .is_some_and(|s| !s.is_empty())
-                    {
+                        .is_none_or(|s| s.trim().is_empty())
+                        || connector
+                            .interface_probe_db_password_alias
+                            .as_deref()
+                            .is_none_or(|s| s.trim().is_empty()))
+                {
+                    return (false, Some("H8_PROBE_CREDENTIAL_NOT_CONFIGURED".into()));
+                }
+                if connector
+                    .interface_db_host
+                    .as_deref()
+                    .is_some_and(|s| !s.is_empty())
+                {
+                    if let Err(msg) = crate::secrets::resolve_secret_alias_for_probe(
+                        connector.interface_probe_db_password_alias.as_deref(),
+                    ) {
                         return (false, Some(format!("fallback interface secret: {msg}")));
                     }
                 }
@@ -62,8 +76,19 @@ pub(crate) async fn run_connection_probe(connector: &H8ErpConnector) -> (bool, O
             {
                 return (false, Some("interface table fields incomplete".into()));
             }
+            if connector
+                .interface_probe_db_username
+                .as_deref()
+                .is_none_or(|s| s.trim().is_empty())
+                || connector
+                    .interface_probe_db_password_alias
+                    .as_deref()
+                    .is_none_or(|s| s.trim().is_empty())
+            {
+                return (false, Some("H8_PROBE_CREDENTIAL_NOT_CONFIGURED".into()));
+            }
             if let Err(msg) = crate::secrets::resolve_secret_alias_for_probe(
-                connector.interface_db_password_alias.as_deref(),
+                connector.interface_probe_db_password_alias.as_deref(),
             ) {
                 return (false, Some(msg));
             }
