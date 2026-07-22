@@ -450,6 +450,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | 2026-07-23 | 三十四轮库存状态路由身份 | 库存状态变更在同一 PostgreSQL 事务内从批次库位解析货主内仓库，并把 `warehouse_id` 写入 outbox canonical 载荷；真实 M3 PostgreSQL 测试回读验证。历史异常批次无法解析库位时不阻断库存事务，但仓库范围 Worker 不会认领该 outbox。当前有业务生产者的入库完成、库存状态和报损报溢三类均携带仓库身份；档案补录、对账差异、发货确认和库存快照四类仍只有 outbox 基础表、没有业务生产者，不能用测试数据冒充完成，AC4 保持 `NEEDS_WORK`。 |
 | 2026-07-23 | 三十五轮入站 canonical 边界 | 接口表适配器读取的五类 MSSQL 行统一转换为 `H8CanonicalInboundCommand`，连接、配置版本、幂等键、关联标识、发生时间和业务字段在 `convert` 阶段收口；业务 API handler 不再接收接口表 DTO。数量和时间在边界完成类型规整，未知储存条件和缺失销退批号以 422 类不可重试映射错误终止。Worker 全套纯逻辑回归通过，AC2 关闭；真实 M-PM 规则查询仍由 AC5 跟踪。 |
 | 2026-07-23 | 三十六轮五类入站 L11 | 复用既有 M2/M4/M1 PostgreSQL 幂等机制，新增销退申请、出库订单和商品变更逐类回归，并与既有 ASN、商品主数据创建证据合并。五类均证明同一 Idempotency-Key 重放返回原资源，业务行、明细、审计及幂等记录不重复；AC7 仍等待七类出站、主备降级和业务回执重复证据。 |
+| 2026-07-23 | 三十七轮已有出站生产者 L11 | 增强入库完成、库存状态、报损和报溢四条既有 PostgreSQL 回归：同键重放后业务副作用、outbox、对应 H2 审计和幂等记录均各一条，outbox 保留仓库身份。当前证明三类已有出站生产者；档案补录、对账差异、发货确认和库存快照尚无业务生产者，AC7 保持 `NEEDS_WORK`。 |
 
 ## 验收记录（US-H8-004 软件切片）
 
@@ -557,7 +558,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | AC-4 出站链路 | `V1/V2` | H8-WORKER、H8-LOCAL、M2-PUTAWAY-PG、M3-STATUS-PG | Worker 不再读取全局首条连接；认领先按绑定连接货主/目录/仓库收窄，逐消息调用 `route-resolve`，校验 Worker 连接并把连接编码、配置版本和主通道写入生命周期；现有生产者中的入库完成、库存状态和报损报溢载荷均携带仓库标识 | `NEEDS_WORK` | 接通档案补录、对账差异、发货确认、库存快照四类业务生产者，并取得七类逐类双通道 L2–L4/L11 与真实运行证据 |
 | AC-5 字段规整 | `V1` | H8-DOMAIN、H8-WORKER、代码路径复审 | `apply_mpm_normalize` 有 domain 单测；Worker 已在业务 API 前以 422 拒绝未知 `storage_condition`，且测试证明不发生静默 `normal` 写入 | `NEEDS_WORK` | Worker 接入实际 M-PM 规则查询与有效映射，并补真实数据回读 |
 | AC-6 配置版本绑定 | `V1/V2` | H8-DOMAIN、H8-WORKER、H8-U2、H8-MSG-U3 | 首次处理写入完整绑定；生命周期端点拒绝绑定切换；PostgreSQL 自动保存不可变版本快照并拒绝无版本变更；Worker 重试读取原绑定和历史配置；人工重放桥使用原 Idempotency-Key 恢复接口行并立即接管 `replay:*` 消息，真实 PostgreSQL 已验证筛选与认领 | `NEEDS_WORK` | 在 Docker MSSQL + 真实 WMS API 上证明 `failed/dead → replay → pending → processing → success` 且复用原绑定 |
-| AC-7 幂等语义 | `V1/V2` | H8-DOMAIN、H8-ASN-V2、H8-INBOUND-L11 | ASN、销退申请、出库订单、商品主数据和商品变更五类均以真实 PostgreSQL 证明同键返回原资源且业务/明细/审计/幂等记录不重复 | `NEEDS_WORK` | 补齐七类出站、主备降级与业务回执重复的 L11 证据 |
+| AC-7 幂等语义 | `V1/V2` | H8-DOMAIN、H8-ASN-V2、H8-INBOUND-L11、H8-OUTBOUND-L11 | 五类入站均证明同键返回原资源且业务/明细/审计/幂等记录不重复；入库完成、库存状态、报损报溢三类已有出站生产者均证明同键重放仅产生一份业务副作用、outbox、对应 H2 审计和幂等记录 | `NEEDS_WORK` | 补档案补录、对账差异、发货确认、库存快照四类出站生产者，以及主备降级与业务回执重复的 L11 证据 |
 | AC-8 投递保证 | `V1` | H8-WORKER | `scripts/h8_erp_interface_sync/test_h8_sync_worker.py` 的 failover/circuit 测试证明成功路径不双写且切换保留业务键 | `PASS` | - |
 | AC-9 错误分类 | `V1` | H8-DOMAIN、H8-WORKER | Worker 已将网络/408/425/429/5xx 识别为可重试，其余错误直接死信；ASN、出库订单、商品主数据、销退申请和商品变更五类处理器均有 503/422 分类与凭据脱敏测试 | `PASS` | - |
 | AC-10 货主仓隔离 | `V1` | H8-DOMAIN、H8-WORKER、H8-U2 | 当前货主 active 连接和仓库白名单参与唯一路由；`route-resolve` 已默认采用 `AuthContext.warehouse_scope` 并以 HTTP 403 拒绝显式越权仓库 | `NEEDS_WORK` | JWT 用户会话仍需从公共用户仓库授权模型解析多仓范围，并接入 Worker 调用身份 |
@@ -575,6 +576,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 - V2（M2-PUTAWAY-PG）：`cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_smart_putaway_postgres smart_putaway_recommends_and_commits_owner_scoped_inventory_atomically -- --exact --test-threads=1`
 - V2（M3-STATUS-PG）：`cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_ops_closeout_postgres status_change_enqueues_erp_outbox_and_process_succeeds -- --exact --test-threads=1`
 - V2（H8-INBOUND-L11）：分别运行 `master_data_postgres h8_product_change_replays_without_duplicate_update_or_audit`、`m2_deferred_closeout_postgres_part2 h8_sales_return_create_replays_without_duplicate_order_or_audit`、`wave4_wave_planning_postgres h8_outbound_order_create_replays_without_duplicate_lines` 三条精确 PostgreSQL 测试；ASN 与商品创建复用各自现有 L11 回归
+- V2（H8-OUTBOUND-L11）：运行 M2 上架、M3 库存状态、M-SA 报损和报溢四条精确 PostgreSQL 测试，断言同键重放不重复业务副作用、outbox、对应 H2 审计或幂等记录
 - V2（H8-MSG-PG）：`cargo test --manifest-path backend/Cargo.toml -p wms-api --lib h8_erp_messages::`，覆盖真实 PostgreSQL 重放筛选和 Worker 即时接管
 - V2（H8-ASN-V2）：按 `docs/runbooks/h8-erp-interface-table-sync.md` 的 ASN 入站闭环执行；证据为 `docs/retros/h8-asn-inbound-flow-evidence.json`
 - V2（H8-LOCAL）：`just h8-local-integration`；证据为 `docs/retros/h8-local-integration-evidence.json`
@@ -583,7 +585,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 
 ### 验收结论
 
-- 已证明：受控目录与纯 domain 规则；五类接口表 DTO 统一经过 canonical 转换后才进入业务 API handler，且五类业务 API 均有真实 PostgreSQL 同键重放证据；Worker 入站唯一路由、首次配置绑定、历史配置快照读取、重试主动复用原绑定、人工重放桥的原键恢复与 PostgreSQL 即时接管、绑定切换拒绝、契约版本拒绝、错误重试分类、凭据脱敏和未知储存条件写入前拒绝；`route-resolve` 对已注入单仓范围的默认绑定与越权拒绝；ASN 接口表入站 V2、幂等回放和 H2 生命周期审计；出站认领的连接货主/目录/仓库收窄、逐消息唯一路由，以及入库完成、库存状态、报损报溢三类现有生产者的仓库身份；本地出站主备与非双写切片。
+- 已证明：受控目录与纯 domain 规则；五类接口表 DTO 统一经过 canonical 转换后才进入业务 API handler，且五类业务 API 均有真实 PostgreSQL 同键重放证据；Worker 入站唯一路由、首次配置绑定、历史配置快照读取、重试主动复用原绑定、人工重放桥的原键恢复与 PostgreSQL 即时接管、绑定切换拒绝、契约版本拒绝、错误重试分类、凭据脱敏和未知储存条件写入前拒绝；`route-resolve` 对已注入单仓范围的默认绑定与越权拒绝；ASN 接口表入站 V2、幂等回放和 H2 生命周期审计；出站认领的连接货主/目录/仓库收窄、逐消息唯一路由，以及入库完成、库存状态、报损报溢三类现有生产者的仓库身份和 L11；本地出站主备与非双写切片。
 - 未完成：真实 M-PM 规则查询与映射、人工重放桥真实 MSSQL 运行证据、JWT 用户多仓范围、档案补录/对账差异/发货确认/库存快照四类业务生产者与真实唯一路由证据，以及其余消息类型 L2–L4/L11 和客户正式 ERP V4。
 - 恢复条件：完成上述运行接线和逐消息证据后，再使用客户正式 ERP dev/staging 跑双向请求、回执、重试和审计关联；完成前保持 `deferred_stories`。
 
@@ -632,6 +634,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | H8-WORKER | `python3 -m unittest test_exchange_lifecycle test_h8_sync_worker test_inbound_canonical -v`（在 `scripts/h8_erp_interface_sync`） |
 | H8-CANONICAL | `python3 -m unittest test_inbound_canonical -v`（在 `scripts/h8_erp_interface_sync`） |
 | H8-INBOUND-L11 | 三条精确 PostgreSQL 测试：`master_data_postgres h8_product_change_replays_without_duplicate_update_or_audit`、`m2_deferred_closeout_postgres_part2 h8_sales_return_create_replays_without_duplicate_order_or_audit`、`wave4_wave_planning_postgres h8_outbound_order_create_replays_without_duplicate_lines` |
+| H8-OUTBOUND-L11 | M2 上架、M3 库存状态、M-SA 报损与报溢四条精确 PostgreSQL 测试 |
 | H8-MSG-PG | `cargo test --manifest-path backend/Cargo.toml -p wms-api --lib h8_erp_messages::pg_repository_tests` |
 | H8-WEB-TYPE | `pnpm --dir apps/web-admin exec tsc --noEmit` |
 | H8-MSG-E2E | `pnpm --dir prototypes exec playwright test --config=playwright-web-admin-h8-messages-config.ts` |
