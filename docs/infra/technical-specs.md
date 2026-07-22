@@ -163,8 +163,8 @@ US-H8-002 的 5 类入站和 7 类出站均保持双通道能力。交付按入�
 |----|------|
 | Compose | `deploy/docker-compose.h8-erp-if.yml`（MSSQL 模拟 ERP 接口库） |
 | 入站表 | `if_in_asn` / `if_in_outbound_order` / `if_in_product_master` / `if_in_return_order` / `if_in_product_change` |
-| 出站表 | `if_out_message`（通道 B）；通道 A 为 HTTP 回调（`ERP_CALLBACK_BASE` + path） |
-| Worker | `sync_worker.py`：`--direction` + `--transport table\|http\|both`；`both` 仅用于本地双通道联调，不是生产路由模式 |
+| 出站表 | `if_out_message`（通道 B）；通道 A 为 HTTP 回调（连接 `api_base_url` + path） |
+| Worker | `sync_worker.py`：`--direction`；出站逐消息按货主、仓库、方向、消息类型调用 `route-resolve`，连接 `channel_mode` 决定 REST / 接口表 / 主备，禁止命令行覆盖生产路由 |
 | 出站源 | putaway / inventory_status / stock_adjustment / **archive_revision** / **reconciliation** / **shipment_confirm** / **inventory_snapshot** outbox |
 | 通道 A Mock | `channel_a_callback_mock.py`；确认工具 `ack_if_out.py` |
 | Runbook | `docs/runbooks/h8-erp-interface-table-sync.md` |

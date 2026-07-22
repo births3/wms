@@ -40,14 +40,11 @@ export WMS_ENCRYPTION_KEY_VERSION='v2' # 可选，默认 v1
 # 轮换期按版本提供尚未到期的旧密钥；值由 Secret 管理器注入，禁止写入文件或日志
 export WMS_ENCRYPTION_PREVIOUS_MASTER_KEYS='{"v1":"至少 32 字节的旧主密钥"}'
 
-# 出站传输：生产使用 table | http；both 只用于本地双写联调
-export H8_OUTBOUND_TRANSPORT=table
-# 通道 A 回调根 URL（transport=http；本地 both 联调也需要）
-export ERP_CALLBACK_BASE=http://127.0.0.1:18091
-# both 仅本地联调：H8_ALLOW_LOCAL_DUAL_TRANSPORT=1
-# 生产 channel_mode 见 US-H8-001（rest_primary_table_fallback=主备降级，非双写）
-# 主备：H8_CHANNEL_MODE=rest_primary_table_fallback 或 H8_OUTBOUND_TRANSPORT=failover
-#       REST 连续失败（H8_HTTP_MAX_ATTEMPTS，默认 2）后写入 if_out_message，不双写
+# 出站生产路由来自 H8 ERP 连接配置：channel_mode + api_base_url。
+# Worker 不接受 --transport，也不读取全局首条 active 连接；每条 outbox 按
+# 货主、可用 warehouse_id、outbound 和 message_type 调 route-resolve。
+# rest_primary_table_fallback：REST 连续失败（H8_HTTP_MAX_ATTEMPTS，默认 2）后
+# 以同一 Idempotency-Key 写入 if_out_message，不双写。
 ```
 
 权限：`m2.write`、`m4.write`、商品写；缺 `m4.write` 跑 `202607180004_m4_write_permission.sql` 后重登。
@@ -98,16 +95,16 @@ Worker 启动后向「H8 ERP 消息 / Worker 状态」上报实例、版本、�
 # 双向 + 接口表出站
 python3 scripts/h8_erp_interface_sync/sync_worker.py --once
 
-# 仅通道 A 出站
+# 连接配置为 REST 后仅跑出站
 python3 scripts/h8_erp_interface_sync/channel_a_callback_mock.py --port 18091 &
-export ERP_CALLBACK_BASE=http://127.0.0.1:18091
-python3 scripts/h8_erp_interface_sync/sync_worker.py --once --direction out --transport http
+# 在 H8 ERP 连接中配置 api_base_url=http://127.0.0.1:18091
+python3 scripts/h8_erp_interface_sync/sync_worker.py --once --direction out
 
 # 入站指定类型
 python3 scripts/h8_erp_interface_sync/sync_worker.py --once --direction in --types product_change
 ```
 
-单测：`cd scripts/h8_erp_interface_sync && python3 -m unittest test_h8_sync_worker -v`
+单测：`cd scripts/h8_erp_interface_sync && python3 -m unittest test_h8_sync_worker test_exchange_lifecycle test_outbound_routing -v`
 
 ### ASN 入站闭环样本
 
