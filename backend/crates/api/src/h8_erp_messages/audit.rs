@@ -8,7 +8,7 @@ use wms_domain::{
 };
 
 use crate::{
-    audit::{append_event, AuditDiff, AuditEventRecord, AuditWriteRequest},
+    audit::{append_event, AuditDiff, AuditError, AuditWriteRequest},
     auth::AuthContext,
 };
 
@@ -21,7 +21,7 @@ pub(crate) async fn write_message_audit(
     action: &str,
     message: &H8ErpMessage,
     result: &str,
-) {
+) -> Result<(), AuditError> {
     let after = message_audit_summary(
         action,
         message.id,
@@ -44,14 +44,12 @@ pub(crate) async fn write_message_audit(
         Some(AuditDiff::compute(serde_json::Value::Null, after)),
     );
     req.occurred_at = Utc::now();
-    // 始终写入可观测 sink（软件路径验收）
+    persist_audit(state.audit_pool.as_ref(), &req).await?;
     {
         let mut log = state.audit_log.lock().expect("audit log");
-        log.append_event(req.clone());
+        log.append_event(req);
     }
-    if let Some(pool) = &state.audit_pool {
-        let _ = append_event(pool, &req).await;
-    }
+    Ok(())
 }
 
 pub(crate) async fn write_owner_audit(
@@ -59,7 +57,7 @@ pub(crate) async fn write_owner_audit(
     ctx: &AuthContext,
     action: &str,
     after: serde_json::Value,
-) {
+) -> Result<(), AuditError> {
     let mut req = AuditWriteRequest::from_auth_context(
         ctx,
         action,
@@ -69,13 +67,22 @@ pub(crate) async fn write_owner_audit(
         Some(AuditDiff::compute(serde_json::Value::Null, after)),
     );
     req.occurred_at = Utc::now();
+    persist_audit(state.audit_pool.as_ref(), &req).await?;
     {
         let mut log = state.audit_log.lock().expect("audit log");
-        log.append_event(req.clone());
+        log.append_event(req);
     }
-    if let Some(pool) = &state.audit_pool {
-        let _ = append_event(pool, &req).await;
+    Ok(())
+}
+
+async fn persist_audit(
+    pool: Option<&sqlx::PgPool>,
+    request: &AuditWriteRequest,
+) -> Result<(), AuditError> {
+    if let Some(pool) = pool {
+        append_event(pool, request).await?;
     }
+    Ok(())
 }
 
 /// US-H8-003 AC6：进入 dead 时写 H2。
@@ -83,8 +90,8 @@ pub(crate) async fn write_dead_entry_audit(
     state: &H8ErpMessageAppState,
     ctx: &AuthContext,
     message: &H8ErpMessage,
-) {
-    write_message_audit(state, ctx, H8_MESSAGE_DEAD_AUDIT_ACTION, message, "dead").await;
+) -> Result<(), AuditError> {
+    write_message_audit(state, ctx, H8_MESSAGE_DEAD_AUDIT_ACTION, message, "dead").await
 }
 
 /// US-H8-002 AC11：交换生命周期阶段审计。
@@ -101,14 +108,51 @@ pub(crate) async fn write_exchange_lifecycle_audit(
         ));
     }
     let action = format!("h8_exchange_{stage}");
-    write_message_audit(state, ctx, &action, message, result).await;
+    write_message_audit(state, ctx, &action, message, result).await?;
     Ok(())
 }
 
+#[cfg(test)]
 pub(crate) fn snapshot_audit_actions(state: &H8ErpMessageAppState) -> Vec<String> {
     let log = state.audit_log.lock().expect("audit log");
     log.events()
         .iter()
-        .map(|e: &AuditEventRecord| e.action.clone())
+        .map(|event| event.action.clone())
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use sqlx::postgres::PgPoolOptions;
+    use uuid::Uuid;
+
+    use super::*;
+    use crate::auth::AuthContext;
+
+    #[tokio::test]
+    async fn persistent_audit_failure_is_not_swallowed() {
+        let pool = PgPoolOptions::new()
+            .acquire_timeout(Duration::from_millis(50))
+            .connect_lazy("postgres://wms:wms@127.0.0.1:1/wms")
+            .expect("lazy pool");
+        let context = AuthContext {
+            user_id: Uuid::new_v4(),
+            owner_id: Uuid::new_v4(),
+            actor_name: "audit-test".into(),
+            permissions: vec![],
+            jti: "audit-test".into(),
+            warehouse_scope: None,
+        };
+        let request = AuditWriteRequest::from_auth_context(
+            &context,
+            "h8_payload_decrypt",
+            "H8",
+            "h8_erp_message",
+            "payload-test",
+            None,
+        );
+        assert!(persist_audit(Some(&pool), &request).await.is_err());
+    }
 }
