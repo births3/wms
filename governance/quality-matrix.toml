@@ -4626,9 +4626,9 @@ evidence_refs = [
   "artifacts/screenshot-portal/real-web/h8-erp-messages/payload-retention.png",
   "artifacts/screenshot-portal/real-web/h8-erp-messages/payload-decrypted.png",
 ]
-reason = "消息/尝试存储、两级回执、claim 租约、服务端精确高级查询、created_at+id 稳定游标分页、按连接/通道/消息类型统计及 P95、Worker 心跳健康、暂停恢复、权限审计、完整报文短期加密保留/授权解密/no-store/到期清理，以及本地 Docker MSSQL 死信/人工重放状态闭环均有真实 PostgreSQL 或关闭 dev-mock 的浏览器证据；仍缺普通 Worker 成功/可重试失败的独立 attempt 与 next_retry_at、JWT 仓库范围接线、生产约定数据量 P95、生产 RANGE 月分区和自研 ERP 故障恢复 S4。"
+reason = "消息/尝试存储、两级回执、claim 租约、普通 Worker 成功/失败完成尝试、服务端精确高级查询、created_at+id 稳定游标分页、按连接/通道/消息类型统计及 P95、Worker 心跳健康、暂停恢复、权限审计、完整报文短期加密保留/授权解密/no-store/到期清理，以及本地 Docker MSSQL 死信/人工重放状态闭环均有真实 PostgreSQL 或关闭 dev-mock 的浏览器证据；仍缺按 ADR-0018 持久化 next_retry_at、JWT 仓库范围接线、生产约定数据量 P95、生产 RANGE 月分区和自研 ERP 故障恢复 S4。"
 owner = "H8 模块负责人"
-resume_when = "补普通 Worker 成功/可重试失败 attempt 与 next_retry_at、JWT 仓库范围和生产约定数据量 P95，生产库切换 RANGE 月分区并验证保留清理性能，再补自研 ERP dev/staging 的超时、死信、重放、回执和 H2 审计关联后关闭延期。"
+resume_when = "补按 ADR-0018 持久化 next_retry_at、JWT 仓库范围和生产约定数据量 P95，生产库切换 RANGE 月分区并验证保留清理性能，再补自研 ERP dev/staging 的超时、死信、重放、回执和 H2 审计关联后关闭延期。"
 
 [[stories]]
 id = "US-H8-004"

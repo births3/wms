@@ -452,6 +452,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | 2026-07-23 | 三十六轮五类入站 L11 | 复用既有 M2/M4/M1 PostgreSQL 幂等机制，新增销退申请、出库订单和商品变更逐类回归，并与既有 ASN、商品主数据创建证据合并。五类均证明同一 Idempotency-Key 重放返回原资源，业务行、明细、审计及幂等记录不重复；AC7 仍等待七类出站、主备降级和业务回执重复证据。 |
 | 2026-07-23 | 三十七轮已有出站生产者 L11 | 增强入库完成、库存状态、报损和报溢四条既有 PostgreSQL 回归：同键重放后业务副作用、outbox、对应 H2 审计和幂等记录均各一条，outbox 保留仓库身份。当前证明三类已有出站生产者；档案补录、对账差异、发货确认和库存快照尚无业务生产者，AC7 保持 `NEEDS_WORK`。 |
 | 2026-07-23 | 三十八轮人工重放真实链路 | 修复 lifecycle 只写审计、不更新消息状态的问题；入站失败、自动重试和成功现按 domain 状态机落 `failed/processing/succeeded`。Worker 在不可重试或耗尽时先经既有 dead API 写 H8 死信与 H2，再把 MSSQL 行置 dead；H8 终态同步失败则释放接口行重试。Docker MSSQL + 当前源码 API 已证明同一消息、原 Idempotency-Key 和原连接版本完成 `dead → replay → processing → succeeded`，M2 仅一张单据。AC6 关闭；复审确认普通成功/可重试失败仍缺独立 attempt 与 `next_retry_at`，US-H8-003 AC5 更正为 `PARTIAL`；客户 ERP V4 仍未完成。 |
+| 2026-07-23 | 三十九轮 Worker 尝试记录 | 生命周期仓储在 `failed/succeeded` 时与消息状态同事务追加完成尝试，记录通道、起止时间、递增序号、结果、执行者和脱敏错误；内存与真实 PostgreSQL 路径均有回归。US-H8-003 AC5 仍为 `PARTIAL`，剩余缺口收窄为按 ADR-0018 计算并持久化 `next_retry_at`。 |
 
 ## 验收记录（US-H8-004 软件切片）
 
@@ -610,7 +611,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | AC2 存储边界 | `PASS` | messages + attempts 表 |
 | AC3 状态机 | `PASS` | domain + 测试 |
 | AC4 并发认领 | `PASS` | claim/lease API + 测试 |
-| AC5 失败重试记录 | `PARTIAL` | claim/dead/replay 已追加 attempts；真实 Worker 普通成功和可重试失败尚未追加独立 attempt，也未落 `next_retry_at` |
+| AC5 失败重试记录 | `PARTIAL` | claim/dead/replay 及真实 Worker 的普通成功/失败均追加 attempts；失败消息尚未按 ADR-0018 落 `next_retry_at` |
 | AC6 死信条件 | `PASS` | should_enter_dead + mark_dead + h8_message_dead H2 审计 |
 | AC7 人工重放 | `PASS` | API + E2E + 不换业务 id |
 | AC8 查询详情 | `PASS` | QueryPanel 的连接、仓库、通道、外部业务标识、幂等键、关联标识和时间范围均进入服务端精确过滤；真实 PostgreSQL 与关闭 dev-mock 的 Playwright 复用确定性业务键 |
