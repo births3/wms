@@ -540,8 +540,16 @@ class TestInboundCorePipeline(unittest.TestCase):
                 "2026-07-22T09:59:00",
             ]
         )
-        with patch("worker_mssql.sqlcmd_query", return_value=raw):
+        with patch("worker_mssql.sqlcmd_query", return_value=raw) as query:
             rows = claim_rows(settings(), "if_in_asn")
+        sql = query.call_args.args[1]
+        self.assertIn("DATEADD(MILLISECOND", sql)
+        self.assertIn("retry_count = 1 THEN 1000", sql)
+        self.assertIn("retry_count = 4 THEN 8000", sql)
+        self.assertIn("ELSE 16000", sql)
+        self.assertIn("UNICODE(LEFT(idempotency_key, 1))", sql)
+        self.assertIn("% 4001", sql)
+        self.assertIn("last_error IS NULL", sql)
         self.assertEqual(rows[0]["external_doc_no"], "ASN-1")
         self.assertEqual(rows[0]["schema_version"], "1")
         self.assertEqual(rows[0]["created_at"], "2026-07-22T09:59:00")

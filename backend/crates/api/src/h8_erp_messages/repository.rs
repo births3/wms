@@ -8,8 +8,8 @@ use std::sync::Mutex;
 use uuid::Uuid;
 use wms_domain::{
     can_claim_message, can_replay_message, can_transition_message_status, estimate_p95_latency_ms,
-    may_auto_purge, sanitize_error_summary, H8ErpMessage, H8ErpMessageAttempt, H8ErpMessageStats,
-    H8MessageError,
+    may_auto_purge, sanitize_error_summary, standard_retry_delay_millis, H8ErpMessage,
+    H8ErpMessageAttempt, H8ErpMessageStats, H8MessageError,
 };
 
 use super::error::H8ErpMessageRepoError;
@@ -327,6 +327,7 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
             .unwrap_or(1);
         let mut next = msg;
         next.sync_status = "processing".into();
+        next.next_retry_at = None;
         next.claimed_by = Some(format!("replay:{actor}"));
         next.lease_expires_at = Some(now + chrono::Duration::minutes(5));
         next.updated_at = now;
@@ -388,6 +389,7 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
             .map_err(H8ErpMessageRepoError::Domain)?;
         let mut next = msg;
         next.sync_status = "processing".into();
+        next.next_retry_at = None;
         next.claimed_by = Some(worker_id.to_string());
         next.lease_expires_at = Some(now + chrono::Duration::seconds(lease_seconds.max(1)));
         next.updated_at = now;
@@ -437,6 +439,7 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
         let mut next = msg;
         let prev = next.sync_status.clone();
         next.sync_status = "dead".into();
+        next.next_retry_at = None;
         next.last_error_summary = Some(sanitize_error_summary(error_summary));
         next.updated_at = now;
         next.completed_at = Some(now);
@@ -490,6 +493,12 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
             let started_at = message.updated_at;
             message.sync_status = target.into();
             message.retry_count += i32::from(target == "failed");
+            message.next_retry_at = (target == "failed").then(|| {
+                now + chrono::Duration::milliseconds(standard_retry_delay_millis(
+                    message.retry_count,
+                    &message.idempotency_key,
+                ))
+            });
             message.last_error_summary = error_summary.map(sanitize_error_summary);
             message.claimed_by = (target == "processing").then(|| actor.to_string());
             message.lease_expires_at =

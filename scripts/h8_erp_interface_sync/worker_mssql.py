@@ -64,6 +64,23 @@ DECLARE @claimed TABLE (id UNIQUEIDENTIFIER);
   SELECT TOP ({int(settings.batch_size)}) id
     FROM dbo.{{table}} WITH (ROWLOCK, READPAST)
    WHERE sync_status = N'pending'
+     AND (
+       retry_count = 0
+       OR last_error IS NULL
+       OR DATEADD(MILLISECOND,
+            (CASE
+              WHEN retry_count = 1 THEN 1000
+              WHEN retry_count = 2 THEN 2000
+              WHEN retry_count = 3 THEN 4000
+              WHEN retry_count = 4 THEN 8000
+              ELSE 16000
+            END * (8000 + (
+              UNICODE(LEFT(idempotency_key, 1)) * 31
+              + UNICODE(RIGHT(idempotency_key, 1)) * 17
+              + LEN(idempotency_key)
+            ) % 4001)) / 10000,
+            updated_at) <= SYSUTCDATETIME()
+     )
    ORDER BY updated_at ASC
 )
 UPDATE t

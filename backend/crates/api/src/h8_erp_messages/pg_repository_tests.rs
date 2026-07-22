@@ -8,7 +8,7 @@ use chrono::{DateTime, Duration, Utc};
 use sqlx::PgPool;
 use tower::ServiceExt;
 use uuid::Uuid;
-use wms_domain::H8ErpMessageListResponse;
+use wms_domain::{standard_retry_delay_millis, H8ErpMessageListResponse};
 
 use crate::auth::AuthContext;
 
@@ -127,9 +127,10 @@ async fn replay_marker_can_be_claimed_immediately_in_postgres(pool: PgPool) {
         r#"INSERT INTO h8_erp_messages
            (id, owner_id, connector_id, connector_code, direction, message_type, schema_version,
             channel, external_ref, idempotency_key, correlation_id, sync_status,
-            retry_count, payload_digest)
+            retry_count, next_retry_at, payload_digest)
            VALUES ($1,$2,$3,'SELF-ERP','inbound','asn','1','interface_table',
-                   'ERP-REPLAY-1','idem-replay-1','corr-replay-1','failed',1,'digest')"#,
+                   'ERP-REPLAY-1','idem-replay-1','corr-replay-1','failed',1,
+                   now() + interval '1 hour','digest')"#,
     )
     .bind(message_id)
     .bind(owner_id)
@@ -167,6 +168,7 @@ async fn replay_marker_can_be_claimed_immediately_in_postgres(pool: PgPool) {
         .unwrap();
     assert_eq!(replay_requests.len(), 1);
     assert_eq!(replay_requests[0].id, message_id);
+    assert!(replay_requests[0].next_retry_at.is_none());
 
     let claimed = repository
         .claim(owner_id, message_id, "worker-1", 60, now)
@@ -345,15 +347,16 @@ async fn inbound_lifecycle_persists_failure_retry_and_success_status(pool: PgPoo
         .unwrap();
     let app = h8_erp_message_router(H8ErpMessageAppState::with_postgres(pool.clone()));
 
-    for (stage, result, expected_status) in [
-        ("receive", "ok", "processing"),
+    for (stage, result, expected_status, retry_scheduled) in [
+        ("receive", "ok", "processing", false),
         (
             "final_failure",
             "Bearer supersecrettoken password=anotherlongsecret",
             "failed",
+            true,
         ),
-        ("receive", "ok", "processing"),
-        ("receipt", "ok", "succeeded"),
+        ("receive", "ok", "processing", false),
+        ("receipt", "ok", "succeeded", false),
     ] {
         let body = serde_json::json!({
             "stage": stage,
@@ -376,8 +379,12 @@ async fn inbound_lifecycle_persists_failure_retry_and_success_status(pool: PgPoo
         let response = app.clone().oneshot(request).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK, "stage={stage}");
 
-        let status: String = sqlx::query_scalar(
-            "SELECT sync_status FROM h8_erp_messages WHERE owner_id=$1 AND idempotency_key=$2",
+        let (status, next_retry_at, updated_at): (
+            String,
+            Option<DateTime<Utc>>,
+            DateTime<Utc>,
+        ) = sqlx::query_as(
+            "SELECT sync_status, next_retry_at, updated_at FROM h8_erp_messages WHERE owner_id=$1 AND idempotency_key=$2",
         )
         .bind(owner_id)
         .bind("idem-retry-pg-1")
@@ -385,6 +392,14 @@ async fn inbound_lifecycle_persists_failure_retry_and_success_status(pool: PgPoo
         .await
         .unwrap();
         assert_eq!(status, expected_status, "stage={stage}");
+        if retry_scheduled {
+            assert_eq!(
+                next_retry_at.expect("retry should be scheduled") - updated_at,
+                Duration::milliseconds(standard_retry_delay_millis(1, "idem-retry-pg-1"))
+            );
+        } else {
+            assert!(next_retry_at.is_none(), "stage={stage}");
+        }
         if stage == "final_failure" {
             let summary: String = sqlx::query_scalar(
                 "SELECT last_error_summary FROM h8_erp_messages WHERE owner_id=$1 AND idempotency_key=$2",

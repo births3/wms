@@ -4,7 +4,8 @@ use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use uuid::Uuid;
 use wms_domain::{
-    can_transition_message_status, sanitize_error_summary, H8ErpMessage, H8MessageError,
+    can_transition_message_status, sanitize_error_summary, standard_retry_delay_millis,
+    H8ErpMessage, H8MessageError,
 };
 
 use super::{error::H8ErpMessageRepoError, pg_rows::MessageRow};
@@ -39,10 +40,17 @@ pub(super) async fn transition_lifecycle_status(
     can_transition_message_status(&current.sync_status, target)
         .map_err(H8ErpMessageRepoError::Domain)?;
     let summary = error_summary.map(sanitize_error_summary);
+    let next_retry_at = (target == "failed").then(|| {
+        now + chrono::Duration::milliseconds(standard_retry_delay_millis(
+            current.retry_count + 1,
+            &current.idempotency_key,
+        ))
+    });
     let next = sqlx::query_as::<_, MessageRow>(
         r#"UPDATE h8_erp_messages
-           SET sync_status=$4, retry_count=retry_count+$5, last_error_summary=$6,
-               claimed_by=$7, lease_expires_at=$8, completed_at=$9, updated_at=$10
+           SET sync_status=$4, retry_count=retry_count+$5, next_retry_at=$6,
+               last_error_summary=$7, claimed_by=$8, lease_expires_at=$9,
+               completed_at=$10, updated_at=$11
            WHERE owner_id=$1 AND id=$2 AND sync_status=$3
            RETURNING id, owner_id, warehouse_id, connector_id, connector_code, config_version,
                      direction, message_type, schema_version, channel, external_ref, wms_resource_id,
@@ -55,6 +63,7 @@ pub(super) async fn transition_lifecycle_status(
     .bind(&current.sync_status)
     .bind(target)
     .bind(i32::from(target == "failed"))
+    .bind(next_retry_at)
     .bind(&summary)
     .bind((target == "processing").then(|| actor.to_string()))
     .bind((target == "processing").then(|| now + chrono::Duration::minutes(10)))

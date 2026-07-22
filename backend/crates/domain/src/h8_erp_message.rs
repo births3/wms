@@ -338,6 +338,16 @@ pub fn should_enter_dead(error_class: H8ErrorClass, retry_count: i32, max_retrie
     matches!(error_class, H8ErrorClass::NonRetryable) || retry_count >= max_retries
 }
 
+/// ADR-0018 L2 标准重试：1/2/4/8/16 秒 ±20%，后续尝试保持 16 秒基线上限。
+pub fn standard_retry_delay_millis(attempt_number: i32, idempotency_key: &str) -> i64 {
+    const BASE_MILLIS: [i64; 5] = [1_000, 2_000, 4_000, 8_000, 16_000];
+    let first = idempotency_key.chars().next().unwrap_or_default() as u64;
+    let last = idempotency_key.chars().last().unwrap_or_default() as u64;
+    let seed = (first * 31 + last * 17 + idempotency_key.chars().count() as u64) % 4_001;
+    let jitter_permyriad = 8_000 + seed as i64;
+    BASE_MILLIS[(attempt_number.clamp(1, 5) - 1) as usize] * jitter_permyriad / 10_000
+}
+
 /// 未配置保留策略时禁止自动删除（AC10）。
 pub fn may_auto_purge(retention_days: Option<i32>) -> bool {
     retention_days.is_some_and(|d| d > 0)
@@ -620,6 +630,18 @@ mod tests {
         assert_eq!(classify_h8_error("timeout"), H8ErrorClass::Retryable);
         assert_eq!(classify_h8_error("mapping"), H8ErrorClass::NonRetryable);
         assert_eq!(classify_h8_error("auth"), H8ErrorClass::NonRetryable);
+    }
+
+    #[test]
+    fn standard_retry_delay_uses_adr_0018_schedule_and_stable_jitter() {
+        let key = "idem-1";
+        let delays = (1..=6)
+            .map(|attempt| standard_retry_delay_millis(attempt, key))
+            .collect::<Vec<_>>();
+        assert_eq!(delays, vec![809, 1_618, 3_237, 6_474, 12_948, 12_948]);
+        for (delay, base) in delays.into_iter().zip([1, 2, 4, 8, 16, 16]) {
+            assert!((base * 800..=base * 1_200).contains(&delay));
+        }
     }
 
     #[test]

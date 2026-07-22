@@ -271,6 +271,7 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
             r#"
             UPDATE h8_erp_messages
                SET sync_status = 'processing',
+                   next_retry_at = NULL,
                    claimed_by = $3,
                    lease_expires_at = $4,
                    last_error_summary = $5,
@@ -387,6 +388,7 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
             r#"
             UPDATE h8_erp_messages
                SET sync_status = 'processing',
+                   next_retry_at = NULL,
                    claimed_by = $3,
                    lease_expires_at = $4,
                    updated_at = $5
@@ -470,6 +472,7 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
             r#"
             UPDATE h8_erp_messages
                SET sync_status = 'dead',
+                   next_retry_at = NULL,
                    last_error_summary = $3,
                    claimed_by = NULL,
                    lease_expires_at = NULL,
