@@ -121,8 +121,9 @@ python3 scripts/h8_erp_interface_sync/sync_worker.py --once --direction in --typ
 
 验收必须同时确认：接口行由 `pending` 经 Worker 认领后变为 `success`；
 `wms_resource_id` 指向唯一的 M2 `receiving_orders`；H2 存在 receive、convert、
-business_api、receipt 审计；将同一行恢复为 `pending` 后以原 Idempotency-Key 重放，
-M2 单据数量仍为 1 且资源 ID 不变。证据见
+business_api、receipt 审计；通过消息重放 API 对同一消息填写原因并确认后，Worker
+应自动以原 Idempotency-Key 将既有终态接口行恢复为 `pending`、接管消息并重放，
+不得人工修改接口表；M2 单据数量仍为 1 且资源 ID 不变。证据见
 `docs/retros/h8-asn-inbound-flow-evidence.json`。
 
 ## 6. 验收

@@ -4501,6 +4501,12 @@ types = [
   "audit_compliance",
   "external_runtime",
 ]
+test_checks = [
+  "cargo test --manifest-path backend/Cargo.toml -p wms-domain --lib h8_erp",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --lib h8_erp_messages::",
+  "PYTHONPATH=scripts/h8_erp_interface_sync python3 -m unittest test_h8_sync_worker test_exchange_lifecycle",
+  "just openapi-check",
+]
 evidence_refs = [
   "deploy/h8-erp-if/init/02_seed_example.sql",
   "backend/crates/domain/src/h8_erp_message.rs",
@@ -4508,6 +4514,8 @@ evidence_refs = [
   "backend/migrations/202607220001_h8_erp_message_receipts.sql",
   "backend/crates/api/src/h8_erp_connectors/handlers.rs",
   "backend/crates/api/src/h8_erp_connectors/tests.rs",
+  "backend/crates/api/src/h8_erp_messages/replay_tests.rs",
+  "backend/crates/api/src/h8_erp_messages/pg_repository_tests.rs",
   "scripts/h8_erp_interface_sync/sync_worker.py",
   "scripts/h8_erp_interface_sync/worker_mssql.py",
   "scripts/h8_erp_interface_sync/worker_route.py",
@@ -4518,7 +4526,7 @@ evidence_refs = [
   "docs/retros/h8-asn-inbound-flow-evidence.json",
   "docs/retros/h8-local-integration-evidence.json",
 ]
-reason = "ASN V2、本地主备、入站唯一路由、首次配置绑定、不可变历史配置快照及 Worker 重试按原版本读取、既有幂等消息绑定切换拒绝、schema_version 严格拒绝、预检失败 receive/final_failure H2 审计、审计失败阻断业务、五类入站业务 API 的 503/422 错误分类、共享错误出口凭据脱敏、未知 storage_condition 写入前拒绝，以及 route-resolve 对已注入单仓范围的默认绑定和越权 403 已验证；仍缺 canonical/M-PM 实际映射、人工重放认领链、JWT 用户多仓范围与 Worker 身份接线、出站唯一路由、逐消息 L2-L4/L11 与自研 ERP 双向 S4。"
+reason = "ASN V2、本地主备、入站唯一路由、首次配置绑定、不可变历史配置快照及 Worker 重试按原版本读取、人工重放桥的原 Idempotency-Key 恢复与 PostgreSQL 即时接管、既有幂等消息绑定切换拒绝、schema_version 严格拒绝、预检失败 receive/final_failure H2 审计、审计失败阻断业务、五类入站业务 API 的 503/422 错误分类、共享错误出口凭据脱敏、未知 storage_condition 写入前拒绝，以及 route-resolve 对已注入单仓范围的默认绑定和越权 403 已验证；仍缺 canonical/M-PM 实际映射、人工重放桥真实 MSSQL 运行证据、JWT 用户多仓范围与 Worker 身份接线、出站唯一路由、逐消息 L2-L4/L11 与自研 ERP 双向 S4。"
 owner = "H8 模块负责人"
 resume_when = "接入公共 JWT 用户多仓范围与 Worker 身份，完成剩余 Worker 运行接线和四组闭环逐消息 L2-L4/L11，再归档自研 ERP dev/staging 双向请求、两级回执、重试和审计关联后关闭延期。"
 
