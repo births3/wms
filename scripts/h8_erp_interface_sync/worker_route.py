@@ -67,6 +67,78 @@ def get_worker_claim_decision(
     return parsed["allowed"]
 
 
+def list_manual_replays(
+    settings: Any,
+    message_type: str,
+    *,
+    http_json_fn: HttpJsonFn,
+) -> list[dict[str, Any]]:
+    """读取当前连接、当前类型等待 Worker 接管的人工重放消息。"""
+    path = "/api/v1/integration/erp-messages?" + urllib.parse.urlencode(
+        {
+            "direction": "inbound",
+            "message_type": message_type,
+            "status": "processing",
+            "connector_id": settings.connector_id,
+            "channel": "interface_table",
+            "replay_requested": "true",
+            "created_from": "1970-01-01T00:00:00Z",
+            "limit": 200,
+        }
+    )
+    status, parsed, raw = http_json_fn(
+        settings,
+        "GET",
+        path,
+        None,
+        f"manual-replays-{settings.connector_id}-{message_type}",
+    )
+    if status != 200 or not isinstance(parsed, dict):
+        raise WorkerHttpError(status, "manual replay list", raw)
+    data = parsed.get("data")
+    if not isinstance(data, list):
+        raise WorkerHttpError(502, "manual replay list", "data missing")
+    for message in data:
+        if not isinstance(message, dict):
+            raise WorkerHttpError(502, "manual replay list", "invalid message")
+        expected = {
+            "connector_id": settings.connector_id,
+            "direction": "inbound",
+            "message_type": message_type,
+            "channel": "interface_table",
+        }
+        if any(str(message.get(key) or "") != value for key, value in expected.items()):
+            raise WorkerHttpError(409, "manual replay list", "message scope changed")
+        if not str(message.get("claimed_by") or "").startswith("replay:"):
+            raise WorkerHttpError(409, "manual replay list", "replay marker missing")
+        if not message.get("id") or not str(message.get("idempotency_key") or "").strip():
+            raise WorkerHttpError(502, "manual replay list", "message identity missing")
+    return data
+
+
+def claim_manual_replay(
+    settings: Any,
+    message_id: str,
+    *,
+    http_json_fn: HttpJsonFn,
+) -> None:
+    body = {"worker_id": settings.worker_id, "lease_seconds": 300}
+    status, parsed, raw = http_json_fn(
+        settings,
+        "POST",
+        f"/api/v1/integration/erp-messages/{message_id}/claim",
+        body,
+        f"manual-replay-claim-{message_id}-{settings.worker_id}",
+    )
+    if (
+        status != 200
+        or not isinstance(parsed, dict)
+        or str(parsed.get("id") or "") != message_id
+        or str(parsed.get("claimed_by") or "") != settings.worker_id
+    ):
+        raise WorkerHttpError(status, "manual replay claim", raw)
+
+
 def post_worker_heartbeat(
     settings: Any,
     directions: list[str],

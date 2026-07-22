@@ -6,6 +6,15 @@ import subprocess
 from typing import Any
 
 
+INBOUND_TABLES = {
+    "if_in_asn",
+    "if_in_outbound_order",
+    "if_in_product_master",
+    "if_in_return_order",
+    "if_in_product_change",
+}
+
+
 def sqlcmd_query(settings: Any, sql: str) -> str:
     """执行 SQL 并返回 stdout 文本（-s| -W -h-1）。"""
     cmd = [
@@ -236,6 +245,32 @@ FROM dbo.if_in_product_change WHERE id IN (SELECT id FROM @claimed);
         if len(parts) >= len(cols):
             rows.append(dict(zip(cols, parts)))
     return rows
+
+
+def requeue_replay_row(settings: Any, table: str, idempotency_key: str) -> bool:
+    """按原幂等键将终态接口行恢复为 pending，供现有认领路径处理。"""
+    if table not in INBOUND_TABLES:
+        raise ValueError(table)
+    key = sql_escape(idempotency_key)
+    output = sqlcmd_query(
+        settings,
+        f"""
+SET NOCOUNT ON;
+UPDATE dbo.{table} WITH (ROWLOCK)
+   SET sync_status = N'pending',
+       retry_count = CASE WHEN retry_count < 1 THEN 1 ELSE retry_count END,
+       last_error = NULL,
+       updated_at = SYSUTCDATETIME()
+ WHERE idempotency_key = N'{key}'
+   AND sync_status IN (N'failed', N'dead', N'success');
+SELECT CASE WHEN EXISTS (
+  SELECT 1 FROM dbo.{table}
+   WHERE idempotency_key = N'{key}'
+     AND sync_status = N'pending'
+) THEN N'ready' ELSE N'missing' END;
+""",
+    )
+    return any(line.strip() == "ready" for line in output.splitlines())
 
 
 def mark_row(

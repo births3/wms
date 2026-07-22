@@ -29,12 +29,14 @@ from sync_worker import (
     validate_row_schema_version,
 )
 from worker_route import (
+    claim_manual_replay,
     get_worker_claim_decision,
+    list_manual_replays,
     post_worker_heartbeat,
     resolve_existing_inbound_binding,
     sanitize_worker_error,
 )
-from worker_mssql import claim_rows
+from worker_mssql import claim_rows, requeue_replay_row
 
 
 def settings() -> Settings:
@@ -59,6 +61,128 @@ def settings() -> Settings:
 
 
 class TestInboundCorePipeline(unittest.TestCase):
+    def test_manual_replay_http_calls_are_scoped_and_claimed(self) -> None:
+        calls: list[tuple[str, str, dict | None]] = []
+
+        def fake_http(_settings, method, path, body, _idem):
+            calls.append((method, path, body))
+            if method == "GET":
+                return (
+                    200,
+                    {
+                        "data": [
+                            {
+                                "id": "message-1",
+                                "connector_id": settings().connector_id,
+                                "direction": "inbound",
+                                "message_type": "asn",
+                                "channel": "interface_table",
+                                "claimed_by": "replay:admin",
+                                "idempotency_key": "idem-1",
+                            }
+                        ]
+                    },
+                    "",
+                )
+            return 200, {"id": "message-1", "claimed_by": "worker-test"}, ""
+
+        messages = list_manual_replays(
+            settings(), "asn", http_json_fn=fake_http
+        )
+        claim_manual_replay(
+            settings(), str(messages[0]["id"]), http_json_fn=fake_http
+        )
+
+        self.assertIn(f"connector_id={settings().connector_id}", calls[0][1])
+        self.assertIn("replay_requested=true", calls[0][1])
+        self.assertEqual(calls[1][0], "POST")
+        self.assertEqual(calls[1][2]["worker_id"], "worker-test")
+
+    def test_manual_replay_requeues_then_claims_before_normal_processing(self) -> None:
+        import sync_worker
+
+        replay_message = {
+            "id": "message-1",
+            "idempotency_key": "idem-1",
+        }
+        row = {
+            "id": "row-1",
+            "external_doc_no": "ASN-1",
+            "idempotency_key": "idem-1",
+            "schema_version": "1",
+            "retry_count": "1",
+        }
+        order: list[str] = []
+        with (
+            patch.object(sync_worker, "get_worker_claim_decision", return_value=True),
+            patch.object(sync_worker, "try_record_worker_heartbeat"),
+            patch.object(
+                sync_worker,
+                "list_manual_replays",
+                return_value=[replay_message],
+            ) as list_replays,
+            patch.object(
+                sync_worker,
+                "requeue_replay_row",
+                side_effect=lambda *_args: order.append("requeue") or True,
+            ),
+            patch.object(
+                sync_worker,
+                "claim_manual_replay",
+                side_effect=lambda *_args, **_kwargs: order.append("claim"),
+            ),
+            patch.object(
+                sync_worker,
+                "claim_rows",
+                side_effect=lambda *_args: order.append("process") or [row],
+            ),
+            patch.object(
+                sync_worker,
+                "resolve_existing_inbound_binding",
+                return_value=sync_worker.RouteBinding(
+                    connector_id=settings().connector_id,
+                    connector_code="SELF-ERP",
+                    config_version=1,
+                    channel="interface_table",
+                    message_type="asn",
+                ),
+            ),
+            patch.object(
+                sync_worker,
+                "run_inbound_pipeline",
+                return_value=("wms-1", object()),
+            ),
+            patch.object(sync_worker, "mark_row"),
+        ):
+            self.assertEqual(sync_worker.process_once(settings(), ["asn"], False), 1)
+
+        self.assertEqual(order, ["requeue", "claim", "process"])
+        list_replays.assert_called_once_with(settings(), "asn")
+
+    def test_requeue_replay_row_restores_terminal_row_with_original_key(self) -> None:
+        with patch("worker_mssql.sqlcmd_query", return_value="ready") as query:
+            self.assertTrue(requeue_replay_row(settings(), "if_in_asn", "idem-'1"))
+        sql = query.call_args.args[1]
+        self.assertIn("sync_status = N'pending'", sql)
+        self.assertIn("retry_count < 1", sql)
+        self.assertIn("idem-''1", sql)
+        self.assertIn("N'failed', N'dead', N'success'", sql)
+
+    def test_missing_manual_replay_row_does_not_claim_message(self) -> None:
+        import sync_worker
+
+        with (
+            patch.object(
+                sync_worker,
+                "list_manual_replays",
+                return_value=[{"id": "message-1", "idempotency_key": "missing"}],
+            ),
+            patch.object(sync_worker, "requeue_replay_row", return_value=False),
+            patch.object(sync_worker, "claim_manual_replay") as claim,
+        ):
+            sync_worker.prepare_manual_replays(settings(), "asn", "if_in_asn")
+        claim.assert_not_called()
+
     def test_retry_rejects_snapshot_that_does_not_match_original_binding(self) -> None:
         replies = iter(
             [
@@ -163,6 +287,7 @@ class TestInboundCorePipeline(unittest.TestCase):
         with (
             patch.object(sync_worker, "get_worker_claim_decision", return_value=True),
             patch.object(sync_worker, "try_record_worker_heartbeat"),
+            patch.object(sync_worker, "list_manual_replays", return_value=[]),
             patch.object(sync_worker, "claim_rows", return_value=[row]),
             patch.object(sync_worker, "http_json", side_effect=fake_http),
             patch.object(sync_worker, "resolve_inbound_route") as resolve_current,
@@ -321,6 +446,7 @@ class TestInboundCorePipeline(unittest.TestCase):
         with (
             patch.object(sync_worker, "get_worker_claim_decision", return_value=True),
             patch.object(sync_worker, "try_record_worker_heartbeat"),
+            patch.object(sync_worker, "list_manual_replays", return_value=[]),
             patch.object(sync_worker, "record_preflight_failure") as preflight_audit,
             patch.object(sync_worker, "claim_rows", return_value=[row]),
             patch.object(
@@ -348,6 +474,7 @@ class TestInboundCorePipeline(unittest.TestCase):
         with (
             patch.object(sync_worker, "get_worker_claim_decision", return_value=True),
             patch.object(sync_worker, "try_record_worker_heartbeat"),
+            patch.object(sync_worker, "list_manual_replays", return_value=[]),
             patch.object(
                 sync_worker,
                 "record_preflight_failure",

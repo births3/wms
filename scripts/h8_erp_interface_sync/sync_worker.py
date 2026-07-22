@@ -53,15 +53,17 @@ from outbound_publish import (  # noqa: E402
 from worker_route import (  # noqa: E402
     RouteBinding,
     WorkerHttpError,
+    claim_manual_replay as claim_manual_replay_with_http,
     get_worker_claim_decision as get_worker_claim_decision_with_http,
     is_retryable_worker_error,
+    list_manual_replays as list_manual_replays_with_http,
     post_worker_heartbeat as post_worker_heartbeat_with_http,
     resolve_existing_inbound_binding,
     resolve_inbound_route as resolve_inbound_route_with_http,
     sanitize_worker_error,
     validate_row_schema_version,
 )
-from worker_mssql import claim_rows, mark_row, sqlcmd_query  # noqa: E402
+from worker_mssql import claim_rows, mark_row, requeue_replay_row, sqlcmd_query  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # 配置
@@ -192,6 +194,29 @@ def get_worker_claim_decision(settings: Settings, direction: str) -> bool:
         direction,
         http_json_fn=http_json,
     )
+
+
+def list_manual_replays(settings: Settings, message_type: str) -> list[dict[str, Any]]:
+    return list_manual_replays_with_http(
+        settings,
+        message_type,
+        http_json_fn=http_json,
+    )
+
+
+def claim_manual_replay(settings: Settings, message_id: str) -> None:
+    claim_manual_replay_with_http(settings, message_id, http_json_fn=http_json)
+
+
+def prepare_manual_replays(settings: Settings, message_type: str, table: str) -> None:
+    for message in list_manual_replays(settings, message_type):
+        if not requeue_replay_row(settings, table, str(message["idempotency_key"])):
+            print(
+                f"[h8] manual replay row missing message={message['id']}",
+                flush=True,
+            )
+            continue
+        claim_manual_replay(settings, str(message["id"]))
 
 
 def try_record_worker_heartbeat(
@@ -458,6 +483,14 @@ def process_once(
                     f"[h8] paused connector={settings.connector_id} direction=inbound",
                     flush=True,
                 )
+                continue
+            try:
+                prepare_manual_replays(settings, type_name, table)
+            except Exception as exc:  # noqa: BLE001 — 未接管重放前不得认领接口行
+                summary = sanitize_worker_error(
+                    str(exc), (settings.api_token, settings.mssql_password)
+                )
+                print(f"[h8] manual replay warn: {summary}", flush=True)
                 continue
         rows = claim_rows(settings, table)
         if not dry_run:
