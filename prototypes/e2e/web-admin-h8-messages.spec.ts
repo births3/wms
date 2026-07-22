@@ -100,6 +100,76 @@ test("H8 ERP 消息：失败筛选、死信详情与重放", async ({ page }) =>
   await page.screenshot({ path: path.join(screenshotDir, "replay-success.png"), fullPage: false });
 });
 
+test("H8 ERP 消息：稳定游标加载下一页", async ({ page }) => {
+  const cursors: Array<string | null> = [];
+  let allRows: unknown[] = [];
+  await page.route("**/api/v1/integration/erp-messages?*", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname !== "/api/v1/integration/erp-messages") {
+      await route.continue();
+      return;
+    }
+    const cursor = url.searchParams.get("cursor");
+    cursors.push(cursor);
+    if (cursor) {
+      await route.fulfill({
+        json: { data: allRows.slice(1), page: { next_cursor: null, count: 1 } },
+      });
+      return;
+    }
+    const response = await route.fetch();
+    const payload = (await response.json()) as { data: unknown[] };
+    allRows = payload.data;
+    await route.fulfill({
+      response,
+      json: {
+        data: payload.data.slice(0, 1),
+        page: { next_cursor: "mock-next", count: 1 },
+      },
+    });
+  });
+
+  await login(page, "admin");
+  await openMessagesPage(page);
+  await expect(page.getByText("ERP-ASN-DEAD-1")).toBeVisible();
+  await expect(page.getByText("ERP-ASN-FAIL-1")).toHaveCount(0);
+  await page.getByRole("button", { name: "加载更多", exact: true }).click();
+  await expect(page.getByText("ERP-ASN-FAIL-1")).toBeVisible();
+  expect(cursors).toEqual([null, "mock-next"]);
+});
+
+test("H8 ERP 消息：下一页失败显示中文错误", async ({ page }) => {
+  await page.route("**/api/v1/integration/erp-messages?*", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname !== "/api/v1/integration/erp-messages") {
+      await route.continue();
+      return;
+    }
+    if (url.searchParams.has("cursor")) {
+      await route.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: JSON.stringify({ code: "H8-500", message: "database operation failed" }),
+      });
+      return;
+    }
+    const response = await route.fetch();
+    const payload = (await response.json()) as { data: unknown[] };
+    await route.fulfill({
+      response,
+      json: {
+        data: payload.data.slice(0, 1),
+        page: { next_cursor: "mock-next", count: 1 },
+      },
+    });
+  });
+
+  await login(page, "admin");
+  await openMessagesPage(page);
+  await page.getByRole("button", { name: "加载更多", exact: true }).click();
+  await expect(page.getByRole("alert")).toHaveText("加载下一页失败，请重试。");
+});
+
 test("H8 ERP 消息：只读用户无重放按钮", async ({ page }) => {
   fs.mkdirSync(screenshotDir, { recursive: true });
   await page.route("**/api/v1/auth/me", async (route) => {

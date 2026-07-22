@@ -294,6 +294,7 @@ export async function handleH8ErpMessageDevMock(
     const correlationId = url.searchParams.get("correlation_id");
     const createdFrom = url.searchParams.get("created_from");
     const createdTo = url.searchParams.get("created_to");
+    const windowFrom = createdFrom ?? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     if (direction) rows = rows.filter((m) => m.direction === direction);
     if (messageType) rows = rows.filter((m) => m.message_type === messageType);
     if (status) rows = rows.filter((m) => m.sync_status === status);
@@ -305,9 +306,31 @@ export async function handleH8ErpMessageDevMock(
     if (correlationId) rows = rows.filter((m) => m.correlation_id === correlationId);
     if (createdFrom) rows = rows.filter((m) => m.created_at >= createdFrom);
     if (createdTo) rows = rows.filter((m) => m.created_at <= createdTo);
+    rows.sort(
+      (left, right) =>
+        right.created_at.localeCompare(left.created_at) || right.id.localeCompare(left.id),
+    );
+    const cursor = url.searchParams.get("cursor");
+    if (cursor) {
+      const [cursorWindowFrom, cursorCreatedAt, cursorId] = cursor.split(",");
+      rows = rows.filter(
+        (message) =>
+          message.created_at >= (cursorWindowFrom ?? "") &&
+          (message.created_at < (cursorCreatedAt ?? "") ||
+            (message.created_at === cursorCreatedAt && message.id < (cursorId ?? ""))),
+      );
+    }
+    const requestedLimit = Number(url.searchParams.get("limit") ?? 50);
+    const limit = Math.min(Math.max(requestedLimit, 1), 200);
+    const hasMore = rows.length > limit;
+    rows = rows.slice(0, limit);
+    const last = rows.at(-1);
     sendJson(res, 200, {
       data: rows,
-      page: { next_cursor: null, count: rows.length },
+      page: {
+        next_cursor: hasMore && last ? `${windowFrom},${last.created_at},${last.id}` : null,
+        count: rows.length,
+      },
     });
     return true;
   }

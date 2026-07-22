@@ -261,17 +261,20 @@ export function ErpMessageLogPage() {
   const replayMutation = useReplayErpMessageMutation();
   const payloadMutation = useDecryptH8PayloadMutation();
 
-  const rows = listQuery.data?.data ?? [];
+  const rows = React.useMemo(
+    () => listQuery.data?.pages.flatMap((page) => page.data) ?? [],
+    [listQuery.data],
+  );
   const warehouseOptions = React.useMemo(
     () =>
       Array.from(
         new Set(
-          (listQuery.data?.data ?? [])
+          rows
             .map((message) => message.warehouse_id)
             .filter((value): value is string => Boolean(value)),
         ),
       ).map((value) => ({ label: value, value })),
-    [listQuery.data?.data],
+    [rows],
   );
   const selected = rows.find((r) => r.id === selectedKeys[0]);
   const busy = replayMutation.isPending;
@@ -380,6 +383,23 @@ export function ErpMessageLogPage() {
             emptyDescription="失败与死信消息可在此查询与重放"
             caption={listQuery.isLoading ? "加载 ERP 消息..." : undefined}
           />
+          {listQuery.isFetchNextPageError ? (
+            <p role="alert" className="text-center text-sm text-destructive">
+              加载下一页失败，请重试。
+            </p>
+          ) : null}
+          {listQuery.hasNextPage ? (
+            <div className="flex justify-center">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void listQuery.fetchNextPage()}
+                disabled={listQuery.isFetchingNextPage}
+              >
+                {listQuery.isFetchingNextPage ? "加载中…" : "加载更多"}
+              </Button>
+            </div>
+          ) : null}
         </TabsContent>
         <TabsContent value="workers" className="mt-0 min-h-0">
           <H8WorkerRuntimePanel

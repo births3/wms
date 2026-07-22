@@ -16,6 +16,26 @@ test("H8 ERP 消息真实链路：高级查询、重放、Worker 控制与加密
   const token = await accessToken(page);
   await openMessagesPage(page);
 
+  const firstPage = await page.request.get(
+    `${apiURL}/api/v1/integration/erp-messages?limit=1`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  expect(firstPage.status(), await firstPage.text()).toBe(200);
+  const firstPageBody = (await firstPage.json()) as {
+    data: Array<{ id: string }>;
+    page: { next_cursor: string | null };
+  };
+  expect(firstPageBody.data).toHaveLength(1);
+  expect(firstPageBody.page.next_cursor).not.toBeNull();
+  const secondPage = await page.request.get(
+    `${apiURL}/api/v1/integration/erp-messages?limit=1&cursor=${encodeURIComponent(firstPageBody.page.next_cursor ?? "")}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  expect(secondPage.status(), await secondPage.text()).toBe(200);
+  const secondPageBody = (await secondPage.json()) as { data: Array<{ id: string }> };
+  expect(secondPageBody.data).toHaveLength(1);
+  expect(secondPageBody.data[0]?.id).not.toBe(firstPageBody.data[0]?.id);
+
   await expect(page.getByText("H8-MSG-E2E-DEAD", { exact: true })).toBeVisible();
   await expect(page.getByText("H8-MSG-E2E-FAIL", { exact: true })).toBeVisible();
   await expect(page.getByText("H8-MSG-E2E-OTHER-OWNER", { exact: true })).toHaveCount(0);

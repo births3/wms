@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { components } from "@wms/api-client";
 
 import { ApiError } from "@/features/auth/auth-queries";
@@ -30,9 +30,10 @@ export function useErpMessagesQuery(params: {
   created_from?: string;
   created_to?: string;
 }) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: [...key, params],
-    queryFn: async () => {
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam }) => {
       const result = await api.GET("/api/v1/integration/erp-messages", {
         params: {
           query: {
@@ -47,6 +48,8 @@ export function useErpMessagesQuery(params: {
             correlation_id: params.correlation_id || undefined,
             created_from: params.created_from || undefined,
             created_to: params.created_to || undefined,
+            cursor: pageParam,
+            limit: 50,
           },
         },
       });
@@ -55,6 +58,7 @@ export function useErpMessagesQuery(params: {
       }
       return result.data;
     },
+    getNextPageParam: (lastPage) => lastPage.page.next_cursor ?? undefined,
   });
 }
 
