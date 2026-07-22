@@ -2484,8 +2484,8 @@
           }
         },
         "security": [],
-        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。",
-        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。"
+        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。",
+        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。"
       }
     },
     "/api/v1/auth/logout": {
@@ -9450,6 +9450,28 @@
             "schema": {
               "type": "string",
               "nullable": true
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "上一页返回的稳定游标",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "每页 1..=200，默认 50",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
             }
           }
         ],

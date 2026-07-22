@@ -15361,6 +15361,10 @@ export interface operations {
                 created_from?: string | null;
                 /** @description 结束时间 ISO8601 */
                 created_to?: string | null;
+                /** @description 上一页返回的稳定游标 */
+                cursor?: string | null;
+                /** @description 每页 1..=200，默认 50 */
+                limit?: number | null;
             };
             header?: never;
             path?: never;

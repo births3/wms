@@ -234,6 +234,8 @@ pub(crate) fn delete_h8_erp_connector() {}
         ("correlation_id" = Option<String>, Query, description = "关联标识精确筛选"),
         ("created_from" = Option<String>, Query, description = "开始时间 ISO8601"),
         ("created_to" = Option<String>, Query, description = "结束时间 ISO8601"),
+        ("cursor" = Option<String>, Query, description = "上一页返回的稳定游标"),
+        ("limit" = Option<u32>, Query, description = "每页 1..=200，默认 50"),
     ),
     responses(
         (status = 200, description = "ERP 消息列表", body = H8ErpMessageListResponse),
