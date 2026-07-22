@@ -448,6 +448,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | 2026-07-23 | 三十二轮人工重放桥接 | 消息列表新增按连接 ID 和人工重放标记的货主内筛选；Worker 按消息类型读取 `replay:*` 标记，以原 Idempotency-Key 将既有 MSSQL 终态行恢复为 `pending`，再调用现有消息认领 API，普通处理中租约仍不可抢占。内存、真实 PostgreSQL 与 Worker 纯逻辑回归已通过；本机 Docker socket 无访问权限，尚未取得真实 MSSQL→业务 API 运行证据，AC6 保持 `NEEDS_WORK`。 |
 | 2026-07-23 | 三十三轮出站唯一路由 | 删除 Worker 的全局首条 active 连接和命令行通道覆盖；出站 outbox 认领先按绑定连接的货主、方向、消息类型和可用仓库标识收窄，再逐消息调用既有 `route-resolve`，校验返回连接仍等于 Worker 绑定，并把连接编码、配置版本和主通道写入生命周期。入库完成 outbox 同步携带仓库标识。Worker 与真实 PostgreSQL M2 outbox 回归通过；其余出站源仍需补仓库标识及双通道 L2–L4/L11，AC4 保持 `NEEDS_WORK`。 |
 | 2026-07-23 | 三十四轮库存状态路由身份 | 库存状态变更在同一 PostgreSQL 事务内从批次库位解析货主内仓库，并把 `warehouse_id` 写入 outbox canonical 载荷；真实 M3 PostgreSQL 测试回读验证。历史异常批次无法解析库位时不阻断库存事务，但仓库范围 Worker 不会认领该 outbox。当前有业务生产者的入库完成、库存状态和报损报溢三类均携带仓库身份；档案补录、对账差异、发货确认和库存快照四类仍只有 outbox 基础表、没有业务生产者，不能用测试数据冒充完成，AC4 保持 `NEEDS_WORK`。 |
+| 2026-07-23 | 三十五轮入站 canonical 边界 | 接口表适配器读取的五类 MSSQL 行统一转换为 `H8CanonicalInboundCommand`，连接、配置版本、幂等键、关联标识、发生时间和业务字段在 `convert` 阶段收口；业务 API handler 不再接收接口表 DTO。数量和时间在边界完成类型规整，未知储存条件和缺失销退批号以 422 类不可重试映射错误终止。Worker 全套纯逻辑回归通过，AC2 关闭；真实 M-PM 规则查询仍由 AC5 跟踪。 |
 
 ## 验收记录（US-H8-004 软件切片）
 
@@ -550,7 +551,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | AC | 证据层 | 验证命令或方式 | 证据 | 结果 | 缺口 / 恢复条件 |
 |---|---|---|---|---|---|
 | AC-1 受控消息目录 | `V0/V1` | H8-DOMAIN、H8-WORKER | `backend/crates/domain/src/h8_erp_message.rs`、`scripts/h8_erp_interface_sync/outbound_publish.py` 及目录对齐测试 | `PASS` | - |
-| AC-2 三级边界 | `V0/V1` | 代码路径复审、H8-DOMAIN | `backend/crates/domain/src/h8_erp_exchange.rs` 定义 canonical；`scripts/h8_erp_interface_sync/sync_worker.py` 仍在同一适配器内直接组业务 API DTO | `NEEDS_WORK` | Worker 必须经 H8 canonical 转换端口调用业务 API，通道适配与语义转换分层 |
+| AC-2 三级边界 | `V0/V1` | H8-DOMAIN、H8-WORKER、H8-CANONICAL | Rust domain 定义 canonical 契约；`inbound_canonical.py` 将五类接口表 DTO 转成独立命令；lifecycle 在 `convert` 阶段调用转换器，业务 handler 仅消费 canonical 命令 | `PASS` | - |
 | AC-3 入站链路 | `V1/V2` | H8-WORKER、H8-ASN-V2、H8-U2 | Worker 已在业务 API 前调用 `route-resolve` 并严格校验 `schema_version`；处理器已拒绝与 `AuthContext.warehouse_scope` 不一致的仓库；ASN V2 已跑通 | `NEEDS_WORK` | 接入 M-PM 与 JWT 用户多仓范围，并补齐其余 4 类 L2–L4/L11 |
 | AC-4 出站链路 | `V1/V2` | H8-WORKER、H8-LOCAL、M2-PUTAWAY-PG、M3-STATUS-PG | Worker 不再读取全局首条连接；认领先按绑定连接货主/目录/仓库收窄，逐消息调用 `route-resolve`，校验 Worker 连接并把连接编码、配置版本和主通道写入生命周期；现有生产者中的入库完成、库存状态和报损报溢载荷均携带仓库标识 | `NEEDS_WORK` | 接通档案补录、对账差异、发货确认、库存快照四类业务生产者，并取得七类逐类双通道 L2–L4/L11 与真实运行证据 |
 | AC-5 字段规整 | `V1` | H8-DOMAIN、H8-WORKER、代码路径复审 | `apply_mpm_normalize` 有 domain 单测；Worker 已在业务 API 前以 422 拒绝未知 `storage_condition`，且测试证明不发生静默 `normal` 写入 | `NEEDS_WORK` | Worker 接入实际 M-PM 规则查询与有效映射，并补真实数据回读 |
@@ -567,7 +568,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 
 - V0：`python3 scripts/governance/check_quality_matrix.py --json`；`python3 scripts/governance/check_scope_gap_discovery.py --strict --module H8 --json`
 - V1（H8-DOMAIN）：`cargo test --manifest-path backend/Cargo.toml -p wms-domain --lib h8_erp`
-- V1（H8-WORKER）：在 `scripts/h8_erp_interface_sync` 运行 `python3 -m unittest test_h8_sync_worker test_exchange_lifecycle -v`
+- V1（H8-WORKER）：在 `scripts/h8_erp_interface_sync` 运行 `python3 -m unittest test_h8_sync_worker test_exchange_lifecycle test_inbound_canonical -v`
 - V1（H8-OUTBOUND-ROUTE）：在 `scripts/h8_erp_interface_sync` 运行 `python3 -m unittest test_outbound_routing -v`
 - V1（H8-U2 出站路由）：`cargo test --manifest-path backend/Cargo.toml -p wms-api --lib h8_erp_connectors::tests::route_resolve_enforces_auth_context_warehouse_scope`
 - V2（M2-PUTAWAY-PG）：`cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_smart_putaway_postgres smart_putaway_recommends_and_commits_owner_scoped_inventory_atomically -- --exact --test-threads=1`
@@ -580,8 +581,8 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 
 ### 验收结论
 
-- 已证明：受控目录与纯 domain 规则；Worker 入站唯一路由、首次配置绑定、历史配置快照读取、重试主动复用原绑定、人工重放桥的原键恢复与 PostgreSQL 即时接管、绑定切换拒绝、契约版本拒绝、错误重试分类、凭据脱敏和未知储存条件写入前拒绝；`route-resolve` 对已注入单仓范围的默认绑定与越权拒绝；ASN 接口表入站 V2、幂等回放和 H2 生命周期审计；出站认领的连接货主/目录/仓库收窄、逐消息唯一路由，以及入库完成、库存状态、报损报溢三类现有生产者的仓库身份；本地出站主备与非双写切片。
-- 未完成：Worker 的 canonical/M-PM、人工重放桥真实 MSSQL 运行证据、JWT 用户多仓范围、档案补录/对账差异/发货确认/库存快照四类业务生产者与真实唯一路由证据，以及其余消息类型 L2–L4/L11 和客户正式 ERP V4。
+- 已证明：受控目录与纯 domain 规则；五类接口表 DTO 统一经过 canonical 转换后才进入业务 API handler；Worker 入站唯一路由、首次配置绑定、历史配置快照读取、重试主动复用原绑定、人工重放桥的原键恢复与 PostgreSQL 即时接管、绑定切换拒绝、契约版本拒绝、错误重试分类、凭据脱敏和未知储存条件写入前拒绝；`route-resolve` 对已注入单仓范围的默认绑定与越权拒绝；ASN 接口表入站 V2、幂等回放和 H2 生命周期审计；出站认领的连接货主/目录/仓库收窄、逐消息唯一路由，以及入库完成、库存状态、报损报溢三类现有生产者的仓库身份；本地出站主备与非双写切片。
+- 未完成：真实 M-PM 规则查询与映射、人工重放桥真实 MSSQL 运行证据、JWT 用户多仓范围、档案补录/对账差异/发货确认/库存快照四类业务生产者与真实唯一路由证据，以及其余消息类型 L2–L4/L11 和客户正式 ERP V4。
 - 恢复条件：完成上述运行接线和逐消息证据后，再使用客户正式 ERP dev/staging 跑双向请求、回执、重试和审计关联；完成前保持 `deferred_stories`。
 
 ---
@@ -626,7 +627,8 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | H8-MSG-U3 | `cargo test --manifest-path backend/Cargo.toml -p wms-api --lib h8_erp_messages` |
 | H8-U1 | `cargo test --manifest-path backend/Cargo.toml -p wms-domain --lib h8_erp` |
 | H8-U2 | `cargo test --manifest-path backend/Cargo.toml -p wms-api --lib h8_erp_connectors` |
-| H8-WORKER | `python3 -m unittest test_exchange_lifecycle test_h8_sync_worker -v`（在 `scripts/h8_erp_interface_sync`） |
+| H8-WORKER | `python3 -m unittest test_exchange_lifecycle test_h8_sync_worker test_inbound_canonical -v`（在 `scripts/h8_erp_interface_sync`） |
+| H8-CANONICAL | `python3 -m unittest test_inbound_canonical -v`（在 `scripts/h8_erp_interface_sync`） |
 | H8-MSG-PG | `cargo test --manifest-path backend/Cargo.toml -p wms-api --lib h8_erp_messages::pg_repository_tests` |
 | H8-WEB-TYPE | `pnpm --dir apps/web-admin exec tsc --noEmit` |
 | H8-MSG-E2E | `pnpm --dir prototypes exec playwright test --config=playwright-web-admin-h8-messages-config.ts` |
