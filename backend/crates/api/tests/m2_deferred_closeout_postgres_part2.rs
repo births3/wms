@@ -446,6 +446,59 @@ async fn create_is_idempotent_and_audited_in_the_postgres_path(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn h8_sales_return_create_replays_without_duplicate_order_or_audit(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let ctx = context(owner_id);
+    let repository = PgWave3Repository::new(pool.clone());
+    let mut req = request(
+        RECEIVING_DOCUMENT_TYPE_SALES_RETURN,
+        Some("B-H8-RETURN-001"),
+    );
+    seed_asn_references(&pool, owner_id, &mut req).await;
+    let audit = AuditWriteRequest::from_auth_context(
+        &ctx,
+        "create",
+        "M2",
+        "receiving_order",
+        "pending",
+        None,
+    );
+
+    let first = repository
+        .create_receiving_order_with_audit(
+            &ctx,
+            req.clone(),
+            chrono::Utc::now(),
+            "h8-sales-return-1",
+            audit.clone(),
+        )
+        .await
+        .expect("sales return should be created");
+    let replayed = repository
+        .create_receiving_order_with_audit(
+            &ctx,
+            req,
+            chrono::Utc::now(),
+            "h8-sales-return-1",
+            audit,
+        )
+        .await
+        .expect("sales return should replay");
+
+    assert!(!first.replayed);
+    assert!(replayed.replayed);
+    assert_eq!(replayed.value.id, first.value.id);
+    let evidence: (i64, i64, i64) = sqlx::query_as(
+        "SELECT (SELECT COUNT(*) FROM receiving_orders WHERE owner_id = $1 AND document_type = 'sales_return'), (SELECT COUNT(*) FROM audit_event WHERE owner_id = $1 AND action = 'create'), (SELECT COUNT(*) FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = 'h8-sales-return-1')",
+    )
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("sales return evidence should query");
+    assert_eq!(evidence, (1, 1, 1));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn dashboard_groups_real_postgres_receiving_statuses(pool: PgPool) {
     let owner_id = Uuid::new_v4();
     let ctx = context(owner_id);

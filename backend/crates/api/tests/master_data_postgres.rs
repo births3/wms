@@ -9,3 +9,4 @@ include!("master_data_postgres/m1_location_disable_guard.rs");
 include!("master_data_postgres/m1_location_owner_binding.rs");
 include!("master_data_postgres/m1_warehouse_disable_cascade.rs");
 include!("master_data_postgres/m1_warehouse_type.rs");
+include!("master_data_postgres/h8_product_change_idempotency.rs");

@@ -126,3 +126,50 @@ async fn outbound_wave_release_persists_tasks_locks_audit_and_replays(pool: PgPo
         Wave4RepositoryError::OrderAlreadyInWave
     ));
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn h8_outbound_order_create_replays_without_duplicate_lines(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let ctx = ctx(owner_id);
+    let repo = PgWave4Repository::new(pool.clone());
+    let now = Utc
+        .with_ymd_and_hms(2026, 7, 23, 9, 30, 0)
+        .single()
+        .expect("valid time");
+    let request = CreateOutboundOrderRequest {
+        document_type: "sales_outbound".to_string(),
+        wms_order_no: "WMS-H8-L11-001".to_string(),
+        erp_order_no: Some("ERP-H8-L11-001".to_string()),
+        customer_id: Uuid::new_v4(),
+        warehouse_id: Uuid::new_v4(),
+        required_ship_at: None,
+        lines: vec![CreateOutboundOrderLineRequest {
+            line_no: 1,
+            product_code: "P-H8-L11-001".to_string(),
+            batch_no: "B-H8-L11-001".to_string(),
+            planned_qty: 3,
+        }],
+    };
+
+    let first = repo
+        .create_outbound_order(&ctx, request.clone(), now, "h8-outbound-order-1", None)
+        .await
+        .expect("outbound order should be created");
+    let replayed = repo
+        .create_outbound_order(&ctx, request, now, "h8-outbound-order-1", None)
+        .await
+        .expect("outbound order should replay");
+
+    assert!(!first.replayed);
+    assert!(replayed.replayed);
+    assert_eq!(replayed.value.id, first.value.id);
+    let evidence: (i64, i64, i64, i64) = sqlx::query_as(
+        "SELECT (SELECT COUNT(*) FROM outbound_orders WHERE owner_id = $1 AND id = $2), (SELECT COUNT(*) FROM outbound_order_lines WHERE owner_id = $1 AND outbound_order_id = $2), (SELECT COUNT(*) FROM audit_event WHERE owner_id = $1 AND action = 'create_outbound_order' AND resource_id = $2::text), (SELECT COUNT(*) FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = 'h8-outbound-order-1')",
+    )
+    .bind(owner_id)
+    .bind(first.value.id)
+    .fetch_one(&pool)
+    .await
+    .expect("outbound order evidence should query");
+    assert_eq!(evidence, (1, 1, 1, 1));
+}
