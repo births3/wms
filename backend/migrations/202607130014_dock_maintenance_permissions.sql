@@ -39,14 +39,43 @@ AFTER INSERT ON auth_roles
 FOR EACH ROW
 EXECUTE FUNCTION grant_dock_manage_to_warehouse_manager();
 
--- 预约模块后续复用此表；此处建立删除保护所需的最小关联约束。
+-- US-DOCK-002/004：预约当前完整基线。
 CREATE TABLE IF NOT EXISTS dock_appointments (
-    id          UUID PRIMARY KEY,
-    dock_id     UUID NOT NULL REFERENCES warehouse_docks(id) ON DELETE RESTRICT,
-    status      TEXT NOT NULL DEFAULT 'pending',
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    CHECK (status IN ('pending', 'confirmed', 'arrived', 'completed', 'timed_out', 'cancelled'))
+    id                        UUID PRIMARY KEY,
+    dock_id                   UUID NOT NULL,
+    owner_id                  UUID NOT NULL,
+    warehouse_id              UUID NOT NULL,
+    appointment_no            TEXT NOT NULL,
+    document_type             TEXT NOT NULL,
+    document_no               TEXT NOT NULL,
+    window_start_at           TIMESTAMPTZ NOT NULL,
+    window_end_at             TIMESTAMPTZ NOT NULL,
+    vehicle_plate_no          TEXT NOT NULL DEFAULT '',
+    vehicle_type              TEXT NOT NULL,
+    driver_name               TEXT NOT NULL,
+    driver_phone              TEXT NOT NULL DEFAULT '',
+    status                    TEXT NOT NULL DEFAULT 'pending',
+    supersedes_id             UUID REFERENCES dock_appointments(id) ON DELETE RESTRICT,
+    arrived_at                TIMESTAMPTZ,
+    arrival_deviation_minutes BIGINT,
+    created_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
+    version                   BIGINT NOT NULL DEFAULT 1,
+    FOREIGN KEY (owner_id, warehouse_id) REFERENCES warehouses (owner_id, id) ON DELETE RESTRICT,
+    FOREIGN KEY (dock_id, warehouse_id) REFERENCES warehouse_docks (id, warehouse_id) ON DELETE RESTRICT,
+    CHECK (status IN ('pending', 'confirmed', 'arrived', 'completed', 'timed_out', 'cancelled')),
+    CHECK (window_end_at > window_start_at)
 );
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON dock_appointments TO wms_app;
+CREATE UNIQUE INDEX IF NOT EXISTS ux_dock_appointments_appointment_no
+    ON dock_appointments (appointment_no);
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_dock_appointments_active
+    ON dock_appointments (owner_id, document_type, document_no)
+    WHERE status IN ('pending', 'confirmed', 'arrived');
+
+CREATE INDEX IF NOT EXISTS idx_dock_appointments_supersedes
+    ON dock_appointments (supersedes_id);
+
+GRANT SELECT, INSERT, UPDATE ON dock_appointments TO wms_app;
 GRANT DELETE ON warehouse_docks TO wms_app;

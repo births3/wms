@@ -254,12 +254,14 @@ impl PgDockRepository {
         .await
         .map_err(map_db_error)?
         .ok_or(DockRepositoryError::NotFound)?;
-        let active_appointments: i64 =
-            sqlx::query_scalar("SELECT COUNT(*)::BIGINT FROM dock_appointments WHERE dock_id=$1")
-                .bind(id)
-                .fetch_one(&mut *tx)
-                .await
-                .map_err(map_db_error)?;
+        let active_appointments: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*)::BIGINT FROM dock_appointments WHERE dock_id=$1 AND owner_id=$2",
+        )
+        .bind(id)
+        .bind(ctx.owner_id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(map_db_error)?;
         if active_appointments > 0 {
             return Err(DockRepositoryError::InUse(active_appointments));
         }

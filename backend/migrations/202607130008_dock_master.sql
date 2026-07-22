@@ -22,4 +22,7 @@ CREATE TABLE IF NOT EXISTS warehouse_docks (
     UNIQUE (warehouse_id, dock_code)
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS warehouse_docks_id_warehouse_id_uidx
+    ON warehouse_docks (id, warehouse_id);
+
 GRANT SELECT, INSERT, UPDATE ON warehouse_docks TO wms_app;

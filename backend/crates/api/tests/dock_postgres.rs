@@ -167,12 +167,23 @@ async fn dock_import_is_transactional_and_delete_respects_active_appointments(po
         .expect("bulk import should create all rows");
     assert_eq!(imported.len(), 2);
 
-    sqlx::query("INSERT INTO dock_appointments (id, dock_id, status) VALUES ($1, $2, 'confirmed')")
-        .bind(Uuid::new_v4())
-        .bind(imported[0].id)
-        .execute(&pool)
-        .await
-        .expect("appointment seed should persist");
+    sqlx::query(
+        "INSERT INTO dock_appointments
+         (id, dock_id, owner_id, warehouse_id, appointment_no, document_type, document_no,
+          window_start_at, window_end_at, vehicle_type, driver_name, status)
+         VALUES ($1,$2,$3,$4,$5,'inbound',$6,$7,$8,'truck','测试司机','confirmed')",
+    )
+    .bind(Uuid::new_v4())
+    .bind(imported[0].id)
+    .bind(owner_id)
+    .bind(warehouse_id)
+    .bind("APP-DELETE-GUARD")
+    .bind("DOC-DELETE-GUARD")
+    .bind(at(9))
+    .bind(at(10))
+    .execute(&pool)
+    .await
+    .expect("appointment seed should persist");
     assert!(matches!(
         repo.delete_dock(&actor, imported[0].id, at(10), "dock-delete-in-use")
             .await,
@@ -244,35 +255,6 @@ async fn dock(pool: &PgPool, warehouse_id: Uuid, dock_code: &str) -> Uuid {
     .await
     .expect("dock seed should persist");
     id
-}
-
-#[sqlx::test(migrations = "../../migrations")]
-async fn dock_appointment_backfill_rows_from_minimal_schema(pool: PgPool) {
-    let owner_id = Uuid::new_v4();
-    let warehouse_id = warehouse(&pool, owner_id, "WH-APP-1").await;
-    let dock_id = dock(&pool, warehouse_id, "D-APP-1").await;
-    let appointment_id = Uuid::new_v4();
-
-    sqlx::query("INSERT INTO dock_appointments (id, dock_id, status) VALUES ($1, $2, 'pending')")
-        .bind(appointment_id)
-        .bind(dock_id)
-        .execute(&pool)
-        .await
-        .expect("legacy appointment row should persist");
-
-    let row: (Uuid, Uuid, String, String, String, i64) = sqlx::query_as(
-        "SELECT owner_id, warehouse_id, appointment_no, document_type, document_no, version FROM dock_appointments WHERE id = $1",
-    )
-    .bind(appointment_id)
-    .fetch_one(&pool)
-    .await
-    .expect("appointment fields should be backfilled");
-    assert_eq!(row.0, owner_id);
-    assert_eq!(row.1, warehouse_id);
-    assert!(row.2.starts_with("APP-"));
-    assert_eq!(row.3, "inbound");
-    assert!(row.4.starts_with("DOC-"));
-    assert_eq!(row.5, 1);
 }
 
 #[sqlx::test(migrations = "../../migrations")]

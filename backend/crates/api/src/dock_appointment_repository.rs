@@ -144,6 +144,7 @@ impl PgDockAppointmentRepository {
         ensure_active_document_available(&mut tx, ctx.owner_id, &req).await?;
         ensure_no_time_overlap(
             &mut tx,
+            ctx.owner_id,
             req.dock_id,
             req.window_start_at,
             req.window_end_at,
@@ -237,6 +238,7 @@ impl PgDockAppointmentRepository {
         ensure_dock_warehouse_owned(&mut tx, ctx.owner_id, req.dock_id, old.warehouse_id).await?;
         ensure_no_time_overlap(
             &mut tx,
+            ctx.owner_id,
             req.dock_id,
             req.window_start_at,
             req.window_end_at,
@@ -561,14 +563,16 @@ async fn ensure_active_document_available(
 
 async fn ensure_no_time_overlap(
     tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
     dock_id: Uuid,
     window_start_at: DateTime<Utc>,
     window_end_at: DateTime<Utc>,
     excluded_id: Option<Uuid>,
 ) -> Result<(), DockAppointmentRepositoryError> {
     let overlaps: bool = sqlx::query_scalar(
-        "SELECT EXISTS (SELECT 1 FROM dock_appointments WHERE dock_id = $1 AND status IN ('pending', 'confirmed', 'arrived') AND ($4::UUID IS NULL OR id <> $4) AND window_start_at < $3 AND window_end_at > $2)",
+        "SELECT EXISTS (SELECT 1 FROM dock_appointments WHERE owner_id = $1 AND dock_id = $2 AND status IN ('pending', 'confirmed', 'arrived') AND ($5::UUID IS NULL OR id <> $5) AND window_start_at < $4 AND window_end_at > $3)",
     )
+    .bind(owner_id)
     .bind(dock_id)
     .bind(window_start_at)
     .bind(window_end_at)
