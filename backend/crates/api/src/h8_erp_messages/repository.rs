@@ -33,7 +33,7 @@ pub trait H8ErpMessageRepository: Send + Sync {
         connector_id: Option<Uuid>,
         channel: Option<&str>,
         replay_requested: bool,
-        warehouse_id: Option<Uuid>,
+        warehouse_ids: Option<&[Uuid]>,
         external_ref: Option<&str>,
         idempotency_key: Option<&str>,
         correlation_id: Option<&str>,
@@ -57,6 +57,7 @@ pub trait H8ErpMessageRepository: Send + Sync {
         connector_code: Option<&str>,
         channel: Option<&str>,
         message_type: Option<&str>,
+        warehouse_ids: Option<&[Uuid]>,
     ) -> Result<H8ErpMessageStats, H8ErpMessageRepoError>;
 
     async fn replay(
@@ -160,7 +161,7 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
         connector_id: Option<Uuid>,
         channel: Option<&str>,
         replay_requested: bool,
-        warehouse_id: Option<Uuid>,
+        warehouse_ids: Option<&[Uuid]>,
         external_ref: Option<&str>,
         idempotency_key: Option<&str>,
         correlation_id: Option<&str>,
@@ -187,7 +188,12 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
                         .as_deref()
                         .is_some_and(|actor| actor.starts_with("replay:"))
             })
-            .filter(|m| warehouse_id.is_none_or(|value| m.warehouse_id == Some(value)))
+            .filter(|m| {
+                warehouse_ids.is_none_or(|values| {
+                    m.warehouse_id
+                        .is_some_and(|warehouse_id| values.contains(&warehouse_id))
+                })
+            })
             .filter(|m| external_ref.is_none_or(|value| m.external_ref == value))
             .filter(|m| idempotency_key.is_none_or(|value| m.idempotency_key == value))
             .filter(|m| correlation_id.is_none_or(|value| m.correlation_id == value))
@@ -234,6 +240,7 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
         connector_code: Option<&str>,
         channel: Option<&str>,
         message_type: Option<&str>,
+        warehouse_ids: Option<&[Uuid]>,
     ) -> Result<H8ErpMessageStats, H8ErpMessageRepoError> {
         let rows = self
             .list(
@@ -245,7 +252,7 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
                 None,
                 channel,
                 false,
-                None,
+                warehouse_ids,
                 None,
                 None,
                 None,

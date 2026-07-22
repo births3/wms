@@ -8,7 +8,7 @@ use chrono::{DateTime, Duration, Utc};
 use sqlx::PgPool;
 use tower::ServiceExt;
 use uuid::Uuid;
-use wms_domain::{standard_retry_delay_millis, H8ErpMessageListResponse};
+use wms_domain::{standard_retry_delay_millis, H8ErpMessageListResponse, H8ErpMessageStats};
 
 use crate::auth::AuthContext;
 
@@ -29,6 +29,145 @@ fn test_ctx(owner_id: Uuid) -> AuthContext {
         jti: "h8-preflight-test".into(),
         warehouse_scope: None,
     }
+}
+
+fn warehouse_reader_ctx(owner_id: Uuid, user_id: Uuid) -> AuthContext {
+    AuthContext {
+        user_id,
+        owner_id,
+        actor_name: "warehouse-reader".into(),
+        permissions: vec!["h8.erp_connector.read".into()],
+        jti: "h8-warehouse-reader-test".into(),
+        warehouse_scope: None,
+    }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn jwt_warehouse_scopes_limit_message_list_detail_and_stats(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let user_id = Uuid::new_v4();
+    let allowed_warehouse = Uuid::new_v4();
+    let second_allowed_warehouse = Uuid::new_v4();
+    let denied_warehouse = Uuid::new_v4();
+    sqlx::query("INSERT INTO auth_owners (id, owner_code, owner_name) VALUES ($1,$2,$3)")
+        .bind(owner_id)
+        .bind(format!("OWNER-{owner_id}"))
+        .bind("H8 warehouse scope test")
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO auth_users (id, username, display_name, password_hash, status) VALUES ($1,$2,'H8 warehouse reader','test-hash','active')")
+        .bind(user_id)
+        .bind(format!("h8-reader-{user_id}"))
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO auth_user_owner_bindings (user_id, owner_id, is_active, is_primary) VALUES ($1,$2,TRUE,TRUE)")
+        .bind(user_id)
+        .bind(owner_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    for (warehouse_id, code) in [
+        (allowed_warehouse, "H8-SCOPE-A"),
+        (second_allowed_warehouse, "H8-SCOPE-B"),
+        (denied_warehouse, "H8-SCOPE-C"),
+    ] {
+        sqlx::query("INSERT INTO warehouses (id, owner_id, warehouse_code, warehouse_name, warehouse_type, status) VALUES ($1,$2,$3,$3,'normal','active')")
+            .bind(warehouse_id)
+            .bind(owner_id)
+            .bind(code)
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+    for warehouse_id in [allowed_warehouse, second_allowed_warehouse] {
+        sqlx::query("INSERT INTO auth_user_warehouse_scopes (user_id, owner_id, warehouse_id) VALUES ($1,$2,$3)")
+            .bind(user_id)
+            .bind(owner_id)
+            .bind(warehouse_id)
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+
+    let allowed_id = Uuid::new_v4();
+    let second_allowed_id = Uuid::new_v4();
+    let denied_id = Uuid::new_v4();
+    for (id, warehouse_id, external_ref) in [
+        (allowed_id, allowed_warehouse, "ERP-SCOPE-ALLOWED"),
+        (
+            second_allowed_id,
+            second_allowed_warehouse,
+            "ERP-SCOPE-ALLOWED-2",
+        ),
+        (denied_id, denied_warehouse, "ERP-SCOPE-DENIED"),
+    ] {
+        sqlx::query(
+            r#"INSERT INTO h8_erp_messages
+               (id, owner_id, warehouse_id, connector_code, direction, message_type,
+                schema_version, channel, external_ref, idempotency_key, correlation_id,
+                sync_status, retry_count, payload_digest)
+               VALUES ($1,$2,$3,'SELF-ERP','inbound','asn','1','interface_table',$4,$4,$4,
+                       'failed',0,'digest')"#,
+        )
+        .bind(id)
+        .bind(owner_id)
+        .bind(warehouse_id)
+        .bind(external_ref)
+        .execute(&pool)
+        .await
+        .unwrap();
+    }
+
+    let app = h8_erp_message_router(H8ErpMessageAppState::with_postgres(pool));
+    let ctx = warehouse_reader_ctx(owner_id, user_id);
+
+    let mut request = Request::builder()
+        .uri("/api/v1/integration/erp-messages?created_from=1970-01-01T00:00:00Z")
+        .body(Body::empty())
+        .unwrap();
+    request.extensions_mut().insert(ctx.clone());
+    let response = app.clone().oneshot(request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let listed: H8ErpMessageListResponse = serde_json::from_slice(&body).unwrap();
+    assert_eq!(listed.data.len(), 2);
+    assert!(listed.data.iter().any(|message| message.id == allowed_id));
+    assert!(listed
+        .data
+        .iter()
+        .any(|message| message.id == second_allowed_id));
+
+    let mut request = Request::builder()
+        .uri(format!(
+            "/api/v1/integration/erp-messages?warehouse_id={denied_warehouse}"
+        ))
+        .body(Body::empty())
+        .unwrap();
+    request.extensions_mut().insert(ctx.clone());
+    let response = app.clone().oneshot(request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+
+    let mut request = Request::builder()
+        .uri(format!("/api/v1/integration/erp-messages/{denied_id}"))
+        .body(Body::empty())
+        .unwrap();
+    request.extensions_mut().insert(ctx.clone());
+    let response = app.clone().oneshot(request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+
+    let mut request = Request::builder()
+        .uri("/api/v1/integration/erp-messages/stats")
+        .body(Body::empty())
+        .unwrap();
+    request.extensions_mut().insert(ctx);
+    let response = app.oneshot(request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let stats: H8ErpMessageStats = serde_json::from_slice(&body).unwrap();
+    assert_eq!(stats.total, 2);
+    assert_eq!(stats.failed, 2);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -325,6 +464,7 @@ async fn stats_filter_real_rows_and_attempt_latency(pool: PgPool) {
             Some("SELF-ERP"),
             Some("interface_table"),
             Some("asn"),
+            None,
         )
         .await
         .unwrap();

@@ -12,13 +12,13 @@ use std::collections::HashMap;
 use uuid::Uuid;
 use wms_domain::{
     validate_schema_version, ClaimH8ErpMessageRequest, H8ErpMessage, H8ErpMessageDetail,
-    H8ErpMessageListResponse, H8ErpMessageStats, H8WorkerClaimDecision, H8WorkerHeartbeatRequest,
+    H8ErpMessageListResponse, H8WorkerClaimDecision, H8WorkerHeartbeatRequest,
     H8WorkerRuntimeResponse, H8WorkerStatus, PageMeta, PurgeH8ErpMessagesRequest,
     PurgeH8ErpMessagesResponse, ReplayH8ErpMessageRequest, SetH8WorkerClaimControlRequest,
     UpdateH8PayloadRetentionPolicyRequest, UpsertH8ErpMessageLifecycleRequest,
 };
 
-use crate::auth::AuthContext;
+use crate::auth::{AuthContext, AuthError};
 
 use super::audit::{
     write_dead_entry_audit, write_exchange_lifecycle_audit, write_message_audit, write_owner_audit,
@@ -26,6 +26,7 @@ use super::audit::{
 use super::error::H8ErpMessageHandlerError;
 use super::lifecycle::{apply_inbound_lifecycle_status, record_lifecycle, safe_lifecycle_result};
 use super::repository::H8ErpMessageCursor;
+use super::scope::{authorized_warehouse_ids, message_stats, require_message_warehouse_scope};
 use super::state::{H8ErpMessageAppState, H8_MSG_READ, H8_MSG_WRITE};
 
 const DEFAULT_LIST_LIMIT: u32 = 50;
@@ -122,13 +123,6 @@ struct ClaimDecisionQuery {
     direction: String,
 }
 
-#[derive(Debug, Deserialize)]
-struct StatsQuery {
-    connector_code: Option<String>,
-    channel: Option<String>,
-    message_type: Option<String>,
-}
-
 async fn list_messages(
     ctx: AuthContext,
     State(state): State<H8ErpMessageAppState>,
@@ -196,6 +190,7 @@ async fn list_messages(
             "cursor does not match created_from",
         ));
     }
+    let warehouse_ids = authorized_warehouse_ids(&state, &ctx, q.warehouse_id).await?;
     let mut data = state
         .repository
         .list(
@@ -207,7 +202,7 @@ async fn list_messages(
             q.connector_id,
             channel,
             q.replay_requested.unwrap_or(false),
-            q.warehouse_id,
+            warehouse_ids.as_deref(),
             external_ref,
             idempotency_key,
             correlation_id,
@@ -279,6 +274,7 @@ async fn get_message(
 ) -> Result<Json<H8ErpMessageDetail>, H8ErpMessageHandlerError> {
     ctx.require_permission(H8_MSG_READ)?;
     let message = state.repository.get(ctx.owner_id, id).await?;
+    require_message_warehouse_scope(&state, &ctx, &message).await?;
     let attempts = state.repository.list_attempts(ctx.owner_id, id).await?;
     let (payload_retained, payload_expires_at) = state
         .payload_repository
@@ -383,6 +379,8 @@ async fn decrypt_message_payload(
     Path(id): Path<Uuid>,
 ) -> Result<(HeaderMap, Json<wms_domain::H8DecryptedPayload>), H8ErpMessageHandlerError> {
     ctx.require_permission(H8_MSG_WRITE)?;
+    let message = state.repository.get(ctx.owner_id, id).await?;
+    require_message_warehouse_scope(&state, &ctx, &message).await?;
     let keys = encryption_master_keys()?;
     let payload = state
         .payload_repository
@@ -403,36 +401,6 @@ async fn decrypt_message_payload(
     headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     headers.insert(header::PRAGMA, HeaderValue::from_static("no-cache"));
     Ok((headers, Json(payload)))
-}
-
-async fn message_stats(
-    ctx: AuthContext,
-    State(state): State<H8ErpMessageAppState>,
-    Query(query): Query<StatsQuery>,
-) -> Result<Json<H8ErpMessageStats>, H8ErpMessageHandlerError> {
-    ctx.require_permission(H8_MSG_READ)?;
-    let connector_code = query.connector_code.as_deref().map(str::trim);
-    let channel = query.channel.as_deref().map(str::trim);
-    let message_type = query.message_type.as_deref().map(str::trim);
-    if connector_code.is_some_and(str::is_empty) {
-        return Err(H8ErpMessageHandlerError::BadRequest(
-            "connector_code required",
-        ));
-    }
-    if let Some(channel) = channel {
-        wms_domain::validate_channel(channel)
-            .map_err(|error| super::error::H8ErpMessageRepoError::Domain(error))?;
-    }
-    if let Some(message_type) = message_type {
-        wms_domain::validate_message_type_in_catalog(message_type)
-            .map_err(|error| super::error::H8ErpMessageRepoError::Domain(error))?;
-    }
-    Ok(Json(
-        state
-            .repository
-            .stats(ctx.owner_id, connector_code, channel, message_type)
-            .await?,
-    ))
 }
 
 async fn worker_runtime(
@@ -528,6 +496,8 @@ async fn replay_message(
     if body.reason.trim().is_empty() {
         return Err(H8ErpMessageHandlerError::BadRequest("reason required"));
     }
+    let existing = state.repository.get(ctx.owner_id, id).await?;
+    require_message_warehouse_scope(&state, &ctx, &existing).await?;
     let actor = ctx.user_id.to_string();
     let message = state
         .repository
@@ -545,6 +515,7 @@ async fn claim_message(
 ) -> Result<Json<H8ErpMessage>, H8ErpMessageHandlerError> {
     ctx.require_permission(H8_MSG_WRITE)?;
     let existing = state.repository.get(ctx.owner_id, id).await?;
+    require_message_warehouse_scope(&state, &ctx, &existing).await?;
     if let Some(connector_id) = existing.connector_id {
         let decision = state
             .runtime_repository
@@ -578,6 +549,8 @@ async fn mark_dead_message(
             "error_summary required",
         ));
     }
+    let existing = state.repository.get(ctx.owner_id, id).await?;
+    require_message_warehouse_scope(&state, &ctx, &existing).await?;
     let actor = ctx.user_id.to_string();
     let message = state
         .repository
@@ -600,6 +573,8 @@ async fn archive_message(
     Path(id): Path<Uuid>,
 ) -> Result<Json<H8ErpMessage>, H8ErpMessageHandlerError> {
     ctx.require_permission(H8_MSG_WRITE)?;
+    let existing = state.repository.get(ctx.owner_id, id).await?;
+    require_message_warehouse_scope(&state, &ctx, &existing).await?;
     let actor = ctx.user_id.to_string();
     let message = state
         .repository
@@ -645,7 +620,9 @@ async fn record_lifecycle_upsert(
     }
     let now = Utc::now();
     let mut message = if let Some(id) = body.message_id {
-        state.repository.get(ctx.owner_id, id).await?
+        let message = state.repository.get(ctx.owner_id, id).await?;
+        require_message_warehouse_scope(&state, &ctx, &message).await?;
+        message
     } else {
         let existing = state
             .repository
@@ -657,12 +634,13 @@ async fn record_lifecycle_upsert(
             )
             .await?;
         if let Some(m) = existing {
+            require_message_warehouse_scope(&state, &ctx, &m).await?;
             m
         } else {
             let m = H8ErpMessage {
                 id: Uuid::new_v4(),
                 owner_id: ctx.owner_id,
-                warehouse_id: None,
+                warehouse_id: ctx.warehouse_scope,
                 connector_id: body.connector_id,
                 connector_code: body.connector_code.clone(),
                 config_version: body.config_version,
@@ -753,6 +731,12 @@ async fn purge_messages(
         return Err(H8ErpMessageHandlerError::BadRequest(
             "confirmed must be true",
         ));
+    }
+    if authorized_warehouse_ids(&state, &ctx, None)
+        .await?
+        .is_some()
+    {
+        return Err(AuthError::PermissionDenied("warehouse scope".into()).into());
     }
     let (deleted, retention_days) = state
         .repository

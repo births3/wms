@@ -11,6 +11,7 @@ use crate::auth::AuthContext;
 use super::{
     audit::write_exchange_lifecycle_audit,
     error::H8ErpMessageHandlerError,
+    scope::require_message_warehouse_scope,
     state::{H8ErpMessageAppState, H8_MSG_WRITE},
 };
 
@@ -28,6 +29,7 @@ pub(super) async fn record_lifecycle(
 ) -> Result<Json<H8ErpMessage>, H8ErpMessageHandlerError> {
     ctx.require_permission(H8_MSG_WRITE)?;
     let message = state.repository.get(ctx.owner_id, id).await?;
+    require_message_warehouse_scope(&state, &ctx, &message).await?;
     let result = safe_lifecycle_result(body.stage.trim(), body.result.trim());
     write_exchange_lifecycle_audit(&state, &ctx, &message, body.stage.trim(), &result).await?;
     Ok(Json(message))

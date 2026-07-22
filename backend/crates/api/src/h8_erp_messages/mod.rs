@@ -10,6 +10,7 @@ mod pg_repository;
 mod pg_rows;
 mod repository;
 mod runtime_repository;
+mod scope;
 mod state;
 
 #[cfg(test)]

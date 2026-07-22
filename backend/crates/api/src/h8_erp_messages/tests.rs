@@ -103,52 +103,12 @@ async fn list_filters_by_status_and_stats() {
     assert_eq!(listed[0].sync_status, "dead");
     let stats = state
         .repository
-        .stats(owner, None, None, None)
+        .stats(owner, None, None, None, None)
         .await
         .unwrap();
     assert_eq!(stats.total, 2);
     assert_eq!(stats.dead, 1);
     assert_eq!(stats.succeeded, 1);
-}
-
-#[tokio::test]
-async fn list_filters_by_warehouse_and_trace_keys() {
-    let state = H8ErpMessageAppState::with_memory();
-    let owner = Uuid::new_v4();
-    let warehouse = Uuid::new_v4();
-    let mut selected = sample_message(owner, "failed");
-    selected.warehouse_id = Some(warehouse);
-    selected.external_ref = "ERP-SELECTED".into();
-    selected.idempotency_key = "idem-selected".into();
-    selected.correlation_id = "corr-selected".into();
-    let other = sample_message(owner, "failed");
-    state.repository.upsert_for_test(&selected).await.unwrap();
-    state.repository.upsert_for_test(&other).await.unwrap();
-
-    let listed = state
-        .repository
-        .list(
-            owner,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            false,
-            Some(warehouse),
-            Some("ERP-SELECTED"),
-            Some("idem-selected"),
-            Some("corr-selected"),
-            Some(selected.created_at - chrono::Duration::seconds(1)),
-            Some(selected.created_at + chrono::Duration::seconds(1)),
-            None,
-            200,
-        )
-        .await
-        .unwrap();
-    assert_eq!(listed.len(), 1);
-    assert_eq!(listed[0].id, selected.id);
 }
 
 #[tokio::test]
@@ -226,6 +186,7 @@ async fn stats_filter_by_connector_channel_and_message_type() {
             Some("SELF-ERP"),
             Some("interface_table"),
             Some("asn"),
+            None,
         )
         .await
         .unwrap();
@@ -820,7 +781,7 @@ async fn stats_include_p95_from_attempts() {
         .unwrap();
     let stats = state
         .repository
-        .stats(owner, None, None, None)
+        .stats(owner, None, None, None, None)
         .await
         .unwrap();
     assert!(stats.p95_latency_ms >= 100);

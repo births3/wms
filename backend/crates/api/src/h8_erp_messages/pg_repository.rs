@@ -36,7 +36,7 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
         connector_id: Option<Uuid>,
         channel: Option<&str>,
         replay_requested: bool,
-        warehouse_id: Option<Uuid>,
+        warehouse_ids: Option<&[Uuid]>,
         external_ref: Option<&str>,
         idempotency_key: Option<&str>,
         correlation_id: Option<&str>,
@@ -70,7 +70,7 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
               AND ($8::uuid IS NULL OR connector_id = $8)
               AND ($9::text IS NULL OR channel = $9)
               AND (NOT $10::bool OR claimed_by LIKE 'replay:%')
-              AND ($11::uuid IS NULL OR warehouse_id = $11)
+              AND ($11::uuid[] IS NULL OR warehouse_id = ANY($11))
               AND ($12::text IS NULL OR external_ref = $12)
               AND ($13::text IS NULL OR idempotency_key = $13)
               AND ($14::text IS NULL OR correlation_id = $14)
@@ -90,7 +90,7 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
         .bind(connector_id)
         .bind(channel)
         .bind(replay_requested)
-        .bind(warehouse_id)
+        .bind(warehouse_ids)
         .bind(external_ref)
         .bind(idempotency_key)
         .bind(correlation_id)
@@ -153,6 +153,7 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
         connector_code: Option<&str>,
         channel: Option<&str>,
         message_type: Option<&str>,
+        warehouse_ids: Option<&[Uuid]>,
     ) -> Result<H8ErpMessageStats, H8ErpMessageRepoError> {
         let from = Utc::now() - chrono::Duration::days(30);
         let row = sqlx::query_as::<_, StatsRow>(
@@ -170,6 +171,7 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
               AND ($3::text IS NULL OR connector_code = $3)
               AND ($4::text IS NULL OR channel = $4)
               AND ($5::text IS NULL OR message_type = $5)
+              AND ($6::uuid[] IS NULL OR warehouse_id = ANY($6))
             "#,
         )
         .bind(owner_id)
@@ -177,6 +179,7 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
         .bind(connector_code)
         .bind(channel)
         .bind(message_type)
+        .bind(warehouse_ids)
         .fetch_one(&self.pool)
         .await
         .map_err(|e| H8ErpMessageRepoError::Db(e.to_string()))?;
@@ -191,6 +194,7 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
               AND ($3::text IS NULL OR message.connector_code = $3)
               AND ($4::text IS NULL OR message.channel = $4)
               AND ($5::text IS NULL OR message.message_type = $5)
+              AND ($6::uuid[] IS NULL OR message.warehouse_id = ANY($6))
             "#,
         )
         .bind(owner_id)
@@ -198,6 +202,7 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
         .bind(connector_code)
         .bind(channel)
         .bind(message_type)
+        .bind(warehouse_ids)
         .fetch_all(&self.pool)
         .await
         .map_err(|e| H8ErpMessageRepoError::Db(e.to_string()))?;
