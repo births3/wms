@@ -27,6 +27,8 @@ from sync_worker import (
     resolve_inbound_route,
     validate_row_schema_version,
 )
+from worker_route import get_worker_claim_decision, post_worker_heartbeat
+from worker_mssql import claim_rows
 
 
 def settings() -> Settings:
@@ -43,6 +45,10 @@ def settings() -> Settings:
         max_retry=5,
         batch_size=1,
         use_sqlcmd=True,
+        connector_id="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        worker_id="worker-test",
+        worker_version="test-1",
+        heartbeat_ttl_seconds=15,
     )
 
 
@@ -55,14 +61,18 @@ class TestInboundCorePipeline(unittest.TestCase):
             self.assertEqual(method, "GET")
             self.assertIsNone(body)
             self.assertEqual(idem, "route-idem-1")
-            return 200, {
-                "connector": {
-                    "id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-                    "config_version": 3,
-                    "channel_mode": "rest_primary_table_fallback",
-                    "connector_code": "SELF-ERP",
-                }
-            }, ""
+            return (
+                200,
+                {
+                    "connector": {
+                        "id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                        "config_version": 3,
+                        "channel_mode": "rest_primary_table_fallback",
+                        "connector_code": "SELF-ERP",
+                    }
+                },
+                "",
+            )
 
         binding = resolve_inbound_route(
             settings(),
@@ -81,8 +91,12 @@ class TestInboundCorePipeline(unittest.TestCase):
 
     def test_only_transient_http_errors_are_retryable(self) -> None:
         self.assertTrue(is_retryable_worker_error(WorkerHttpError(0, "route", "down")))
-        self.assertTrue(is_retryable_worker_error(WorkerHttpError(503, "route", "down")))
-        self.assertFalse(is_retryable_worker_error(WorkerHttpError(422, "schema", "bad")))
+        self.assertTrue(
+            is_retryable_worker_error(WorkerHttpError(503, "route", "down"))
+        )
+        self.assertFalse(
+            is_retryable_worker_error(WorkerHttpError(422, "schema", "bad"))
+        )
         self.assertFalse(is_retryable_worker_error(ValueError("bad mapping")))
 
     def test_schema_version_is_strict(self) -> None:
@@ -101,6 +115,9 @@ class TestInboundCorePipeline(unittest.TestCase):
             "retry_count": "0",
         }
         with (
+            patch.object(sync_worker, "get_worker_claim_decision", return_value=True),
+            patch.object(sync_worker, "try_record_worker_heartbeat"),
+            patch.object(sync_worker, "record_preflight_failure") as preflight_audit,
             patch.object(sync_worker, "claim_rows", return_value=[row]),
             patch.object(
                 sync_worker,
@@ -112,6 +129,92 @@ class TestInboundCorePipeline(unittest.TestCase):
             self.assertEqual(sync_worker.process_once(settings(), ["asn"], False), 1)
         self.assertEqual(mark.call_args.args[3], "dead")
         self.assertEqual(mark.call_args.kwargs["retry_count"], 1)
+        preflight_audit.assert_called_once()
+
+    def test_preflight_audit_failure_releases_claim_for_retry(self) -> None:
+        import sync_worker
+
+        row = {
+            "id": "row-1",
+            "external_doc_no": "ASN-1",
+            "idempotency_key": "idem-1",
+            "schema_version": "999",
+            "retry_count": "0",
+        }
+        with (
+            patch.object(sync_worker, "get_worker_claim_decision", return_value=True),
+            patch.object(sync_worker, "try_record_worker_heartbeat"),
+            patch.object(
+                sync_worker,
+                "record_preflight_failure",
+                side_effect=WorkerHttpError(503, "audit", "unavailable"),
+            ),
+            patch.object(sync_worker, "claim_rows", return_value=[row]),
+            patch.object(sync_worker, "mark_row") as mark,
+        ):
+            self.assertEqual(sync_worker.process_once(settings(), ["asn"], False), 1)
+        self.assertEqual(mark.call_args.args[3], "pending")
+        self.assertEqual(mark.call_args.kwargs["retry_count"], 1)
+
+    def test_paused_connector_does_not_claim_mssql_rows(self) -> None:
+        import sync_worker
+
+        with (
+            patch.object(sync_worker, "get_worker_claim_decision", return_value=False),
+            patch.object(sync_worker, "try_record_worker_heartbeat"),
+            patch.object(sync_worker, "claim_rows") as claim,
+        ):
+            self.assertEqual(sync_worker.process_once(settings(), ["asn"], False), 0)
+        claim.assert_not_called()
+
+    def test_claim_rows_parses_interface_table_output(self) -> None:
+        raw = "|".join(
+            [
+                "row-1",
+                "ASN-1",
+                "owner-1",
+                "warehouse-1",
+                "supplier-1",
+                "P-1",
+                "2",
+                "2026-07-22T10:00:00",
+                "purchase_inbound",
+                "ERP-1",
+                "R-1",
+                "1",
+                "idem-1",
+                "0",
+            ]
+        )
+        with patch("worker_mssql.sqlcmd_query", return_value=raw):
+            rows = claim_rows(settings(), "if_in_asn")
+        self.assertEqual(rows[0]["external_doc_no"], "ASN-1")
+        self.assertEqual(rows[0]["schema_version"], "1")
+
+    def test_worker_runtime_calls_include_binding_and_claim_count(self) -> None:
+        calls: list[tuple[str, str, dict | None]] = []
+
+        def fake_http(_settings, method, path, body, _idem):
+            calls.append((method, path, body))
+            if method == "GET":
+                return 200, {"allowed": False, "reason": "维护"}, ""
+            return 200, {"health": "healthy"}, ""
+
+        self.assertFalse(
+            get_worker_claim_decision(
+                settings(),
+                "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                "inbound",
+                http_json_fn=fake_http,
+            )
+        )
+        post_worker_heartbeat(
+            settings(), ["inbound", "outbound"], 2, http_json_fn=fake_http
+        )
+        self.assertIn("connector_id=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", calls[0][1])
+        self.assertEqual(calls[1][2]["worker_id"], "worker-test")
+        self.assertEqual(calls[1][2]["current_claims"], 2)
+        self.assertEqual(calls[1][2]["directions"], ["inbound", "outbound"])
 
 
 class TestInsertIfOutSql(unittest.TestCase):
@@ -167,7 +270,9 @@ class TestPayloadJson(unittest.TestCase):
         )
         sql = insert_if_out_sql(row)
         self.assertIn("a|b", sql)
-        self.assertNotIn("\n  INSERT", sql.split("IF NOT EXISTS")[0])  # payload line compact
+        self.assertNotIn(
+            "\n  INSERT", sql.split("IF NOT EXISTS")[0]
+        )  # payload line compact
 
 
 class TestChannelFailover(unittest.TestCase):
@@ -178,7 +283,9 @@ class TestChannelFailover(unittest.TestCase):
             map_channel_mode_to_transport("rest_primary_table_fallback"),
             "failover",
         )
-        self.assertFalse(production_allows_simultaneous_dual_write("rest_primary_table_fallback"))
+        self.assertFalse(
+            production_allows_simultaneous_dual_write("rest_primary_table_fallback")
+        )
 
     def test_failover_uses_table_after_http_fail(self) -> None:
         calls: list[str] = []

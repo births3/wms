@@ -11,9 +11,11 @@ from typing import Any
 from exchange_lifecycle import (
     H8_EXCHANGE_AUDIT_STAGES,
     is_exchange_audit_stage,
+    record_preflight_failure,
     run_inbound_pipeline,
     run_outbound_pipeline,
 )
+from worker_route import WorkerHttpError
 
 
 @dataclass
@@ -23,6 +25,27 @@ class FakeSettings:
 
 
 class TestExchangeLifecycle(unittest.TestCase):
+    def test_lifecycle_audit_failure_blocks_business_handler(self) -> None:
+        handler_called = False
+
+        def failed_audit(*_args: Any) -> tuple[int, dict[str, Any] | None, str]:
+            return 500, None, "audit unavailable"
+
+        def handler(_settings: Any, _row: dict[str, str]) -> str:
+            nonlocal handler_called
+            handler_called = True
+            return "unexpected"
+
+        with self.assertRaises(WorkerHttpError):
+            run_inbound_pipeline(
+                FakeSettings(),
+                "asn",
+                {"id": "1", "external_doc_no": "D", "idempotency_key": "k"},
+                handler,
+                http_json=failed_audit,
+            )
+        self.assertFalse(handler_called)
+
     def test_stages_match_domain_catalog(self) -> None:
         self.assertEqual(
             list(H8_EXCHANGE_AUDIT_STAGES),
@@ -89,6 +112,8 @@ class TestExchangeLifecycle(unittest.TestCase):
         self.assertEqual(posts[0]["body"]["connector_id"], "connector-1")
         self.assertEqual(posts[0]["body"]["config_version"], 3)
         self.assertEqual(posts[0]["body"]["schema_version"], "1")
+        self.assertEqual(posts[0]["body"]["payload"], row)
+        self.assertTrue(all("payload" not in post["body"] for post in posts[1:]))
         self.assertEqual(posts[2]["body"]["stage"], "business_api")
         self.assertEqual(posts[2]["body"]["result"], "started")
         self.assertEqual(posts[3]["body"]["result"], "ok")
@@ -96,7 +121,7 @@ class TestExchangeLifecycle(unittest.TestCase):
         self.assertEqual(life.message_id, "00000000-0000-0000-0000-0000000000aa")
 
     def test_inbound_failure_emits_final_failure(self) -> None:
-        posts: list[str] = []
+        posts: list[dict[str, Any]] = []
 
         def fake_http(
             settings: Any,
@@ -106,7 +131,7 @@ class TestExchangeLifecycle(unittest.TestCase):
             idem: str,
         ) -> tuple[int, dict[str, Any] | None, str]:
             assert body is not None
-            posts.append(str(body["stage"]))
+            posts.append(body)
             return 200, {"id": "m1"}, "{}"
 
         def boom(_s: Any, _r: dict[str, str]) -> str:
@@ -120,11 +145,13 @@ class TestExchangeLifecycle(unittest.TestCase):
                 boom,
                 http_json=fake_http,
             )
-        self.assertIn("final_failure", posts)
-        self.assertEqual(posts[-1], "final_failure")
+        self.assertIn("final_failure", [post["stage"] for post in posts])
+        self.assertEqual(posts[-1]["stage"], "final_failure")
 
-    def test_outbound_pipeline_emits_send_stages(self) -> None:
-        posts: list[str] = []
+    def test_preflight_failure_records_receive_and_final_failure_with_payload(
+        self,
+    ) -> None:
+        posts: list[dict[str, Any]] = []
 
         def fake_http(
             settings: Any,
@@ -134,7 +161,43 @@ class TestExchangeLifecycle(unittest.TestCase):
             idem: str,
         ) -> tuple[int, dict[str, Any] | None, str]:
             assert body is not None
-            posts.append(str(body["stage"]))
+            posts.append(body)
+            return 200, {"id": "preflight-message"}, "{}"
+
+        row = {
+            "id": "7",
+            "external_ref": "ERP-BAD-SCHEMA-1",
+            "idempotency_key": "idem-bad-schema-1",
+            "schema_version": "999",
+        }
+        record_preflight_failure(
+            FakeSettings(),
+            "asn",
+            row,
+            "connector-1",
+            http_json=fake_http,
+        )
+
+        self.assertEqual(
+            [post["stage"] for post in posts],
+            ["receive", "final_failure"],
+        )
+        self.assertEqual(posts[0]["payload"], row)
+        self.assertNotIn("payload", posts[1])
+        self.assertEqual(posts[1]["schema_version"], "999")
+
+    def test_outbound_pipeline_emits_send_stages(self) -> None:
+        posts: list[dict[str, Any]] = []
+
+        def fake_http(
+            settings: Any,
+            method: str,
+            path: str,
+            body: dict[str, Any] | None,
+            idem: str,
+        ) -> tuple[int, dict[str, Any] | None, str]:
+            assert body is not None
+            posts.append(body)
             return 200, {"id": "out-1"}, "{}"
 
         def send() -> None:
@@ -147,12 +210,20 @@ class TestExchangeLifecycle(unittest.TestCase):
             "idem-out-1",
             send,
             http_json=fake_http,
+            connector_id="connector-1",
+            payload={"qty": 1},
         )
         self.assertEqual(
             [s for s, _ in life.stages_emitted],
             ["receive", "convert", "send", "send", "receipt"],
         )
-        self.assertEqual(posts, ["receive", "convert", "send", "send", "receipt"])
+        self.assertEqual(
+            [post["stage"] for post in posts],
+            ["receive", "convert", "send", "send", "receipt"],
+        )
+        self.assertEqual(posts[0]["payload"], {"qty": 1})
+        self.assertEqual(posts[0]["connector_id"], "connector-1")
+        self.assertTrue(all("payload" not in post for post in posts[1:]))
 
     def test_process_once_path_uses_inbound_pipeline(self) -> None:
         """process_once 真实调用 run_inbound_pipeline（非旁路）。"""
