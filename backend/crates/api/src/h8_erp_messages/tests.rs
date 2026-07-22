@@ -303,6 +303,19 @@ async fn preflight_schema_failure_still_records_receive_and_final_failure() {
     assert!(actions
         .iter()
         .any(|action| action == "h8_exchange_final_failure"));
+    let message = state
+        .repository
+        .find_by_idempotency(owner, "asn", "ERP-BAD-SCHEMA-1", "idem-bad-schema-1")
+        .await
+        .unwrap()
+        .expect("preflight message");
+    let attempts = state
+        .repository
+        .list_attempts(owner, message.id)
+        .await
+        .unwrap();
+    assert_eq!(attempts.len(), 1);
+    assert_eq!(attempts[0].result, "failed");
 }
 
 #[tokio::test]

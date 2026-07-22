@@ -28,7 +28,7 @@ pub(super) struct MessageRow {
     pub(super) claimed_by: Option<String>,
     pub(super) lease_expires_at: Option<DateTime<Utc>>,
     created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    pub(super) updated_at: DateTime<Utc>,
     completed_at: Option<DateTime<Utc>>,
     acked_at: Option<DateTime<Utc>>,
 }

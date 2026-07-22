@@ -479,22 +479,40 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
         now: DateTime<Utc>,
     ) -> Result<H8ErpMessage, H8ErpMessageRepoError> {
         let mut guard = self.inner.lock().expect("lock");
-        let message = guard
-            .messages
-            .get_mut(&id)
-            .filter(|message| message.owner_id == owner_id)
-            .ok_or(H8ErpMessageRepoError::NotFound)?;
-        can_transition_message_status(&message.sync_status, target)
-            .map_err(H8ErpMessageRepoError::Domain)?;
-        message.sync_status = target.into();
-        message.retry_count += i32::from(target == "failed");
-        message.last_error_summary = error_summary.map(sanitize_error_summary);
-        message.claimed_by = (target == "processing").then(|| actor.to_string());
-        message.lease_expires_at =
-            (target == "processing").then(|| now + chrono::Duration::minutes(10));
-        message.completed_at = (target == "succeeded").then_some(now);
-        message.updated_at = now;
-        Ok(message.clone())
+        let (next, started_at) = {
+            let message = guard
+                .messages
+                .get_mut(&id)
+                .filter(|message| message.owner_id == owner_id)
+                .ok_or(H8ErpMessageRepoError::NotFound)?;
+            can_transition_message_status(&message.sync_status, target)
+                .map_err(H8ErpMessageRepoError::Domain)?;
+            let started_at = message.updated_at;
+            message.sync_status = target.into();
+            message.retry_count += i32::from(target == "failed");
+            message.last_error_summary = error_summary.map(sanitize_error_summary);
+            message.claimed_by = (target == "processing").then(|| actor.to_string());
+            message.lease_expires_at =
+                (target == "processing").then(|| now + chrono::Duration::minutes(10));
+            message.completed_at = (target == "succeeded").then_some(now);
+            message.updated_at = now;
+            (message.clone(), started_at)
+        };
+        if matches!(target, "failed" | "succeeded") {
+            let attempts = guard.attempts.entry(id).or_default();
+            attempts.push(H8ErpMessageAttempt {
+                id: Uuid::new_v4(),
+                message_id: id,
+                attempt_no: attempts.len() as i32 + 1,
+                channel: next.channel.clone(),
+                started_at,
+                finished_at: Some(now),
+                result: target.into(),
+                error_summary: error_summary.map(sanitize_error_summary),
+                actor: actor.into(),
+            });
+        }
+        Ok(next)
     }
 
     async fn mark_archived(

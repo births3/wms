@@ -4,7 +4,7 @@ use axum::{
     body::{to_bytes, Body},
     http::{Method, Request, StatusCode},
 };
-use chrono::{Duration, Utc};
+use chrono::{DateTime, Duration, Utc};
 use sqlx::PgPool;
 use tower::ServiceExt;
 use uuid::Uuid;
@@ -407,4 +407,36 @@ async fn inbound_lifecycle_persists_failure_retry_and_success_status(pool: PgPoo
             }
         }
     }
+
+    let attempts: Vec<(
+        i32,
+        String,
+        DateTime<Utc>,
+        Option<DateTime<Utc>>,
+        String,
+        Option<String>,
+        String,
+    )> = sqlx::query_as(
+        r#"SELECT attempt_no, channel, started_at, finished_at, result, error_summary, actor
+           FROM h8_erp_message_attempts
+           WHERE owner_id=$1
+           ORDER BY attempt_no"#,
+    )
+    .bind(owner_id)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(attempts.len(), 2);
+    assert_eq!((attempts[0].0, attempts[0].4.as_str()), (1, "failed"));
+    assert_eq!((attempts[1].0, attempts[1].4.as_str()), (2, "succeeded"));
+    for attempt in &attempts {
+        assert_eq!(attempt.1, "interface_table");
+        assert!(attempt.3.is_some_and(|finished| finished >= attempt.2));
+        assert!(attempt.6.starts_with("worker:"));
+    }
+    let failed_summary = attempts[0].5.as_deref().expect("failed attempt summary");
+    for secret in ["supersecrettoken", "rettoken", "anotherlongsecret"] {
+        assert!(!failed_summary.contains(secret), "attempt leaked {secret}");
+    }
+    assert!(attempts[1].5.is_none());
 }
