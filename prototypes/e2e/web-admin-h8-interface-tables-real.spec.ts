@@ -21,7 +21,8 @@ test("H8 接口表探查：真实 DEMO 列表、筛选、详情且无写操作",
   await page.getByLabel("同步状态", { exact: true }).click();
   await page.getByLabel("待处理", { exact: true }).check();
   await page.getByLabel("失败", { exact: true }).check();
-  await page.getByLabel("同步状态", { exact: true }).click();
+  await page.getByLabel("更新时间（最近 7 天）开始").click();
+  await expect(page.getByLabel("待处理", { exact: true })).toBeHidden();
   const filteredRequest = page.waitForRequest((request) =>
     request.url().includes("/api/v1/h8/erp-interface-tables/rows") &&
     new URL(request.url()).searchParams.get("sync_status") === "pending,failed",

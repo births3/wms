@@ -288,9 +288,21 @@ function QueryPanelMultiSelect({
   value: string[];
   onChange: (value: string[]) => void;
 }) {
+  const detailsRef = React.useRef<HTMLDetailsElement>(null);
   const selectedLabels = (field.options ?? [])
     .filter((option) => value.includes(option.value))
     .map((option) => option.label);
+
+  React.useEffect(() => {
+    function closeOnOutsidePointer(event: PointerEvent) {
+      const details = detailsRef.current;
+      if (!details?.open || !(event.target instanceof Node) || details.contains(event.target)) return;
+      details.open = false;
+    }
+
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
+  }, []);
 
   function toggle(optionValue: string, checked: boolean) {
     const next = new Set(value);
@@ -302,7 +314,7 @@ function QueryPanelMultiSelect({
   return (
     <div>
       <label className="mb-1 block text-xs text-muted-foreground">{field.label}</label>
-      <details className="group relative">
+      <details ref={detailsRef} className="group relative">
         <summary
           className={cn(
             "flex h-9 w-full cursor-pointer list-none items-center rounded-md border border-input",
