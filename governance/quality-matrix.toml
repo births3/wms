@@ -4608,10 +4608,12 @@ evidence_refs = [
   "backend/migrations/202607190006_h8_erp_messages_admin_menu.sql",
   "backend/migrations/202607220002_h8_worker_runtime_and_payload_retention.sql",
   "scripts/h8_erp_interface_sync/sync_worker.py",
+  "scripts/h8_erp_interface_sync/worker_mssql.py",
   "scripts/h8_erp_interface_sync/worker_route.py",
   "scripts/h8_erp_interface_sync/test_h8_sync_worker.py",
   "scripts/h8_erp_interface_sync/test_inbound_terminal_state.py",
   "docs/retros/h8-asn-manual-replay-evidence.json",
+  "docs/retros/h8-retry-schedule-evidence.json",
   "prototypes/e2e/web-admin-h8-messages.spec.ts",
   "prototypes/e2e/web-admin-h8-messages-real.spec.ts",
   "prototypes/playwright-web-admin-h8-real-config.ts",
@@ -4626,9 +4628,9 @@ evidence_refs = [
   "artifacts/screenshot-portal/real-web/h8-erp-messages/payload-retention.png",
   "artifacts/screenshot-portal/real-web/h8-erp-messages/payload-decrypted.png",
 ]
-reason = "消息/尝试存储、两级回执、claim 租约、普通 Worker 成功/失败完成尝试、服务端精确高级查询、created_at+id 稳定游标分页、按连接/通道/消息类型统计及 P95、Worker 心跳健康、暂停恢复、权限审计、完整报文短期加密保留/授权解密/no-store/到期清理，以及本地 Docker MSSQL 死信/人工重放状态闭环均有真实 PostgreSQL 或关闭 dev-mock 的浏览器证据；仍缺按 ADR-0018 持久化 next_retry_at、JWT 仓库范围接线、生产约定数据量 P95、生产 RANGE 月分区和自研 ERP 故障恢复 S4。"
+reason = "消息/尝试存储、两级回执、claim 租约、普通 Worker 成功/失败完成尝试、ADR-0018 L2 next_retry_at 与 MSSQL 到期认领、服务端精确高级查询、created_at+id 稳定游标分页、按连接/通道/消息类型统计及 P95、Worker 心跳健康、暂停恢复、权限审计、完整报文短期加密保留/授权解密/no-store/到期清理，以及本地 Docker MSSQL 死信/人工重放状态闭环均有真实 PostgreSQL、隔离 MSSQL 或关闭 dev-mock 的浏览器证据；仍缺档案补录 L3 的 5 分钟/24 小时专门运行证据、JWT 仓库范围接线、生产约定数据量 P95、生产 RANGE 月分区和自研 ERP 故障恢复 S4。"
 owner = "H8 模块负责人"
-resume_when = "补按 ADR-0018 持久化 next_retry_at、JWT 仓库范围和生产约定数据量 P95，生产库切换 RANGE 月分区并验证保留清理性能，再补自研 ERP dev/staging 的超时、死信、重放、回执和 H2 审计关联后关闭延期。"
+resume_when = "补档案补录 L3 的 5 分钟/24 小时专门运行证据、JWT 仓库范围和生产约定数据量 P95，生产库切换 RANGE 月分区并验证保留清理性能，再补自研 ERP dev/staging 的超时、死信、重放、回执和 H2 审计关联后关闭延期。"
 
 [[stories]]
 id = "US-H8-004"
