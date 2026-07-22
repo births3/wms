@@ -22,6 +22,12 @@ pub trait H8ErpMessageRepository: Send + Sync {
         direction: Option<&str>,
         message_type: Option<&str>,
         status: Option<&str>,
+        connector_code: Option<&str>,
+        channel: Option<&str>,
+        warehouse_id: Option<Uuid>,
+        external_ref: Option<&str>,
+        idempotency_key: Option<&str>,
+        correlation_id: Option<&str>,
         created_from: Option<DateTime<Utc>>,
         created_to: Option<DateTime<Utc>>,
     ) -> Result<Vec<H8ErpMessage>, H8ErpMessageRepoError>;
@@ -34,7 +40,13 @@ pub trait H8ErpMessageRepository: Send + Sync {
         message_id: Uuid,
     ) -> Result<Vec<H8ErpMessageAttempt>, H8ErpMessageRepoError>;
 
-    async fn stats(&self, owner_id: Uuid) -> Result<H8ErpMessageStats, H8ErpMessageRepoError>;
+    async fn stats(
+        &self,
+        owner_id: Uuid,
+        connector_code: Option<&str>,
+        channel: Option<&str>,
+        message_type: Option<&str>,
+    ) -> Result<H8ErpMessageStats, H8ErpMessageRepoError>;
 
     async fn replay(
         &self,
@@ -122,6 +134,12 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
         direction: Option<&str>,
         message_type: Option<&str>,
         status: Option<&str>,
+        connector_code: Option<&str>,
+        channel: Option<&str>,
+        warehouse_id: Option<Uuid>,
+        external_ref: Option<&str>,
+        idempotency_key: Option<&str>,
+        correlation_id: Option<&str>,
         created_from: Option<DateTime<Utc>>,
         created_to: Option<DateTime<Utc>>,
     ) -> Result<Vec<H8ErpMessage>, H8ErpMessageRepoError> {
@@ -133,6 +151,12 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
             .filter(|m| direction.is_none_or(|d| m.direction == d))
             .filter(|m| message_type.is_none_or(|t| m.message_type == t))
             .filter(|m| status.is_none_or(|s| m.sync_status == s))
+            .filter(|m| connector_code.is_none_or(|code| m.connector_code.as_deref() == Some(code)))
+            .filter(|m| channel.is_none_or(|value| m.channel == value))
+            .filter(|m| warehouse_id.is_none_or(|value| m.warehouse_id == Some(value)))
+            .filter(|m| external_ref.is_none_or(|value| m.external_ref == value))
+            .filter(|m| idempotency_key.is_none_or(|value| m.idempotency_key == value))
+            .filter(|m| correlation_id.is_none_or(|value| m.correlation_id == value))
             .filter(|m| created_from.is_none_or(|f| m.created_at >= f))
             .filter(|m| created_to.is_none_or(|t| m.created_at <= t))
             .cloned()
@@ -162,8 +186,29 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
         Ok(guard.attempts.get(&message_id).cloned().unwrap_or_default())
     }
 
-    async fn stats(&self, owner_id: Uuid) -> Result<H8ErpMessageStats, H8ErpMessageRepoError> {
-        let rows = self.list(owner_id, None, None, None, None, None).await?;
+    async fn stats(
+        &self,
+        owner_id: Uuid,
+        connector_code: Option<&str>,
+        channel: Option<&str>,
+        message_type: Option<&str>,
+    ) -> Result<H8ErpMessageStats, H8ErpMessageRepoError> {
+        let rows = self
+            .list(
+                owner_id,
+                None,
+                message_type,
+                None,
+                connector_code,
+                channel,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .await?;
         let mut stats = H8ErpMessageStats {
             owner_id,
             total: rows.len() as i64,
@@ -493,6 +538,7 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
 }
 
 impl MemoryH8ErpMessageRepository {
+    #[cfg(test)]
     pub fn set_retention_for_test(&self, owner_id: Uuid, days: i32) {
         let mut guard = self.inner.lock().expect("lock");
         guard.retention.insert(owner_id, days);

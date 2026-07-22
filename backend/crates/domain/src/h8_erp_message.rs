@@ -69,12 +69,17 @@ pub enum H8MessageError {
     IllegalTransition,
     NotRetryable,
     LeaseConflict,
+    ClaimPaused,
     ReplayNotAllowed,
     FieldRequired(&'static str),
     OwnerMismatch,
     WarehouseOutOfScope,
     MappingMissing,
     UnsupportedSchemaVersion,
+    InvalidRetentionDays,
+    EncryptionKeyUnavailable,
+    PayloadUnavailable,
+    PayloadExpired,
 }
 
 /// 入站消息类型所需最小 API Key scope（与连接配置 AC9 对齐并扩展出库/退货）。
@@ -334,6 +339,37 @@ pub fn may_auto_purge(retention_days: Option<i32>) -> bool {
     retention_days.is_some_and(|d| d > 0)
 }
 
+/// Worker 心跳由服务端保存绝对失效时间，避免页面各自猜测健康阈值。
+pub fn derive_worker_health(
+    heartbeat_expires_at: DateTime<Utc>,
+    now: DateTime<Utc>,
+) -> &'static str {
+    if heartbeat_expires_at > now {
+        "healthy"
+    } else {
+        "stale"
+    }
+}
+
+/// 暂停到期后自动允许认领；未设置到期时间则保持暂停直到人工恢复。
+pub fn is_worker_claim_paused(
+    paused: bool,
+    paused_until: Option<DateTime<Utc>>,
+    now: DateTime<Utc>,
+) -> bool {
+    paused && paused_until.is_none_or(|until| until > now)
+}
+
+/// 完整报文保留默认 7 天，允许范围 1..=30 天。
+pub fn resolve_payload_retention_days(days: Option<i32>) -> Result<i32, H8MessageError> {
+    let days = days.unwrap_or(7);
+    if (1..=30).contains(&days) {
+        Ok(days)
+    } else {
+        Err(H8MessageError::InvalidRetentionDays)
+    }
+}
+
 /// 消息主记录 API 视图（脱敏，不含完整报文）。
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema, PartialEq, Eq)]
 pub struct H8ErpMessage {
@@ -387,6 +423,8 @@ pub struct H8ErpMessageListResponse {
 pub struct H8ErpMessageDetail {
     pub message: H8ErpMessage,
     pub attempts: Vec<H8ErpMessageAttempt>,
+    pub payload_retained: bool,
+    pub payload_expires_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -427,6 +465,105 @@ pub struct PurgeH8ErpMessagesRequest {
 pub struct PurgeH8ErpMessagesResponse {
     pub deleted: i64,
     pub retention_days: i32,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema, PartialEq, Eq)]
+pub struct H8WorkerHeartbeatRequest {
+    pub worker_id: String,
+    pub worker_version: String,
+    pub connector_id: Uuid,
+    pub directions: Vec<String>,
+    pub current_claims: i32,
+    pub heartbeat_ttl_seconds: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema, PartialEq, Eq)]
+pub struct H8WorkerStatus {
+    pub worker_id: String,
+    pub worker_version: String,
+    pub connector_id: Uuid,
+    pub directions: Vec<String>,
+    pub current_claims: i32,
+    pub created_at: DateTime<Utc>,
+    pub last_heartbeat_at: DateTime<Utc>,
+    pub heartbeat_expires_at: DateTime<Utc>,
+    pub health: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema, PartialEq, Eq)]
+pub struct H8WorkerClaimControl {
+    pub connector_id: Uuid,
+    pub direction: String,
+    pub paused: bool,
+    pub reason: String,
+    pub paused_until: Option<DateTime<Utc>>,
+    pub updated_by: String,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema, PartialEq, Eq)]
+pub struct SetH8WorkerClaimControlRequest {
+    pub connector_id: Uuid,
+    pub direction: String,
+    pub paused: bool,
+    pub reason: String,
+    pub paused_until: Option<DateTime<Utc>>,
+    pub confirmed: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema, PartialEq, Eq)]
+pub struct H8WorkerRuntimeResponse {
+    pub workers: Vec<H8WorkerStatus>,
+    pub controls: Vec<H8WorkerClaimControl>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema, PartialEq, Eq)]
+pub struct H8WorkerClaimDecision {
+    pub allowed: bool,
+    pub reason: Option<String>,
+    pub paused_until: Option<DateTime<Utc>>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema, PartialEq, Eq)]
+pub struct H8PayloadRetentionPolicy {
+    pub connector_id: Uuid,
+    pub enabled: bool,
+    pub retention_days: i32,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema, PartialEq, Eq)]
+pub struct UpdateH8PayloadRetentionPolicyRequest {
+    pub connector_id: Uuid,
+    pub enabled: bool,
+    pub retention_days: Option<i32>,
+    pub confirmed: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema, PartialEq, Eq)]
+pub struct H8DecryptedPayload {
+    pub message_id: Uuid,
+    pub payload: String,
+    pub expires_at: DateTime<Utc>,
+}
+
+/// Worker 入站/出站交换阶段上报；仅 receive 可携带完整报文用于摘要/受控加密。
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct UpsertH8ErpMessageLifecycleRequest {
+    pub stage: String,
+    pub result: String,
+    pub direction: String,
+    pub message_type: String,
+    pub schema_version: String,
+    pub external_ref: String,
+    pub idempotency_key: String,
+    pub correlation_id: String,
+    pub channel: String,
+    pub connector_id: Option<Uuid>,
+    pub connector_code: Option<String>,
+    pub config_version: Option<i64>,
+    pub message_id: Option<Uuid>,
+    pub payload: Option<serde_json::Value>,
 }
 
 /// 根据尝试样本估算 P95（最近似：排序后 95 分位）。
@@ -520,6 +657,32 @@ mod tests {
         can_replay_message("failed").unwrap();
         can_replay_message("dead").unwrap();
         assert!(can_replay_message("succeeded").is_err());
+    }
+
+    #[test]
+    fn worker_health_and_pause_follow_server_timestamps() {
+        let now = Utc::now();
+        assert_eq!(
+            derive_worker_health(now + chrono::Duration::seconds(1), now),
+            "healthy"
+        );
+        assert_eq!(derive_worker_health(now, now), "stale");
+        assert!(is_worker_claim_paused(
+            true,
+            Some(now + chrono::Duration::seconds(1)),
+            now
+        ));
+        assert!(!is_worker_claim_paused(true, Some(now), now));
+        assert!(is_worker_claim_paused(true, None, now));
+        assert!(!is_worker_claim_paused(false, None, now));
+    }
+
+    #[test]
+    fn payload_retention_defaults_to_seven_and_caps_at_thirty_days() {
+        assert_eq!(resolve_payload_retention_days(None).unwrap(), 7);
+        assert_eq!(resolve_payload_retention_days(Some(30)).unwrap(), 30);
+        assert!(resolve_payload_retention_days(Some(0)).is_err());
+        assert!(resolve_payload_retention_days(Some(31)).is_err());
     }
 
     #[test]

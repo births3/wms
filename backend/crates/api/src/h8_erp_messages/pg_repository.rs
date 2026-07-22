@@ -10,6 +10,7 @@ use wms_domain::{
 };
 
 use super::error::H8ErpMessageRepoError;
+use super::pg_rows::{AttemptRow, MessageRow, StatsRow};
 use super::repository::H8ErpMessageRepository;
 
 pub struct PgH8ErpMessageRepository {
@@ -30,6 +31,12 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
         direction: Option<&str>,
         message_type: Option<&str>,
         status: Option<&str>,
+        connector_code: Option<&str>,
+        channel: Option<&str>,
+        warehouse_id: Option<Uuid>,
+        external_ref: Option<&str>,
+        idempotency_key: Option<&str>,
+        correlation_id: Option<&str>,
         created_from: Option<DateTime<Utc>>,
         created_to: Option<DateTime<Utc>>,
     ) -> Result<Vec<H8ErpMessage>, H8ErpMessageRepoError> {
@@ -49,6 +56,12 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
               AND ($4::text IS NULL OR direction = $4)
               AND ($5::text IS NULL OR message_type = $5)
               AND ($6::text IS NULL OR sync_status = $6)
+              AND ($7::text IS NULL OR connector_code = $7)
+              AND ($8::text IS NULL OR channel = $8)
+              AND ($9::uuid IS NULL OR warehouse_id = $9)
+              AND ($10::text IS NULL OR external_ref = $10)
+              AND ($11::text IS NULL OR idempotency_key = $11)
+              AND ($12::text IS NULL OR correlation_id = $12)
             ORDER BY created_at DESC
             LIMIT 200
             "#,
@@ -59,6 +72,12 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
         .bind(direction)
         .bind(message_type)
         .bind(status)
+        .bind(connector_code)
+        .bind(channel)
+        .bind(warehouse_id)
+        .bind(external_ref)
+        .bind(idempotency_key)
+        .bind(correlation_id)
         .fetch_all(&self.pool)
         .await
         .map_err(|e| H8ErpMessageRepoError::Db(e.to_string()))?;
@@ -109,7 +128,13 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
-    async fn stats(&self, owner_id: Uuid) -> Result<H8ErpMessageStats, H8ErpMessageRepoError> {
+    async fn stats(
+        &self,
+        owner_id: Uuid,
+        connector_code: Option<&str>,
+        channel: Option<&str>,
+        message_type: Option<&str>,
+    ) -> Result<H8ErpMessageStats, H8ErpMessageRepoError> {
         let from = Utc::now() - chrono::Duration::days(30);
         let row = sqlx::query_as::<_, StatsRow>(
             r#"
@@ -123,22 +148,37 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
               COALESCE(SUM(retry_count),0)::bigint AS retry_total
             FROM h8_erp_messages
             WHERE owner_id = $1 AND created_at >= $2
+              AND ($3::text IS NULL OR connector_code = $3)
+              AND ($4::text IS NULL OR channel = $4)
+              AND ($5::text IS NULL OR message_type = $5)
             "#,
         )
         .bind(owner_id)
         .bind(from)
+        .bind(connector_code)
+        .bind(channel)
+        .bind(message_type)
         .fetch_one(&self.pool)
         .await
         .map_err(|e| H8ErpMessageRepoError::Db(e.to_string()))?;
         let latency_rows: Vec<(Option<DateTime<Utc>>, DateTime<Utc>)> = sqlx::query_as(
             r#"
-            SELECT finished_at, started_at
-            FROM h8_erp_message_attempts
-            WHERE owner_id = $1 AND finished_at IS NOT NULL AND started_at >= $2
+            SELECT attempt.finished_at, attempt.started_at
+            FROM h8_erp_message_attempts attempt
+            JOIN h8_erp_messages message
+              ON message.owner_id = attempt.owner_id AND message.id = attempt.message_id
+            WHERE attempt.owner_id = $1
+              AND attempt.finished_at IS NOT NULL AND attempt.started_at >= $2
+              AND ($3::text IS NULL OR message.connector_code = $3)
+              AND ($4::text IS NULL OR message.channel = $4)
+              AND ($5::text IS NULL OR message.message_type = $5)
             "#,
         )
         .bind(owner_id)
         .bind(from)
+        .bind(connector_code)
+        .bind(channel)
+        .bind(message_type)
         .fetch_all(&self.pool)
         .await
         .map_err(|e| H8ErpMessageRepoError::Db(e.to_string()))?;
@@ -290,6 +330,25 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
         .await
         .map_err(|e| H8ErpMessageRepoError::Db(e.to_string()))?
         .ok_or(H8ErpMessageRepoError::NotFound)?;
+        if let Some(connector_id) = row.connector_id {
+            let paused: bool = sqlx::query_scalar(
+                r#"SELECT EXISTS(
+                     SELECT 1 FROM h8_erp_worker_claim_controls
+                     WHERE owner_id=$1 AND connector_id=$2 AND direction=$3
+                       AND paused=TRUE AND (paused_until IS NULL OR paused_until > $4)
+                   )"#,
+            )
+            .bind(owner_id)
+            .bind(connector_id)
+            .bind(&row.direction)
+            .bind(now)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(|e| H8ErpMessageRepoError::Db(e.to_string()))?;
+            if paused {
+                return Err(H8ErpMessageRepoError::Domain(H8MessageError::ClaimPaused));
+            }
+        }
         can_claim_message(&row.sync_status, row.lease_expires_at, now)
             .map_err(H8ErpMessageRepoError::Domain)?;
         let lease_until = now + chrono::Duration::seconds(lease_seconds.max(1));
@@ -669,105 +728,4 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
         .map_err(|e| H8ErpMessageRepoError::Db(e.to_string()))?;
         Ok(())
     }
-}
-
-#[derive(sqlx::FromRow)]
-struct MessageRow {
-    id: Uuid,
-    owner_id: Uuid,
-    warehouse_id: Option<Uuid>,
-    connector_id: Option<Uuid>,
-    connector_code: Option<String>,
-    config_version: Option<i64>,
-    direction: String,
-    message_type: String,
-    schema_version: String,
-    channel: String,
-    external_ref: String,
-    wms_resource_id: Option<String>,
-    idempotency_key: String,
-    correlation_id: String,
-    sync_status: String,
-    retry_count: i32,
-    next_retry_at: Option<DateTime<Utc>>,
-    last_error_summary: Option<String>,
-    payload_digest: String,
-    claimed_by: Option<String>,
-    lease_expires_at: Option<DateTime<Utc>>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
-    completed_at: Option<DateTime<Utc>>,
-    acked_at: Option<DateTime<Utc>>,
-}
-
-impl From<MessageRow> for H8ErpMessage {
-    fn from(r: MessageRow) -> Self {
-        Self {
-            id: r.id,
-            owner_id: r.owner_id,
-            warehouse_id: r.warehouse_id,
-            connector_id: r.connector_id,
-            connector_code: r.connector_code,
-            config_version: r.config_version,
-            direction: r.direction,
-            message_type: r.message_type,
-            schema_version: r.schema_version,
-            channel: r.channel,
-            external_ref: r.external_ref,
-            wms_resource_id: r.wms_resource_id,
-            idempotency_key: r.idempotency_key,
-            correlation_id: r.correlation_id,
-            sync_status: r.sync_status,
-            retry_count: r.retry_count,
-            next_retry_at: r.next_retry_at,
-            last_error_summary: r.last_error_summary,
-            payload_digest: r.payload_digest,
-            claimed_by: r.claimed_by,
-            lease_expires_at: r.lease_expires_at,
-            created_at: r.created_at,
-            updated_at: r.updated_at,
-            completed_at: r.completed_at,
-            acked_at: r.acked_at,
-        }
-    }
-}
-
-#[derive(sqlx::FromRow)]
-struct AttemptRow {
-    id: Uuid,
-    message_id: Uuid,
-    attempt_no: i32,
-    channel: String,
-    started_at: DateTime<Utc>,
-    finished_at: Option<DateTime<Utc>>,
-    result: String,
-    error_summary: Option<String>,
-    actor: String,
-}
-
-impl From<AttemptRow> for H8ErpMessageAttempt {
-    fn from(r: AttemptRow) -> Self {
-        Self {
-            id: r.id,
-            message_id: r.message_id,
-            attempt_no: r.attempt_no,
-            channel: r.channel,
-            started_at: r.started_at,
-            finished_at: r.finished_at,
-            result: r.result,
-            error_summary: r.error_summary,
-            actor: r.actor,
-        }
-    }
-}
-
-#[derive(sqlx::FromRow)]
-struct StatsRow {
-    total: i64,
-    succeeded: i64,
-    failed: i64,
-    dead: i64,
-    processing: i64,
-    pending: i64,
-    retry_total: i64,
 }
