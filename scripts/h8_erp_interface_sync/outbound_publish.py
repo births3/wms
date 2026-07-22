@@ -328,10 +328,10 @@ IF NOT EXISTS (
 BEGIN
   INSERT INTO dbo.if_out_message (
     event_type, owner_id, source_outbox_table, source_outbox_id,
-    external_ref, payload_json, sync_status, idempotency_key
+    external_ref, schema_version, payload_json, sync_status, idempotency_key
   ) VALUES (
     N'{event}', '{owner}', N'{table}', N'{oid}',
-    NULLIF(N'{ext}', N''), N'{payload}', N'pending', N'{idem_sql}'
+    NULLIF(N'{ext}', N''), N'1', N'{payload}', N'pending', N'{idem_sql}'
   );
 END
 ELSE

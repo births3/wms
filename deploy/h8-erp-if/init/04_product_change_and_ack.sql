@@ -15,6 +15,7 @@ BEGIN
         new_value         NVARCHAR(512)    NOT NULL,
         liaison_id        UNIQUEIDENTIFIER NULL,
         asn_id            UNIQUEIDENTIFIER NULL,
+        schema_version    NVARCHAR(16)     NOT NULL CONSTRAINT DF_if_in_pc_sv DEFAULT N'1',
         payload_json      NVARCHAR(MAX)    NULL,
         sync_status       NVARCHAR(16)     NOT NULL CONSTRAINT DF_if_in_pc_st DEFAULT N'pending',
         retry_count       INT              NOT NULL CONSTRAINT DF_if_in_pc_rc DEFAULT 0,

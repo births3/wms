@@ -45,6 +45,13 @@ from outbound_publish import (  # noqa: E402
     resolve_outbound_transport,
     resolve_wms_db_url,
 )
+from worker_route import (  # noqa: E402
+    RouteBinding,
+    WorkerHttpError,
+    is_retryable_worker_error,
+    resolve_inbound_route as resolve_inbound_route_with_http,
+    validate_row_schema_version,
+)
 
 # ---------------------------------------------------------------------------
 # 配置
@@ -175,6 +182,7 @@ SELECT
   CONVERT(NVARCHAR(32), expected_qty),
   CONVERT(NVARCHAR(33), expected_arrival_at, 126),
   document_type, ISNULL(external_ref,N''), ISNULL(receipt_no,N''),
+  schema_version,
   idempotency_key, CONVERT(NVARCHAR(16), retry_count)
 FROM dbo.if_in_asn WHERE id IN (SELECT id FROM @claimed);
 """
@@ -191,6 +199,7 @@ FROM dbo.if_in_asn WHERE id IN (SELECT id FROM @claimed);
             "document_type",
             "external_ref",
             "receipt_no",
+            "schema_version",
             "idempotency_key",
             "retry_count",
         ]
@@ -205,6 +214,7 @@ SELECT
   ISNULL(erp_order_no,N''), ISNULL(wms_order_no,N''), product_code,
   ISNULL(batch_no,N''), CONVERT(NVARCHAR(32), planned_qty),
   ISNULL(CONVERT(NVARCHAR(33), required_ship_at, 126),N''),
+  schema_version,
   idempotency_key, CONVERT(NVARCHAR(16), retry_count)
 FROM dbo.if_in_outbound_order WHERE id IN (SELECT id FROM @claimed);
 """
@@ -222,6 +232,7 @@ FROM dbo.if_in_outbound_order WHERE id IN (SELECT id FROM @claimed);
             "batch_no",
             "planned_qty",
             "required_ship_at",
+            "schema_version",
             "idempotency_key",
             "retry_count",
         ]
@@ -234,6 +245,7 @@ SELECT
   CONVERT(NVARCHAR(36), owner_id), product_code, product_name,
   ISNULL(approval_no,N''), ISNULL(spec,N''), ISNULL(dosage_form,N''),
   ISNULL(manufacturer,N''), ISNULL(storage_condition,N''),
+  schema_version,
   idempotency_key, CONVERT(NVARCHAR(16), retry_count)
 FROM dbo.if_in_product_master WHERE id IN (SELECT id FROM @claimed);
 """
@@ -249,6 +261,7 @@ FROM dbo.if_in_product_master WHERE id IN (SELECT id FROM @claimed);
             "dosage_form",
             "manufacturer",
             "storage_condition",
+            "schema_version",
             "idempotency_key",
             "retry_count",
         ]
@@ -266,6 +279,7 @@ SELECT
   CONVERT(NVARCHAR(33), expected_arrival_at, 126),
   document_type, ISNULL(external_ref,N''), ISNULL(receipt_no,N''),
   ISNULL(batch_no,N''),
+  schema_version,
   idempotency_key, CONVERT(NVARCHAR(16), retry_count)
 FROM dbo.if_in_return_order WHERE id IN (SELECT id FROM @claimed);
 """
@@ -284,6 +298,7 @@ FROM dbo.if_in_return_order WHERE id IN (SELECT id FROM @claimed);
             "external_ref",
             "receipt_no",
             "batch_no",
+            "schema_version",
             "idempotency_key",
             "retry_count",
         ]
@@ -298,6 +313,7 @@ SELECT
   field_name, new_value,
   ISNULL(CONVERT(NVARCHAR(36), liaison_id),N''),
   ISNULL(CONVERT(NVARCHAR(36), asn_id),N''),
+  schema_version,
   idempotency_key, CONVERT(NVARCHAR(16), retry_count)
 FROM dbo.if_in_product_change WHERE id IN (SELECT id FROM @claimed);
 """
@@ -312,6 +328,7 @@ FROM dbo.if_in_product_change WHERE id IN (SELECT id FROM @claimed);
             "new_value",
             "liaison_id",
             "asn_id",
+            "schema_version",
             "idempotency_key",
             "retry_count",
         ]
@@ -395,6 +412,21 @@ def http_json(
         return 0, None, str(exc.reason)
 
 
+def resolve_inbound_route(
+    settings: Settings,
+    message_type: str,
+    row: dict[str, str],
+    *,
+    http_json_fn: Callable[..., tuple[int, dict[str, Any] | None, str]] = http_json,
+) -> RouteBinding:
+    return resolve_inbound_route_with_http(
+        settings,
+        message_type,
+        row,
+        http_json_fn=http_json_fn,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Handlers
 # ---------------------------------------------------------------------------
@@ -437,7 +469,7 @@ def handle_asn(settings: Settings, row: dict[str, str]) -> str:
     )
     if status in (200, 201) and isinstance(parsed, dict) and parsed.get("id"):
         return str(parsed["id"])
-    raise RuntimeError(f"ASN API {status}: {raw[:500]}")
+    raise WorkerHttpError(status, "ASN API", raw)
 
 
 def handle_outbound(settings: Settings, row: dict[str, str]) -> str:
@@ -474,7 +506,7 @@ def handle_outbound(settings: Settings, row: dict[str, str]) -> str:
     )
     if status in (200, 201) and isinstance(parsed, dict) and parsed.get("id"):
         return str(parsed["id"])
-    raise RuntimeError(f"Outbound API {status}: {raw[:500]}")
+    raise WorkerHttpError(status, "Outbound API", raw)
 
 
 def handle_product(settings: Settings, row: dict[str, str]) -> str:
@@ -509,7 +541,7 @@ def handle_product(settings: Settings, row: dict[str, str]) -> str:
     )
     if status in (200, 201) and isinstance(parsed, dict) and parsed.get("id"):
         return str(parsed["id"])
-    raise RuntimeError(f"Product API {status}: {raw[:500]}")
+    raise WorkerHttpError(status, "Product API", raw)
 
 
 def handle_return(settings: Settings, row: dict[str, str]) -> str:
@@ -552,7 +584,7 @@ def handle_return(settings: Settings, row: dict[str, str]) -> str:
     )
     if status in (200, 201) and isinstance(parsed, dict) and parsed.get("id"):
         return str(parsed["id"])
-    raise RuntimeError(f"Return ASN API {status}: {raw[:500]}")
+    raise WorkerHttpError(status, "Return ASN API", raw)
 
 
 def handle_product_change(settings: Settings, row: dict[str, str]) -> str:
@@ -567,7 +599,7 @@ def handle_product_change(settings: Settings, row: dict[str, str]) -> str:
             row["idempotency_key"] + "-list",
         )
         if status != 200 or not isinstance(parsed, dict):
-            raise RuntimeError(f"list products {status}: {raw[:300]}")
+            raise WorkerHttpError(status, "list products", raw)
         items = parsed.get("data") or parsed.get("items") or []
         if not isinstance(items, list):
             raise RuntimeError("products list shape unexpected")
@@ -610,7 +642,7 @@ def handle_product_change(settings: Settings, row: dict[str, str]) -> str:
     )
     if status in (200, 201) and isinstance(parsed, dict) and parsed.get("id"):
         return str(parsed["id"])
-    raise RuntimeError(f"Product change API {status}: {raw[:500]}")
+    raise WorkerHttpError(status, "Product change API", raw)
 
 
 HANDLERS: dict[str, tuple[str, Callable[[Settings, dict[str, str]], str]]] = {
@@ -658,21 +690,29 @@ def process_once(settings: Settings, types: list[str], dry_run: bool) -> int:
                 print(f"[h8] dry-run release {type_name} id={row_id}", flush=True)
                 continue
             try:
+                validate_row_schema_version(row)
+                binding = resolve_inbound_route(settings, type_name, row)
                 # US-H8-002 AC11：真实路径 emit receive→convert→business_api→receipt
                 wms_id, _life = run_inbound_pipeline(
                     settings,
                     type_name,
                     row,
                     handler,
+                    route_binding=binding,
                     dry_run=False,
                 )
                 mark_row(settings, table, row_id, "success", wms_id=wms_id)
                 print(f"[h8] success {type_name} -> {wms_id}", flush=True)
             except Exception as exc:  # noqa: BLE001 — worker 边界
                 retry += 1
-                # run_inbound_pipeline 已在 final_failure 阶段写审计
-                # 未达上限：回 pending 便于下一轮；达上限：dead
-                next_status = "dead" if retry >= settings.max_retry else "pending"
+                # 进入 pipeline 后的失败由 lifecycle 写 final_failure；
+                # schema/路由预检失败的统一审计仍由 US-H8-002 后续切片补齐。
+                retryable = is_retryable_worker_error(exc)
+                next_status = (
+                    "pending"
+                    if retryable and retry < settings.max_retry
+                    else "dead"
+                )
                 mark_row(
                     settings,
                     table,

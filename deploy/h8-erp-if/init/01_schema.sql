@@ -27,6 +27,7 @@ BEGIN
         document_type     NVARCHAR(32)     NOT NULL CONSTRAINT DF_if_in_asn_doc DEFAULT N'purchase_inbound',
         external_ref      NVARCHAR(128)    NULL,
         receipt_no        NVARCHAR(64)     NULL, -- 可选；空则 WMS 侧 M-CG 生成
+        schema_version    NVARCHAR(16)     NOT NULL CONSTRAINT DF_if_in_asn_sv DEFAULT N'1',
         payload_json      NVARCHAR(MAX)    NULL,
         sync_status       NVARCHAR(16)     NOT NULL CONSTRAINT DF_if_in_asn_st DEFAULT N'pending',
         retry_count       INT              NOT NULL CONSTRAINT DF_if_in_asn_rc DEFAULT 0,
@@ -58,6 +59,7 @@ BEGIN
         batch_no          NVARCHAR(64)     NULL,
         planned_qty       BIGINT           NOT NULL,
         required_ship_at  DATETIME2        NULL,
+        schema_version    NVARCHAR(16)     NOT NULL CONSTRAINT DF_if_in_ob_sv DEFAULT N'1',
         payload_json      NVARCHAR(MAX)    NULL,
         sync_status       NVARCHAR(16)     NOT NULL CONSTRAINT DF_if_in_ob_st DEFAULT N'pending',
         retry_count       INT              NOT NULL CONSTRAINT DF_if_in_ob_rc DEFAULT 0,
@@ -87,6 +89,7 @@ BEGIN
         dosage_form       NVARCHAR(64)     NULL,
         manufacturer      NVARCHAR(256)    NULL,
         storage_condition NVARCHAR(32)     NULL,
+        schema_version    NVARCHAR(16)     NOT NULL CONSTRAINT DF_if_in_pm_sv DEFAULT N'1',
         payload_json      NVARCHAR(MAX)    NULL,
         sync_status       NVARCHAR(16)     NOT NULL CONSTRAINT DF_if_in_pm_st DEFAULT N'pending',
         retry_count       INT              NOT NULL CONSTRAINT DF_if_in_pm_rc DEFAULT 0,

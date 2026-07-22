@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import unittest
+from unittest.mock import patch
 
 from channel_failover import (
     map_channel_mode_to_transport,
@@ -19,6 +20,98 @@ from outbound_publish import (
     insert_if_out_sql,
     sql_escape_mssql,
 )
+from sync_worker import (
+    Settings,
+    WorkerHttpError,
+    is_retryable_worker_error,
+    resolve_inbound_route,
+    validate_row_schema_version,
+)
+
+
+def settings() -> Settings:
+    return Settings(
+        mssql_host="localhost",
+        mssql_port="1433",
+        mssql_user="test",
+        mssql_password="test",
+        mssql_database="test",
+        mssql_container="test",
+        api_base="http://wms.test",
+        api_token="token",
+        poll_interval=1,
+        max_retry=5,
+        batch_size=1,
+        use_sqlcmd=True,
+    )
+
+
+class TestInboundCorePipeline(unittest.TestCase):
+    def test_route_binding_is_resolved_before_business_api(self) -> None:
+        calls: list[str] = []
+
+        def fake_http(_settings, method, path, body, idem):
+            calls.append(path)
+            self.assertEqual(method, "GET")
+            self.assertIsNone(body)
+            self.assertEqual(idem, "route-idem-1")
+            return 200, {
+                "connector": {
+                    "id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                    "config_version": 3,
+                    "channel_mode": "rest_primary_table_fallback",
+                    "connector_code": "SELF-ERP",
+                }
+            }, ""
+
+        binding = resolve_inbound_route(
+            settings(),
+            "asn",
+            {
+                "warehouse_id": "11111111-1111-1111-1111-111111111111",
+                "idempotency_key": "idem-1",
+            },
+            http_json_fn=fake_http,
+        )
+        self.assertIn("direction=inbound", calls[0])
+        self.assertIn("message_type=asn", calls[0])
+        self.assertEqual(binding.connector_code, "SELF-ERP")
+        self.assertEqual(binding.config_version, 3)
+        self.assertEqual(binding.channel, "interface_table")
+
+    def test_only_transient_http_errors_are_retryable(self) -> None:
+        self.assertTrue(is_retryable_worker_error(WorkerHttpError(0, "route", "down")))
+        self.assertTrue(is_retryable_worker_error(WorkerHttpError(503, "route", "down")))
+        self.assertFalse(is_retryable_worker_error(WorkerHttpError(422, "schema", "bad")))
+        self.assertFalse(is_retryable_worker_error(ValueError("bad mapping")))
+
+    def test_schema_version_is_strict(self) -> None:
+        self.assertEqual(validate_row_schema_version({"schema_version": "1"}), "1")
+        with self.assertRaises(WorkerHttpError):
+            validate_row_schema_version({"schema_version": "2"})
+
+    def test_non_retryable_route_error_enters_dead_immediately(self) -> None:
+        import sync_worker
+
+        row = {
+            "id": "row-1",
+            "external_doc_no": "ASN-1",
+            "idempotency_key": "idem-1",
+            "schema_version": "1",
+            "retry_count": "0",
+        }
+        with (
+            patch.object(sync_worker, "claim_rows", return_value=[row]),
+            patch.object(
+                sync_worker,
+                "resolve_inbound_route",
+                side_effect=WorkerHttpError(422, "schema", "unsupported"),
+            ),
+            patch.object(sync_worker, "mark_row") as mark,
+        ):
+            self.assertEqual(sync_worker.process_once(settings(), ["asn"], False), 1)
+        self.assertEqual(mark.call_args.args[3], "dead")
+        self.assertEqual(mark.call_args.kwargs["retry_count"], 1)
 
 
 class TestInsertIfOutSql(unittest.TestCase):

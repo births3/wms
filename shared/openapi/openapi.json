@@ -2484,8 +2484,8 @@
           }
         },
         "security": [],
-        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。",
-        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。"
+        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。",
+        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。"
       }
     },
     "/api/v1/auth/logout": {
@@ -26438,6 +26438,7 @@
           "owner_id",
           "direction",
           "message_type",
+          "schema_version",
           "channel",
           "external_ref",
           "idempotency_key",
@@ -26527,6 +26528,9 @@
           "retry_count": {
             "type": "integer",
             "format": "int32"
+          },
+          "schema_version": {
+            "type": "string"
           },
           "sync_status": {
             "type": "string"

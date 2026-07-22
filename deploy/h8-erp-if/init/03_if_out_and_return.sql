@@ -15,6 +15,7 @@ BEGIN
         source_outbox_table  NVARCHAR(128)    NOT NULL,
         source_outbox_id     NVARCHAR(64)     NOT NULL,
         external_ref         NVARCHAR(128)    NULL,
+        schema_version       NVARCHAR(16)     NOT NULL CONSTRAINT DF_if_out_sv DEFAULT N'1',
         payload_json         NVARCHAR(MAX)    NOT NULL,
         sync_status          NVARCHAR(16)     NOT NULL CONSTRAINT DF_if_out_st DEFAULT N'pending',
         retry_count          INT              NOT NULL CONSTRAINT DF_if_out_rc DEFAULT 0,
@@ -54,6 +55,7 @@ BEGIN
         external_ref        NVARCHAR(128)    NULL,
         receipt_no          NVARCHAR(64)     NULL,
         batch_no            NVARCHAR(64)     NOT NULL, -- sales_return 业务要求原批号
+        schema_version      NVARCHAR(16)     NOT NULL CONSTRAINT DF_if_in_ret_sv DEFAULT N'1',
         payload_json        NVARCHAR(MAX)    NULL,
         sync_status         NVARCHAR(16)     NOT NULL CONSTRAINT DF_if_in_ret_st DEFAULT N'pending',
         retry_count         INT              NOT NULL CONSTRAINT DF_if_in_ret_rc DEFAULT 0,
@@ -79,4 +81,3 @@ BEGIN
     ALTER TABLE dbo.if_in_return_order ADD supplier_id UNIQUEIDENTIFIER NULL;
 END
 GO
-

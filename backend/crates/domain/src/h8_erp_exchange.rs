@@ -326,6 +326,7 @@ mod tests {
             warehouse_id: Some(Uuid::nil()),
             direction: "inbound".into(),
             message_type: "asn".into(),
+            schema_version: "1".into(),
             external_ref: "ERP-1".into(),
             idempotency_key: "idem-1".into(),
             connector_id: None,

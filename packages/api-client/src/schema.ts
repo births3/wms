@@ -5857,6 +5857,7 @@ export interface components {
             payload_digest: string;
             /** Format: int32 */
             retry_count: number;
+            schema_version: string;
             sync_status: string;
             /** Format: date-time */
             updated_at: string;

@@ -123,19 +123,19 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 
 ### 验收标准
 
-1. **受控消息目录**：首批入站覆盖 ASN、出库订单、退货申请、商品主数据和商品主数据变更；首批出站覆盖入库完成、库存状态、报损报溢、档案补录、对账差异、发货确认和库存快照。消息类型必须来自 H8 受控目录，不接受自由文本。
+1. **受控消息目录**：首批入站覆盖 ASN、出库订单、退货申请、商品主数据和商品主数据变更；首批出站覆盖入库完成、库存状态、报损报溢、档案补录、对账差异、发货确认和库存快照。首个真实对接为遵循 H8 契约的自研 ERP，12 类消息均支持 REST 主用、独立接口表备用；消息类型必须来自 H8 受控目录，不接受自由文本。
 2. **三级边界**：业务模块只提交或接收 WMS canonical 命令/事件；H8 负责路由、幂等和 ERP↔WMS 语义转换；REST/接口表适配器只处理协议、连接和 ERP DTO。ERP DTO 不得进入 M1/M2/M3/M4 domain。
-3. **入站链路**：入站消息依次完成 H1 认证与最小 scope、货主/仓库范围、有效连接唯一路由、幂等、结构校验、M-PM 字段规整和 WMS 业务 API 调用；业务事务提交成功后才能返回成功回执。
-4. **出站链路**：业务模块在自身事务内写入 outbox；H8 认领消息后解析唯一有效连接和通道，把 canonical 事件转换为 ERP 报文并发送；业务模块不得直接调用 ERP URL 或写 ERP 接口表。
+3. **入站链路**：入站消息依次完成 H1 认证与最小 scope、货主/仓库范围、有效连接唯一路由、幂等、`schema_version` 校验、M-PM 字段规整和 WMS 业务 API 调用；业务事务提交成功后才能返回业务成功结果，技术接收不得冒充业务成功。
+4. **出站链路**：业务模块在自身事务内写入 outbox；H8 认领消息后解析唯一有效连接和通道，把 canonical 事件转换为 ERP 报文并发送；技术接收后进入 `awaiting_receipt`，业务成功回执后进入 `acked`。业务模块不得直接调用 ERP URL 或写 ERP 接口表。
 5. **字段规整**：外部编码、单位、状态和自由文本在进入业务 API 前必须通过 M-PM；找不到有效映射时记录可定位的失败结果，不得把原始外部值写入受控业务字段。
-6. **配置版本绑定**：每次处理记录实际使用的连接、配置版本、通道和消息类型；消息开始处理后不得因连接配置变化静默切换语义，重试和重放继续使用原业务 Idempotency-Key。
+6. **配置与契约版本绑定**：每次处理记录实际使用的连接、配置版本、通道、消息类型和 `schema_version`；消息开始处理后不得因连接配置变化静默切换语义。不支持的 `schema_version` 作为不可重试错误明确拒绝，禁止按最新版猜测解析。
 7. **幂等语义**：入站和出站至少按货主、消息类型、外部业务标识和 Idempotency-Key 判定重复；重复请求返回原结果，不重复创建业务单据、outbox 或 H2 审计业务事件。
-8. **投递保证**：H8 使用“至少一次投递 + WMS 业务幂等”，不得宣称跨 WMS 与 ERP 的分布式 exactly-once；通道切换、超时重试和回执丢失都不得产生业务双投递。
+8. **投递与回执保证**：H8 使用“至少一次投递 + WMS 业务幂等”，不得宣称跨 WMS 与 ERP 的分布式 exactly-once。消息发送方生成 Idempotency-Key（入站 ERP、出站 WMS）；通道切换、超时重试和人工重放保持原键。技术接收后长期无业务回执时按原键重试，明确拒绝或重试耗尽进入 `dead`。
 9. **错误分类**：认证、权限、报文结构、字段映射和业务校验失败为不可重试错误；网络、超时、限流和临时不可用按 ADR-0018 重试。错误响应和日志必须脱敏，并保留 correlation 标识。
 10. **货主与仓库隔离**：所有消息必须携带货主上下文；仓库只能落在连接白名单和调用主体授权范围交集内，跨货主、未知仓库和歧义路由一律拒绝。
 11. **审计追踪**：消息接收、转换结果、业务 API 结果、发送、回执和最终失败写入 H2 append-only 审计引用；审计只记录摘要、标识和结果，不记录明文凭据或完整敏感报文。
 12. **档案补录闭环**：H8 负责投递档案补录请求并把 ERP 商品主数据变更转换为 WMS 事件；M1/M-QL/M2 负责业务校验和解除当前 ASN 的“档案补录中”状态，H8 不直接修改 ASN 或商品主数据。
-13. **契约与 S4 证据**：每个消息类型至少具备 REST/接口表适用通道的 L2 契约测试、L3 主流程、L4 错误路径和 L11 幂等测试；故事完成还必须取得客户正式 ERP dev/staging 的请求、回执、重试和审计关联证据。
+13. **契约与 S4 证据**：每个消息类型至少具备 REST/接口表双通道的 L2 契约测试、L3 主流程、L4 错误路径和 L11 幂等测试；按入库、出库、主数据/档案补录、库存/财务四个闭环依次取得一个货主、一个仓库的自研 ERP dev/staging 请求、两级回执、重试和审计关联证据后启用。全部闭环完成前不得宣称故事完成。
 
 ### 消息信封最小字段
 
@@ -143,6 +143,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 |---|---|
 | `owner_id` / `warehouse_id` | 货主必填；仓库按消息类型和连接范围校验 |
 | `direction` / `message_type` | 来自 H8 受控目录，用于唯一路由和最小 scope |
+| `schema_version` | 必填受控版本；不支持的版本明确拒绝，不做猜测兼容 |
 | `external_ref` | ERP 业务标识；与消息类型共同参与去重 |
 | `idempotency_key` | 跨重试、降级和人工重放保持不变 |
 | `connector_id` / `config_version` | 记录实际使用的连接和配置版本 |
@@ -150,6 +151,15 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | `occurred_at` | 外部事件或 WMS canonical 事件发生时间 |
 | `payload_digest` | 原始报文摘要；不得替代受控的加密报文存储策略 |
 | `wms_resource_id` | 业务 API 成功后记录对应 WMS 资源标识 |
+
+### 自研 ERP 首批交付顺序
+
+| 闭环 | 消息 | 启用门槛 |
+|---|---|---|
+| 入库 | ASN 入站、入库完成出站 | 双通道 L2-L4/L11 + 一个货主/仓库 S4 |
+| 出库 | 出库订单入站、发货确认出站 | 双通道 L2-L4/L11 + 一个货主/仓库 S4 |
+| 主数据 / 补录 | 商品主数据、商品主数据变更入站、档案补录出站 | M-PM 映射失败路径 + 跨 M1/M-QL/M2 闭环 + S4 |
+| 库存 / 财务 | 退货申请入站、库存状态、报损报溢、对账差异、库存快照出站 | 双通道 L2-L4/L11 + 一个货主/仓库 S4 |
 
 ### 测试维度覆盖
 
@@ -179,18 +189,20 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 
 1. **独立入口**：在「基础能力 / H8 集成中心」增加叶子页「H8 ERP 消息」（`view_id=h8-erp-messages`）；该页为列表型页面，使用公共 `QueryPanel` + `DataGrid`，不把消息日志塞进连接配置页。
 2. **日志存储边界**：H8 使用独立消息主记录和 append-only 尝试记录，不以 H2 审计代替运行日志，也不把完整报文写入 H2；消息当前状态可按处理规则更新，H2 审计仍只能 INSERT。
-3. **状态机**：消息状态只允许 `pending`、`processing`、`succeeded`、`failed`、`dead`；要求 ERP 业务回执的出站消息可由 `succeeded` 进入 `acked`。非法跳转、终态回退和无租约认领必须拒绝。
+3. **状态机**：消息状态只允许 `pending`、`processing`、`succeeded`、`awaiting_receipt`、`failed`、`dead`、`acked`。无需异步业务回执的处理成功进入 `succeeded`；需要业务回执的消息技术接收后进入 `awaiting_receipt`，业务成功进入 `acked`，明确拒绝或重试耗尽进入 `dead`。非法跳转、终态回退和无租约认领必须拒绝。
 4. **并发认领**：Worker 认领消息必须使用数据库并发控制和带期限租约；同一消息同一时刻只能由一个 Worker 处理，租约超时可恢复，已成功或已回执消息不得再次自动认领。
 5. **失败与重试**：每次尝试记录通道、开始/结束时间、脱敏错误、重试序号和结果；重试次数、间隔、熔断和死信条件复用 ADR-0018，档案补录继续执行 5 次/5 分钟/24 小时边界。
 6. **死信进入条件**：不可重试错误或重试耗尽进入 `dead`；进入死信必须保留原连接、配置版本、业务 Idempotency-Key、最后错误和业务资源引用，并产生 H2 审计事件。
 7. **人工重放**：只有 `failed` 或 `dead` 消息允许重放；系统管理员使用现有 `h8.erp_connector.write` 权限执行，必须填写原因并二次确认。重放复用原 Idempotency-Key，新增尝试记录，不复制新的业务消息。
 8. **查询与详情**：核心查询为方向、消息类型和状态；更多查询包含连接编码、仓库、通道、外部业务标识、Idempotency-Key、correlation 标识和时间范围。详情展示处理时间线、尝试、业务资源和审计引用，报文只显示脱敏摘要。
-9. **监控指标**：按货主、连接、通道和消息类型统计处理量、成功率、失败/死信数量、重试次数和 P95 延迟；指标来自消息与尝试记录，不从页面临时全表聚合。
+9. **监控指标与 Worker 健康**：按货主、连接、通道和消息类型统计处理量、成功率、失败/死信数量、重试次数和 P95 延迟；指标来自消息与尝试记录，不从页面临时全表聚合。同页展示 Worker 实例、版本、方向、最后心跳、当前认领数和派生健康状态，不把进程启动/停止能力放入 WMS。
 10. **分区与保留**：消息和尝试记录按月分区，并支持按受控保留策略归档和清理；未配置保留策略时禁止自动删除。清理不得删除 H2 审计、业务单据或尚未终结的消息。
 11. **权限与审计**：系统管理员可查询和重放，仓库主管使用现有 `h8.erp_connector.read` 只读查看授权仓库范围；查询详情、重放、归档和清理全部记录 H2 审计引用，跨货主和越权仓库返回拒绝。
 12. **大数据量边界**：查询必须命中货主、仓库和时间分区索引，默认要求时间范围；以生产约定数据量验证分页稳定性和 P95，不允许无界导出或把完整报文返回列表页。
 13. **页面证据**：新增菜单页必须登记页面级查询配置、真实 Playwright 命令和截图映射；E2E 至少覆盖失败查询、死信详情、重放成功、重复重放无双业务效果、只读无重放按钮和跨货主拒绝。
 14. **S4 故障恢复证据**：故事完成必须使用客户正式 ERP dev/staging 演练超时/失败、死信、人工重放、ERP 回执和 H2 审计关联；localhost、Mock 和容器只能证明开发切片。
+15. **暂停与恢复认领**：系统管理员可按连接 + 方向设置独立持久的暂停控制，必须填写原因并可选到期时间；当前在途处理完成后不再认领新消息，人工恢复或到期后继续认领。该控制不改变连接 `active/testing/disabled` 状态，动作写 H2 审计；仓库主管只读。
+16. **完整报文短期保留**：默认只保存摘要；系统管理员可按连接启用完整报文加密保留，默认 7 天、最大 30 天。详情仅授权用户按需解密并记录 H2 审计；到期删除密文，不删除消息标识、处理结果、尝试和 H2 审计。
 
 ### 页面设计契约
 
@@ -198,10 +210,11 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 |---|---|
 | 页面类型 | 列表型 |
 | 主信息载体 | 页面上方公共 `QueryPanel`；主体公共 `DataGrid` |
+| 页内视图 | “消息记录”与“Worker 状态”；复用同一菜单，不新增 Worker 菜单页 |
 | 核心查询 | 方向、消息类型、状态，首屏一行可见 |
 | 更多查询 | 连接编码、仓库、通道、外部业务标识、Idempotency-Key、correlation 标识、时间范围，默认折叠 |
 | 标准动作入口 | 页头或 DataGrid 提供刷新、字段显示和视图；首版禁止无界导出 |
-| 私有动作入口 | 行内“详情”“重放”；重放只在允许状态和权限下显示，并打开确认弹窗 |
+| 私有动作入口 | 消息行内“详情”“重放”；Worker 状态区提供按连接 + 方向“暂停认领/恢复认领”，写动作均需原因和确认 |
 | 详情展示方式 | Dialog 上下分区展示对象信息、当前状态、尝试时间线、错误摘要、业务资源和审计引用 |
 | 禁止常驻区域 | 不常驻消息详情、尝试时间线、审计面板、完整报文或重放表单 |
 
@@ -215,10 +228,12 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | `direction` / `message_type` / `channel` | 受控值；用于分区内查询与统计 |
 | `external_ref` / `wms_resource_id` | 关联 ERP 与 WMS 业务对象 |
 | `idempotency_key` / `correlation_id` | 跨尝试、重放、审计和回执保持可追踪 |
-| `sync_status` | `pending/processing/succeeded/failed/dead/acked` |
+| `schema_version` | 实际解析的受控消息契约版本 |
+| `sync_status` | `pending/processing/succeeded/awaiting_receipt/failed/dead/acked` |
 | `retry_count` / `next_retry_at` | 由 ADR-0018 策略计算；人工重放不覆盖历史尝试 |
 | `last_error_summary` | 脱敏摘要，不保存 token、密码或完整敏感报文 |
-| `payload_digest` | 报文摘要；完整报文如需保留必须走受控加密存储和保留策略 |
+| `payload_digest` | 报文摘要；始终保留，用于核对完整报文密文 |
+| `encrypted_payload` / `payload_expires_at` | 按连接启用时可空；受控加密且默认 7 天、最大 30 天，到期清理密文 |
 | `claimed_by` / `lease_expires_at` | Worker 并发认领和租约恢复依据 |
 | `created_at` / `updated_at` / `completed_at` / `acked_at` | 支持生命周期、分区、延迟和保留策略计算 |
 
@@ -227,8 +242,11 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | 当前状态 | 动作 | 目标状态 | 前置条件 |
 |---|---|---|---|
 | `pending` | Worker 认领 | `processing` | 未被有效租约占用 |
-| `processing` | 处理成功 | `succeeded` | WMS 业务提交或 ERP 发送成功 |
-| `succeeded` | 收到业务回执 | `acked` | 该消息类型要求 ERP 回执且回执校验通过 |
+| `processing` | 无需异步回执的处理成功 | `succeeded` | WMS 业务事务已提交 |
+| `processing` | 技术接收 | `awaiting_receipt` | 消息要求异步业务回执 |
+| `awaiting_receipt` | 业务成功回执 | `acked` | 回执版本、关联标识和幂等键校验通过 |
+| `awaiting_receipt` | 超时重试 | `processing` | 未耗尽且按原幂等键重新投递 |
+| `awaiting_receipt` | 明确拒绝或重试耗尽 | `dead` | 保留回执摘要并写 H2 审计 |
 | `processing` | 可重试失败 | `failed` | 记录尝试并计算下一次重试 |
 | `processing/failed` | 不可重试或耗尽 | `dead` | 记录最终错误并写 H2 审计 |
 | `failed` | 到期自动重试 | `processing` | 未熔断且取得有效租约 |
@@ -238,12 +256,12 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 
 | 维度 | 场景 |
 |---|---|
-| L1 单元 | 状态转换、重试分类、保留保护和脱敏 |
+| L1 单元 | 两级回执状态转换、重试分类、暂停到期、保留保护和脱敏 |
 | L2 API 契约 | 列表、详情、重放、统计与统一错误结构 |
 | L3 业务流程 | 失败→重试→死信→人工重放→ERP 回执 |
 | L4 错误路径 | 非法状态、重复重放、租约冲突、跨货主、无界查询和清理未终结消息 |
 | L5 数据一致 | 消息状态、尝试、业务资源和 H2 审计引用一致 |
-| L6 并发 | 多 Worker 竞争、租约超时恢复和同消息单消费者 |
+| L6 并发 | 多 Worker 竞争、租约超时恢复、暂停边界和同消息单消费者 |
 | L7 性能 | 月分区裁剪、分页稳定性、统计快照和约定数据量 P95 |
 | L8 权限 | 系统管理员读写、仓库主管只读、货主/仓库隔离 |
 | L9 安全 | 报文摘要、错误、导出和详情脱敏 |
@@ -519,15 +537,15 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 |---|---|---|---|---|---|
 | AC-1 受控消息目录 | `V0/V1` | H8-DOMAIN、H8-WORKER | `backend/crates/domain/src/h8_erp_message.rs`、`scripts/h8_erp_interface_sync/outbound_publish.py` 及目录对齐测试 | `PASS` | - |
 | AC-2 三级边界 | `V0/V1` | 代码路径复审、H8-DOMAIN | `backend/crates/domain/src/h8_erp_exchange.rs` 定义 canonical；`scripts/h8_erp_interface_sync/sync_worker.py` 仍在同一适配器内直接组业务 API DTO | `NEEDS_WORK` | Worker 必须经 H8 canonical 转换端口调用业务 API，通道适配与语义转换分层 |
-| AC-3 入站链路 | `V1/V2` | H8-WORKER、H8-ASN-V2 | `docs/retros/h8-asn-inbound-flow-evidence.json` 证明 ASN 已跑通；其余 4 类仅有处理函数 | `NEEDS_WORK` | 接入唯一路由、M-PM 和范围校验，并补齐出库单、销退、商品、商品变更的 L2–L4/L11 |
+| AC-3 入站链路 | `V1/V2` | H8-WORKER、H8-ASN-V2 | Worker 已在业务 API 前调用 `route-resolve` 并严格校验 `schema_version`；ASN V2 已跑通 | `NEEDS_WORK` | 接入 M-PM 与主体仓库范围，并补齐其余 4 类 L2–L4/L11 |
 | AC-4 出站链路 | `V1/V2` | H8-WORKER、H8-LOCAL | `docs/retros/h8-local-integration-evidence.json` 证明本地主备；`scripts/h8_erp_interface_sync/outbound_publish.py` 当前只取全局最早 active 连接 | `NEEDS_WORK` | 按货主、仓库、方向、消息类型解析并绑定唯一连接后再投递 |
 | AC-5 字段规整 | `V1` | H8-DOMAIN、代码路径复审 | `backend/crates/domain/src/h8_erp_exchange.rs` 的 `apply_mpm_normalize` 有单测；Worker 运行路径未调用 M-PM | `NEEDS_WORK` | Worker 接入实际 M-PM 规则与映射缺失失败路径，并补真实数据回读 |
-| AC-6 配置版本绑定 | `V1` | H8-DOMAIN、代码路径复审 | `h8_erp_exchange.rs::config_binding_is_frozen` 仅为纯函数；Worker 生命周期记录未绑定连接和配置版本 | `NEEDS_WORK` | 认领时固化 `connector_id/config_version/channel/message_type`，重试与重放复用绑定 |
+| AC-6 配置版本绑定 | `V1` | H8-DOMAIN、H8-WORKER | 首次处理已把 `connector_id/config_version/channel/message_type/schema_version` 写入生命周期消息 | `NEEDS_WORK` | 重试与重放须先读取原消息绑定，禁止重新解析到新配置 |
 | AC-7 幂等语义 | `V1/V2` | H8-DOMAIN、H8-ASN-V2 | `docs/retros/h8-asn-inbound-flow-evidence.json` 记录 ASN 同键重放后 M2 数量仍为 1 且资源 ID 不变 | `NEEDS_WORK` | 补齐其余入站、全部出站、降级与回执重复的 L11 证据 |
 | AC-8 投递保证 | `V1` | H8-WORKER | `scripts/h8_erp_interface_sync/test_h8_sync_worker.py` 的 failover/circuit 测试证明成功路径不双写且切换保留业务键 | `PASS` | - |
-| AC-9 错误分类 | `V1` | H8-DOMAIN、代码路径复审 | domain 有分类/脱敏函数；`sync_worker.py` 当前捕获所有异常并统一重试至 dead | `NEEDS_WORK` | Worker 使用错误分类，仅对可重试错误退避重试，并统一脱敏日志与错误摘要 |
-| AC-10 货主仓隔离 | `V1` | H8-DOMAIN、代码路径复审 | `warehouse_in_scope` 有单测；`sync_worker.py` 未执行连接白名单与调用主体范围交集校验 | `NEEDS_WORK` | 在业务 API 前执行货主、仓库、连接路由和主体授权交集校验并补拒绝测试 |
-| AC-11 审计追踪 | `V1/V2` | H8-WORKER、H8-ASN-V2 | `docs/retros/h8-asn-inbound-flow-evidence.json` 记录 receive、convert、business_api、receipt 的 H2 append-only 事件 | `PASS` | - |
+| AC-9 错误分类 | `V1` | H8-DOMAIN、H8-WORKER | Worker 已将网络/408/425/429/5xx 识别为可重试，其余错误直接死信 | `NEEDS_WORK` | 统一脱敏 Worker 日志与错误摘要，并补各业务 API 错误分类证据 |
+| AC-10 货主仓隔离 | `V1` | H8-DOMAIN、H8-WORKER | 业务 API 前已通过当前货主的 active 连接和仓库白名单解析唯一路由 | `NEEDS_WORK` | route-resolve 还须校验调用主体仓库授权范围交集并补拒绝测试 |
+| AC-11 审计追踪 | `V1/V2` | H8-WORKER、H8-ASN-V2 | `docs/retros/h8-asn-inbound-flow-evidence.json` 记录 ASN 成功路径的 receive、convert、business_api、receipt H2 append-only 事件 | `NEEDS_WORK` | schema/路由预检失败也必须形成 receive 与 final_failure 审计，并补失败路径证据 |
 | AC-12 档案补录闭环 | `V1` | H8-DOMAIN、代码路径复审 | domain 禁止 H8 直接改 ASN；`sync_worker.py::handle_product_change` 尚无 M1/M-QL/M2 跨模块闭环证据 | `NEEDS_WORK` | 补商品变更事件、业务校验和当前 ASN 解锁的 L3/L4/L5 证据 |
 | AC-13 契约与 S4 | `V1/V2/V4` | H8-DOMAIN、H8-WORKER、H8-ASN-V2 | 当前仅 ASN V2 与部分本地出站切片 | `NEEDS_WORK` | 每类消息补 L2/L3/L4/L11，并归档客户正式 ERP dev/staging 双向请求、回执、重试与审计关联 |
 
@@ -543,8 +561,8 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 
 ### 验收结论
 
-- 已证明：受控目录与纯 domain 规则；ASN 接口表入站 V2、幂等回放和 H2 生命周期审计；本地出站主备与非双写切片。
-- 未完成：Worker 的 canonical/M-PM、按业务键唯一路由与配置绑定、错误分类、仓库范围，以及其余消息类型 L2–L4/L11 和客户正式 ERP V4。
+- 已证明：受控目录与纯 domain 规则；Worker 入站唯一路由、首次配置绑定、契约版本拒绝和错误重试分类；ASN 接口表入站 V2、幂等回放和 H2 生命周期审计；本地出站主备与非双写切片。
+- 未完成：Worker 的 canonical/M-PM、重试复用原绑定、主体仓库范围、出站唯一路由、预检失败审计、错误脱敏，以及其余消息类型 L2–L4/L11 和客户正式 ERP V4。
 - 恢复条件：完成上述运行接线和逐消息证据后，再使用客户正式 ERP dev/staging 跑双向请求、回执、重试和审计关联；完成前保持 `deferred_stories`。
 
 ---
@@ -552,8 +570,8 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 ## 验收记录（US-H8-003 软件切片）
 
 - 故事：`US-H8-003`
-- 验收基线：2026-07-19 H8 软件路径收口
-- 验收日期：`2026-07-19`
+- 验收基线：2026-07-22 自研 ERP 与 Worker 运行治理扩展
+- 验收日期：`2026-07-22`
 - 质量矩阵状态：`deferred_stories`（S4 未齐）
 - 整体结论：软件切片已验证，故事整体 `NEEDS_WORK`
 
@@ -569,12 +587,14 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | AC6 死信条件 | `PASS` | should_enter_dead + mark_dead + h8_message_dead H2 审计 |
 | AC7 人工重放 | `PASS` | API + E2E + 不换业务 id |
 | AC8 查询详情 | `PASS` | list/detail QueryPanel |
-| AC9 监控指标 | `PASS` | stats + p95_latency_ms |
+| AC9 监控指标与 Worker 健康 | `NEEDS_WORK` | 消息 stats + P95 已有；缺 Worker 实例心跳与健康视图 |
 | AC10 分区与保留 | `PARTIAL` | 索引+分区准备+archive 不删+purge 需 retention；未切生产 RANGE 父表 |
 | AC11 权限审计 | `PASS` | read/write 权限 + detail/replay/archive/purge/dead H2 审计 |
 | AC12 查询裁剪 | `PASS` | 默认时间窗 + 货主索引 |
 | AC13 页面证据 | `PASS` | Playwright 3 条 + 矩阵截图登记 |
 | AC14 S4 | `NEEDS_WORK` | 客户正式 ERP |
+| AC15 暂停与恢复认领 | `NEEDS_WORK` | 缺独立持久控制、API、审计和页内操作 |
+| AC16 完整报文短期保留 | `NEEDS_WORK` | 缺按连接策略、密文、到期清理和解密审计 |
 
 验证命令：
 

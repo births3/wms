@@ -9,9 +9,9 @@ use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use uuid::Uuid;
 use wms_domain::{
-    ClaimH8ErpMessageRequest, H8ErpMessage, H8ErpMessageDetail, H8ErpMessageListResponse,
-    H8ErpMessageStats, PageMeta, PurgeH8ErpMessagesRequest, PurgeH8ErpMessagesResponse,
-    ReplayH8ErpMessageRequest,
+    validate_schema_version, ClaimH8ErpMessageRequest, H8ErpMessage, H8ErpMessageDetail,
+    H8ErpMessageListResponse, H8ErpMessageStats, PageMeta, PurgeH8ErpMessagesRequest,
+    PurgeH8ErpMessagesResponse, ReplayH8ErpMessageRequest,
 };
 
 use crate::auth::AuthContext;
@@ -86,10 +86,14 @@ struct LifecycleUpsertRequest {
     result: String,
     direction: String,
     message_type: String,
+    schema_version: String,
     external_ref: String,
     idempotency_key: String,
     correlation_id: String,
     channel: String,
+    connector_id: Option<Uuid>,
+    connector_code: Option<String>,
+    config_version: Option<i64>,
     message_id: Option<Uuid>,
 }
 
@@ -249,6 +253,8 @@ async fn record_lifecycle_upsert(
     Json(body): Json<LifecycleUpsertRequest>,
 ) -> Result<Json<H8ErpMessage>, H8ErpMessageHandlerError> {
     ctx.require_permission(H8_MSG_WRITE)?;
+    validate_schema_version(body.schema_version.trim())
+        .map_err(super::error::H8ErpMessageRepoError::Domain)?;
     let now = Utc::now();
     let message = if let Some(id) = body.message_id {
         state.repository.get(ctx.owner_id, id).await?
@@ -269,11 +275,12 @@ async fn record_lifecycle_upsert(
                 id: Uuid::new_v4(),
                 owner_id: ctx.owner_id,
                 warehouse_id: None,
-                connector_id: None,
-                connector_code: None,
-                config_version: None,
+                connector_id: body.connector_id,
+                connector_code: body.connector_code.clone(),
+                config_version: body.config_version,
                 direction: body.direction.trim().to_string(),
                 message_type: body.message_type.trim().to_string(),
+                schema_version: body.schema_version.trim().to_string(),
                 channel: body.channel.trim().to_string(),
                 external_ref: body.external_ref.trim().to_string(),
                 wms_resource_id: None,

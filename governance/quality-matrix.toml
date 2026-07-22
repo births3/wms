@@ -4505,7 +4505,9 @@ evidence_refs = [
   "deploy/h8-erp-if/init/02_seed_example.sql",
   "backend/crates/domain/src/h8_erp_message.rs",
   "backend/crates/domain/src/h8_erp_exchange.rs",
+  "backend/migrations/202607220001_h8_erp_message_receipts.sql",
   "scripts/h8_erp_interface_sync/sync_worker.py",
+  "scripts/h8_erp_interface_sync/worker_route.py",
   "scripts/h8_erp_interface_sync/outbound_publish.py",
   "scripts/h8_erp_interface_sync/test_h8_sync_worker.py",
   "scripts/h8_erp_interface_sync/test_exchange_lifecycle.py",
@@ -4513,9 +4515,9 @@ evidence_refs = [
   "docs/retros/h8-asn-inbound-flow-evidence.json",
   "docs/retros/h8-local-integration-evidence.json",
 ]
-reason = "ASN 接口表入站 V2、幂等回放、H2 生命周期审计和本地主备切片已验证；Worker 尚未接入 canonical/M-PM、按业务键唯一路由与配置版本绑定、错误分类和仓库范围，且缺其余逐消息 L2-L4/L11 与客户正式 ERP 双向 S4。"
+reason = "ASN V2、本地主备、入站唯一路由、首次配置绑定、schema_version 严格拒绝和 Worker 错误重试分类已验证；仍缺 canonical/M-PM、重试复用原绑定、主体仓库范围、出站唯一路由、预检失败审计、错误脱敏、逐消息 L2-L4/L11 与自研 ERP 双向 S4。"
 owner = "H8 模块负责人"
-resume_when = "完成 Worker 运行接线与逐消息 L2-L4/L11，再归档客户正式 ERP dev/staging 双向请求、回执、重试和审计关联后关闭延期。"
+resume_when = "完成剩余 Worker 运行接线、schema/路由预检失败审计与四组闭环逐消息 L2-L4/L11，再归档自研 ERP dev/staging 双向请求、两级回执、重试和审计关联后关闭延期。"
 
 [[deferred_stories]]
 id = "US-H8-003"
@@ -4556,9 +4558,9 @@ evidence_refs = [
   "artifacts/screenshot-portal/real-web/h8-erp-messages/replay-success.png",
   "artifacts/screenshot-portal/real-web/h8-erp-messages/readonly-no-replay.png",
 ]
-reason = "已补消息/尝试存储、状态机、Worker claim 租约、stats P95、保留策略 purge、菜单页 E2E 与分区准备迁移；尚缺生产月分区切换与客户 ERP 死信重放 S4。"
+reason = "已补消息/尝试存储、awaiting_receipt 两级回执状态、Worker claim 租约、stats P95、保留策略 purge、菜单页 E2E 与分区准备迁移；新增的 Worker 心跳、按连接+方向暂停恢复、加密短期报文保留尚未实现，并缺生产月分区和自研 ERP 故障恢复 S4。"
 owner = "H8 模块负责人"
-resume_when = "生产库切换 RANGE 月分区、补归档清理演练与客户 ERP 故障恢复证据后关闭延期。"
+resume_when = "完成 Worker 健康/暂停恢复/加密短期保留及页面证据，生产库切换 RANGE 月分区，并补自研 ERP 故障恢复证据后关闭延期。"
 
 [[stories]]
 id = "US-H8-004"

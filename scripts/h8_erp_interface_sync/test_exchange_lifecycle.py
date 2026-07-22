@@ -5,11 +5,11 @@ from __future__ import annotations
 import unittest
 from dataclasses import dataclass
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 from exchange_lifecycle import (
     H8_EXCHANGE_AUDIT_STAGES,
-    ExchangeLifecycle,
     is_exchange_audit_stage,
     run_inbound_pipeline,
     run_outbound_pipeline,
@@ -62,6 +62,7 @@ class TestExchangeLifecycle(unittest.TestCase):
             "external_doc_no": "DOC-1",
             "external_ref": "ERP-1",
             "idempotency_key": "idem-asn-1",
+            "schema_version": "1",
         }
         wms_id, life = run_inbound_pipeline(
             FakeSettings(),
@@ -69,6 +70,11 @@ class TestExchangeLifecycle(unittest.TestCase):
             row,
             handler,
             http_json=fake_http,
+            route_binding=SimpleNamespace(
+                connector_id="connector-1",
+                connector_code="SELF-ERP",
+                config_version=3,
+            ),
             dry_run=False,
         )
         self.assertEqual(wms_id, "wms-res-1")
@@ -80,6 +86,9 @@ class TestExchangeLifecycle(unittest.TestCase):
         # 每个 stage 都真实 POST 到 lifecycle 端点（非旁路假造）
         self.assertEqual(len(posts), 5)
         self.assertEqual(posts[0]["body"]["stage"], "receive")
+        self.assertEqual(posts[0]["body"]["connector_id"], "connector-1")
+        self.assertEqual(posts[0]["body"]["config_version"], 3)
+        self.assertEqual(posts[0]["body"]["schema_version"], "1")
         self.assertEqual(posts[2]["body"]["stage"], "business_api")
         self.assertEqual(posts[2]["body"]["result"], "started")
         self.assertEqual(posts[3]["body"]["result"], "ok")

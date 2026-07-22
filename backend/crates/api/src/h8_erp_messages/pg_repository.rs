@@ -38,7 +38,7 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
         let rows = sqlx::query_as::<_, MessageRow>(
             r#"
             SELECT id, owner_id, warehouse_id, connector_id, connector_code, config_version,
-                   direction, message_type, channel, external_ref, wms_resource_id,
+                   direction, message_type, schema_version, channel, external_ref, wms_resource_id,
                    idempotency_key, correlation_id, sync_status, retry_count, next_retry_at,
                    last_error_summary, payload_digest, claimed_by, lease_expires_at,
                    created_at, updated_at, completed_at, acked_at
@@ -69,7 +69,7 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
         let row = sqlx::query_as::<_, MessageRow>(
             r#"
             SELECT id, owner_id, warehouse_id, connector_id, connector_code, config_version,
-                   direction, message_type, channel, external_ref, wms_resource_id,
+                   direction, message_type, schema_version, channel, external_ref, wms_resource_id,
                    idempotency_key, correlation_id, sync_status, retry_count, next_retry_at,
                    last_error_summary, payload_digest, claimed_by, lease_expires_at,
                    created_at, updated_at, completed_at, acked_at
@@ -181,7 +181,7 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
         let row = sqlx::query_as::<_, MessageRow>(
             r#"
             SELECT id, owner_id, warehouse_id, connector_id, connector_code, config_version,
-                   direction, message_type, channel, external_ref, wms_resource_id,
+                   direction, message_type, schema_version, channel, external_ref, wms_resource_id,
                    idempotency_key, correlation_id, sync_status, retry_count, next_retry_at,
                    last_error_summary, payload_digest, claimed_by, lease_expires_at,
                    created_at, updated_at, completed_at, acked_at
@@ -275,7 +275,7 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
         let row = sqlx::query_as::<_, MessageRow>(
             r#"
             SELECT id, owner_id, warehouse_id, connector_id, connector_code, config_version,
-                   direction, message_type, channel, external_ref, wms_resource_id,
+                   direction, message_type, schema_version, channel, external_ref, wms_resource_id,
                    idempotency_key, correlation_id, sync_status, retry_count, next_retry_at,
                    last_error_summary, payload_digest, claimed_by, lease_expires_at,
                    created_at, updated_at, completed_at, acked_at
@@ -358,7 +358,7 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
         let row = sqlx::query_as::<_, MessageRow>(
             r#"
             SELECT id, owner_id, warehouse_id, connector_id, connector_code, config_version,
-                   direction, message_type, channel, external_ref, wms_resource_id,
+                   direction, message_type, schema_version, channel, external_ref, wms_resource_id,
                    idempotency_key, correlation_id, sync_status, retry_count, next_retry_at,
                    last_error_summary, payload_digest, claimed_by, lease_expires_at,
                    created_at, updated_at, completed_at, acked_at
@@ -442,7 +442,7 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
         let row = sqlx::query_as::<_, MessageRow>(
             r#"
             SELECT id, owner_id, warehouse_id, connector_id, connector_code, config_version,
-                   direction, message_type, channel, external_ref, wms_resource_id,
+                   direction, message_type, schema_version, channel, external_ref, wms_resource_id,
                    idempotency_key, correlation_id, sync_status, retry_count, next_retry_at,
                    last_error_summary, payload_digest, claimed_by, lease_expires_at,
                    created_at, updated_at, completed_at, acked_at
@@ -574,7 +574,7 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
         let row = sqlx::query_as::<_, MessageRow>(
             r#"
             SELECT id, owner_id, warehouse_id, connector_id, connector_code, config_version,
-                   direction, message_type, channel, external_ref, wms_resource_id,
+                   direction, message_type, schema_version, channel, external_ref, wms_resource_id,
                    idempotency_key, correlation_id, sync_status, retry_count, next_retry_at,
                    last_error_summary, payload_digest, claimed_by, lease_expires_at,
                    created_at, updated_at, completed_at, acked_at
@@ -598,12 +598,12 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
             r#"
             INSERT INTO h8_erp_messages (
               id, owner_id, warehouse_id, connector_id, connector_code, config_version,
-              direction, message_type, channel, external_ref, wms_resource_id,
+              direction, message_type, schema_version, channel, external_ref, wms_resource_id,
               idempotency_key, correlation_id, sync_status, retry_count, next_retry_at,
               last_error_summary, payload_digest, claimed_by, lease_expires_at,
               created_at, updated_at, completed_at, acked_at
             ) VALUES (
-              $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24
+              $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25
             )
             ON CONFLICT (id) DO UPDATE SET
               sync_status = EXCLUDED.sync_status,
@@ -620,6 +620,7 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
         .bind(message.config_version)
         .bind(&message.direction)
         .bind(&message.message_type)
+        .bind(&message.schema_version)
         .bind(&message.channel)
         .bind(&message.external_ref)
         .bind(&message.wms_resource_id)
@@ -680,6 +681,7 @@ struct MessageRow {
     config_version: Option<i64>,
     direction: String,
     message_type: String,
+    schema_version: String,
     channel: String,
     external_ref: String,
     wms_resource_id: Option<String>,
@@ -709,6 +711,7 @@ impl From<MessageRow> for H8ErpMessage {
             config_version: r.config_version,
             direction: r.direction,
             message_type: r.message_type,
+            schema_version: r.schema_version,
             channel: r.channel,
             external_ref: r.external_ref,
             wms_resource_id: r.wms_resource_id,

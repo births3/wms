@@ -47,12 +47,14 @@ pub const H8_CATALOG_MESSAGE_TYPES: [&str; 12] = [
 
 pub const H8_MESSAGE_DIRECTIONS: [&str; 2] = ["inbound", "outbound"];
 pub const H8_MESSAGE_CHANNELS: [&str; 2] = ["rest", "interface_table"];
+pub const H8_SUPPORTED_SCHEMA_VERSIONS: [&str; 1] = ["1"];
 
-/// 消息处理状态（US-H8-003 AC3）。`acked` 仅出站且需要业务回执时使用。
-pub const H8_MESSAGE_STATUSES: [&str; 6] = [
+/// 消息处理状态（US-H8-003 AC3）。
+pub const H8_MESSAGE_STATUSES: [&str; 7] = [
     "pending",
     "processing",
     "succeeded",
+    "awaiting_receipt",
     "failed",
     "dead",
     "acked",
@@ -72,6 +74,7 @@ pub enum H8MessageError {
     OwnerMismatch,
     WarehouseOutOfScope,
     MappingMissing,
+    UnsupportedSchemaVersion,
 }
 
 /// 入站消息类型所需最小 API Key scope（与连接配置 AC9 对齐并扩展出库/退货）。
@@ -129,6 +132,14 @@ pub fn validate_sync_status(status: &str) -> Result<(), H8MessageError> {
     }
 }
 
+pub fn validate_schema_version(version: &str) -> Result<(), H8MessageError> {
+    if H8_SUPPORTED_SCHEMA_VERSIONS.contains(&version) {
+        Ok(())
+    } else {
+        Err(H8MessageError::UnsupportedSchemaVersion)
+    }
+}
+
 /// 业务幂等判定键：货主 + 消息类型 + 外部业务标识 + Idempotency-Key。
 pub fn message_idempotency_identity(
     owner_id: Uuid,
@@ -155,6 +166,7 @@ pub struct H8MessageEnvelope {
     pub warehouse_id: Option<Uuid>,
     pub direction: String,
     pub message_type: String,
+    pub schema_version: String,
     pub external_ref: String,
     pub idempotency_key: String,
     pub connector_id: Option<Uuid>,
@@ -175,6 +187,7 @@ impl H8MessageEnvelope {
         if self.direction == "outbound" && !is_outbound_message_type(&self.message_type) {
             return Err(H8MessageError::UnknownMessageType);
         }
+        validate_schema_version(&self.schema_version)?;
         if self.external_ref.trim().is_empty() {
             return Err(H8MessageError::FieldRequired("external_ref"));
         }
@@ -259,9 +272,12 @@ pub fn can_transition_message_status(from: &str, to: &str) -> Result<(), H8Messa
         (from, to),
         ("pending", "processing")
             | ("processing", "succeeded")
+            | ("processing", "awaiting_receipt")
             | ("processing", "failed")
             | ("processing", "dead")
-            | ("succeeded", "acked")
+            | ("awaiting_receipt", "acked")
+            | ("awaiting_receipt", "processing")
+            | ("awaiting_receipt", "dead")
             | ("failed", "processing")
             | ("failed", "dead")
             | ("dead", "processing") // 人工重放
@@ -294,7 +310,7 @@ pub fn can_claim_message(
                 Ok(())
             }
         }
-        "succeeded" | "acked" | "dead" => Err(H8MessageError::LeaseConflict),
+        "succeeded" | "awaiting_receipt" | "acked" | "dead" => Err(H8MessageError::LeaseConflict),
         _ => Err(H8MessageError::InvalidStatus),
     }
 }
@@ -329,6 +345,7 @@ pub struct H8ErpMessage {
     pub config_version: Option<i64>,
     pub direction: String,
     pub message_type: String,
+    pub schema_version: String,
     pub channel: String,
     pub external_ref: String,
     pub wms_resource_id: Option<String>,
@@ -448,6 +465,16 @@ mod tests {
     }
 
     #[test]
+    fn envelope_rejects_unsupported_schema_version() {
+        let mut env = sample_envelope("inbound", "asn");
+        env.schema_version = "2".into();
+        assert_eq!(
+            env.validate(),
+            Err(H8MessageError::UnsupportedSchemaVersion)
+        );
+    }
+
+    #[test]
     fn error_classification_retryable_vs_not() {
         assert_eq!(classify_h8_error("timeout"), H8ErrorClass::Retryable);
         assert_eq!(classify_h8_error("mapping"), H8ErrorClass::NonRetryable);
@@ -480,10 +507,14 @@ mod tests {
     #[test]
     fn status_machine_and_replay_rules() {
         can_transition_message_status("pending", "processing").unwrap();
+        can_transition_message_status("processing", "awaiting_receipt").unwrap();
+        can_transition_message_status("awaiting_receipt", "acked").unwrap();
+        can_transition_message_status("awaiting_receipt", "processing").unwrap();
+        can_transition_message_status("awaiting_receipt", "dead").unwrap();
         can_transition_message_status("processing", "failed").unwrap();
         can_transition_message_status("failed", "dead").unwrap();
         can_transition_message_status("dead", "processing").unwrap();
-        can_transition_message_status("succeeded", "acked").unwrap();
+        assert!(can_transition_message_status("succeeded", "acked").is_err());
         assert!(can_transition_message_status("succeeded", "pending").is_err());
         assert!(can_transition_message_status("acked", "processing").is_err());
         can_replay_message("failed").unwrap();
@@ -539,6 +570,7 @@ mod tests {
             warehouse_id: None,
             direction: direction.into(),
             message_type: message_type.into(),
+            schema_version: "1".into(),
             external_ref: "ERP-1".into(),
             idempotency_key: "idem-1".into(),
             connector_id: None,

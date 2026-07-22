@@ -153,6 +153,10 @@ H8。H8 是 ADR-0030 的首个参考实现，但不得承载冷链、TMS、快�
 
 两条通道最终都进入同一 WMS 业务 API（M2/M4/M1…），禁止业务模块直连 ERP 库。
 
+首个真实对接为遵循 H8 契约的自研 ERP：REST 为主通道，独立接口库为备用通道，
+US-H8-002 的 5 类入站和 7 类出站均保持双通道能力。交付按入库、出库、主数据/档案补录、
+库存/财务四个闭环推进，每个闭环在一个货主、一个仓库取得真实 dev/staging S4 证据后启用。
+
 #### 接口表通道（通道 B）本地联调
 
 | 项 | 说明 |
@@ -165,7 +169,7 @@ H8。H8 是 ADR-0030 的首个参考实现，但不得承载冷链、TMS、快�
 | 通道 A Mock | `channel_a_callback_mock.py`；确认工具 `ack_if_out.py` |
 | Runbook | `docs/runbooks/h8-erp-interface-table-sync.md` |
 
-控制列约定：`sync_status`（入站 pending/processing/success/failed/dead；出站另含 acked）、`retry_count`、`last_error`、`idempotency_key`、`wms_resource_id`。档案补录 outbox 另有 `max_attempts`/`deadline_at`（5 次 / 5 分钟 / 24h）。
+接口表控制列继续使用 `sync_status`（入站 pending/processing/success/failed/dead；出站另含 acked）、`schema_version`、`retry_count`、`last_error`、`idempotency_key`、`wms_resource_id`，不得与 WMS 消息状态混用。WMS 消息技术接收后需要业务结果时进入 `awaiting_receipt`；业务成功进入 `acked`，明确拒绝或原幂等键重试耗尽进入 `dead`。档案补录 outbox 另有 `max_attempts`/`deadline_at`（5 次 / 5 分钟 / 24h）。
 
 新增 ERP 单据类型 = 新接口表（或统一 staging + type 列）+ H8 映射/handler；ERP DTO 不进入 M2/M3/M4 域模型。只有 WMS 业务语义本身变化时，才修改对应业务 domain。
 
@@ -192,6 +196,11 @@ ERP 连接通过管理端「基础能力 / H8 集成中心 / H8 ERP 连接」独
 REST 按 ADR-0018 重试和熔断，满足降级条件后把同一消息及原 Idempotency-Key 转入接口表；半开探测恢复后回到 REST。连接测试只做健康、认证、权限和结构探测，不写真实业务单据。完整字段、状态动作、权限和证据标准见 [US-H8-001](../domain/user-stories-h8-erp-integration.md)。
 
 消息日志、监控、死信、并发租约、人工重放、分区和保留边界见 [H8 用户故事](../domain/user-stories-h8-erp-integration.md) 中的 US-H8-003；本地 Worker 日志或 H2 审计均不能替代该故事的运行记录与故障恢复证据。
+
+Worker 运行治理复用「H8 ERP 消息」页：消息指标之外登记实例心跳，并按连接 + 方向保存
+独立暂停控制。暂停允许可选到期时间，在途处理完成后停止新认领；不改变连接配置状态，也
+不允许 WMS 直接启动、停止或重启操作系统进程。完整报文默认不保存；按连接启用时加密
+保留 7 天、最长 30 天，到期仅删除密文，H2 审计和消息处理结果继续保留。
 
 ### 消费方
 

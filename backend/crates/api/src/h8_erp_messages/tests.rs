@@ -29,6 +29,7 @@ fn sample_message(owner: Uuid, status: &str) -> H8ErpMessage {
         config_version: Some(1),
         direction: "inbound".into(),
         message_type: "asn".into(),
+        schema_version: "1".into(),
         channel: "rest".into(),
         external_ref: "ERP-ASN-1".into(),
         wms_resource_id: None,

@@ -44,6 +44,10 @@ class ExchangeLifecycle:
     direction: str = "inbound"
     channel: str = "interface_table"
     correlation_id: str = ""
+    connector_id: str | None = None
+    connector_code: str | None = None
+    config_version: int | None = None
+    schema_version: str = "1"
     message_id: str | None = None
     stages_emitted: list[tuple[str, str]] = field(default_factory=list)
     http_json: HttpJsonFn | None = None
@@ -68,6 +72,11 @@ class ExchangeLifecycle:
         }
         if self.message_id:
             body["message_id"] = self.message_id
+        if self.connector_id:
+            body["connector_id"] = self.connector_id
+            body["connector_code"] = self.connector_code
+            body["config_version"] = self.config_version
+        body["schema_version"] = self.schema_version
         http = self.http_json
         if http is None:
             # 延迟导入避免循环；与 sync_worker.http_json 签名一致
@@ -99,6 +108,7 @@ def run_inbound_pipeline(
     handler: Callable[[Any, dict[str, str]], str],
     *,
     http_json: HttpJsonFn | None = None,
+    route_binding: Any | None = None,
     dry_run: bool = False,
 ) -> tuple[str | None, ExchangeLifecycle]:
     """真实入站路径：receive→convert→business_api→receipt|final_failure。
@@ -114,6 +124,10 @@ def run_inbound_pipeline(
         idempotency_key=str(idem),
         direction="inbound",
         channel="interface_table",
+        connector_id=(route_binding.connector_id if route_binding else None),
+        connector_code=(route_binding.connector_code if route_binding else None),
+        config_version=(route_binding.config_version if route_binding else None),
+        schema_version=str(row.get("schema_version") or "1"),
         http_json=http_json,
     )
     life.stage("receive", "ok")
