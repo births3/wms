@@ -29,11 +29,57 @@ class WorkerHttpError(RuntimeError):
         self.status = status
 
 
+def get_worker_claim_decision(
+    settings: Any,
+    connector_id: str,
+    direction: str,
+    *,
+    http_json_fn: HttpJsonFn,
+) -> bool:
+    path = "/api/v1/integration/erp-messages/worker-runtime/claim-decision?" + (
+        urllib.parse.urlencode({"connector_id": connector_id, "direction": direction})
+    )
+    status, parsed, raw = http_json_fn(
+        settings, "GET", path, None, f"worker-claim-{connector_id}-{direction}"
+    )
+    if (
+        status != 200
+        or not isinstance(parsed, dict)
+        or not isinstance(parsed.get("allowed"), bool)
+    ):
+        raise WorkerHttpError(status, "worker claim decision", raw)
+    return parsed["allowed"]
+
+
+def post_worker_heartbeat(
+    settings: Any,
+    directions: list[str],
+    current_claims: int,
+    *,
+    http_json_fn: HttpJsonFn,
+) -> None:
+    body = {
+        "worker_id": settings.worker_id,
+        "worker_version": settings.worker_version,
+        "connector_id": settings.connector_id,
+        "directions": directions,
+        "current_claims": current_claims,
+        "heartbeat_ttl_seconds": settings.heartbeat_ttl_seconds,
+    }
+    status, parsed, raw = http_json_fn(
+        settings,
+        "POST",
+        "/api/v1/integration/erp-messages/worker-runtime/heartbeat",
+        body,
+        f"worker-heartbeat-{settings.worker_id}",
+    )
+    if status != 200 or not isinstance(parsed, dict):
+        raise WorkerHttpError(status, "worker heartbeat", raw)
+
+
 def is_retryable_worker_error(error: Exception) -> bool:
     return isinstance(error, WorkerHttpError) and (
-        error.status == 0
-        or error.status in (408, 425, 429)
-        or error.status >= 500
+        error.status == 0 or error.status in (408, 425, 429) or error.status >= 500
     )
 
 
@@ -75,7 +121,9 @@ def resolve_inbound_route(
         raise WorkerHttpError(502, "route resolve", "connector missing")
     mode = str(connector.get("channel_mode") or "")
     if mode not in ("interface_table", "rest_primary_table_fallback"):
-        raise WorkerHttpError(409, "route resolve", "connector has no interface table channel")
+        raise WorkerHttpError(
+            409, "route resolve", "connector has no interface table channel"
+        )
     connector_id = str(connector.get("id") or "")
     connector_code = str(connector.get("connector_code") or "")
     config_version = int(connector.get("config_version") or 0)

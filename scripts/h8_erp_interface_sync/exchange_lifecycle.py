@@ -12,6 +12,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
+from worker_route import WorkerHttpError
+
 # 与 backend/crates/domain/src/h8_erp_exchange.rs 保持一致
 H8_EXCHANGE_AUDIT_STAGES = (
     "receive",
@@ -48,6 +50,7 @@ class ExchangeLifecycle:
     connector_code: str | None = None
     config_version: int | None = None
     schema_version: str = "1"
+    payload: dict[str, Any] | None = None
     message_id: str | None = None
     stages_emitted: list[tuple[str, str]] = field(default_factory=list)
     http_json: HttpJsonFn | None = None
@@ -77,6 +80,8 @@ class ExchangeLifecycle:
             body["connector_code"] = self.connector_code
             body["config_version"] = self.config_version
         body["schema_version"] = self.schema_version
+        if stage == "receive" and self.payload is not None:
+            body["payload"] = self.payload
         http = self.http_json
         if http is None:
             # 延迟导入避免循环；与 sync_worker.http_json 签名一致
@@ -91,12 +96,7 @@ class ExchangeLifecycle:
             f"h8-life-{self.idempotency_key}-{stage}-{len(self.stages_emitted)}",
         )
         if status not in (200, 201):
-            # 审计失败不阻断业务，但记录；单测可断言 stages_emitted
-            print(
-                f"[h8] lifecycle audit {stage} HTTP {status}: {raw[:200]}",
-                flush=True,
-            )
-            return
+            raise WorkerHttpError(status, f"lifecycle audit {stage}", raw)
         if isinstance(parsed, dict) and parsed.get("id"):
             self.message_id = str(parsed["id"])
 
@@ -115,7 +115,9 @@ def run_inbound_pipeline(
 
     返回 (wms_resource_id|None, lifecycle)。
     """
-    external = row.get("external_ref") or row.get("external_doc_no") or row.get("id") or ""
+    external = (
+        row.get("external_ref") or row.get("external_doc_no") or row.get("id") or ""
+    )
     idem = row.get("idempotency_key") or f"{message_type}-{row.get('id', 'x')}"
     life = ExchangeLifecycle(
         settings=settings,
@@ -128,6 +130,7 @@ def run_inbound_pipeline(
         connector_code=(route_binding.connector_code if route_binding else None),
         config_version=(route_binding.config_version if route_binding else None),
         schema_version=str(row.get("schema_version") or "1"),
+        payload=row,
         http_json=http_json,
     )
     life.stage("receive", "ok")
@@ -146,6 +149,34 @@ def run_inbound_pipeline(
         raise exc
 
 
+def record_preflight_failure(
+    settings: Any,
+    message_type: str,
+    row: dict[str, str],
+    connector_id: str,
+    *,
+    http_json: HttpJsonFn | None = None,
+) -> ExchangeLifecycle:
+    """schema/路由预检失败仍留下 receive → final_failure 审计。"""
+    life = ExchangeLifecycle(
+        settings=settings,
+        message_type=message_type,
+        external_ref=str(
+            row.get("external_ref") or row.get("external_doc_no") or row["id"]
+        ),
+        idempotency_key=str(
+            row.get("idempotency_key") or f"{message_type}-{row['id']}"
+        ),
+        connector_id=connector_id,
+        schema_version=str(row.get("schema_version") or ""),
+        payload=row,
+        http_json=http_json,
+    )
+    life.stage("receive", "received")
+    life.stage("final_failure", "preflight_rejected")
+    return life
+
+
 def run_outbound_pipeline(
     settings: Any,
     message_type: str,
@@ -154,6 +185,8 @@ def run_outbound_pipeline(
     send_fn: Callable[[], None],
     *,
     http_json: HttpJsonFn | None = None,
+    connector_id: str | None = None,
+    payload: dict[str, Any] | None = None,
     dry_run: bool = False,
 ) -> ExchangeLifecycle:
     """真实出站路径：receive→convert→send→receipt|final_failure。"""
@@ -164,6 +197,8 @@ def run_outbound_pipeline(
         idempotency_key=idempotency_key,
         direction="outbound",
         channel="rest",
+        connector_id=connector_id,
+        payload=payload,
         http_json=http_json,
     )
     life.stage("receive", "ok")

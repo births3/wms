@@ -14,6 +14,10 @@
   H8_MSSQL_CONTAINER     默认 wms-mssql-erp-if（sqlcmd 回退用）
   WMS_API_BASE           默认 http://127.0.0.1:8080
   WMS_API_TOKEN          Bearer token（入站必填，除 --dry-run）
+  H8_CONNECTOR_ID        本 Worker 唯一绑定的 H8 连接 UUID（必填）
+  H8_WORKER_ID           默认主机名-PID
+  H8_WORKER_VERSION      默认 1
+  H8_HEARTBEAT_TTL_SEC   默认 max(15, 3 × 轮询秒数)
   WMS_DB_URL / DATABASE_URL  出站读 WMS outbox（PostgreSQL）
   H8_POLL_INTERVAL_SEC   默认 5
   H8_MAX_RETRY           默认 5
@@ -25,11 +29,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import subprocess
 import sys
 import time
 import urllib.error
 import urllib.request
+import socket
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -38,7 +43,7 @@ from typing import Any, Callable
 _sys_path = str(Path(__file__).resolve().parent)
 if _sys_path not in sys.path:
     sys.path.insert(0, _sys_path)
-from exchange_lifecycle import run_inbound_pipeline  # noqa: E402
+from exchange_lifecycle import record_preflight_failure, run_inbound_pipeline  # noqa: E402
 from outbound_publish import (  # noqa: E402
     process_outbound_once,
     resolve_callback_base,
@@ -48,10 +53,13 @@ from outbound_publish import (  # noqa: E402
 from worker_route import (  # noqa: E402
     RouteBinding,
     WorkerHttpError,
+    get_worker_claim_decision as get_worker_claim_decision_with_http,
     is_retryable_worker_error,
+    post_worker_heartbeat as post_worker_heartbeat_with_http,
     resolve_inbound_route as resolve_inbound_route_with_http,
     validate_row_schema_version,
 )
+from worker_mssql import claim_rows, mark_row, sqlcmd_query  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # 配置
@@ -79,298 +87,46 @@ class Settings:
     max_retry: int
     batch_size: int
     use_sqlcmd: bool
+    connector_id: str
+    worker_id: str
+    worker_version: str
+    heartbeat_ttl_seconds: int
 
     @classmethod
     def from_env(cls) -> "Settings":
         use_sqlcmd = os.environ.get("H8_USE_SQLCMD", "1") != "0"
+        poll_interval = float(os.environ.get("H8_POLL_INTERVAL_SEC", "5"))
+        connector_id = env("H8_CONNECTOR_ID")
+        try:
+            uuid.UUID(connector_id)
+        except ValueError as exc:
+            raise SystemExit("H8_CONNECTOR_ID must be UUID") from exc
         return cls(
             mssql_host=os.environ.get("H8_MSSQL_HOST", "127.0.0.1"),
             mssql_port=os.environ.get("H8_MSSQL_PORT", "14333"),
             mssql_user=os.environ.get("H8_MSSQL_USER", "sa"),
-            mssql_password=os.environ.get(
-                "H8_MSSQL_PASSWORD", "Wms_Erp_If_Dev_2026!"
-            ),
+            mssql_password=os.environ.get("H8_MSSQL_PASSWORD", "Wms_Erp_If_Dev_2026!"),
             mssql_database=os.environ.get("H8_MSSQL_DATABASE", "wms_erp_if"),
             mssql_container=os.environ.get("H8_MSSQL_CONTAINER", "wms-mssql-erp-if"),
             api_base=os.environ.get("WMS_API_BASE", "http://127.0.0.1:8080").rstrip(
                 "/"
             ),
             api_token=os.environ.get("WMS_API_TOKEN") or None,
-            poll_interval=float(os.environ.get("H8_POLL_INTERVAL_SEC", "5")),
+            poll_interval=poll_interval,
             max_retry=int(os.environ.get("H8_MAX_RETRY", "5")),
             batch_size=int(os.environ.get("H8_BATCH_SIZE", "10")),
             use_sqlcmd=use_sqlcmd,
+            connector_id=connector_id,
+            worker_id=os.environ.get(
+                "H8_WORKER_ID", f"{socket.gethostname()}-{os.getpid()}"
+            ),
+            worker_version=os.environ.get("H8_WORKER_VERSION", "1"),
+            heartbeat_ttl_seconds=int(
+                os.environ.get(
+                    "H8_HEARTBEAT_TTL_SEC", str(max(15, int(poll_interval * 3)))
+                )
+            ),
         )
-
-
-# ---------------------------------------------------------------------------
-# MSSQL 访问（默认 docker exec sqlcmd，避免本机装 ODBC）
-# ---------------------------------------------------------------------------
-
-
-def sqlcmd_query(settings: Settings, sql: str) -> str:
-    """执行 SQL 并返回 stdout 文本（-s| -W -h-1）。"""
-    cmd = [
-        "docker",
-        "exec",
-        "-i",
-        settings.mssql_container,
-        "/opt/mssql-tools18/bin/sqlcmd",
-        "-S",
-        "localhost",
-        "-U",
-        settings.mssql_user,
-        "-P",
-        settings.mssql_password,
-        "-C",
-        "-b",  # 遇错误非零退出
-        "-d",
-        settings.mssql_database,
-        "-s",
-        "|",
-        "-W",
-        "-h",
-        "-1",
-        "-Q",
-        sql,
-    ]
-    proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
-    if proc.returncode != 0:
-        raise RuntimeError(
-            f"sqlcmd failed rc={proc.returncode}: {proc.stderr or proc.stdout}"
-        )
-    # 部分版本仍把 Msg 写到 stdout 且 rc=0
-    if "Msg " in proc.stdout and "Level" in proc.stdout:
-        raise RuntimeError(f"sqlcmd logical error: {proc.stdout[:800]}")
-    return proc.stdout
-
-
-def sql_escape(value: str) -> str:
-    return value.replace("'", "''")
-
-
-def claim_rows(settings: Settings, table: str) -> list[dict[str, str]]:
-    """认领一批 pending 行，置为 processing，返回字段字典列表。
-
-    SQL Server 不允许 ``UPDATE TOP ... ORDER BY``；用 CTE 排序后更新。
-    """
-    batch = int(settings.batch_size)
-    claim_cte = f"""
-SET NOCOUNT ON;
-DECLARE @claimed TABLE (id UNIQUEIDENTIFIER);
-;WITH cte AS (
-  SELECT TOP ({batch}) id
-    FROM dbo.{{table}} WITH (ROWLOCK, READPAST)
-   WHERE sync_status = N'pending'
-   ORDER BY updated_at ASC
-)
-UPDATE t
-   SET sync_status = N'processing', updated_at = SYSUTCDATETIME()
-OUTPUT inserted.id INTO @claimed
-  FROM dbo.{{table}} t
-  INNER JOIN cte ON cte.id = t.id;
-"""
-    # 不同表列不同：用动态列集合查询
-    if table == "if_in_asn":
-        select_sql = (
-            claim_cte.format(table="if_in_asn")
-            + """
-SELECT
-  CONVERT(NVARCHAR(36), id), external_doc_no,
-  CONVERT(NVARCHAR(36), owner_id), CONVERT(NVARCHAR(36), warehouse_id),
-  CONVERT(NVARCHAR(36), supplier_id), product_code,
-  CONVERT(NVARCHAR(32), expected_qty),
-  CONVERT(NVARCHAR(33), expected_arrival_at, 126),
-  document_type, ISNULL(external_ref,N''), ISNULL(receipt_no,N''),
-  schema_version,
-  idempotency_key, CONVERT(NVARCHAR(16), retry_count)
-FROM dbo.if_in_asn WHERE id IN (SELECT id FROM @claimed);
-"""
-        )
-        cols = [
-            "id",
-            "external_doc_no",
-            "owner_id",
-            "warehouse_id",
-            "supplier_id",
-            "product_code",
-            "expected_qty",
-            "expected_arrival_at",
-            "document_type",
-            "external_ref",
-            "receipt_no",
-            "schema_version",
-            "idempotency_key",
-            "retry_count",
-        ]
-    elif table == "if_in_outbound_order":
-        select_sql = (
-            claim_cte.format(table="if_in_outbound_order")
-            + """
-SELECT
-  CONVERT(NVARCHAR(36), id), external_doc_no,
-  CONVERT(NVARCHAR(36), owner_id), CONVERT(NVARCHAR(36), warehouse_id),
-  CONVERT(NVARCHAR(36), customer_id), document_type,
-  ISNULL(erp_order_no,N''), ISNULL(wms_order_no,N''), product_code,
-  ISNULL(batch_no,N''), CONVERT(NVARCHAR(32), planned_qty),
-  ISNULL(CONVERT(NVARCHAR(33), required_ship_at, 126),N''),
-  schema_version,
-  idempotency_key, CONVERT(NVARCHAR(16), retry_count)
-FROM dbo.if_in_outbound_order WHERE id IN (SELECT id FROM @claimed);
-"""
-        )
-        cols = [
-            "id",
-            "external_doc_no",
-            "owner_id",
-            "warehouse_id",
-            "customer_id",
-            "document_type",
-            "erp_order_no",
-            "wms_order_no",
-            "product_code",
-            "batch_no",
-            "planned_qty",
-            "required_ship_at",
-            "schema_version",
-            "idempotency_key",
-            "retry_count",
-        ]
-    elif table == "if_in_product_master":
-        select_sql = (
-            claim_cte.format(table="if_in_product_master")
-            + """
-SELECT
-  CONVERT(NVARCHAR(36), id), external_doc_no,
-  CONVERT(NVARCHAR(36), owner_id), product_code, product_name,
-  ISNULL(approval_no,N''), ISNULL(spec,N''), ISNULL(dosage_form,N''),
-  ISNULL(manufacturer,N''), ISNULL(storage_condition,N''),
-  schema_version,
-  idempotency_key, CONVERT(NVARCHAR(16), retry_count)
-FROM dbo.if_in_product_master WHERE id IN (SELECT id FROM @claimed);
-"""
-        )
-        cols = [
-            "id",
-            "external_doc_no",
-            "owner_id",
-            "product_code",
-            "product_name",
-            "approval_no",
-            "spec",
-            "dosage_form",
-            "manufacturer",
-            "storage_condition",
-            "schema_version",
-            "idempotency_key",
-            "retry_count",
-        ]
-    elif table == "if_in_return_order":
-        select_sql = (
-            claim_cte.format(table="if_in_return_order")
-            + """
-SELECT
-  CONVERT(NVARCHAR(36), id), external_doc_no,
-  CONVERT(NVARCHAR(36), owner_id), CONVERT(NVARCHAR(36), warehouse_id),
-  CONVERT(NVARCHAR(36), customer_id),
-  CONVERT(NVARCHAR(36), ISNULL(supplier_id, customer_id)),
-  product_code,
-  CONVERT(NVARCHAR(32), expected_qty),
-  CONVERT(NVARCHAR(33), expected_arrival_at, 126),
-  document_type, ISNULL(external_ref,N''), ISNULL(receipt_no,N''),
-  ISNULL(batch_no,N''),
-  schema_version,
-  idempotency_key, CONVERT(NVARCHAR(16), retry_count)
-FROM dbo.if_in_return_order WHERE id IN (SELECT id FROM @claimed);
-"""
-        )
-        cols = [
-            "id",
-            "external_doc_no",
-            "owner_id",
-            "warehouse_id",
-            "customer_id",
-            "supplier_id",
-            "product_code",
-            "expected_qty",
-            "expected_arrival_at",
-            "document_type",
-            "external_ref",
-            "receipt_no",
-            "batch_no",
-            "schema_version",
-            "idempotency_key",
-            "retry_count",
-        ]
-    elif table == "if_in_product_change":
-        select_sql = (
-            claim_cte.format(table="if_in_product_change")
-            + """
-SELECT
-  CONVERT(NVARCHAR(36), id), external_doc_no,
-  CONVERT(NVARCHAR(36), owner_id), product_code,
-  ISNULL(CONVERT(NVARCHAR(36), product_id),N''),
-  field_name, new_value,
-  ISNULL(CONVERT(NVARCHAR(36), liaison_id),N''),
-  ISNULL(CONVERT(NVARCHAR(36), asn_id),N''),
-  schema_version,
-  idempotency_key, CONVERT(NVARCHAR(16), retry_count)
-FROM dbo.if_in_product_change WHERE id IN (SELECT id FROM @claimed);
-"""
-        )
-        cols = [
-            "id",
-            "external_doc_no",
-            "owner_id",
-            "product_code",
-            "product_id",
-            "field_name",
-            "new_value",
-            "liaison_id",
-            "asn_id",
-            "schema_version",
-            "idempotency_key",
-            "retry_count",
-        ]
-    else:
-        raise ValueError(table)
-
-    out = sqlcmd_query(settings, select_sql)
-    rows: list[dict[str, str]] = []
-    for line in out.splitlines():
-        line = line.strip()
-        if not line or line.startswith("(") or line.startswith("rows"):
-            continue
-        parts = [p.strip() for p in line.split("|")]
-        if len(parts) < len(cols):
-            continue
-        rows.append({cols[i]: parts[i] for i in range(len(cols))})
-    return rows
-
-
-def mark_row(
-    settings: Settings,
-    table: str,
-    row_id: str,
-    status: str,
-    error: str | None = None,
-    wms_id: str | None = None,
-    retry_count: int | None = None,
-) -> None:
-    err_sql = "NULL" if not error else f"N'{sql_escape(error[:900])}'"
-    wms_sql = "NULL" if not wms_id else f"N'{sql_escape(wms_id)}'"
-    retry_sql = "" if retry_count is None else f", retry_count = {int(retry_count)}"
-    sql = f"""
-SET NOCOUNT ON;
-UPDATE dbo.{table}
-   SET sync_status = N'{sql_escape(status)}',
-       last_error = {err_sql},
-       wms_resource_id = COALESCE({wms_sql}, wms_resource_id),
-       updated_at = SYSUTCDATETIME()
-       {retry_sql}
- WHERE id = '{sql_escape(row_id)}';
-"""
-    sqlcmd_query(settings, sql)
 
 
 # ---------------------------------------------------------------------------
@@ -425,6 +181,29 @@ def resolve_inbound_route(
         row,
         http_json_fn=http_json_fn,
     )
+
+
+def get_worker_claim_decision(settings: Settings, direction: str) -> bool:
+    return get_worker_claim_decision_with_http(
+        settings,
+        settings.connector_id,
+        direction,
+        http_json_fn=http_json,
+    )
+
+
+def try_record_worker_heartbeat(
+    settings: Settings, directions: list[str], current_claims: int
+) -> None:
+    try:
+        post_worker_heartbeat_with_http(
+            settings,
+            directions,
+            current_claims,
+            http_json_fn=http_json,
+        )
+    except Exception as exc:  # noqa: BLE001 — 监控失败不得中断在途业务
+        print(f"[h8] heartbeat warn: {exc}", flush=True)
 
 
 # ---------------------------------------------------------------------------
@@ -605,11 +384,7 @@ def handle_product_change(settings: Settings, row: dict[str, str]) -> str:
             raise RuntimeError("products list shape unexpected")
         code = row["product_code"]
         match = next(
-            (
-                p
-                for p in items
-                if isinstance(p, dict) and p.get("product_code") == code
-            ),
+            (p for p in items if isinstance(p, dict) and p.get("product_code") == code),
             None,
         )
         if not match or not match.get("id"):
@@ -654,11 +429,27 @@ HANDLERS: dict[str, tuple[str, Callable[[Settings, dict[str, str]], str]]] = {
 }
 
 
-def process_once(settings: Settings, types: list[str], dry_run: bool) -> int:
+def process_once(
+    settings: Settings,
+    types: list[str],
+    dry_run: bool,
+    heartbeat_directions: list[str] | None = None,
+) -> int:
     processed = 0
+    heartbeat_directions = heartbeat_directions or ["inbound"]
     for type_name in types:
         table, handler = HANDLERS[type_name]
+        if not dry_run:
+            try_record_worker_heartbeat(settings, heartbeat_directions, 0)
+            if not get_worker_claim_decision(settings, "inbound"):
+                print(
+                    f"[h8] paused connector={settings.connector_id} direction=inbound",
+                    flush=True,
+                )
+                continue
         rows = claim_rows(settings, table)
+        if not dry_run:
+            try_record_worker_heartbeat(settings, heartbeat_directions, len(rows))
         for row in rows:
             processed += 1
             row_id = row["id"]
@@ -690,9 +481,17 @@ def process_once(settings: Settings, types: list[str], dry_run: bool) -> int:
                 print(f"[h8] dry-run release {type_name} id={row_id}", flush=True)
                 continue
             try:
+                pipeline_started = False
                 validate_row_schema_version(row)
                 binding = resolve_inbound_route(settings, type_name, row)
+                if binding.connector_id != settings.connector_id:
+                    raise WorkerHttpError(
+                        409,
+                        "route binding",
+                        f"resolved connector {binding.connector_id} differs from worker binding",
+                    )
                 # US-H8-002 AC11：真实路径 emit receive→convert→business_api→receipt
+                pipeline_started = True
                 wms_id, _life = run_inbound_pipeline(
                     settings,
                     type_name,
@@ -704,24 +503,33 @@ def process_once(settings: Settings, types: list[str], dry_run: bool) -> int:
                 mark_row(settings, table, row_id, "success", wms_id=wms_id)
                 print(f"[h8] success {type_name} -> {wms_id}", flush=True)
             except Exception as exc:  # noqa: BLE001 — worker 边界
+                error = exc
+                if not pipeline_started:
+                    try:
+                        record_preflight_failure(
+                            settings,
+                            type_name,
+                            row,
+                            settings.connector_id,
+                        )
+                    except Exception as audit_exc:  # noqa: BLE001 — 释放认领后重试审计
+                        error = audit_exc
                 retry += 1
-                # 进入 pipeline 后的失败由 lifecycle 写 final_failure；
-                # schema/路由预检失败的统一审计仍由 US-H8-002 后续切片补齐。
-                retryable = is_retryable_worker_error(exc)
+                retryable = is_retryable_worker_error(error)
                 next_status = (
-                    "pending"
-                    if retryable and retry < settings.max_retry
-                    else "dead"
+                    "pending" if retryable and retry < settings.max_retry else "dead"
                 )
                 mark_row(
                     settings,
                     table,
                     row_id,
                     next_status,
-                    error=str(exc),
+                    error=str(error),
                     retry_count=retry,
                 )
-                print(f"[h8] error {type_name}: {exc}", flush=True)
+                print(f"[h8] error {type_name}: {error}", flush=True)
+        if not dry_run:
+            try_record_worker_heartbeat(settings, heartbeat_directions, 0)
     return processed
 
 
@@ -765,7 +573,10 @@ def main(argv: list[str] | None = None) -> int:
     transport = args.transport or resolve_outbound_transport(database_url=wms_db)
     callback_base = resolve_callback_base()
     # US-H8-001：生产 channel_mode 禁止同时双写；both 仅本地联调
-    if transport == "both" and os.environ.get("H8_ALLOW_LOCAL_DUAL_TRANSPORT", "0") != "1":
+    if (
+        transport == "both"
+        and os.environ.get("H8_ALLOW_LOCAL_DUAL_TRANSPORT", "0") != "1"
+    ):
         print(
             "transport=both is local dual-channel probe only; "
             "set H8_ALLOW_LOCAL_DUAL_TRANSPORT=1 to override "
@@ -807,11 +618,28 @@ def main(argv: list[str] | None = None) -> int:
         f"transport={transport} types={types} once={args.once}",
         flush=True,
     )
+    heartbeat_directions = [
+        direction
+        for direction, enabled in (("inbound", need_in), ("outbound", need_out))
+        if enabled
+    ]
     while True:
         n = 0
+        if not args.dry_run:
+            try_record_worker_heartbeat(settings, heartbeat_directions, 0)
         if need_in:
-            n += process_once(settings, types, dry_run=args.dry_run)
-        if need_out and wms_db:
+            n += process_once(
+                settings,
+                types,
+                dry_run=args.dry_run,
+                heartbeat_directions=heartbeat_directions,
+            )
+        outbound_allowed = (
+            not need_out
+            or args.dry_run
+            or get_worker_claim_decision(settings, "outbound")
+        )
+        if need_out and wms_db and outbound_allowed:
             n += process_outbound_once(
                 database_url=wms_db,
                 sqlcmd_exec=(
@@ -823,7 +651,15 @@ def main(argv: list[str] | None = None) -> int:
                 dry_run=args.dry_run,
                 transport=transport,
                 callback_base=callback_base,
+                connector_id=settings.connector_id,
             )
+        elif need_out and not outbound_allowed:
+            print(
+                f"[h8] paused connector={settings.connector_id} direction=outbound",
+                flush=True,
+            )
+        if not args.dry_run:
+            try_record_worker_heartbeat(settings, heartbeat_directions, 0)
         if args.once:
             print(f"[h8] done processed={n}", flush=True)
             return 0
