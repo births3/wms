@@ -438,6 +438,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | 2026-07-23 | 二十二轮 v6 证据复审 | 修复更多查询仅前端过滤的问题，仓库、外部业务标识、幂等键、关联标识和创建时间改为服务端精确过滤；新增隔离 PostgreSQL + 关闭 dev-mock 的真实浏览器链路，覆盖高级查询、详情、重放/重复拒绝、Worker 暂停恢复、报文加密解密、只读权限和跨货主 404。修复新迁移重复创建既有索引的问题。AC11 的 JWT 仓库授权范围、AC12 稳定服务端分页/生产 P95、AC10 生产 RANGE 分区和 AC14 正式 ERP S4 仍未完成。 |
 | 2026-07-23 | 二十三轮终审修复 | 创建日期按浏览器本地自然日转换为 UTC 边界，避免中国时区错查八小时；Worker 预检审计暂时不可用时不再把已认领接口表行遗留在 `processing`，而是按可重试错误释放为 `pending`。新增定向回归测试并通过。 |
 | 2026-07-23 | 二十四轮稳定分页 | 消息列表改为 `created_at + id` 降序联合游标，服务端限制每页 1–200 条；同时间戳的内存与真实 PostgreSQL 测试证明跨页无重复、无漏行，管理端提供“加载更多”，关闭 dev-mock 的真实浏览器链路验证两页返回不同消息。AC12 仅剩生产约定数据量 P95 证据。 |
+| 2026-07-23 | 二十五轮 Worker 错误脱敏 | 将凭据脱敏收敛到 Worker 共享错误出口；HTTP 原文、入站失败、出站认领/投递失败和心跳告警在写接口表失败摘要或输出日志前统一隐藏 Bearer、password、token、API Key 及进程已知凭据。纯逻辑测试验证明文不进入摘要；AC9 仍待各业务 API 的错误分类证据。 |
 
 ## 验收记录（US-H8-004 软件切片）
 
@@ -547,7 +548,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | AC-6 配置版本绑定 | `V1` | H8-DOMAIN、H8-WORKER | 首次处理已把 `connector_id/config_version/channel/message_type/schema_version` 写入生命周期消息 | `NEEDS_WORK` | 重试与重放须先读取原消息绑定，禁止重新解析到新配置 |
 | AC-7 幂等语义 | `V1/V2` | H8-DOMAIN、H8-ASN-V2 | `docs/retros/h8-asn-inbound-flow-evidence.json` 记录 ASN 同键重放后 M2 数量仍为 1 且资源 ID 不变 | `NEEDS_WORK` | 补齐其余入站、全部出站、降级与回执重复的 L11 证据 |
 | AC-8 投递保证 | `V1` | H8-WORKER | `scripts/h8_erp_interface_sync/test_h8_sync_worker.py` 的 failover/circuit 测试证明成功路径不双写且切换保留业务键 | `PASS` | - |
-| AC-9 错误分类 | `V1` | H8-DOMAIN、H8-WORKER | Worker 已将网络/408/425/429/5xx 识别为可重试，其余错误直接死信 | `NEEDS_WORK` | 统一脱敏 Worker 日志与错误摘要，并补各业务 API 错误分类证据 |
+| AC-9 错误分类 | `V1` | H8-DOMAIN、H8-WORKER | Worker 已将网络/408/425/429/5xx 识别为可重试，其余错误直接死信；共享错误出口已对 HTTP 原文、入站/出站失败和心跳告警做凭据脱敏并由纯逻辑测试证明 | `NEEDS_WORK` | 补各业务 API 错误分类证据 |
 | AC-10 货主仓隔离 | `V1` | H8-DOMAIN、H8-WORKER | 业务 API 前已通过当前货主的 active 连接和仓库白名单解析唯一路由 | `NEEDS_WORK` | route-resolve 还须校验调用主体仓库授权范围交集并补拒绝测试 |
 | AC-11 审计追踪 | `V1/V2` | H8-WORKER、H8-ASN-V2、H8-MSG-PG | ASN 成功路径已有 V2；Worker 在 schema/路由预检失败时调用同一 lifecycle API，真实 PostgreSQL 测试回读 `h8_exchange_receive` 与 `h8_exchange_final_failure` | `PASS` | - |
 | AC-12 档案补录闭环 | `V1` | H8-DOMAIN、代码路径复审 | domain 禁止 H8 直接改 ASN；`sync_worker.py::handle_product_change` 尚无 M1/M-QL/M2 跨模块闭环证据 | `NEEDS_WORK` | 补商品变更事件、业务校验和当前 ASN 解锁的 L3/L4/L5 证据 |
