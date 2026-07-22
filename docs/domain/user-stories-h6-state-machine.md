@@ -34,7 +34,7 @@
 | L3 流程 | API 消费方能连续读取 M2 ASN、M4 出库单、M-TE 任务三类状态图；业务状态写入接入另开执行切片 |
 | L4 错误路径 | 未知状态机返回 404；未知状态或非法跳转返回拒绝原因 |
 | L8 权限 | 未具备 `h6.state_machine.read` 权限时拒绝访问 |
-| L9 契约兼容 | OpenAPI 和 TypeScript API schema 同步生成 |
+| 契约一致性 | OpenAPI 和 TypeScript API schema 同步生成；首个正式版本前不建立兼容基线 |
 
 ### 跨故事约束
 

@@ -636,7 +636,7 @@ POST   /api/outbound/orders/:id/pick     # 拣选
 - URL 全小写 kebab-case（`/api/cold-chain/temperature-logs`）
 - 资源名用复数（`/products` 不是 `/product`）
 - 嵌套不超过 2 层（`/api/inbound/receipts/:id/items` 可以；再深就拍平）
-- API 版本放 URL 路径（`/api/v1/...`）；breaking change 走新主版本 `/api/v2/`，老版本保留 ≥ 6 个月（与 H3-001 §4 一致；详见 [reviews/software-design-audit-2026-05-18.md](reviews/software-design-audit-2026-05-18.md) §3.1）
+- API 版本放 URL 路径（`/api/v1/...`）；首个正式版本前 breaking change 直接同步当前契约，正式版本后才走新主版本 `/api/v2/` 和退役窗口（与 H3-001 §4、ADR-0016 一致）
 
 **分页**：
 ```json

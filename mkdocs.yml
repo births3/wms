@@ -169,6 +169,7 @@ nav:
     - ADR-0035 Wave 6 证据收口: adr/0035-wave-6-pre-release-evidence-closeout.md
     - ADR-0036 打印模板引擎: adr/0036-print-template-engine.md
     - ADR-0037 轻量治理控制链: adr/0037-lightweight-governance-control-chain.md
+    - ADR-0038 首版前兼容策略: adr/0038-pre-v1-compatibility-policy.md
     - 技术 Spike:
       - Spike 索引: spikes/README.md
       - SPIKE-001 Axum + JWT: spikes/spike-001-axum-jwt.md

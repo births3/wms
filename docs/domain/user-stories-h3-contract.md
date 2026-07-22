@@ -38,7 +38,7 @@ WMS 后端 Rust + 前端 Vite/React + PDA React Native，需要类型一致。�
    - `#[openapi(paths(...), components(schemas(...)))]` 顶层聚合
 2. **Spec 输出**：`shared/openapi/openapi.yaml`（仓库版本管理）
 3. **CI 集成**：构建时自动生成；与上次比较有变化 → 提示"需更新前端类型"
-4. **多版本**：API 路径含 `/v1/`；breaking change 走 `/v2/`，老版本保留 ≥ 6 个月
+4. **版本策略**：API 路径预留 `/v1/`；首个正式版本发布前直接同步当前契约，不保留旧版本；发布后 breaking change 才按 ADR-0016 建立 `/v2/` 和退役窗口
 5. **错误码标准**：所有 API 错误返回标准格式 `{ code, message, details? }`
 6. **Spec 覆盖率**：所有 public API 必须有 Spec 定义；CI 检查覆盖率
 7. **示例**：每个 API 至少 1 个 request + response 示例
@@ -161,7 +161,7 @@ WMS 后端 Rust + 前端 Vite/React + PDA React Native，需要类型一致。�
 | 场景 | 行为 |
 |------|------|
 | PDA 离线时调用 API | api-client 层拦截 → 返回本地缓存数据（如有）或提示"网络不可用" |
-| 类型版本不匹配（PDA 旧版本 vs 新 API） | api-client 做向后兼容处理; 新增字段 optional; 删除字段忽略 |
+| PDA 与 API 类型不一致 | 首个正式版本前禁止混跑；同步更新 OpenAPI、api-client、PDA 调用方和测试后再交付 |
 
 #### 扫码交互
 
@@ -171,7 +171,7 @@ WMS 后端 Rust + 前端 Vite/React + PDA React Native，需要类型一致。�
 
 | 场景 | 行为 |
 |------|------|
-| PDA APP 升级后类型变更 | 首次启动自动拉取最新 openapi.yaml 校验; 不兼容 → 强制升级提示 |
+| PDA 构建使用过期类型 | 构建和契约检查失败；重新生成 api-client 并修正调用方 |
 
 ---
 

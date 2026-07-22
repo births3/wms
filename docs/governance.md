@@ -3,8 +3,8 @@
 > 本文档是 wms 项目的"宪法"。所有规范、流程、决策机制都在此声明。
 > 修改本文档必须经过 PR，并在文末"变更记录"中追加条目。
 
-- 版本：v0.7（轻量治理控制链）
-- 日期：2026-07-14
+- 版本：v0.8（首版前无兼容基线）
+- 日期：2026-07-22
 - 适用范围：整个 wms 仓库（backend、apps/*、packages/*、scripts/*、docs/*）
 
 ---
@@ -331,8 +331,8 @@ G1 决策层（法规 / 合同 / 业务与合规确认 / ADR）
 详细规则见 **ADR-0006**。本节仅给出概要：
 
 - **开发模式**：业务行为采用 **outside-in TDD 双层循环**（外层 L3 业务流程驱动、内层 L1 单元红绿循环）
-- **测试维度（11 层）**：L1 单元 / L2 API 契约 / L3 业务流程 / L4 错误处理 / L5 数据一致性 / L6 并发安全 / L7 性能 / L8 权限 / L9 兼容性 / L10 可观测性 / L11 幂等性
-- **执行分配**：11 层按 Tier 分时机执行（T2 跑 L1+L2，T3 跑 L3-L5/L8/L11，T4 跑 L6/L7/L9/L10 + 全套 E2E），详见 ADR-0006 §3
+- **测试维度（11 层）**：L1 单元 / L2 API 契约 / L3 业务流程 / L4 错误处理 / L5 数据一致性 / L6 并发安全 / L7 性能 / L8 权限 / L9 兼容性（首个正式版本后启用）/ L10 可观测性 / L11 幂等性
+- **执行分配**：11 层按 Tier 分时机执行（T2 跑 L1+L2，T3 跑 L3-L5/L8/L11，T4 跑 L6/L7/L10 + 全套 E2E；首个正式版本后再加 L9），详见 ADR-0006 §3 与 ADR-0038
 - **测试金字塔比例**（参考）：单元 70% / 集成 20% / E2E 10%
 - **覆盖率目标**：domain crate ≥ 80%（GSP 核心，硬指标）；其他 ≥ 60%
 - **起步阶段**：CI 检测但不强卡，靠 baseline 渐进收紧
@@ -474,11 +474,13 @@ Wave 1 起，涉及一线操作或复杂业务流程的前端页面采用"前端
 | Wave 1 | `check_openapi_in_sync.py` / `validate_openapi_artifacts.py` / `check_openapi_contract.py` | T2 | `shared/openapi/openapi.json` + `backend/crates/api/**` + `backend/crates/domain/**` + `packages/api-client/src/schema.ts` |
 | Wave 3 | `check_audit_trail_coverage.py` / `check_idempotency_test.py` | T3 | `backend/crates/api/src/**` |
 | Wave 3 | `check_cold_chain_data_freshness.py` | T3 | `backend/crates/domain/src/cold_chain/**` |
-| Wave 4-6 | `report_wave6_pre_release.py`（L7 / runtime evidence）/ `check_api_compat.py` | T4 | （CI 全量，非 diff 触发）|
+| Wave 4-6 | `report_wave6_pre_release.py`（L7 / runtime evidence） | T4 | （CI 全量，非 diff 触发）|
 | Wave 4 | `check_observability.py`（L10 可观测）| T4 | （CI 全量，非 diff 触发）|
 | Wave 5 | `check_changelog_freshness.py` | T1 | `*.md`（变更前必跑）|
 
 > **事实之源约定**：本表与 `governance/gate-rules.toml` 中的占位规则**必须保持一致**；以本表为权威源，gate-rules.toml 仅作为脚本侧实现承接。`task_check.py --strict` 模式（当前为 Wave 1+ 准备中）会强制检查未实现脚本。
+
+首个正式版本发布前按 ADR-0038 不建立 OpenAPI 兼容基线，也不运行 L9 版本兼容门禁；契约变更直接同步 utoipa、OpenAPI、api-client、调用方和测试。首个正式版本发布后再按 ADR-0016 建立已发布基线并启用 L9。
 
 **门禁强制**：
 - `just wave-N-ready` 必须列出"应当新增的脚本"清单
@@ -540,6 +542,7 @@ docs/governance.md（本文档，规则源头）
   ├─→ docs/adr/0004-phase-roadmap.md        （波次路线决策）
   ├─→ docs/adr/0006-tdd-and-test-layers.md  （TDD + 11 层测试）
   ├─→ docs/adr/0037-lightweight-governance-control-chain.md（G1-G4 轻量控制链）
+  ├─→ docs/adr/0038-pre-v1-compatibility-policy.md（首版前兼容策略）
   ├─→ docs/architecture-dependencies.md     （模块依赖图）
   ├─→ justfile                              （T1-T4 执行入口）
   ├─→ lefthook.yml                          （Git hooks 落地）
@@ -571,3 +574,4 @@ G4 证据，在提交和推送发生前状态必须保持 `blocked`。
 | 2026-06-28 | v0.6.2 | 新增 US-M1-011 系统字典中心静态对齐门禁 `check_system_dictionary_alignment.py`；覆盖 M2/M4 单据类型 RTM、项目级 RTM、T1、gate-rules 和 smoke |
 | 2026-07-14 | v0.7 | 接受 ADR-0037：增加 G1-G4 轻量治理控制链、权威顺序、Tier×context、二值规则与四态执行结果；Gitea CI 分场景编排；`check_page_size` 后移 T2 以恢复 T1 `<10s` 预算 |
 | 2026-07-19 | v0.7.1 | `check_page_size` 重新纳入 T1：`gov-t1` / pre-commit 即拦截 ≥800 行源码与页面，避免超长文件拖到 T2 才发现 |
+| 2026-07-22 | v0.8 | 接受 ADR-0038：首个正式版本前取消 OpenAPI 兼容基线、旧调用别名和过渡适配；契约按当前基线同步，正式版本后再按 ADR-0016 启用 L9。 |
