@@ -4516,7 +4516,7 @@ evidence_refs = [
   "docs/retros/h8-asn-inbound-flow-evidence.json",
   "docs/retros/h8-local-integration-evidence.json",
 ]
-reason = "ASN V2、本地主备、入站唯一路由、首次配置绑定、schema_version 严格拒绝、预检失败 receive/final_failure H2 审计、审计失败阻断业务、Worker 错误重试分类及共享错误出口凭据脱敏已验证；仍缺 canonical/M-PM、重试复用原绑定、主体仓库范围、出站唯一路由、逐消息 L2-L4/L11 与自研 ERP 双向 S4。"
+reason = "ASN V2、本地主备、入站唯一路由、首次配置绑定、schema_version 严格拒绝、预检失败 receive/final_failure H2 审计、审计失败阻断业务、五类入站业务 API 的 503/422 错误分类及共享错误出口凭据脱敏已验证；仍缺 canonical/M-PM、重试复用原绑定、主体仓库范围、出站唯一路由、逐消息 L2-L4/L11 与自研 ERP 双向 S4。"
 owner = "H8 模块负责人"
 resume_when = "完成剩余 Worker 运行接线与四组闭环逐消息 L2-L4/L11，再归档自研 ERP dev/staging 双向请求、两级回执、重试和审计关联后关闭延期。"
 
