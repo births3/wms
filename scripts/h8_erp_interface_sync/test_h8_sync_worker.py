@@ -58,6 +58,26 @@ def settings() -> Settings:
 
 
 class TestInboundCorePipeline(unittest.TestCase):
+    def test_product_rejects_unmapped_storage_condition_before_business_api(
+        self,
+    ) -> None:
+        handler = HANDLERS["product_master"][1]
+        row = {
+            "idempotency_key": "idem-product-1",
+            "product_code": "P-1",
+            "product_name": "药品一",
+            "storage_condition": "ERP_UNKNOWN",
+        }
+        with patch(
+            "sync_worker.http_json",
+            return_value=(201, {"id": "product-1"}, ""),
+        ) as business_api:
+            with self.assertRaises(WorkerHttpError) as caught:
+                handler(settings(), row)
+        self.assertEqual(caught.exception.status, 422)
+        self.assertFalse(is_retryable_worker_error(caught.exception))
+        business_api.assert_not_called()
+
     def test_each_inbound_business_api_uses_shared_error_classification(self) -> None:
         row = {
             "idempotency_key": "idem-1",

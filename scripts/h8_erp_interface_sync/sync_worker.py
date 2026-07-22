@@ -299,7 +299,11 @@ def handle_product(settings: Settings, row: dict[str, str]) -> str:
     # 与 master-data CreateProduct 契约一致：storage_condition 走 attrs 枚举
     storage = (row.get("storage_condition") or "normal").strip().lower()
     if storage not in ("frozen", "cold", "cool", "normal"):
-        storage = "normal"
+        raise WorkerHttpError(
+            422,
+            "storage condition mapping",
+            f"unmapped storage_condition {storage}",
+        )
     attrs: dict[str, Any] = {
         "storage_condition": storage,
         "source": "erp_interface",
