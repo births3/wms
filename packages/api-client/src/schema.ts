@@ -14031,7 +14031,7 @@ export interface operations {
                 connector_id: string;
                 /** @description 受控接口表白名单 */
                 table_key: string;
-                /** @description 当前表允许的同步状态 */
+                /** @description 当前表允许的一个或多个同步状态，多个值以逗号分隔 */
                 sync_status?: string | null;
                 /** @description updated_at 起始时间 */
                 time_from?: string | null;

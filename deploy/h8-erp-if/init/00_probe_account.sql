@@ -14,6 +14,12 @@ BEGIN
         + N' WITH PASSWORD = ' + QUOTENAME(@probe_password, '''')
         + N', CHECK_POLICY = OFF, CHECK_EXPIRATION = OFF';
     EXEC sp_executesql @sql;
+END
+ELSE
+BEGIN
+    SET @sql = N'ALTER LOGIN ' + QUOTENAME(@probe_user)
+        + N' WITH PASSWORD = ' + QUOTENAME(@probe_password, '''');
+    EXEC sp_executesql @sql;
 END;
 
 IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = @probe_user)

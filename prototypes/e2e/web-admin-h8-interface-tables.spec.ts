@@ -45,11 +45,20 @@ test("H8 接口表探查：列表、状态筛选、详情且无写操作", async
   await expect(page.getByRole("button", { name: "新增", exact: true })).toHaveCount(0);
   await page.screenshot({ path: path.join(screenshotDir, "interface-table-list.png"), fullPage: false });
 
-  await page.getByLabel("同步状态", { exact: true }).selectOption("failed");
+  await page.getByLabel("同步状态", { exact: true }).click();
+  await page.getByLabel("成功", { exact: true }).check();
+  await page.getByLabel("失败", { exact: true }).check();
+  await page.getByLabel("同步状态", { exact: true }).click();
+  const filteredRequest = page.waitForRequest((request) =>
+    request.url().includes("/api/v1/h8/erp-interface-tables/rows") &&
+    new URL(request.url()).searchParams.get("sync_status") === "success,failed",
+  );
   await page.getByRole("button", { name: "查询", exact: true }).click();
+  await filteredRequest;
   await expect(page.getByText("ASN-20260719-002")).toBeVisible();
-  await expect(page.getByText("ASN-20260719-001")).toHaveCount(0);
-  await page.screenshot({ path: path.join(screenshotDir, "interface-table-failed-filter.png"), fullPage: false });
+  await expect(page.getByText("ASN-20260719-001")).toBeVisible();
+  await expect(page.getByText(/合计 2/)).toBeVisible();
+  await page.screenshot({ path: path.join(screenshotDir, "interface-table-multi-status-filter.png"), fullPage: false });
 
   const row = page.locator("tbody tr").filter({ hasText: "ASN-20260719-002" });
   await row.getByRole("checkbox", { name: "选择此行" }).check();

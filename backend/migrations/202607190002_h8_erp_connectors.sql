@@ -15,9 +15,13 @@ CREATE TABLE IF NOT EXISTS h8_erp_connectors (
     interface_db_port           INT,
     interface_db_name           TEXT,
     interface_db_username       TEXT,
+    interface_probe_db_username TEXT,
     api_key_id                  UUID,
     bearer_secret_alias         TEXT,
     interface_db_password_alias TEXT,
+    interface_probe_db_password_alias TEXT,
+    interface_probe_config_version BIGINT NOT NULL DEFAULT 1
+        CHECK (interface_probe_config_version >= 1),
     status                      TEXT NOT NULL DEFAULT 'testing'
         CHECK (status IN ('testing', 'active', 'disabled')),
     config_version              BIGINT NOT NULL DEFAULT 1 CHECK (config_version >= 1),
@@ -35,6 +39,11 @@ CREATE TABLE IF NOT EXISTS h8_erp_connectors (
 
 CREATE INDEX IF NOT EXISTS h8_erp_connectors_owner_status_idx
     ON h8_erp_connectors (owner_id, status, updated_at DESC);
+
+COMMENT ON COLUMN h8_erp_connectors.interface_probe_db_username IS
+    'H8-004 MSSQL SELECT-only probe account; never reuse Worker account';
+COMMENT ON COLUMN h8_erp_connectors.interface_probe_db_password_alias IS
+    'ADR-0013 secret alias for H8-004 probe account password';
 
 -- 在途消息绑定（停用后续传）
 CREATE TABLE IF NOT EXISTS h8_erp_in_flight_messages (

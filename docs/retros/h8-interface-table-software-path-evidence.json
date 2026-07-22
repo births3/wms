@@ -1,10 +1,10 @@
 {
-  "collected_at": "2026-07-22T07:02:59+08:00",
+  "collected_at": "2026-07-22T08:53:14+08:00",
   "story": "US-H8-004",
   "scope": "Docker MSSQL software path: SELECT-only database boundary, real API/browser authorization, H2 persistent audit and screenshots",
   "ok": true,
   "environment": {
-    "postgres_database": "wms_h8_real",
+    "postgres_database": "wms_h8_e2e",
     "mssql_database": "wms_erp_if",
     "mssql_endpoint": "127.0.0.1:14333",
     "web_admin": "http://127.0.0.1:9002",
@@ -14,10 +14,11 @@
   "checks": [
     {
       "name": "mssql_select_only",
-      "command": "H8_MSSQL_CHECK_MODE=tcp ... scripts/h8_erp_interface_sync/check_probe_readonly.sh",
+      "command": "sudo -n bash scripts/h8_erp_interface_sync/check_probe_readonly.sh",
       "ok": true,
       "assertions": [
         "DEMO-ASN-001 pending is visible",
+        "DEMO-ASN-002 failed is visible",
         "DEMO-PM-001 pending is visible",
         "UPDATE denied",
         "DELETE denied",
@@ -31,8 +32,9 @@
       "ok": true,
       "tests": 2,
       "assertions": [
-        "admin sees DEMO-ASN-001 and filters sync_status=pending through the Chinese label 同步状态",
-        "query, grid and detail field labels are displayed in Chinese",
+        "admin filters sync_status=pending,failed through the Chinese label 同步状态",
+        "multi-select OR semantics returns DEMO-ASN-001 pending and DEMO-ASN-002 failed",
+        "query, grid, detail fields, status options and actions are displayed in Chinese",
         "detail exposes the Chinese label 报文摘要 without payload_json",
         "page has no write actions",
         "connector.read-only user has no menu after fresh login and refresh",
@@ -58,19 +60,19 @@
   "screenshots": [
     {
       "path": "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-list.png",
-      "sha256": "b544aafbe9151d87585916b0a3defa54e3c48c99c11ae08a8ced11f295761bbc"
+      "sha256": "515659ce7f9d0c06c59fd1832db440ff9411e2a444cda86207ed9bad38ecf828"
     },
     {
-      "path": "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-pending-filter.png",
-      "sha256": "5e39959452afa4b37b506eb0ffb65217cb59c10bdcebdda3e4ba15b4d1b4e242"
+      "path": "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-multi-status-filter.png",
+      "sha256": "4f4493ea4389e4aa0e4f555aad8c2bb109c44ea91e2eaf750e02c9037ece4a9a"
     },
     {
       "path": "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-detail.png",
-      "sha256": "8e6e1d781a5611a4e38c3939d4ed622241bf33a0501568ca585bd99999c1f374"
+      "sha256": "1903151563cea43716d50ffe6592aec90bf0b1c44a607bd02aa6f851d2594c80"
     },
     {
       "path": "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-permission-denied.png",
-      "sha256": "d8b4b392ba9d59c9ec9e712db9292e72b737da421e34b052a6ddb28af89d9036"
+      "sha256": "7c254b778797c7cbc785d47d9a921c05c6c625de0cd7cac48157fbc891597f52"
     }
   ],
   "conclusion": "SOFTWARE_PATH_PASS",

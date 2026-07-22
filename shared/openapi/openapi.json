@@ -2484,8 +2484,8 @@
           }
         },
         "security": [],
-        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。",
-        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。"
+        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。",
+        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。"
       }
     },
     "/api/v1/auth/logout": {
@@ -7758,7 +7758,7 @@
           {
             "name": "sync_status",
             "in": "query",
-            "description": "当前表允许的同步状态",
+            "description": "当前表允许的一个或多个同步状态，多个值以逗号分隔",
             "required": false,
             "schema": {
               "type": "string",

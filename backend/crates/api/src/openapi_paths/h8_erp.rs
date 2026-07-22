@@ -27,7 +27,7 @@ pub(crate) fn list_h8_erp_interface_table_connectors() {}
     params(
         ("connector_id" = uuid::Uuid, Query, description = "当前货主的 H8 连接"),
         ("table_key" = String, Query, description = "受控接口表白名单"),
-        ("sync_status" = Option<String>, Query, description = "当前表允许的同步状态"),
+        ("sync_status" = Option<String>, Query, description = "当前表允许的一个或多个同步状态，多个值以逗号分隔"),
         ("time_from" = Option<String>, Query, description = "updated_at 起始时间"),
         ("time_to" = Option<String>, Query, description = "updated_at 结束时间"),
         ("warehouse_id" = Option<uuid::Uuid>, Query, description = "仓库精确匹配"),

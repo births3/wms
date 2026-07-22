@@ -54,16 +54,14 @@ impl H8InterfaceTableRepository for MemoryH8InterfaceTableRepository {
             .validate()
             .map_err(|err| H8InterfaceTableRepoError::Db(format!("invalid query: {err:?}")))?;
         let mut rows = self.rows.lock().expect("interface rows").clone();
+        let sync_statuses = query.sync_statuses();
         rows.retain(|row| {
             row.connector_id == connector.id
                 && row.table_key == query.table_key
                 && row.owner_id == connector.owner_id
                 && row.updated_at >= query.updated_from
                 && row.updated_at <= query.updated_to
-                && query
-                    .sync_status
-                    .as_deref()
-                    .is_none_or(|value| row.sync_status == value)
+                && (sync_statuses.is_empty() || sync_statuses.contains(&row.sync_status.as_str()))
                 && query
                     .warehouse_id
                     .is_none_or(|value| row.warehouse_id == Some(value))
@@ -211,6 +209,7 @@ impl MssqlH8InterfaceTableRepository {
             .ok_or(H8InterfaceTableRepoError::ConnectorNotSupported)?;
         let projection = projection_for(spec.table_key);
         let detail_mode = row_id.is_some();
+        let sync_statuses = query.sync_statuses();
         let mut filters = vec!["owner_id = @P1".to_string()];
         let mut next = 2u32;
         if !detail_mode {
@@ -218,10 +217,12 @@ impl MssqlH8InterfaceTableRepository {
             filters.push("updated_at <= @P3".to_string());
             next = 4;
         }
-        if let Some(value) = query.sync_status.as_deref() {
-            filters.push(format!("sync_status = @P{next}"));
-            next += 1;
-            let _ = value;
+        if !sync_statuses.is_empty() {
+            let placeholders = (0..sync_statuses.len())
+                .map(|offset| format!("@P{}", next + offset as u32))
+                .collect::<Vec<_>>();
+            filters.push(format!("sync_status IN ({})", placeholders.join(",")));
+            next += sync_statuses.len() as u32;
         }
         if let Some(value) = query.warehouse_id {
             filters.push(format!("warehouse_id = @P{next}"));
@@ -306,8 +307,8 @@ impl MssqlH8InterfaceTableRepository {
                     statement.bind(query.updated_from);
                     statement.bind(query.updated_to);
                 }
-                if let Some(value) = query.sync_status.as_deref() {
-                    statement.bind(value.to_owned());
+                for value in &sync_statuses {
+                    statement.bind((*value).to_owned());
                 }
                 if let Some(value) = query.warehouse_id {
                     statement.bind(value);

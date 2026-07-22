@@ -31,6 +31,10 @@ INSERT INTO dbo.if_in_asn (
     N'DEMO-ASN-001', @owner, @wh, @sup, N'DEMO-P-001', 100,
     DATEADD(day, 3, SYSUTCDATETIME()), N'purchase_inbound', N'ERP-PO-DEMO-001',
     N'h8-demo-asn-001', N'pending'
+), (
+    N'DEMO-ASN-002', @owner, @wh, @sup, N'DEMO-P-001', 20,
+    DATEADD(day, 4, SYSUTCDATETIME()), N'purchase_inbound', N'ERP-PO-DEMO-002',
+    N'h8-demo-asn-002', N'failed'
 );
 
 INSERT INTO dbo.if_in_outbound_order (

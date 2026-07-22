@@ -1,4 +1,5 @@
 use sqlx::PgPool;
+use std::env;
 use uuid::Uuid;
 
 pub async fn seed_mvr_matrix_approver(
@@ -503,6 +504,51 @@ pub async fn seed_h8_warehouse_manager(
         "#,
     )
     .bind(role_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// US-H8-004：真实 MSSQL 接口表 E2E 使用的当前连接基线，仅保存 secret alias。
+pub async fn seed_h8_interface_connector(pool: &PgPool) -> Result<(), sqlx::Error> {
+    let host = env::var("WMS_E2E_H8_INTERFACE_DB_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+    let port = env::var("WMS_E2E_H8_INTERFACE_DB_PORT")
+        .ok()
+        .and_then(|value| value.parse::<i32>().ok())
+        .unwrap_or(14333);
+    sqlx::query(
+        r#"
+        INSERT INTO h8_erp_connectors (
+            id, owner_id, connector_code, connector_name, warehouse_ids, directions,
+            message_types, channel_mode, interface_db_host, interface_db_port,
+            interface_db_name, interface_probe_db_username,
+            interface_probe_db_password_alias, status
+        )
+        VALUES (
+            '00000000-0000-0000-0000-000000008801',
+            '00000000-0000-0000-0000-000000000001',
+            'H8-IF-E2E', 'H8 接口表真实 E2E', ARRAY[]::uuid[],
+            ARRAY['inbound', 'outbound'], ARRAY['asn'], 'interface_table',
+            $1, $2, 'wms_erp_if', 'wms_h8_probe',
+            'vault://wms/e2e/h8/probe', 'testing'
+        )
+        ON CONFLICT (owner_id, connector_code) DO UPDATE
+        SET connector_name = EXCLUDED.connector_name,
+            warehouse_ids = EXCLUDED.warehouse_ids,
+            directions = EXCLUDED.directions,
+            message_types = EXCLUDED.message_types,
+            channel_mode = EXCLUDED.channel_mode,
+            interface_db_host = EXCLUDED.interface_db_host,
+            interface_db_port = EXCLUDED.interface_db_port,
+            interface_db_name = EXCLUDED.interface_db_name,
+            interface_probe_db_username = EXCLUDED.interface_probe_db_username,
+            interface_probe_db_password_alias = EXCLUDED.interface_probe_db_password_alias,
+            status = EXCLUDED.status,
+            updated_at = now()
+        "#,
+    )
+    .bind(host)
+    .bind(port)
     .execute(pool)
     .await?;
     Ok(())

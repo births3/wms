@@ -4571,7 +4571,7 @@ e2e_checks = [
 ]
 e2e_screenshots = [
   { page = "h8-erp-interface-tables", spec = "prototypes/e2e/web-admin-h8-interface-tables-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-list.png" },
-  { page = "h8-erp-interface-tables", spec = "prototypes/e2e/web-admin-h8-interface-tables-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-pending-filter.png" },
+  { page = "h8-erp-interface-tables", spec = "prototypes/e2e/web-admin-h8-interface-tables-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-multi-status-filter.png" },
   { page = "h8-erp-interface-tables", spec = "prototypes/e2e/web-admin-h8-interface-tables-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-detail.png" },
   { page = "h8-erp-interface-tables", spec = "prototypes/e2e/web-admin-h8-interface-tables-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-permission-denied.png" },
 ]
@@ -4607,16 +4607,15 @@ evidence_refs = [
   "backend/crates/domain/src/h8_erp_interface_table.rs",
   "backend/crates/domain/tests/h8_erp_interface_table.rs",
   "backend/crates/api/src/h8_erp_interface_tables",
-  "backend/migrations/202607210001_h8_erp_interface_probe_credentials.sql",
+  "backend/migrations/202607190002_h8_erp_connectors.sql",
   "backend/migrations/202607210002_h8_erp_interface_table_permissions_menu.sql",
-  "backend/migrations/202607210003_h8_erp_interface_table_menu_latest_version.sql",
   "apps/web-admin/src/pages/config-center/ErpInterfaceTablePage.tsx",
   "apps/web-admin/self-checks/h8-erp-interface-table-slice-self-check.mjs",
   "prototypes/e2e/web-admin-h8-interface-tables.spec.ts",
   "prototypes/e2e/web-admin-h8-interface-tables-real.spec.ts",
   "prototypes/playwright-web-admin-h8-interface-real-config.ts",
   "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-list.png",
-  "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-pending-filter.png",
+  "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-multi-status-filter.png",
   "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-detail.png",
   "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-permission-denied.png",
   "scripts/h8_erp_interface_sync/check_probe_readonly.sh",

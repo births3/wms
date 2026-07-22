@@ -59,7 +59,7 @@ WHERE node.id = '00000000-0000-0000-0000-000000130043'
 ON CONFLICT DO NOTHING;
 
 WITH version_row AS (
-    SELECT id FROM admin_menu_versions WHERE version_no = 1
+    SELECT id FROM admin_menu_versions ORDER BY version_no DESC LIMIT 1
 )
 INSERT INTO admin_menu_version_nodes (
     id, version_id, source_node_id, parent_source_id, level, code, path, title,
@@ -86,7 +86,7 @@ WHERE node.id = '00000000-0000-0000-0000-000000130043'
 ON CONFLICT DO NOTHING;
 
 WITH version_row AS (
-    SELECT id FROM admin_menu_versions WHERE version_no = 1
+    SELECT id FROM admin_menu_versions ORDER BY version_no DESC LIMIT 1
 )
 INSERT INTO admin_menu_version_button_permissions (
     id, version_id, menu_source_node_id, action_key, action_label, action_kind, enabled, sort_order

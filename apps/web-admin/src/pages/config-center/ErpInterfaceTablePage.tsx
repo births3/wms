@@ -76,7 +76,7 @@ export const h8ErpInterfaceTableQueryFields: QueryPanelField[] = [
     type: "select",
     options: TABLES.map(([value, label]) => ({ value, label: `${label}（${value}）` })),
   },
-  { key: "sync_status", label: "同步状态", type: "select", options: [{ label: "全部", value: "" }] },
+  { key: "sync_status", label: "同步状态", type: "multiSelect", options: [] },
   { key: "updated_at", label: "更新时间（最近 7 天）", type: "dateRange" },
   { key: "external_doc_no", label: "外部单据号", type: "text" },
   { key: "external_ref", label: "外部引用", type: "text" },
@@ -135,7 +135,7 @@ function defaultQuery(connectorId = ""): QueryPanelValue {
   return {
     connector_id: connectorId,
     table_key: "if_in_asn",
-    sync_status: "",
+    sync_status: [],
     updated_at: {},
     external_doc_no: "",
     external_ref: "",
@@ -179,7 +179,9 @@ export function ErpInterfaceTablePage() {
   const listQuery = useH8ErpInterfaceTableRowsQuery({
     connector_id: String(appliedQuery.connector_id ?? ""),
     table_key: tableKey,
-    sync_status: String(appliedQuery.sync_status ?? "") || undefined,
+    sync_status: Array.isArray(appliedQuery.sync_status)
+      ? appliedQuery.sync_status.join(",") || undefined
+      : undefined,
     time_from: toIsoDay(range.from),
     time_to: toIsoDay(range.to, true),
     warehouse_id: isApplicable(tableKey, "warehouse_id") ? String(appliedQuery.warehouse_id ?? "") || undefined : undefined,
@@ -202,7 +204,7 @@ export function ErpInterfaceTablePage() {
       field.key === "connector_id"
       ? { ...field, options: [{ label: "请选择", value: "" }, ...connectors.map((connector) => ({ label: connector.probe_credentials_configured ? `${connector.connector_name}（${connector.connector_code} · ${statusLabel(connector.status)}）` : `${connector.connector_name}（${connector.connector_code} · 未配置独立探查凭据）`, value: connector.id, disabled: !connector.probe_credentials_configured }))] }
       : field.key === "sync_status"
-        ? { ...field, options: [{ label: "全部", value: "" }, ...draftStatusOptions.map((value) => ({ label: statusLabel(value), value }))] }
+        ? { ...field, options: draftStatusOptions.map((value) => ({ label: statusLabel(value), value })) }
       : field,
     );
   const toolbarActions: DataGridToolbarAction[] = [
@@ -225,8 +227,8 @@ export function ErpInterfaceTablePage() {
         value={draftQuery}
         onValueChange={(next) =>
           setDraftQuery(
-            next.table_key !== "if_out_message" && next.sync_status === "acked"
-              ? { ...next, sync_status: "" }
+            next.table_key !== "if_out_message" && Array.isArray(next.sync_status)
+              ? { ...next, sync_status: next.sync_status.filter((status) => status !== "acked") }
               : next,
           )
         }

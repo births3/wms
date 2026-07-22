@@ -270,7 +270,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | 软件路径完成证据 | Docker MSSQL（`deploy/docker-compose.h8-erp-if.yml`）联调与 E2E 可关闭**软件路径**；不要求客户正式接口库才能关软件 AC |
 | 数据库只读边界 | 探查会话必须使用与 Worker 写账号分离、仅授予 `SELECT` 的账号；Docker 软件路径必须证明 DML 被数据库拒绝 |
 | 探查凭据绑定 | H8 连接扩展可空字段 `interface_probe_db_username` / `interface_probe_db_password_alias` 与独立 `interface_probe_config_version`；仅使用 004 时凭据必须成对配置，不改变现有 Worker 凭据和传输配置版本 |
-| 查询契约 | 默认查询最近 7 天、最大跨度 31 天、返回准确 `total`；限流复用 H3，外部查询超时复用 ADR-0018 |
+| 查询契约 | 默认查询最近 7 天、最大跨度 31 天、返回准确 `total`；`sync_status` 接受逗号分隔的一个或多个精确值；限流复用 H3，外部查询超时复用 ADR-0018 |
 
 ### 与相邻故事的边界
 
@@ -299,7 +299,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | 入站 `if_in_*` | `pending`、`processing`、`success`、`failed`、`dead` |
 | 出站 `if_out_message` | 上表 + `acked` |
 
-对当前 `table_key` 非法的 `sync_status`（例如入站表传 `acked`）必须返回 **400**，禁止静默忽略成空列表。对当前表不适用的可选过滤字段（如对 `if_out_message` 传 `external_doc_no`）同样 **400**；前端按所选表隐藏不适用控件。
+任一 `sync_status` 对当前 `table_key` 非法（例如入站表传 `pending,acked`）必须返回 **400**，禁止静默忽略非法值。对当前表不适用的可选过滤字段（如对 `if_out_message` 传 `external_doc_no`）同样 **400**；前端按所选表隐藏不适用控件。
 
 ### 验收标准
 
@@ -312,14 +312,14 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
    - 列表 `GET /api/v1/h8/erp-interface-tables/rows`
    - 详情 `GET /api/v1/h8/erp-interface-tables/rows/{row_id}`（**query 必填** `connector_id` + `table_key`；详情身份 = `connector_id` + `table_key` + `row_id`，禁止仅靠 UUID 跨表定位）
    - 仅接受结构化过滤；服务端参数化 SELECT。契约与实现须可证明**无** `UPDATE`/`INSERT`/`DELETE` 接口表路径。
-7. **核心/更多查询**：核心为连接、接口表、`sync_status`、时间范围；更多为按表适用的业务键（见映射表）。时间过滤默认落在 **`updated_at`**（便于发现长期 `pending`）；默认最近 7 天，跨度 ≤ 31 天；缺省时间窗由服务端补齐，无界查询 **400**。匹配方式在 OpenAPI 固定为精确匹配（首版不做模糊，避免全表扫描）。
+7. **核心/更多查询**：核心为连接、接口表、`sync_status`、时间范围；`sync_status` 使用公共 `QueryPanel` 多选控件，多个状态按“或”查询，API 用逗号分隔且每个值精确匹配。更多为按表适用的业务键（见映射表）。时间过滤默认落在 **`updated_at`**（便于发现长期 `pending`）；默认最近 7 天，跨度 ≤ 31 天；缺省时间窗由服务端补齐，无界查询 **400**。其他字段首版不做模糊匹配，避免全表扫描。
 8. **列表字段**：至少展示主键 `id`、业务键摘要（入站 `external_doc_no` / 出站 `source_outbox_id`）、`sync_status`、`retry_count`、`last_error` 摘要、`idempotency_key`、`created_at`/`updated_at`；入站表另展示可空 `wms_resource_id`，`if_out_message` 不虚构该列。完整 `payload_json` 不进列表。
 9. **详情**：Dialog 只展示脱敏字段和服务端生成的 `payload_summary`；摘要按 UTF-8 截断至 4096 字节。列表与详情 API 均不得返回原始 `payload_json`。首版不提供原文查看；确有原文排障需求时另立故事和权限。无编辑、无改 `sync_status` 或写操作控件。列表行与同键详情字段必须一致。
 10. **货主与仓库隔离**：强制当前货主；表有 `owner_id` 时 SQL 必须 `owner_id = 当前货主`。表有 `warehouse_id` 时：SQL 必须落在 **调用主体授权仓库 ∩ 连接 `warehouse_ids` 白名单**（连接白名单为空表示该货主全部仓，仍受主体仓权约束）。表无 `warehouse_id` 时，只有系统管理员或具备货主全仓数据范围的主体可查询，其他主体返回 403；审计过滤摘要须标明「无仓列」。跨货主数据不得返回。
 11. **分页、超时与限流**：强制分页，`page_size` ≤ 100；列表不得无界导出。单次外部查询复用 ADR-0018 超时策略，API 复用 H3 已认证端点限流，超限返回 429；不新增 H8 私有 QPS 配置。**不得**为降噪合并或省略 H2 审计事件。
 12. **审计**：每次列表与详情查询写入 H2 append-only 审计，记录操作者、货主、`connector_id`、`table_key`、过滤摘要、结果行数或是否命中；不记录密码、完整 payload。
 13. **账号权限（软件路径）**：Docker 和生产探查都必须使用与 Worker 写账号分离的 **SELECT-only** 专用账号。Docker 初始化需创建该账号；验收必须证明 `SELECT` 成功且 `INSERT`、`UPDATE`、`DELETE` 均被数据库拒绝，未满足时不得关闭软件路径。
-14. **页面证据**：登记页面级查询配置；真实浏览器 E2E 至少覆盖：有权限选连接与表并看到列表、按 `sync_status` 过滤、打开详情、无权限 403/隐藏入口、只读无写按钮。质量矩阵登记 `e2e_checks` / `e2e_screenshots`。
+14. **页面证据**：登记页面级查询配置；真实浏览器 E2E 至少覆盖：有权限选连接与表并看到列表、同时选择两个 `sync_status` 并验证并集结果、打开详情、无权限 403/隐藏入口、只读无写按钮；查询区、表头、状态与详情字段使用中文业务文案。质量矩阵登记 `e2e_checks` / `e2e_screenshots`。
 15. **软件路径完成条件**：在 `deploy/docker-compose.h8-erp-if.yml` 启动的 MSSQL 接口库上，用演示/种子行（至少断言 `external_doc_no` 如 `DEMO-ASN-001` / `DEMO-PM-001` 与 `sync_status=pending` 可见）完成 API 单测或集成测 + 真实浏览器 E2E + 权限/审计单测 + SELECT-only 账号 DML 拒绝测试 + `gov-t1` 相关门禁后，可关闭本故事**软件路径**并在验收记录标记 `SOFTWARE_PATH_PASS`。客户正式接口库只读账号联调为可选增强，**不是**本故事软件路径关闭的必要条件。
 16. **非目标**：不做通用数据库浏览器；不做接口表行编辑/补单；不替代 003 监控与重放；不把 ERP DTO 放入业务 domain 聚合。
 
@@ -329,7 +329,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 |---|---|
 | 页面类型 | 列表型 |
 | 主信息载体 | 页面上方公共 `QueryPanel`；主体公共 `DataGrid` |
-| 核心查询 | 连接、接口表、`sync_status`、时间范围（`updated_at`），首屏一行可见 |
+| 核心查询 | 连接、接口表、`sync_status` 多选、时间范围（`updated_at`），首屏一行可见 |
 | 更多查询 | 按所选 `table_key` 动态显示适用字段：`external_doc_no` / `external_ref` / `source_outbox_id` / `idempotency_key` / `warehouse_id` / `event_type`，默认折叠 |
 | 标准动作入口 | 页头或 DataGrid 提供刷新、字段显示和视图；首版禁止无界导出 |
 | 私有动作入口 | 行内「详情」；首版无「重放」「改状态」 |
@@ -343,20 +343,20 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | `connector_id` | 必填；当前货主且通道含接口表；配置状态不限 |
 | `table_key` | 必填；受控枚举（上表白名单） |
 | `row_id` | 详情必填；与 `connector_id`+`table_key` 联合定位 |
-| `sync_status` | 可选；必须属于当前表允许值，否则 400 |
+| `sync_status` | 可选；一个或多个精确状态，多个值以逗号分隔并按“或”查询；任一值不属于当前表允许值则 400 |
 | `time_from` / `time_to` | 过滤列固定为 `updated_at`；默认最近 7 天；跨度 ≤ 31 天 |
 | `page` / `page_size` | 分页；`page_size` ≤ 100 |
 | 业务键过滤 | 仅接受当前表适用列；精确匹配；不适用列 400 |
 
 ### 探查凭据字段契约
 
-| 字段 | 存储与兼容 | API 可见性 |
+| 字段 | 存储约束 | API 可见性 |
 |---|---|---|
-| `interface_probe_db_username` | `h8_erp_connectors` 可空字段；与密码 alias 成对配置；历史连接保持可用 | 仅连接写配置回显用户名；004 查询响应不返回 |
+| `interface_probe_db_username` | `h8_erp_connectors` 可空字段；与密码 alias 成对配置 | 仅连接写配置回显用户名；004 查询响应不返回 |
 | `interface_probe_db_password_alias` | `h8_erp_connectors` 可空字段；只保存 secret alias，不保存密码明文 | 连接配置只返回是否已设置；004 读权限不可见 alias |
-| `interface_probe_config_version` | 非空整数，兼容迁移默认 1；仅探查凭据变更时递增，用于乐观并发与审计 | 连接写配置可见；004 查询响应不返回 |
+| `interface_probe_config_version` | 非空整数，初始值 1；仅探查凭据变更时递增，用于乐观并发与审计 | 连接写配置可见；004 查询响应不返回 |
 
-探查凭据不是查询 API 入参；服务端只能按 `connector_id` 读取上述字段。历史连接缺少这两个字段时仍可正常传输消息，但 004 查询固定返回 **409** `H8_PROBE_CREDENTIAL_NOT_CONFIGURED`，不得回退 Worker 凭据。
+探查凭据不是查询 API 入参；服务端只能按 `connector_id` 读取上述字段。未配置探查凭据时，004 查询固定返回 **409** `H8_PROBE_CREDENTIAL_NOT_CONFIGURED`，不得回退 Worker 凭据。
 
 | 响应 | 约束 |
 |---|---|
@@ -367,14 +367,14 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 
 | 维度 | 场景 |
 |---|---|
-| L1 单元 | `table_key` 白名单、owner/仓过滤、非法 `sync_status`/不适用列 400、禁止 SQL 拼接 |
+| L1 单元 | `table_key` 白名单、owner/仓过滤、单值/多值 `sync_status`、混入非法状态/不适用列 400、禁止 SQL 拼接 |
 | L2 API 契约 | 列表/详情 OpenAPI（含 `row_id` 联合键）、统一错误、api-client 同步 |
-| L3 业务流程 | Docker 种子 `DEMO-ASN-001` pending → 列表可见 → 详情字段一致 |
+| L3 业务流程 | Docker 种子 `DEMO-ASN-001` pending + `DEMO-ASN-002` failed → 双值多选返回并集 → 详情字段一致 |
 | L4 错误路径 | 连接不可达、只读凭据缺失、secret 不可解析、未知表、入站+`acked`、跨货主、无仓表的仓库级主体、无界时间窗、超时、429 |
 | L5 数据一致 | 同键列表与详情一致；跳转 003 失败不破坏 004 |
 | L7 性能 | `page_size=100` 多表白名单 smoke；超时上限可触发 |
 | L8 权限 | 持有 `h8.erp_interface_table.read` 可查；仅 connector.read 不可查；无权限、跨货主和无仓表的仓库级主体均 403 |
-| L9 兼容性 | OpenAPI 向后兼容检查与生成 api-client 类型同步 |
+| 契约一致性 | OpenAPI 与生成的 api-client 类型同步；首个正式版本前不建立兼容基线 |
 | L10 可观测性 | 查询耗时、超时和 429 可观测；列表/详情各产生 H2 事件（含过滤摘要） |
 | 安全专项 | 密码不回显；API 与审计无原始 payload；SELECT-only 账号的 DML 被数据库拒绝 |
 | 软件路径证据 | `docker compose -f deploy/docker-compose.h8-erp-if.yml` + DEMO 种子断言 + SELECT-only 否定测试 + Playwright + 单测日志 |
@@ -405,13 +405,15 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | 2026-07-21 | 七轮确认 | 用户确认 US-H8-004：新建权限 `h8.erp_interface_table.read`、独立菜单页 `h8-erp-interface-tables`、Docker MSSQL 可关闭软件路径；补齐只读探查故事与矩阵延期条目。 |
 | 2026-07-21 | 八轮评审修复 | 按规格评审补齐：详情联合键、时间列 `updated_at`、任意配置状态可探查、表级过滤/`sync_status` 400、002 映射表、OpenAPI 路径、权限菜单种子、仓权隔离、QPS 与审计不合并、DEMO 种子断言与 L5/L7。 |
 | 2026-07-21 | 九轮评审修复 | 强制探查与 Worker 账号分离并由数据库拒绝 DML；无仓列收紧为货主全仓范围；首版只返回 4096 字节脱敏摘要；复用 H3/ADR-0018；固定准确 total；修正 L9/L10 维度，并移除未实现页面的虚假矩阵接线。 |
-| 2026-07-21 | 十轮评审修复 | 补齐独立探查凭据的连接绑定：新增两个可空兼容字段，仅 004 查询时成对必填；明确维护权限、读权限不可见 alias、禁止回退 Worker 凭据。复审发现复用传输 `config_version` 会破坏 active 当前版本已测通不变量，改为独立 `interface_probe_config_version`；同时冻结 API 路径、固定缺配置 409，并按实际接口表结构收紧出站列。 |
+| 2026-07-21 | 十轮评审修复 | 补齐独立探查凭据的连接绑定：新增两个可空探查字段，仅 004 查询时成对必填；明确维护权限、读权限不可见 alias、禁止回退 Worker 凭据。复审发现复用传输 `config_version` 会破坏 active 当前版本已测通不变量，改为独立 `interface_probe_config_version`；同时冻结 API 路径、固定缺配置 409，并按实际接口表结构收紧出站列。 |
 | 2026-07-21 | 十一轮开发复审 | 修复 Docker 探查账号未切换到 `wms_erp_if`、系统管理员权限种子遗漏、无仓列审计摘要未标识、旧探查连接池缓存增长和 dev-mock 探查版本锁未对齐；补充非 active 连接排障提示与非法 `acked` 状态自动清理。真实 Docker/API/权限/持久化审计证据仍按 deferred 条件待执行。 |
 | 2026-07-21 | 十二轮开发复审 | 修复连接选择器未区分缺少独立探查凭据：API 只返回成对配置状态，前端对不可用连接禁选并提示维护入口；QueryPanel 原生支持禁用选项。补齐 ASN/销退表 `external_ref` 查询控件及参数透传。探查连接池缓存键同时绑定探查版本与传输配置版本，避免端点变更复用旧池；同步 RTM 的已实现/待证据描述。 |
 | 2026-07-21 | 十三轮开发复审 | 按“每次查询可追溯”补齐列表/详情失败与未命中也写入 H2 摘要（`hit=false`/结果 0）；接口库只读检查脚本补 DEMO-ASN-001、DEMO-PM-001 的 `pending` 断言；增加连接选择器成对凭据单测。真实 Docker/API/持久化证据仍保持 deferred。 |
 | 2026-07-21 | 十四轮终审 | 对照实现与故事映射复核：补齐 ASN/销退 `external_ref` 过滤映射；详情失败显示明确错误而非无限加载；dev-mock 补齐外部引用、仓库、出站资源和 WMS 资源过滤。self-check、TypeScript、浏览器 E2E、T1 均通过；真实 Docker/API/权限/持久化审计证据继续阻塞。 |
 | 2026-07-21 | 十五轮运行复审 | 复现“前端页面不显示”：dev E2E 正常，真实菜单服务读取最新发布版本，而原迁移只写 `version_no=1`。新增兼容回填迁移，将 H8 菜单子树和按钮权限补入最新版本，并加入 self-check；当前 `wms_h8_real` 已执行迁移，真实菜单接口与 9002 页面均已验证可见。其他环境需运行迁移后刷新菜单。 |
 | 2026-07-21 | 十六轮运行复审 | 复现“查询无真实数据”：18180 E2E API 未挂载接口表路由且返回 404；补挂生产同款接口表路由与 H8 探查权限种子。当前 `wms_h8_real` 已配置接口表连接，MSSQL `wms_erp_if` 已准备 `DEMO-ASN-001`（`pending`），真实 API 列表/详情和 9002 页面均已返回该行。 |
+| 2026-07-22 | 十七轮交互复审 | 同步状态改用公共多选控件；API 的 `sync_status` 支持逗号分隔多值和参数化 `IN`。验收模板同步增加中文业务文案与控件语义证据。 |
+| 2026-07-22 | 十八轮验收复审 | 发现真实 E2E 只有 pending 行，不能证明多选并集；新增 `DEMO-ASN-002` failed 种子并断言双状态各命中一行。按 ADR-0038 重建 `wms_h8_e2e`，把探查连接写入可重复 E2E seed，并将探查字段和菜单写入逻辑收敛到当前 migration 基线。 |
 
 ## 验收记录（US-H8-004 软件切片）
 
@@ -425,9 +427,10 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 |---|---|---|---|
 | AC1–AC12（入口、权限接线、连接选择、白名单 API、查询/详情、范围、分页、脱敏、审计代码、页面交互） | V0/V1/V2 | `PASS` | 领域/API 单测、OpenAPI/api-client、权限/菜单迁移、self-check；H2 持久化失败改为查询失败，不再静默丢审计 |
 | MENU-VISIBILITY（发布版本、权限、真实页面可见、刷新后复验） | V0/V3 | `PASS` | 管理员真实页面可见；仅有 `h8.erp_connector.read` 的新会话及刷新后均隐藏入口，直接 API 返回 403 |
-| AC14（页面证据：列表/筛选/详情/无写控件） | V1/V3 | `PASS` | 真实 Playwright 覆盖 `DEMO-ASN-001` 列表、`pending` 筛选、详情、无写按钮、反向权限与 4 张截图 |
-| AC13（SELECT-only 账号与 DML 拒绝） | V2 | `PASS` | TCP 证据工具验证 `DEMO-ASN-001`/`DEMO-PM-001` 可 SELECT；实际 UPDATE/DELETE/INSERT 均被 MSSQL 拒绝且无残留 |
-| AC15（Docker DEMO 行列表→详情、真实权限/审计） | V2/V3 | `PASS` | `wms_h8_real` + `wms_erp_if` 完成列表→筛选→详情；PostgreSQL H2 观察到列表/详情事件、结果数/命中与脱敏过滤摘要 |
+| AC14（页面证据：列表/筛选/详情/无写控件） | V1/V3 | `PASS` | 真实 Playwright 覆盖中文字段、`pending,failed` 双值多选请求，以及 `DEMO-ASN-001` pending + `DEMO-ASN-002` failed 的并集结果、详情、无写按钮、反向权限与 4 张截图 |
+| UI-SEMANTICS（中文文案与控件选择） | V0/V3 | `PASS` | 查询区、表头、状态和详情字段均为中文业务文案；同步状态使用公共多选控件，API 与结果断言覆盖两个值 |
+| AC13（SELECT-only 账号与 DML 拒绝） | V2 | `PASS` | Docker 证据工具验证 `DEMO-ASN-001` pending、`DEMO-ASN-002` failed、`DEMO-PM-001` pending 可 SELECT；实际 UPDATE/DELETE/INSERT 均被 MSSQL 拒绝且无残留 |
+| AC15（Docker DEMO 行列表→详情、真实权限/审计） | V2/V3 | `PASS` | `wms_h8_e2e` + `wms_erp_if` 完成列表→双状态并集→详情；PostgreSQL H2 观察到列表/详情事件、结果数/命中与脱敏过滤摘要 |
 
 验证命令：
 
@@ -439,7 +442,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | `pnpm --dir apps/web-admin run test:self-checks` | `PASS` |
 | `pnpm --dir apps/web-admin run test:e2e:h8-interface-dev` | `PASS`（1 条，3 张开发 E2E 截图） |
 | `pnpm --dir apps/web-admin run test:e2e:h8-interface-real` | `PASS`（2 条，4 张真实数据/权限截图） |
-| `H8_MSSQL_CHECK_MODE=tcp ... scripts/h8_erp_interface_sync/check_probe_readonly.sh` | `PASS`（SELECT + 2 条 DEMO 种子；UPDATE/DELETE/INSERT 拒绝；无残留） |
+| `sudo -n bash scripts/h8_erp_interface_sync/check_probe_readonly.sh` | `PASS`（SELECT + 3 条 DEMO 种子；UPDATE/DELETE/INSERT 拒绝；无残留） |
 | `cargo test --manifest-path backend/Cargo.toml -p wms-api persistent_audit_failure_is_not_swallowed --lib` | `PASS`（H2 持久化失败不得静默吞掉） |
 | `pnpm --dir apps/web-admin exec tsc --noEmit` / `pnpm --dir apps/web-admin run build` | `PASS`（仅既有依赖/产物体积警告） |
 | `just openapi-check` / `python3 scripts/governance/check_quality_matrix.py --json` / `python3 scripts/governance/check_scope_gap_discovery.py --strict --module H8 --json` | `PASS` |

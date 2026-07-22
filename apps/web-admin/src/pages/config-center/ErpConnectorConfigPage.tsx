@@ -663,9 +663,6 @@ export function ErpConnectorConfigPage({
   );
 }
 
-/** @deprecated 使用 ErpConnectorConfigPage；保留别名避免旧 import 瞬时失败 */
-export const ErpConnectorConfigPanel = ErpConnectorConfigPage;
-
 function textColumn(
   key: keyof H8ErpConnector,
   header: string,

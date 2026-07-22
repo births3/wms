@@ -29,8 +29,18 @@ fn allowlist_and_table_specific_status_filters_are_enforced() {
     };
     assert!(valid.validate().is_ok());
 
+    let valid_multi_status = H8ErpInterfaceTableQuery {
+        sync_status: Some("pending,failed".into()),
+        ..valid.clone()
+    };
+    assert_eq!(
+        valid_multi_status.sync_statuses(),
+        vec!["pending", "failed"]
+    );
+    assert!(valid_multi_status.validate().is_ok());
+
     let invalid_status = H8ErpInterfaceTableQuery {
-        sync_status: Some("acked".into()),
+        sync_status: Some("pending,acked".into()),
         ..valid.clone()
     };
     assert!(invalid_status.validate().is_err());

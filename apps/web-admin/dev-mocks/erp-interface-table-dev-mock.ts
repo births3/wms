@@ -85,7 +85,9 @@ const rows: DevInterfaceRow[] = [
 function filteredRows(url: URL): DevInterfaceRow[] {
   const connector = url.searchParams.get("connector_id");
   const table = url.searchParams.get("table_key");
-  const status = url.searchParams.get("sync_status");
+  const statuses = new Set(
+    url.searchParams.get("sync_status")?.split(",").map((value) => value.trim()).filter(Boolean) ?? [],
+  );
   const externalDoc = url.searchParams.get("external_doc_no");
   const externalRef = url.searchParams.get("external_ref");
   const warehouse = url.searchParams.get("warehouse_id");
@@ -96,7 +98,7 @@ function filteredRows(url: URL): DevInterfaceRow[] {
   return rows.filter((row) =>
     (!connector || row.connector_id === connector) &&
     (!table || row.table_key === table) &&
-    (!status || row.sync_status === status) &&
+    (statuses.size === 0 || statuses.has(row.sync_status)) &&
     (!externalDoc || row.business_key === externalDoc) &&
     (!externalRef || row.external_ref === externalRef) &&
     (!warehouse || row.warehouse_id === warehouse) &&

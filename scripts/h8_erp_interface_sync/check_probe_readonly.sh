@@ -25,6 +25,7 @@ echo "SELECT allowed"
 
 echo "==> DEMO seed assertions"
 sql_probe "IF NOT EXISTS (SELECT 1 FROM dbo.if_in_asn WHERE external_doc_no = N'DEMO-ASN-001' AND sync_status = N'pending') BEGIN RAISERROR (N'DEMO-ASN-001 pending row missing', 16, 1); END"
+sql_probe "IF NOT EXISTS (SELECT 1 FROM dbo.if_in_asn WHERE external_doc_no = N'DEMO-ASN-002' AND sync_status = N'failed') BEGIN RAISERROR (N'DEMO-ASN-002 failed row missing', 16, 1); END"
 sql_probe "IF NOT EXISTS (SELECT 1 FROM dbo.if_in_product_master WHERE external_doc_no = N'DEMO-PM-001' AND sync_status = N'pending') BEGIN RAISERROR (N'DEMO-PM-001 pending row missing', 16, 1); END"
 echo "DEMO seed rows visible"
 

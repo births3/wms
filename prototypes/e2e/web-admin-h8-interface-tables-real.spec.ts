@@ -18,11 +18,20 @@ test("H8 接口表探查：真实 DEMO 列表、筛选、详情且无写操作",
   await assertNoWriteActions(page);
   await page.screenshot({ path: path.join(screenshotDir, "interface-table-list.png"), fullPage: false });
 
-  await page.getByLabel("同步状态", { exact: true }).selectOption("pending");
+  await page.getByLabel("同步状态", { exact: true }).click();
+  await page.getByLabel("待处理", { exact: true }).check();
+  await page.getByLabel("失败", { exact: true }).check();
+  await page.getByLabel("同步状态", { exact: true }).click();
+  const filteredRequest = page.waitForRequest((request) =>
+    request.url().includes("/api/v1/h8/erp-interface-tables/rows") &&
+    new URL(request.url()).searchParams.get("sync_status") === "pending,failed",
+  );
   await page.getByRole("button", { name: "查询", exact: true }).click();
+  await filteredRequest;
   await expect(page.getByText("DEMO-ASN-001", { exact: true })).toBeVisible();
-  await expect(page.getByText(/合计 1/)).toBeVisible();
-  await page.screenshot({ path: path.join(screenshotDir, "interface-table-pending-filter.png"), fullPage: false });
+  await expect(page.getByText("DEMO-ASN-002", { exact: true })).toBeVisible();
+  await expect(page.getByText(/合计 2/)).toBeVisible();
+  await page.screenshot({ path: path.join(screenshotDir, "interface-table-multi-status-filter.png"), fullPage: false });
 
   const row = page.locator("tbody tr").filter({ hasText: "DEMO-ASN-001" });
   await row.getByRole("checkbox", { name: "选择此行" }).check();

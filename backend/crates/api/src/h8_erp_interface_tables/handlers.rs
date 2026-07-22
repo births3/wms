@@ -344,7 +344,9 @@ fn validate_query(query: &H8ErpInterfaceTableQuery) -> Result<(), H8InterfaceTab
             H8InterfaceTableQueryError::InvalidTimeRange => "time_from must be <= time_to",
             H8InterfaceTableQueryError::TimeRangeTooLarge => "time range must be <= 31 days",
             H8InterfaceTableQueryError::InvalidPage => "page must be >= 1 and page_size 1..=100",
-            H8InterfaceTableQueryError::InvalidSyncStatus => "sync_status is invalid for table",
+            H8InterfaceTableQueryError::InvalidSyncStatus => {
+                "sync_status contains invalid values for table"
+            }
             H8InterfaceTableQueryError::FilterNotSupported(field) => {
                 return H8InterfaceTableHandlerError::BadRequest(format!(
                     "filter is not supported for table: {field}"
@@ -361,7 +363,7 @@ fn filter_summary(query: &H8ErpInterfaceTableQuery, has_warehouse_id: bool) -> s
         "table_key": query.table_key,
         "updated_from": query.updated_from,
         "updated_to": query.updated_to,
-        "sync_status": query.sync_status,
+        "sync_status": query.sync_statuses(),
         "warehouse_id": query.warehouse_id,
         "external_doc_no": query.external_doc_no,
         "source_outbox_id": query.source_outbox_id,

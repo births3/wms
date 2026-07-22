@@ -150,6 +150,13 @@ pub struct H8ErpInterfaceTableField {
 }
 
 impl H8ErpInterfaceTableQuery {
+    pub fn sync_statuses(&self) -> Vec<&str> {
+        self.sync_status
+            .as_deref()
+            .map(|value| value.split(',').map(str::trim).collect())
+            .unwrap_or_default()
+    }
+
     pub fn validate(&self) -> Result<(), H8InterfaceTableQueryError> {
         let spec = interface_table_spec(self.table_key.trim())
             .ok_or(H8InterfaceTableQueryError::TableNotAllowed)?;
@@ -165,10 +172,13 @@ impl H8ErpInterfaceTableQuery {
         {
             return Err(H8InterfaceTableQueryError::InvalidPage);
         }
-        if let Some(status) = self.sync_status.as_deref() {
-            if !spec.allowed_sync_statuses.contains(&status) {
-                return Err(H8InterfaceTableQueryError::InvalidSyncStatus);
-            }
+        let sync_statuses = self.sync_statuses();
+        if sync_statuses.len() > spec.allowed_sync_statuses.len()
+            || sync_statuses
+                .iter()
+                .any(|status| !spec.allowed_sync_statuses.contains(status))
+        {
+            return Err(H8InterfaceTableQueryError::InvalidSyncStatus);
         }
         if self.warehouse_id.is_some() && !spec.has_warehouse_id {
             return Err(H8InterfaceTableQueryError::FilterNotSupported(
