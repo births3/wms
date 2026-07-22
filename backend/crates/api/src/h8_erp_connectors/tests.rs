@@ -1,18 +1,24 @@
 //! H8 ERP 连接单元测试。
 
-use axum::http::StatusCode;
+use axum::{
+    body::{to_bytes, Body},
+    http::{Request, StatusCode},
+};
 use chrono::Utc;
 use sha2::{Digest, Sha256};
+use tower::ServiceExt;
 use uuid::Uuid;
 use wms_domain::{
     can_activate, inflight_status_after_activate, inflight_status_after_disable,
-    resolve_active_connector, CreateH8ErpConnectorRequest, H8ErpConnector, H8ErpConnectorError,
-    H8_INFLIGHT_PAUSED, H8_INFLIGHT_RUNNING,
+    CreateH8ErpConnectorRequest, H8ErpConnector, H8ErpConnectorError, H8_INFLIGHT_PAUSED,
+    H8_INFLIGHT_RUNNING,
 };
 
 use super::error::{H8ErpConnectorHandlerError, H8ErpConnectorRepoError};
+use super::handlers::h8_erp_connector_router;
 use super::idempotency::{load_idempotent_response, store_idempotent_response};
 use super::state::{H8ErpConnectorAppState, H8_CONFIG_READ, H8_CONFIG_WRITE};
+use crate::auth::AuthContext;
 
 #[tokio::test]
 async fn memory_create_test_activate_flow() {
@@ -201,16 +207,18 @@ async fn memory_optimistic_lock_rejects_stale_version() {
 }
 
 #[tokio::test]
-async fn memory_route_resolve_unique() {
+async fn route_resolve_enforces_auth_context_warehouse_scope() {
     let state = H8ErpConnectorAppState::with_memory();
-    let owner = Uuid::nil();
+    let owner = Uuid::new_v4();
+    let allowed_warehouse = Uuid::new_v4();
+    let denied_warehouse = Uuid::new_v4();
     let now = Utc::now();
     let c = H8ErpConnector {
         id: Uuid::new_v4(),
         owner_id: owner,
         connector_code: "route1".into(),
         connector_name: "R1".into(),
-        warehouse_ids: vec![],
+        warehouse_ids: vec![allowed_warehouse],
         directions: vec!["inbound".into()],
         message_types: vec!["asn".into()],
         channel_mode: "rest".into(),
@@ -237,9 +245,46 @@ async fn memory_route_resolve_unique() {
         updated_at: now,
     };
     state.repository.insert(&c).await.unwrap();
-    let actives = state.repository.list_active(owner).await.unwrap();
-    let found = resolve_active_connector(&actives, None, "inbound", "asn").unwrap();
-    assert_eq!(found.connector_code, "route1");
+    let mut denied_connector = c.clone();
+    denied_connector.id = Uuid::new_v4();
+    denied_connector.connector_code = "denied-route".into();
+    denied_connector.warehouse_ids = vec![denied_warehouse];
+    state.repository.insert(&denied_connector).await.unwrap();
+    let ctx = AuthContext {
+        user_id: Uuid::new_v4(),
+        owner_id: owner,
+        actor_name: "scoped-caller".into(),
+        permissions: vec![H8_CONFIG_READ.into()],
+        jti: "scoped-caller-test".into(),
+        warehouse_scope: Some(allowed_warehouse),
+    };
+
+    let mut denied = Request::builder()
+        .uri(format!(
+            "/api/v1/config/erp-connectors/route-resolve?direction=inbound&message_type=asn&warehouse_id={denied_warehouse}"
+        ))
+        .body(Body::empty())
+        .unwrap();
+    denied.extensions_mut().insert(ctx.clone());
+    let response = h8_erp_connector_router(state.clone())
+        .oneshot(denied)
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+
+    let mut allowed = Request::builder()
+        .uri("/api/v1/config/erp-connectors/route-resolve?direction=inbound&message_type=asn")
+        .body(Body::empty())
+        .unwrap();
+    allowed.extensions_mut().insert(ctx);
+    let response = h8_erp_connector_router(state)
+        .oneshot(allowed)
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body: serde_json::Value =
+        serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
+    assert_eq!(body["connector"]["id"], c.id.to_string());
 }
 
 #[test]

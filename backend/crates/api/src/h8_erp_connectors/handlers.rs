@@ -16,7 +16,7 @@ use wms_domain::{
     UpdateH8ErpConnectorRequest,
 };
 
-use crate::auth::AuthContext;
+use crate::auth::{AuthContext, AuthError};
 
 use super::audit::{audit_snapshot, write_audit};
 use super::error::{H8ErpConnectorHandlerError, H8ErpConnectorRepoError};
@@ -94,10 +94,17 @@ async fn resolve_connector_route(
     Query(q): Query<RouteResolveQuery>,
 ) -> Result<Json<RouteResolveResponse>, H8ErpConnectorHandlerError> {
     ctx.require_permission(H8_CONFIG_READ)?;
+    let warehouse_id = match (q.warehouse_id, ctx.warehouse_scope) {
+        (Some(requested), Some(scope)) if requested != scope => {
+            return Err(AuthError::PermissionDenied("warehouse scope".into()).into());
+        }
+        (None, Some(scope)) => Some(scope),
+        (requested, _) => requested,
+    };
     let actives = state.repository.list_active(ctx.owner_id).await?;
     let connector = resolve_active_connector(
         &actives,
-        q.warehouse_id,
+        warehouse_id,
         q.direction.trim(),
         q.message_type.trim(),
     )
