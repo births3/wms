@@ -15,13 +15,15 @@ CREATE TABLE IF NOT EXISTS archive_revision_erp_feedback_outbox (
     payload           JSONB NOT NULL,
     status            TEXT NOT NULL DEFAULT 'pending'
         CHECK (status IN ('pending', 'failed', 'succeeded', 'dead')),
-    attempt_count     INT NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
-    max_attempts      INT NOT NULL DEFAULT 5 CHECK (max_attempts > 0),
+    attempt_count     INT NOT NULL DEFAULT 0
+        CHECK (attempt_count BETWEEN 0 AND 5),
+    max_attempts      INT NOT NULL DEFAULT 5 CHECK (max_attempts = 5),
     next_attempt_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     deadline_at       TIMESTAMPTZ NOT NULL DEFAULT (now() + interval '24 hours'),
     last_error        TEXT,
     created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CHECK (deadline_at = created_at + interval '24 hours')
 );
 
 CREATE INDEX IF NOT EXISTS archive_revision_erp_outbox_poll_idx

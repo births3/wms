@@ -179,6 +179,54 @@ async fn replay_marker_can_be_claimed_immediately_in_postgres(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn archive_revision_retry_boundary_is_enforced_by_postgres(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    sqlx::query("INSERT INTO auth_owners (id, owner_code, owner_name) VALUES ($1,$2,$3)")
+        .bind(owner_id)
+        .bind(format!("OWNER-{owner_id}"))
+        .bind("H8 archive retry boundary test")
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let (max_attempts, deadline_seconds): (i32, i64) = sqlx::query_as(
+        r#"INSERT INTO archive_revision_erp_feedback_outbox
+           (id, owner_id, product_code, field_name, payload)
+           VALUES ($1,$2,'P-1','approval_no','{}'::jsonb)
+           RETURNING max_attempts,
+                     EXTRACT(EPOCH FROM (deadline_at - created_at))::bigint"#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!((max_attempts, deadline_seconds), (5, 86_400));
+
+    let invalid_attempts = sqlx::query(
+        r#"INSERT INTO archive_revision_erp_feedback_outbox
+           (id, owner_id, product_code, field_name, payload, max_attempts)
+           VALUES ($1,$2,'P-2','approval_no','{}'::jsonb,6)"#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(owner_id)
+    .execute(&pool)
+    .await;
+    assert!(invalid_attempts.is_err());
+
+    let invalid_deadline = sqlx::query(
+        r#"INSERT INTO archive_revision_erp_feedback_outbox
+           (id, owner_id, product_code, field_name, payload, created_at, deadline_at)
+           VALUES ($1,$2,'P-3','approval_no','{}'::jsonb,now(),now()+interval '25 hours')"#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(owner_id)
+    .execute(&pool)
+    .await;
+    assert!(invalid_deadline.is_err());
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn stats_filter_real_rows_and_attempt_latency(pool: PgPool) {
     let owner_id = Uuid::new_v4();
     sqlx::query("INSERT INTO auth_owners (id, owner_code, owner_name) VALUES ($1,$2,$3)")

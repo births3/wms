@@ -314,15 +314,17 @@ UPDATE {table}
 """
     else:
         err = sql_escape_pg((error or "h8 publish failed")[:900])
-        interval = "5 minutes"
-        if special_retry == "archive" and attempt_count >= max_attempts:
+        exhausted = special_retry == "archive" and attempt_count >= max_attempts
+        if exhausted:
             status_sql = "status = 'dead'"
+            next_attempt_sql = "now()"
         else:
             status_sql = "status = 'failed'"
+            next_attempt_sql = "now() + interval '5 minutes'"
         sql = f"""
 UPDATE {table}
    SET last_error = '{err}',
-       next_attempt_at = now() + interval '{interval}',
+       next_attempt_at = {next_attempt_sql},
        updated_at = now(),
        {status_sql}
  WHERE id = '{sql_escape_pg(row_id)}'::uuid;

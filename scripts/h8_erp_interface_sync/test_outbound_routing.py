@@ -9,7 +9,12 @@ from unittest.mock import patch
 import outbound_publish
 import sync_worker
 from exchange_lifecycle import run_outbound_pipeline
-from outbound_publish import OutboxRow, claim_wms_outbox, process_outbound_once
+from outbound_publish import (
+    OutboxRow,
+    claim_wms_outbox,
+    mark_wms_outbox,
+    process_outbound_once,
+)
 from worker_route import RouteBinding, WorkerHttpError, resolve_outbound_route
 
 
@@ -137,6 +142,61 @@ class TestOutboundClaimScope(unittest.TestCase):
         self.assertIn("putaway_complete", claim_sql)
         self.assertIn("unnest(warehouse_ids)", claim_sql)
         self.assertIn("o.payload ->> 'warehouse_id'", claim_sql)
+
+    def test_archive_fifth_failure_has_no_future_retry(self) -> None:
+        with patch.object(outbound_publish, "psql_query") as query:
+            mark_wms_outbox(
+                "postgres://wms",
+                "archive_revision_erp_feedback_outbox",
+                "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                succeeded=False,
+                error="timeout",
+                special_retry="archive",
+                attempt_count=5,
+                max_attempts=5,
+            )
+
+        sql = query.call_args.args[1]
+        self.assertIn("status = 'dead'", sql)
+        self.assertIn("next_attempt_at = now()", sql)
+        self.assertNotIn("next_attempt_at = now() + interval", sql)
+
+    def test_archive_retry_waits_five_minutes_and_honors_24_hour_deadline(self) -> None:
+        sql_calls: list[str] = []
+
+        with (
+            patch.object(outbound_publish, "table_has_column", return_value=True),
+            patch.object(
+                outbound_publish,
+                "psql_query",
+                side_effect=lambda _url, sql: sql_calls.append(sql) or "",
+            ),
+        ):
+            claim_wms_outbox(
+                "postgres://wms",
+                "archive_revision_erp_feedback_outbox",
+                "liaison_id",
+                10,
+                callback_path="/archive-revision",
+                special_retry="archive",
+            )
+            mark_wms_outbox(
+                "postgres://wms",
+                "archive_revision_erp_feedback_outbox",
+                "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                succeeded=False,
+                error="timeout",
+                special_retry="archive",
+                attempt_count=1,
+                max_attempts=5,
+            )
+
+        self.assertIn("deadline_at <= now()", sql_calls[0])
+        self.assertIn("attempt_count >= max_attempts", sql_calls[0])
+        self.assertIn("o.deadline_at > now()", sql_calls[1])
+        self.assertIn("o.attempt_count < o.max_attempts", sql_calls[1])
+        self.assertIn("next_attempt_at = now() + interval '5 minutes'", sql_calls[2])
+        self.assertIn("status = 'failed'", sql_calls[2])
 
 
 class TestOutboundProcessRoute(unittest.TestCase):
