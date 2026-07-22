@@ -9372,6 +9372,67 @@
             }
           },
           {
+            "name": "connector_code",
+            "in": "query",
+            "description": "连接编码精确筛选",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "channel",
+            "in": "query",
+            "description": "通道精确筛选",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "warehouse_id",
+            "in": "query",
+            "description": "仓库精确筛选",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "external_ref",
+            "in": "query",
+            "description": "外部业务标识精确筛选",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "idempotency_key",
+            "in": "query",
+            "description": "幂等键精确筛选",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "correlation_id",
+            "in": "query",
+            "description": "关联标识精确筛选",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
             "name": "created_from",
             "in": "query",
             "description": "开始时间 ISO8601",
@@ -9415,6 +9476,207 @@
           },
           "403": {
             "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/integration/erp-messages/lifecycle": {
+      "post": {
+        "tags": [
+          "h8-erp"
+        ],
+        "operationId": "upsert_h8_erp_message_lifecycle",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertH8ErpMessageLifecycleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "按幂等键记录 Worker 交换阶段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H8ErpMessage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "完整报文保留密钥不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/integration/erp-messages/payload-retention": {
+      "get": {
+        "tags": [
+          "h8-erp"
+        ],
+        "operationId": "list_h8_payload_retention_policies",
+        "responses": {
+          "200": {
+            "description": "当前货主的完整报文保留策略",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/H8PayloadRetentionPolicy"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "h8-erp"
+        ],
+        "operationId": "update_h8_payload_retention_policy",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateH8PayloadRetentionPolicyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "更新连接的完整报文保留策略",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H8PayloadRetentionPolicy"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "加密主密钥不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -9472,6 +9734,38 @@
           "h8-erp"
         ],
         "operationId": "stats_h8_erp_messages",
+        "parameters": [
+          {
+            "name": "connector_code",
+            "in": "query",
+            "description": "连接编码精确筛选",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "channel",
+            "in": "query",
+            "description": "通道精确筛选",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "message_type",
+            "in": "query",
+            "description": "消息类型精确筛选",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "消息统计",
@@ -9495,6 +9789,247 @@
           },
           "403": {
             "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/integration/erp-messages/worker-runtime": {
+      "get": {
+        "tags": [
+          "h8-erp"
+        ],
+        "operationId": "get_h8_worker_runtime",
+        "responses": {
+          "200": {
+            "description": "Worker 心跳与认领控制",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H8WorkerRuntimeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/integration/erp-messages/worker-runtime/claim-decision": {
+      "get": {
+        "tags": [
+          "h8-erp"
+        ],
+        "operationId": "get_h8_worker_claim_decision",
+        "parameters": [
+          {
+            "name": "connector_id",
+            "in": "query",
+            "description": "连接 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "description": "inbound/outbound",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "当前是否允许认领",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H8WorkerClaimDecision"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/integration/erp-messages/worker-runtime/control": {
+      "post": {
+        "tags": [
+          "h8-erp"
+        ],
+        "operationId": "set_h8_worker_claim_control",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetH8WorkerClaimControlRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "暂停或恢复连接方向的消息认领",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H8WorkerClaimControl"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/integration/erp-messages/worker-runtime/heartbeat": {
+      "post": {
+        "tags": [
+          "h8-erp"
+        ],
+        "operationId": "record_h8_worker_heartbeat",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/H8WorkerHeartbeatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "记录 Worker 心跳",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H8WorkerStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -9609,6 +10144,88 @@
           },
           "409": {
             "description": "租约冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/integration/erp-messages/{id}/payload": {
+      "get": {
+        "tags": [
+          "h8-erp"
+        ],
+        "operationId": "decrypt_h8_erp_message_payload",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "消息 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "按需解密的完整报文",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H8DecryptedPayload"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "报文已到期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "加密主密钥不可用",
             "content": {
               "application/json": {
                 "schema": {
@@ -25988,6 +26605,27 @@
           }
         }
       },
+      "H8DecryptedPayload": {
+        "type": "object",
+        "required": [
+          "message_id",
+          "payload",
+          "expires_at"
+        ],
+        "properties": {
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "message_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payload": {
+            "type": "string"
+          }
+        }
+      },
       "H8ErpConnector": {
         "type": "object",
         "required": [
@@ -26602,7 +27240,8 @@
         "type": "object",
         "required": [
           "message",
-          "attempts"
+          "attempts",
+          "payload_retained"
         ],
         "properties": {
           "attempts": {
@@ -26613,6 +27252,14 @@
           },
           "message": {
             "$ref": "#/components/schemas/H8ErpMessage"
+          },
+          "payload_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "payload_retained": {
+            "type": "boolean"
           }
         }
       },
@@ -26684,6 +27331,199 @@
           "total": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "H8PayloadRetentionPolicy": {
+        "type": "object",
+        "required": [
+          "connector_id",
+          "enabled",
+          "retention_days",
+          "updated_at"
+        ],
+        "properties": {
+          "connector_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "retention_days": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "H8WorkerClaimControl": {
+        "type": "object",
+        "required": [
+          "connector_id",
+          "direction",
+          "paused",
+          "reason",
+          "updated_by",
+          "updated_at"
+        ],
+        "properties": {
+          "connector_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "paused": {
+            "type": "boolean"
+          },
+          "paused_until": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_by": {
+            "type": "string"
+          }
+        }
+      },
+      "H8WorkerClaimDecision": {
+        "type": "object",
+        "required": [
+          "allowed"
+        ],
+        "properties": {
+          "allowed": {
+            "type": "boolean"
+          },
+          "paused_until": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "H8WorkerHeartbeatRequest": {
+        "type": "object",
+        "required": [
+          "worker_id",
+          "worker_version",
+          "connector_id",
+          "directions",
+          "current_claims",
+          "heartbeat_ttl_seconds"
+        ],
+        "properties": {
+          "connector_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "current_claims": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "directions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "heartbeat_ttl_seconds": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "worker_id": {
+            "type": "string"
+          },
+          "worker_version": {
+            "type": "string"
+          }
+        }
+      },
+      "H8WorkerRuntimeResponse": {
+        "type": "object",
+        "required": [
+          "workers",
+          "controls"
+        ],
+        "properties": {
+          "controls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/H8WorkerClaimControl"
+            }
+          },
+          "workers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/H8WorkerStatus"
+            }
+          }
+        }
+      },
+      "H8WorkerStatus": {
+        "type": "object",
+        "required": [
+          "worker_id",
+          "worker_version",
+          "connector_id",
+          "directions",
+          "current_claims",
+          "created_at",
+          "last_heartbeat_at",
+          "heartbeat_expires_at",
+          "health"
+        ],
+        "properties": {
+          "connector_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "current_claims": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "directions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "health": {
+            "type": "string"
+          },
+          "heartbeat_expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_heartbeat_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "worker_id": {
+            "type": "string"
+          },
+          "worker_version": {
+            "type": "string"
           }
         }
       },
@@ -31204,6 +32044,39 @@
           }
         }
       },
+      "SetH8WorkerClaimControlRequest": {
+        "type": "object",
+        "required": [
+          "connector_id",
+          "direction",
+          "paused",
+          "reason",
+          "confirmed"
+        ],
+        "properties": {
+          "confirmed": {
+            "type": "boolean"
+          },
+          "connector_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "paused": {
+            "type": "boolean"
+          },
+          "paused_until": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
       "SetTaskTypeEnabledRequest": {
         "type": "object",
         "required": [
@@ -33271,6 +34144,31 @@
           }
         }
       },
+      "UpdateH8PayloadRetentionPolicyRequest": {
+        "type": "object",
+        "required": [
+          "connector_id",
+          "enabled",
+          "confirmed"
+        ],
+        "properties": {
+          "confirmed": {
+            "type": "boolean"
+          },
+          "connector_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "retention_days": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          }
+        }
+      },
       "UpdateLocationRequest": {
         "type": "object",
         "properties": {
@@ -33910,6 +34808,72 @@
             "format": "int32"
           },
           "secret_alias": {
+            "type": "string"
+          }
+        }
+      },
+      "UpsertH8ErpMessageLifecycleRequest": {
+        "type": "object",
+        "description": "Worker 入站/出站交换阶段上报；仅 receive 可携带完整报文用于摘要/受控加密。",
+        "required": [
+          "stage",
+          "result",
+          "direction",
+          "message_type",
+          "schema_version",
+          "external_ref",
+          "idempotency_key",
+          "correlation_id",
+          "channel"
+        ],
+        "properties": {
+          "channel": {
+            "type": "string"
+          },
+          "config_version": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "connector_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "connector_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "correlation_id": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "external_ref": {
+            "type": "string"
+          },
+          "idempotency_key": {
+            "type": "string"
+          },
+          "message_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "message_type": {
+            "type": "string"
+          },
+          "payload": {
+            "nullable": true
+          },
+          "result": {
+            "type": "string"
+          },
+          "schema_version": {
+            "type": "string"
+          },
+          "stage": {
             "type": "string"
           }
         }

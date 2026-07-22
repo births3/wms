@@ -1,10 +1,14 @@
 #[allow(unused_imports)]
 use wms_domain::{
-    ClaimH8ErpMessageRequest, CreateH8ErpConnectorRequest, ErrorResponse, H8ErpConnector,
-    H8ErpConnectorListResponse, H8ErpConnectorTestResult, H8ErpInterfaceTableConnectorOption,
-    H8ErpInterfaceTableDetail, H8ErpInterfaceTableListResponse, H8ErpMessage, H8ErpMessageDetail,
-    H8ErpMessageListResponse, H8ErpMessageStats, PurgeH8ErpMessagesRequest,
-    PurgeH8ErpMessagesResponse, ReplayH8ErpMessageRequest, UpdateH8ErpConnectorRequest,
+    ClaimH8ErpMessageRequest, CreateH8ErpConnectorRequest, ErrorResponse, H8DecryptedPayload,
+    H8ErpConnector, H8ErpConnectorListResponse, H8ErpConnectorTestResult,
+    H8ErpInterfaceTableConnectorOption, H8ErpInterfaceTableDetail, H8ErpInterfaceTableListResponse,
+    H8ErpMessage, H8ErpMessageDetail, H8ErpMessageListResponse, H8ErpMessageStats,
+    H8PayloadRetentionPolicy, H8WorkerClaimControl, H8WorkerClaimDecision,
+    H8WorkerHeartbeatRequest, H8WorkerRuntimeResponse, H8WorkerStatus, PurgeH8ErpMessagesRequest,
+    PurgeH8ErpMessagesResponse, ReplayH8ErpMessageRequest, SetH8WorkerClaimControlRequest,
+    UpdateH8ErpConnectorRequest, UpdateH8PayloadRetentionPolicyRequest,
+    UpsertH8ErpMessageLifecycleRequest,
 };
 
 #[utoipa::path(
@@ -222,6 +226,12 @@ pub(crate) fn delete_h8_erp_connector() {}
         ("direction" = Option<String>, Query, description = "inbound/outbound"),
         ("message_type" = Option<String>, Query, description = "受控消息类型"),
         ("status" = Option<String>, Query, description = "sync_status"),
+        ("connector_code" = Option<String>, Query, description = "连接编码精确筛选"),
+        ("channel" = Option<String>, Query, description = "通道精确筛选"),
+        ("warehouse_id" = Option<uuid::Uuid>, Query, description = "仓库精确筛选"),
+        ("external_ref" = Option<String>, Query, description = "外部业务标识精确筛选"),
+        ("idempotency_key" = Option<String>, Query, description = "幂等键精确筛选"),
+        ("correlation_id" = Option<String>, Query, description = "关联标识精确筛选"),
         ("created_from" = Option<String>, Query, description = "开始时间 ISO8601"),
         ("created_to" = Option<String>, Query, description = "结束时间 ISO8601"),
     ),
@@ -238,6 +248,11 @@ pub(crate) fn list_h8_erp_messages() {}
     get,
     path = "/api/v1/integration/erp-messages/stats",
     tag = "h8-erp",
+    params(
+        ("connector_code" = Option<String>, Query, description = "连接编码精确筛选"),
+        ("channel" = Option<String>, Query, description = "通道精确筛选"),
+        ("message_type" = Option<String>, Query, description = "消息类型精确筛选"),
+    ),
     responses(
         (status = 200, description = "消息统计", body = H8ErpMessageStats),
         (status = 401, description = "未登录", body = ErrorResponse),
@@ -246,6 +261,132 @@ pub(crate) fn list_h8_erp_messages() {}
 )]
 #[allow(dead_code)]
 pub(crate) fn stats_h8_erp_messages() {}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/integration/erp-messages/payload-retention",
+    tag = "h8-erp",
+    responses(
+        (status = 200, description = "当前货主的完整报文保留策略", body = [H8PayloadRetentionPolicy]),
+        (status = 401, body = ErrorResponse),
+        (status = 403, body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn list_h8_payload_retention_policies() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/integration/erp-messages/payload-retention",
+    tag = "h8-erp",
+    request_body = UpdateH8PayloadRetentionPolicyRequest,
+    responses(
+        (status = 200, description = "更新连接的完整报文保留策略", body = H8PayloadRetentionPolicy),
+        (status = 400, body = ErrorResponse),
+        (status = 401, body = ErrorResponse),
+        (status = 403, body = ErrorResponse),
+        (status = 404, body = ErrorResponse),
+        (status = 503, description = "加密主密钥不可用", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn update_h8_payload_retention_policy() {}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/integration/erp-messages/{id}/payload",
+    tag = "h8-erp",
+    params(("id" = uuid::Uuid, Path, description = "消息 ID")),
+    responses(
+        (status = 200, description = "按需解密的完整报文", body = H8DecryptedPayload),
+        (status = 401, body = ErrorResponse),
+        (status = 403, body = ErrorResponse),
+        (status = 404, body = ErrorResponse),
+        (status = 410, description = "报文已到期", body = ErrorResponse),
+        (status = 503, description = "加密主密钥不可用", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn decrypt_h8_erp_message_payload() {}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/integration/erp-messages/worker-runtime",
+    tag = "h8-erp",
+    responses(
+        (status = 200, description = "Worker 心跳与认领控制", body = H8WorkerRuntimeResponse),
+        (status = 401, body = ErrorResponse),
+        (status = 403, body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn get_h8_worker_runtime() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/integration/erp-messages/worker-runtime/heartbeat",
+    tag = "h8-erp",
+    request_body = H8WorkerHeartbeatRequest,
+    responses(
+        (status = 200, description = "记录 Worker 心跳", body = H8WorkerStatus),
+        (status = 400, body = ErrorResponse),
+        (status = 401, body = ErrorResponse),
+        (status = 403, body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn record_h8_worker_heartbeat() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/integration/erp-messages/worker-runtime/control",
+    tag = "h8-erp",
+    request_body = SetH8WorkerClaimControlRequest,
+    responses(
+        (status = 200, description = "暂停或恢复连接方向的消息认领", body = H8WorkerClaimControl),
+        (status = 400, body = ErrorResponse),
+        (status = 401, body = ErrorResponse),
+        (status = 403, body = ErrorResponse),
+        (status = 404, body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn set_h8_worker_claim_control() {}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/integration/erp-messages/worker-runtime/claim-decision",
+    tag = "h8-erp",
+    params(
+        ("connector_id" = uuid::Uuid, Query, description = "连接 ID"),
+        ("direction" = String, Query, description = "inbound/outbound"),
+    ),
+    responses(
+        (status = 200, description = "当前是否允许认领", body = H8WorkerClaimDecision),
+        (status = 400, body = ErrorResponse),
+        (status = 401, body = ErrorResponse),
+        (status = 403, body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn get_h8_worker_claim_decision() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/integration/erp-messages/lifecycle",
+    tag = "h8-erp",
+    request_body = UpsertH8ErpMessageLifecycleRequest,
+    responses(
+        (status = 200, description = "按幂等键记录 Worker 交换阶段", body = H8ErpMessage),
+        (status = 400, body = ErrorResponse),
+        (status = 401, body = ErrorResponse),
+        (status = 403, body = ErrorResponse),
+        (status = 404, body = ErrorResponse),
+        (status = 503, description = "完整报文保留密钥不可用", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn upsert_h8_erp_message_lifecycle() {}
 
 #[utoipa::path(
     get,

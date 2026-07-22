@@ -1844,6 +1844,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/integration/erp-messages/lifecycle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["upsert_h8_erp_message_lifecycle"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integration/erp-messages/payload-retention": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_h8_payload_retention_policies"];
+        put?: never;
+        post: operations["update_h8_payload_retention_policy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/integration/erp-messages/purge": {
         parameters: {
             query?: never;
@@ -1876,6 +1908,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/integration/erp-messages/worker-runtime": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_h8_worker_runtime"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integration/erp-messages/worker-runtime/claim-decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_h8_worker_claim_decision"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integration/erp-messages/worker-runtime/control": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["set_h8_worker_claim_control"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integration/erp-messages/worker-runtime/heartbeat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["record_h8_worker_heartbeat"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/integration/erp-messages/{id}": {
         parameters: {
             query?: never;
@@ -1902,6 +1998,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["claim_h8_erp_message"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integration/erp-messages/{id}/payload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["decrypt_h8_erp_message_payload"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -5691,6 +5803,13 @@ export interface components {
             message: string;
             status: string;
         };
+        H8DecryptedPayload: {
+            /** Format: date-time */
+            expires_at: string;
+            /** Format: uuid */
+            message_id: string;
+            payload: string;
+        };
         H8ErpConnector: {
             api_base_url?: string | null;
             /**
@@ -5884,6 +6003,9 @@ export interface components {
         H8ErpMessageDetail: {
             attempts: components["schemas"]["H8ErpMessageAttempt"][];
             message: components["schemas"]["H8ErpMessage"];
+            /** Format: date-time */
+            payload_expires_at?: string | null;
+            payload_retained: boolean;
         };
         H8ErpMessageListResponse: {
             data: components["schemas"]["H8ErpMessage"][];
@@ -5911,6 +6033,64 @@ export interface components {
             succeeded: number;
             /** Format: int64 */
             total: number;
+        };
+        H8PayloadRetentionPolicy: {
+            /** Format: uuid */
+            connector_id: string;
+            enabled: boolean;
+            /** Format: int32 */
+            retention_days: number;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        H8WorkerClaimControl: {
+            /** Format: uuid */
+            connector_id: string;
+            direction: string;
+            paused: boolean;
+            /** Format: date-time */
+            paused_until?: string | null;
+            reason: string;
+            /** Format: date-time */
+            updated_at: string;
+            updated_by: string;
+        };
+        H8WorkerClaimDecision: {
+            allowed: boolean;
+            /** Format: date-time */
+            paused_until?: string | null;
+            reason?: string | null;
+        };
+        H8WorkerHeartbeatRequest: {
+            /** Format: uuid */
+            connector_id: string;
+            /** Format: int32 */
+            current_claims: number;
+            directions: string[];
+            /** Format: int64 */
+            heartbeat_ttl_seconds: number;
+            worker_id: string;
+            worker_version: string;
+        };
+        H8WorkerRuntimeResponse: {
+            controls: components["schemas"]["H8WorkerClaimControl"][];
+            workers: components["schemas"]["H8WorkerStatus"][];
+        };
+        H8WorkerStatus: {
+            /** Format: uuid */
+            connector_id: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: int32 */
+            current_claims: number;
+            directions: string[];
+            health: string;
+            /** Format: date-time */
+            heartbeat_expires_at: string;
+            /** Format: date-time */
+            last_heartbeat_at: string;
+            worker_id: string;
+            worker_version: string;
         };
         HandleInventoryAlertRequest: {
             lifecycle_status: string;
@@ -7380,6 +7560,16 @@ export interface components {
         SetDocumentNumberRuleEnabledRequest: {
             enabled: boolean;
         };
+        SetH8WorkerClaimControlRequest: {
+            confirmed: boolean;
+            /** Format: uuid */
+            connector_id: string;
+            direction: string;
+            paused: boolean;
+            /** Format: date-time */
+            paused_until?: string | null;
+            reason: string;
+        };
         SetTaskTypeEnabledRequest: {
             enabled: boolean;
         };
@@ -8006,6 +8196,14 @@ export interface components {
             message_types?: string[] | null;
             warehouse_ids?: string[] | null;
         };
+        UpdateH8PayloadRetentionPolicyRequest: {
+            confirmed: boolean;
+            /** Format: uuid */
+            connector_id: string;
+            enabled: boolean;
+            /** Format: int32 */
+            retention_days?: number | null;
+        };
         UpdateLocationRequest: {
             /** Format: uuid */
             bound_owner_id?: string | null;
@@ -8195,6 +8393,26 @@ export interface components {
             /** Format: int32 */
             retry_max_attempts: number;
             secret_alias: string;
+        };
+        /** @description Worker 入站/出站交换阶段上报；仅 receive 可携带完整报文用于摘要/受控加密。 */
+        UpsertH8ErpMessageLifecycleRequest: {
+            channel: string;
+            /** Format: int64 */
+            config_version?: number | null;
+            connector_code?: string | null;
+            /** Format: uuid */
+            connector_id?: string | null;
+            correlation_id: string;
+            direction: string;
+            external_ref: string;
+            idempotency_key: string;
+            /** Format: uuid */
+            message_id?: string | null;
+            message_type: string;
+            payload?: unknown;
+            result: string;
+            schema_version: string;
+            stage: string;
         };
         UpsertInventoryStatusTransitionRequest: {
             approval_sources: string[];
@@ -15127,6 +15345,18 @@ export interface operations {
                 message_type?: string | null;
                 /** @description sync_status */
                 status?: string | null;
+                /** @description 连接编码精确筛选 */
+                connector_code?: string | null;
+                /** @description 通道精确筛选 */
+                channel?: string | null;
+                /** @description 仓库精确筛选 */
+                warehouse_id?: string | null;
+                /** @description 外部业务标识精确筛选 */
+                external_ref?: string | null;
+                /** @description 幂等键精确筛选 */
+                idempotency_key?: string | null;
+                /** @description 关联标识精确筛选 */
+                correlation_id?: string | null;
                 /** @description 开始时间 ISO8601 */
                 created_from?: string | null;
                 /** @description 结束时间 ISO8601 */
@@ -15158,6 +15388,172 @@ export interface operations {
             };
             /** @description 权限不足 */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    upsert_h8_erp_message_lifecycle: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertH8ErpMessageLifecycleRequest"];
+            };
+        };
+        responses: {
+            /** @description 按幂等键记录 Worker 交换阶段 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H8ErpMessage"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 完整报文保留密钥不可用 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_h8_payload_retention_policies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前货主的完整报文保留策略 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H8PayloadRetentionPolicy"][];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_h8_payload_retention_policy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateH8PayloadRetentionPolicyRequest"];
+            };
+        };
+        responses: {
+            /** @description 更新连接的完整报文保留策略 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H8PayloadRetentionPolicy"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 加密主密钥不可用 */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -15202,7 +15598,14 @@ export interface operations {
     };
     stats_h8_erp_messages: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 连接编码精确筛选 */
+                connector_code?: string | null;
+                /** @description 通道精确筛选 */
+                channel?: string | null;
+                /** @description 消息类型精确筛选 */
+                message_type?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -15228,6 +15631,195 @@ export interface operations {
                 };
             };
             /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_h8_worker_runtime: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Worker 心跳与认领控制 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H8WorkerRuntimeResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_h8_worker_claim_decision: {
+        parameters: {
+            query: {
+                /** @description 连接 ID */
+                connector_id: string;
+                /** @description inbound/outbound */
+                direction: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前是否允许认领 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H8WorkerClaimDecision"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    set_h8_worker_claim_control: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetH8WorkerClaimControlRequest"];
+            };
+        };
+        responses: {
+            /** @description 暂停或恢复连接方向的消息认领 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H8WorkerClaimControl"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    record_h8_worker_heartbeat: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["H8WorkerHeartbeatRequest"];
+            };
+        };
+        responses: {
+            /** @description 记录 Worker 心跳 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H8WorkerStatus"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -15315,6 +15907,71 @@ export interface operations {
             };
             /** @description 租约冲突 */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    decrypt_h8_erp_message_payload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 消息 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 按需解密的完整报文 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H8DecryptedPayload"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 报文已到期 */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 加密主密钥不可用 */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
