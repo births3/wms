@@ -264,6 +264,15 @@ async fn smart_putaway_recommends_and_commits_owner_scoped_inventory_atomically(
     .await
     .expect("putaway erp outbox pending");
     assert_eq!(pending, 1);
+    let routed_warehouse_matches: bool = sqlx::query_scalar(
+        "SELECT payload->>'warehouse_id' = (SELECT warehouse_id::text FROM receiving_orders WHERE id = $1) FROM receiving_putaway_erp_feedback_outbox WHERE owner_id = $2",
+    )
+    .bind(fixture.order_id)
+    .bind(fixture.owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("putaway outbox should retain warehouse route identity");
+    assert!(routed_warehouse_matches);
     let processed = repository
         .process_putaway_erp_feedback_outbox(Utc::now(), 10)
         .await

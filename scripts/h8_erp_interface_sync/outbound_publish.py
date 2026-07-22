@@ -10,7 +10,7 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from worker_route import sanitize_worker_error
+from worker_route import resolve_outbound_route, sanitize_worker_error
 
 # table + external_ref 列 + 可选档案补录专用
 # message_type 与 US-H8-002 受控出站目录对齐
@@ -141,6 +141,8 @@ def claim_wms_outbox(
     *,
     callback_path: str,
     special_retry: str | None = None,
+    connector_id: str | None = None,
+    message_type: str | None = None,
 ) -> list[OutboxRow]:
     """认领 pending/failed；档案补录尊重 deadline_at 与 max_attempts。"""
     if not table_has_column(database_url, table, "id"):
@@ -163,6 +165,26 @@ def claim_wms_outbox(
         extra_where += " AND o.deadline_at > now()"
     if has_max:
         extra_where += " AND o.attempt_count < o.max_attempts"
+    if connector_id:
+        if not message_type:
+            raise ValueError("message_type required with connector_id")
+        extra_where += f"""
+ AND o.owner_id = (
+   SELECT owner_id
+     FROM h8_erp_connectors
+    WHERE id = '{sql_escape_pg(connector_id)}'::uuid
+      AND status = 'active'
+      AND 'outbound' = ANY(directions)
+      AND '{sql_escape_pg(message_type)}' = ANY(message_types)
+      AND (
+        cardinality(warehouse_ids) = 0
+        OR EXISTS (
+          SELECT 1
+            FROM unnest(warehouse_ids) AS route_warehouse_id
+           WHERE route_warehouse_id::text = o.payload ->> 'warehouse_id'
+        )
+      )
+ )"""
 
     # dead 标记：档案过 deadline 或超 max
     if special_retry == "archive" and has_deadline:
@@ -386,12 +408,14 @@ def process_outbound_once(
     callback_base: str | None = None,
     http_max_attempts: int | None = None,
     connector_id: str | None = None,
+    settings: Any | None = None,
+    http_json_fn: Callable[..., tuple[int, dict[str, Any] | None, str]] | None = None,
 ) -> int:
     """
-    transport:
+    传入 settings 时生产通道由逐消息 route-resolve 决定；以下参数只供本地证据脚本：
       table    — 通道 B，写入 MSSQL if_out_message（需 sqlcmd_exec）
-      http     — 通道 A，POST ERP_CALLBACK_BASE
-      both     — 先 table 再 http（双写联调，需 H8_ALLOW_LOCAL_DUAL_TRANSPORT）
+      http     — 通道 A，POST callback_base
+      both     — 先 table 再 http（本地双写联调）
       failover — REST 主用失败后转接口表（rest_primary_table_fallback）
     """
     try:
@@ -418,6 +442,8 @@ def process_outbound_once(
                 batch_size,
                 callback_path=callback_path,
                 special_retry=special,
+                connector_id=connector_id,
+                message_type=src.get("message_type"),
             )
         except Exception as exc:  # noqa: BLE001
             summary = sanitize_worker_error(
@@ -438,12 +464,24 @@ def process_outbound_once(
             )
             msg_type = src.get("message_type") or "putaway_complete"
             idem = f"out:{table}:{row.id}"
+            route_binding = None
+            active_transport = transport
+            active_callback_base = callback_base
+            lifecycle_channel = "interface_table" if transport == "table" else "rest"
             life_settings = type(
                 "LifeSettings",
                 (),
                 {
-                    "api_base": os.environ.get("WMS_API_BASE", "http://127.0.0.1:8080"),
-                    "api_token": os.environ.get("WMS_API_TOKEN"),
+                    "api_base": (
+                        settings.api_base
+                        if settings is not None
+                        else os.environ.get("WMS_API_BASE", "http://127.0.0.1:8080")
+                    ),
+                    "api_token": (
+                        settings.api_token
+                        if settings is not None
+                        else os.environ.get("WMS_API_TOKEN")
+                    ),
                 },
             )()
             if dry_run:
@@ -457,6 +495,8 @@ def process_outbound_once(
                         idem,
                         lambda: None,
                         connector_id=connector_id,
+                        route_binding=route_binding,
+                        channel=lifecycle_channel,
                         payload=row.payload,
                         dry_run=True,
                     )
@@ -472,13 +512,32 @@ def process_outbound_once(
                 print(f"[h8-out] dry-run release {table}/{row.id}", flush=True)
                 continue
             try:
+                if settings is not None:
+                    route_http = http_json_fn
+                    if route_http is None:
+                        from sync_worker import http_json as route_http
+
+                    route_binding = resolve_outbound_route(
+                        settings,
+                        msg_type,
+                        row.owner_id,
+                        str(row.payload.get("warehouse_id") or "").strip() or None,
+                        idem,
+                        http_json_fn=route_http,
+                    )
+                    from channel_failover import map_channel_mode_to_transport
+
+                    active_transport = map_channel_mode_to_transport(
+                        route_binding.channel_mode or route_binding.channel
+                    )
+                    active_callback_base = route_binding.api_base_url
+                    lifecycle_channel = route_binding.channel
+
                 # 默认参数绑定当前 row，避免循环闭包误用末行
                 def _http(active: OutboxRow = row) -> None:
-                    if not callback_base:
-                        raise RuntimeError(
-                            "ERP_CALLBACK_BASE required for http transport"
-                        )
-                    http_callback_publish(callback_base, active)
+                    if not active_callback_base:
+                        raise RuntimeError("connector api_base_url required for REST")
+                    http_callback_publish(active_callback_base, active)
 
                 def _table(active: OutboxRow = row) -> None:
                     if sqlcmd_exec is None:
@@ -489,7 +548,7 @@ def process_outbound_once(
 
                 def _send() -> None:
                     publish_with_failover(
-                        transport=transport,
+                        transport=active_transport,
                         publish_http=_http,
                         publish_table=_table,
                         http_max_attempts=attempts,
@@ -503,12 +562,15 @@ def process_outbound_once(
                     idem,
                     _send,
                     connector_id=connector_id,
+                    route_binding=route_binding,
+                    channel=lifecycle_channel,
                     payload=row.payload,
                     dry_run=False,
                 )
                 mark_wms_outbox(database_url, table, row.id, succeeded=True)
                 print(
-                    f"[h8-out] published {table}/{row.id} " f"(transport={transport})",
+                    f"[h8-out] published {table}/{row.id} "
+                    f"(transport={active_transport})",
                     flush=True,
                 )
             except Exception as exc:  # noqa: BLE001
@@ -536,39 +598,3 @@ def process_outbound_once(
 
 def resolve_wms_db_url() -> str | None:
     return os.environ.get("WMS_DB_URL") or os.environ.get("DATABASE_URL") or None
-
-
-def resolve_channel_mode_from_db(database_url: str) -> str | None:
-    """读取货主下一条 active 连接的 channel_mode（多连接时取最早启用）。"""
-    if not table_has_column(database_url, "h8_erp_connectors", "channel_mode"):
-        return None
-    sql = """
-SELECT channel_mode FROM h8_erp_connectors
- WHERE status = 'active'
- ORDER BY first_activated_at NULLS LAST, created_at
- LIMIT 1;
-"""
-    try:
-        raw = psql_query(database_url, sql).strip()
-    except Exception:  # noqa: BLE001
-        return None
-    return raw or None
-
-
-def resolve_outbound_transport(*, database_url: str | None = None) -> str:
-    """优先级：H8_OUTBOUND_TRANSPORT > H8_CHANNEL_MODE / DB channel_mode > table。"""
-    env_t = os.environ.get("H8_OUTBOUND_TRANSPORT", "").strip().lower()
-    if env_t:
-        return env_t
-    mode = os.environ.get("H8_CHANNEL_MODE", "").strip().lower()
-    if not mode and database_url:
-        mode = (resolve_channel_mode_from_db(database_url) or "").strip().lower()
-    if mode:
-        from channel_failover import map_channel_mode_to_transport
-
-        return map_channel_mode_to_transport(mode)
-    return "table"
-
-
-def resolve_callback_base() -> str | None:
-    return os.environ.get("ERP_CALLBACK_BASE") or os.environ.get("H8_ERP_CALLBACK_BASE")

@@ -186,6 +186,8 @@ def run_outbound_pipeline(
     *,
     http_json: HttpJsonFn | None = None,
     connector_id: str | None = None,
+    route_binding: Any | None = None,
+    channel: str = "rest",
     payload: dict[str, Any] | None = None,
     dry_run: bool = False,
 ) -> ExchangeLifecycle:
@@ -196,8 +198,10 @@ def run_outbound_pipeline(
         external_ref=external_ref,
         idempotency_key=idempotency_key,
         direction="outbound",
-        channel="rest",
-        connector_id=connector_id,
+        channel=channel,
+        connector_id=(route_binding.connector_id if route_binding else connector_id),
+        connector_code=(route_binding.connector_code if route_binding else None),
+        config_version=(route_binding.config_version if route_binding else None),
         payload=payload,
         http_json=http_json,
     )

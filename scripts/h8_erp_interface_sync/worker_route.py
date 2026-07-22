@@ -1,4 +1,4 @@
-"""H8 Worker 入站契约版本、错误分类与连接路由。"""
+"""H8 Worker 契约版本、错误分类与连接路由。"""
 
 from __future__ import annotations
 
@@ -22,6 +22,9 @@ class RouteBinding:
     config_version: int
     channel: str
     message_type: str
+    owner_id: str | None = None
+    api_base_url: str | None = None
+    channel_mode: str | None = None
 
 
 class WorkerHttpError(RuntimeError):
@@ -111,7 +114,10 @@ def list_manual_replays(
             raise WorkerHttpError(409, "manual replay list", "message scope changed")
         if not str(message.get("claimed_by") or "").startswith("replay:"):
             raise WorkerHttpError(409, "manual replay list", "replay marker missing")
-        if not message.get("id") or not str(message.get("idempotency_key") or "").strip():
+        if (
+            not message.get("id")
+            or not str(message.get("idempotency_key") or "").strip()
+        ):
             raise WorkerHttpError(502, "manual replay list", "message identity missing")
     return data
 
@@ -226,6 +232,83 @@ def resolve_inbound_route(
     )
 
 
+def resolve_outbound_route(
+    settings: Any,
+    message_type: str,
+    owner_id: str,
+    warehouse_id: str | None,
+    idempotency_key: str,
+    *,
+    http_json_fn: HttpJsonFn,
+) -> RouteBinding:
+    """按货主上下文、仓库、方向和消息类型解析当前唯一出站连接。"""
+    query = {"direction": "outbound", "message_type": message_type}
+    if warehouse_id:
+        query["warehouse_id"] = warehouse_id
+    path = "/api/v1/config/erp-connectors/route-resolve?" + urllib.parse.urlencode(
+        query
+    )
+    status, parsed, raw = http_json_fn(
+        settings,
+        "GET",
+        path,
+        None,
+        f"outbound-route-{idempotency_key}",
+    )
+    if status != 200 or not isinstance(parsed, dict):
+        raise WorkerHttpError(status, "outbound route resolve", raw)
+    connector = parsed.get("connector")
+    if not isinstance(connector, dict):
+        raise WorkerHttpError(502, "outbound route resolve", "connector missing")
+
+    connector_id = str(connector.get("id") or "")
+    connector_owner = str(connector.get("owner_id") or "")
+    connector_code = str(connector.get("connector_code") or "")
+    channel_mode = str(connector.get("channel_mode") or "")
+    try:
+        config_version = int(connector.get("config_version") or 0)
+    except (TypeError, ValueError) as exc:
+        raise WorkerHttpError(
+            502, "outbound route resolve", "invalid config version"
+        ) from exc
+    if connector_id != settings.connector_id or connector_owner != owner_id:
+        raise WorkerHttpError(409, "outbound route resolve", "connector scope changed")
+    if not connector_code or config_version < 1:
+        raise WorkerHttpError(502, "outbound route resolve", "binding incomplete")
+    if channel_mode not in ("rest", "interface_table", "rest_primary_table_fallback"):
+        raise WorkerHttpError(409, "outbound route resolve", "channel unavailable")
+    if (
+        channel_mode in ("rest", "rest_primary_table_fallback")
+        and not str(connector.get("api_base_url") or "").strip()
+    ):
+        raise WorkerHttpError(409, "outbound route resolve", "ERP API base missing")
+
+    directions = connector.get("directions")
+    message_types = connector.get("message_types")
+    warehouse_ids = connector.get("warehouse_ids")
+    if not isinstance(directions, list) or "outbound" not in directions:
+        raise WorkerHttpError(409, "outbound route resolve", "direction unavailable")
+    if not isinstance(message_types, list) or message_type not in message_types:
+        raise WorkerHttpError(409, "outbound route resolve", "message type unavailable")
+    if not isinstance(warehouse_ids, list):
+        raise WorkerHttpError(409, "outbound route resolve", "warehouse scope missing")
+    if warehouse_id and warehouse_ids and warehouse_id not in warehouse_ids:
+        raise WorkerHttpError(409, "outbound route resolve", "warehouse unavailable")
+
+    return RouteBinding(
+        connector_id=connector_id,
+        connector_code=connector_code,
+        config_version=config_version,
+        channel="interface_table" if channel_mode == "interface_table" else "rest",
+        message_type=message_type,
+        owner_id=connector_owner,
+        api_base_url=(
+            str(connector["api_base_url"]) if connector.get("api_base_url") else None
+        ),
+        channel_mode=channel_mode,
+    )
+
+
 def resolve_existing_inbound_binding(
     settings: Any,
     message_type: str,
@@ -280,7 +363,9 @@ def resolve_existing_inbound_binding(
     try:
         config_version = int(message.get("config_version") or 0)
     except (TypeError, ValueError) as exc:
-        raise WorkerHttpError(502, "message binding lookup", "invalid config version") from exc
+        raise WorkerHttpError(
+            502, "message binding lookup", "invalid config version"
+        ) from exc
     if not connector_id or not connector_code or config_version < 1:
         return None
     binding = RouteBinding(
@@ -318,9 +403,13 @@ def resolve_existing_inbound_binding(
     if not isinstance(directions, list) or "inbound" not in directions:
         raise WorkerHttpError(409, "connector version lookup", "direction unavailable")
     if not isinstance(message_types, list) or message_type not in message_types:
-        raise WorkerHttpError(409, "connector version lookup", "message type unavailable")
+        raise WorkerHttpError(
+            409, "connector version lookup", "message type unavailable"
+        )
     if not isinstance(warehouse_ids, list):
-        raise WorkerHttpError(409, "connector version lookup", "warehouse scope missing")
+        raise WorkerHttpError(
+            409, "connector version lookup", "warehouse scope missing"
+        )
     warehouse_id = str(row.get("warehouse_id") or "").strip()
     if warehouse_id and warehouse_ids and warehouse_id not in warehouse_ids:
         raise WorkerHttpError(409, "connector version lookup", "warehouse unavailable")

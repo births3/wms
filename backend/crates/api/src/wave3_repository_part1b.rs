@@ -377,6 +377,7 @@ pub async fn putaway_receiving_order_and_inventory(
         .bind(id)
         .bind(inventory_batch.id)
         .bind(serde_json::json!({
+            "warehouse_id": order.warehouse_id,
             "product_code": req.product_code,
             "batch_no": req.batch_no,
             "qty": req.qty,

@@ -46,8 +46,6 @@ if _sys_path not in sys.path:
 from exchange_lifecycle import record_preflight_failure, run_inbound_pipeline  # noqa: E402
 from outbound_publish import (  # noqa: E402
     process_outbound_once,
-    resolve_callback_base,
-    resolve_outbound_transport,
     resolve_wms_db_url,
 )
 from worker_route import (  # noqa: E402
@@ -612,36 +610,13 @@ def main(argv: list[str] | None = None) -> int:
         default="asn,outbound_order,product_master,return_order,product_change",
         help="入站类型：asn,outbound_order,product_master,return_order,product_change",
     )
-    parser.add_argument(
-        "--transport",
-        choices=("table", "http", "both", "failover"),
-        default=None,
-        help=(
-            "出站：table=B, http=A, failover=REST失败转表, both=本地双写；"
-            "默认 H8_OUTBOUND_TRANSPORT / H8_CHANNEL_MODE / DB channel_mode"
-        ),
-    )
     args = parser.parse_args(argv)
     settings = Settings.from_env()
     need_in = args.direction in ("in", "both")
     need_out = args.direction in ("out", "both")
     wms_db = resolve_wms_db_url()
-    transport = args.transport or resolve_outbound_transport(database_url=wms_db)
-    callback_base = resolve_callback_base()
-    # US-H8-001：生产 channel_mode 禁止同时双写；both 仅本地联调
-    if (
-        transport == "both"
-        and os.environ.get("H8_ALLOW_LOCAL_DUAL_TRANSPORT", "0") != "1"
-    ):
-        print(
-            "transport=both is local dual-channel probe only; "
-            "set H8_ALLOW_LOCAL_DUAL_TRANSPORT=1 to override "
-            "(production uses rest_primary_table_fallback failover, not dual write)",
-            file=sys.stderr,
-        )
-        return 2
-    if need_in and not args.dry_run and not settings.api_token:
-        print("WMS_API_TOKEN is required for inbound unless --dry-run", file=sys.stderr)
+    if (need_in or need_out) and not args.dry_run and not settings.api_token:
+        print("WMS_API_TOKEN is required unless --dry-run", file=sys.stderr)
         return 2
     if need_out and not wms_db and not args.dry_run:
         print(
@@ -649,20 +624,6 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 2
-    if (
-        need_out
-        and transport in ("http", "both", "failover")
-        and not callback_base
-        and not args.dry_run
-    ):
-        print(
-            "ERP_CALLBACK_BASE required for http/both/failover transport",
-            file=sys.stderr,
-        )
-        return 2
-    if need_out and transport in ("table", "both", "failover") and not args.dry_run:
-        # failover 需要 table 后备；table 接口由 sqlcmd 提供
-        pass
     types = [t.strip() for t in args.types.split(",") if t.strip()]
     for t in types:
         if t not in HANDLERS:
@@ -671,7 +632,7 @@ def main(argv: list[str] | None = None) -> int:
 
     print(
         f"[h8] worker start api={settings.api_base} direction={args.direction} "
-        f"transport={transport} types={types} once={args.once}",
+        f"transport=configured-route types={types} once={args.once}",
         flush=True,
     )
     heartbeat_directions = [
@@ -698,16 +659,14 @@ def main(argv: list[str] | None = None) -> int:
         if need_out and wms_db and outbound_allowed:
             n += process_outbound_once(
                 database_url=wms_db,
-                sqlcmd_exec=(
-                    (lambda sql: sqlcmd_query(settings, sql))
-                    if transport in ("table", "both", "failover")
-                    else None
-                ),
+                sqlcmd_exec=lambda sql: sqlcmd_query(settings, sql),
                 batch_size=settings.batch_size,
                 dry_run=args.dry_run,
-                transport=transport,
-                callback_base=callback_base,
+                transport="table",
+                callback_base=None,
                 connector_id=settings.connector_id,
+                settings=settings,
+                http_json_fn=http_json,
             )
         elif need_out and not outbound_allowed:
             print(

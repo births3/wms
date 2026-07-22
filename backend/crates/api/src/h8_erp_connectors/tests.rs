@@ -256,8 +256,8 @@ async fn route_resolve_enforces_auth_context_warehouse_scope() {
         connector_code: "route1".into(),
         connector_name: "R1".into(),
         warehouse_ids: vec![allowed_warehouse],
-        directions: vec!["inbound".into()],
-        message_types: vec!["asn".into()],
+        directions: vec!["inbound".into(), "outbound".into()],
+        message_types: vec!["asn".into(), "putaway_complete".into()],
         channel_mode: "rest".into(),
         api_base_url: Some("https://erp.example.com".into()),
         interface_db_host: None,
@@ -314,8 +314,31 @@ async fn route_resolve_enforces_auth_context_warehouse_scope() {
         .body(Body::empty())
         .unwrap();
     allowed.extensions_mut().insert(ctx);
-    let response = h8_erp_connector_router(state)
+    let response = h8_erp_connector_router(state.clone())
         .oneshot(allowed)
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body: serde_json::Value =
+        serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
+    assert_eq!(body["connector"]["id"], c.id.to_string());
+
+    let mut outbound = Request::builder()
+        .uri(
+            "/api/v1/config/erp-connectors/route-resolve?direction=outbound&message_type=putaway_complete",
+        )
+        .body(Body::empty())
+        .unwrap();
+    outbound.extensions_mut().insert(AuthContext {
+        user_id: Uuid::new_v4(),
+        owner_id: owner,
+        actor_name: "outbound-worker".into(),
+        permissions: vec![H8_CONFIG_READ.into()],
+        jti: "outbound-worker-test".into(),
+        warehouse_scope: Some(allowed_warehouse),
+    });
+    let response = h8_erp_connector_router(state)
+        .oneshot(outbound)
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
