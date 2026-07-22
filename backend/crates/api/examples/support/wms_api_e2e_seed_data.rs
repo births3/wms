@@ -278,6 +278,109 @@ pub async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
     .execute(pool)
     .await?;
     crate::wms_api_e2e_seed::seed_h8_interface_connector(pool).await?;
+    sqlx::raw_sql(
+        r#"
+        INSERT INTO auth_owners (id, owner_code, owner_name)
+        VALUES ('00000000-0000-0000-0000-000000000002', 'H8_OTHER_OWNER', 'H8 隔离验收货主')
+        ON CONFLICT (id) DO UPDATE SET owner_name = EXCLUDED.owner_name;
+
+        INSERT INTO h8_erp_messages (
+            id, owner_id, warehouse_id, connector_id, connector_code, config_version,
+            direction, message_type, schema_version, channel, external_ref, wms_resource_id,
+            idempotency_key, correlation_id, sync_status, retry_count, last_error_summary,
+            payload_digest, created_at, updated_at, completed_at
+        ) VALUES
+        (
+            '00000000-0000-0000-0000-000000008901',
+            '00000000-0000-0000-0000-000000000001',
+            '00000000-0000-0000-0000-000000001301',
+            '00000000-0000-0000-0000-000000008801', 'H8-IF-E2E', 1,
+            'inbound', 'asn', '1', 'interface_table', 'H8-MSG-E2E-DEAD', NULL,
+            'h8-msg-e2e-dead-idem', 'h8-msg-e2e-dead-corr', 'dead', 2,
+            'ERP 返回业务拒绝', 'h8-msg-e2e-dead-digest', now(), now(), now()
+        ),
+        (
+            '00000000-0000-0000-0000-000000008902',
+            '00000000-0000-0000-0000-000000000001',
+            '00000000-0000-0000-0000-000000001301',
+            '00000000-0000-0000-0000-000000008801', 'H8-IF-E2E', 1,
+            'inbound', 'asn', '1', 'interface_table', 'H8-MSG-E2E-FAIL', NULL,
+            'h8-msg-e2e-fail-idem', 'h8-msg-e2e-fail-corr', 'failed', 1,
+            'ERP 暂时不可用', 'h8-msg-e2e-fail-digest', now(), now(), NULL
+        ),
+        (
+            '00000000-0000-0000-0000-000000008999',
+            '00000000-0000-0000-0000-000000000002', NULL, NULL, 'OTHER-ERP', 1,
+            'inbound', 'asn', '1', 'rest', 'H8-MSG-E2E-OTHER-OWNER', NULL,
+            'h8-msg-e2e-other-idem', 'h8-msg-e2e-other-corr', 'dead', 1,
+            '跨货主隔离样本', 'h8-msg-e2e-other-digest', now(), now(), now()
+        )
+        ON CONFLICT (id) DO UPDATE SET
+            warehouse_id = EXCLUDED.warehouse_id,
+            connector_id = EXCLUDED.connector_id,
+            connector_code = EXCLUDED.connector_code,
+            sync_status = EXCLUDED.sync_status,
+            retry_count = EXCLUDED.retry_count,
+            last_error_summary = EXCLUDED.last_error_summary,
+            claimed_by = NULL,
+            lease_expires_at = NULL,
+            updated_at = now();
+
+        INSERT INTO h8_erp_message_attempts (
+            id, message_id, owner_id, attempt_no, channel, started_at, finished_at,
+            result, error_summary, actor
+        ) VALUES
+        (
+            '00000000-0000-0000-0000-000000008911',
+            '00000000-0000-0000-0000-000000008901',
+            '00000000-0000-0000-0000-000000000001', 1, 'interface_table',
+            now() - interval '2 seconds', now(), 'dead', 'ERP 返回业务拒绝', 'e2e-worker'
+        ),
+        (
+            '00000000-0000-0000-0000-000000008912',
+            '00000000-0000-0000-0000-000000008902',
+            '00000000-0000-0000-0000-000000000001', 1, 'interface_table',
+            now() - interval '1 second', now(), 'failed', 'ERP 暂时不可用', 'e2e-worker'
+        )
+        ON CONFLICT (message_id, attempt_no) DO UPDATE SET
+            result = EXCLUDED.result,
+            error_summary = EXCLUDED.error_summary,
+            actor = EXCLUDED.actor;
+
+        INSERT INTO h8_erp_worker_heartbeats (
+            owner_id, worker_id, worker_version, connector_id, directions, current_claims,
+            created_at, last_heartbeat_at, heartbeat_expires_at
+        ) VALUES (
+            '00000000-0000-0000-0000-000000000001', 'h8-worker-real-e2e', '1.0.0',
+            '00000000-0000-0000-0000-000000008801', ARRAY['inbound', 'outbound'], 1,
+            now(), now(), now() + interval '1 day'
+        )
+        ON CONFLICT (owner_id, worker_id) DO UPDATE SET
+            connector_id = EXCLUDED.connector_id,
+            directions = EXCLUDED.directions,
+            current_claims = EXCLUDED.current_claims,
+            last_heartbeat_at = EXCLUDED.last_heartbeat_at,
+            heartbeat_expires_at = EXCLUDED.heartbeat_expires_at;
+
+        DELETE FROM h8_erp_worker_claim_controls
+        WHERE owner_id = '00000000-0000-0000-0000-000000000001'
+          AND connector_id = '00000000-0000-0000-0000-000000008801';
+
+        INSERT INTO h8_erp_payload_retention_policies (
+            owner_id, connector_id, enabled, retention_days, updated_by, updated_at
+        ) VALUES (
+            '00000000-0000-0000-0000-000000000001',
+            '00000000-0000-0000-0000-000000008801', FALSE, 7, 'e2e-seed', now()
+        )
+        ON CONFLICT (owner_id, connector_id) DO UPDATE SET
+            enabled = FALSE,
+            retention_days = 7,
+            updated_by = 'e2e-seed',
+            updated_at = now();
+        "#,
+    )
+    .execute(pool)
+    .await?;
     sqlx::query(
         r#"
         INSERT INTO warehouse_zones (

@@ -19,7 +19,7 @@ function bindAddr(url: string) {
 
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: /web-admin-h8-real\.spec\.ts/,
+  testMatch: /web-admin-h8-(?:real|messages-real)\.spec\.ts/,
   timeout: 90_000,
   expect: { timeout: 10_000 },
   workers: 1,
@@ -49,6 +49,8 @@ export default defineConfig({
           "vault://wms/e2e/h8/if-db": "e2e-if-db-pass",
         }),
         WMS_SECRETS_REQUIRE_RESOLVE: "1",
+        WMS_ENCRYPTION_MASTER_KEY: jwtSigningKey,
+        WMS_ENCRYPTION_KEY_VERSION: "e2e-v1",
       },
     },
     {
