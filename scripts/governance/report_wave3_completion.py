@@ -370,23 +370,13 @@ def collect_key_path_layers() -> list[LayerEvidence]:
         [] if l8_ok else ["缺少 M2 权限或 M3 owner 隔离测试"],
     ))
 
-    l9_ok = (
-        file_exists("shared/openapi/openapi.json")
-        and file_exists("packages/api-client/src/schema.ts")
-        and file_contains("scripts/governance/check_openapi_in_sync.py", "--strict")
-        and file_contains("scripts/governance/check_openapi_contract.py", "/api/v1/inventory/batches/status")
-    )
     layers.append(LayerEvidence(
         "L9",
-        "兼容性：OpenAPI 与 api-client 生成物同步，并有契约检查",
-        l9_ok,
-        [
-            "shared/openapi/openapi.json",
-            "packages/api-client/src/schema.ts",
-            "scripts/governance/check_openapi_in_sync.py",
-            "scripts/governance/check_openapi_contract.py",
-        ] if l9_ok else [],
-        [] if l9_ok else ["缺少 OpenAPI 同步产物或契约检查"],
+        "版本兼容：首个正式版本前按 ADR-0038 不启用",
+        True,
+        ["docs/adr/0038-pre-v1-compatibility-policy.md"],
+        [],
+        strict_blocking=False,
     ))
 
     l10_ok = files_contain(

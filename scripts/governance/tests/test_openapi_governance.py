@@ -1,7 +1,6 @@
 """OpenAPI 契约治理测试。
 
-从 test_core_logic.py 拆出，覆盖 OpenAPI 文档结构、错误响应与
-free-form JSON 边界。
+覆盖 OpenAPI 文档结构、错误响应与 free-form JSON 边界。
 """
 import sys
 from pathlib import Path

@@ -122,11 +122,11 @@ _t3-governance-l3:
 # ============================================================
 # Tier 4: verify（< 30 分钟）
 # 合并前、CI、发版前
-# T3 + L6 并发 + L7 性能 + L9 兼容 + L10 可观测 + 完整 E2E + 合规追溯
+# T3 + L6 并发 + L7 性能 + L10 可观测 + 完整 E2E + 合规追溯
 # ============================================================
 
-# Tier 4 verify (< 30min): T3 + L6/L7/L9/L10 + E2E
-verify: preflight _t4-banner _t4-full-tests _t4-e2e _t4-perf-bench _t4-compat-check _t4-governance-l4
+# Tier 4 verify (< 30min): T3 + L6/L7/L10 + E2E
+verify: preflight _t4-banner _t4-full-tests _t4-e2e _t4-perf-bench _t4-contract-check _t4-governance-l4
 
 _t4-banner:
     @echo "▶ Tier 4 verify (target < 30min)"
@@ -144,12 +144,11 @@ _t4-perf-bench:
     @python3 scripts/governance/validate_wave1_runtime_evidence.py --kind h2
     @just wave-6-complete-check
 
-_t4-compat-check:
-    @echo "  · L9 OpenAPI compatibility"
+_t4-contract-check:
+    @echo "  · OpenAPI contract consistency"
     @python3 scripts/governance/check_openapi_in_sync.py --strict
     @python3 scripts/governance/validate_openapi_artifacts.py
     @python3 scripts/governance/check_openapi_contract.py
-    @python3 scripts/governance/check_api_compat.py
 
 _t4-governance-l4:
     @echo "  · active-module scope completeness"
@@ -949,10 +948,6 @@ wave-2-runtime-evidence-readiness *args:
 
 # 执行 Wave 2 配置中心 Feature Flag 真实 smoke 并记录 runtime evidence
 wave-2-runtime-evidence-smoke *args:
-    @python3 scripts/governance/collect_wave2_runtime_evidence.py {{args}}
-
-# 执行 Wave 2 配置中心 Feature Flag 真实 smoke 并记录 runtime evidence（兼容别名）
-wave-2-runtime-evidence-collect *args:
     @python3 scripts/governance/collect_wave2_runtime_evidence.py {{args}}
 
 # 生成 Wave 2 staging H1 token；输出 export WAVE_2_H1_TOKEN=...

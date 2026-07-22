@@ -109,7 +109,6 @@ TIER_SCRIPTS: dict[str, list[str]] = {
     ],
     "T4": [
         # 完整矩阵 E2E 截图报告由 just verify 的 _t4-e2e 生成，这里只校验报告。
-        "check_api_compat.py",
         "check_matrix_e2e_report.py",
     ],
 }
@@ -170,9 +169,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--tier", required=True, choices=["T1", "T2", "T3", "T4"])
     parser.add_argument("--json", action="store_true", help="仅输出本调度器 JSON 总结")
-    parser.add_argument("--report-json", action="store_true", help="兼容旧调用；等价于 --json")
     args = parser.parse_args(argv)
-    machine_output = args.json or args.report_json
+    machine_output = args.json
 
     scripts = expand_tier_scripts(args.tier)
     if not scripts:

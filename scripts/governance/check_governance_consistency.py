@@ -22,7 +22,7 @@ Tier：T1（< 10s）
   3. 同一脚本在两处的 Tier 标注一致
 
 例外：
-  - §4.6 标注"CI 全量，非 diff 触发"的（如 perf_baseline / api_compat）
+  - §4.6 标注"CI 全量，非 diff 触发"的（如 runtime evidence）
     允许只在 §4.6 出现，不在 gate-rules.toml
 """
 from __future__ import annotations
@@ -150,7 +150,7 @@ TIER_ENTRYPOINT_RECIPES = {
     "_t4-full-tests",
     "_t4-e2e",
     "_t4-perf-bench",
-    "_t4-compat-check",
+    "_t4-contract-check",
     "_t4-governance-l4",
 }
 

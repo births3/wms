@@ -83,7 +83,6 @@ GOVERNANCE_SCRIPTS = [
     "check_idempotency_test.py",
     "validate_openapi_artifacts.py",
     "check_openapi_contract.py",
-    "check_api_compat.py",
     "check_baseline_completeness.py",
     "check_page_size.py",
     "check_component_doc_header.py",
