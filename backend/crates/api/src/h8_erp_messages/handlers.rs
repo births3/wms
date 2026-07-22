@@ -710,6 +710,25 @@ async fn record_lifecycle_upsert(
             m
         }
     };
+    let connector_changed = matches!(
+        (message.connector_id, body.connector_id),
+        (Some(bound), Some(requested)) if bound != requested
+    );
+    let version_changed = matches!(
+        (message.config_version, body.config_version),
+        (Some(bound), Some(requested)) if bound != requested
+    );
+    if connector_changed
+        || version_changed
+        || message.direction != body.direction.trim()
+        || message.message_type != body.message_type.trim()
+        || message.schema_version != body.schema_version.trim()
+        || message.channel != body.channel.trim()
+    {
+        return Err(H8ErpMessageHandlerError::BadRequest(
+            "message config binding must not change",
+        ));
+    }
     write_exchange_lifecycle_audit(
         &state,
         &ctx,

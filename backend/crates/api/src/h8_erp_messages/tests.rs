@@ -337,6 +337,52 @@ async fn invalid_lifecycle_stage_is_rejected_before_message_insert() {
 }
 
 #[tokio::test]
+async fn lifecycle_rejects_changes_to_existing_message_binding() {
+    let state = H8ErpMessageAppState::with_memory();
+    let owner = Uuid::new_v4();
+    let message = sample_message(owner, "processing");
+    state.repository.upsert_for_test(&message).await.unwrap();
+    let base = serde_json::json!({
+        "stage": "receive",
+        "result": "retry",
+        "direction": message.direction,
+        "message_type": message.message_type,
+        "schema_version": message.schema_version,
+        "external_ref": message.external_ref,
+        "idempotency_key": message.idempotency_key,
+        "correlation_id": message.correlation_id,
+        "channel": message.channel,
+        "connector_id": message.connector_id,
+        "connector_code": message.connector_code,
+        "config_version": message.config_version
+    });
+
+    for (field, changed) in [
+        ("connector_id", serde_json::json!(Uuid::new_v4())),
+        ("config_version", serde_json::json!(2)),
+        ("channel", serde_json::json!("interface_table")),
+        ("direction", serde_json::json!("outbound")),
+        ("schema_version", serde_json::json!("999")),
+    ] {
+        let mut body = base.clone();
+        body[field] = changed;
+        let mut request = Request::builder()
+            .method(Method::POST)
+            .uri("/api/v1/integration/erp-messages/lifecycle")
+            .header("content-type", "application/json")
+            .body(Body::from(body.to_string()))
+            .unwrap();
+        request.extensions_mut().insert(test_ctx(owner));
+        let response = super::handlers::h8_erp_message_router(state.clone())
+            .oneshot(request)
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST, "{field}");
+    }
+    assert!(snapshot_audit_actions(&state).is_empty());
+}
+
+#[tokio::test]
 async fn replay_failed_adds_attempt_and_sets_processing() {
     let state = H8ErpMessageAppState::with_memory();
     let owner = Uuid::nil();
