@@ -121,9 +121,19 @@ pub async fn change_inventory_status_with_audit(
             .await
             .map_err(map_db_error)?;
 
+            let warehouse_id: Option<Uuid> = sqlx::query_scalar(
+                "SELECT warehouse_id FROM warehouse_locations WHERE owner_id = $1 AND id = $2",
+            )
+            .bind(ctx.owner_id)
+            .bind(updated.location_id)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(map_db_error)?;
+
             Self::enqueue_status_erp_feedback_in_tx(
                 &mut tx,
                 ctx.owner_id,
+                warehouse_id,
                 req.batch_id,
                 Some(status_change_id),
                 &from_status,

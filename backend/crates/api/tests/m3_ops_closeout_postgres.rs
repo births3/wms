@@ -167,6 +167,8 @@ async fn relocate_inventory_moves_qty_atomically_and_rejects_quarantined(pool: s
 async fn status_change_enqueues_erp_outbox_and_process_succeeds(pool: sqlx::PgPool) {
     let owner_id = Uuid::new_v4();
     let batch_id = Uuid::new_v4();
+    let location_id = Uuid::new_v4();
+    seed_location(&pool, owner_id, location_id, "L-ERP").await;
     sqlx::query(
         r#"
         INSERT INTO inventory_batches (
@@ -179,7 +181,7 @@ async fn status_change_enqueues_erp_outbox_and_process_succeeds(pool: sqlx::PgPo
     .bind(owner_id)
     .bind(NaiveDate::from_ymd_opt(2026, 1, 1).unwrap())
     .bind(NaiveDate::from_ymd_opt(2028, 1, 1).unwrap())
-    .bind(Uuid::new_v4())
+    .bind(location_id)
     .execute(&pool)
     .await
     .expect("batch");
@@ -210,6 +212,16 @@ async fn status_change_enqueues_erp_outbox_and_process_succeeds(pool: sqlx::PgPo
     .await
     .expect("pending");
     assert!(pending >= 1);
+    let routed_warehouse_matches: bool = sqlx::query_scalar(
+        "SELECT payload->>'warehouse_id' = (SELECT warehouse_id::text FROM warehouse_locations WHERE owner_id = $1 AND id = $2) FROM inventory_status_erp_feedback_outbox WHERE owner_id = $1 AND batch_id = $3",
+    )
+    .bind(owner_id)
+    .bind(location_id)
+    .bind(batch_id)
+    .fetch_one(&pool)
+    .await
+    .expect("status outbox should retain warehouse route identity");
+    assert!(routed_warehouse_matches);
 
     let processed = repository
         .process_status_erp_feedback_outbox(Utc::now(), 20)

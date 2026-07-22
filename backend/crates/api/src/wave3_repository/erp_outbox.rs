@@ -5,6 +5,7 @@ impl PgWave3Repository {
     pub async fn enqueue_status_erp_feedback_in_tx(
         tx: &mut Transaction<'_, Postgres>,
         owner_id: Uuid,
+        warehouse_id: Option<Uuid>,
         batch_id: Uuid,
         status_change_id: Option<Uuid>,
         from_status: &str,
@@ -30,6 +31,7 @@ impl PgWave3Repository {
         .bind(batch_id)
         .bind(status_change_id)
         .bind(json!({
+            "warehouse_id": warehouse_id,
             "product_code": product_code,
             "batch_no": batch_no,
             "qty": qty,
