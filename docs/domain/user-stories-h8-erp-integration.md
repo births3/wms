@@ -434,6 +434,9 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | 2026-07-22 | 十八轮验收复审 | 发现真实 E2E 只有 pending 行，不能证明多选并集；新增 `DEMO-ASN-002` failed 种子并断言双状态各命中一行。按 ADR-0038 重建 `wms_h8_e2e`，把探查连接写入可重复 E2E seed，并将探查字段和菜单写入逻辑收敛到当前 migration 基线。 |
 | 2026-07-22 | 十九轮 ASN 入站闭环 | 新增独立 `DEMO-ASN-FLOW-001`，以真实 E2E 基础档案跑通 MSSQL 接口表→H8 Worker→M2→接口表成功回写；同一幂等键重放后单据数仍为 1，H2 生命周期审计完整。该证据只关闭 ASN 软件链路，不替代其余消息类型与客户正式 ERP S4。 |
 | 2026-07-22 | 二十轮 H8-002 模板复审 | 按新版验收模板逐 AC 映射 V0–V4；纠正“纯 domain 规则已测试即等于 Worker 已接线”的误判。确认 ASN V2 切片通过，但 Worker 尚未接入 canonical/M-PM、路由与配置版本绑定、错误分类和完整逐消息证据，故事整体保持 `NEEDS_WORK`。 |
+| 2026-07-22 | 二十一轮 H8-003 运行治理复审 | 按 v6 模板补齐连接/通道/消息类型统计、Worker 心跳健康、按连接+方向暂停恢复、完整报文短期加密保留；真实 PostgreSQL 证明分维度 P95、持久控制、Worker 首次登记时间、按 Key Version 解密、停用/到期清密文和预检失败 H2 审计。复审进一步补上审计持久化失败门禁、Worker lifecycle 审计失败阻断业务、解密 no-store、lifecycle OpenAPI、受控中文枚举与明确错误态；dev-mock Playwright 6 条和新增截图通过。AC10 生产 RANGE 分区与 AC14 客户正式 ERP S4 仍保持 `NEEDS_WORK`。 |
+| 2026-07-23 | 二十二轮 v6 证据复审 | 修复更多查询仅前端过滤的问题，仓库、外部业务标识、幂等键、关联标识和创建时间改为服务端精确过滤；新增隔离 PostgreSQL + 关闭 dev-mock 的真实浏览器链路，覆盖高级查询、详情、重放/重复拒绝、Worker 暂停恢复、报文加密解密、只读权限和跨货主 404。修复新迁移重复创建既有索引的问题。AC11 的 JWT 仓库授权范围、AC12 稳定服务端分页/生产 P95、AC10 生产 RANGE 分区和 AC14 正式 ERP S4 仍未完成。 |
+| 2026-07-23 | 二十三轮终审修复 | 创建日期按浏览器本地自然日转换为 UTC 边界，避免中国时区错查八小时；Worker 预检审计暂时不可用时不再把已认领接口表行遗留在 `processing`，而是按可重试错误释放为 `pending`。新增定向回归测试并通过。 |
 
 ## 验收记录（US-H8-004 软件切片）
 
@@ -545,7 +548,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | AC-8 投递保证 | `V1` | H8-WORKER | `scripts/h8_erp_interface_sync/test_h8_sync_worker.py` 的 failover/circuit 测试证明成功路径不双写且切换保留业务键 | `PASS` | - |
 | AC-9 错误分类 | `V1` | H8-DOMAIN、H8-WORKER | Worker 已将网络/408/425/429/5xx 识别为可重试，其余错误直接死信 | `NEEDS_WORK` | 统一脱敏 Worker 日志与错误摘要，并补各业务 API 错误分类证据 |
 | AC-10 货主仓隔离 | `V1` | H8-DOMAIN、H8-WORKER | 业务 API 前已通过当前货主的 active 连接和仓库白名单解析唯一路由 | `NEEDS_WORK` | route-resolve 还须校验调用主体仓库授权范围交集并补拒绝测试 |
-| AC-11 审计追踪 | `V1/V2` | H8-WORKER、H8-ASN-V2 | `docs/retros/h8-asn-inbound-flow-evidence.json` 记录 ASN 成功路径的 receive、convert、business_api、receipt H2 append-only 事件 | `NEEDS_WORK` | schema/路由预检失败也必须形成 receive 与 final_failure 审计，并补失败路径证据 |
+| AC-11 审计追踪 | `V1/V2` | H8-WORKER、H8-ASN-V2、H8-MSG-PG | ASN 成功路径已有 V2；Worker 在 schema/路由预检失败时调用同一 lifecycle API，真实 PostgreSQL 测试回读 `h8_exchange_receive` 与 `h8_exchange_final_failure` | `PASS` | - |
 | AC-12 档案补录闭环 | `V1` | H8-DOMAIN、代码路径复审 | domain 禁止 H8 直接改 ASN；`sync_worker.py::handle_product_change` 尚无 M1/M-QL/M2 跨模块闭环证据 | `NEEDS_WORK` | 补商品变更事件、业务校验和当前 ASN 解锁的 L3/L4/L5 证据 |
 | AC-13 契约与 S4 | `V1/V2/V4` | H8-DOMAIN、H8-WORKER、H8-ASN-V2 | 当前仅 ASN V2 与部分本地出站切片 | `NEEDS_WORK` | 每类消息补 L2/L3/L4/L11，并归档客户正式 ERP dev/staging 双向请求、回执、重试与审计关联 |
 
@@ -562,7 +565,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 ### 验收结论
 
 - 已证明：受控目录与纯 domain 规则；Worker 入站唯一路由、首次配置绑定、契约版本拒绝和错误重试分类；ASN 接口表入站 V2、幂等回放和 H2 生命周期审计；本地出站主备与非双写切片。
-- 未完成：Worker 的 canonical/M-PM、重试复用原绑定、主体仓库范围、出站唯一路由、预检失败审计、错误脱敏，以及其余消息类型 L2–L4/L11 和客户正式 ERP V4。
+- 未完成：Worker 的 canonical/M-PM、重试复用原绑定、主体仓库范围、出站唯一路由、错误脱敏，以及其余消息类型 L2–L4/L11 和客户正式 ERP V4。
 - 恢复条件：完成上述运行接线和逐消息证据后，再使用客户正式 ERP dev/staging 跑双向请求、回执、重试和审计关联；完成前保持 `deferred_stories`。
 
 ---
@@ -573,7 +576,8 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 - 验收基线：2026-07-22 自研 ERP 与 Worker 运行治理扩展
 - 验收日期：`2026-07-22`
 - 质量矩阵状态：`deferred_stories`（S4 未齐）
-- 整体结论：软件切片已验证，故事整体 `NEEDS_WORK`
+- 证据层覆盖：软件切片 `V0/V1/V2/V3=PASS`；故事要求的 `V4=NEEDS_WORK`
+- 整体结论：本轮运行治理软件切片已验证，故事整体 `NEEDS_WORK`
 
 ### US-H8-003 软件 AC 核对（不含 S4）
 
@@ -586,15 +590,16 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | AC5 失败重试记录 | `PASS` | attempts 追加 |
 | AC6 死信条件 | `PASS` | should_enter_dead + mark_dead + h8_message_dead H2 审计 |
 | AC7 人工重放 | `PASS` | API + E2E + 不换业务 id |
-| AC8 查询详情 | `PASS` | list/detail QueryPanel |
-| AC9 监控指标与 Worker 健康 | `NEEDS_WORK` | 消息 stats + P95 已有；缺 Worker 实例心跳与健康视图 |
+| AC8 查询详情 | `PASS` | QueryPanel 的连接、仓库、通道、外部业务标识、幂等键、关联标识和时间范围均进入服务端精确过滤；真实 PostgreSQL 与关闭 dev-mock 的 Playwright 复用确定性业务键 |
+| AC9 监控指标与 Worker 健康 | `PASS` | 货主固定在上下文；连接/通道/消息类型统计及过滤后 P95 有真实 PostgreSQL 行证据；同页展示实例、版本、方向、认领数、创建时间、心跳和派生健康状态 |
 | AC10 分区与保留 | `PARTIAL` | 索引+分区准备+archive 不删+purge 需 retention；未切生产 RANGE 父表 |
-| AC11 权限审计 | `PASS` | read/write 权限 + detail/replay/archive/purge/dead H2 审计 |
-| AC12 查询裁剪 | `PASS` | 默认时间窗 + 货主索引 |
-| AC13 页面证据 | `PASS` | Playwright 3 条 + 矩阵截图登记 |
+| AC11 权限审计 | `PARTIAL` | read/write 权限、跨货主拒绝及 detail/replay/archive/purge/dead H2 审计已验证；JWT 用户会话尚未把授权仓库范围带入 H8 查询 |
+| AC12 查询裁剪 | `PARTIAL` | 默认 7 天、货主/仓库/时间索引和 200 条硬上限已实现；尚无稳定服务端分页游标及生产约定数据量 P95 证据 |
+| AC13 页面证据 | `PASS` | dev-mock Playwright 6 条用于 UI 异常分支；关闭 dev-mock 的真实 PostgreSQL Playwright 2 条覆盖高级筛选、详情、重放与重复拒绝、只读、跨货主拒绝、Worker、暂停恢复、保留策略和授权解密；13 张截图完成视觉复核 |
 | AC14 S4 | `NEEDS_WORK` | 客户正式 ERP |
-| AC15 暂停与恢复认领 | `NEEDS_WORK` | 缺独立持久控制、API、审计和页内操作 |
-| AC16 完整报文短期保留 | `NEEDS_WORK` | 缺按连接策略、密文、到期清理和解密审计 |
+| AC15 暂停与恢复认领 | `PASS` | 独立持久控制、到期恢复、权限/H2 审计、Worker 认领前门禁和页内操作均有自动化证据 |
+| AC16 完整报文短期保留 | `PASS` | 默认摘要；按连接启用 1–30 天、pgcrypto 密文、Key Version 历史密钥解析、授权解密/no-store/H2 脱敏审计、审计失败门禁、每小时到期清密文及页面证据齐全 |
+| UI-SEMANTICS | `PASS` | 受控单选、中文状态/类型/通道/尝试结果和中文日期展示；真实 E2E 断言全部更多查询值进入 API 且只返回精确命中行 |
 
 验证命令：
 
@@ -605,6 +610,9 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | H8-MSG-U3 | `cargo test --manifest-path backend/Cargo.toml -p wms-api --lib h8_erp_messages` |
 | H8-U1 | `cargo test --manifest-path backend/Cargo.toml -p wms-domain --lib h8_erp` |
 | H8-U2 | `cargo test --manifest-path backend/Cargo.toml -p wms-api --lib h8_erp_connectors` |
-| H8-WORKER | `python3 -m unittest test_h8_sync_worker`（在 `scripts/h8_erp_interface_sync`） |
+| H8-WORKER | `python3 -m unittest test_exchange_lifecycle test_h8_sync_worker -v`（在 `scripts/h8_erp_interface_sync`） |
+| H8-MSG-PG | `cargo test --manifest-path backend/Cargo.toml -p wms-api --lib h8_erp_messages::pg_repository_tests` |
+| H8-WEB-TYPE | `pnpm --dir apps/web-admin exec tsc --noEmit` |
 | H8-MSG-E2E | `pnpm --dir prototypes exec playwright test --config=playwright-web-admin-h8-messages-config.ts` |
+| H8-MSG-REAL-E2E | `DATABASE_URL=<隔离测试库> pnpm --dir prototypes exec playwright test --config=playwright-web-admin-h8-real-config.ts --grep 'H8 ERP 消息真实链路'` |
 | H8-T1 | `just gov-t1` |

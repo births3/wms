@@ -96,6 +96,7 @@ WMS_<MODULE>_<KEY>
 | `WMS_JWT_SIGNING_KEY` | JWT 签名密钥 |
 | `WMS_JWT_REFRESH_KEY` | Refresh token 密钥 |
 | `WMS_ENCRYPTION_MASTER_KEY` | 字段加密主密钥（DEK 派生） |
+| `WMS_ENCRYPTION_PREVIOUS_MASTER_KEYS` | 轮换期按 Key Version 提供尚未到期的历史主密钥（Secret 注入的 JSON，不入库） |
 | `WMS_REGULATORY_API_KEY` | 码上放心 API 密钥 |
 | `WMS_WECHAT_CORP_SECRET` | 企业微信 corpsecret |
 
