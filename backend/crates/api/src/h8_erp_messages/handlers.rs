@@ -6,7 +6,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, SecondsFormat, Utc};
 use serde::Deserialize;
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -24,7 +24,11 @@ use super::audit::{
     write_dead_entry_audit, write_exchange_lifecycle_audit, write_message_audit, write_owner_audit,
 };
 use super::error::H8ErpMessageHandlerError;
+use super::repository::H8ErpMessageCursor;
 use super::state::{H8ErpMessageAppState, H8_MSG_READ, H8_MSG_WRITE};
+
+const DEFAULT_LIST_LIMIT: u32 = 50;
+const MAX_LIST_LIMIT: u32 = 200;
 
 pub fn h8_erp_message_router(state: H8ErpMessageAppState) -> Router {
     Router::new()
@@ -100,6 +104,8 @@ struct ListQuery {
     correlation_id: Option<String>,
     created_from: Option<DateTime<Utc>>,
     created_to: Option<DateTime<Utc>>,
+    cursor: Option<String>,
+    limit: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -177,7 +183,23 @@ async fn list_messages(
             "created_from must not exceed created_to",
         ));
     }
-    let data = state
+    let limit = q.limit.unwrap_or(DEFAULT_LIST_LIMIT);
+    if !(1..=MAX_LIST_LIMIT).contains(&limit) {
+        return Err(H8ErpMessageHandlerError::BadRequest(
+            "limit must be 1..=200",
+        ));
+    }
+    let cursor = q.cursor.as_deref().map(parse_message_cursor).transpose()?;
+    let window_from = q
+        .created_from
+        .or(cursor.map(|value| value.window_from))
+        .unwrap_or_else(|| Utc::now() - chrono::Duration::days(7));
+    if cursor.is_some_and(|value| value.window_from != window_from) {
+        return Err(H8ErpMessageHandlerError::BadRequest(
+            "cursor does not match created_from",
+        ));
+    }
+    let mut data = state
         .repository
         .list(
             ctx.owner_id,
@@ -190,18 +212,65 @@ async fn list_messages(
             external_ref,
             idempotency_key,
             correlation_id,
-            q.created_from,
+            Some(window_from),
             q.created_to,
+            cursor,
+            limit,
         )
         .await?;
+    let next_cursor = if data.len() > limit as usize {
+        data.pop();
+        data.last()
+            .map(|message| format_message_cursor(window_from, message))
+    } else {
+        None
+    };
     let len = data.len();
     Ok(Json(H8ErpMessageListResponse {
         data,
         page: PageMeta {
-            next_cursor: None,
+            next_cursor,
             count: len as u32,
         },
     }))
+}
+
+fn parse_message_cursor(value: &str) -> Result<H8ErpMessageCursor, H8ErpMessageHandlerError> {
+    let mut parts = value.splitn(3, ',');
+    let window_from = parts
+        .next()
+        .ok_or(H8ErpMessageHandlerError::BadRequest("invalid cursor"))?;
+    let created_at = parts
+        .next()
+        .ok_or(H8ErpMessageHandlerError::BadRequest("invalid cursor"))?;
+    let id = parts
+        .next()
+        .ok_or(H8ErpMessageHandlerError::BadRequest("invalid cursor"))?;
+    let window_from = DateTime::parse_from_rfc3339(window_from)
+        .map_err(|_| H8ErpMessageHandlerError::BadRequest("invalid cursor"))?
+        .with_timezone(&Utc);
+    let created_at = DateTime::parse_from_rfc3339(created_at)
+        .map_err(|_| H8ErpMessageHandlerError::BadRequest("invalid cursor"))?
+        .with_timezone(&Utc);
+    let id = id
+        .parse::<Uuid>()
+        .map_err(|_| H8ErpMessageHandlerError::BadRequest("invalid cursor"))?;
+    Ok(H8ErpMessageCursor {
+        window_from,
+        created_at,
+        id,
+    })
+}
+
+fn format_message_cursor(window_from: DateTime<Utc>, message: &H8ErpMessage) -> String {
+    format!(
+        "{},{},{}",
+        window_from.to_rfc3339_opts(SecondsFormat::Nanos, true),
+        message
+            .created_at
+            .to_rfc3339_opts(SecondsFormat::Nanos, true),
+        message.id
+    )
 }
 
 async fn get_message(

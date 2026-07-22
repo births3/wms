@@ -1,7 +1,7 @@
 //! H8 消息内存仓储、重放与 H2 审计 sink 测试。
 
 use axum::{
-    body::Body,
+    body::{to_bytes, Body},
     http::{Method, Request, StatusCode},
 };
 use chrono::Utc;
@@ -10,7 +10,8 @@ use tower::ServiceExt;
 use uuid::Uuid;
 use wms_domain::{
     audit_summary_is_safe, message_audit_summary, H8ErpMessage, H8ErpMessageAttempt,
-    H8WorkerHeartbeatRequest, SetH8WorkerClaimControlRequest, H8_MESSAGE_DEAD_AUDIT_ACTION,
+    H8ErpMessageListResponse, H8WorkerHeartbeatRequest, SetH8WorkerClaimControlRequest,
+    H8_MESSAGE_DEAD_AUDIT_ACTION,
 };
 
 use crate::audit::AuditLog;
@@ -91,6 +92,8 @@ async fn list_filters_by_status_and_stats() {
             None,
             None,
             None,
+            None,
+            200,
         )
         .await
         .unwrap();
@@ -135,11 +138,66 @@ async fn list_filters_by_warehouse_and_trace_keys() {
             Some("corr-selected"),
             Some(selected.created_at - chrono::Duration::seconds(1)),
             Some(selected.created_at + chrono::Duration::seconds(1)),
+            None,
+            200,
         )
         .await
         .unwrap();
     assert_eq!(listed.len(), 1);
     assert_eq!(listed[0].id, selected.id);
+}
+
+#[tokio::test]
+async fn list_cursor_is_stable_when_created_at_matches() {
+    let state = H8ErpMessageAppState::with_memory();
+    let owner = Uuid::new_v4();
+    let created_at = Utc::now();
+    for value in 1..=3 {
+        let mut message = sample_message(owner, "pending");
+        message.id = Uuid::from_u128(value);
+        message.created_at = created_at;
+        state.repository.upsert_for_test(&message).await.unwrap();
+    }
+
+    let mut request = Request::builder()
+        .uri("/api/v1/integration/erp-messages?limit=2")
+        .body(Body::empty())
+        .unwrap();
+    request.extensions_mut().insert(test_ctx(owner));
+    let response = super::handlers::h8_erp_message_router(state.clone())
+        .oneshot(request)
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let first: H8ErpMessageListResponse = serde_json::from_slice(&body).unwrap();
+    assert_eq!(
+        first
+            .data
+            .iter()
+            .map(|message| message.id)
+            .collect::<Vec<_>>(),
+        vec![Uuid::from_u128(3), Uuid::from_u128(2)]
+    );
+    let cursor = first.page.next_cursor.expect("next cursor");
+
+    let mut request = Request::builder()
+        .uri(format!(
+            "/api/v1/integration/erp-messages?limit=2&cursor={cursor}"
+        ))
+        .body(Body::empty())
+        .unwrap();
+    request.extensions_mut().insert(test_ctx(owner));
+    let response = super::handlers::h8_erp_message_router(state)
+        .oneshot(request)
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let second: H8ErpMessageListResponse = serde_json::from_slice(&body).unwrap();
+    assert_eq!(second.data.len(), 1);
+    assert_eq!(second.data[0].id, Uuid::from_u128(1));
+    assert!(second.page.next_cursor.is_none());
 }
 
 #[tokio::test]
@@ -186,6 +244,25 @@ async fn list_rejects_invalid_query_values_at_http_boundary() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn list_rejects_invalid_cursor_and_limit() {
+    for uri in [
+        "/api/v1/integration/erp-messages?cursor=broken",
+        "/api/v1/integration/erp-messages?limit=0",
+        "/api/v1/integration/erp-messages?limit=201",
+    ] {
+        let state = H8ErpMessageAppState::with_memory();
+        let owner = Uuid::new_v4();
+        let mut request = Request::builder().uri(uri).body(Body::empty()).unwrap();
+        request.extensions_mut().insert(test_ctx(owner));
+        let response = super::handlers::h8_erp_message_router(state)
+            .oneshot(request)
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST, "{uri}");
+    }
 }
 
 #[tokio::test]

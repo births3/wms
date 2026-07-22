@@ -14,6 +14,13 @@ use wms_domain::{
 
 use super::error::H8ErpMessageRepoError;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct H8ErpMessageCursor {
+    pub window_from: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
+    pub id: Uuid,
+}
+
 #[axum::async_trait]
 pub trait H8ErpMessageRepository: Send + Sync {
     async fn list(
@@ -30,6 +37,8 @@ pub trait H8ErpMessageRepository: Send + Sync {
         correlation_id: Option<&str>,
         created_from: Option<DateTime<Utc>>,
         created_to: Option<DateTime<Utc>>,
+        cursor: Option<H8ErpMessageCursor>,
+        limit: u32,
     ) -> Result<Vec<H8ErpMessage>, H8ErpMessageRepoError>;
 
     async fn get(&self, owner_id: Uuid, id: Uuid) -> Result<H8ErpMessage, H8ErpMessageRepoError>;
@@ -142,8 +151,11 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
         correlation_id: Option<&str>,
         created_from: Option<DateTime<Utc>>,
         created_to: Option<DateTime<Utc>>,
+        cursor: Option<H8ErpMessageCursor>,
+        limit: u32,
     ) -> Result<Vec<H8ErpMessage>, H8ErpMessageRepoError> {
         let guard = self.inner.lock().expect("lock");
+        let window_from = created_from.or(cursor.map(|value| value.window_from));
         let mut rows: Vec<_> = guard
             .messages
             .values()
@@ -157,11 +169,19 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
             .filter(|m| external_ref.is_none_or(|value| m.external_ref == value))
             .filter(|m| idempotency_key.is_none_or(|value| m.idempotency_key == value))
             .filter(|m| correlation_id.is_none_or(|value| m.correlation_id == value))
-            .filter(|m| created_from.is_none_or(|f| m.created_at >= f))
+            .filter(|m| window_from.is_none_or(|f| m.created_at >= f))
             .filter(|m| created_to.is_none_or(|t| m.created_at <= t))
+            .filter(|m| {
+                cursor.is_none_or(|value| (m.created_at, m.id) < (value.created_at, value.id))
+            })
             .cloned()
             .collect();
-        rows.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        rows.sort_by(|a, b| {
+            b.created_at
+                .cmp(&a.created_at)
+                .then_with(|| b.id.cmp(&a.id))
+        });
+        rows.truncate((limit as usize).saturating_add(1));
         Ok(rows)
     }
 
@@ -207,6 +227,8 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
                 None,
                 None,
                 None,
+                None,
+                u32::MAX,
             )
             .await?;
         let mut stats = H8ErpMessageStats {

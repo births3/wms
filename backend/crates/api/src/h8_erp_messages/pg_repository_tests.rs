@@ -1,13 +1,14 @@
 //! US-H8-003 AC9：真实 PostgreSQL 分维度统计证据。
 
 use axum::{
-    body::Body,
+    body::{to_bytes, Body},
     http::{Method, Request, StatusCode},
 };
 use chrono::{Duration, Utc};
 use sqlx::PgPool;
 use tower::ServiceExt;
 use uuid::Uuid;
+use wms_domain::H8ErpMessageListResponse;
 
 use crate::auth::AuthContext;
 
@@ -21,10 +22,83 @@ fn test_ctx(owner_id: Uuid) -> AuthContext {
         user_id: Uuid::new_v4(),
         owner_id,
         actor_name: "h8-worker-test".into(),
-        permissions: vec!["h8.erp_connector.write".into()],
+        permissions: vec![
+            "h8.erp_connector.read".into(),
+            "h8.erp_connector.write".into(),
+        ],
         jti: "h8-preflight-test".into(),
         warehouse_scope: None,
     }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn list_cursor_is_stable_with_equal_created_at_in_postgres(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    sqlx::query("INSERT INTO auth_owners (id, owner_code, owner_name) VALUES ($1,$2,$3)")
+        .bind(owner_id)
+        .bind(format!("OWNER-{owner_id}"))
+        .bind("H8 cursor test")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let created_at = Utc::now();
+    for value in 1..=3 {
+        let id = Uuid::from_u128(value);
+        let external_ref = format!("ERP-CURSOR-{value}");
+        sqlx::query(
+            r#"INSERT INTO h8_erp_messages
+               (id, owner_id, connector_code, direction, message_type, schema_version,
+                channel, external_ref, idempotency_key, correlation_id, sync_status,
+                retry_count, payload_digest, created_at, updated_at)
+               VALUES ($1,$2,'SELF-ERP','inbound','asn','1','interface_table',$3,$3,$3,
+                       'pending',0,'digest',$4,$4)"#,
+        )
+        .bind(id)
+        .bind(owner_id)
+        .bind(external_ref)
+        .bind(created_at)
+        .execute(&pool)
+        .await
+        .unwrap();
+    }
+    let state = H8ErpMessageAppState::with_postgres(pool);
+
+    let mut request = Request::builder()
+        .uri("/api/v1/integration/erp-messages?limit=2")
+        .body(Body::empty())
+        .unwrap();
+    request.extensions_mut().insert(test_ctx(owner_id));
+    let response = h8_erp_message_router(state.clone())
+        .oneshot(request)
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let first: H8ErpMessageListResponse = serde_json::from_slice(&body).unwrap();
+    assert_eq!(
+        first
+            .data
+            .iter()
+            .map(|message| message.id)
+            .collect::<Vec<_>>(),
+        vec![Uuid::from_u128(3), Uuid::from_u128(2)]
+    );
+    let cursor = first.page.next_cursor.expect("next cursor");
+
+    let mut request = Request::builder()
+        .uri(format!(
+            "/api/v1/integration/erp-messages?limit=2&cursor={cursor}"
+        ))
+        .body(Body::empty())
+        .unwrap();
+    request.extensions_mut().insert(test_ctx(owner_id));
+    let response = h8_erp_message_router(state).oneshot(request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let second: H8ErpMessageListResponse = serde_json::from_slice(&body).unwrap();
+    assert_eq!(second.data.len(), 1);
+    assert_eq!(second.data[0].id, Uuid::from_u128(1));
+    assert!(second.page.next_cursor.is_none());
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -110,6 +184,8 @@ async fn stats_filter_real_rows_and_attempt_latency(pool: PgPool) {
             Some("ERP-ASN-STATS-1"),
             Some(now - Duration::minutes(1)),
             Some(now + Duration::minutes(1)),
+            None,
+            200,
         )
         .await
         .unwrap();

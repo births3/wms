@@ -11,7 +11,7 @@ use wms_domain::{
 
 use super::error::H8ErpMessageRepoError;
 use super::pg_rows::{AttemptRow, MessageRow, StatsRow};
-use super::repository::H8ErpMessageRepository;
+use super::repository::{H8ErpMessageCursor, H8ErpMessageRepository};
 
 pub struct PgH8ErpMessageRepository {
     pool: PgPool,
@@ -39,9 +39,16 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
         correlation_id: Option<&str>,
         created_from: Option<DateTime<Utc>>,
         created_to: Option<DateTime<Utc>>,
+        cursor: Option<H8ErpMessageCursor>,
+        limit: u32,
     ) -> Result<Vec<H8ErpMessage>, H8ErpMessageRepoError> {
         // 默认要求时间范围：未传则限制最近 7 天，避免无界扫描（AC12）
-        let from = created_from.unwrap_or_else(|| Utc::now() - chrono::Duration::days(7));
+        let from = created_from
+            .or(cursor.map(|value| value.window_from))
+            .unwrap_or_else(|| Utc::now() - chrono::Duration::days(7));
+        let cursor_created_at = cursor.map(|value| value.created_at);
+        let cursor_id = cursor.map(|value| value.id);
+        let fetch_limit = i64::from(limit) + 1;
         let rows = sqlx::query_as::<_, MessageRow>(
             r#"
             SELECT id, owner_id, warehouse_id, connector_id, connector_code, config_version,
@@ -62,8 +69,10 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
               AND ($10::text IS NULL OR external_ref = $10)
               AND ($11::text IS NULL OR idempotency_key = $11)
               AND ($12::text IS NULL OR correlation_id = $12)
-            ORDER BY created_at DESC
-            LIMIT 200
+              AND ($13::timestamptz IS NULL OR created_at < $13
+                   OR (created_at = $13 AND id < $14))
+            ORDER BY created_at DESC, id DESC
+            LIMIT $15
             "#,
         )
         .bind(owner_id)
@@ -78,6 +87,9 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
         .bind(external_ref)
         .bind(idempotency_key)
         .bind(correlation_id)
+        .bind(cursor_created_at)
+        .bind(cursor_id)
+        .bind(fetch_limit)
         .fetch_all(&self.pool)
         .await
         .map_err(|e| H8ErpMessageRepoError::Db(e.to_string()))?;
