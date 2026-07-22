@@ -441,6 +441,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | 2026-07-23 | 二十五轮 Worker 错误脱敏 | 将凭据脱敏收敛到 Worker 共享错误出口；HTTP 原文、入站失败、出站认领/投递失败和心跳告警在写接口表失败摘要或输出日志前统一隐藏 Bearer、password、token、API Key 及进程已知凭据。纯逻辑测试验证明文不进入摘要；AC9 仍待各业务 API 的错误分类证据。 |
 | 2026-07-23 | 二十六轮业务 API 错误分类 | 对 ASN、出库订单、商品主数据、销退申请和商品变更五类入站处理器逐一验证：503 进入可重试队列，422 直接进入不可重试路径，且两类 API 原始错误中的凭据均不进入异常摘要。AC9 软件证据关闭。 |
 | 2026-07-23 | 二十七轮仓库范围复审 | `route-resolve` 对已注入 `AuthContext.warehouse_scope` 的调用默认绑定授权仓库，并对显式请求其他仓库返回 403；处理器 HTTP 测试同时覆盖默认绑定和越权拒绝。Worker 当前使用的 JWT 会话仍没有多仓范围，AC10 保持 `NEEDS_WORK`。 |
+| 2026-07-23 | 二十八轮映射失败保护 | 商品主数据入站不再把未知 `storage_condition` 静默改成 `normal`；未映射值在业务 API 前以 422 不可重试错误拒绝，测试证明不会发起业务写入。完整 M-PM 规则查询和实际映射仍未接线，AC5 保持 `NEEDS_WORK`。 |
 
 ## 验收记录（US-H8-004 软件切片）
 
@@ -546,7 +547,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | AC-2 三级边界 | `V0/V1` | 代码路径复审、H8-DOMAIN | `backend/crates/domain/src/h8_erp_exchange.rs` 定义 canonical；`scripts/h8_erp_interface_sync/sync_worker.py` 仍在同一适配器内直接组业务 API DTO | `NEEDS_WORK` | Worker 必须经 H8 canonical 转换端口调用业务 API，通道适配与语义转换分层 |
 | AC-3 入站链路 | `V1/V2` | H8-WORKER、H8-ASN-V2、H8-U2 | Worker 已在业务 API 前调用 `route-resolve` 并严格校验 `schema_version`；处理器已拒绝与 `AuthContext.warehouse_scope` 不一致的仓库；ASN V2 已跑通 | `NEEDS_WORK` | 接入 M-PM 与 JWT 用户多仓范围，并补齐其余 4 类 L2–L4/L11 |
 | AC-4 出站链路 | `V1/V2` | H8-WORKER、H8-LOCAL | `docs/retros/h8-local-integration-evidence.json` 证明本地主备；`scripts/h8_erp_interface_sync/outbound_publish.py` 当前只取全局最早 active 连接 | `NEEDS_WORK` | 按货主、仓库、方向、消息类型解析并绑定唯一连接后再投递 |
-| AC-5 字段规整 | `V1` | H8-DOMAIN、代码路径复审 | `backend/crates/domain/src/h8_erp_exchange.rs` 的 `apply_mpm_normalize` 有单测；Worker 运行路径未调用 M-PM | `NEEDS_WORK` | Worker 接入实际 M-PM 规则与映射缺失失败路径，并补真实数据回读 |
+| AC-5 字段规整 | `V1` | H8-DOMAIN、H8-WORKER、代码路径复审 | `apply_mpm_normalize` 有 domain 单测；Worker 已在业务 API 前以 422 拒绝未知 `storage_condition`，且测试证明不发生静默 `normal` 写入 | `NEEDS_WORK` | Worker 接入实际 M-PM 规则查询与有效映射，并补真实数据回读 |
 | AC-6 配置版本绑定 | `V1` | H8-DOMAIN、H8-WORKER | 首次处理已把 `connector_id/config_version/channel/message_type/schema_version` 写入生命周期消息 | `NEEDS_WORK` | 重试与重放须先读取原消息绑定，禁止重新解析到新配置 |
 | AC-7 幂等语义 | `V1/V2` | H8-DOMAIN、H8-ASN-V2 | `docs/retros/h8-asn-inbound-flow-evidence.json` 记录 ASN 同键重放后 M2 数量仍为 1 且资源 ID 不变 | `NEEDS_WORK` | 补齐其余入站、全部出站、降级与回执重复的 L11 证据 |
 | AC-8 投递保证 | `V1` | H8-WORKER | `scripts/h8_erp_interface_sync/test_h8_sync_worker.py` 的 failover/circuit 测试证明成功路径不双写且切换保留业务键 | `PASS` | - |
@@ -568,7 +569,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 
 ### 验收结论
 
-- 已证明：受控目录与纯 domain 规则；Worker 入站唯一路由、首次配置绑定、契约版本拒绝、错误重试分类和凭据脱敏；`route-resolve` 对已注入单仓范围的默认绑定与越权拒绝；ASN 接口表入站 V2、幂等回放和 H2 生命周期审计；本地出站主备与非双写切片。
+- 已证明：受控目录与纯 domain 规则；Worker 入站唯一路由、首次配置绑定、契约版本拒绝、错误重试分类、凭据脱敏和未知储存条件写入前拒绝；`route-resolve` 对已注入单仓范围的默认绑定与越权拒绝；ASN 接口表入站 V2、幂等回放和 H2 生命周期审计；本地出站主备与非双写切片。
 - 未完成：Worker 的 canonical/M-PM、重试复用原绑定、JWT 用户多仓范围、出站唯一路由，以及其余消息类型 L2–L4/L11 和客户正式 ERP V4。
 - 恢复条件：完成上述运行接线和逐消息证据后，再使用客户正式 ERP dev/staging 跑双向请求、回执、重试和审计关联；完成前保持 `deferred_stories`。
 
