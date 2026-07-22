@@ -43,7 +43,7 @@ export function warehouseZoneRow(item: WarehouseZone, warehouses: ReadonlyMap<st
 }
 
 export function productRow(item: Product): MasterDataRow {
-  const storageConditionCode = text(item.attrs.storage_condition ?? item.attrs.storage);
+  const storageConditionCode = text(item.attrs.storage_condition);
   const storageConditionLabel = storageConditionDisplayLabel(storageConditionCode);
   const sourceValue = productSourceLabel(item.attrs.source);
   const middlePackage = productAttrText(item.attrs, "middle_package");
@@ -322,10 +322,10 @@ export function storageConditionDisplayLabel(value: unknown): string {
   const raw = value.trim();
   if (!raw || raw === "-") return "-";
   const normalized = raw.toLowerCase();
-  if (["frozen", "freeze", "冷冻"].includes(normalized)) return "冷冻";
-  if (["cold", "refrigerated", "冷藏"].includes(normalized)) return "冷藏";
-  if (["cool", "cool_storage", "阴凉"].includes(normalized)) return "阴凉";
-  if (["normal", "ambient", "room", "常温"].includes(normalized)) return "常温";
+  if (normalized === "frozen") return "冷冻";
+  if (normalized === "cold") return "冷藏";
+  if (normalized === "cool") return "阴凉";
+  if (normalized === "normal") return "常温";
   return raw;
 }
 

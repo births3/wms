@@ -62,12 +62,12 @@ try {
   assert.equal(form.productCode, "P-M1-001");
   assert.equal(form.productName, "冷藏胰岛素注射液");
   assert.equal(form.storageCondition, "cold");
-  const formFromChineseExtra = productEditFormFromRow({
+  const formWithoutCanonicalStorageCondition = productEditFormFromRow({
     ...row,
     productFields: { ...row.productFields, storageCondition: null },
     extraValue: "冷藏",
   });
-  assert.equal(formFromChineseExtra.storageCondition, "cold");
+  assert.equal(formWithoutCanonicalStorageCondition.storageCondition, "normal");
   assert.equal(form.middlePackage, "10 件/中包");
   assert.equal(form.largePackage, "20 件/大包");
   assert.equal(form.unitLengthMm, "120");

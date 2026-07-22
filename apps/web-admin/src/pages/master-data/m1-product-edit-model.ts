@@ -46,9 +46,7 @@ export function productEditFormFromRow(row: MasterDataRow): ProductEditFormState
     dosageForm: cleanText(row.productFields?.dosageForm),
     manufacturer: cleanText(row.productFields?.manufacturer),
     specialDrugCategoryCode: cleanText(row.productFields?.specialDrugCategoryCode),
-    storageCondition: storageConditionCode(
-      row.productFields?.storageCondition ?? row.extraValue,
-    ),
+    storageCondition: storageConditionCode(row.productFields?.storageCondition),
     status: row.status || "active",
     middlePackage: cleanText(row.productFields?.middlePackage ?? attrText(attrs, "middle_package")),
     largePackage: cleanText(row.productFields?.largePackage ?? attrText(attrs, "large_package")),
@@ -86,16 +84,10 @@ export function productEditRequestFromForm(form: ProductEditFormState): UpdatePr
   };
 }
 
-/** 表单绑定用英文 code；兼容列表已中文化的 extraValue 回退 */
 function storageConditionCode(value: unknown): string {
   const raw = cleanText(value);
   if (!raw) return "normal";
-  const normalized = raw.toLowerCase();
-  if (["frozen", "freeze", "冷冻"].includes(normalized)) return "frozen";
-  if (["cold", "refrigerated", "冷藏"].includes(normalized)) return "cold";
-  if (["cool", "cool_storage", "阴凉"].includes(normalized)) return "cool";
-  if (["normal", "ambient", "room", "常温"].includes(normalized)) return "normal";
-  return raw;
+  return raw.toLowerCase();
 }
 
 function requiredText(value: string) {
