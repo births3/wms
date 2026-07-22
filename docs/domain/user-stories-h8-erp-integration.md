@@ -414,6 +414,8 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | 2026-07-21 | 十六轮运行复审 | 复现“查询无真实数据”：18180 E2E API 未挂载接口表路由且返回 404；补挂生产同款接口表路由与 H8 探查权限种子。当前 `wms_h8_real` 已配置接口表连接，MSSQL `wms_erp_if` 已准备 `DEMO-ASN-001`（`pending`），真实 API 列表/详情和 9002 页面均已返回该行。 |
 | 2026-07-22 | 十七轮交互复审 | 同步状态改用公共多选控件；API 的 `sync_status` 支持逗号分隔多值和参数化 `IN`。验收模板同步增加中文业务文案与控件语义证据。 |
 | 2026-07-22 | 十八轮验收复审 | 发现真实 E2E 只有 pending 行，不能证明多选并集；新增 `DEMO-ASN-002` failed 种子并断言双状态各命中一行。按 ADR-0038 重建 `wms_h8_e2e`，把探查连接写入可重复 E2E seed，并将探查字段和菜单写入逻辑收敛到当前 migration 基线。 |
+| 2026-07-22 | 十九轮 ASN 入站闭环 | 新增独立 `DEMO-ASN-FLOW-001`，以真实 E2E 基础档案跑通 MSSQL 接口表→H8 Worker→M2→接口表成功回写；同一幂等键重放后单据数仍为 1，H2 生命周期审计完整。该证据只关闭 ASN 软件链路，不替代其余消息类型与客户正式 ERP S4。 |
+| 2026-07-22 | 二十轮 H8-002 模板复审 | 按新版验收模板逐 AC 映射 V0–V4；纠正“纯 domain 规则已测试即等于 Worker 已接线”的误判。确认 ASN V2 切片通过，但 Worker 尚未接入 canonical/M-PM、路由与配置版本绑定、错误分类和完整逐消息证据，故事整体保持 `NEEDS_WORK`。 |
 
 ## 验收记录（US-H8-004 软件切片）
 
@@ -503,36 +505,57 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 
 ---
 
-## 验收记录（US-H8-002 / US-H8-003 软件切片）
+## 验收记录（US-H8-002）
 
-- 故事：`US-H8-002` / `US-H8-003`
-- 验收基线：本轮 H8 软件路径收口提交（含消息 H2 审计摘要）
+- 故事：`US-H8-002`
+- 验收基线：本记录所在提交
+- 验收层级：`S4`（`external_runtime`）
+- 质量矩阵状态：`deferred_stories`
+- 证据层覆盖：`V0=PASS`；`V1=NEEDS_WORK（部分覆盖）`；`V2=ASN 入站切片 PASS`；`V3=不适用（无独立用户页面）`；`V4=NEEDS_WORK`
+- 验收日期：`2026-07-22`
+- 整体结论：`NEEDS_WORK`
+
+| AC | 证据层 | 验证命令或方式 | 证据 | 结果 | 缺口 / 恢复条件 |
+|---|---|---|---|---|---|
+| AC-1 受控消息目录 | `V0/V1` | H8-DOMAIN、H8-WORKER | `backend/crates/domain/src/h8_erp_message.rs`、`scripts/h8_erp_interface_sync/outbound_publish.py` 及目录对齐测试 | `PASS` | - |
+| AC-2 三级边界 | `V0/V1` | 代码路径复审、H8-DOMAIN | `backend/crates/domain/src/h8_erp_exchange.rs` 定义 canonical；`scripts/h8_erp_interface_sync/sync_worker.py` 仍在同一适配器内直接组业务 API DTO | `NEEDS_WORK` | Worker 必须经 H8 canonical 转换端口调用业务 API，通道适配与语义转换分层 |
+| AC-3 入站链路 | `V1/V2` | H8-WORKER、H8-ASN-V2 | `docs/retros/h8-asn-inbound-flow-evidence.json` 证明 ASN 已跑通；其余 4 类仅有处理函数 | `NEEDS_WORK` | 接入唯一路由、M-PM 和范围校验，并补齐出库单、销退、商品、商品变更的 L2–L4/L11 |
+| AC-4 出站链路 | `V1/V2` | H8-WORKER、H8-LOCAL | `docs/retros/h8-local-integration-evidence.json` 证明本地主备；`scripts/h8_erp_interface_sync/outbound_publish.py` 当前只取全局最早 active 连接 | `NEEDS_WORK` | 按货主、仓库、方向、消息类型解析并绑定唯一连接后再投递 |
+| AC-5 字段规整 | `V1` | H8-DOMAIN、代码路径复审 | `backend/crates/domain/src/h8_erp_exchange.rs` 的 `apply_mpm_normalize` 有单测；Worker 运行路径未调用 M-PM | `NEEDS_WORK` | Worker 接入实际 M-PM 规则与映射缺失失败路径，并补真实数据回读 |
+| AC-6 配置版本绑定 | `V1` | H8-DOMAIN、代码路径复审 | `h8_erp_exchange.rs::config_binding_is_frozen` 仅为纯函数；Worker 生命周期记录未绑定连接和配置版本 | `NEEDS_WORK` | 认领时固化 `connector_id/config_version/channel/message_type`，重试与重放复用绑定 |
+| AC-7 幂等语义 | `V1/V2` | H8-DOMAIN、H8-ASN-V2 | `docs/retros/h8-asn-inbound-flow-evidence.json` 记录 ASN 同键重放后 M2 数量仍为 1 且资源 ID 不变 | `NEEDS_WORK` | 补齐其余入站、全部出站、降级与回执重复的 L11 证据 |
+| AC-8 投递保证 | `V1` | H8-WORKER | `scripts/h8_erp_interface_sync/test_h8_sync_worker.py` 的 failover/circuit 测试证明成功路径不双写且切换保留业务键 | `PASS` | - |
+| AC-9 错误分类 | `V1` | H8-DOMAIN、代码路径复审 | domain 有分类/脱敏函数；`sync_worker.py` 当前捕获所有异常并统一重试至 dead | `NEEDS_WORK` | Worker 使用错误分类，仅对可重试错误退避重试，并统一脱敏日志与错误摘要 |
+| AC-10 货主仓隔离 | `V1` | H8-DOMAIN、代码路径复审 | `warehouse_in_scope` 有单测；`sync_worker.py` 未执行连接白名单与调用主体范围交集校验 | `NEEDS_WORK` | 在业务 API 前执行货主、仓库、连接路由和主体授权交集校验并补拒绝测试 |
+| AC-11 审计追踪 | `V1/V2` | H8-WORKER、H8-ASN-V2 | `docs/retros/h8-asn-inbound-flow-evidence.json` 记录 receive、convert、business_api、receipt 的 H2 append-only 事件 | `PASS` | - |
+| AC-12 档案补录闭环 | `V1` | H8-DOMAIN、代码路径复审 | domain 禁止 H8 直接改 ASN；`sync_worker.py::handle_product_change` 尚无 M1/M-QL/M2 跨模块闭环证据 | `NEEDS_WORK` | 补商品变更事件、业务校验和当前 ASN 解锁的 L3/L4/L5 证据 |
+| AC-13 契约与 S4 | `V1/V2/V4` | H8-DOMAIN、H8-WORKER、H8-ASN-V2 | 当前仅 ASN V2 与部分本地出站切片 | `NEEDS_WORK` | 每类消息补 L2/L3/L4/L11，并归档客户正式 ERP dev/staging 双向请求、回执、重试与审计关联 |
+
+### 聚合验证
+
+- V0：`python3 scripts/governance/check_quality_matrix.py --json`；`python3 scripts/governance/check_scope_gap_discovery.py --strict --module H8 --json`
+- V1（H8-DOMAIN）：`cargo test --manifest-path backend/Cargo.toml -p wms-domain --lib h8_erp`
+- V1（H8-WORKER）：在 `scripts/h8_erp_interface_sync` 运行 `python3 -m unittest test_h8_sync_worker test_exchange_lifecycle -v`
+- V2（H8-ASN-V2）：按 `docs/runbooks/h8-erp-interface-table-sync.md` 的 ASN 入站闭环执行；证据为 `docs/retros/h8-asn-inbound-flow-evidence.json`
+- V2（H8-LOCAL）：`just h8-local-integration`；证据为 `docs/retros/h8-local-integration-evidence.json`
+- V3：不适用；US-H8-002 是后台交换能力，无独立用户页面，消息运维页属于 US-H8-003
+- V4：未取得客户正式 ERP dev/staging 证据；本地容器、Mock 和 Docker MSSQL 不计 V4
+
+### 验收结论
+
+- 已证明：受控目录与纯 domain 规则；ASN 接口表入站 V2、幂等回放和 H2 生命周期审计；本地出站主备与非双写切片。
+- 未完成：Worker 的 canonical/M-PM、按业务键唯一路由与配置绑定、错误分类、仓库范围，以及其余消息类型 L2–L4/L11 和客户正式 ERP V4。
+- 恢复条件：完成上述运行接线和逐消息证据后，再使用客户正式 ERP dev/staging 跑双向请求、回执、重试和审计关联；完成前保持 `deferred_stories`。
+
+---
+
+## 验收记录（US-H8-003 软件切片）
+
+- 故事：`US-H8-003`
+- 验收基线：2026-07-19 H8 软件路径收口
 - 验收日期：`2026-07-19`
 - 质量矩阵状态：`deferred_stories`（S4 未齐）
-- 整体结论：`SOFTWARE_PATH_PASS`（软件 AC 可验证通过）；**不得**因本记录宣称 S4 故事整体关闭
-
-| 故事 | 软件主链 | 仍缺（故事完成门槛） |
-|---|---|---|
-| US-H8-002 | 受控目录、canonical 入站/出站、M-PM 未映射即失败、入站管线步骤、配置冻结/幂等键保持、错误分类/脱敏、Worker outbox 7 类对齐 | 逐消息业务 API 全链 L2–L4/L11、客户正式 ERP 双向 S4 |
-| US-H8-003 | 消息/尝试表、状态机、claim 租约、stats+P95、retention purge、分区准备、菜单页 E2E（含重复重放） | 生产 RANGE 月分区切换、客户 ERP 死信重放 S4 |
-
-### US-H8-002 软件 AC 核对（不含 S4）
-
-| AC | 结果 | 说明 |
-|---|---|---|
-| AC1 受控消息目录 | `PASS` | domain catalog + worker outbox 对齐 |
-| AC2 三级边界 | `PASS` | canonical 命令/事件；DTO 不进 domain |
-| AC3 入站链路规则 | `PASS` | 管线步骤 + M-PM + 成功 ack 约束（业务 API 实调按类型增量） |
-| AC4 出站链路规则 | `PASS` | outbox→failover 非双写；业务不直连 ERP |
-| AC5 字段规整 | `PASS` | 未映射 external 失败，不写入 canonical |
-| AC6 配置版本绑定 | `PASS` | binding freeze domain |
-| AC7 幂等语义 | `PASS` | 身份键 + 通道切换保持 Idempotency-Key |
-| AC8 至少一次/非双投递 | `PASS` | failover/circuit 单测 |
-| AC9 错误分类 | `PASS` | retryable/non-retryable + 脱敏 |
-| AC10 货主仓隔离 | `PASS` | warehouse_in_scope |
-| AC11 审计引用 | `PASS` | Worker `run_inbound_pipeline`/`run_outbound_pipeline` 真实路径 POST lifecycle；管理端 detail/replay/claim/dead/archive/purge 脱敏 H2 |
-| AC12 档案补录边界 | `PASS` | H8 不得直接改 ASN domain 断言 |
-| AC13 S4 | `NEEDS_WORK` | 客户正式 ERP |
+- 整体结论：软件切片已验证，故事整体 `NEEDS_WORK`
 
 ### US-H8-003 软件 AC 核对（不含 S4）
 

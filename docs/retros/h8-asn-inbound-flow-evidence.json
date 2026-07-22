@@ -1,0 +1,44 @@
+{
+  "collected_at": "2026-07-22T13:01:54+08:00",
+  "story": "US-H8-002",
+  "scope": "Docker MSSQL interface table -> H8 Worker -> M2 receiving API -> PostgreSQL -> MSSQL receipt",
+  "ok": true,
+  "environment": {
+    "postgres_database": "wms_h8_e2e",
+    "mssql_database": "wms_erp_if",
+    "credentials_recorded": false
+  },
+  "fixture": {
+    "external_doc_no": "DEMO-ASN-FLOW-001",
+    "external_ref": "ERP-PO-DEMO-FLOW-001",
+    "idempotency_key": "h8-demo-asn-flow-001"
+  },
+  "assertions": {
+    "interface_table_status_transition": [
+      "pending",
+      "processing",
+      "success"
+    ],
+    "interface_table_status": "success",
+    "retry_count": 0,
+    "wms_resource_id": "4f76ed1e-d567-4438-bd3a-b4dff3db7988",
+    "m2_receipt_no": "ERP-DEMO-ASN-FLOW-001",
+    "m2_status": "draft",
+    "product_code": "P-M1-E2E-001",
+    "expected_qty": 30,
+    "h2_audit_actions": [
+      "h8_exchange_receive",
+      "h8_exchange_convert",
+      "h8_exchange_business_api",
+      "h8_exchange_receipt"
+    ],
+    "idempotency_replay": {
+      "runs": 2,
+      "receiving_order_count_before": 1,
+      "receiving_order_count_after": 1,
+      "same_wms_resource_id": true
+    }
+  },
+  "conclusion": "LOCAL_ASN_FLOW_PASS",
+  "note": "本证据关闭 ASN 接口表入站软件链路，不替代其他消息类型的 L2-L4/L11 或客户正式 ERP dev/staging S4。"
+}

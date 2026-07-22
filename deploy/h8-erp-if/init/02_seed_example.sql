@@ -37,6 +37,20 @@ INSERT INTO dbo.if_in_asn (
     N'h8-demo-asn-002', N'failed'
 );
 
+-- US-H8-002 入站闭环专用：时间置旧，H8_BATCH_SIZE=1 时不会消费 H8-004 的 pending 固定样本。
+INSERT INTO dbo.if_in_asn (
+    external_doc_no, owner_id, warehouse_id, supplier_id, product_code, expected_qty,
+    expected_arrival_at, document_type, external_ref, idempotency_key, sync_status,
+    created_at, updated_at
+) VALUES (
+    N'DEMO-ASN-FLOW-001', @owner,
+    '00000000-0000-0000-0000-000000001301',
+    '00000000-0000-0000-0000-000000001101', N'P-M1-E2E-001', 30,
+    DATEADD(day, 5, SYSUTCDATETIME()), N'purchase_inbound', N'ERP-PO-DEMO-FLOW-001',
+    N'h8-demo-asn-flow-001', N'pending', DATEADD(day, -10, SYSUTCDATETIME()),
+    DATEADD(day, -10, SYSUTCDATETIME())
+);
+
 INSERT INTO dbo.if_in_outbound_order (
     external_doc_no, owner_id, warehouse_id, customer_id, document_type, erp_order_no,
     product_code, batch_no, planned_qty, required_ship_at, idempotency_key, sync_status

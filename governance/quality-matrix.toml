@@ -4501,9 +4501,21 @@ types = [
   "audit_compliance",
   "external_runtime",
 ]
-reason = "软件 AC 主链已齐：受控目录、canonical/M-PM、管线/幂等/错误分类、outbox 对齐、H2 脱敏审计摘要；尚缺逐消息业务 API 全链 L2-L4 与客户正式 ERP 双向 S4。"
+evidence_refs = [
+  "deploy/h8-erp-if/init/02_seed_example.sql",
+  "backend/crates/domain/src/h8_erp_message.rs",
+  "backend/crates/domain/src/h8_erp_exchange.rs",
+  "scripts/h8_erp_interface_sync/sync_worker.py",
+  "scripts/h8_erp_interface_sync/outbound_publish.py",
+  "scripts/h8_erp_interface_sync/test_h8_sync_worker.py",
+  "scripts/h8_erp_interface_sync/test_exchange_lifecycle.py",
+  "docs/runbooks/h8-erp-interface-table-sync.md",
+  "docs/retros/h8-asn-inbound-flow-evidence.json",
+  "docs/retros/h8-local-integration-evidence.json",
+]
+reason = "ASN 接口表入站 V2、幂等回放、H2 生命周期审计和本地主备切片已验证；Worker 尚未接入 canonical/M-PM、按业务键唯一路由与配置版本绑定、错误分类和仓库范围，且缺其余逐消息 L2-L4/L11 与客户正式 ERP 双向 S4。"
 owner = "H8 模块负责人"
-resume_when = "补齐各消息类型业务 API 接线与 L2-L4/L11 证据，并归档客户正式 ERP 双向请求回执后关闭延期。"
+resume_when = "完成 Worker 运行接线与逐消息 L2-L4/L11，再归档客户正式 ERP dev/staging 双向请求、回执、重试和审计关联后关闭延期。"
 
 [[deferred_stories]]
 id = "US-H8-003"

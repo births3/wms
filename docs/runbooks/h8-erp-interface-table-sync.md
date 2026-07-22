@@ -92,6 +92,22 @@ python3 scripts/h8_erp_interface_sync/sync_worker.py --once --direction in --typ
 
 单测：`cd scripts/h8_erp_interface_sync && python3 -m unittest test_h8_sync_worker -v`
 
+### ASN 入站闭环样本
+
+初始化脚本提供独立的 `DEMO-ASN-FLOW-001`，引用 E2E 库中真实存在的货主、仓库、
+供应商和商品，不占用 US-H8-004 只读探查固定样本。启动 WMS API 并取得令牌后执行：
+
+```bash
+export H8_BATCH_SIZE=1
+python3 scripts/h8_erp_interface_sync/sync_worker.py --once --direction in --types asn
+```
+
+验收必须同时确认：接口行由 `pending` 经 Worker 认领后变为 `success`；
+`wms_resource_id` 指向唯一的 M2 `receiving_orders`；H2 存在 receive、convert、
+business_api、receipt 审计；将同一行恢复为 `pending` 后以原 Idempotency-Key 重放，
+M2 单据数量仍为 1 且资源 ID 不变。证据见
+`docs/retros/h8-asn-inbound-flow-evidence.json`。
+
 ## 6. 验收
 
 | ID | 检查 |
