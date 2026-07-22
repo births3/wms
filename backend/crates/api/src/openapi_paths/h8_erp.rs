@@ -1,10 +1,10 @@
 #[allow(unused_imports)]
 use wms_domain::{
     ClaimH8ErpMessageRequest, CreateH8ErpConnectorRequest, ErrorResponse, H8DecryptedPayload,
-    H8ErpConnector, H8ErpConnectorListResponse, H8ErpConnectorTestResult,
-    H8ErpInterfaceTableConnectorOption, H8ErpInterfaceTableDetail, H8ErpInterfaceTableListResponse,
-    H8ErpMessage, H8ErpMessageDetail, H8ErpMessageListResponse, H8ErpMessageStats,
-    H8PayloadRetentionPolicy, H8WorkerClaimControl, H8WorkerClaimDecision,
+    H8ErpConnector, H8ErpConnectorListResponse, H8ErpConnectorRuntimeConfig,
+    H8ErpConnectorTestResult, H8ErpInterfaceTableConnectorOption, H8ErpInterfaceTableDetail,
+    H8ErpInterfaceTableListResponse, H8ErpMessage, H8ErpMessageDetail, H8ErpMessageListResponse,
+    H8ErpMessageStats, H8PayloadRetentionPolicy, H8WorkerClaimControl, H8WorkerClaimDecision,
     H8WorkerHeartbeatRequest, H8WorkerRuntimeResponse, H8WorkerStatus, PurgeH8ErpMessagesRequest,
     PurgeH8ErpMessagesResponse, ReplayH8ErpMessageRequest, SetH8WorkerClaimControlRequest,
     UpdateH8ErpConnectorRequest, UpdateH8PayloadRetentionPolicyRequest,
@@ -120,6 +120,24 @@ pub(crate) fn create_h8_erp_connector() {}
 )]
 #[allow(dead_code)]
 pub(crate) fn get_h8_erp_connector() {}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/config/erp-connectors/{id}/versions/{version}",
+    tag = "h8-erp",
+    params(
+        ("id" = uuid::Uuid, Path, description = "连接 ID"),
+        ("version" = i64, Path, description = "处理消息时绑定的配置版本"),
+    ),
+    responses(
+        (status = 200, description = "不可变连接运行配置快照", body = H8ErpConnectorRuntimeConfig),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+        (status = 404, description = "版本不存在", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn get_h8_erp_connector_version() {}
 
 #[utoipa::path(
     patch,

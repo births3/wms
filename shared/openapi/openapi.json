@@ -5816,6 +5816,78 @@
         }
       }
     },
+    "/api/v1/config/erp-connectors/{id}/versions/{version}": {
+      "get": {
+        "tags": [
+          "h8-erp"
+        ],
+        "operationId": "get_h8_erp_connector_version",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "连接 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "description": "处理消息时绑定的配置版本",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "不可变连接运行配置快照",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H8ErpConnectorRuntimeConfig"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "版本不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/dock-appointments": {
       "get": {
         "tags": [
@@ -26806,6 +26878,93 @@
           },
           "page": {
             "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "H8ErpConnectorRuntimeConfig": {
+        "type": "object",
+        "description": "US-H8-002 AC6：消息处理时绑定的不可变连接运行配置。",
+        "required": [
+          "id",
+          "owner_id",
+          "connector_code",
+          "warehouse_ids",
+          "directions",
+          "message_types",
+          "channel_mode",
+          "config_version"
+        ],
+        "properties": {
+          "api_base_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "api_key_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "bearer_secret_alias": {
+            "type": "string",
+            "nullable": true
+          },
+          "channel_mode": {
+            "type": "string"
+          },
+          "config_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "connector_code": {
+            "type": "string"
+          },
+          "directions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "interface_db_host": {
+            "type": "string",
+            "nullable": true
+          },
+          "interface_db_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "interface_db_password_alias": {
+            "type": "string",
+            "nullable": true
+          },
+          "interface_db_port": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "interface_db_username": {
+            "type": "string",
+            "nullable": true
+          },
+          "message_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "warehouse_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         }
       },

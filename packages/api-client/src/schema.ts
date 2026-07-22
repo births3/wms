@@ -1252,6 +1252,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/config/erp-connectors/{id}/versions/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_h8_erp_connector_version"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/dock-appointments": {
         parameters: {
             query?: never;
@@ -5859,6 +5875,30 @@ export interface components {
         H8ErpConnectorListResponse: {
             data: components["schemas"]["H8ErpConnector"][];
             page: components["schemas"]["PageMeta"];
+        };
+        /** @description US-H8-002 AC6：消息处理时绑定的不可变连接运行配置。 */
+        H8ErpConnectorRuntimeConfig: {
+            api_base_url?: string | null;
+            /** Format: uuid */
+            api_key_id?: string | null;
+            bearer_secret_alias?: string | null;
+            channel_mode: string;
+            /** Format: int64 */
+            config_version: number;
+            connector_code: string;
+            directions: string[];
+            /** Format: uuid */
+            id: string;
+            interface_db_host?: string | null;
+            interface_db_name?: string | null;
+            interface_db_password_alias?: string | null;
+            /** Format: int32 */
+            interface_db_port?: number | null;
+            interface_db_username?: string | null;
+            message_types: string[];
+            /** Format: uuid */
+            owner_id: string;
+            warehouse_ids: string[];
         };
         H8ErpConnectorTestResult: {
             error_summary?: string | null;
@@ -12806,6 +12846,58 @@ export interface operations {
                 };
             };
             /** @description 不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_h8_erp_connector_version: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 连接 ID */
+                id: string;
+                /** @description 处理消息时绑定的配置版本 */
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 不可变连接运行配置快照 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H8ErpConnectorRuntimeConfig"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 版本不存在 */
             404: {
                 headers: {
                     [name: string]: unknown;
