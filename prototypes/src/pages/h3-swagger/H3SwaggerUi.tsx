@@ -1,7 +1,7 @@
 import { Card } from "@wms/ui";
 import { Button } from "@wms/ui";
 import { Input } from "@wms/ui";
-import { StatusBadge, PageHeader } from "@wms/ui";
+import { PageHeader } from "@wms/ui";
 import { ChevronRight, FileJson, Search, Lock, Globe } from "lucide-react";
 
 interface ApiEndpoint {
@@ -10,7 +10,6 @@ interface ApiEndpoint {
   summary: string;
   module: string;
   auth: "jwt" | "apikey" | "public";
-  deprecated?: boolean;
 }
 
 const MOCK_ENDPOINTS: Record<string, ApiEndpoint[]> = {
@@ -33,7 +32,7 @@ const MOCK_ENDPOINTS: Record<string, ApiEndpoint[]> = {
   ],
   "M-TC 追溯码（部分公开）": [
     { method: "GET", path: "/api/v1/trace/events", summary: "追溯码事件查询（供 ERP 上报使用）", module: "M-TC", auth: "apikey" },
-    { method: "POST", path: "/api/v1/trace/callback", summary: "回调 webhook（已迁 v2）", module: "M-TC", auth: "apikey", deprecated: true },
+    { method: "POST", path: "/api/v1/trace/callback", summary: "回调 webhook", module: "M-TC", auth: "apikey" },
     { method: "GET", path: "/health/trace", summary: "追溯码服务健康检查", module: "M-TC", auth: "public" },
   ],
 };
@@ -55,22 +54,21 @@ const AUTH_META = {
  * H3SwaggerUi — API 文档可访问性页面（Swagger UI 定制）
  *
  * 层级：Layer 3 页面级
- * 关联故事：US-H3-004（OpenAPI 文档展示 + 鉴权类型 + 弃用标记）
+ * 关联故事：US-H3-004（OpenAPI 文档展示 + 鉴权类型）
  * Wave：Wave 0.5（P0 必交付）
- * 业务约束：弃用接口必须显式标记；公开接口与鉴权接口区分
+ * 业务约束：公开接口与鉴权接口区分
  *
  * @example
  *   <H3SwaggerUi />
  */
 export function H3SwaggerUi() {
   const total = Object.values(MOCK_ENDPOINTS).flat().length;
-  const deprecated = Object.values(MOCK_ENDPOINTS).flat().filter((e) => e.deprecated).length;
 
   return (
     <div className="w-full max-w-[1280px] min-h-[800px] bg-muted/40 border rounded-xl p-6 font-sans">
       <PageHeader
         title="WMS API 文档"
-        subtitle={`H3-004 · OpenAPI 3.1 · v1.0.0 · 共 ${total} 个端点 · ${deprecated} 个已弃用`}
+        subtitle={`H3-004 · OpenAPI 3.1 · 当前契约 · 共 ${total} 个端点`}
         actions={
           <>
             <Button variant="outline" size="sm"><FileJson data-icon="inline-start" />下载 openapi.json</Button>
@@ -123,17 +121,16 @@ export function H3SwaggerUi() {
                 {items.map((e, i) => {
                   const A = AUTH_META[e.auth];
                   return (
-                    <li key={i} className={`flex items-center gap-3 px-4 py-2.5 hover:bg-accent/40 cursor-pointer ${e.deprecated ? "opacity-60" : ""}`}>
+                    <li key={i} className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/40 cursor-pointer">
                       <span className={`px-2 py-0.5 rounded text-[11px] font-mono font-semibold border ${METHOD_COLOR[e.method]}`}>
                         {e.method}
                       </span>
-                      <code className={`flex-1 font-mono text-xs ${e.deprecated ? "line-through" : ""}`}>{e.path}</code>
+                      <code className="flex-1 font-mono text-xs">{e.path}</code>
                       <span className="text-sm text-foreground/80 flex-1">{e.summary}</span>
                       <span className={`inline-flex items-center gap-1 text-xs ${A.color}`}>
                         <A.icon className="size-3" />
                         {A.label}
                       </span>
-                      {e.deprecated && <StatusBadge status="expired" size="sm" label="弃用" />}
                     </li>
                   );
                 })}

@@ -170,7 +170,7 @@ const h3ContractEntries = [
   {
     label: "OpenAPI Spec",
     path: "/openapi.json",
-    description: "机器可读契约源，供生成客户端与兼容检查使用",
+    description: "机器可读契约源，供生成客户端与契约一致性检查使用",
   },
   {
     label: "Swagger UI",
