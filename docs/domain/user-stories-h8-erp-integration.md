@@ -440,6 +440,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | 2026-07-23 | 二十四轮稳定分页 | 消息列表改为 `created_at + id` 降序联合游标，服务端限制每页 1–200 条；同时间戳的内存与真实 PostgreSQL 测试证明跨页无重复、无漏行，管理端提供“加载更多”，关闭 dev-mock 的真实浏览器链路验证两页返回不同消息。AC12 仅剩生产约定数据量 P95 证据。 |
 | 2026-07-23 | 二十五轮 Worker 错误脱敏 | 将凭据脱敏收敛到 Worker 共享错误出口；HTTP 原文、入站失败、出站认领/投递失败和心跳告警在写接口表失败摘要或输出日志前统一隐藏 Bearer、password、token、API Key 及进程已知凭据。纯逻辑测试验证明文不进入摘要；AC9 仍待各业务 API 的错误分类证据。 |
 | 2026-07-23 | 二十六轮业务 API 错误分类 | 对 ASN、出库订单、商品主数据、销退申请和商品变更五类入站处理器逐一验证：503 进入可重试队列，422 直接进入不可重试路径，且两类 API 原始错误中的凭据均不进入异常摘要。AC9 软件证据关闭。 |
+| 2026-07-23 | 二十七轮仓库范围复审 | `route-resolve` 对已注入 `AuthContext.warehouse_scope` 的调用默认绑定授权仓库，并对显式请求其他仓库返回 403；处理器 HTTP 测试同时覆盖默认绑定和越权拒绝。Worker 当前使用的 JWT 会话仍没有多仓范围，AC10 保持 `NEEDS_WORK`。 |
 
 ## 验收记录（US-H8-004 软件切片）
 
@@ -543,14 +544,14 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 |---|---|---|---|---|---|
 | AC-1 受控消息目录 | `V0/V1` | H8-DOMAIN、H8-WORKER | `backend/crates/domain/src/h8_erp_message.rs`、`scripts/h8_erp_interface_sync/outbound_publish.py` 及目录对齐测试 | `PASS` | - |
 | AC-2 三级边界 | `V0/V1` | 代码路径复审、H8-DOMAIN | `backend/crates/domain/src/h8_erp_exchange.rs` 定义 canonical；`scripts/h8_erp_interface_sync/sync_worker.py` 仍在同一适配器内直接组业务 API DTO | `NEEDS_WORK` | Worker 必须经 H8 canonical 转换端口调用业务 API，通道适配与语义转换分层 |
-| AC-3 入站链路 | `V1/V2` | H8-WORKER、H8-ASN-V2 | Worker 已在业务 API 前调用 `route-resolve` 并严格校验 `schema_version`；ASN V2 已跑通 | `NEEDS_WORK` | 接入 M-PM 与主体仓库范围，并补齐其余 4 类 L2–L4/L11 |
+| AC-3 入站链路 | `V1/V2` | H8-WORKER、H8-ASN-V2、H8-U2 | Worker 已在业务 API 前调用 `route-resolve` 并严格校验 `schema_version`；处理器已拒绝与 `AuthContext.warehouse_scope` 不一致的仓库；ASN V2 已跑通 | `NEEDS_WORK` | 接入 M-PM 与 JWT 用户多仓范围，并补齐其余 4 类 L2–L4/L11 |
 | AC-4 出站链路 | `V1/V2` | H8-WORKER、H8-LOCAL | `docs/retros/h8-local-integration-evidence.json` 证明本地主备；`scripts/h8_erp_interface_sync/outbound_publish.py` 当前只取全局最早 active 连接 | `NEEDS_WORK` | 按货主、仓库、方向、消息类型解析并绑定唯一连接后再投递 |
 | AC-5 字段规整 | `V1` | H8-DOMAIN、代码路径复审 | `backend/crates/domain/src/h8_erp_exchange.rs` 的 `apply_mpm_normalize` 有单测；Worker 运行路径未调用 M-PM | `NEEDS_WORK` | Worker 接入实际 M-PM 规则与映射缺失失败路径，并补真实数据回读 |
 | AC-6 配置版本绑定 | `V1` | H8-DOMAIN、H8-WORKER | 首次处理已把 `connector_id/config_version/channel/message_type/schema_version` 写入生命周期消息 | `NEEDS_WORK` | 重试与重放须先读取原消息绑定，禁止重新解析到新配置 |
 | AC-7 幂等语义 | `V1/V2` | H8-DOMAIN、H8-ASN-V2 | `docs/retros/h8-asn-inbound-flow-evidence.json` 记录 ASN 同键重放后 M2 数量仍为 1 且资源 ID 不变 | `NEEDS_WORK` | 补齐其余入站、全部出站、降级与回执重复的 L11 证据 |
 | AC-8 投递保证 | `V1` | H8-WORKER | `scripts/h8_erp_interface_sync/test_h8_sync_worker.py` 的 failover/circuit 测试证明成功路径不双写且切换保留业务键 | `PASS` | - |
 | AC-9 错误分类 | `V1` | H8-DOMAIN、H8-WORKER | Worker 已将网络/408/425/429/5xx 识别为可重试，其余错误直接死信；ASN、出库订单、商品主数据、销退申请和商品变更五类处理器均有 503/422 分类与凭据脱敏测试 | `PASS` | - |
-| AC-10 货主仓隔离 | `V1` | H8-DOMAIN、H8-WORKER | 业务 API 前已通过当前货主的 active 连接和仓库白名单解析唯一路由 | `NEEDS_WORK` | route-resolve 还须校验调用主体仓库授权范围交集并补拒绝测试 |
+| AC-10 货主仓隔离 | `V1` | H8-DOMAIN、H8-WORKER、H8-U2 | 当前货主 active 连接和仓库白名单参与唯一路由；`route-resolve` 已默认采用 `AuthContext.warehouse_scope` 并以 HTTP 403 拒绝显式越权仓库 | `NEEDS_WORK` | JWT 用户会话仍需从公共用户仓库授权模型解析多仓范围，并接入 Worker 调用身份 |
 | AC-11 审计追踪 | `V1/V2` | H8-WORKER、H8-ASN-V2、H8-MSG-PG | ASN 成功路径已有 V2；Worker 在 schema/路由预检失败时调用同一 lifecycle API，真实 PostgreSQL 测试回读 `h8_exchange_receive` 与 `h8_exchange_final_failure` | `PASS` | - |
 | AC-12 档案补录闭环 | `V1` | H8-DOMAIN、代码路径复审 | domain 禁止 H8 直接改 ASN；`sync_worker.py::handle_product_change` 尚无 M1/M-QL/M2 跨模块闭环证据 | `NEEDS_WORK` | 补商品变更事件、业务校验和当前 ASN 解锁的 L3/L4/L5 证据 |
 | AC-13 契约与 S4 | `V1/V2/V4` | H8-DOMAIN、H8-WORKER、H8-ASN-V2 | 当前仅 ASN V2 与部分本地出站切片 | `NEEDS_WORK` | 每类消息补 L2/L3/L4/L11，并归档客户正式 ERP dev/staging 双向请求、回执、重试与审计关联 |
@@ -567,8 +568,8 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 
 ### 验收结论
 
-- 已证明：受控目录与纯 domain 规则；Worker 入站唯一路由、首次配置绑定、契约版本拒绝和错误重试分类；ASN 接口表入站 V2、幂等回放和 H2 生命周期审计；本地出站主备与非双写切片。
-- 未完成：Worker 的 canonical/M-PM、重试复用原绑定、主体仓库范围、出站唯一路由、错误脱敏，以及其余消息类型 L2–L4/L11 和客户正式 ERP V4。
+- 已证明：受控目录与纯 domain 规则；Worker 入站唯一路由、首次配置绑定、契约版本拒绝、错误重试分类和凭据脱敏；`route-resolve` 对已注入单仓范围的默认绑定与越权拒绝；ASN 接口表入站 V2、幂等回放和 H2 生命周期审计；本地出站主备与非双写切片。
+- 未完成：Worker 的 canonical/M-PM、重试复用原绑定、JWT 用户多仓范围、出站唯一路由，以及其余消息类型 L2–L4/L11 和客户正式 ERP V4。
 - 恢复条件：完成上述运行接线和逐消息证据后，再使用客户正式 ERP dev/staging 跑双向请求、回执、重试和审计关联；完成前保持 `deferred_stories`。
 
 ---
