@@ -29,6 +29,7 @@ interface DevH8Message {
   updated_at: string;
   completed_at: string | null;
   acked_at: string | null;
+  schema_version: string;
 }
 
 interface DevAttempt {
@@ -49,7 +50,7 @@ const messages: DevH8Message[] = [
   {
     id: "00000000-0000-0000-0000-00000000m001",
     owner_id: devOwnerId,
-    warehouse_id: null,
+    warehouse_id: "00000000-0000-0000-0000-000000000801",
     connector_id: "00000000-0000-0000-0000-00000000e801",
     connector_code: "demo-rest-erp",
     config_version: 1,
@@ -71,11 +72,12 @@ const messages: DevH8Message[] = [
     updated_at: now,
     completed_at: null,
     acked_at: null,
+    schema_version: "1",
   },
   {
     id: "00000000-0000-0000-0000-00000000m002",
     owner_id: devOwnerId,
-    warehouse_id: null,
+    warehouse_id: "00000000-0000-0000-0000-000000000801",
     connector_id: "00000000-0000-0000-0000-00000000e801",
     connector_code: "demo-rest-erp",
     config_version: 1,
@@ -97,6 +99,7 @@ const messages: DevH8Message[] = [
     updated_at: now,
     completed_at: null,
     acked_at: null,
+    schema_version: "1",
   },
 ];
 
@@ -114,6 +117,35 @@ const attempts: DevAttempt[] = [
   },
 ];
 
+const worker = {
+  worker_id: "h8-worker-demo-01",
+  worker_version: "1.0.0",
+  connector_id: "00000000-0000-0000-0000-00000000e801",
+  directions: ["inbound", "outbound"],
+  current_claims: 1,
+  created_at: now,
+  last_heartbeat_at: now,
+  heartbeat_expires_at: "2099-07-19T08:00:15.000Z",
+  health: "healthy",
+};
+
+let workerControls: Array<{
+  connector_id: string;
+  direction: string;
+  paused: boolean;
+  reason: string;
+  paused_until: string | null;
+  updated_by: string;
+  updated_at: string;
+}> = [];
+
+let payloadPolicy = {
+  connector_id: worker.connector_id,
+  enabled: false,
+  retention_days: 7,
+  updated_at: now,
+};
+
 function parsePath(pathname: string): { id: string; action: string } | null {
   const match = pathname.match(/^\/api\/v1\/integration\/erp-messages\/([^/]+)(?:\/(replay))?$/);
   if (!match) return null;
@@ -125,17 +157,124 @@ export async function handleH8ErpMessageDevMock(
   res: ServerResponse,
   pathname: string,
 ): Promise<boolean> {
+  if (
+    pathname === "/api/v1/integration/erp-messages/payload-retention" &&
+    req.method === "GET"
+  ) {
+    sendJson(res, 200, [payloadPolicy]);
+    return true;
+  }
+
+  if (
+    pathname === "/api/v1/integration/erp-messages/payload-retention" &&
+    req.method === "POST"
+  ) {
+    const body = (await readJsonBody(req)) as {
+      connector_id?: string;
+      enabled?: boolean;
+      retention_days?: number;
+      confirmed?: boolean;
+    };
+    if (!body.confirmed || (body.retention_days ?? 7) < 1 || (body.retention_days ?? 7) > 30) {
+      sendError(res, 400, "H8-400", "invalid payload retention policy");
+      return true;
+    }
+    payloadPolicy = {
+      connector_id: asString(body.connector_id, worker.connector_id),
+      enabled: Boolean(body.enabled),
+      retention_days: body.retention_days ?? 7,
+      updated_at: new Date().toISOString(),
+    };
+    sendJson(res, 200, payloadPolicy);
+    return true;
+  }
+
+  if (pathname === "/api/v1/integration/erp-messages/worker-runtime" && req.method === "GET") {
+    sendJson(res, 200, { workers: [worker], controls: workerControls });
+    return true;
+  }
+
+  if (
+    pathname === "/api/v1/integration/erp-messages/worker-runtime/control" &&
+    req.method === "POST"
+  ) {
+    const body = (await readJsonBody(req)) as {
+      connector_id?: string;
+      direction?: string;
+      paused?: boolean;
+      reason?: string;
+      paused_until?: string | null;
+      confirmed?: boolean;
+    };
+    if (!body.confirmed || !asString(body.reason, "").trim()) {
+      sendError(res, 400, "H8-400", "reason and confirmation required");
+      return true;
+    }
+    const control = {
+      connector_id: asString(body.connector_id, ""),
+      direction: asString(body.direction, ""),
+      paused: Boolean(body.paused),
+      reason: asString(body.reason, "").trim(),
+      paused_until: body.paused_until ?? null,
+      updated_by: "admin",
+      updated_at: new Date().toISOString(),
+    };
+    workerControls = workerControls.filter(
+      (item) =>
+        item.connector_id !== control.connector_id || item.direction !== control.direction,
+    );
+    workerControls.push(control);
+    sendJson(res, 200, control);
+    return true;
+  }
+
+  if (
+    pathname === "/api/v1/integration/erp-messages/worker-runtime/claim-decision" &&
+    req.method === "GET"
+  ) {
+    const url = new URL(req.url ?? "", "http://localhost");
+    const control = workerControls.find(
+      (item) =>
+        item.connector_id === url.searchParams.get("connector_id") &&
+        item.direction === url.searchParams.get("direction"),
+    );
+    sendJson(res, 200, {
+      allowed: !control?.paused,
+      reason: control?.paused ? control.reason : null,
+      paused_until: control?.paused_until ?? null,
+    });
+    return true;
+  }
+
+  if (
+    pathname === "/api/v1/integration/erp-messages/worker-runtime/heartbeat" &&
+    req.method === "POST"
+  ) {
+    sendJson(res, 200, worker);
+    return true;
+  }
+
   if (pathname === "/api/v1/integration/erp-messages/stats" && req.method === "GET") {
+    const url = new URL(req.url ?? "", "http://localhost");
+    const connectorCode = url.searchParams.get("connector_code");
+    const channel = url.searchParams.get("channel");
+    const messageType = url.searchParams.get("message_type");
+    const rows = messages.filter(
+      (message) =>
+        (!connectorCode || message.connector_code === connectorCode) &&
+        (!channel || message.channel === channel) &&
+        (!messageType || message.message_type === messageType),
+    );
     sendJson(res, 200, {
       owner_id: devOwnerId,
-      total: messages.length,
-      succeeded: messages.filter((m) => m.sync_status === "succeeded" || m.sync_status === "acked")
+      total: rows.length,
+      succeeded: rows.filter((m) => m.sync_status === "succeeded" || m.sync_status === "acked")
         .length,
-      failed: messages.filter((m) => m.sync_status === "failed").length,
-      dead: messages.filter((m) => m.sync_status === "dead").length,
-      processing: messages.filter((m) => m.sync_status === "processing").length,
-      pending: messages.filter((m) => m.sync_status === "pending").length,
-      retry_total: messages.reduce((sum, m) => sum + m.retry_count, 0),
+      failed: rows.filter((m) => m.sync_status === "failed").length,
+      dead: rows.filter((m) => m.sync_status === "dead").length,
+      processing: rows.filter((m) => m.sync_status === "processing").length,
+      pending: rows.filter((m) => m.sync_status === "pending").length,
+      retry_total: rows.reduce((sum, m) => sum + m.retry_count, 0),
       p95_latency_ms: 120,
     });
     return true;
@@ -147,12 +286,44 @@ export async function handleH8ErpMessageDevMock(
     const direction = url.searchParams.get("direction");
     const messageType = url.searchParams.get("message_type");
     const status = url.searchParams.get("status");
+    const connectorCode = url.searchParams.get("connector_code");
+    const channel = url.searchParams.get("channel");
+    const warehouseId = url.searchParams.get("warehouse_id");
+    const externalRef = url.searchParams.get("external_ref");
+    const idempotencyKey = url.searchParams.get("idempotency_key");
+    const correlationId = url.searchParams.get("correlation_id");
+    const createdFrom = url.searchParams.get("created_from");
+    const createdTo = url.searchParams.get("created_to");
     if (direction) rows = rows.filter((m) => m.direction === direction);
     if (messageType) rows = rows.filter((m) => m.message_type === messageType);
     if (status) rows = rows.filter((m) => m.sync_status === status);
+    if (connectorCode) rows = rows.filter((m) => m.connector_code === connectorCode);
+    if (channel) rows = rows.filter((m) => m.channel === channel);
+    if (warehouseId) rows = rows.filter((m) => m.warehouse_id === warehouseId);
+    if (externalRef) rows = rows.filter((m) => m.external_ref === externalRef);
+    if (idempotencyKey) rows = rows.filter((m) => m.idempotency_key === idempotencyKey);
+    if (correlationId) rows = rows.filter((m) => m.correlation_id === correlationId);
+    if (createdFrom) rows = rows.filter((m) => m.created_at >= createdFrom);
+    if (createdTo) rows = rows.filter((m) => m.created_at <= createdTo);
     sendJson(res, 200, {
       data: rows,
       page: { next_cursor: null, count: rows.length },
+    });
+    return true;
+  }
+
+  const payloadMatch = pathname.match(
+    /^\/api\/v1\/integration\/erp-messages\/([^/]+)\/payload$/,
+  );
+  if (payloadMatch && req.method === "GET") {
+    if (!payloadPolicy.enabled) {
+      sendError(res, 404, "H8-404", "retained payload unavailable");
+      return true;
+    }
+    sendJson(res, 200, {
+      message_id: payloadMatch[1],
+      payload: JSON.stringify({ external_ref: "ERP-ASN-DEAD-1", qty: 1 }),
+      expires_at: "2099-07-26T08:00:00.000Z",
     });
     return true;
   }
@@ -172,6 +343,8 @@ export async function handleH8ErpMessageDevMock(
     sendJson(res, 200, {
       message: msg,
       attempts: attempts.filter((a) => a.message_id === msg.id),
+      payload_retained: payloadPolicy.enabled,
+      payload_expires_at: payloadPolicy.enabled ? "2099-07-26T08:00:00.000Z" : null,
     });
     return true;
   }
