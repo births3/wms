@@ -12,8 +12,8 @@ use uuid::Uuid;
 use wms_domain::{
     apply_update, can_activate, can_physically_delete, reject_route_overlap_with_actives,
     required_inbound_scopes, resolve_active_connector, CreateH8ErpConnectorRequest, H8ErpConnector,
-    H8ErpConnectorError, H8ErpConnectorListResponse, H8ErpConnectorTestResult, PageMeta,
-    UpdateH8ErpConnectorRequest,
+    H8ErpConnectorError, H8ErpConnectorListResponse, H8ErpConnectorRuntimeConfig,
+    H8ErpConnectorTestResult, PageMeta, UpdateH8ErpConnectorRequest,
 };
 
 use crate::auth::{AuthContext, AuthError};
@@ -42,6 +42,10 @@ pub fn h8_erp_connector_router(state: H8ErpConnectorAppState) -> Router {
             get(get_connector)
                 .patch(update_connector)
                 .delete(delete_connector),
+        )
+        .route(
+            "/api/v1/config/erp-connectors/:id/versions/:version",
+            get(get_connector_version),
         )
         .route(
             "/api/v1/config/erp-connectors/:id/test",
@@ -124,6 +128,20 @@ async fn get_connector(
 ) -> Result<Json<H8ErpConnector>, H8ErpConnectorHandlerError> {
     ctx.require_permission(H8_CONFIG_READ)?;
     Ok(Json(state.repository.get(ctx.owner_id, id).await?))
+}
+
+async fn get_connector_version(
+    ctx: AuthContext,
+    State(state): State<H8ErpConnectorAppState>,
+    Path((id, version)): Path<(Uuid, i64)>,
+) -> Result<Json<H8ErpConnectorRuntimeConfig>, H8ErpConnectorHandlerError> {
+    ctx.require_permission(H8_CONFIG_READ)?;
+    Ok(Json(
+        state
+            .repository
+            .get_version(ctx.owner_id, id, version)
+            .await?,
+    ))
 }
 
 async fn create_connector(

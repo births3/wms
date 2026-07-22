@@ -6,6 +6,7 @@ use axum::{
 };
 use chrono::Utc;
 use sha2::{Digest, Sha256};
+use sqlx::PgPool;
 use tower::ServiceExt;
 use uuid::Uuid;
 use wms_domain::{
@@ -17,8 +18,44 @@ use wms_domain::{
 use super::error::{H8ErpConnectorHandlerError, H8ErpConnectorRepoError};
 use super::handlers::h8_erp_connector_router;
 use super::idempotency::{load_idempotent_response, store_idempotent_response};
+use super::repository::{H8ErpConnectorRepository, PgH8ErpConnectorRepository};
 use super::state::{H8ErpConnectorAppState, H8_CONFIG_READ, H8_CONFIG_WRITE};
 use crate::auth::AuthContext;
+
+fn versioned_connector(owner_id: Uuid) -> H8ErpConnector {
+    let now = Utc::now();
+    H8ErpConnector {
+        id: Uuid::new_v4(),
+        owner_id,
+        connector_code: "versioned".into(),
+        connector_name: "Versioned ERP".into(),
+        warehouse_ids: vec![],
+        directions: vec!["inbound".into()],
+        message_types: vec!["asn".into()],
+        channel_mode: "rest".into(),
+        api_base_url: Some("https://erp-v1.example.com".into()),
+        interface_db_host: None,
+        interface_db_port: None,
+        interface_db_name: None,
+        interface_db_username: None,
+        api_key_id: Some(Uuid::new_v4()),
+        bearer_secret_alias: None,
+        interface_db_password_alias: None,
+        interface_probe_db_username: None,
+        interface_probe_db_password_alias: None,
+        interface_probe_db_password_alias_set: false,
+        interface_probe_config_version: 1,
+        status: "testing".into(),
+        config_version: 1,
+        first_activated_at: None,
+        last_tested_version: None,
+        last_tested_at: None,
+        last_tested_succeeded: None,
+        last_tested_error_summary: None,
+        created_at: now,
+        updated_at: now,
+    }
+}
 
 #[tokio::test]
 async fn memory_create_test_activate_flow() {
@@ -285,6 +322,137 @@ async fn route_resolve_enforces_auth_context_warehouse_scope() {
     let body: serde_json::Value =
         serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
     assert_eq!(body["connector"]["id"], c.id.to_string());
+}
+
+#[tokio::test]
+async fn connector_runtime_versions_are_immutable_and_owner_scoped() {
+    let state = H8ErpConnectorAppState::with_memory();
+    let owner = Uuid::new_v4();
+    let connector = versioned_connector(owner);
+    state.repository.insert(&connector).await.unwrap();
+    let mut v2 = connector.clone();
+    v2.api_base_url = Some("https://erp-v2.example.com".into());
+    v2.config_version = 2;
+    state.repository.save(&v2, 1, 1).await.unwrap();
+
+    let ctx = AuthContext {
+        user_id: Uuid::new_v4(),
+        owner_id: owner,
+        actor_name: "worker".into(),
+        permissions: vec![H8_CONFIG_READ.into()],
+        jti: "worker-version-test".into(),
+        warehouse_scope: None,
+    };
+    for (version, expected_url) in [
+        (1, "https://erp-v1.example.com"),
+        (2, "https://erp-v2.example.com"),
+    ] {
+        let mut request = Request::builder()
+            .uri(format!(
+                "/api/v1/config/erp-connectors/{}/versions/{version}",
+                connector.id
+            ))
+            .body(Body::empty())
+            .unwrap();
+        request.extensions_mut().insert(ctx.clone());
+        let response = h8_erp_connector_router(state.clone())
+            .oneshot(request)
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(value["config_version"], version);
+        assert_eq!(value["api_base_url"], expected_url);
+    }
+
+    let mut cross_owner = Request::builder()
+        .uri(format!(
+            "/api/v1/config/erp-connectors/{}/versions/1",
+            connector.id
+        ))
+        .body(Body::empty())
+        .unwrap();
+    cross_owner.extensions_mut().insert(AuthContext {
+        owner_id: Uuid::new_v4(),
+        ..ctx
+    });
+    let response = h8_erp_connector_router(state.clone())
+        .oneshot(cross_owner)
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    state.repository.delete(owner, connector.id).await.unwrap();
+    assert!(state
+        .repository
+        .get_version(owner, connector.id, 1)
+        .await
+        .is_err());
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn postgres_captures_each_runtime_version_and_rejects_unversioned_change(pool: PgPool) {
+    let owner = Uuid::new_v4();
+    let connector_id = Uuid::new_v4();
+    sqlx::query("INSERT INTO auth_owners (id, owner_code, owner_name) VALUES ($1,$2,$2)")
+        .bind(owner)
+        .bind(format!("H8-VERSION-{owner}"))
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query(
+        r#"INSERT INTO h8_erp_connectors
+           (id, owner_id, connector_code, connector_name, directions, message_types,
+            channel_mode, api_base_url, status, config_version)
+           VALUES ($1,$2,'SELF-ERP','Self ERP',ARRAY['inbound'],ARRAY['asn'],
+                   'rest','https://erp-v1.example.com','testing',1)"#,
+    )
+    .bind(connector_id)
+    .bind(owner)
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "UPDATE h8_erp_connectors SET api_base_url = $3, config_version = 2 WHERE owner_id = $1 AND id = $2",
+    )
+    .bind(owner)
+    .bind(connector_id)
+    .bind("https://erp-v2.example.com")
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let repository = PgH8ErpConnectorRepository { pool: pool.clone() };
+    let v1 = repository
+        .get_version(owner, connector_id, 1)
+        .await
+        .unwrap();
+    let v2 = repository
+        .get_version(owner, connector_id, 2)
+        .await
+        .unwrap();
+    assert_eq!(
+        v1.api_base_url.as_deref(),
+        Some("https://erp-v1.example.com")
+    );
+    assert_eq!(
+        v2.api_base_url.as_deref(),
+        Some("https://erp-v2.example.com")
+    );
+    assert!(repository
+        .get_version(Uuid::new_v4(), connector_id, 1)
+        .await
+        .is_err());
+
+    let unversioned_change = sqlx::query(
+        "UPDATE h8_erp_connectors SET api_base_url = $3 WHERE owner_id = $1 AND id = $2",
+    )
+    .bind(owner)
+    .bind(connector_id)
+    .bind("https://silently-changed.example.com")
+    .execute(&pool)
+    .await;
+    assert!(unversioned_change.is_err());
 }
 
 #[test]

@@ -6,7 +6,7 @@ use std::sync::Mutex;
 use uuid::Uuid;
 use wms_domain::{
     inflight_status_after_activate, inflight_status_after_disable, H8ErpConnector,
-    H8ErpConnectorError, H8_INFLIGHT_PAUSED, H8_INFLIGHT_RUNNING,
+    H8ErpConnectorError, H8ErpConnectorRuntimeConfig, H8_INFLIGHT_PAUSED, H8_INFLIGHT_RUNNING,
 };
 
 use super::error::H8ErpConnectorRepoError;
@@ -20,6 +20,12 @@ pub trait H8ErpConnectorRepository: Send + Sync {
         owner_id: Uuid,
         id: Uuid,
     ) -> Result<H8ErpConnector, H8ErpConnectorRepoError>;
+    async fn get_version(
+        &self,
+        owner_id: Uuid,
+        id: Uuid,
+        config_version: i64,
+    ) -> Result<H8ErpConnectorRuntimeConfig, H8ErpConnectorRepoError>;
     async fn insert(
         &self,
         connector: &H8ErpConnector,
@@ -74,6 +80,7 @@ pub trait H8ErpConnectorRepository: Send + Sync {
 #[derive(Default)]
 pub(crate) struct MemoryH8ErpConnectorRepository {
     inner: Mutex<Vec<H8ErpConnector>>,
+    versions: Mutex<HashMap<(Uuid, Uuid, i64), H8ErpConnectorRuntimeConfig>>,
     /// connector_id -> (status, count of messages)
     inflight: Mutex<HashMap<Uuid, Vec<String>>>,
     api_key_scopes: Mutex<HashMap<Uuid, Vec<String>>>,
@@ -104,6 +111,22 @@ impl H8ErpConnectorRepository for MemoryH8ErpConnectorRepository {
             ))
     }
 
+    async fn get_version(
+        &self,
+        owner_id: Uuid,
+        id: Uuid,
+        config_version: i64,
+    ) -> Result<H8ErpConnectorRuntimeConfig, H8ErpConnectorRepoError> {
+        self.versions
+            .lock()
+            .expect("lock")
+            .get(&(owner_id, id, config_version))
+            .cloned()
+            .ok_or(H8ErpConnectorRepoError::Domain(
+                H8ErpConnectorError::NotFound,
+            ))
+    }
+
     async fn insert(
         &self,
         connector: &H8ErpConnector,
@@ -115,6 +138,10 @@ impl H8ErpConnectorRepository for MemoryH8ErpConnectorRepository {
             return Err(H8ErpConnectorRepoError::DuplicateCode);
         }
         guard.push(connector.clone());
+        self.versions.lock().expect("lock").insert(
+            (connector.owner_id, connector.id, connector.config_version),
+            connector.into(),
+        );
         Ok(connector.clone())
     }
 
@@ -144,6 +171,11 @@ impl H8ErpConnectorRepository for MemoryH8ErpConnectorRepository {
             ));
         }
         *slot = connector.clone();
+        self.versions
+            .lock()
+            .expect("lock")
+            .entry((connector.owner_id, connector.id, connector.config_version))
+            .or_insert_with(|| connector.into());
         Ok(connector.clone())
     }
 
@@ -156,6 +188,12 @@ impl H8ErpConnectorRepository for MemoryH8ErpConnectorRepository {
                 H8ErpConnectorError::NotFound,
             ));
         }
+        self.versions
+            .lock()
+            .expect("lock")
+            .retain(|(snapshot_owner, connector_id, _), _| {
+                *snapshot_owner != owner_id || *connector_id != id
+            });
         Ok(())
     }
 
@@ -289,6 +327,34 @@ impl H8ErpConnectorRepository for PgH8ErpConnectorRepository {
         .ok_or(H8ErpConnectorRepoError::Domain(
             H8ErpConnectorError::NotFound,
         ))
+    }
+
+    async fn get_version(
+        &self,
+        owner_id: Uuid,
+        id: Uuid,
+        config_version: i64,
+    ) -> Result<H8ErpConnectorRuntimeConfig, H8ErpConnectorRepoError> {
+        let value: Option<serde_json::Value> = sqlx::query_scalar(
+            r#"
+            SELECT runtime_config
+              FROM h8_erp_connector_versions
+             WHERE owner_id = $1 AND connector_id = $2 AND config_version = $3
+            "#,
+        )
+        .bind(owner_id)
+        .bind(id)
+        .bind(config_version)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| H8ErpConnectorRepoError::Db(e.to_string()))?;
+        value
+            .map(serde_json::from_value)
+            .transpose()
+            .map_err(|e| H8ErpConnectorRepoError::Db(e.to_string()))?
+            .ok_or(H8ErpConnectorRepoError::Domain(
+                H8ErpConnectorError::NotFound,
+            ))
     }
 
     async fn insert(

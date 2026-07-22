@@ -166,6 +166,50 @@ pub struct H8ErpConnector {
     pub updated_at: DateTime<Utc>,
 }
 
+/// US-H8-002 AC6：消息处理时绑定的不可变连接运行配置。
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema, PartialEq, Eq)]
+pub struct H8ErpConnectorRuntimeConfig {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub connector_code: String,
+    pub warehouse_ids: Vec<Uuid>,
+    pub directions: Vec<String>,
+    pub message_types: Vec<String>,
+    pub channel_mode: String,
+    pub api_base_url: Option<String>,
+    pub interface_db_host: Option<String>,
+    pub interface_db_port: Option<i32>,
+    pub interface_db_name: Option<String>,
+    pub interface_db_username: Option<String>,
+    pub api_key_id: Option<Uuid>,
+    pub bearer_secret_alias: Option<String>,
+    pub interface_db_password_alias: Option<String>,
+    pub config_version: i64,
+}
+
+impl From<&H8ErpConnector> for H8ErpConnectorRuntimeConfig {
+    fn from(connector: &H8ErpConnector) -> Self {
+        Self {
+            id: connector.id,
+            owner_id: connector.owner_id,
+            connector_code: connector.connector_code.clone(),
+            warehouse_ids: connector.warehouse_ids.clone(),
+            directions: connector.directions.clone(),
+            message_types: connector.message_types.clone(),
+            channel_mode: connector.channel_mode.clone(),
+            api_base_url: connector.api_base_url.clone(),
+            interface_db_host: connector.interface_db_host.clone(),
+            interface_db_port: connector.interface_db_port,
+            interface_db_name: connector.interface_db_name.clone(),
+            interface_db_username: connector.interface_db_username.clone(),
+            api_key_id: connector.api_key_id,
+            bearer_secret_alias: connector.bearer_secret_alias.clone(),
+            interface_db_password_alias: connector.interface_db_password_alias.clone(),
+            config_version: connector.config_version,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct H8ErpConnectorListResponse {
     pub data: Vec<H8ErpConnector>,
