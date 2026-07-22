@@ -161,12 +161,31 @@ CREATE TABLE IF NOT EXISTS inventory_movements (
     qty_delta             BIGINT NOT NULL,
     source_document_type  TEXT NOT NULL,
     source_document_id    UUID NOT NULL,
+    location_code         TEXT,
+    from_location_code    TEXT,
+    to_location_code      TEXT,
+    lpn_code              TEXT,
+    operator_user_id      UUID,
+    operator_name         TEXT,
+    volume_delta_cm3      BIGINT,
     occurred_at           TIMESTAMPTZ NOT NULL,
     created_at            TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS inventory_movements_owner_batch_idx
     ON inventory_movements (owner_id, batch_id, occurred_at DESC);
+
+CREATE INDEX IF NOT EXISTS inventory_movements_owner_location_occurred_idx
+    ON inventory_movements (owner_id, location_code, occurred_at DESC)
+    WHERE location_code IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS inventory_movements_owner_from_location_occurred_idx
+    ON inventory_movements (owner_id, from_location_code, occurred_at DESC)
+    WHERE from_location_code IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS inventory_movements_owner_to_location_occurred_idx
+    ON inventory_movements (owner_id, to_location_code, occurred_at DESC)
+    WHERE to_location_code IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS inventory_status_changes (
     id               UUID PRIMARY KEY,

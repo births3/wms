@@ -407,7 +407,7 @@ api_paths = ["GET /api/v1/inventory/locations/history", "GET /api/v1/inventory/b
 database_objects = ["inventory_batches", "inventory_movements", "inventory_status_changes", "warehouse_locations", "warehouse_zones", "products"]
 evidence_refs = [
   "docs/domain/user-stories-m3-inventory-operation.md",
-  "backend/migrations/202607170002_m3_location_history.sql",
+  "backend/migrations/202606030001_wave3_core_tables.sql",
   "backend/migrations/202607170003_m3_location_history_admin_menu.sql",
   "backend/crates/domain/src/operations.rs",
   "backend/crates/api/src/wave3_repository/trace.rs",
