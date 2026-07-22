@@ -36,7 +36,9 @@ BASE = os.environ.get("ERP_CALLBACK_BASE", "http://127.0.0.1:18092").rstrip("/")
 # 避免误用本机旧 channel_a mock 端口
 
 
-def http_json(method: str, url: str, body: dict | None = None, timeout: float = 5.0) -> tuple[int, dict]:
+def http_json(
+    method: str, url: str, body: dict | None = None, timeout: float = 5.0
+) -> tuple[int, dict]:
     data = None if body is None else json.dumps(body).encode("utf-8")
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
     admin = os.environ.get("ERP_VENDOR_ADMIN_TOKEN", "").strip()
@@ -130,7 +132,12 @@ def scenario_failover_against_vendor() -> dict:
     if code != 200:
         boot = ensure_vendor_up()
         if not boot.get("ok"):
-            return {"name": "failover_vendor", "ok": False, "error": "vendor down", "boot": boot}
+            return {
+                "name": "failover_vendor",
+                "ok": False,
+                "error": "vendor down",
+                "boot": boot,
+            }
 
     # 动态注入：随后 3 次业务 POST 返回 503（无需重建镜像）
     acode, abody = http_json("POST", f"{BASE}/_admin/fail-count", {"count": 3})
@@ -158,9 +165,7 @@ def scenario_failover_against_vendor() -> dict:
             raise RuntimeError(f"HTTP {code}: {body}")
 
     def publish_table() -> None:
-        table_keys.append(
-            f"out:shipment_confirm_erp_feedback_outbox:{source_id}"
-        )
+        table_keys.append(f"out:shipment_confirm_erp_feedback_outbox:{source_id}")
 
     result = publish_with_failover(
         transport="failover",
@@ -199,7 +204,9 @@ def main() -> int:
             "scenarios": scenarios,
             "ok": False,
         }
-        EVIDENCE.write_text(json.dumps(evidence, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        EVIDENCE.write_text(
+            json.dumps(evidence, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
         print(json.dumps(evidence, ensure_ascii=False, indent=2))
         return 1
 
@@ -226,7 +233,9 @@ def main() -> int:
         ),
     }
     EVIDENCE.parent.mkdir(parents=True, exist_ok=True)
-    EVIDENCE.write_text(json.dumps(evidence, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    EVIDENCE.write_text(
+        json.dumps(evidence, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
     print(json.dumps(evidence, ensure_ascii=False, indent=2))
     print(f"wrote {EVIDENCE}", file=sys.stderr)
     return 0 if evidence["ok"] else 1

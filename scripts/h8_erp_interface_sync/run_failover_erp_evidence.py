@@ -200,23 +200,41 @@ def scenario_circuit_half_open_recover() -> dict:
         table_n += 1
 
     publish_with_failover(
-        transport="failover", publish_http=fail, publish_table=table, http_max_attempts=1, circuit=circuit
+        transport="failover",
+        publish_http=fail,
+        publish_table=table,
+        http_max_attempts=1,
+        circuit=circuit,
     )
     publish_with_failover(
-        transport="failover", publish_http=fail, publish_table=table, http_max_attempts=1, circuit=circuit
+        transport="failover",
+        publish_http=fail,
+        publish_table=table,
+        http_max_attempts=1,
+        circuit=circuit,
     )
     open_state = circuit.state
     # open 跳过一次 HTTP
     publish_with_failover(
-        transport="failover", publish_http=fail, publish_table=table, http_max_attempts=1, circuit=circuit
+        transport="failover",
+        publish_http=fail,
+        publish_table=table,
+        http_max_attempts=1,
+        circuit=circuit,
     )
     # half_open 窗口成功回 closed
     result = publish_with_failover(
-        transport="failover", publish_http=ok, publish_table=table, http_max_attempts=1, circuit=circuit
+        transport="failover",
+        publish_http=ok,
+        publish_table=table,
+        http_max_attempts=1,
+        circuit=circuit,
     )
     return {
         "name": "circuit_half_open_recover",
-        "ok": open_state == "open" and result.channel == "http" and circuit.state == "closed",
+        "ok": open_state == "open"
+        and result.channel == "http"
+        and circuit.state == "closed",
         "opened": open_state,
         "recovered_channel": result.channel,
         "final_state": circuit.state,
