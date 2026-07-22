@@ -444,6 +444,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | 2026-07-23 | 二十八轮映射失败保护 | 商品主数据入站不再把未知 `storage_condition` 静默改成 `normal`；未映射值在业务 API 前以 422 不可重试错误拒绝，测试证明不会发起业务写入。完整 M-PM 规则查询和实际映射仍未接线，AC5 保持 `NEEDS_WORK`。 |
 | 2026-07-23 | 二十九轮绑定不可变保护 | 生命周期端点命中既有幂等消息后，若调用方改变连接 ID、配置版本、方向、消息类型、契约版本或通道则在写审计前拒绝；HTTP 测试覆盖五类切换并证明不产生伪生命周期审计。Worker 重试仍须主动读取原绑定及历史配置，AC6 保持 `NEEDS_WORK`。 |
 | 2026-07-23 | 三十轮重试原绑定读取 | 接口表行 `retry_count > 0` 时，Worker 先按货主上下文、方向、消息类型、外部标识和幂等键精确读取既有消息，并复用首次连接 ID、连接编码、配置版本和通道；已绑定消息不再调用当前路由解析，且查询覆盖超过默认 7 天窗口的人工重放。历史配置快照读取和人工重放到接口表认领链仍未完成，AC6 保持 `NEEDS_WORK`。 |
+| 2026-07-23 | 三十一轮历史配置快照 | PostgreSQL 在连接创建及配置版本递增时自动保存不可变运行配置快照，并拒绝运行字段在版本号不变时静默修改；按货主、连接和版本读取的 API 已进入 OpenAPI。Worker 重试读取原消息绑定后必须加载并校验对应历史版本，连接、方向、消息类型或接口表通道不一致即拒绝。真实 PostgreSQL 与 Worker 回归通过；人工重放到接口表重新认领链仍未完成，AC6 保持 `NEEDS_WORK`。 |
 
 ## 验收记录（US-H8-004 软件切片）
 
@@ -550,7 +551,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | AC-3 入站链路 | `V1/V2` | H8-WORKER、H8-ASN-V2、H8-U2 | Worker 已在业务 API 前调用 `route-resolve` 并严格校验 `schema_version`；处理器已拒绝与 `AuthContext.warehouse_scope` 不一致的仓库；ASN V2 已跑通 | `NEEDS_WORK` | 接入 M-PM 与 JWT 用户多仓范围，并补齐其余 4 类 L2–L4/L11 |
 | AC-4 出站链路 | `V1/V2` | H8-WORKER、H8-LOCAL | `docs/retros/h8-local-integration-evidence.json` 证明本地主备；`scripts/h8_erp_interface_sync/outbound_publish.py` 当前只取全局最早 active 连接 | `NEEDS_WORK` | 按货主、仓库、方向、消息类型解析并绑定唯一连接后再投递 |
 | AC-5 字段规整 | `V1` | H8-DOMAIN、H8-WORKER、代码路径复审 | `apply_mpm_normalize` 有 domain 单测；Worker 已在业务 API 前以 422 拒绝未知 `storage_condition`，且测试证明不发生静默 `normal` 写入 | `NEEDS_WORK` | Worker 接入实际 M-PM 规则查询与有效映射，并补真实数据回读 |
-| AC-6 配置版本绑定 | `V1` | H8-DOMAIN、H8-WORKER、H8-MSG-U3 | 首次处理已写入连接、配置版本、通道、消息类型和契约版本；生命周期端点拒绝既有绑定切换；Worker 重试已按完整幂等身份主动读取并复用原绑定，不再解析当前路由 | `NEEDS_WORK` | 补连接历史配置快照读取，以及人工重放到接口表重新认领并复用原绑定的运行闭环 |
+| AC-6 配置版本绑定 | `V1/V2` | H8-DOMAIN、H8-WORKER、H8-U2、H8-MSG-U3 | 首次处理写入完整绑定；生命周期端点拒绝绑定切换；PostgreSQL 自动保存不可变版本快照并拒绝无版本变更；Worker 重试读取原绑定后加载并校验对应历史配置，不再解析当前路由 | `NEEDS_WORK` | 补人工重放到接口表重新认领并复用原绑定的运行闭环 |
 | AC-7 幂等语义 | `V1/V2` | H8-DOMAIN、H8-ASN-V2 | `docs/retros/h8-asn-inbound-flow-evidence.json` 记录 ASN 同键重放后 M2 数量仍为 1 且资源 ID 不变 | `NEEDS_WORK` | 补齐其余入站、全部出站、降级与回执重复的 L11 证据 |
 | AC-8 投递保证 | `V1` | H8-WORKER | `scripts/h8_erp_interface_sync/test_h8_sync_worker.py` 的 failover/circuit 测试证明成功路径不双写且切换保留业务键 | `PASS` | - |
 | AC-9 错误分类 | `V1` | H8-DOMAIN、H8-WORKER | Worker 已将网络/408/425/429/5xx 识别为可重试，其余错误直接死信；ASN、出库订单、商品主数据、销退申请和商品变更五类处理器均有 503/422 分类与凭据脱敏测试 | `PASS` | - |
@@ -571,8 +572,8 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 
 ### 验收结论
 
-- 已证明：受控目录与纯 domain 规则；Worker 入站唯一路由、首次配置绑定、重试主动复用原绑定、绑定切换拒绝、契约版本拒绝、错误重试分类、凭据脱敏和未知储存条件写入前拒绝；`route-resolve` 对已注入单仓范围的默认绑定与越权拒绝；ASN 接口表入站 V2、幂等回放和 H2 生命周期审计；本地出站主备与非双写切片。
-- 未完成：Worker 的 canonical/M-PM、历史配置快照读取与人工重放认领链、JWT 用户多仓范围、出站唯一路由，以及其余消息类型 L2–L4/L11 和客户正式 ERP V4。
+- 已证明：受控目录与纯 domain 规则；Worker 入站唯一路由、首次配置绑定、历史配置快照读取、重试主动复用原绑定、绑定切换拒绝、契约版本拒绝、错误重试分类、凭据脱敏和未知储存条件写入前拒绝；`route-resolve` 对已注入单仓范围的默认绑定与越权拒绝；ASN 接口表入站 V2、幂等回放和 H2 生命周期审计；本地出站主备与非双写切片。
+- 未完成：Worker 的 canonical/M-PM、人工重放认领链、JWT 用户多仓范围、出站唯一路由，以及其余消息类型 L2–L4/L11 和客户正式 ERP V4。
 - 恢复条件：完成上述运行接线和逐消息证据后，再使用客户正式 ERP dev/staging 跑双向请求、回执、重试和审计关联；完成前保持 `deferred_stories`。
 
 ---
