@@ -31,6 +31,7 @@ from sync_worker import (
 from worker_route import (
     get_worker_claim_decision,
     post_worker_heartbeat,
+    resolve_existing_inbound_binding,
     sanitize_worker_error,
 )
 from worker_mssql import claim_rows
@@ -58,6 +59,56 @@ def settings() -> Settings:
 
 
 class TestInboundCorePipeline(unittest.TestCase):
+    def test_retry_rejects_snapshot_that_does_not_match_original_binding(self) -> None:
+        replies = iter(
+            [
+                (
+                    200,
+                    {
+                        "data": [
+                            {
+                                "connector_id": settings().connector_id,
+                                "connector_code": "SELF-ERP",
+                                "config_version": 2,
+                                "direction": "inbound",
+                                "message_type": "asn",
+                                "schema_version": "1",
+                                "channel": "interface_table",
+                            }
+                        ]
+                    },
+                    "",
+                ),
+                (
+                    200,
+                    {
+                        "id": settings().connector_id,
+                        "connector_code": "OTHER-ERP",
+                        "config_version": 2,
+                        "warehouse_ids": [],
+                        "directions": ["inbound"],
+                        "message_types": ["asn"],
+                        "channel_mode": "interface_table",
+                    },
+                    "",
+                ),
+            ]
+        )
+
+        with self.assertRaises(WorkerHttpError) as caught:
+            resolve_existing_inbound_binding(
+                settings(),
+                "asn",
+                {
+                    "id": "row-1",
+                    "external_ref": "ASN-1",
+                    "idempotency_key": "idem-1",
+                    "schema_version": "1",
+                },
+                http_json_fn=lambda *_args: next(replies),
+            )
+        self.assertEqual(caught.exception.status, 409)
+
     def test_retry_loads_original_binding_instead_of_resolving_current_route(
         self,
     ) -> None:
@@ -69,6 +120,20 @@ class TestInboundCorePipeline(unittest.TestCase):
             calls.append(path)
             self.assertEqual(method, "GET")
             self.assertIsNone(body)
+            if "/versions/2" in path:
+                return (
+                    200,
+                    {
+                        "id": settings().connector_id,
+                        "connector_code": "SELF-ERP",
+                        "config_version": 2,
+                        "warehouse_ids": [],
+                        "directions": ["inbound"],
+                        "message_types": ["asn"],
+                        "channel_mode": "interface_table",
+                    },
+                    "",
+                )
             return (
                 200,
                 {
@@ -118,6 +183,7 @@ class TestInboundCorePipeline(unittest.TestCase):
         self.assertIn("external_ref=ERP+ASN%2F1", calls[0])
         self.assertIn("idempotency_key=idem-1", calls[0])
         self.assertIn("created_from=1970-01-01T00%3A00%3A00Z", calls[0])
+        self.assertIn(f"/{settings().connector_id}/versions/2", calls[1])
 
     def test_product_rejects_unmapped_storage_condition_before_business_api(
         self,

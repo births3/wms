@@ -211,10 +211,45 @@ def resolve_existing_inbound_binding(
         raise WorkerHttpError(502, "message binding lookup", "invalid config version") from exc
     if not connector_id or not connector_code or config_version < 1:
         return None
-    return RouteBinding(
+    binding = RouteBinding(
         connector_id=connector_id,
         connector_code=connector_code,
         config_version=config_version,
         channel="interface_table",
         message_type=message_type,
     )
+    path = f"/api/v1/config/erp-connectors/{connector_id}/versions/{config_version}"
+    status, snapshot, raw = http_json_fn(
+        settings,
+        "GET",
+        path,
+        None,
+        f"connector-version-{connector_id}-{config_version}",
+    )
+    if status != 200 or not isinstance(snapshot, dict):
+        raise WorkerHttpError(status, "connector version lookup", raw)
+    expected_snapshot = {
+        "id": connector_id,
+        "connector_code": connector_code,
+        "config_version": config_version,
+    }
+    if any(snapshot.get(key) != value for key, value in expected_snapshot.items()):
+        raise WorkerHttpError(409, "connector version lookup", "binding changed")
+    if snapshot.get("channel_mode") not in (
+        "interface_table",
+        "rest_primary_table_fallback",
+    ):
+        raise WorkerHttpError(409, "connector version lookup", "channel unavailable")
+    directions = snapshot.get("directions")
+    message_types = snapshot.get("message_types")
+    warehouse_ids = snapshot.get("warehouse_ids")
+    if not isinstance(directions, list) or "inbound" not in directions:
+        raise WorkerHttpError(409, "connector version lookup", "direction unavailable")
+    if not isinstance(message_types, list) or message_type not in message_types:
+        raise WorkerHttpError(409, "connector version lookup", "message type unavailable")
+    if not isinstance(warehouse_ids, list):
+        raise WorkerHttpError(409, "connector version lookup", "warehouse scope missing")
+    warehouse_id = str(row.get("warehouse_id") or "").strip()
+    if warehouse_id and warehouse_ids and warehouse_id not in warehouse_ids:
+        raise WorkerHttpError(409, "connector version lookup", "warehouse unavailable")
+    return binding
