@@ -42,6 +42,7 @@ class TestExchangeLifecycle(unittest.TestCase):
                 "asn",
                 {"id": "1", "external_doc_no": "D", "idempotency_key": "k"},
                 handler,
+                lambda _message_type, row, _binding: row,
                 http_json=failed_audit,
             )
         self.assertFalse(handler_called)
@@ -77,8 +78,14 @@ class TestExchangeLifecycle(unittest.TestCase):
             assert body is not None
             return 200, {"id": "00000000-0000-0000-0000-0000000000aa"}, "{}"
 
-        def handler(_settings: Any, _row: dict[str, str]) -> str:
+        def handler(_settings: Any, command: dict[str, str]) -> str:
+            self.assertEqual(command, {"canonical_ref": "ERP-1"})
             return "wms-res-1"
+
+        def convert(
+            _message_type: str, raw: dict[str, str], _binding: Any
+        ) -> dict[str, str]:
+            return {"canonical_ref": raw["external_ref"]}
 
         row = {
             "id": "1",
@@ -92,6 +99,7 @@ class TestExchangeLifecycle(unittest.TestCase):
             "asn",
             row,
             handler,
+            convert,
             http_json=fake_http,
             route_binding=SimpleNamespace(
                 connector_id="connector-1",
@@ -143,6 +151,7 @@ class TestExchangeLifecycle(unittest.TestCase):
                 "asn",
                 {"id": "1", "external_doc_no": "D", "idempotency_key": "k"},
                 boom,
+                lambda _message_type, row, _binding: row,
                 http_json=fake_http,
             )
         self.assertIn("final_failure", [post["stage"] for post in posts])

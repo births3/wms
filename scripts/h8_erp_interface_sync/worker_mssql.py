@@ -84,7 +84,8 @@ SELECT
   CONVERT(NVARCHAR(33), expected_arrival_at, 126),
   document_type, ISNULL(external_ref,N''), ISNULL(receipt_no,N''),
   schema_version,
-  idempotency_key, CONVERT(NVARCHAR(16), retry_count)
+  idempotency_key, CONVERT(NVARCHAR(16), retry_count),
+  CONVERT(NVARCHAR(33), created_at, 126)
 FROM dbo.if_in_asn WHERE id IN (SELECT id FROM @claimed);
 """
         )
@@ -103,6 +104,7 @@ FROM dbo.if_in_asn WHERE id IN (SELECT id FROM @claimed);
             "schema_version",
             "idempotency_key",
             "retry_count",
+            "created_at",
         ]
     elif table == "if_in_outbound_order":
         select_sql = (
@@ -116,7 +118,8 @@ SELECT
   ISNULL(batch_no,N''), CONVERT(NVARCHAR(32), planned_qty),
   ISNULL(CONVERT(NVARCHAR(33), required_ship_at, 126),N''),
   schema_version,
-  idempotency_key, CONVERT(NVARCHAR(16), retry_count)
+  idempotency_key, CONVERT(NVARCHAR(16), retry_count),
+  CONVERT(NVARCHAR(33), created_at, 126)
 FROM dbo.if_in_outbound_order WHERE id IN (SELECT id FROM @claimed);
 """
         )
@@ -136,6 +139,7 @@ FROM dbo.if_in_outbound_order WHERE id IN (SELECT id FROM @claimed);
             "schema_version",
             "idempotency_key",
             "retry_count",
+            "created_at",
         ]
     elif table == "if_in_product_master":
         select_sql = (
@@ -147,7 +151,8 @@ SELECT
   ISNULL(approval_no,N''), ISNULL(spec,N''), ISNULL(dosage_form,N''),
   ISNULL(manufacturer,N''), ISNULL(storage_condition,N''),
   schema_version,
-  idempotency_key, CONVERT(NVARCHAR(16), retry_count)
+  idempotency_key, CONVERT(NVARCHAR(16), retry_count),
+  CONVERT(NVARCHAR(33), created_at, 126)
 FROM dbo.if_in_product_master WHERE id IN (SELECT id FROM @claimed);
 """
         )
@@ -165,6 +170,7 @@ FROM dbo.if_in_product_master WHERE id IN (SELECT id FROM @claimed);
             "schema_version",
             "idempotency_key",
             "retry_count",
+            "created_at",
         ]
     elif table == "if_in_return_order":
         select_sql = (
@@ -181,7 +187,8 @@ SELECT
   document_type, ISNULL(external_ref,N''), ISNULL(receipt_no,N''),
   ISNULL(batch_no,N''),
   schema_version,
-  idempotency_key, CONVERT(NVARCHAR(16), retry_count)
+  idempotency_key, CONVERT(NVARCHAR(16), retry_count),
+  CONVERT(NVARCHAR(33), created_at, 126)
 FROM dbo.if_in_return_order WHERE id IN (SELECT id FROM @claimed);
 """
         )
@@ -202,6 +209,7 @@ FROM dbo.if_in_return_order WHERE id IN (SELECT id FROM @claimed);
             "schema_version",
             "idempotency_key",
             "retry_count",
+            "created_at",
         ]
     elif table == "if_in_product_change":
         select_sql = (
@@ -215,7 +223,8 @@ SELECT
   ISNULL(CONVERT(NVARCHAR(36), liaison_id),N''),
   ISNULL(CONVERT(NVARCHAR(36), asn_id),N''),
   schema_version,
-  idempotency_key, CONVERT(NVARCHAR(16), retry_count)
+  idempotency_key, CONVERT(NVARCHAR(16), retry_count),
+  CONVERT(NVARCHAR(33), created_at, 126)
 FROM dbo.if_in_product_change WHERE id IN (SELECT id FROM @claimed);
 """
         )
@@ -232,6 +241,7 @@ FROM dbo.if_in_product_change WHERE id IN (SELECT id FROM @claimed);
             "schema_version",
             "idempotency_key",
             "retry_count",
+            "created_at",
         ]
     else:
         raise ValueError(table)

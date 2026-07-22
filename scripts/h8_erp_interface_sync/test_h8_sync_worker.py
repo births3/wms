@@ -28,7 +28,9 @@ from sync_worker import (
     resolve_inbound_route,
     validate_row_schema_version,
 )
+from inbound_canonical import CanonicalMappingError, build_inbound_canonical
 from worker_route import (
+    RouteBinding,
     claim_manual_replay,
     get_worker_claim_decision,
     list_manual_replays,
@@ -151,13 +153,16 @@ class TestInboundCorePipeline(unittest.TestCase):
                 sync_worker,
                 "run_inbound_pipeline",
                 return_value=("wms-1", object()),
-            ),
+            ) as pipeline,
             patch.object(sync_worker, "mark_row"),
         ):
             self.assertEqual(sync_worker.process_once(settings(), ["asn"], False), 1)
 
         self.assertEqual(order, ["requeue", "claim", "process"])
         list_replays.assert_called_once_with(settings(), "asn")
+        self.assertIs(
+            pipeline.call_args.args[4], sync_worker.build_inbound_canonical
+        )
 
     def test_requeue_replay_row_restores_terminal_row_with_original_key(self) -> None:
         with patch("worker_mssql.sqlcmd_query", return_value="ready") as query:
@@ -310,28 +315,35 @@ class TestInboundCorePipeline(unittest.TestCase):
         self.assertIn("created_from=1970-01-01T00%3A00%3A00Z", calls[0])
         self.assertIn(f"/{settings().connector_id}/versions/2", calls[1])
 
-    def test_product_rejects_unmapped_storage_condition_before_business_api(
-        self,
-    ) -> None:
-        handler = HANDLERS["product_master"][1]
+    def test_product_rejects_unmapped_storage_condition_before_business_api(self) -> None:
         row = {
+            "id": "row-1",
+            "owner_id": "owner-1",
+            "external_doc_no": "ERP-1",
             "idempotency_key": "idem-product-1",
             "product_code": "P-1",
             "product_name": "药品一",
             "storage_condition": "ERP_UNKNOWN",
         }
-        with patch(
-            "sync_worker.http_json",
-            return_value=(201, {"id": "product-1"}, ""),
-        ) as business_api:
-            with self.assertRaises(WorkerHttpError) as caught:
-                handler(settings(), row)
+        with self.assertRaises(CanonicalMappingError) as caught:
+            build_inbound_canonical(
+                "product_master",
+                row,
+                RouteBinding(
+                    connector_id=settings().connector_id,
+                    connector_code="SELF-ERP",
+                    config_version=1,
+                    channel="interface_table",
+                    message_type="product_master",
+                ),
+            )
         self.assertEqual(caught.exception.status, 422)
         self.assertFalse(is_retryable_worker_error(caught.exception))
-        business_api.assert_not_called()
 
     def test_each_inbound_business_api_uses_shared_error_classification(self) -> None:
         row = {
+            "id": "row-1",
+            "owner_id": "owner-1",
             "idempotency_key": "idem-1",
             "external_doc_no": "ERP-1",
             "external_ref": "ERP-1",
@@ -351,15 +363,23 @@ class TestInboundCorePipeline(unittest.TestCase):
             "field_name": "spec",
             "new_value": "10mg",
         }
+        binding = RouteBinding(
+            connector_id=settings().connector_id,
+            connector_code="SELF-ERP",
+            config_version=1,
+            channel="interface_table",
+            message_type="asn",
+        )
         for status, expected_retryable in ((503, True), (422, False)):
             for message_type, (_table, handler) in HANDLERS.items():
                 with self.subTest(message_type=message_type, status=status):
+                    command = build_inbound_canonical(message_type, row, binding)
                     with patch(
                         "sync_worker.http_json",
                         return_value=(status, None, '{"token":"response-secret"}'),
                     ):
                         with self.assertRaises(WorkerHttpError) as caught:
-                            handler(settings(), row)
+                            handler(settings(), command)
                     self.assertEqual(
                         is_retryable_worker_error(caught.exception),
                         expected_retryable,
@@ -515,12 +535,14 @@ class TestInboundCorePipeline(unittest.TestCase):
                 "1",
                 "idem-1",
                 "0",
+                "2026-07-22T09:59:00",
             ]
         )
         with patch("worker_mssql.sqlcmd_query", return_value=raw):
             rows = claim_rows(settings(), "if_in_asn")
         self.assertEqual(rows[0]["external_doc_no"], "ASN-1")
         self.assertEqual(rows[0]["schema_version"], "1")
+        self.assertEqual(rows[0]["created_at"], "2026-07-22T09:59:00")
 
     def test_worker_runtime_calls_include_binding_and_claim_count(self) -> None:
         calls: list[tuple[str, str, dict | None]] = []

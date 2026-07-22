@@ -105,7 +105,8 @@ def run_inbound_pipeline(
     settings: Any,
     message_type: str,
     row: dict[str, str],
-    handler: Callable[[Any, dict[str, str]], str],
+    handler: Callable[[Any, Any], str],
+    converter: Callable[[str, dict[str, str], Any | None], Any],
     *,
     http_json: HttpJsonFn | None = None,
     route_binding: Any | None = None,
@@ -134,12 +135,13 @@ def run_inbound_pipeline(
         http_json=http_json,
     )
     life.stage("receive", "ok")
-    life.stage("convert", "ok")
-    if dry_run:
-        return None, life
     try:
+        command = converter(message_type, row, route_binding)
+        life.stage("convert", "ok")
+        if dry_run:
+            return None, life
         life.stage("business_api", "started")
-        wms_id = handler(settings, row)
+        wms_id = handler(settings, command)
         life.stage("business_api", "ok")
         # 入站成功：WMS 已接受即视为回执阶段完成（ERP 业务回执另走 acked）
         life.stage("receipt", "ok")

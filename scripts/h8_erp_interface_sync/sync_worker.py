@@ -44,6 +44,10 @@ _sys_path = str(Path(__file__).resolve().parent)
 if _sys_path not in sys.path:
     sys.path.insert(0, _sys_path)
 from exchange_lifecycle import record_preflight_failure, run_inbound_pipeline  # noqa: E402
+from inbound_canonical import (  # noqa: E402
+    H8CanonicalInboundCommand,
+    build_inbound_canonical,
+)
 from outbound_publish import (  # noqa: E402
     process_outbound_once,
     resolve_wms_db_url,
@@ -242,28 +246,21 @@ def try_record_worker_heartbeat(
 # ---------------------------------------------------------------------------
 
 
-def handle_asn(settings: Settings, row: dict[str, str]) -> str:
-    receipt_no = row.get("receipt_no") or ""
-    if not receipt_no.strip():
-        # 由服务端 M-CG 生成时部分实现仍要求字段；给外部可读单号
-        receipt_no = f"ERP-{row['external_doc_no']}"
-    # expected_arrival 需 RFC3339
-    arrival = row["expected_arrival_at"]
-    if arrival and not arrival.endswith("Z") and "+" not in arrival:
-        arrival = arrival + "Z"
+def handle_asn(settings: Settings, command: H8CanonicalInboundCommand) -> str:
+    fields = command.fields
     body = {
-        "receipt_no": receipt_no,
-        "document_type": row["document_type"] or "purchase_inbound",
-        "supplier_id": row["supplier_id"],
-        "warehouse_id": row["warehouse_id"],
-        "external_ref": row.get("external_ref") or row["external_doc_no"],
-        "expected_arrival_at": arrival,
+        "receipt_no": fields["receipt_no"],
+        "document_type": fields["document_type"],
+        "supplier_id": fields["supplier_id"],
+        "warehouse_id": command.warehouse_id,
+        "external_ref": command.external_ref,
+        "expected_arrival_at": fields["expected_arrival_at"],
         "lines": [
             {
                 "line_no": 1,
                 "product_id": None,
-                "product_code": row["product_code"],
-                "expected_qty": int(row["expected_qty"]),
+                "product_code": fields["product_code"],
+                "expected_qty": fields["expected_qty"],
                 "batch_no": None,
                 "production_date": None,
                 "expiry_date": None,
@@ -275,36 +272,28 @@ def handle_asn(settings: Settings, row: dict[str, str]) -> str:
         "POST",
         "/api/v1/inbound/receiving-orders",
         body,
-        row["idempotency_key"],
+        command.idempotency_key,
     )
     if status in (200, 201) and isinstance(parsed, dict) and parsed.get("id"):
         return str(parsed["id"])
     raise WorkerHttpError(status, "ASN API", raw)
 
 
-def handle_outbound(settings: Settings, row: dict[str, str]) -> str:
-    wms_no = row.get("wms_order_no") or ""
-    if not wms_no.strip():
-        wms_no = f"WMS-{row['external_doc_no']}"
-    ship_at = row.get("required_ship_at") or None
-    if ship_at == "":
-        ship_at = None
-    elif ship_at and not ship_at.endswith("Z") and "+" not in ship_at:
-        ship_at = ship_at + "Z"
-    batch_no = (row.get("batch_no") or "").strip() or "ERP-UNSPEC"
+def handle_outbound(settings: Settings, command: H8CanonicalInboundCommand) -> str:
+    fields = command.fields
     line: dict[str, Any] = {
         "line_no": 1,
-        "product_code": row["product_code"],
-        "batch_no": batch_no,
-        "planned_qty": int(row["planned_qty"]),
+        "product_code": fields["product_code"],
+        "batch_no": fields["batch_no"],
+        "planned_qty": fields["planned_qty"],
     }
     body: dict[str, Any] = {
-        "document_type": row["document_type"] or "sales_outbound",
-        "wms_order_no": wms_no,
-        "erp_order_no": row.get("erp_order_no") or row["external_doc_no"],
-        "customer_id": row["customer_id"],
-        "warehouse_id": row["warehouse_id"],
-        "required_ship_at": ship_at,
+        "document_type": fields["document_type"],
+        "wms_order_no": fields["wms_order_no"],
+        "erp_order_no": fields["erp_order_no"],
+        "customer_id": fields["customer_id"],
+        "warehouse_id": command.warehouse_id,
+        "required_ship_at": fields["required_ship_at"],
         "lines": [line],
     }
     status, parsed, raw = http_json(
@@ -312,78 +301,58 @@ def handle_outbound(settings: Settings, row: dict[str, str]) -> str:
         "POST",
         "/api/v1/outbound/orders",
         body,
-        row["idempotency_key"],
+        command.idempotency_key,
     )
     if status in (200, 201) and isinstance(parsed, dict) and parsed.get("id"):
         return str(parsed["id"])
     raise WorkerHttpError(status, "Outbound API", raw)
 
 
-def handle_product(settings: Settings, row: dict[str, str]) -> str:
-    # 与 master-data CreateProduct 契约一致：storage_condition 走 attrs 枚举
-    storage = (row.get("storage_condition") or "normal").strip().lower()
-    if storage not in ("frozen", "cold", "cool", "normal"):
-        raise WorkerHttpError(
-            422,
-            "storage condition mapping",
-            f"unmapped storage_condition {storage}",
-        )
+def handle_product(settings: Settings, command: H8CanonicalInboundCommand) -> str:
+    fields = command.fields
     attrs: dict[str, Any] = {
-        "storage_condition": storage,
+        "storage_condition": fields["storage_condition"],
         "source": "erp_interface",
     }
     body = {
-        "product_code": row["product_code"],
-        "product_name": row["product_name"],
-        "approval_no": row.get("approval_no") or None,
-        "spec": row.get("spec") or None,
-        "dosage_form": row.get("dosage_form") or None,
-        "manufacturer": row.get("manufacturer") or None,
+        "product_code": fields["product_code"],
+        "product_name": fields["product_name"],
+        "approval_no": fields["approval_no"],
+        "spec": fields["spec"],
+        "dosage_form": fields["dosage_form"],
+        "manufacturer": fields["manufacturer"],
         "special_drug_category_code": "none",
         "attrs": attrs,
     }
-    # 空串转 null
-    for key in ("approval_no", "spec", "dosage_form", "manufacturer"):
-        if body[key] == "":
-            body[key] = None
     status, parsed, raw = http_json(
         settings,
         "POST",
         "/api/v1/master-data/products",
         body,
-        row["idempotency_key"],
+        command.idempotency_key,
     )
     if status in (200, 201) and isinstance(parsed, dict) and parsed.get("id"):
         return str(parsed["id"])
     raise WorkerHttpError(status, "Product API", raw)
 
 
-def handle_return(settings: Settings, row: dict[str, str]) -> str:
+def handle_return(settings: Settings, command: H8CanonicalInboundCommand) -> str:
     """销退入库：走收货单 API，document_type 默认 sales_return（必填原批号）。"""
-    receipt_no = row.get("receipt_no") or ""
-    if not receipt_no.strip():
-        receipt_no = f"ERP-RET-{row['external_doc_no']}"
-    arrival = row["expected_arrival_at"]
-    if arrival and not arrival.endswith("Z") and "+" not in arrival:
-        arrival = arrival + "Z"
-    batch_no = (row.get("batch_no") or "").strip()
-    if not batch_no:
-        raise RuntimeError("sales_return requires batch_no (original batch)")
-    supplier_id = (row.get("supplier_id") or "").strip() or row["customer_id"]
+    fields = command.fields
     body = {
-        "receipt_no": receipt_no,
-        "document_type": row.get("document_type") or "sales_return",
-        "supplier_id": supplier_id,
-        "warehouse_id": row["warehouse_id"],
-        "external_ref": row.get("external_ref") or row["external_doc_no"],
-        "expected_arrival_at": arrival,
+        "receipt_no": fields["receipt_no"],
+        "document_type": fields["document_type"],
+        "supplier_id": fields["supplier_id"],
+        "warehouse_id": command.warehouse_id,
+        "external_ref": command.external_ref,
+        "expected_arrival_at": fields["expected_arrival_at"],
         "lines": [
             {
                 "line_no": 1,
                 "product_id": None,
-                "product_code": row["product_code"],
-                "expected_qty": int(row["expected_qty"]),
-                "batch_no": batch_no,
+                "product_code": fields["product_code"],
+                "expected_qty": fields["expected_qty"],
+                "batch_no": fields["batch_no"],
                 "production_date": None,
                 "expiry_date": None,
             }
@@ -394,30 +363,33 @@ def handle_return(settings: Settings, row: dict[str, str]) -> str:
         "POST",
         "/api/v1/inbound/receiving-orders",
         body,
-        row["idempotency_key"],
+        command.idempotency_key,
     )
     if status in (200, 201) and isinstance(parsed, dict) and parsed.get("id"):
         return str(parsed["id"])
     raise WorkerHttpError(status, "Return ASN API", raw)
 
 
-def handle_product_change(settings: Settings, row: dict[str, str]) -> str:
+def handle_product_change(
+    settings: Settings, command: H8CanonicalInboundCommand
+) -> str:
     """档案补录/主数据变更回写：按 product_id 或 list 匹配 product_code 后 PATCH。"""
-    product_id = (row.get("product_id") or "").strip()
+    fields = command.fields
+    product_id = fields["product_id"]
     if not product_id:
         status, parsed, raw = http_json(
             settings,
             "GET",
             "/api/v1/master-data/products",
             None,
-            row["idempotency_key"] + "-list",
+            command.idempotency_key + "-list",
         )
         if status != 200 or not isinstance(parsed, dict):
             raise WorkerHttpError(status, "list products", raw)
         items = parsed.get("data") or parsed.get("items") or []
         if not isinstance(items, list):
             raise RuntimeError("products list shape unexpected")
-        code = row["product_code"]
+        code = fields["product_code"]
         match = next(
             (p for p in items if isinstance(p, dict) and p.get("product_code") == code),
             None,
@@ -426,8 +398,8 @@ def handle_product_change(settings: Settings, row: dict[str, str]) -> str:
             raise RuntimeError(f"product_code {code} not found")
         product_id = str(match["id"])
 
-    field = (row.get("field_name") or "").strip()
-    new_value = row.get("new_value") or ""
+    field = fields["field_name"].strip()
+    new_value = fields["new_value"]
     body: dict[str, Any] = {}
     # 常见字段映射到 UpdateProductRequest
     if field in (
@@ -448,14 +420,16 @@ def handle_product_change(settings: Settings, row: dict[str, str]) -> str:
         "PATCH",
         f"/api/v1/master-data/products/{product_id}",
         body,
-        row["idempotency_key"],
+        command.idempotency_key,
     )
     if status in (200, 201) and isinstance(parsed, dict) and parsed.get("id"):
         return str(parsed["id"])
     raise WorkerHttpError(status, "Product change API", raw)
 
 
-HANDLERS: dict[str, tuple[str, Callable[[Settings, dict[str, str]], str]]] = {
+HANDLERS: dict[
+    str, tuple[str, Callable[[Settings, H8CanonicalInboundCommand], str]]
+] = {
     "asn": ("if_in_asn", handle_asn),
     "outbound_order": ("if_in_outbound_order", handle_outbound),
     "product_master": ("if_in_product_master", handle_product),
@@ -509,6 +483,7 @@ def process_once(
                         type_name,
                         row,
                         handler,
+                        build_inbound_canonical,
                         dry_run=True,
                     )
                 except Exception as life_exc:  # noqa: BLE001
@@ -548,6 +523,7 @@ def process_once(
                     type_name,
                     row,
                     handler,
+                    build_inbound_canonical,
                     route_binding=binding,
                     dry_run=False,
                 )
