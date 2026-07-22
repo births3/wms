@@ -4509,6 +4509,9 @@ test_checks = [
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_smart_putaway_postgres smart_putaway_recommends_and_commits_owner_scoped_inventory_atomically -- --exact --test-threads=1",
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_ops_closeout_postgres status_change_enqueues_erp_outbox_and_process_succeeds -- --exact --test-threads=1",
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_status_allocation_postgres -- --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test master_data_postgres h8_product_change_replays_without_duplicate_update_or_audit -- --exact --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_deferred_closeout_postgres_part2 h8_sales_return_create_replays_without_duplicate_order_or_audit -- --exact --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave4_wave_planning_postgres h8_outbound_order_create_replays_without_duplicate_lines -- --exact --test-threads=1",
   "just openapi-check",
 ]
 evidence_refs = [
@@ -4534,11 +4537,14 @@ evidence_refs = [
   "backend/crates/api/src/wave3_repository/erp_outbox.rs",
   "backend/crates/api/src/wave3_repository_part2b.rs",
   "backend/crates/api/tests/m3_ops_closeout_postgres.rs",
+  "backend/crates/api/tests/master_data_postgres/h8_product_change_idempotency.rs",
+  "backend/crates/api/tests/m2_deferred_closeout_postgres_part2.rs",
+  "backend/crates/api/tests/wave4_wave_planning_postgres.rs",
   "docs/runbooks/h8-erp-interface-table-sync.md",
   "docs/retros/h8-asn-inbound-flow-evidence.json",
   "docs/retros/h8-local-integration-evidence.json",
 ]
-reason = "ASN V2、本地主备、五类接口表 DTO 到 canonical 命令的统一转换、入站唯一路由、首次配置绑定、不可变历史配置快照及 Worker 重试按原版本读取、人工重放桥的原 Idempotency-Key 恢复与 PostgreSQL 即时接管、既有幂等消息绑定切换拒绝、schema_version 严格拒绝、预检失败 receive/final_failure H2 审计、审计失败阻断业务、五类入站业务 API 的 503/422 错误分类、共享错误出口凭据脱敏、未知 storage_condition 写入前拒绝、route-resolve 对已注入单仓范围的默认绑定和越权 403，以及出站按连接货主/目录/仓库收窄、逐消息唯一路由和现有三类生产者的仓库身份已验证；仍缺真实 M-PM 规则查询与映射、人工重放桥真实 MSSQL 运行证据、JWT 用户多仓范围与 Worker 身份接线、档案补录/对账差异/发货确认/库存快照四类生产者、逐消息 L2-L4/L11 与自研 ERP 双向 S4。"
+reason = "ASN V2、本地主备、五类接口表 DTO 到 canonical 命令的统一转换、五类入站业务 API 的 PostgreSQL 同键重放、入站唯一路由、首次配置绑定、不可变历史配置快照及 Worker 重试按原版本读取、人工重放桥的原 Idempotency-Key 恢复与 PostgreSQL 即时接管、既有幂等消息绑定切换拒绝、schema_version 严格拒绝、预检失败 receive/final_failure H2 审计、审计失败阻断业务、五类入站业务 API 的 503/422 错误分类、共享错误出口凭据脱敏、未知 storage_condition 写入前拒绝、route-resolve 对已注入单仓范围的默认绑定和越权 403，以及出站按连接货主/目录/仓库收窄、逐消息唯一路由和现有三类生产者的仓库身份已验证；仍缺真实 M-PM 规则查询与映射、人工重放桥真实 MSSQL 运行证据、JWT 用户多仓范围与 Worker 身份接线、档案补录/对账差异/发货确认/库存快照四类生产者、七类出站及降级/回执 L11 与自研 ERP 双向 S4。"
 owner = "H8 模块负责人"
 resume_when = "接入公共 JWT 用户多仓范围与 Worker 身份，完成剩余 Worker 运行接线和四组闭环逐消息 L2-L4/L11，再归档自研 ERP dev/staging 双向请求、两级回执、重试和审计关联后关闭延期。"
 
