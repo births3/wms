@@ -148,11 +148,7 @@ def claim_wms_outbox(
     has_deadline = table_has_column(database_url, table, "deadline_at")
     has_ref = table_has_column(database_url, table, ref_col)
 
-    ref_expr = (
-        f"COALESCE(o.{ref_col}::text, '')"
-        if has_ref
-        else "''"
-    )
+    ref_expr = f"COALESCE(o.{ref_col}::text, '')" if has_ref else "''"
     max_expr = "o.max_attempts" if has_max else "5"
     deadline_expr = (
         "to_char(o.deadline_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')"
@@ -250,7 +246,9 @@ FROM upd;
                 external_ref=str(obj.get("external_ref") or ""),
                 attempt_count=int(obj.get("attempt_count") or 0),
                 max_attempts=int(obj.get("max_attempts") or 5),
-                deadline_at=(str(obj["deadline_at"]) if obj.get("deadline_at") else None),
+                deadline_at=(
+                    str(obj["deadline_at"]) if obj.get("deadline_at") else None
+                ),
                 callback_path=callback_path,
             )
         )
@@ -385,6 +383,7 @@ def process_outbound_once(
     transport: str = "table",
     callback_base: str | None = None,
     http_max_attempts: int | None = None,
+    connector_id: str | None = None,
 ) -> int:
     """
     transport:
@@ -447,6 +446,8 @@ def process_outbound_once(
                         str(row.external_ref or row.id),
                         idem,
                         lambda: None,
+                        connector_id=connector_id,
+                        payload=row.payload,
                         dry_run=True,
                     )
                 except Exception as life_exc:  # noqa: BLE001
@@ -491,12 +492,13 @@ def process_outbound_once(
                     str(getattr(row, "external_ref", None) or row.id),
                     idem,
                     _send,
+                    connector_id=connector_id,
+                    payload=row.payload,
                     dry_run=False,
                 )
                 mark_wms_outbox(database_url, table, row.id, succeeded=True)
                 print(
-                    f"[h8-out] published {table}/{row.id} "
-                    f"(transport={transport})",
+                    f"[h8-out] published {table}/{row.id} " f"(transport={transport})",
                     flush=True,
                 )
             except Exception as exc:  # noqa: BLE001
@@ -551,6 +553,4 @@ def resolve_outbound_transport(*, database_url: str | None = None) -> str:
 
 
 def resolve_callback_base() -> str | None:
-    return os.environ.get("ERP_CALLBACK_BASE") or os.environ.get(
-        "H8_ERP_CALLBACK_BASE"
-    )
+    return os.environ.get("ERP_CALLBACK_BASE") or os.environ.get("H8_ERP_CALLBACK_BASE")

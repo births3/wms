@@ -10,6 +10,8 @@ US-H8-001：生产 `channel_mode` 为 `rest` / `interface_table` / `rest_primary
 ```bash
 export WMS_API_TOKEN=...
 export WMS_DB_URL=postgres://...
+export H8_CONNECTOR_ID=<当前接口库对应的连接 UUID>
+# 完整报文保留密钥配置在 WMS API，不配置在 Worker；详见 runbook
 # B 接口表
 python3 scripts/h8_erp_interface_sync/sync_worker.py --once --transport table
 # A REST

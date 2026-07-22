@@ -31,6 +31,14 @@ ERP 厂商容器端口 **18092**，厂商标识 `container-erp-vendor-a`；回�
 export WMS_API_BASE=http://127.0.0.1:18090
 export WMS_API_TOKEN='...'   # login 需 owner_code
 export WMS_DB_URL='postgres://...'   # 出站读 outbox
+export H8_CONNECTOR_ID='...' # 当前接口库对应的 H8 连接 UUID；一个 Worker 只绑定一个连接
+# 可选：H8_WORKER_ID（默认主机名+PID）/ H8_WORKER_VERSION / H8_HEARTBEAT_TTL_SEC
+
+# API 侧完整报文短期保留；生产必须由 Secret 管理器注入，不写入仓库或日志
+export WMS_ENCRYPTION_MASTER_KEY='至少 32 字节的主密钥'
+export WMS_ENCRYPTION_KEY_VERSION='v2' # 可选，默认 v1
+# 轮换期按版本提供尚未到期的旧密钥；值由 Secret 管理器注入，禁止写入文件或日志
+export WMS_ENCRYPTION_PREVIOUS_MASTER_KEYS='{"v1":"至少 32 字节的旧主密钥"}'
 
 # 出站传输：生产使用 table | http；both 只用于本地双写联调
 export H8_OUTBOUND_TRANSPORT=table
@@ -76,6 +84,15 @@ python3 scripts/h8_erp_interface_sync/ack_if_out.py --all
 ```
 
 ## 5. Worker
+
+Worker 启动后向「H8 ERP 消息 / Worker 状态」上报实例、版本、方向、当前认领数和心跳。
+每批认领前读取当前连接 + 方向的暂停控制；暂停时不触碰 MSSQL 待处理行，在途批次继续完成。
+恢复或暂停到期后继续认领。心跳失败只告警，不中断已经在途的业务处理。
+
+完整报文默认只计算摘要。管理员在 Worker 状态页按连接启用后，API 使用 PostgreSQL
+`pgcrypto` 加密保存 1–30 天（默认 7 天）；查看明文需要写权限并产生 H2 审计。API 每小时
+清除到期密文，保留消息、尝试、摘要和审计。部署迁移账号必须有创建 `pgcrypto` 扩展的权限；
+密钥缺失或错误时禁止启用/解密，不得把数据库加密错误返回前端。
 
 ```bash
 # 双向 + 接口表出站
