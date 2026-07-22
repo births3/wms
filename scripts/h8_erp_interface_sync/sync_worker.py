@@ -57,6 +57,7 @@ from worker_route import (  # noqa: E402
     is_retryable_worker_error,
     post_worker_heartbeat as post_worker_heartbeat_with_http,
     resolve_inbound_route as resolve_inbound_route_with_http,
+    sanitize_worker_error,
     validate_row_schema_version,
 )
 from worker_mssql import claim_rows, mark_row, sqlcmd_query  # noqa: E402
@@ -203,7 +204,13 @@ def try_record_worker_heartbeat(
             http_json_fn=http_json,
         )
     except Exception as exc:  # noqa: BLE001 — 监控失败不得中断在途业务
-        print(f"[h8] heartbeat warn: {exc}", flush=True)
+        summary = sanitize_worker_error(
+            str(exc), (settings.api_token, settings.mssql_password)
+        )
+        print(
+            f"[h8] heartbeat warn: {summary}",
+            flush=True,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -516,6 +523,9 @@ def process_once(
                         error = audit_exc
                 retry += 1
                 retryable = is_retryable_worker_error(error)
+                error_summary = sanitize_worker_error(
+                    str(error), (settings.api_token, settings.mssql_password)
+                )
                 next_status = (
                     "pending" if retryable and retry < settings.max_retry else "dead"
                 )
@@ -524,10 +534,10 @@ def process_once(
                     table,
                     row_id,
                     next_status,
-                    error=str(error),
+                    error=error_summary,
                     retry_count=retry,
                 )
-                print(f"[h8] error {type_name}: {error}", flush=True)
+                print(f"[h8] error {type_name}: {error_summary}", flush=True)
         if not dry_run:
             try_record_worker_heartbeat(settings, heartbeat_directions, 0)
     return processed

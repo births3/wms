@@ -27,7 +27,11 @@ from sync_worker import (
     resolve_inbound_route,
     validate_row_schema_version,
 )
-from worker_route import get_worker_claim_decision, post_worker_heartbeat
+from worker_route import (
+    get_worker_claim_decision,
+    post_worker_heartbeat,
+    sanitize_worker_error,
+)
 from worker_mssql import claim_rows
 
 
@@ -53,6 +57,22 @@ def settings() -> Settings:
 
 
 class TestInboundCorePipeline(unittest.TestCase):
+    def test_worker_error_summary_redacts_credentials(self) -> None:
+        summary = sanitize_worker_error(
+            'Authorization: Bearer top-secret password="db-secret" token=api-secret',
+            secrets=("top-secret", "db-secret", "api-secret"),
+        )
+        self.assertNotIn("top-secret", summary)
+        self.assertNotIn("db-secret", summary)
+        self.assertNotIn("api-secret", summary)
+        self.assertIn("***", summary)
+
+        unknown = sanitize_worker_error(
+            '{"token":"response-secret","password":"response-password"}'
+        )
+        self.assertNotIn("response-secret", unknown)
+        self.assertNotIn("response-password", unknown)
+
     def test_route_binding_is_resolved_before_business_api(self) -> None:
         calls: list[str] = []
 

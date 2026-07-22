@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import urllib.parse
 from dataclasses import dataclass
 from typing import Any, Callable
@@ -25,8 +26,23 @@ class RouteBinding:
 
 class WorkerHttpError(RuntimeError):
     def __init__(self, status: int, operation: str, detail: str) -> None:
-        super().__init__(f"{operation} HTTP {status}: {detail[:500]}")
+        super().__init__(f"{operation} HTTP {status}: {sanitize_worker_error(detail)}")
         self.status = status
+
+
+def sanitize_worker_error(raw: str, secrets: tuple[str | None, ...] = ()) -> str:
+    """Worker 日志/失败摘要边界：隐藏已知凭据和常见认证字段。"""
+    safe = raw
+    for secret in secrets:
+        if secret:
+            safe = safe.replace(secret, "***")
+    safe = re.sub(r"(?i)(bearer\s+)[^\s,;\"'}]+", r"\1***", safe)
+    safe = re.sub(
+        r"(?i)([\"']?(?:password|token|api[_-]?key)[\"']?\s*[:=]\s*[\"']?)[^\"'\s,;}]+",
+        r"\1***",
+        safe,
+    )
+    return safe[:500]
 
 
 def get_worker_claim_decision(

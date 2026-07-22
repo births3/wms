@@ -10,6 +10,8 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from worker_route import sanitize_worker_error
+
 # table + external_ref 列 + 可选档案补录专用
 # message_type 与 US-H8-002 受控出站目录对齐
 OUTBOX_SOURCES: list[dict[str, str]] = [
@@ -418,7 +420,15 @@ def process_outbound_once(
                 special_retry=special,
             )
         except Exception as exc:  # noqa: BLE001
-            print(f"[h8-out] skip claim {table}: {exc}", flush=True)
+            summary = sanitize_worker_error(
+                str(exc),
+                (
+                    database_url,
+                    os.environ.get("WMS_API_TOKEN"),
+                    os.environ.get("H8_MSSQL_PASSWORD"),
+                ),
+            )
+            print(f"[h8-out] skip claim {table}: {summary}", flush=True)
             continue
         for row in rows:
             processed += 1
@@ -502,17 +512,25 @@ def process_outbound_once(
                     flush=True,
                 )
             except Exception as exc:  # noqa: BLE001
+                summary = sanitize_worker_error(
+                    str(exc),
+                    (
+                        database_url,
+                        os.environ.get("WMS_API_TOKEN"),
+                        os.environ.get("H8_MSSQL_PASSWORD"),
+                    ),
+                )
                 mark_wms_outbox(
                     database_url,
                     table,
                     row.id,
                     succeeded=False,
-                    error=str(exc),
+                    error=summary,
                     special_retry=special,
                     attempt_count=row.attempt_count,
                     max_attempts=row.max_attempts,
                 )
-                print(f"[h8-out] error {table}/{row.id}: {exc}", flush=True)
+                print(f"[h8-out] error {table}/{row.id}: {summary}", flush=True)
     return processed
 
 
