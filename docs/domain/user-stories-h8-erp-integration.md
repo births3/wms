@@ -451,6 +451,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | 2026-07-23 | 三十五轮入站 canonical 边界 | 接口表适配器读取的五类 MSSQL 行统一转换为 `H8CanonicalInboundCommand`，连接、配置版本、幂等键、关联标识、发生时间和业务字段在 `convert` 阶段收口；业务 API handler 不再接收接口表 DTO。数量和时间在边界完成类型规整，未知储存条件和缺失销退批号以 422 类不可重试映射错误终止。Worker 全套纯逻辑回归通过，AC2 关闭；真实 M-PM 规则查询仍由 AC5 跟踪。 |
 | 2026-07-23 | 三十六轮五类入站 L11 | 复用既有 M2/M4/M1 PostgreSQL 幂等机制，新增销退申请、出库订单和商品变更逐类回归，并与既有 ASN、商品主数据创建证据合并。五类均证明同一 Idempotency-Key 重放返回原资源，业务行、明细、审计及幂等记录不重复；AC7 仍等待七类出站、主备降级和业务回执重复证据。 |
 | 2026-07-23 | 三十七轮已有出站生产者 L11 | 增强入库完成、库存状态、报损和报溢四条既有 PostgreSQL 回归：同键重放后业务副作用、outbox、对应 H2 审计和幂等记录均各一条，outbox 保留仓库身份。当前证明三类已有出站生产者；档案补录、对账差异、发货确认和库存快照尚无业务生产者，AC7 保持 `NEEDS_WORK`。 |
+| 2026-07-23 | 三十八轮人工重放真实链路 | 修复 lifecycle 只写审计、不更新消息状态的问题；入站失败、自动重试和成功现按 domain 状态机落 `failed/processing/succeeded`。Worker 在不可重试或耗尽时先经既有 dead API 写 H8 死信与 H2，再把 MSSQL 行置 dead；H8 终态同步失败则释放接口行重试。Docker MSSQL + 当前源码 API 已证明同一消息、原 Idempotency-Key 和原连接版本完成 `dead → replay → processing → succeeded`，M2 仅一张单据。AC6 关闭；复审确认普通成功/可重试失败仍缺独立 attempt 与 `next_retry_at`，US-H8-003 AC5 更正为 `PARTIAL`；客户 ERP V4 仍未完成。 |
 
 ## 验收记录（US-H8-004 软件切片）
 
@@ -557,7 +558,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | AC-3 入站链路 | `V1/V2` | H8-WORKER、H8-ASN-V2、H8-U2 | Worker 已在业务 API 前调用 `route-resolve` 并严格校验 `schema_version`；处理器已拒绝与 `AuthContext.warehouse_scope` 不一致的仓库；ASN V2 已跑通 | `NEEDS_WORK` | 接入 M-PM 与 JWT 用户多仓范围，并补齐其余 4 类 L2–L4/L11 |
 | AC-4 出站链路 | `V1/V2` | H8-WORKER、H8-LOCAL、M2-PUTAWAY-PG、M3-STATUS-PG | Worker 不再读取全局首条连接；认领先按绑定连接货主/目录/仓库收窄，逐消息调用 `route-resolve`，校验 Worker 连接并把连接编码、配置版本和主通道写入生命周期；现有生产者中的入库完成、库存状态和报损报溢载荷均携带仓库标识 | `NEEDS_WORK` | 接通档案补录、对账差异、发货确认、库存快照四类业务生产者，并取得七类逐类双通道 L2–L4/L11 与真实运行证据 |
 | AC-5 字段规整 | `V1` | H8-DOMAIN、H8-WORKER、代码路径复审 | `apply_mpm_normalize` 有 domain 单测；Worker 已在业务 API 前以 422 拒绝未知 `storage_condition`，且测试证明不发生静默 `normal` 写入 | `NEEDS_WORK` | Worker 接入实际 M-PM 规则查询与有效映射，并补真实数据回读 |
-| AC-6 配置版本绑定 | `V1/V2` | H8-DOMAIN、H8-WORKER、H8-U2、H8-MSG-U3 | 首次处理写入完整绑定；生命周期端点拒绝绑定切换；PostgreSQL 自动保存不可变版本快照并拒绝无版本变更；Worker 重试读取原绑定和历史配置；人工重放桥使用原 Idempotency-Key 恢复接口行并立即接管 `replay:*` 消息，真实 PostgreSQL 已验证筛选与认领 | `NEEDS_WORK` | 在 Docker MSSQL + 真实 WMS API 上证明 `failed/dead → replay → pending → processing → success` 且复用原绑定 |
+| AC-6 配置版本绑定 | `V1/V2` | H8-DOMAIN、H8-WORKER、H8-U2、H8-MSG-U3、H8-ASN-REPLAY-V2 | 首次处理写入完整绑定；生命周期端点拒绝绑定切换；PostgreSQL 自动保存不可变版本快照并拒绝无版本变更；Worker 重试读取原绑定和历史配置；Docker MSSQL + 当前源码 API 已证明同一消息和原 Idempotency-Key 从 dead 经人工确认重放、Worker 自动恢复接口行并以原连接 ID/编码/版本/通道处理成功 | `PASS` | - |
 | AC-7 幂等语义 | `V1/V2` | H8-DOMAIN、H8-ASN-V2、H8-INBOUND-L11、H8-OUTBOUND-L11 | 五类入站均证明同键返回原资源且业务/明细/审计/幂等记录不重复；入库完成、库存状态、报损报溢三类已有出站生产者均证明同键重放仅产生一份业务副作用、outbox、对应 H2 审计和幂等记录 | `NEEDS_WORK` | 补档案补录、对账差异、发货确认、库存快照四类出站生产者，以及主备降级与业务回执重复的 L11 证据 |
 | AC-8 投递保证 | `V1` | H8-WORKER | `scripts/h8_erp_interface_sync/test_h8_sync_worker.py` 的 failover/circuit 测试证明成功路径不双写且切换保留业务键 | `PASS` | - |
 | AC-9 错误分类 | `V1` | H8-DOMAIN、H8-WORKER | Worker 已将网络/408/425/429/5xx 识别为可重试，其余错误直接死信；ASN、出库订单、商品主数据、销退申请和商品变更五类处理器均有 503/422 分类与凭据脱敏测试 | `PASS` | - |
@@ -579,14 +580,15 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 - V2（H8-OUTBOUND-L11）：运行 M2 上架、M3 库存状态、M-SA 报损和报溢四条精确 PostgreSQL 测试，断言同键重放不重复业务副作用、outbox、对应 H2 审计或幂等记录
 - V2（H8-MSG-PG）：`cargo test --manifest-path backend/Cargo.toml -p wms-api --lib h8_erp_messages::`，覆盖真实 PostgreSQL 重放筛选和 Worker 即时接管
 - V2（H8-ASN-V2）：按 `docs/runbooks/h8-erp-interface-table-sync.md` 的 ASN 入站闭环执行；证据为 `docs/retros/h8-asn-inbound-flow-evidence.json`
+- V2（H8-ASN-REPLAY-V2）：同一 runbook 的 ASN 死信与人工重放切片；证据为 `docs/retros/h8-asn-manual-replay-evidence.json`
 - V2（H8-LOCAL）：`just h8-local-integration`；证据为 `docs/retros/h8-local-integration-evidence.json`
 - V3：不适用；US-H8-002 是后台交换能力，无独立用户页面，消息运维页属于 US-H8-003
 - V4：未取得客户正式 ERP dev/staging 证据；本地容器、Mock 和 Docker MSSQL 不计 V4
 
 ### 验收结论
 
-- 已证明：受控目录与纯 domain 规则；五类接口表 DTO 统一经过 canonical 转换后才进入业务 API handler，且五类业务 API 均有真实 PostgreSQL 同键重放证据；Worker 入站唯一路由、首次配置绑定、历史配置快照读取、重试主动复用原绑定、人工重放桥的原键恢复与 PostgreSQL 即时接管、绑定切换拒绝、契约版本拒绝、错误重试分类、凭据脱敏和未知储存条件写入前拒绝；`route-resolve` 对已注入单仓范围的默认绑定与越权拒绝；ASN 接口表入站 V2、幂等回放和 H2 生命周期审计；出站认领的连接货主/目录/仓库收窄、逐消息唯一路由，以及入库完成、库存状态、报损报溢三类现有生产者的仓库身份和 L11；本地出站主备与非双写切片。
-- 未完成：真实 M-PM 规则查询与映射、人工重放桥真实 MSSQL 运行证据、JWT 用户多仓范围、档案补录/对账差异/发货确认/库存快照四类业务生产者与真实唯一路由证据，以及其余消息类型 L2–L4/L11 和客户正式 ERP V4。
+- 已证明：受控目录与纯 domain 规则；五类接口表 DTO 统一经过 canonical 转换后才进入业务 API handler，且五类业务 API 均有真实 PostgreSQL 同键重放证据；Worker 入站唯一路由、首次配置绑定、历史配置快照读取、重试主动复用原绑定、Docker MSSQL 人工重放桥的原键恢复、死信同步、即时接管与成功回执，绑定切换拒绝、契约版本拒绝、错误重试分类、凭据脱敏和未知储存条件写入前拒绝；`route-resolve` 对已注入单仓范围的默认绑定与越权拒绝；ASN 接口表入站 V2、幂等回放和 H2 生命周期审计；出站认领的连接货主/目录/仓库收窄、逐消息唯一路由，以及入库完成、库存状态、报损报溢三类现有生产者的仓库身份和 L11；本地出站主备与非双写切片。
+- 未完成：真实 M-PM 规则查询与映射、JWT 用户多仓范围、档案补录/对账差异/发货确认/库存快照四类业务生产者与真实唯一路由证据，以及其余消息类型 L2–L4/L11、H8 成功消息业务资源引用和客户正式 ERP V4。
 - 恢复条件：完成上述运行接线和逐消息证据后，再使用客户正式 ERP dev/staging 跑双向请求、回执、重试和审计关联；完成前保持 `deferred_stories`。
 
 ---
@@ -608,7 +610,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | AC2 存储边界 | `PASS` | messages + attempts 表 |
 | AC3 状态机 | `PASS` | domain + 测试 |
 | AC4 并发认领 | `PASS` | claim/lease API + 测试 |
-| AC5 失败重试记录 | `PASS` | attempts 追加 |
+| AC5 失败重试记录 | `PARTIAL` | claim/dead/replay 已追加 attempts；真实 Worker 普通成功和可重试失败尚未追加独立 attempt，也未落 `next_retry_at` |
 | AC6 死信条件 | `PASS` | should_enter_dead + mark_dead + h8_message_dead H2 审计 |
 | AC7 人工重放 | `PASS` | API + E2E + 不换业务 id |
 | AC8 查询详情 | `PASS` | QueryPanel 的连接、仓库、通道、外部业务标识、幂等键、关联标识和时间范围均进入服务端精确过滤；真实 PostgreSQL 与关闭 dev-mock 的 Playwright 复用确定性业务键 |

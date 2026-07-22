@@ -123,6 +123,31 @@ business_api、receipt 审计；通过消息重放 API 对同一消息填写原�
 不得人工修改接口表；M2 单据数量仍为 1 且资源 ID 不变。证据见
 `docs/retros/h8-asn-inbound-flow-evidence.json`。
 
+### ASN 死信与人工重放切片
+
+用不存在的供应商引用准备独立 ASN，并设置 `H8_MAX_RETRY=1` 后运行同一 Worker：接口表与
+H8 消息必须同时进入 `dead`，H8 留下 `h8_exchange_final_failure`、`h8_message_dead`
+和 dead 尝试记录。随后由外部 ERP 更正供应商引用但不修改 `sync_status`，管理员调用既有
+重放 API（原因 + 二次确认）；Worker 必须以原 Idempotency-Key 自动把原接口行恢复为
+`pending`、认领并完成业务调用。最终必须同时断言：
+
+- H8 使用同一消息 ID、连接 ID、连接编码、配置版本和通道，状态为 `succeeded`；
+- MSSQL 原行状态为 `success`，`retry_count` 保留且资源 ID 指向 M2 单据；
+- M2 同一 `external_ref` 只有一张收货单；
+- H2 具备失败、死信、重放、认领和成功回执的完整关联动作。
+
+定向自动化命令：
+
+```bash
+cd scripts/h8_erp_interface_sync
+python3 -m unittest test_inbound_terminal_state test_h8_sync_worker test_exchange_lifecycle -v
+cargo test --manifest-path ../../backend/Cargo.toml -p wms-api \
+  inbound_lifecycle_persists_failure_retry_and_success_status --lib -- --nocapture
+```
+
+本地真实运行记录见 `docs/retros/h8-asn-manual-replay-evidence.json`；它只证明 V2 软件切片，
+不替代客户 ERP dev/staging 的 V4 故障恢复证据。
+
 ## 6. 验收
 
 | ID | 检查 |
