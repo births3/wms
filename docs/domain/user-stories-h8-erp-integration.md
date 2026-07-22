@@ -455,6 +455,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | 2026-07-23 | 三十九轮 Worker 尝试记录 | 生命周期仓储在 `failed/succeeded` 时与消息状态同事务追加完成尝试，记录通道、起止时间、递增序号、结果、执行者和脱敏错误；内存与真实 PostgreSQL 路径均有回归。US-H8-003 AC5 仍为 `PARTIAL`，剩余缺口收窄为按 ADR-0018 计算并持久化 `next_retry_at`。 |
 | 2026-07-23 | 四十轮标准重试时间 | H8 消息失败转换按 ADR-0018 L2 的 1/2/4/8/16 秒基线与基于 Idempotency-Key 的稳定 ±20% 抖动持久化 `next_retry_at`；processing、succeeded、dead 与人工重放清空该字段。隔离 Docker MSSQL 证明未到期不认领、到期认领和人工重放立即认领。AC5 仍为 `PARTIAL`，只剩档案补录 L3 的 5 分钟/24 小时边界缺专门运行证据。 |
 | 2026-07-23 | 四十一轮档案补录持久重试 | PostgreSQL 建表约束将档案补录固定为 5 次和创建后 24 小时截止，Worker 失败后固定等待 5 分钟；隔离迁移库证明立即重取为 0、第 5 次失败和到期行均进入 `dead`。同时修复 dead 仍显示未来 `next_attempt_at` 的误导字段。US-H8-003 AC5 关闭；档案补录业务生产者缺口仍由 US-H8-002 跟踪。 |
+| 2026-07-23 | 四十二轮 JWT 多仓范围 | H8 消息列表、统计和详情从 `auth_user_warehouse_scopes` 加载只读 JWT 用户的多仓授权；显式查询或详情访问未授权仓库返回 403，无仓消息不向受限用户暴露。API Key 单仓范围同步约束详情、重放、认领、dead、归档、报文解密、生命周期与全仓清理，新建生命周期消息继承调用身份仓库。隔离 PostgreSQL 与 HTTP 回归通过，US-H8-003 AC11 关闭。 |
 
 ## 验收记录（US-H8-004 软件切片）
 
@@ -619,7 +620,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | AC8 查询详情 | `PASS` | QueryPanel 的连接、仓库、通道、外部业务标识、幂等键、关联标识和时间范围均进入服务端精确过滤；真实 PostgreSQL 与关闭 dev-mock 的 Playwright 复用确定性业务键 |
 | AC9 监控指标与 Worker 健康 | `PASS` | 货主固定在上下文；连接/通道/消息类型统计及过滤后 P95 有真实 PostgreSQL 行证据；同页展示实例、版本、方向、认领数、创建时间、心跳和派生健康状态 |
 | AC10 分区与保留 | `PARTIAL` | 索引+分区准备+archive 不删+purge 需 retention；未切生产 RANGE 父表 |
-| AC11 权限审计 | `PARTIAL` | read/write 权限、跨货主拒绝及 detail/replay/archive/purge/dead H2 审计已验证；JWT 用户会话尚未把授权仓库范围带入 H8 查询 |
+| AC11 权限审计 | `PASS` | read/write 权限、跨货主拒绝及 detail/replay/archive/purge/dead H2 审计已验证；只读 JWT 用户按公共授权表获得多仓列表/统计裁剪，显式跨仓和详情越权返回 403；API Key 单仓身份同时约束消息操作与生命周期写入 |
 | AC12 查询裁剪 | `PARTIAL` | 默认 7 天、货主/仓库/时间索引、每页 1–200 条和 `created_at + id` 稳定游标已由内存、真实 PostgreSQL 与真实浏览器验证；尚缺生产约定数据量 P95 证据 |
 | AC13 页面证据 | `PASS` | dev-mock Playwright 8 条覆盖 UI 异常分支、“加载更多”及下一页失败中文提示；关闭 dev-mock 的真实 PostgreSQL Playwright 2 条覆盖稳定分页、高级筛选、详情、重放与重复拒绝、只读、跨货主拒绝、Worker、暂停恢复、保留策略和授权解密；13 张截图完成视觉复核 |
 | AC14 S4 | `NEEDS_WORK` | 客户正式 ERP |
