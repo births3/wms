@@ -332,3 +332,79 @@ async fn preflight_failure_persists_receive_and_final_failure_audit(pool: PgPool
         vec!["h8_exchange_receive", "h8_exchange_final_failure"]
     );
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn inbound_lifecycle_persists_failure_retry_and_success_status(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    sqlx::query("INSERT INTO auth_owners (id, owner_code, owner_name) VALUES ($1,$2,$3)")
+        .bind(owner_id)
+        .bind(format!("OWNER-{owner_id}"))
+        .bind("H8 lifecycle status test")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let app = h8_erp_message_router(H8ErpMessageAppState::with_postgres(pool.clone()));
+
+    for (stage, result, expected_status) in [
+        ("receive", "ok", "processing"),
+        (
+            "final_failure",
+            "Bearer supersecrettoken password=anotherlongsecret",
+            "failed",
+        ),
+        ("receive", "ok", "processing"),
+        ("receipt", "ok", "succeeded"),
+    ] {
+        let body = serde_json::json!({
+            "stage": stage,
+            "result": result,
+            "direction": "inbound",
+            "message_type": "asn",
+            "schema_version": "1",
+            "external_ref": "ERP-RETRY-PG-1",
+            "idempotency_key": "idem-retry-pg-1",
+            "correlation_id": "corr-retry-pg-1",
+            "channel": "interface_table"
+        });
+        let mut request = Request::builder()
+            .method(Method::POST)
+            .uri("/api/v1/integration/erp-messages/lifecycle")
+            .header("content-type", "application/json")
+            .body(Body::from(body.to_string()))
+            .unwrap();
+        request.extensions_mut().insert(test_ctx(owner_id));
+        let response = app.clone().oneshot(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK, "stage={stage}");
+
+        let status: String = sqlx::query_scalar(
+            "SELECT sync_status FROM h8_erp_messages WHERE owner_id=$1 AND idempotency_key=$2",
+        )
+        .bind(owner_id)
+        .bind("idem-retry-pg-1")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(status, expected_status, "stage={stage}");
+        if stage == "final_failure" {
+            let summary: String = sqlx::query_scalar(
+                "SELECT last_error_summary FROM h8_erp_messages WHERE owner_id=$1 AND idempotency_key=$2",
+            )
+            .bind(owner_id)
+            .bind("idem-retry-pg-1")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            let audit: String = sqlx::query_scalar(
+                "SELECT diff::text FROM audit_event WHERE owner_id=$1 AND action='h8_exchange_final_failure' ORDER BY occurred_at DESC LIMIT 1",
+            )
+            .bind(owner_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            for secret in ["supersecrettoken", "rettoken", "anotherlongsecret"] {
+                assert!(!summary.contains(secret), "message leaked {secret}");
+                assert!(!audit.contains(secret), "audit leaked {secret}");
+            }
+        }
+    }
+}

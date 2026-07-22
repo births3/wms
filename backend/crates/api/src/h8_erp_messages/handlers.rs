@@ -24,6 +24,7 @@ use super::audit::{
     write_dead_entry_audit, write_exchange_lifecycle_audit, write_message_audit, write_owner_audit,
 };
 use super::error::H8ErpMessageHandlerError;
+use super::lifecycle::{apply_inbound_lifecycle_status, record_lifecycle, safe_lifecycle_result};
 use super::repository::H8ErpMessageCursor;
 use super::state::{H8ErpMessageAppState, H8_MSG_READ, H8_MSG_WRITE};
 
@@ -113,12 +114,6 @@ struct ListQuery {
 #[derive(Debug, Deserialize)]
 struct MarkDeadRequest {
     error_summary: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct LifecycleRequest {
-    stage: String,
-    result: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -614,25 +609,6 @@ async fn archive_message(
     Ok(Json(message))
 }
 
-async fn record_lifecycle(
-    ctx: AuthContext,
-    State(state): State<H8ErpMessageAppState>,
-    Path(id): Path<Uuid>,
-    Json(body): Json<LifecycleRequest>,
-) -> Result<Json<H8ErpMessage>, H8ErpMessageHandlerError> {
-    ctx.require_permission(H8_MSG_WRITE)?;
-    let message = state.repository.get(ctx.owner_id, id).await?;
-    write_exchange_lifecycle_audit(
-        &state,
-        &ctx,
-        &message,
-        body.stage.trim(),
-        body.result.trim(),
-    )
-    .await?;
-    Ok(Json(message))
-}
-
 async fn record_lifecycle_upsert(
     ctx: AuthContext,
     State(state): State<H8ErpMessageAppState>,
@@ -668,7 +644,7 @@ async fn record_lifecycle_upsert(
             .map_err(super::error::H8ErpMessageRepoError::Domain)?;
     }
     let now = Utc::now();
-    let message = if let Some(id) = body.message_id {
+    let mut message = if let Some(id) = body.message_id {
         state.repository.get(ctx.owner_id, id).await?
     } else {
         let existing = state
@@ -733,12 +709,16 @@ async fn record_lifecycle_upsert(
             "message config binding must not change",
         ));
     }
-    write_exchange_lifecycle_audit(
+    let lifecycle_result = safe_lifecycle_result(body.stage.trim(), body.result.trim());
+    write_exchange_lifecycle_audit(&state, &ctx, &message, body.stage.trim(), &lifecycle_result)
+        .await?;
+    message = apply_inbound_lifecycle_status(
         &state,
         &ctx,
-        &message,
+        message,
         body.stage.trim(),
-        body.result.trim(),
+        &lifecycle_result,
+        now,
     )
     .await?;
     if body.stage.trim() == "receive" {

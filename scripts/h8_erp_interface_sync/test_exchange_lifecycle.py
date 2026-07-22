@@ -156,6 +156,7 @@ class TestExchangeLifecycle(unittest.TestCase):
             )
         self.assertIn("final_failure", [post["stage"] for post in posts])
         self.assertEqual(posts[-1]["stage"], "final_failure")
+        self.assertEqual(posts[-1]["result"], "api down")
 
     def test_preflight_failure_records_receive_and_final_failure_with_payload(
         self,

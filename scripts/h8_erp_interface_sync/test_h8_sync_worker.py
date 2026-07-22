@@ -468,6 +468,7 @@ class TestInboundCorePipeline(unittest.TestCase):
             patch.object(sync_worker, "try_record_worker_heartbeat"),
             patch.object(sync_worker, "list_manual_replays", return_value=[]),
             patch.object(sync_worker, "record_preflight_failure") as preflight_audit,
+            patch.object(sync_worker, "mark_terminal_inbound_message") as mark_dead,
             patch.object(sync_worker, "claim_rows", return_value=[row]),
             patch.object(
                 sync_worker,
@@ -480,6 +481,7 @@ class TestInboundCorePipeline(unittest.TestCase):
         self.assertEqual(mark.call_args.args[3], "dead")
         self.assertEqual(mark.call_args.kwargs["retry_count"], 1)
         preflight_audit.assert_called_once()
+        mark_dead.assert_called_once()
 
     def test_preflight_audit_failure_releases_claim_for_retry(self) -> None:
         import sync_worker

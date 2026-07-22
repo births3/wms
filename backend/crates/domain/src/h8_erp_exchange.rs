@@ -218,10 +218,28 @@ pub fn should_auto_retry(error_kind: &str) -> bool {
 /// 脱敏错误摘要：去掉 token / password 片段。
 pub fn sanitize_error_summary(raw: &str) -> String {
     let mut out = raw.to_string();
-    for needle in ["Bearer ", "password=", "token=", "api_key="] {
-        if let Some(idx) = out.to_ascii_lowercase().find(&needle.to_ascii_lowercase()) {
-            let end = (idx + needle.len() + 8).min(out.len());
-            out.replace_range(idx..end, &format!("{needle}***"));
+    for needle in [
+        "bearer ",
+        "password=",
+        "password:",
+        "token=",
+        "token:",
+        "api_key=",
+        "api_key:",
+    ] {
+        let mut offset = 0;
+        loop {
+            let Some(found) = out[offset..].to_ascii_lowercase().find(needle) else {
+                break;
+            };
+            let value_start = offset + found + needle.len();
+            let value_end = out[value_start..]
+                .char_indices()
+                .find(|(_, ch)| ch.is_whitespace() || matches!(ch, ',' | ';' | '}' | ']'))
+                .map(|(index, _)| value_start + index)
+                .unwrap_or(out.len());
+            out.replace_range(value_start..value_end, "***");
+            offset = value_start + 3;
         }
     }
     if out.len() > 256 {
@@ -415,9 +433,13 @@ mod tests {
     fn sanitize_and_retry_class() {
         assert!(should_auto_retry("timeout"));
         assert!(!should_auto_retry("mapping"));
-        let s = sanitize_error_summary("auth failed Bearer supersecrettoken more");
+        let s = sanitize_error_summary(
+            "auth failed Bearer supersecrettoken password=anotherlongsecret more",
+        );
         assert!(s.contains("***"));
         assert!(!s.contains("supersecrettoken"));
+        assert!(!s.contains("rettoken"));
+        assert!(!s.contains("anotherlongsecret"));
     }
 
     #[test]

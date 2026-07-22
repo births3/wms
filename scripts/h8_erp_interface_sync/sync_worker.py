@@ -59,6 +59,7 @@ from worker_route import (  # noqa: E402
     get_worker_claim_decision as get_worker_claim_decision_with_http,
     is_retryable_worker_error,
     list_manual_replays as list_manual_replays_with_http,
+    mark_inbound_message_dead as mark_inbound_message_dead_with_http,
     post_worker_heartbeat as post_worker_heartbeat_with_http,
     resolve_existing_inbound_binding,
     resolve_inbound_route as resolve_inbound_route_with_http,
@@ -219,6 +220,21 @@ def prepare_manual_replays(settings: Settings, message_type: str, table: str) ->
             )
             continue
         claim_manual_replay(settings, str(message["id"]))
+
+
+def mark_terminal_inbound_message(
+    settings: Settings,
+    message_type: str,
+    row: dict[str, str],
+    error_summary: str,
+) -> None:
+    mark_inbound_message_dead_with_http(
+        settings,
+        message_type,
+        row,
+        error_summary,
+        http_json_fn=http_json,
+    )
 
 
 def try_record_worker_heartbeat(
@@ -549,6 +565,17 @@ def process_once(
                 next_status = (
                     "pending" if retryable and retry < settings.max_retry else "dead"
                 )
+                if next_status == "dead":
+                    try:
+                        mark_terminal_inbound_message(
+                            settings, type_name, row, error_summary
+                        )
+                    except Exception as state_exc:  # noqa: BLE001 — 两端终态必须一致
+                        next_status = "pending"
+                        error_summary = sanitize_worker_error(
+                            str(state_exc),
+                            (settings.api_token, settings.mssql_password),
+                        )
                 mark_row(
                     settings,
                     table,

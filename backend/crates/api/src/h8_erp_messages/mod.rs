@@ -3,7 +3,9 @@
 mod audit;
 mod error;
 mod handlers;
+mod lifecycle;
 mod payload_repository;
+mod pg_lifecycle;
 mod pg_repository;
 mod pg_rows;
 mod repository;

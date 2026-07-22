@@ -309,14 +309,14 @@ def resolve_outbound_route(
     )
 
 
-def resolve_existing_inbound_binding(
+def find_existing_inbound_message(
     settings: Any,
     message_type: str,
     row: dict[str, str],
     *,
     http_json_fn: HttpJsonFn,
-) -> RouteBinding | None:
-    """重试时按完整幂等身份读取首次处理绑定；预检记录未绑定则返回 None。"""
+) -> dict[str, Any] | None:
+    """按完整幂等身份读取唯一入站消息。"""
     external_ref = str(
         row.get("external_ref") or row.get("external_doc_no") or row.get("id") or ""
     )
@@ -358,6 +358,54 @@ def resolve_existing_inbound_binding(
     }
     if any(str(message.get(key) or "") != value for key, value in expected.items()):
         raise WorkerHttpError(409, "message binding lookup", "binding identity changed")
+    return message
+
+
+def mark_inbound_message_dead(
+    settings: Any,
+    message_type: str,
+    row: dict[str, str],
+    error_summary: str,
+    *,
+    http_json_fn: HttpJsonFn,
+) -> None:
+    message = find_existing_inbound_message(
+        settings, message_type, row, http_json_fn=http_json_fn
+    )
+    if message is None or not str(message.get("id") or "").strip():
+        raise WorkerHttpError(409, "mark dead", "message missing")
+    if message.get("sync_status") == "dead":
+        return
+    message_id = str(message["id"])
+    status, parsed, raw = http_json_fn(
+        settings,
+        "POST",
+        f"/api/v1/integration/erp-messages/{message_id}/dead",
+        {"error_summary": error_summary},
+        f"dead-{message_id}",
+    )
+    if (
+        status != 200
+        or not isinstance(parsed, dict)
+        or str(parsed.get("id") or "") != message_id
+        or parsed.get("sync_status") != "dead"
+    ):
+        raise WorkerHttpError(status, "mark dead", raw)
+
+
+def resolve_existing_inbound_binding(
+    settings: Any,
+    message_type: str,
+    row: dict[str, str],
+    *,
+    http_json_fn: HttpJsonFn,
+) -> RouteBinding | None:
+    """重试时读取首次处理绑定；预检记录未绑定则返回 None。"""
+    message = find_existing_inbound_message(
+        settings, message_type, row, http_json_fn=http_json_fn
+    )
+    if message is None:
+        return None
     connector_id = str(message.get("connector_id") or "")
     connector_code = str(message.get("connector_code") or "")
     try:

@@ -10,6 +10,7 @@ use wms_domain::{
 };
 
 use super::error::H8ErpMessageRepoError;
+use super::pg_lifecycle::transition_lifecycle_status;
 use super::pg_rows::{AttemptRow, MessageRow, StatsRow};
 use super::repository::{H8ErpMessageCursor, H8ErpMessageRepository};
 
@@ -507,6 +508,19 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
             .await
             .map_err(|e| H8ErpMessageRepoError::Db(e.to_string()))?;
         self.get(owner_id, id).await
+    }
+
+    async fn transition_lifecycle_status(
+        &self,
+        owner_id: Uuid,
+        id: Uuid,
+        target: &str,
+        error_summary: Option<&str>,
+        actor: &str,
+        now: DateTime<Utc>,
+    ) -> Result<H8ErpMessage, H8ErpMessageRepoError> {
+        transition_lifecycle_status(&self.pool, owner_id, id, target, error_summary, actor, now)
+            .await
     }
 
     async fn mark_archived(

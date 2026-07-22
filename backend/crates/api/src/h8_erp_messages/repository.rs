@@ -78,6 +78,17 @@ pub trait H8ErpMessageRepository: Send + Sync {
         now: DateTime<Utc>,
     ) -> Result<H8ErpMessage, H8ErpMessageRepoError>;
 
+    /// Worker 生命周期状态流转；状态合法性仍由 domain 状态机校验。
+    async fn transition_lifecycle_status(
+        &self,
+        owner_id: Uuid,
+        id: Uuid,
+        target: &str,
+        error_summary: Option<&str>,
+        actor: &str,
+        now: DateTime<Utc>,
+    ) -> Result<H8ErpMessage, H8ErpMessageRepoError>;
+
     /// 进入 dead（AC6）；调用方须写 H2 审计。
     async fn mark_dead(
         &self,
@@ -456,6 +467,34 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
             });
         guard.messages.insert(id, next.clone());
         Ok(next)
+    }
+
+    async fn transition_lifecycle_status(
+        &self,
+        owner_id: Uuid,
+        id: Uuid,
+        target: &str,
+        error_summary: Option<&str>,
+        actor: &str,
+        now: DateTime<Utc>,
+    ) -> Result<H8ErpMessage, H8ErpMessageRepoError> {
+        let mut guard = self.inner.lock().expect("lock");
+        let message = guard
+            .messages
+            .get_mut(&id)
+            .filter(|message| message.owner_id == owner_id)
+            .ok_or(H8ErpMessageRepoError::NotFound)?;
+        can_transition_message_status(&message.sync_status, target)
+            .map_err(H8ErpMessageRepoError::Domain)?;
+        message.sync_status = target.into();
+        message.retry_count += i32::from(target == "failed");
+        message.last_error_summary = error_summary.map(sanitize_error_summary);
+        message.claimed_by = (target == "processing").then(|| actor.to_string());
+        message.lease_expires_at =
+            (target == "processing").then(|| now + chrono::Duration::minutes(10));
+        message.completed_at = (target == "succeeded").then_some(now);
+        message.updated_at = now;
+        Ok(message.clone())
     }
 
     async fn mark_archived(

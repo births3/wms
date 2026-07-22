@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-from worker_route import WorkerHttpError
+from worker_route import WorkerHttpError, sanitize_worker_error
 
 # 与 backend/crates/domain/src/h8_erp_exchange.rs 保持一致
 H8_EXCHANGE_AUDIT_STAGES = (
@@ -147,7 +147,16 @@ def run_inbound_pipeline(
         life.stage("receipt", "ok")
         return wms_id, life
     except Exception as exc:  # noqa: BLE001
-        life.stage("final_failure", "error")
+        life.stage(
+            "final_failure",
+            sanitize_worker_error(
+                str(exc),
+                (
+                    getattr(settings, "api_token", None),
+                    getattr(settings, "mssql_password", None),
+                ),
+            ),
+        )
         raise exc
 
 
