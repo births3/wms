@@ -15439,8 +15439,12 @@ export interface operations {
                 status?: string | null;
                 /** @description 连接编码精确筛选 */
                 connector_code?: string | null;
+                /** @description 连接 ID 精确筛选 */
+                connector_id?: string | null;
                 /** @description 通道精确筛选 */
                 channel?: string | null;
+                /** @description 仅返回等待 Worker 接管的人工重放消息 */
+                replay_requested?: boolean | null;
                 /** @description 仓库精确筛选 */
                 warehouse_id?: string | null;
                 /** @description 外部业务标识精确筛选 */

@@ -32,7 +32,9 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
         message_type: Option<&str>,
         status: Option<&str>,
         connector_code: Option<&str>,
+        connector_id: Option<Uuid>,
         channel: Option<&str>,
+        replay_requested: bool,
         warehouse_id: Option<Uuid>,
         external_ref: Option<&str>,
         idempotency_key: Option<&str>,
@@ -64,15 +66,17 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
               AND ($5::text IS NULL OR message_type = $5)
               AND ($6::text IS NULL OR sync_status = $6)
               AND ($7::text IS NULL OR connector_code = $7)
-              AND ($8::text IS NULL OR channel = $8)
-              AND ($9::uuid IS NULL OR warehouse_id = $9)
-              AND ($10::text IS NULL OR external_ref = $10)
-              AND ($11::text IS NULL OR idempotency_key = $11)
-              AND ($12::text IS NULL OR correlation_id = $12)
-              AND ($13::timestamptz IS NULL OR created_at < $13
-                   OR (created_at = $13 AND id < $14))
+              AND ($8::uuid IS NULL OR connector_id = $8)
+              AND ($9::text IS NULL OR channel = $9)
+              AND (NOT $10::bool OR claimed_by LIKE 'replay:%')
+              AND ($11::uuid IS NULL OR warehouse_id = $11)
+              AND ($12::text IS NULL OR external_ref = $12)
+              AND ($13::text IS NULL OR idempotency_key = $13)
+              AND ($14::text IS NULL OR correlation_id = $14)
+              AND ($15::timestamptz IS NULL OR created_at < $15
+                   OR (created_at = $15 AND id < $16))
             ORDER BY created_at DESC, id DESC
-            LIMIT $15
+            LIMIT $17
             "#,
         )
         .bind(owner_id)
@@ -82,7 +86,9 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
         .bind(message_type)
         .bind(status)
         .bind(connector_code)
+        .bind(connector_id)
         .bind(channel)
+        .bind(replay_requested)
         .bind(warehouse_id)
         .bind(external_ref)
         .bind(idempotency_key)
@@ -361,8 +367,13 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
                 return Err(H8ErpMessageRepoError::Domain(H8MessageError::ClaimPaused));
             }
         }
-        can_claim_message(&row.sync_status, row.lease_expires_at, now)
-            .map_err(H8ErpMessageRepoError::Domain)?;
+        can_claim_message(
+            &row.sync_status,
+            row.claimed_by.as_deref(),
+            row.lease_expires_at,
+            now,
+        )
+        .map_err(H8ErpMessageRepoError::Domain)?;
         let lease_until = now + chrono::Duration::seconds(lease_seconds.max(1));
         let attempt_no: i32 = sqlx::query_scalar(
             r#"SELECT COALESCE(MAX(attempt_no), 0) + 1 FROM h8_erp_message_attempts WHERE message_id = $1"#,

@@ -30,7 +30,9 @@ pub trait H8ErpMessageRepository: Send + Sync {
         message_type: Option<&str>,
         status: Option<&str>,
         connector_code: Option<&str>,
+        connector_id: Option<Uuid>,
         channel: Option<&str>,
+        replay_requested: bool,
         warehouse_id: Option<Uuid>,
         external_ref: Option<&str>,
         idempotency_key: Option<&str>,
@@ -144,7 +146,9 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
         message_type: Option<&str>,
         status: Option<&str>,
         connector_code: Option<&str>,
+        connector_id: Option<Uuid>,
         channel: Option<&str>,
+        replay_requested: bool,
         warehouse_id: Option<Uuid>,
         external_ref: Option<&str>,
         idempotency_key: Option<&str>,
@@ -164,7 +168,14 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
             .filter(|m| message_type.is_none_or(|t| m.message_type == t))
             .filter(|m| status.is_none_or(|s| m.sync_status == s))
             .filter(|m| connector_code.is_none_or(|code| m.connector_code.as_deref() == Some(code)))
+            .filter(|m| connector_id.is_none_or(|value| m.connector_id == Some(value)))
             .filter(|m| channel.is_none_or(|value| m.channel == value))
+            .filter(|m| {
+                !replay_requested
+                    || m.claimed_by
+                        .as_deref()
+                        .is_some_and(|actor| actor.starts_with("replay:"))
+            })
             .filter(|m| warehouse_id.is_none_or(|value| m.warehouse_id == Some(value)))
             .filter(|m| external_ref.is_none_or(|value| m.external_ref == value))
             .filter(|m| idempotency_key.is_none_or(|value| m.idempotency_key == value))
@@ -220,7 +231,9 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
                 message_type,
                 None,
                 connector_code,
+                None,
                 channel,
+                false,
                 None,
                 None,
                 None,
@@ -345,8 +358,13 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
         else {
             return Err(H8ErpMessageRepoError::NotFound);
         };
-        can_claim_message(&msg.sync_status, msg.lease_expires_at, now)
-            .map_err(H8ErpMessageRepoError::Domain)?;
+        can_claim_message(
+            &msg.sync_status,
+            msg.claimed_by.as_deref(),
+            msg.lease_expires_at,
+            now,
+        )
+        .map_err(H8ErpMessageRepoError::Domain)?;
         can_transition_message_status(&msg.sync_status, "processing")
             .or_else(|_| {
                 // processing + expired lease 可重新认领

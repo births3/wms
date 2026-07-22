@@ -25,7 +25,7 @@ pub(super) struct MessageRow {
     next_retry_at: Option<DateTime<Utc>>,
     last_error_summary: Option<String>,
     payload_digest: String,
-    claimed_by: Option<String>,
+    pub(super) claimed_by: Option<String>,
     pub(super) lease_expires_at: Option<DateTime<Utc>>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,

@@ -9454,12 +9454,33 @@
             }
           },
           {
+            "name": "connector_id",
+            "in": "query",
+            "description": "连接 ID 精确筛选",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "nullable": true
+            }
+          },
+          {
             "name": "channel",
             "in": "query",
             "description": "通道精确筛选",
             "required": false,
             "schema": {
               "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "replay_requested",
+            "in": "query",
+            "description": "仅返回等待 Worker 接管的人工重放消息",
+            "required": false,
+            "schema": {
+              "type": "boolean",
               "nullable": true
             }
           },

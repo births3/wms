@@ -24,7 +24,7 @@ use super::audit::{
 use super::repository::MemoryH8ErpMessageRepository;
 use super::state::H8ErpMessageAppState;
 
-fn sample_message(owner: Uuid, status: &str) -> H8ErpMessage {
+pub(super) fn sample_message(owner: Uuid, status: &str) -> H8ErpMessage {
     let now = Utc::now();
     H8ErpMessage {
         id: Uuid::new_v4(),
@@ -55,7 +55,7 @@ fn sample_message(owner: Uuid, status: &str) -> H8ErpMessage {
     }
 }
 
-fn test_ctx(owner: Uuid) -> AuthContext {
+pub(super) fn test_ctx(owner: Uuid) -> AuthContext {
     AuthContext {
         user_id: Uuid::nil(),
         owner_id: owner,
@@ -86,6 +86,8 @@ async fn list_filters_by_status_and_stats() {
             Some("dead"),
             None,
             None,
+            None,
+            false,
             None,
             None,
             None,
@@ -132,6 +134,8 @@ async fn list_filters_by_warehouse_and_trace_keys() {
             None,
             None,
             None,
+            None,
+            false,
             Some(warehouse),
             Some("ERP-SELECTED"),
             Some("idem-selected"),

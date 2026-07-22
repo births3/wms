@@ -294,9 +294,10 @@ pub fn can_transition_message_status(from: &str, to: &str) -> Result<(), H8Messa
     }
 }
 
-/// Worker 认领：仅 pending/failed（到期）且租约失效可认领。
+/// Worker 认领：常规消息要求租约失效；人工重放标记允许 Worker 立即接管。
 pub fn can_claim_message(
     status: &str,
+    claimed_by: Option<&str>,
     lease_expires_at: Option<DateTime<Utc>>,
     now: DateTime<Utc>,
 ) -> Result<(), H8MessageError> {
@@ -308,6 +309,9 @@ pub fn can_claim_message(
             Ok(())
         }
         "processing" => {
+            if claimed_by.is_some_and(|actor| actor.starts_with("replay:")) {
+                return Ok(());
+            }
             if lease_expires_at.is_some_and(|exp| exp > now) {
                 Err(H8MessageError::LeaseConflict)
             } else {
@@ -688,13 +692,30 @@ mod tests {
     #[test]
     fn claim_respects_lease_and_terminal() {
         let now = Utc::now();
-        can_claim_message("pending", None, now).unwrap();
-        assert!(
-            can_claim_message("pending", Some(now + chrono::Duration::seconds(30)), now).is_err()
-        );
-        can_claim_message("processing", Some(now - chrono::Duration::seconds(1)), now).unwrap();
-        assert!(can_claim_message("succeeded", None, now).is_err());
-        assert!(can_claim_message("acked", None, now).is_err());
+        can_claim_message("pending", None, None, now).unwrap();
+        assert!(can_claim_message(
+            "pending",
+            None,
+            Some(now + chrono::Duration::seconds(30)),
+            now
+        )
+        .is_err());
+        can_claim_message(
+            "processing",
+            None,
+            Some(now - chrono::Duration::seconds(1)),
+            now,
+        )
+        .unwrap();
+        can_claim_message(
+            "processing",
+            Some("replay:admin"),
+            Some(now + chrono::Duration::minutes(5)),
+            now,
+        )
+        .unwrap();
+        assert!(can_claim_message("succeeded", None, None, now).is_err());
+        assert!(can_claim_message("acked", None, None, now).is_err());
     }
 
     #[test]

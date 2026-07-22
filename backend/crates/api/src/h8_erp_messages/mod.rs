@@ -15,6 +15,8 @@ mod payload_tests;
 #[cfg(test)]
 mod pg_repository_tests;
 #[cfg(test)]
+mod replay_tests;
+#[cfg(test)]
 mod tests;
 
 pub use handlers::h8_erp_message_router;

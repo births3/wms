@@ -102,6 +102,81 @@ async fn list_cursor_is_stable_with_equal_created_at_in_postgres(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn replay_marker_can_be_claimed_immediately_in_postgres(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    sqlx::query("INSERT INTO auth_owners (id, owner_code, owner_name) VALUES ($1,$2,$3)")
+        .bind(owner_id)
+        .bind(format!("OWNER-{owner_id}"))
+        .bind("H8 replay claim test")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let connector_id = Uuid::new_v4();
+    sqlx::query(
+        r#"INSERT INTO h8_erp_connectors
+           (id, owner_id, connector_code, connector_name, directions, message_types, channel_mode)
+           VALUES ($1,$2,'SELF-ERP','Self ERP',ARRAY['inbound'],ARRAY['asn'],'interface_table')"#,
+    )
+    .bind(connector_id)
+    .bind(owner_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let message_id = Uuid::new_v4();
+    sqlx::query(
+        r#"INSERT INTO h8_erp_messages
+           (id, owner_id, connector_id, connector_code, direction, message_type, schema_version,
+            channel, external_ref, idempotency_key, correlation_id, sync_status,
+            retry_count, payload_digest)
+           VALUES ($1,$2,$3,'SELF-ERP','inbound','asn','1','interface_table',
+                   'ERP-REPLAY-1','idem-replay-1','corr-replay-1','failed',1,'digest')"#,
+    )
+    .bind(message_id)
+    .bind(owner_id)
+    .bind(connector_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let repository = PgH8ErpMessageRepository::new(pool);
+    let now = Utc::now();
+    repository
+        .replay(owner_id, message_id, "manual fix", "admin", now)
+        .await
+        .unwrap();
+
+    let replay_requests = repository
+        .list(
+            owner_id,
+            Some("inbound"),
+            Some("asn"),
+            Some("processing"),
+            None,
+            Some(connector_id),
+            Some("interface_table"),
+            true,
+            None,
+            None,
+            Some("idem-replay-1"),
+            None,
+            Some(now - Duration::minutes(1)),
+            Some(now + Duration::minutes(1)),
+            None,
+            200,
+        )
+        .await
+        .unwrap();
+    assert_eq!(replay_requests.len(), 1);
+    assert_eq!(replay_requests[0].id, message_id);
+
+    let claimed = repository
+        .claim(owner_id, message_id, "worker-1", 60, now)
+        .await
+        .unwrap();
+
+    assert_eq!(claimed.claimed_by.as_deref(), Some("worker-1"));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn stats_filter_real_rows_and_attempt_latency(pool: PgPool) {
     let owner_id = Uuid::new_v4();
     sqlx::query("INSERT INTO auth_owners (id, owner_code, owner_name) VALUES ($1,$2,$3)")
@@ -177,7 +252,9 @@ async fn stats_filter_real_rows_and_attempt_latency(pool: PgPool) {
             Some("asn"),
             None,
             Some("SELF-ERP"),
+            None,
             Some("interface_table"),
+            false,
             None,
             Some("ERP-ASN-STATS-1"),
             Some("ERP-ASN-STATS-1"),
