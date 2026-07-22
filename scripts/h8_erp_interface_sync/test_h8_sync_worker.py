@@ -21,6 +21,7 @@ from outbound_publish import (
     sql_escape_mssql,
 )
 from sync_worker import (
+    HANDLERS,
     Settings,
     WorkerHttpError,
     is_retryable_worker_error,
@@ -57,6 +58,42 @@ def settings() -> Settings:
 
 
 class TestInboundCorePipeline(unittest.TestCase):
+    def test_each_inbound_business_api_uses_shared_error_classification(self) -> None:
+        row = {
+            "idempotency_key": "idem-1",
+            "external_doc_no": "ERP-1",
+            "external_ref": "ERP-1",
+            "receipt_no": "R-1",
+            "document_type": "purchase_inbound",
+            "supplier_id": "supplier-1",
+            "customer_id": "customer-1",
+            "warehouse_id": "warehouse-1",
+            "expected_arrival_at": "2026-07-23T00:00:00Z",
+            "product_id": "product-1",
+            "product_code": "P-1",
+            "product_name": "药品一",
+            "expected_qty": "1",
+            "planned_qty": "1",
+            "batch_no": "B-1",
+            "required_ship_at": "2026-07-23T00:00:00Z",
+            "field_name": "spec",
+            "new_value": "10mg",
+        }
+        for status, expected_retryable in ((503, True), (422, False)):
+            for message_type, (_table, handler) in HANDLERS.items():
+                with self.subTest(message_type=message_type, status=status):
+                    with patch(
+                        "sync_worker.http_json",
+                        return_value=(status, None, '{"token":"response-secret"}'),
+                    ):
+                        with self.assertRaises(WorkerHttpError) as caught:
+                            handler(settings(), row)
+                    self.assertEqual(
+                        is_retryable_worker_error(caught.exception),
+                        expected_retryable,
+                    )
+                    self.assertNotIn("response-secret", str(caught.exception))
+
     def test_worker_error_summary_redacts_credentials(self) -> None:
         summary = sanitize_worker_error(
             'Authorization: Bearer top-secret password="db-secret" token=api-secret',
