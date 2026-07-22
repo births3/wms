@@ -1,11 +1,16 @@
 //! H8 消息内存仓储、重放与 H2 审计 sink 测试。
 
+use axum::{
+    body::Body,
+    http::{Method, Request, StatusCode},
+};
 use chrono::Utc;
 use std::sync::{Arc, Mutex};
+use tower::ServiceExt;
 use uuid::Uuid;
 use wms_domain::{
     audit_summary_is_safe, message_audit_summary, H8ErpMessage, H8ErpMessageAttempt,
-    H8_MESSAGE_DEAD_AUDIT_ACTION,
+    H8WorkerHeartbeatRequest, SetH8WorkerClaimControlRequest, H8_MESSAGE_DEAD_AUDIT_ACTION,
 };
 
 use crate::audit::AuditLog;
@@ -73,15 +78,185 @@ async fn list_filters_by_status_and_stats() {
     state.repository.upsert_for_test(&ok).await.unwrap();
     let listed = state
         .repository
-        .list(owner, None, None, Some("dead"), None, None)
+        .list(
+            owner,
+            None,
+            None,
+            Some("dead"),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(listed.len(), 1);
     assert_eq!(listed[0].sync_status, "dead");
-    let stats = state.repository.stats(owner).await.unwrap();
+    let stats = state
+        .repository
+        .stats(owner, None, None, None)
+        .await
+        .unwrap();
     assert_eq!(stats.total, 2);
     assert_eq!(stats.dead, 1);
     assert_eq!(stats.succeeded, 1);
+}
+
+#[tokio::test]
+async fn list_filters_by_warehouse_and_trace_keys() {
+    let state = H8ErpMessageAppState::with_memory();
+    let owner = Uuid::new_v4();
+    let warehouse = Uuid::new_v4();
+    let mut selected = sample_message(owner, "failed");
+    selected.warehouse_id = Some(warehouse);
+    selected.external_ref = "ERP-SELECTED".into();
+    selected.idempotency_key = "idem-selected".into();
+    selected.correlation_id = "corr-selected".into();
+    let other = sample_message(owner, "failed");
+    state.repository.upsert_for_test(&selected).await.unwrap();
+    state.repository.upsert_for_test(&other).await.unwrap();
+
+    let listed = state
+        .repository
+        .list(
+            owner,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(warehouse),
+            Some("ERP-SELECTED"),
+            Some("idem-selected"),
+            Some("corr-selected"),
+            Some(selected.created_at - chrono::Duration::seconds(1)),
+            Some(selected.created_at + chrono::Duration::seconds(1)),
+        )
+        .await
+        .unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].id, selected.id);
+}
+
+#[tokio::test]
+async fn stats_filter_by_connector_channel_and_message_type() {
+    let state = H8ErpMessageAppState::with_memory();
+    let owner = Uuid::new_v4();
+    let mut selected = sample_message(owner, "succeeded");
+    selected.connector_code = Some("SELF-ERP".into());
+    selected.channel = "interface_table".into();
+    selected.message_type = "asn".into();
+    let mut other = sample_message(owner, "dead");
+    other.connector_code = Some("OTHER-ERP".into());
+    other.channel = "rest".into();
+    other.message_type = "outbound_order".into();
+    state.repository.upsert_for_test(&selected).await.unwrap();
+    state.repository.upsert_for_test(&other).await.unwrap();
+
+    let stats = state
+        .repository
+        .stats(
+            owner,
+            Some("SELF-ERP"),
+            Some("interface_table"),
+            Some("asn"),
+        )
+        .await
+        .unwrap();
+    assert_eq!(stats.total, 1);
+    assert_eq!(stats.succeeded, 1);
+    assert_eq!(stats.dead, 0);
+}
+
+#[tokio::test]
+async fn list_rejects_invalid_query_values_at_http_boundary() {
+    let state = H8ErpMessageAppState::with_memory();
+    let owner = Uuid::new_v4();
+    let mut request = Request::builder()
+        .uri("/api/v1/integration/erp-messages?direction=sideways")
+        .body(Body::empty())
+        .unwrap();
+    request.extensions_mut().insert(test_ctx(owner));
+    let response = super::handlers::h8_erp_message_router(state)
+        .oneshot(request)
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn preflight_schema_failure_still_records_receive_and_final_failure() {
+    let state = H8ErpMessageAppState::with_memory();
+    let owner = Uuid::new_v4();
+    for stage in ["receive", "final_failure"] {
+        let body = serde_json::json!({
+            "stage": stage,
+            "result": "preflight_rejected",
+            "direction": "inbound",
+            "message_type": "asn",
+            "schema_version": "999",
+            "external_ref": "ERP-BAD-SCHEMA-1",
+            "idempotency_key": "idem-bad-schema-1",
+            "correlation_id": "corr-bad-schema-1",
+            "channel": "interface_table"
+        });
+        let mut request = Request::builder()
+            .method(Method::POST)
+            .uri("/api/v1/integration/erp-messages/lifecycle")
+            .header("content-type", "application/json")
+            .body(Body::from(body.to_string()))
+            .unwrap();
+        request.extensions_mut().insert(test_ctx(owner));
+        let response = super::handlers::h8_erp_message_router(state.clone())
+            .oneshot(request)
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+    let actions = snapshot_audit_actions(&state);
+    assert!(actions.iter().any(|action| action == "h8_exchange_receive"));
+    assert!(actions
+        .iter()
+        .any(|action| action == "h8_exchange_final_failure"));
+}
+
+#[tokio::test]
+async fn invalid_lifecycle_stage_is_rejected_before_message_insert() {
+    let state = H8ErpMessageAppState::with_memory();
+    let owner = Uuid::new_v4();
+    let body = serde_json::json!({
+        "stage": "free_text",
+        "result": "ok",
+        "direction": "inbound",
+        "message_type": "asn",
+        "schema_version": "1",
+        "external_ref": "ERP-INVALID-STAGE-1",
+        "idempotency_key": Uuid::new_v4().to_string(),
+        "correlation_id": "corr-invalid-stage-1",
+        "channel": "interface_table"
+    });
+    let mut request = Request::builder()
+        .method(Method::POST)
+        .uri("/api/v1/integration/erp-messages/lifecycle")
+        .header("content-type", "application/json")
+        .body(Body::from(body.to_string()))
+        .unwrap();
+    request.extensions_mut().insert(test_ctx(owner));
+    let response = super::handlers::h8_erp_message_router(state.clone())
+        .oneshot(request)
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert!(state
+        .repository
+        .find_by_idempotency(owner, "asn", "ERP-INVALID-STAGE-1", "idem-invalid-stage-1",)
+        .await
+        .unwrap()
+        .is_none());
 }
 
 #[tokio::test]
@@ -159,6 +334,138 @@ async fn claim_under_active_lease_conflicts() {
 }
 
 #[tokio::test]
+async fn worker_heartbeat_and_pause_control_gate_claims() {
+    let state = H8ErpMessageAppState::with_memory();
+    let owner = Uuid::new_v4();
+    let connector_id = Uuid::new_v4();
+    let now = Utc::now();
+    let status = state
+        .runtime_repository
+        .record_heartbeat(
+            owner,
+            &H8WorkerHeartbeatRequest {
+                worker_id: "worker-1".into(),
+                worker_version: "1.0.0".into(),
+                connector_id,
+                directions: vec!["inbound".into()],
+                current_claims: 2,
+                heartbeat_ttl_seconds: 30,
+            },
+            now,
+        )
+        .await
+        .unwrap();
+    assert_eq!(status.health, "healthy");
+    assert_eq!(status.current_claims, 2);
+    assert_eq!(status.created_at, now);
+
+    let refreshed = state
+        .runtime_repository
+        .record_heartbeat(
+            owner,
+            &H8WorkerHeartbeatRequest {
+                worker_id: "worker-1".into(),
+                worker_version: "1.0.1".into(),
+                connector_id,
+                directions: vec!["inbound".into()],
+                current_claims: 0,
+                heartbeat_ttl_seconds: 30,
+            },
+            now + chrono::Duration::seconds(1),
+        )
+        .await
+        .unwrap();
+    assert_eq!(refreshed.created_at, now);
+    assert_eq!(
+        refreshed.last_heartbeat_at,
+        now + chrono::Duration::seconds(1)
+    );
+
+    let control = state
+        .runtime_repository
+        .set_claim_control(
+            owner,
+            &SetH8WorkerClaimControlRequest {
+                connector_id,
+                direction: "inbound".into(),
+                paused: true,
+                reason: "ERP 维护".into(),
+                paused_until: Some(now + chrono::Duration::minutes(5)),
+                confirmed: true,
+            },
+            "admin",
+            now,
+        )
+        .await
+        .unwrap();
+    assert!(control.paused);
+    let decision = state
+        .runtime_repository
+        .claim_decision(owner, connector_id, "inbound", now)
+        .await
+        .unwrap();
+    assert!(!decision.allowed);
+    assert_eq!(decision.reason.as_deref(), Some("ERP 维护"));
+
+    let expired = state
+        .runtime_repository
+        .claim_decision(
+            owner,
+            connector_id,
+            "inbound",
+            now + chrono::Duration::minutes(6),
+        )
+        .await
+        .unwrap();
+    assert!(expired.allowed);
+}
+
+#[tokio::test]
+async fn pause_handler_requires_write_permission_and_writes_audit() {
+    let state = H8ErpMessageAppState::with_memory();
+    let owner = Uuid::new_v4();
+    let connector_id = Uuid::new_v4();
+    let body = serde_json::json!({
+        "connector_id": connector_id,
+        "direction": "inbound",
+        "paused": true,
+        "reason": "ERP 维护",
+        "paused_until": null,
+        "confirmed": true
+    });
+    let mut denied = Request::builder()
+        .method(Method::POST)
+        .uri("/api/v1/integration/erp-messages/worker-runtime/control")
+        .header("content-type", "application/json")
+        .body(Body::from(body.to_string()))
+        .unwrap();
+    let mut readonly = test_ctx(owner);
+    readonly.permissions = vec!["h8.erp_connector.read".into()];
+    denied.extensions_mut().insert(readonly);
+    let denied = super::handlers::h8_erp_message_router(state.clone())
+        .oneshot(denied)
+        .await
+        .unwrap();
+    assert_eq!(denied.status(), StatusCode::FORBIDDEN);
+
+    let mut allowed = Request::builder()
+        .method(Method::POST)
+        .uri("/api/v1/integration/erp-messages/worker-runtime/control")
+        .header("content-type", "application/json")
+        .body(Body::from(body.to_string()))
+        .unwrap();
+    allowed.extensions_mut().insert(test_ctx(owner));
+    let response = super::handlers::h8_erp_message_router(state.clone())
+        .oneshot(allowed)
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert!(snapshot_audit_actions(&state)
+        .iter()
+        .any(|action| action == "h8_worker_claim_pause"));
+}
+
+#[tokio::test]
 async fn purge_requires_retention_policy() {
     let state = H8ErpMessageAppState::with_memory();
     let owner = Uuid::nil();
@@ -181,6 +488,12 @@ async fn purge_terminal_only_when_retention_set() {
     memory.set_retention_for_test(Uuid::nil(), 7);
     let state = H8ErpMessageAppState {
         repository: memory.clone(),
+        runtime_repository: Arc::new(
+            super::runtime_repository::MemoryH8WorkerRuntimeRepository::default(),
+        ),
+        payload_repository: Arc::new(
+            super::payload_repository::MemoryH8PayloadRepository::default(),
+        ),
         audit_pool: None,
         audit_log: Arc::new(Mutex::new(AuditLog::default())),
     };
@@ -213,7 +526,9 @@ async fn write_message_audit_records_to_sink_on_replay_path() {
         .await
         .unwrap();
     // 真实 shipped 审计入口（与 handlers 相同）
-    write_message_audit(&state, &ctx, "h8_message_replay", &replayed, "accepted").await;
+    write_message_audit(&state, &ctx, "h8_message_replay", &replayed, "accepted")
+        .await
+        .unwrap();
     let actions = snapshot_audit_actions(&state);
     assert!(
         actions.iter().any(|a| a == "h8_message_replay"),
@@ -247,7 +562,7 @@ async fn mark_dead_writes_h2_dead_audit_action() {
         .await
         .unwrap();
     assert_eq!(dead.sync_status, "dead");
-    write_dead_entry_audit(&state, &ctx, &dead).await;
+    write_dead_entry_audit(&state, &ctx, &dead).await.unwrap();
     let actions = snapshot_audit_actions(&state);
     assert!(actions.iter().any(|a| a == H8_MESSAGE_DEAD_AUDIT_ACTION));
 }
@@ -259,20 +574,25 @@ async fn detail_query_and_purge_and_archive_write_audit() {
     let msg = sample_message(owner, "succeeded");
     state.repository.upsert_for_test(&msg).await.unwrap();
     let ctx = test_ctx(owner);
-    write_message_audit(&state, &ctx, "h8_message_detail_query", &msg, "viewed").await;
+    write_message_audit(&state, &ctx, "h8_message_detail_query", &msg, "viewed")
+        .await
+        .unwrap();
     let archived = state
         .repository
         .mark_archived(owner, msg.id, "admin", Utc::now())
         .await
         .unwrap();
-    write_message_audit(&state, &ctx, "h8_message_archive", &archived, "archived").await;
+    write_message_audit(&state, &ctx, "h8_message_archive", &archived, "archived")
+        .await
+        .unwrap();
     write_owner_audit(
         &state,
         &ctx,
         "h8_message_purge",
         serde_json::json!({"deleted": 0, "payload": null}),
     )
-    .await;
+    .await
+    .unwrap();
     let actions = snapshot_audit_actions(&state);
     assert!(actions.iter().any(|a| a == "h8_message_detail_query"));
     assert!(actions.iter().any(|a| a == "h8_message_archive"));
@@ -358,6 +678,10 @@ async fn stats_include_p95_from_attempts() {
         })
         .await
         .unwrap();
-    let stats = state.repository.stats(owner).await.unwrap();
+    let stats = state
+        .repository
+        .stats(owner, None, None, None)
+        .await
+        .unwrap();
     assert!(stats.p95_latency_ms >= 100);
 }
