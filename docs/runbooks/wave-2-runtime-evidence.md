@@ -66,7 +66,7 @@ just wave-2-runtime-evidence-readiness
 just wave-2-runtime-evidence-smoke
 ```
 
-`just wave-2-runtime-evidence-collect` 是同一 collector 的兼容别名；新的 Wave 6 closeout 清单以 `just wave-2-runtime-evidence-smoke` 为正式采集入口。
+Wave 6 closeout 使用唯一入口 `just wave-2-runtime-evidence-smoke` 采集真实证据。
 
 如果 `docs/retros/wave-2-runtime-evidence.json` 已存在，smoke 默认拒绝覆盖，防止误写旧证据。确需重跑时，必须先确保 config-center 状态已回到可验证 fail-closed 的新实例或重置状态，再显式使用 collector 的 `--force` 选项。
 

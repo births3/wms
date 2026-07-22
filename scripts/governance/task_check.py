@@ -17,7 +17,7 @@ Tier：作为入口，根据 git diff 与 governance/gate-rules.toml 决定跑�
   2  脚本自身错误
 
 模式：
-- 本地兼容模式下，未实现的脚本仅提示并跳过。
+- 本地渐进模式下，未实现的脚本仅提示并跳过。
 - `--strict` 下未实现脚本记为 `error` 并阻塞，CI 必须使用该模式。
 - `--context` 与 Tier 正交；CI 可通过 `WMS_GOV_CONTEXT` 提供默认场景。
 """
@@ -153,12 +153,11 @@ def main(argv: list[str] | None = None) -> int:
         "--context",
         choices=["local", "pr", "main", "release", "runtime"],
         default=os.environ.get("WMS_GOV_CONTEXT"),
-        help="执行场景；省略时保持兼容，不按场景过滤",
+        help="执行场景；省略时保持默认，不按场景过滤",
     )
     parser.add_argument("--strict", action="store_true",
                         help="--strict 模式下，gate-rules.toml 引用的占位脚本视为失败（Wave 1+ 推荐启用）")
     parser.add_argument("--json", action="store_true")
-    parser.add_argument("--report-json", action="store_true")
     args = parser.parse_args(argv)
 
     rules = load_gate_rules()
@@ -176,7 +175,7 @@ def main(argv: list[str] | None = None) -> int:
         path for path in changed if any(rule.matches(path) for rule in specific_rules)
     }
     unknown_files = [path for path in changed if path not in specifically_matched]
-    machine_output = args.json or args.report_json
+    machine_output = args.json
 
     if not machine_output:
         print(f"▶ task_check {args.tier} (base={args.base})")
@@ -258,7 +257,6 @@ def main(argv: list[str] | None = None) -> int:
             rules_for_tier,
         )
         if r.exit_code == -1:
-            # 脚本未实现：根据 --strict 决定是阻塞还是降级
             if args.strict:
                 if not machine_output:
                     print(f"    ✘ script not implemented yet: {check_name} (--strict 模式下视为失败)")
@@ -266,7 +264,7 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 if not machine_output:
                     print(f"    ⚠ script not implemented yet: {check_name} (placeholder, 加 --strict 视为失败)")
-                r.set_exit_code(0)  # 本地兼容模式降级，不用于 CI
+                r.set_exit_code(0)
         results.append(r)
 
     failed = [r for r in results if r.exit_code != 0]

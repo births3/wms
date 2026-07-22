@@ -21,7 +21,7 @@ def test_unknown_changed_path_runs_t1_fallback(monkeypatch, capsys):
         lambda json_mode: task_check.ScriptResult("governance_t1_fallback", 1, 0, 1),
     )
 
-    assert task_check.main(["--tier", "T2", "--report-json", "--json"]) == 0
+    assert task_check.main(["--tier", "T2", "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["triggered"][0]["name"] == "governance_t1_fallback"
 
@@ -108,7 +108,7 @@ def test_json_mode_emits_one_aggregate_document(monkeypatch, capsys):
         lambda _json_mode: task_check.ScriptResult("governance_t1_fallback", 0, 0, 1),
     )
 
-    assert task_check.main(["--tier", "T1", "--report-json", "--json"]) == 0
+    assert task_check.main(["--tier", "T1", "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["ok"] is True
     assert len(payload["triggered"]) == 1

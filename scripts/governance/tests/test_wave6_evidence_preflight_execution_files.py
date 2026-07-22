@@ -117,14 +117,13 @@ def test_wave6_evidence_preflight_requires_gate_record_and_validate_execution_fi
 
 
 def test_wave6_evidence_preflight_maps_wave2_collector_entries_to_collector():
-    """W6.C readiness/smoke/collect 都应绑定到真实 collector。"""
+    """W6.C readiness/smoke 都应绑定到真实 collector。"""
     import check_wave6_evidence_preflight as check
 
     expected = "scripts/governance/collect_wave2_runtime_evidence.py"
 
     assert check.execution_file_for_just_entry("wave-2-runtime-evidence-readiness") == expected
     assert check.execution_file_for_just_entry("wave-2-runtime-evidence-smoke") == expected
-    assert check.execution_file_for_just_entry("wave-2-runtime-evidence-collect") == expected
 
 
 def test_wave6_evidence_preflight_maps_wave3_pda_readiness_to_checker():

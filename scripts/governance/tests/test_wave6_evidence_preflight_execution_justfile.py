@@ -74,7 +74,7 @@ def test_wave6_evidence_preflight_rejects_gate_just_entry_calling_wrong_script(
 
 
 def test_wave6_evidence_preflight_wave2_collector_just_entries_have_expected_modes():
-    """W6.C readiness 必须只读，smoke/collect 必须执行真实采集。"""
+    """W6.C readiness 必须只读，smoke 必须执行真实采集。"""
     import check_wave6_evidence_preflight as check
 
     just_text = Path("justfile").read_text(encoding="utf-8")
@@ -88,16 +88,10 @@ def test_wave6_evidence_preflight_wave2_collector_just_entries_have_expected_mod
         just_text,
         "wave-2-runtime-evidence-smoke",
     )
-    collect_commands = check.just_recipe_commands(
-        just_text,
-        "wave-2-runtime-evidence-collect",
-    )
-
     assert readiness_commands == [
         ["python3", collector_file, "--check-only", "{{args}}"],
     ]
     assert smoke_commands == [["python3", collector_file, "{{args}}"]]
-    assert collect_commands == [["python3", collector_file, "{{args}}"]]
 
 
 def test_wave6_evidence_preflight_wave3_pda_readiness_is_read_only_checker():

@@ -18,7 +18,6 @@ from report_wave2_completion import contains_blocked_runtime_ref_token
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 DEFAULT_ACCESS_TOKEN_ENV = "WAVE_2_H1_TOKEN"
-LEGACY_ACCESS_TOKEN_ENV = "WAVE_2_ACCESS_TOKEN"
 BUSINESS_SMOKE_PATH = "/api/v1/inventory/batches"
 BUSINESS_SMOKE_FLAG = "m3_inventory_batches_config_center_smoke"
 FAIL_CLOSED_CODE = "M1_CONFIG_FLAG_MISSING"
@@ -62,19 +61,9 @@ def validate_ref(label: str, value: str, environment: str) -> None:
 
 
 def access_token(env_name: str) -> str:
-    candidates = [env_name]
-    if env_name == DEFAULT_ACCESS_TOKEN_ENV:
-        candidates.append(LEGACY_ACCESS_TOKEN_ENV)
-
-    for candidate in dict.fromkeys(candidates):
-        token = os.environ.get(candidate, "").strip()
-        if token:
-            return token
-
-    if env_name == DEFAULT_ACCESS_TOKEN_ENV:
-        raise EvidenceError(
-            f"{DEFAULT_ACCESS_TOKEN_ENV} is required; legacy {LEGACY_ACCESS_TOKEN_ENV} is also accepted"
-        )
+    token = os.environ.get(env_name, "").strip()
+    if token:
+        return token
     raise EvidenceError(f"{env_name} is required")
 
 

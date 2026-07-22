@@ -123,11 +123,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["react-native", "webview-capacitor"],
     )
     parser.add_argument("--pda-device-ref")
-    parser.add_argument(
-        "--spike005-result-ref",
-        "--spike-result-ref",
-        dest="spike005_result_ref",
-    )
+    parser.add_argument("--spike005-result-ref")
     parser.add_argument("--m2-scan-log-ref")
     parser.add_argument("--m3-scan-log-ref")
     parser.add_argument("--offline-replay-log-ref")

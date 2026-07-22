@@ -172,7 +172,7 @@ def test_validate_wave3_pda_runtime_evidence_rejects_candidate_ref_mismatch(tmp_
     assert "pda_stack_candidate" in message
 
 
-def test_validate_wave3_pda_runtime_evidence_rejects_non_spike_result_ref(tmp_path):
+def test_validate_wave3_pda_runtime_evidence_rejects_non_spike005_result_ref(tmp_path):
     """Wave 3 PDA runtime 证据的 spike 结果引用不能指向任意运行记录。"""
     import validate_wave3_pda_runtime_evidence as validator
 

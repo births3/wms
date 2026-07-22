@@ -24,7 +24,7 @@ def _valid_args() -> list[str]:
         "react-native",
         "--pda-device-ref",
         "asset://wms-staging/pda/honeywell-eda52-01",
-        "--spike-result-ref",
+        "--spike005-result-ref",
         "s3://wms-staging-evidence/wave3/pda/spike-005-runtime-20260604.md",
         "--m2-scan-log-ref",
         "ci/staging/wave3-pda-m2-scan/123",

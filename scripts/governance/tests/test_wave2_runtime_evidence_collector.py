@@ -109,54 +109,6 @@ def test_collect_wave2_runtime_evidence_runs_smoke_and_writes_valid_json(
     assert payload["business_smoke"]["fail_closed_error_code"] == "M1_CONFIG_FLAG_MISSING"
 
 
-def test_collect_wave2_runtime_evidence_uses_legacy_access_token_fallback(
-    tmp_path,
-    monkeypatch,
-):
-    """默认 H1 token 缺失时，collector 兼容旧 WAVE_2_ACCESS_TOKEN。"""
-    import collect_wave2_runtime_evidence as collector
-
-    output = tmp_path / "wave-2-runtime-evidence.json"
-    archive_ref = "s3://wms-staging-audit/feature-flags/feature_flags.toml"
-    responses = _success_responses(collector, archive_ref)
-    calls = []
-    monkeypatch.delenv("WAVE_2_H1_TOKEN", raising=False)
-    monkeypatch.setenv("WAVE_2_ACCESS_TOKEN", "legacy-token-staging")
-
-    def fake_http(method, url, token, body=None, timeout_seconds=30):
-        calls.append((method, url, token, body, timeout_seconds))
-        return responses.pop(0)
-
-    monkeypatch.setattr(collector, "http_json", fake_http)
-
-    assert collector.main(_base_args(output)) == 0
-    assert {call[2] for call in calls} == {"legacy-token-staging"}
-
-
-def test_collect_wave2_runtime_evidence_prefers_h1_token_over_legacy_token(
-    tmp_path,
-    monkeypatch,
-):
-    """新旧 token 同时存在时，collector 使用 WAVE_2_H1_TOKEN。"""
-    import collect_wave2_runtime_evidence as collector
-
-    output = tmp_path / "wave-2-runtime-evidence.json"
-    archive_ref = "s3://wms-staging-audit/feature-flags/feature_flags.toml"
-    responses = _success_responses(collector, archive_ref)
-    calls = []
-    monkeypatch.setenv("WAVE_2_H1_TOKEN", "h1-token-staging")
-    monkeypatch.setenv("WAVE_2_ACCESS_TOKEN", "legacy-token-staging")
-
-    def fake_http(method, url, token, body=None, timeout_seconds=30):
-        calls.append((method, url, token, body, timeout_seconds))
-        return responses.pop(0)
-
-    monkeypatch.setattr(collector, "http_json", fake_http)
-
-    assert collector.main(_base_args(output)) == 0
-    assert {call[2] for call in calls} == {"h1-token-staging"}
-
-
 def test_collect_wave2_runtime_evidence_uses_environment_defaults(
     tmp_path,
     monkeypatch,
@@ -196,7 +148,6 @@ def test_collect_wave2_runtime_evidence_requires_access_token_before_http(
 
     output = tmp_path / "wave-2-runtime-evidence.json"
     monkeypatch.delenv("WAVE_2_H1_TOKEN", raising=False)
-    monkeypatch.delenv("WAVE_2_ACCESS_TOKEN", raising=False)
     monkeypatch.setattr(
         collector,
         "http_json",

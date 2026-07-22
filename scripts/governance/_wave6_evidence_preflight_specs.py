@@ -74,7 +74,6 @@ JUST_ENTRY_EXECUTION_FILE_OVERRIDES = {
     "wave-2-runtime-evidence-validate": "scripts/governance/report_wave2_completion.py",
     "wave-2-runtime-evidence-readiness": "scripts/governance/collect_wave2_runtime_evidence.py",
     "wave-2-runtime-evidence-smoke": "scripts/governance/collect_wave2_runtime_evidence.py",
-    "wave-2-runtime-evidence-collect": "scripts/governance/collect_wave2_runtime_evidence.py",
     "wave-3-pda-preaudit-kit": "scripts/governance/check_wave3_pda_runtime_readiness.py",
     "wave-3-pda-materials-checklist": "scripts/governance/check_wave3_pda_runtime_readiness.py",
     "wave-3-pda-field-work-request": "scripts/governance/check_wave3_pda_runtime_readiness.py",
