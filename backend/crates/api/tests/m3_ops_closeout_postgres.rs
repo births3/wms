@@ -1,7 +1,7 @@
 use chrono::{NaiveDate, Utc};
 use uuid::Uuid;
-use wms_api::auth::AuthContext;
 use wms_api::wave3_repository::PgWave3Repository;
+use wms_api::{audit::AuditWriteRequest, auth::AuthContext};
 use wms_domain::{
     ChangeInventoryStatusRequest, HandleInventoryAlertRequest, InventoryAbcQuery,
     InventoryAlertQuery, OverrideInventoryAbcRequest, RecomputeInventoryAbcRequest,
@@ -187,31 +187,55 @@ async fn status_change_enqueues_erp_outbox_and_process_succeeds(pool: sqlx::PgPo
     .expect("batch");
 
     let repository = PgWave3Repository::new(pool.clone());
-    repository
+    let ctx = ctx(owner_id);
+    let request = ChangeInventoryStatusRequest {
+        batch_id,
+        target_status: "quarantined".to_string(),
+        reason: "质量隔离".to_string(),
+        approval_source: "质量联系单".to_string(),
+        approval_id: "QL-001".to_string(),
+    };
+    let audit = AuditWriteRequest::from_auth_context(
+        &ctx,
+        "change_status",
+        "M3",
+        "inventory_batch",
+        batch_id.to_string(),
+        None,
+    );
+    let first = repository
         .change_inventory_status_with_audit(
-            &ctx(owner_id),
-            ChangeInventoryStatusRequest {
-                batch_id,
-                target_status: "quarantined".to_string(),
-                reason: "质量隔离".to_string(),
-                approval_source: "质量联系单".to_string(),
-                approval_id: "QL-001".to_string(),
-            },
+            &ctx,
+            request.clone(),
             Utc::now(),
             "idem-status-erp",
-            None,
+            Some(audit.clone()),
         )
         .await
         .expect("status");
+    let replay = repository
+        .change_inventory_status_with_audit(
+            &ctx,
+            request,
+            Utc::now(),
+            "idem-status-erp",
+            Some(audit),
+        )
+        .await
+        .expect("status replay");
+    assert!(!first.replayed);
+    assert!(replay.replayed);
+    assert_eq!(first.value.id, replay.value.id);
 
-    let pending: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM inventory_status_erp_feedback_outbox WHERE owner_id = $1 AND status = 'pending'",
+    let evidence: (i64, i64, i64, i64) = sqlx::query_as(
+        "SELECT (SELECT COUNT(*) FROM inventory_status_changes WHERE owner_id = $1 AND batch_id = $2), (SELECT COUNT(*) FROM inventory_status_erp_feedback_outbox WHERE owner_id = $1 AND batch_id = $2 AND status = 'pending'), (SELECT COUNT(*) FROM audit_event WHERE owner_id = $1 AND action = 'change_status' AND resource_id = $2::text), (SELECT COUNT(*) FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = 'idem-status-erp')",
     )
     .bind(owner_id)
+    .bind(batch_id)
     .fetch_one(&pool)
     .await
-    .expect("pending");
-    assert!(pending >= 1);
+    .expect("status change outbox, audit, and idempotency evidence");
+    assert_eq!(evidence, (1, 1, 1, 1));
     let routed_warehouse_matches: bool = sqlx::query_scalar(
         "SELECT payload->>'warehouse_id' = (SELECT warehouse_id::text FROM warehouse_locations WHERE owner_id = $1 AND id = $2) FROM inventory_status_erp_feedback_outbox WHERE owner_id = $1 AND batch_id = $3",
     )
@@ -227,7 +251,7 @@ async fn status_change_enqueues_erp_outbox_and_process_succeeds(pool: sqlx::PgPo
         .process_status_erp_feedback_outbox(Utc::now(), 20)
         .await
         .expect("process");
-    assert!(processed >= 1);
+    assert_eq!(processed, 1);
     let succeeded: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM inventory_status_erp_feedback_outbox WHERE owner_id = $1 AND status = 'succeeded'",
     )
@@ -235,7 +259,7 @@ async fn status_change_enqueues_erp_outbox_and_process_succeeds(pool: sqlx::PgPo
     .fetch_one(&pool)
     .await
     .expect("succeeded");
-    assert!(succeeded >= 1);
+    assert_eq!(succeeded, 1);
 }
 
 #[sqlx::test(migrations = "../../migrations")]

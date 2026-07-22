@@ -55,8 +55,9 @@ async fn manual_surplus_is_numbered_executed_atomically_audited_and_idempotent(p
         movement_delta,
         execution_process,
         outbox_count,
-        audit_count,
-    ): (i64, i64, i64, i64, String, i64, i64) = sqlx::query_as(
+        execute_audit_count,
+        execute_idempotency_count,
+    ): (i64, i64, i64, i64, String, i64, i64, i64) = sqlx::query_as(
         r#"
         SELECT
           (SELECT qty_on_hand FROM inventory_batches WHERE id = $1),
@@ -64,13 +65,15 @@ async fn manual_surplus_is_numbered_executed_atomically_audited_and_idempotent(p
           (SELECT COUNT(*) FROM inventory_movements WHERE source_document_id = $2 AND movement_type = 'stock_surplus'),
           (SELECT qty_delta FROM inventory_movements WHERE source_document_id = $2 AND movement_type = 'stock_surplus'),
           (SELECT process_code FROM stock_adjustment_execution_records WHERE order_id = $2),
-          (SELECT COUNT(*) FROM stock_adjustment_erp_feedback_outbox WHERE order_id = $2 AND event_type = 'stock_surplus_completed'),
-          (SELECT COUNT(*) FROM audit_event WHERE owner_id = $3 AND resource_id = $2::TEXT)
+          (SELECT COUNT(*) FROM stock_adjustment_erp_feedback_outbox WHERE order_id = $2 AND event_type = 'stock_surplus_completed' AND payload->>'warehouse_id' = $4::TEXT),
+          (SELECT COUNT(*) FROM audit_event WHERE owner_id = $3 AND action = 'execute_stock_surplus_order' AND resource_id = $2::TEXT),
+          (SELECT COUNT(*) FROM idempotency_request WHERE owner_id = $3 AND idempotency_key = 'sa-surplus-execute-1')
         "#,
     )
     .bind(batch_id)
     .bind(created.value.id)
     .bind(owner_id)
+    .bind(warehouse_id)
     .fetch_one(&pool)
     .await
     .expect("surplus evidence should load");
@@ -80,7 +83,8 @@ async fn manual_surplus_is_numbered_executed_atomically_audited_and_idempotent(p
     assert_eq!(movement_delta, 3);
     assert_eq!(execution_process, "报溢");
     assert_eq!(outbox_count, 1);
-    assert!(audit_count >= 3);
+    assert_eq!(execute_audit_count, 1);
+    assert_eq!(execute_idempotency_count, 1);
 }
 
 #[sqlx::test(migrations = "../../migrations")]

@@ -256,14 +256,15 @@ async fn smart_putaway_recommends_and_commits_owner_scoped_inventory_atomically(
     .expect("lpn on movement");
     assert_eq!(movement_lpn.as_deref(), Some("LPN-M2-PUT-001"));
 
-    let pending: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM receiving_putaway_erp_feedback_outbox WHERE owner_id = $1 AND status = 'pending'",
+    let evidence: (i64, i64, i64) = sqlx::query_as(
+        "SELECT (SELECT COUNT(*) FROM receiving_putaway_erp_feedback_outbox WHERE owner_id = $1 AND status = 'pending'), (SELECT COUNT(*) FROM audit_event WHERE owner_id = $1 AND action = 'putaway' AND resource_id = $2::text), (SELECT COUNT(*) FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = 'm2-putaway-idem-1')",
     )
     .bind(fixture.owner_id)
+    .bind(fixture.order_id)
     .fetch_one(&pool)
     .await
-    .expect("putaway erp outbox pending");
-    assert_eq!(pending, 1);
+    .expect("putaway outbox, audit, and idempotency evidence");
+    assert_eq!(evidence, (1, 1, 1));
     let routed_warehouse_matches: bool = sqlx::query_scalar(
         "SELECT payload->>'warehouse_id' = (SELECT warehouse_id::text FROM receiving_orders WHERE id = $1) FROM receiving_putaway_erp_feedback_outbox WHERE owner_id = $2",
     )
