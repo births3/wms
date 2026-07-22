@@ -58,6 +58,67 @@ def settings() -> Settings:
 
 
 class TestInboundCorePipeline(unittest.TestCase):
+    def test_retry_loads_original_binding_instead_of_resolving_current_route(
+        self,
+    ) -> None:
+        import sync_worker
+
+        calls: list[str] = []
+
+        def fake_http(_settings, method, path, body, _idem):
+            calls.append(path)
+            self.assertEqual(method, "GET")
+            self.assertIsNone(body)
+            return (
+                200,
+                {
+                    "data": [
+                        {
+                            "connector_id": settings().connector_id,
+                            "connector_code": "SELF-ERP",
+                            "config_version": 2,
+                            "direction": "inbound",
+                            "message_type": "asn",
+                            "schema_version": "1",
+                            "channel": "interface_table",
+                        }
+                    ]
+                },
+                "",
+            )
+
+        row = {
+            "id": "row-1",
+            "external_doc_no": "ASN-1",
+            "external_ref": "ERP ASN/1",
+            "idempotency_key": "idem-1",
+            "schema_version": "1",
+            "retry_count": "1",
+        }
+        with (
+            patch.object(sync_worker, "get_worker_claim_decision", return_value=True),
+            patch.object(sync_worker, "try_record_worker_heartbeat"),
+            patch.object(sync_worker, "claim_rows", return_value=[row]),
+            patch.object(sync_worker, "http_json", side_effect=fake_http),
+            patch.object(sync_worker, "resolve_inbound_route") as resolve_current,
+            patch.object(
+                sync_worker,
+                "run_inbound_pipeline",
+                return_value=("wms-1", object()),
+            ) as pipeline,
+            patch.object(sync_worker, "mark_row"),
+        ):
+            self.assertEqual(sync_worker.process_once(settings(), ["asn"], False), 1)
+
+        resolve_current.assert_not_called()
+        binding = pipeline.call_args.kwargs["route_binding"]
+        self.assertEqual(binding.config_version, 2)
+        self.assertIn("direction=inbound", calls[0])
+        self.assertIn("message_type=asn", calls[0])
+        self.assertIn("external_ref=ERP+ASN%2F1", calls[0])
+        self.assertIn("idempotency_key=idem-1", calls[0])
+        self.assertIn("created_from=1970-01-01T00%3A00%3A00Z", calls[0])
+
     def test_product_rejects_unmapped_storage_condition_before_business_api(
         self,
     ) -> None:

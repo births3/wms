@@ -56,6 +56,7 @@ from worker_route import (  # noqa: E402
     get_worker_claim_decision as get_worker_claim_decision_with_http,
     is_retryable_worker_error,
     post_worker_heartbeat as post_worker_heartbeat_with_http,
+    resolve_existing_inbound_binding,
     resolve_inbound_route as resolve_inbound_route_with_http,
     sanitize_worker_error,
     validate_row_schema_version,
@@ -494,7 +495,15 @@ def process_once(
             try:
                 pipeline_started = False
                 validate_row_schema_version(row)
-                binding = resolve_inbound_route(settings, type_name, row)
+                binding = (
+                    resolve_existing_inbound_binding(
+                        settings, type_name, row, http_json_fn=http_json
+                    )
+                    if retry > 0
+                    else None
+                )
+                if binding is None:
+                    binding = resolve_inbound_route(settings, type_name, row)
                 if binding.connector_id != settings.connector_id:
                     raise WorkerHttpError(
                         409,

@@ -152,3 +152,69 @@ def resolve_inbound_route(
         channel="interface_table",
         message_type=message_type,
     )
+
+
+def resolve_existing_inbound_binding(
+    settings: Any,
+    message_type: str,
+    row: dict[str, str],
+    *,
+    http_json_fn: HttpJsonFn,
+) -> RouteBinding | None:
+    """重试时按完整幂等身份读取首次处理绑定；预检记录未绑定则返回 None。"""
+    external_ref = str(
+        row.get("external_ref") or row.get("external_doc_no") or row.get("id") or ""
+    )
+    idempotency_key = str(
+        row.get("idempotency_key") or f"{message_type}-{row.get('id', 'x')}"
+    )
+    path = "/api/v1/integration/erp-messages?" + urllib.parse.urlencode(
+        {
+            "direction": "inbound",
+            "message_type": message_type,
+            "external_ref": external_ref,
+            "idempotency_key": idempotency_key,
+            "created_from": "1970-01-01T00:00:00Z",
+            "limit": 2,
+        }
+    )
+    status, parsed, raw = http_json_fn(
+        settings,
+        "GET",
+        path,
+        None,
+        f"binding-{idempotency_key}",
+    )
+    if status != 200 or not isinstance(parsed, dict):
+        raise WorkerHttpError(status, "message binding lookup", raw)
+    data = parsed.get("data")
+    if not isinstance(data, list):
+        raise WorkerHttpError(502, "message binding lookup", "data missing")
+    if not data:
+        return None
+    if len(data) != 1 or not isinstance(data[0], dict):
+        raise WorkerHttpError(409, "message binding lookup", "binding is ambiguous")
+    message = data[0]
+    expected = {
+        "direction": "inbound",
+        "message_type": message_type,
+        "schema_version": str(row.get("schema_version") or ""),
+        "channel": "interface_table",
+    }
+    if any(str(message.get(key) or "") != value for key, value in expected.items()):
+        raise WorkerHttpError(409, "message binding lookup", "binding identity changed")
+    connector_id = str(message.get("connector_id") or "")
+    connector_code = str(message.get("connector_code") or "")
+    try:
+        config_version = int(message.get("config_version") or 0)
+    except (TypeError, ValueError) as exc:
+        raise WorkerHttpError(502, "message binding lookup", "invalid config version") from exc
+    if not connector_id or not connector_code or config_version < 1:
+        return None
+    return RouteBinding(
+        connector_id=connector_id,
+        connector_code=connector_code,
+        config_version=config_version,
+        channel="interface_table",
+        message_type=message_type,
+    )
