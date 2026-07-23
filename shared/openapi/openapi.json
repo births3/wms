@@ -790,6 +790,16 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -832,6 +842,16 @@
               }
             }
           },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "规则字段非法或超过三级",
             "content": {
@@ -842,7 +862,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "升级规则按货主和 rule_code 原位更新，同一请求重复执行不创建第二条规则。"
       }
     },
     "/api/v1/alerts": {
@@ -1058,6 +1079,16 @@
               }
             }
           },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "403": {
             "description": "仓库范围越权",
             "content": {
@@ -1109,6 +1140,16 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -1150,6 +1191,16 @@
               }
             }
           },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "格式或过滤条件非法",
             "content": {
@@ -1160,7 +1211,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "H-AL 既有处理记录和导出任务尚未接入请求级重放缓存；本契约显式保留现状，后续 H-AL 故事补齐。"
       }
     },
     "/api/v1/alerts/exports/{id}": {
@@ -1188,6 +1240,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AlertExportJob"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1226,6 +1288,16 @@
         "responses": {
           "200": {
             "description": "下载 Excel 或 PDF 文件"
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           },
           "404": {
             "description": "导出文件不存在或已过期",
@@ -1334,6 +1406,16 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -1433,6 +1515,16 @@
               }
             }
           },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "查询范围超过一年",
             "content": {
@@ -1471,6 +1563,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AlertInstance"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1517,6 +1619,16 @@
               }
             }
           },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "告警实例不存在",
             "content": {
@@ -1537,7 +1649,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "告警动作由资源 ID 和生命周期状态机约束，重复状态迁移被拒绝，不产生第二次业务迁移。"
       }
     },
     "/api/v1/alerts/{id}/close": {
@@ -1579,6 +1692,16 @@
               }
             }
           },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "告警实例不存在",
             "content": {
@@ -1599,7 +1722,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "告警动作由资源 ID 和生命周期状态机约束，重复状态迁移被拒绝，不产生第二次业务迁移。"
       }
     },
     "/api/v1/alerts/{id}/handling": {
@@ -1641,6 +1765,16 @@
               }
             }
           },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "告警实例不存在",
             "content": {
@@ -1661,7 +1795,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "H-AL 既有处理记录和导出任务尚未接入请求级重放缓存；本契约显式保留现状，后续 H-AL 故事补齐。"
       }
     },
     "/api/v1/alerts/{id}/ignore": {
@@ -1703,6 +1838,16 @@
               }
             }
           },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "告警实例不存在",
             "content": {
@@ -1723,7 +1868,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "告警动作由资源 ID 和生命周期状态机约束，重复状态迁移被拒绝，不产生第二次业务迁移。"
       }
     },
     "/api/v1/audit/archive/partitions": {
@@ -9679,7 +9825,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "H8 写操作由消息幂等键、资源状态机、租约或复合资源键保证重复调用不产生第二个业务效果。"
       }
     },
     "/api/v1/integration/erp-messages/payload-retention": {
@@ -9800,7 +9947,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "H8 写操作由消息幂等键、资源状态机、租约或复合资源键保证重复调用不产生第二个业务效果。"
       }
     },
     "/api/v1/integration/erp-messages/purge": {
@@ -9839,8 +9987,29 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "H8 写操作由消息幂等键、资源状态机、租约或复合资源键保证重复调用不产生第二个业务效果。"
       }
     },
     "/api/v1/integration/erp-messages/stats": {
@@ -10093,7 +10262,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "H8 写操作由消息幂等键、资源状态机、租约或复合资源键保证重复调用不产生第二个业务效果。"
       }
     },
     "/api/v1/integration/erp-messages/worker-runtime/heartbeat": {
@@ -10153,7 +10323,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "H8 写操作由消息幂等键、资源状态机、租约或复合资源键保证重复调用不产生第二个业务效果。"
       }
     },
     "/api/v1/integration/erp-messages/{id}": {
@@ -10257,6 +10428,26 @@
               }
             }
           },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "409": {
             "description": "租约冲突",
             "content": {
@@ -10267,7 +10458,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "H8 写操作由消息幂等键、资源状态机、租约或复合资源键保证重复调用不产生第二个业务效果。"
       }
     },
     "/api/v1/integration/erp-messages/{id}/payload": {
@@ -10431,7 +10623,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "H8 写操作由消息幂等键、资源状态机、租约或复合资源键保证重复调用不产生第二个业务效果。"
       }
     },
     "/api/v1/inventory/abc": {
@@ -10521,7 +10714,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "M3 批处理与覆盖接口按当前资源键更新或跳过已存在待办，不重复创建业务对象。"
       }
     },
     "/api/v1/inventory/abc/override": {
@@ -10571,7 +10765,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "M3 批处理与覆盖接口按当前资源键更新或跳过已存在待办，不重复创建业务对象。"
       }
     },
     "/api/v1/inventory/alerts": {
@@ -10656,7 +10851,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "M3 批处理与覆盖接口按当前资源键更新或跳过已存在待办，不重复创建业务对象。"
       }
     },
     "/api/v1/inventory/alerts/{id}/handle": {
@@ -10718,7 +10914,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "M3 批处理与覆盖接口按当前资源键更新或跳过已存在待办，不重复创建业务对象。"
       }
     },
     "/api/v1/inventory/batches": {
@@ -12151,7 +12348,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "M3 批处理与覆盖接口按当前资源键更新或跳过已存在待办，不重复创建业务对象。"
       }
     },
     "/api/v1/inventory/relocations": {
@@ -12256,7 +12454,8 @@
               }
             }
           }
-        }
+        },
+        "x-idempotency-exempt-reason": "M3 批处理与覆盖接口按当前资源键更新或跳过已存在待办，不重复创建业务对象。"
       }
     },
     "/api/v1/inventory/status-transitions": {

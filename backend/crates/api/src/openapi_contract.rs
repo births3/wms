@@ -147,6 +147,87 @@ const IDEMPOTENCY_EXEMPTION_GROUPS: &[IdempotencyExemptionGroup] = &[
     },
     IdempotencyExemptionGroup {
         operations: &[
+            (
+                "/api/v1/integration/erp-messages/lifecycle",
+                PathItemType::Post,
+            ),
+            (
+                "/api/v1/integration/erp-messages/payload-retention",
+                PathItemType::Post,
+            ),
+            (
+                "/api/v1/integration/erp-messages/worker-runtime/control",
+                PathItemType::Post,
+            ),
+            (
+                "/api/v1/integration/erp-messages/worker-runtime/heartbeat",
+                PathItemType::Post,
+            ),
+            (
+                "/api/v1/integration/erp-messages/{id}/claim",
+                PathItemType::Post,
+            ),
+            (
+                "/api/v1/integration/erp-messages/{id}/replay",
+                PathItemType::Post,
+            ),
+            (
+                "/api/v1/integration/erp-messages/purge",
+                PathItemType::Post,
+            ),
+        ],
+        reason: "H8 写操作由消息幂等键、资源状态机、租约或复合资源键保证重复调用不产生第二个业务效果。",
+    },
+    IdempotencyExemptionGroup {
+        operations: &[(
+            "/api/v1/alert-escalation-rules/{rule_code}",
+            PathItemType::Put,
+        )],
+        reason: "升级规则按货主和 rule_code 原位更新，同一请求重复执行不创建第二条规则。",
+    },
+    IdempotencyExemptionGroup {
+        operations: &[
+            (
+                "/api/v1/alerts/{id}/acknowledge",
+                PathItemType::Post,
+            ),
+            ("/api/v1/alerts/{id}/close", PathItemType::Post),
+            ("/api/v1/alerts/{id}/ignore", PathItemType::Post),
+        ],
+        reason: "告警动作由资源 ID 和生命周期状态机约束，重复状态迁移被拒绝，不产生第二次业务迁移。",
+    },
+    IdempotencyExemptionGroup {
+        operations: &[
+            ("/api/v1/alerts/{id}/handling", PathItemType::Post),
+            ("/api/v1/alerts/exports", PathItemType::Post),
+        ],
+        reason: "H-AL 既有处理记录和导出任务尚未接入请求级重放缓存；本契约显式保留现状，后续 H-AL 故事补齐。",
+    },
+    IdempotencyExemptionGroup {
+        operations: &[
+            ("/api/v1/inventory/abc", PathItemType::Post),
+            ("/api/v1/inventory/abc/override", PathItemType::Post),
+            (
+                "/api/v1/inventory/alerts/generate-near-expiry",
+                PathItemType::Post,
+            ),
+            (
+                "/api/v1/inventory/alerts/{id}/handle",
+                PathItemType::Post,
+            ),
+            (
+                "/api/v1/inventory/maintenance/tasks/generate",
+                PathItemType::Post,
+            ),
+            (
+                "/api/v1/inventory/status-erp-outbox/process",
+                PathItemType::Post,
+            ),
+        ],
+        reason: "M3 批处理与覆盖接口按当前资源键更新或跳过已存在待办，不重复创建业务对象。",
+    },
+    IdempotencyExemptionGroup {
+        operations: &[
             ("/api/v1/print-templates/resolve", PathItemType::Post),
             ("/api/v1/print-templates/preview", PathItemType::Post),
         ],

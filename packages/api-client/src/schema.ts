@@ -9276,6 +9276,15 @@ export interface operations {
                     "application/json": components["schemas"]["AlertEscalationRuleListResponse"];
                 };
             };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     upsert_alert_escalation_rule: {
@@ -9301,6 +9310,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AlertEscalationRule"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description 规则字段非法或超过三级 */
@@ -9388,6 +9406,15 @@ export interface operations {
                     "application/json": components["schemas"]["AlertInstanceListResponse"];
                 };
             };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description 仓库范围越权 */
             403: {
                 headers: {
@@ -9429,6 +9456,15 @@ export interface operations {
                     "application/json": components["schemas"]["AlertChangeListResponse"];
                 };
             };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     create_alert_export: {
@@ -9460,6 +9496,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AlertExportJob"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description 格式或过滤条件非法 */
@@ -9494,6 +9539,15 @@ export interface operations {
                     "application/json": components["schemas"]["AlertExportJob"];
                 };
             };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description 导出任务不存在 */
             404: {
                 headers: {
@@ -9523,6 +9577,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
             };
             /** @description 导出文件不存在或已过期 */
             404: {
@@ -9562,6 +9625,15 @@ export interface operations {
                     "application/json": components["schemas"]["GspAlertLifecycleReport"];
                 };
             };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     get_alert_statistics: {
@@ -9589,6 +9661,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AlertStatisticsResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description 查询范围超过一年 */
@@ -9623,6 +9704,15 @@ export interface operations {
                     "application/json": components["schemas"]["AlertInstance"];
                 };
             };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description 告警实例不存在 */
             404: {
                 headers: {
@@ -9653,6 +9743,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AlertInstance"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description 告警实例不存在 */
@@ -9700,6 +9799,15 @@ export interface operations {
                     "application/json": components["schemas"]["AlertInstance"];
                 };
             };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description 告警实例不存在 */
             404: {
                 headers: {
@@ -9745,6 +9853,15 @@ export interface operations {
                     "application/json": components["schemas"]["AlertInstance"];
                 };
             };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description 告警实例不存在 */
             404: {
                 headers: {
@@ -9788,6 +9905,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AlertInstance"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description 告警实例不存在 */
@@ -15694,6 +15820,24 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     stats_h8_erp_messages: {
@@ -16003,6 +16147,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["H8ErpMessage"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description 租约冲突 */

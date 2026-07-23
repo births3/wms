@@ -450,6 +450,8 @@ pub(crate) fn replay_h8_erp_message() {}
     request_body = ClaimH8ErpMessageRequest,
     responses(
         (status = 200, description = "认领成功", body = H8ErpMessage),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
         (status = 409, description = "租约冲突", body = ErrorResponse),
     ),
 )]
@@ -464,6 +466,8 @@ pub(crate) fn claim_h8_erp_message() {}
     responses(
         (status = 200, description = "按保留策略清理终态消息", body = PurgeH8ErpMessagesResponse),
         (status = 400, description = "未配置保留策略", body = ErrorResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
     ),
 )]
 #[allow(dead_code)]
