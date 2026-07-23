@@ -12,6 +12,7 @@ use wms_domain::{
 
 use super::error::{H8ErpConnectorHandlerError, H8ErpConnectorRepoError};
 use super::state::H8ErpConnectorAppState;
+use crate::sync::lock_recover;
 
 pub(crate) fn idempotency_key(headers: &HeaderMap) -> Result<String, H8ErpConnectorHandlerError> {
     headers
@@ -67,7 +68,7 @@ pub(crate) async fn load_idempotent_response(
         }
         return Ok(None);
     }
-    let guard = state.idempotency.lock().expect("idempotency lock");
+    let guard = lock_recover(&state.idempotency);
     if let Some((stored_hash, status, body)) = guard.get(&cache_key(owner_id, key)) {
         if stored_hash != hash {
             return Err(H8ErpConnectorHandlerError::Repo(
@@ -121,7 +122,7 @@ pub(crate) async fn store_idempotent_response(
         .await;
         return Ok(());
     }
-    let mut guard = state.idempotency.lock().expect("idempotency lock");
+    let mut guard = lock_recover(&state.idempotency);
     guard.insert(
         cache_key(owner_id, key),
         (hash.to_string(), status.as_u16(), response_body),

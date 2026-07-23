@@ -77,6 +77,24 @@ def test_unsafe_and_unwrap_treats_cfg_test_include_as_test_code():
     assert issues == []
 
 
+def test_unsafe_and_unwrap_treats_external_cfg_test_module_as_test_code(tmp_path):
+    from check_unsafe_and_unwrap import _test_only_include_files
+
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "mod.rs").write_text(
+        "#[cfg(test)]\nmod partition_tests;\n",
+        encoding="utf-8",
+    )
+    test_module = src / "partition_tests.rs"
+    test_module.write_text(
+        'fn fixture() { result.expect("test fixture should exist"); }\n',
+        encoding="utf-8",
+    )
+
+    assert _test_only_include_files(tmp_path) == {test_module.resolve()}
+
+
 def test_unsafe_and_unwrap_detects_real_production_usage():
     """生产路径 unsafe / unwrap / expect / panic 必须报错。"""
     from check_unsafe_and_unwrap import find_unsafe_unwrap_issues

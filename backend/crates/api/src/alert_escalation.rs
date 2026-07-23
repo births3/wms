@@ -1,6 +1,6 @@
 //! H-AL escalation-rule persistence and due-alert worker.
 
-use chrono::{DateTime, Datelike, Duration, NaiveDate, NaiveTime, Timelike, Utc, Weekday};
+use chrono::{DateTime, Datelike, Duration, NaiveDate, NaiveTime, Utc, Weekday};
 use serde_json::Value;
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
@@ -458,8 +458,7 @@ async fn process_candidate(
 }
 
 fn is_off_hours(candidate: &CandidateRow, now: DateTime<Utc>) -> bool {
-    let local_time = NaiveTime::from_hms_opt(now.hour(), now.minute(), now.second())
-        .expect("UTC time components are valid");
+    let local_time = now.time();
     let overnight = candidate.off_hours_start > candidate.off_hours_end;
     let outside = if overnight {
         local_time >= candidate.off_hours_start || local_time < candidate.off_hours_end

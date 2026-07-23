@@ -11,6 +11,7 @@ use wms_domain::{
 };
 
 use super::error::H8ErpMessageRepoError;
+use crate::sync::lock_recover;
 
 #[axum::async_trait]
 pub trait H8PayloadRepository: Send + Sync {
@@ -97,10 +98,7 @@ impl H8PayloadRepository for MemoryH8PayloadRepository {
         &self,
         owner_id: Uuid,
     ) -> Result<Vec<H8PayloadRetentionPolicy>, H8ErpMessageRepoError> {
-        Ok(self
-            .policies
-            .lock()
-            .expect("payload policy lock")
+        Ok(lock_recover(&self.policies)
             .iter()
             .filter(|((owner, _), _)| *owner == owner_id)
             .map(|(_, policy)| policy.clone())
@@ -121,16 +119,11 @@ impl H8PayloadRepository for MemoryH8PayloadRepository {
             retention_days,
             updated_at: now,
         };
-        self.policies
-            .lock()
-            .expect("payload policy lock")
-            .insert((owner_id, request.connector_id), policy.clone());
+        lock_recover(&self.policies).insert((owner_id, request.connector_id), policy.clone());
         if !request.enabled {
-            self.payloads.lock().expect("payload lock").retain(
-                |(owner, _), (connector, _, _, _)| {
-                    *owner != owner_id || *connector != request.connector_id
-                },
-            );
+            lock_recover(&self.payloads).retain(|(owner, _), (connector, _, _, _)| {
+                *owner != owner_id || *connector != request.connector_id
+            });
         }
         Ok(policy)
     }
@@ -145,10 +138,7 @@ impl H8PayloadRepository for MemoryH8PayloadRepository {
         key_version: &str,
         now: DateTime<Utc>,
     ) -> Result<bool, H8ErpMessageRepoError> {
-        let policy = self
-            .policies
-            .lock()
-            .expect("payload policy lock")
+        let policy = lock_recover(&self.policies)
             .get(&(owner_id, connector_id))
             .cloned();
         let Some(policy) = policy.filter(|value| value.enabled) else {
@@ -156,7 +146,7 @@ impl H8PayloadRepository for MemoryH8PayloadRepository {
         };
         require_master_key(master_key)?;
         let key_version = require_key_version(key_version)?;
-        self.payloads.lock().expect("payload lock").insert(
+        lock_recover(&self.payloads).insert(
             (owner_id, message_id),
             (
                 connector_id,
@@ -174,10 +164,7 @@ impl H8PayloadRepository for MemoryH8PayloadRepository {
         message_id: Uuid,
         now: DateTime<Utc>,
     ) -> Result<(bool, Option<DateTime<Utc>>), H8ErpMessageRepoError> {
-        let expires = self
-            .payloads
-            .lock()
-            .expect("payload lock")
+        let expires = lock_recover(&self.payloads)
             .get(&(owner_id, message_id))
             .map(|(_, _, expires, _)| *expires);
         Ok((expires.is_some_and(|value| value > now), expires))
@@ -190,10 +177,7 @@ impl H8PayloadRepository for MemoryH8PayloadRepository {
         master_keys: &HashMap<String, String>,
         now: DateTime<Utc>,
     ) -> Result<H8DecryptedPayload, H8ErpMessageRepoError> {
-        let value = self
-            .payloads
-            .lock()
-            .expect("payload lock")
+        let value = lock_recover(&self.payloads)
             .get(&(owner_id, message_id))
             .cloned()
             .ok_or(H8ErpMessageRepoError::Domain(
@@ -213,7 +197,7 @@ impl H8PayloadRepository for MemoryH8PayloadRepository {
     }
 
     async fn purge_expired(&self, now: DateTime<Utc>) -> Result<u64, H8ErpMessageRepoError> {
-        let mut payloads = self.payloads.lock().expect("payload lock");
+        let mut payloads = lock_recover(&self.payloads);
         let before = payloads.len();
         payloads.retain(|_, (_, _, expires, _)| *expires > now);
         Ok((before - payloads.len()) as u64)
@@ -361,7 +345,9 @@ impl H8PayloadRepository for PgH8PayloadRepository {
         }
         let master_key = require_master_key(master_key)?;
         let key_version = require_key_version(key_version)?;
-        let retention_days = policy.expect("enabled policy").1;
+        let Some((_, retention_days)) = policy else {
+            return Ok(false);
+        };
         let expires_at = now + chrono::Duration::days(i64::from(retention_days));
         let updated = sqlx::query(
             r#"UPDATE h8_erp_messages

@@ -13,6 +13,7 @@ use wms_domain::{
 };
 
 use super::error::H8ErpMessageRepoError;
+use crate::sync::lock_recover;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct H8ErpMessageCursor {
@@ -170,7 +171,7 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
         cursor: Option<H8ErpMessageCursor>,
         limit: u32,
     ) -> Result<Vec<H8ErpMessage>, H8ErpMessageRepoError> {
-        let guard = self.inner.lock().expect("lock");
+        let guard = lock_recover(&self.inner);
         let window_from = created_from.or(cursor.map(|value| value.window_from));
         let mut rows: Vec<_> = guard
             .messages
@@ -214,7 +215,7 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
     }
 
     async fn get(&self, owner_id: Uuid, id: Uuid) -> Result<H8ErpMessage, H8ErpMessageRepoError> {
-        let guard = self.inner.lock().expect("lock");
+        let guard = lock_recover(&self.inner);
         guard
             .messages
             .get(&id)
@@ -230,7 +231,7 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
     ) -> Result<Vec<H8ErpMessageAttempt>, H8ErpMessageRepoError> {
         let msg = self.get(owner_id, message_id).await?;
         let _ = msg;
-        let guard = self.inner.lock().expect("lock");
+        let guard = lock_recover(&self.inner);
         Ok(guard.attempts.get(&message_id).cloned().unwrap_or_default())
     }
 
@@ -274,7 +275,7 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
             p95_latency_ms: 0,
         };
         let mut latencies = Vec::new();
-        let guard = self.inner.lock().expect("lock");
+        let guard = lock_recover(&self.inner);
         for m in &rows {
             stats.retry_total += i64::from(m.retry_count);
             match m.sync_status.as_str() {
@@ -313,7 +314,7 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
                 H8MessageError::FieldRequired("reason"),
             ));
         }
-        let mut guard = self.inner.lock().expect("lock");
+        let mut guard = lock_recover(&self.inner);
         let Some(msg) = guard
             .messages
             .get(&id)
@@ -368,7 +369,7 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
                 H8MessageError::FieldRequired("worker_id"),
             ));
         }
-        let mut guard = self.inner.lock().expect("lock");
+        let mut guard = lock_recover(&self.inner);
         let Some(msg) = guard
             .messages
             .get(&id)
@@ -432,7 +433,7 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
         actor: &str,
         now: DateTime<Utc>,
     ) -> Result<H8ErpMessage, H8ErpMessageRepoError> {
-        let mut guard = self.inner.lock().expect("lock");
+        let mut guard = lock_recover(&self.inner);
         let Some(msg) = guard
             .messages
             .get(&id)
@@ -488,7 +489,7 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
         actor: &str,
         now: DateTime<Utc>,
     ) -> Result<H8ErpMessage, H8ErpMessageRepoError> {
-        let mut guard = self.inner.lock().expect("lock");
+        let mut guard = lock_recover(&self.inner);
         let (next, started_at) = {
             let message = guard
                 .messages
@@ -538,7 +539,7 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
         actor: &str,
         now: DateTime<Utc>,
     ) -> Result<H8ErpMessage, H8ErpMessageRepoError> {
-        let mut guard = self.inner.lock().expect("lock");
+        let mut guard = lock_recover(&self.inner);
         let Some(msg) = guard
             .messages
             .get(&id)
@@ -584,7 +585,7 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
         retention_days: Option<i32>,
         now: DateTime<Utc>,
     ) -> Result<(i64, i32), H8ErpMessageRepoError> {
-        let mut guard = self.inner.lock().expect("lock");
+        let mut guard = lock_recover(&self.inner);
         let days = retention_days
             .or_else(|| guard.retention.get(&owner_id).copied())
             .filter(|d| *d > 0);
@@ -593,7 +594,11 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
                 H8MessageError::FieldRequired("retention_days"),
             ));
         }
-        let days = days.expect("checked");
+        let Some(days) = days else {
+            return Err(H8ErpMessageRepoError::Domain(
+                H8MessageError::FieldRequired("retention_days"),
+            ));
+        };
         let cutoff = now - chrono::Duration::days(i64::from(days));
         let to_delete: Vec<Uuid> = guard
             .messages
@@ -617,7 +622,7 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
         external_ref: &str,
         idempotency_key: &str,
     ) -> Result<Option<H8ErpMessage>, H8ErpMessageRepoError> {
-        let guard = self.inner.lock().expect("lock");
+        let guard = lock_recover(&self.inner);
         Ok(guard
             .messages
             .values()
@@ -631,7 +636,7 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
     }
 
     async fn upsert_for_test(&self, message: &H8ErpMessage) -> Result<(), H8ErpMessageRepoError> {
-        let mut guard = self.inner.lock().expect("lock");
+        let mut guard = lock_recover(&self.inner);
         guard.messages.insert(message.id, message.clone());
         Ok(())
     }
@@ -640,7 +645,7 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
         &self,
         attempt: &H8ErpMessageAttempt,
     ) -> Result<(), H8ErpMessageRepoError> {
-        let mut guard = self.inner.lock().expect("lock");
+        let mut guard = lock_recover(&self.inner);
         guard
             .attempts
             .entry(attempt.message_id)

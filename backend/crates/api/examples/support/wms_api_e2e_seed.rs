@@ -251,8 +251,7 @@ pub async fn seed_m4_review_data(pool: &PgPool) -> Result<(), sqlx::Error> {
 }
 
 pub async fn seed_hal_alert_capabilities(pool: &PgPool) -> Result<(), sqlx::Error> {
-    let owner_id = Uuid::parse_str("00000000-0000-0000-0000-000000000001")
-        .expect("static H-AL owner UUID should parse");
+    let owner_id = Uuid::from_u128(1);
     sqlx::query(
         r#"
         INSERT INTO h4_notification_configs (
@@ -323,21 +322,21 @@ pub async fn seed_hal_alert_capabilities(pool: &PgPool) -> Result<(), sqlx::Erro
 
     for (event_id, idempotency_key, event_type, resource_type, resource_id) in [
         (
-            "00000000-0000-0000-0000-000000006101",
+            Uuid::from_u128(0x6101),
             "hal-e2e-event-1",
             "maintenance.overdue",
             "maintenance_task",
             "MT-E2E-001",
         ),
         (
-            "00000000-0000-0000-0000-000000006102",
+            Uuid::from_u128(0x6102),
             "hal-e2e-event-2",
             "cold_chain.break",
             "cold_chain_event",
             "CC-E2E-001",
         ),
         (
-            "00000000-0000-0000-0000-000000006103",
+            Uuid::from_u128(0x6103),
             "hal-e2e-event-3",
             "qualification.expiry",
             "supplier",
@@ -353,7 +352,7 @@ pub async fn seed_hal_alert_capabilities(pool: &PgPool) -> Result<(), sqlx::Erro
             ON CONFLICT (id) DO UPDATE SET created_at = now()
             "#,
         )
-        .bind(Uuid::parse_str(event_id).expect("static H-AL event UUID should parse"))
+        .bind(event_id)
         .bind(owner_id)
         .bind(idempotency_key)
         .bind(event_type)

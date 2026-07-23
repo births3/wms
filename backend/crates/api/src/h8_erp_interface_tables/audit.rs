@@ -5,6 +5,7 @@ use uuid::Uuid;
 use crate::{
     audit::{append_event, AuditDiff, AuditError, AuditWriteRequest},
     auth::AuthContext,
+    sync::lock_recover,
 };
 
 use super::state::H8ErpInterfaceTableAppState;
@@ -34,7 +35,7 @@ pub(crate) async fn write_query_audit(
     );
     req.occurred_at = Utc::now();
     persist_query_audit(state.audit_pool.as_ref(), &req).await?;
-    state.audit_log.lock().expect("audit log").append_event(req);
+    lock_recover(&state.audit_log).append_event(req);
     Ok(())
 }
 

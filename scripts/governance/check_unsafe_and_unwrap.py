@@ -149,11 +149,21 @@ def _test_only_include_files(root: Path) -> set[Path]:
         r"#\s*\[\s*cfg\s*\(\s*test\s*\)\s*\]\s*"
         r"mod\s+[A-Za-z_][A-Za-z0-9_]*\s*\{(?P<body>[\s\S]*?)\n\s*\}",
     )
+    external_test_module_re = re.compile(
+        r"#\s*\[\s*cfg\s*\(\s*test\s*\)\s*\]\s*"
+        r"mod\s+(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*;",
+    )
     for source in sorted(root.rglob("*.rs")):
         text = source.read_text(encoding="utf-8")
         for module in test_module_re.finditer(text):
             for include_path in INCLUDE_RE.findall(module.group("body")):
                 candidate = (source.parent / include_path).resolve()
+                if candidate.is_file():
+                    test_only.add(candidate)
+        for module in external_test_module_re.finditer(text):
+            name = module.group("name")
+            for relative_path in (f"{name}.rs", f"{name}/mod.rs"):
+                candidate = (source.parent / relative_path).resolve()
                 if candidate.is_file():
                     test_only.add(candidate)
     return test_only

@@ -74,6 +74,7 @@ pub mod secrets;
 pub mod state_machine;
 pub mod stock_adjustment;
 pub mod stock_adjustment_handlers;
+mod sync;
 pub mod system_dictionary;
 pub mod system_dictionary_handlers;
 pub mod task_engine;

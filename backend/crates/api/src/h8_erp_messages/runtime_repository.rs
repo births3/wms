@@ -12,6 +12,7 @@ use wms_domain::{
 };
 
 use super::error::H8ErpMessageRepoError;
+use crate::sync::lock_recover;
 
 #[axum::async_trait]
 pub trait H8WorkerRuntimeRepository: Send + Sync {
@@ -142,7 +143,7 @@ impl H8WorkerRuntimeRepository for MemoryH8WorkerRuntimeRepository {
     ) -> Result<H8WorkerStatus, H8ErpMessageRepoError> {
         validate_heartbeat(request)?;
         let mut status = heartbeat_status(request, now);
-        let mut heartbeats = self.heartbeats.lock().expect("worker heartbeat lock");
+        let mut heartbeats = lock_recover(&self.heartbeats);
         if let Some(existing) = heartbeats.get(&(owner_id, status.worker_id.clone())) {
             status.created_at = existing.created_at;
         }
@@ -155,10 +156,7 @@ impl H8WorkerRuntimeRepository for MemoryH8WorkerRuntimeRepository {
         owner_id: Uuid,
         now: DateTime<Utc>,
     ) -> Result<H8WorkerRuntimeResponse, H8ErpMessageRepoError> {
-        let mut workers: Vec<_> = self
-            .heartbeats
-            .lock()
-            .expect("worker heartbeat lock")
+        let mut workers: Vec<_> = lock_recover(&self.heartbeats)
             .iter()
             .filter(|((owner, _), _)| *owner == owner_id)
             .map(|(_, worker)| {
@@ -168,10 +166,7 @@ impl H8WorkerRuntimeRepository for MemoryH8WorkerRuntimeRepository {
             })
             .collect();
         workers.sort_by(|a, b| a.worker_id.cmp(&b.worker_id));
-        let mut controls: Vec<_> = self
-            .controls
-            .lock()
-            .expect("worker control lock")
+        let mut controls: Vec<_> = lock_recover(&self.controls)
             .iter()
             .filter(|((owner, _, _), _)| *owner == owner_id)
             .map(|(_, control)| {
@@ -206,7 +201,7 @@ impl H8WorkerRuntimeRepository for MemoryH8WorkerRuntimeRepository {
             updated_by: actor.to_string(),
             updated_at: now,
         };
-        self.controls.lock().expect("worker control lock").insert(
+        lock_recover(&self.controls).insert(
             (owner_id, request.connector_id, control.direction.clone()),
             control.clone(),
         );
@@ -221,10 +216,7 @@ impl H8WorkerRuntimeRepository for MemoryH8WorkerRuntimeRepository {
         now: DateTime<Utc>,
     ) -> Result<H8WorkerClaimDecision, H8ErpMessageRepoError> {
         validate_direction(direction).map_err(H8ErpMessageRepoError::Domain)?;
-        let control = self
-            .controls
-            .lock()
-            .expect("worker control lock")
+        let control = lock_recover(&self.controls)
             .get(&(owner_id, connector_id, direction.to_string()))
             .cloned();
         Ok(claim_decision(control, now))

@@ -10,6 +10,7 @@ use wms_domain::{
 use crate::{
     audit::{append_event, AuditDiff, AuditError, AuditWriteRequest},
     auth::AuthContext,
+    sync::lock_recover,
 };
 
 use super::error::H8ErpMessageHandlerError;
@@ -46,7 +47,7 @@ pub(crate) async fn write_message_audit(
     req.occurred_at = Utc::now();
     persist_audit(state.audit_pool.as_ref(), &req).await?;
     {
-        let mut log = state.audit_log.lock().expect("audit log");
+        let mut log = lock_recover(&state.audit_log);
         log.append_event(req);
     }
     Ok(())
@@ -69,7 +70,7 @@ pub(crate) async fn write_owner_audit(
     req.occurred_at = Utc::now();
     persist_audit(state.audit_pool.as_ref(), &req).await?;
     {
-        let mut log = state.audit_log.lock().expect("audit log");
+        let mut log = lock_recover(&state.audit_log);
         log.append_event(req);
     }
     Ok(())

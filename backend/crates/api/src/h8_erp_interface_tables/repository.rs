@@ -10,6 +10,7 @@ use wms_domain::{
 };
 
 use super::error::H8InterfaceTableRepoError;
+use crate::sync::lock_recover;
 
 #[async_trait]
 pub(crate) trait H8InterfaceTableRepository: Send + Sync {
@@ -53,7 +54,7 @@ impl H8InterfaceTableRepository for MemoryH8InterfaceTableRepository {
         query
             .validate()
             .map_err(|err| H8InterfaceTableRepoError::Db(format!("invalid query: {err:?}")))?;
-        let mut rows = self.rows.lock().expect("interface rows").clone();
+        let mut rows = lock_recover(&self.rows).clone();
         let sync_statuses = query.sync_statuses();
         rows.retain(|row| {
             row.connector_id == connector.id
@@ -112,10 +113,7 @@ impl H8InterfaceTableRepository for MemoryH8InterfaceTableRepository {
         row_id: &str,
         actor_warehouse_scope: Option<Uuid>,
     ) -> Result<H8ErpInterfaceTableDetail, H8InterfaceTableRepoError> {
-        let row = self
-            .rows
-            .lock()
-            .expect("interface rows")
+        let row = lock_recover(&self.rows)
             .iter()
             .find(|row| {
                 row.connector_id == connector.id
@@ -172,7 +170,7 @@ impl MssqlH8InterfaceTableRepository {
             probe_config_version: connector.interface_probe_config_version,
             transport_config_version: connector.config_version,
         };
-        if let Some(pool) = self.pools.lock().expect("probe pool").get(&key).cloned() {
+        if let Some(pool) = lock_recover(&self.pools).get(&key).cloned() {
             return Ok(pool);
         }
         let pool = Manager::new()
@@ -187,7 +185,7 @@ impl MssqlH8InterfaceTableRepository {
             .recycle_timeout(Duration::from_secs(5))
             .create_pool()
             .map_err(|err| H8InterfaceTableRepoError::Db(sanitize_db_error(err.to_string())))?;
-        let mut pools = self.pools.lock().expect("probe pool");
+        let mut pools = lock_recover(&self.pools);
         // 凭据版本变更后旧池不可再复用；及时移除旧版本，避免长期配置变更造成池缓存增长。
         pools.retain(|pool_key, _| {
             pool_key.connector_id != connector.id

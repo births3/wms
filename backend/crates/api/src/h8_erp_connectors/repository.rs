@@ -11,6 +11,7 @@ use wms_domain::{
 
 use super::error::H8ErpConnectorRepoError;
 use super::row::H8ErpConnectorRow;
+use crate::sync::lock_recover;
 
 #[axum::async_trait]
 pub trait H8ErpConnectorRepository: Send + Sync {
@@ -89,7 +90,7 @@ pub(crate) struct MemoryH8ErpConnectorRepository {
 #[axum::async_trait]
 impl H8ErpConnectorRepository for MemoryH8ErpConnectorRepository {
     async fn list(&self, owner_id: Uuid) -> Result<Vec<H8ErpConnector>, H8ErpConnectorRepoError> {
-        let guard = self.inner.lock().expect("lock");
+        let guard = lock_recover(&self.inner);
         Ok(guard
             .iter()
             .filter(|c| c.owner_id == owner_id)
@@ -117,9 +118,7 @@ impl H8ErpConnectorRepository for MemoryH8ErpConnectorRepository {
         id: Uuid,
         config_version: i64,
     ) -> Result<H8ErpConnectorRuntimeConfig, H8ErpConnectorRepoError> {
-        self.versions
-            .lock()
-            .expect("lock")
+        lock_recover(&self.versions)
             .get(&(owner_id, id, config_version))
             .cloned()
             .ok_or(H8ErpConnectorRepoError::Domain(
@@ -131,14 +130,14 @@ impl H8ErpConnectorRepository for MemoryH8ErpConnectorRepository {
         &self,
         connector: &H8ErpConnector,
     ) -> Result<H8ErpConnector, H8ErpConnectorRepoError> {
-        let mut guard = self.inner.lock().expect("lock");
+        let mut guard = lock_recover(&self.inner);
         if guard.iter().any(|c| {
             c.owner_id == connector.owner_id && c.connector_code == connector.connector_code
         }) {
             return Err(H8ErpConnectorRepoError::DuplicateCode);
         }
         guard.push(connector.clone());
-        self.versions.lock().expect("lock").insert(
+        lock_recover(&self.versions).insert(
             (connector.owner_id, connector.id, connector.config_version),
             connector.into(),
         );
@@ -151,7 +150,7 @@ impl H8ErpConnectorRepository for MemoryH8ErpConnectorRepository {
         observed_version: i64,
         observed_probe_version: i64,
     ) -> Result<H8ErpConnector, H8ErpConnectorRepoError> {
-        let mut guard = self.inner.lock().expect("lock");
+        let mut guard = lock_recover(&self.inner);
         let Some(slot) = guard
             .iter_mut()
             .find(|c| c.id == connector.id && c.owner_id == connector.owner_id)
@@ -171,16 +170,14 @@ impl H8ErpConnectorRepository for MemoryH8ErpConnectorRepository {
             ));
         }
         *slot = connector.clone();
-        self.versions
-            .lock()
-            .expect("lock")
+        lock_recover(&self.versions)
             .entry((connector.owner_id, connector.id, connector.config_version))
             .or_insert_with(|| connector.into());
         Ok(connector.clone())
     }
 
     async fn delete(&self, owner_id: Uuid, id: Uuid) -> Result<(), H8ErpConnectorRepoError> {
-        let mut guard = self.inner.lock().expect("lock");
+        let mut guard = lock_recover(&self.inner);
         let before = guard.len();
         guard.retain(|c| !(c.owner_id == owner_id && c.id == id));
         if guard.len() == before {
@@ -188,12 +185,9 @@ impl H8ErpConnectorRepository for MemoryH8ErpConnectorRepository {
                 H8ErpConnectorError::NotFound,
             ));
         }
-        self.versions
-            .lock()
-            .expect("lock")
-            .retain(|(snapshot_owner, connector_id, _), _| {
-                *snapshot_owner != owner_id || *connector_id != id
-            });
+        lock_recover(&self.versions).retain(|(snapshot_owner, connector_id, _), _| {
+            *snapshot_owner != owner_id || *connector_id != id
+        });
         Ok(())
     }
 
@@ -214,7 +208,7 @@ impl H8ErpConnectorRepository for MemoryH8ErpConnectorRepository {
         _owner_id: Uuid,
         connector_id: Uuid,
     ) -> Result<bool, H8ErpConnectorRepoError> {
-        let guard = self.inflight.lock().expect("lock");
+        let guard = lock_recover(&self.inflight);
         Ok(guard
             .get(&connector_id)
             .is_some_and(|rows| !rows.is_empty()))
@@ -225,7 +219,7 @@ impl H8ErpConnectorRepository for MemoryH8ErpConnectorRepository {
         _owner_id: Uuid,
         connector_id: Uuid,
     ) -> Result<u64, H8ErpConnectorRepoError> {
-        let mut guard = self.inflight.lock().expect("lock");
+        let mut guard = lock_recover(&self.inflight);
         let Some(rows) = guard.get_mut(&connector_id) else {
             return Ok(0);
         };
@@ -244,7 +238,7 @@ impl H8ErpConnectorRepository for MemoryH8ErpConnectorRepository {
         _owner_id: Uuid,
         connector_id: Uuid,
     ) -> Result<u64, H8ErpConnectorRepoError> {
-        let mut guard = self.inflight.lock().expect("lock");
+        let mut guard = lock_recover(&self.inflight);
         let Some(rows) = guard.get_mut(&connector_id) else {
             return Ok(0);
         };
@@ -263,7 +257,7 @@ impl H8ErpConnectorRepository for MemoryH8ErpConnectorRepository {
         _owner_id: Uuid,
         api_key_id: Uuid,
     ) -> Result<Option<Vec<String>>, H8ErpConnectorRepoError> {
-        let guard = self.api_key_scopes.lock().expect("lock");
+        let guard = lock_recover(&self.api_key_scopes);
         Ok(guard.get(&api_key_id).cloned())
     }
 
@@ -277,7 +271,7 @@ impl H8ErpConnectorRepository for MemoryH8ErpConnectorRepository {
         _channel_stage: &str,
         status: &str,
     ) -> Result<(), H8ErpConnectorRepoError> {
-        let mut guard = self.inflight.lock().expect("lock");
+        let mut guard = lock_recover(&self.inflight);
         let rows = guard.entry(connector_id).or_default();
         // 以幂等键为索引时内存实现简化为追加 status 行
         let _ = idempotency_key;
