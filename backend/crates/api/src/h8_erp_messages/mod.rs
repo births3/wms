@@ -14,6 +14,8 @@ mod scope;
 mod state;
 
 #[cfg(test)]
+mod partition_tests;
+#[cfg(test)]
 mod payload_tests;
 #[cfg(test)]
 mod pg_repository_tests;
@@ -25,15 +27,19 @@ mod tests;
 pub use handlers::h8_erp_message_router;
 pub use state::H8ErpMessageAppState;
 
-/// AC16：每小时清除到期密文；消息、尝试和 H2 审计保持不变。
-pub fn spawn_payload_expiry_job(pool: sqlx::PgPool) {
+/// AC10/16：每小时预建本月/下月分区并清除到期密文。
+pub async fn spawn_maintenance_job(pool: sqlx::PgPool) -> Result<(), sqlx::Error> {
     use payload_repository::{H8PayloadRepository, PgH8PayloadRepository};
 
+    ensure_partitions(&pool).await?;
     tokio::spawn(async move {
-        let repository = PgH8PayloadRepository::new(pool);
+        let repository = PgH8PayloadRepository::new(pool.clone());
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(60 * 60));
         loop {
             interval.tick().await;
+            if let Err(error) = ensure_partitions(&pool).await {
+                tracing::error!(?error, "H8 月分区预创建失败");
+            }
             match repository.purge_expired(chrono::Utc::now()).await {
                 Ok(deleted) if deleted > 0 => {
                     tracing::info!(deleted, "H8 到期完整报文密文已清理");
@@ -43,4 +49,17 @@ pub fn spawn_payload_expiry_job(pool: sqlx::PgPool) {
             }
         }
     });
+    Ok(())
+}
+
+async fn ensure_partitions(pool: &sqlx::PgPool) -> Result<(), sqlx::Error> {
+    sqlx::raw_sql(
+        "SELECT h8_erp_messages_ensure_month_partition(\
+           (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date);\
+         SELECT h8_erp_messages_ensure_month_partition(\
+           ((CURRENT_TIMESTAMP AT TIME ZONE 'UTC') + INTERVAL '1 month')::date);",
+    )
+    .execute(pool)
+    .await?;
+    Ok(())
 }

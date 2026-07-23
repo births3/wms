@@ -130,7 +130,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     wms_api::api_key_expiry::spawn(pool.clone());
     wms_api::alert_engine_job::spawn(pool.clone());
     wms_api::inventory_expiry_job::spawn(pool.clone());
-    wms_api::h8_erp_messages::spawn_payload_expiry_job(pool.clone());
+    wms_api::h8_erp_messages::spawn_maintenance_job(pool.clone()).await?;
     wms_api::task_release_job::spawn(pool.clone());
     let config_center_state = ConfigCenterAppState::with_postgres(file_registry, pool.clone());
     let auth_state = AuthAppState::new(pool.clone());

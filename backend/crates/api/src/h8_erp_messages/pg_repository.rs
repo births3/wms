@@ -4,9 +4,8 @@ use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use uuid::Uuid;
 use wms_domain::{
-    can_claim_message, can_replay_message, can_transition_message_status, estimate_p95_latency_ms,
-    may_auto_purge, sanitize_error_summary, H8ErpMessage, H8ErpMessageAttempt, H8ErpMessageStats,
-    H8MessageError,
+    can_claim_message, can_replay_message, can_transition_message_status, sanitize_error_summary,
+    H8ErpMessage, H8ErpMessageAttempt, H8ErpMessageStats, H8MessageError,
 };
 
 use super::error::H8ErpMessageRepoError;
@@ -155,27 +154,63 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
         message_type: Option<&str>,
         warehouse_ids: Option<&[Uuid]>,
     ) -> Result<H8ErpMessageStats, H8ErpMessageRepoError> {
-        let from = Utc::now() - chrono::Duration::days(30);
+        let from_date = Utc::now().date_naive() - chrono::Duration::days(29);
+        let warehouse_keys =
+            warehouse_ids.map(|ids| ids.iter().map(ToString::to_string).collect::<Vec<String>>());
         let row = sqlx::query_as::<_, StatsRow>(
             r#"
             SELECT
-              COUNT(*)::bigint AS total,
-              COUNT(*) FILTER (WHERE sync_status IN ('succeeded','acked'))::bigint AS succeeded,
-              COUNT(*) FILTER (WHERE sync_status = 'failed')::bigint AS failed,
-              COUNT(*) FILTER (WHERE sync_status = 'dead')::bigint AS dead,
-              COUNT(*) FILTER (WHERE sync_status = 'processing')::bigint AS processing,
-              COUNT(*) FILTER (WHERE sync_status = 'pending')::bigint AS pending,
-              COALESCE(SUM(retry_count),0)::bigint AS retry_total
-            FROM h8_erp_messages
-            WHERE owner_id = $1 AND created_at >= $2
+              COALESCE(SUM(total),0)::bigint AS total,
+              COALESCE(SUM(succeeded),0)::bigint AS succeeded,
+              COALESCE(SUM(failed),0)::bigint AS failed,
+              COALESCE(SUM(dead),0)::bigint AS dead,
+              COALESCE(SUM(processing),0)::bigint AS processing,
+              COALESCE(SUM(pending),0)::bigint AS pending,
+              COALESCE(SUM(retry_total),0)::bigint AS retry_total
+            FROM h8_erp_message_stats_daily
+            WHERE owner_id = $1 AND stat_date >= $2
               AND ($3::text IS NULL OR connector_code = $3)
               AND ($4::text IS NULL OR channel = $4)
               AND ($5::text IS NULL OR message_type = $5)
-              AND ($6::uuid[] IS NULL OR warehouse_id = ANY($6))
+              AND ($6::text[] IS NULL OR warehouse_id = ANY($6))
             "#,
         )
         .bind(owner_id)
-        .bind(from)
+        .bind(from_date)
+        .bind(connector_code)
+        .bind(channel)
+        .bind(message_type)
+        .bind(warehouse_keys.as_deref())
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| H8ErpMessageRepoError::Db(e.to_string()))?;
+        // ponytail: 最近 10k 次完成尝试给出有界 P95；只有证据显示失真时再引入直方图。
+        let p95_latency_ms: i64 = sqlx::query_scalar(
+            r#"
+            SELECT COALESCE(
+              percentile_disc(0.95) WITHIN GROUP (ORDER BY latency_ms), 0
+            )::bigint
+            FROM (
+              SELECT FLOOR(EXTRACT(EPOCH FROM (attempt.finished_at - attempt.started_at)) * 1000)::bigint
+                       AS latency_ms
+              FROM h8_erp_message_attempts attempt
+              JOIN h8_erp_message_registry identity ON identity.id = attempt.message_id
+              JOIN h8_erp_messages message
+                ON message.id = identity.id AND message.created_at = identity.created_at
+              WHERE attempt.owner_id = $1
+                AND attempt.finished_at >= attempt.started_at
+                AND attempt.started_at >= ($2::date::timestamp AT TIME ZONE 'UTC')
+                AND ($3::text IS NULL OR message.connector_code = $3)
+                AND ($4::text IS NULL OR message.channel = $4)
+                AND ($5::text IS NULL OR message.message_type = $5)
+                AND ($6::uuid[] IS NULL OR message.warehouse_id = ANY($6))
+              ORDER BY attempt.started_at DESC
+              LIMIT 10000
+            ) recent_attempts
+            "#,
+        )
+        .bind(owner_id)
+        .bind(from_date)
         .bind(connector_code)
         .bind(channel)
         .bind(message_type)
@@ -183,34 +218,6 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
         .fetch_one(&self.pool)
         .await
         .map_err(|e| H8ErpMessageRepoError::Db(e.to_string()))?;
-        let latency_rows: Vec<(Option<DateTime<Utc>>, DateTime<Utc>)> = sqlx::query_as(
-            r#"
-            SELECT attempt.finished_at, attempt.started_at
-            FROM h8_erp_message_attempts attempt
-            JOIN h8_erp_messages message
-              ON message.owner_id = attempt.owner_id AND message.id = attempt.message_id
-            WHERE attempt.owner_id = $1
-              AND attempt.finished_at IS NOT NULL AND attempt.started_at >= $2
-              AND ($3::text IS NULL OR message.connector_code = $3)
-              AND ($4::text IS NULL OR message.channel = $4)
-              AND ($5::text IS NULL OR message.message_type = $5)
-              AND ($6::uuid[] IS NULL OR message.warehouse_id = ANY($6))
-            "#,
-        )
-        .bind(owner_id)
-        .bind(from)
-        .bind(connector_code)
-        .bind(channel)
-        .bind(message_type)
-        .bind(warehouse_ids)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e| H8ErpMessageRepoError::Db(e.to_string()))?;
-        let samples: Vec<i64> = latency_rows
-            .into_iter()
-            .filter_map(|(finished, started)| finished.map(|f| (f - started).num_milliseconds()))
-            .filter(|ms| *ms >= 0)
-            .collect();
         Ok(H8ErpMessageStats {
             owner_id,
             total: row.total,
@@ -220,7 +227,7 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
             processing: row.processing,
             pending: row.pending,
             retry_total: row.retry_total,
-            p95_latency_ms: estimate_p95_latency_ms(&samples),
+            p95_latency_ms,
         })
     }
 
@@ -619,13 +626,12 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| H8ErpMessageRepoError::Db(e.to_string()))?;
-        let days = retention_days.or(days_from_db).filter(|d| *d > 0);
-        if !may_auto_purge(days) {
-            return Err(H8ErpMessageRepoError::Domain(
+        let days = retention_days
+            .or(days_from_db)
+            .filter(|days| *days > 0)
+            .ok_or(H8ErpMessageRepoError::Domain(
                 H8MessageError::FieldRequired("retention_days"),
-            ));
-        }
-        let days = days.expect("checked");
+            ))?;
         let cutoff = now - chrono::Duration::days(i64::from(days));
         let mut tx = self
             .pool
@@ -709,7 +715,7 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
             ) VALUES (
               $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25
             )
-            ON CONFLICT (id) DO UPDATE SET
+            ON CONFLICT (id, created_at) DO UPDATE SET
               sync_status = EXCLUDED.sync_status,
               retry_count = EXCLUDED.retry_count,
               last_error_summary = EXCLUDED.last_error_summary,

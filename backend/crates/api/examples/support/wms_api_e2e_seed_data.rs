@@ -284,6 +284,20 @@ pub async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
         VALUES ('00000000-0000-0000-0000-000000000002', 'H8_OTHER_OWNER', 'H8 隔离验收货主')
         ON CONFLICT (id) DO UPDATE SET owner_name = EXCLUDED.owner_name;
 
+        SELECT h8_erp_messages_ensure_month_partition(CURRENT_DATE);
+        DELETE FROM h8_erp_message_attempts
+        WHERE message_id IN (
+            '00000000-0000-0000-0000-000000008901',
+            '00000000-0000-0000-0000-000000008902',
+            '00000000-0000-0000-0000-000000008999'
+        );
+        DELETE FROM h8_erp_messages
+        WHERE id IN (
+            '00000000-0000-0000-0000-000000008901',
+            '00000000-0000-0000-0000-000000008902',
+            '00000000-0000-0000-0000-000000008999'
+        );
+
         INSERT INTO h8_erp_messages (
             id, owner_id, warehouse_id, connector_id, connector_code, config_version,
             direction, message_type, schema_version, channel, external_ref, wms_resource_id,
@@ -314,17 +328,7 @@ pub async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
             'inbound', 'asn', '1', 'rest', 'H8-MSG-E2E-OTHER-OWNER', NULL,
             'h8-msg-e2e-other-idem', 'h8-msg-e2e-other-corr', 'dead', 1,
             '跨货主隔离样本', 'h8-msg-e2e-other-digest', now(), now(), now()
-        )
-        ON CONFLICT (id) DO UPDATE SET
-            warehouse_id = EXCLUDED.warehouse_id,
-            connector_id = EXCLUDED.connector_id,
-            connector_code = EXCLUDED.connector_code,
-            sync_status = EXCLUDED.sync_status,
-            retry_count = EXCLUDED.retry_count,
-            last_error_summary = EXCLUDED.last_error_summary,
-            claimed_by = NULL,
-            lease_expires_at = NULL,
-            updated_at = now();
+        );
 
         INSERT INTO h8_erp_message_attempts (
             id, message_id, owner_id, attempt_no, channel, started_at, finished_at,
@@ -341,11 +345,7 @@ pub async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
             '00000000-0000-0000-0000-000000008902',
             '00000000-0000-0000-0000-000000000001', 1, 'interface_table',
             now() - interval '1 second', now(), 'failed', 'ERP 暂时不可用', 'e2e-worker'
-        )
-        ON CONFLICT (message_id, attempt_no) DO UPDATE SET
-            result = EXCLUDED.result,
-            error_summary = EXCLUDED.error_summary,
-            actor = EXCLUDED.actor;
+        );
 
         INSERT INTO h8_erp_worker_heartbeats (
             owner_id, worker_id, worker_version, connector_id, directions, current_claims,
