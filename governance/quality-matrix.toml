@@ -4601,11 +4601,13 @@ evidence_refs = [
   "backend/crates/api/src/h8_erp_messages/payload_repository.rs",
   "backend/crates/api/src/h8_erp_messages/payload_tests.rs",
   "backend/crates/api/src/h8_erp_messages/pg_repository_tests.rs",
+  "backend/crates/api/src/h8_erp_messages/partition_tests.rs",
   "backend/crates/api/src/h8_erp_messages/scope.rs",
   "backend/crates/api/src/h8_erp_messages/lifecycle.rs",
   "backend/crates/api/src/h8_erp_messages/pg_lifecycle.rs",
   "backend/crates/api/src/h8_erp_messages/pg_rows.rs",
   "backend/migrations/202607190005_h8_erp_messages.sql",
+  "backend/migrations/202607190007_h8_erp_messages_partition_prep.sql",
   "backend/migrations/202607190006_h8_erp_messages_admin_menu.sql",
   "backend/migrations/202607220002_h8_worker_runtime_and_payload_retention.sql",
   "scripts/h8_erp_interface_sync/sync_worker.py",
@@ -4616,6 +4618,7 @@ evidence_refs = [
   "docs/retros/h8-asn-manual-replay-evidence.json",
   "docs/retros/h8-retry-schedule-evidence.json",
   "docs/retros/h8-archive-retry-evidence.json",
+  "docs/runbooks/h8-erp-message-performance.md",
   "prototypes/e2e/web-admin-h8-messages.spec.ts",
   "prototypes/e2e/web-admin-h8-messages-real.spec.ts",
   "prototypes/playwright-web-admin-h8-real-config.ts",
@@ -4630,9 +4633,9 @@ evidence_refs = [
   "artifacts/screenshot-portal/real-web/h8-erp-messages/payload-retention.png",
   "artifacts/screenshot-portal/real-web/h8-erp-messages/payload-decrypted.png",
 ]
-reason = "消息/尝试存储、两级回执、claim 租约、普通 Worker 成功/失败完成尝试、ADR-0018 L2 next_retry_at 与 MSSQL 到期认领、档案补录 L3 的 5 次/5 分钟/24 小时边界、服务端精确高级查询、created_at+id 稳定游标分页、按连接/通道/消息类型统计及 P95、JWT 用户多仓列表/统计/详情裁剪、API Key 单仓操作约束、Worker 心跳健康、暂停恢复、权限审计、完整报文短期加密保留/授权解密/no-store/到期清理，以及本地 Docker MSSQL 死信/人工重放状态闭环均有真实 PostgreSQL、隔离 MSSQL 或关闭 dev-mock 的浏览器证据；仍缺生产约定数据量 P95、生产 RANGE 月分区和自研 ERP 故障恢复 S4。"
+reason = "消息/尝试声明式 RANGE 月分区、跨月全局 ID/幂等唯一、当前月/下月自动维护、日统计快照、最近 10k 完成尝试 P95、两级回执、claim 租约、普通 Worker 成功/失败完成尝试、ADR-0018 L2 next_retry_at 与 MSSQL 到期认领、档案补录 L3 的 5 次/5 分钟/24 小时边界、服务端精确高级查询、created_at+id 稳定游标分页、JWT 用户多仓列表/统计/详情裁剪、API Key 单仓操作约束、Worker 心跳健康、暂停恢复、权限审计、完整报文短期加密保留/授权解密/no-store/到期清理，以及本地 Docker MSSQL 死信/人工重放状态闭环均有真实 PostgreSQL、隔离 MSSQL 或关闭 dev-mock 的浏览器证据；AC10 已关闭，仍缺生产等价 dev/staging 的单货主单月 10M 消息+10M 完成尝试列表/统计 P95 原始证据，以及自研 ERP 故障恢复 S4。"
 owner = "H8 模块负责人"
-resume_when = "补生产约定数据量 P95，生产库切换 RANGE 月分区并验证保留清理性能，再补自研 ERP dev/staging 的超时、死信、重放、回执和 H2 审计关联后关闭延期。"
+resume_when = "按 H8 性能运行手册补生产等价 dev/staging 的 10M/10M 基线、列表 P95≤500ms、统计 P95≤1s 原始证据，再补自研 ERP dev/staging 的超时、死信、重放、回执和 H2 审计关联后关闭延期。"
 
 [[stories]]
 id = "US-H8-004"

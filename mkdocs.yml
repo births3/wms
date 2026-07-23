@@ -251,6 +251,7 @@ nav:
     - Gitea Issue Agent: runbooks/gitea-issue-agent.md
     - Wave 1 H2 开发环境: runbooks/wave-1-h2-dev-environment.md
     - H8 ERP 接口表同步: runbooks/h8-erp-interface-table-sync.md
+    - H8 ERP 消息性能验收: runbooks/h8-erp-message-performance.md
     - Wave 1 运行证据: runbooks/wave-1-runtime-evidence.md
     - Wave 2 运行证据: runbooks/wave-2-runtime-evidence.md
     - Wave 2 预发布环境: runbooks/wave-2-staging-environment.md
