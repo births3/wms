@@ -8,7 +8,8 @@ use uuid::Uuid;
 pub const H8_INTERFACE_TABLE_PAGE_SIZE_MAX: u32 = 100;
 pub const H8_INTERFACE_TABLE_MAX_RANGE_DAYS: i64 = 31;
 pub const H8_INTERFACE_TABLE_PAYLOAD_SUMMARY_MAX_BYTES: usize = 4096;
-const H8_INTERFACE_TABLE_PAYLOAD_PARSE_MAX_BYTES: usize = 1024 * 1024;
+/// 原始报文或结构化业务字段进入 JSON 解析前允许的最大字节数。
+pub const H8_INTERFACE_TABLE_PAYLOAD_PARSE_MAX_BYTES: usize = 1024 * 1024;
 
 const INBOUND_STATUSES: &[&str] = &["pending", "processing", "success", "failed", "dead"];
 const OUTBOUND_STATUSES: &[&str] = &[
@@ -124,6 +125,8 @@ pub struct H8ErpInterfaceTableRow {
     pub owner_id: Uuid,
     pub warehouse_id: Option<Uuid>,
     pub business_key: Option<String>,
+    /// 按接口表白名单返回的业务摘要字段；禁止放入原始 payload。
+    pub business_fields: Vec<H8ErpInterfaceTableField>,
     pub event_type: Option<String>,
     pub external_ref: Option<String>,
     pub wms_resource_id: Option<String>,
@@ -260,13 +263,13 @@ pub fn enforce_interface_table_scope(
 
 pub fn redacted_payload_summary(raw: &str) -> String {
     if raw.len() > H8_INTERFACE_TABLE_PAYLOAD_PARSE_MAX_BYTES {
-        return "[payload omitted: too large]".into();
+        return "[报文已省略：内容过大]".into();
     }
     let Ok(mut value) = serde_json::from_str::<serde_json::Value>(raw) else {
-        return "[payload omitted: invalid JSON]".into();
+        return "[报文已省略：格式无效]".into();
     };
     redact_value(&mut value);
-    let serialized = serde_json::to_string(&value).unwrap_or_else(|_| "[payload omitted]".into());
+    let serialized = serde_json::to_string(&value).unwrap_or_else(|_| "[报文已省略]".into());
     truncate_utf8(&serialized, H8_INTERFACE_TABLE_PAYLOAD_SUMMARY_MAX_BYTES)
 }
 

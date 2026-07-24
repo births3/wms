@@ -4662,6 +4662,7 @@ e2e_screenshots = [
   { page = "h8-erp-interface-tables", spec = "prototypes/e2e/web-admin-h8-interface-tables-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-list.png" },
   { page = "h8-erp-interface-tables", spec = "prototypes/e2e/web-admin-h8-interface-tables-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-multi-status-filter.png" },
   { page = "h8-erp-interface-tables", spec = "prototypes/e2e/web-admin-h8-interface-tables-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-detail.png" },
+  { page = "h8-erp-interface-tables", spec = "prototypes/e2e/web-admin-h8-interface-tables-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-product-master-detail.png" },
   { page = "h8-erp-interface-tables", spec = "prototypes/e2e/web-admin-h8-interface-tables-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-permission-denied.png" },
 ]
 api_paths = [
@@ -4706,6 +4707,7 @@ evidence_refs = [
   "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-list.png",
   "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-multi-status-filter.png",
   "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-detail.png",
+  "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-product-master-detail.png",
   "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-permission-denied.png",
   "scripts/h8_erp_interface_sync/check_probe_readonly.sh",
   "backend/crates/api/examples/h8_probe_readonly.rs",

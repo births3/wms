@@ -65,6 +65,49 @@ test("H8 接口表探查：仅有 connector.read 的新会话无菜单且 API 40
   await page.screenshot({ path: path.join(screenshotDir, "interface-table-permission-denied.png"), fullPage: false });
 });
 
+test("H8 接口表探查：商品主数据列表和详情展示实际业务内容", async ({ page }) => {
+  await login(page, "admin");
+  await openInterfaceTables(page);
+
+  const initialRow = page.locator("tbody tr").filter({ hasText: "DEMO-ASN-001" });
+  await initialRow.getByRole("checkbox", { name: "选择此行" }).check();
+  await expect(page.getByRole("button", { name: "详情", exact: true })).toBeEnabled();
+
+  await page.getByLabel("接口表", { exact: true }).selectOption("if_in_product_master");
+  const productRequest = page.waitForRequest((request) =>
+    request.url().includes("/api/v1/h8/erp-interface-tables/rows") &&
+    new URL(request.url()).searchParams.get("table_key") === "if_in_product_master",
+  );
+  await page.getByRole("button", { name: "查询", exact: true }).click();
+  await productRequest;
+  await expect(page.getByRole("button", { name: "详情", exact: true })).toBeDisabled();
+
+  const row = page.locator("tbody tr").filter({ hasText: "DEMO-PM-001" });
+  await expect(row).toContainText("DEMO-P-001");
+  await expect(row).toContainText("演示商品-对乙酰氨基酚片");
+  await expect(row).toContainText("0.5g*24片");
+  await row.getByRole("checkbox", { name: "选择此行" }).check();
+  await page.getByRole("button", { name: "详情", exact: true }).click();
+
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByText("商品主数据接口行详情")).toBeVisible();
+  for (const value of ["国药准字H000000", "演示制药", "常温保存", "06912345678901"]) {
+    await expect(dialog.getByText(value, { exact: true })).toBeVisible();
+  }
+  const schemaVersion = dialog.getByText("契约版本", { exact: true }).locator("..");
+  await expect(schemaVersion).toContainText("1");
+  await expect(dialog.getByRole("table", { name: "包装层级" })).toBeVisible();
+  await expect(dialog.getByRole("cell", { name: "片", exact: true })).toBeVisible();
+  const cartonCell = dialog.getByRole("cell", { name: "盒", exact: true });
+  await expect(cartonCell).toBeVisible();
+  await cartonCell.scrollIntoViewIfNeeded();
+  await expect(dialog).not.toContainText("payload_json");
+  await page.screenshot({
+    path: path.join(screenshotDir, "interface-table-product-master-detail.png"),
+    fullPage: false,
+  });
+});
+
 async function login(page: import("@playwright/test").Page, username: string) {
   await page.goto("/");
   await page.evaluate(() => localStorage.clear());

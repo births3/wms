@@ -2,7 +2,8 @@ use chrono::{Duration, Utc};
 use uuid::Uuid;
 use wms_domain::{
     enforce_interface_table_scope, interface_table_spec, redacted_payload_summary,
-    H8ErpInterfaceTableQuery, H8InterfaceTableScopeError,
+    H8ErpInterfaceTableField, H8ErpInterfaceTableQuery, H8ErpInterfaceTableRow,
+    H8InterfaceTableScopeError,
 };
 
 #[test]
@@ -102,5 +103,50 @@ fn payload_summary_redacts_secrets_and_is_bounded() {
     assert!(huge.len() <= 4096);
 
     let oversized = redacted_payload_summary(&"x".repeat(1024 * 1024 + 1));
-    assert_eq!(oversized, "[payload omitted: too large]");
+    assert_eq!(oversized, "[报文已省略：内容过大]");
+    assert_eq!(redacted_payload_summary(""), "[报文已省略：格式无效]");
+}
+
+#[test]
+fn product_master_row_serializes_safe_business_fields() {
+    let now = Utc::now();
+    let row = H8ErpInterfaceTableRow {
+        row_id: Uuid::new_v4().to_string(),
+        connector_id: Uuid::new_v4(),
+        table_key: "if_in_product_master".into(),
+        owner_id: Uuid::new_v4(),
+        warehouse_id: None,
+        business_key: Some("DEMO-PM-001".into()),
+        business_fields: vec![
+            H8ErpInterfaceTableField {
+                key: "product_code".into(),
+                value: Some("DEMO-P-001".into()),
+            },
+            H8ErpInterfaceTableField {
+                key: "product_name".into(),
+                value: Some("演示商品-对乙酰氨基酚片".into()),
+            },
+            H8ErpInterfaceTableField {
+                key: "spec".into(),
+                value: Some("0.5g*24片".into()),
+            },
+        ],
+        event_type: None,
+        external_ref: None,
+        wms_resource_id: None,
+        sync_status: "pending".into(),
+        retry_count: 0,
+        last_error: None,
+        idempotency_key: Some("h8-demo-pm-001".into()),
+        created_at: now,
+        updated_at: now,
+        payload_summary: "{}".into(),
+    };
+
+    let value = serde_json::to_value(row).expect("serialize product master interface row");
+    assert_eq!(
+        value["business_fields"][1]["value"],
+        "演示商品-对乙酰氨基酚片"
+    );
+    assert!(value.get("payload_json").is_none());
 }

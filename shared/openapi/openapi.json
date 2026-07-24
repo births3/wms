@@ -27399,6 +27399,7 @@
           "connector_id",
           "table_key",
           "owner_id",
+          "business_fields",
           "sync_status",
           "retry_count",
           "created_at",
@@ -27406,6 +27407,13 @@
           "payload_summary"
         ],
         "properties": {
+          "business_fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/H8ErpInterfaceTableField"
+            },
+            "description": "按接口表白名单返回的业务摘要字段；禁止放入原始 payload。"
+          },
           "business_key": {
             "type": "string",
             "nullable": true

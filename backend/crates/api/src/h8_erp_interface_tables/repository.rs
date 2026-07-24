@@ -7,6 +7,7 @@ use wms_domain::{
     enforce_interface_table_scope, interface_table_spec, redacted_payload_summary,
     sanitize_error_summary, H8ErpConnector, H8ErpInterfaceTableDetail, H8ErpInterfaceTableField,
     H8ErpInterfaceTableListResponse, H8ErpInterfaceTableQuery, H8ErpInterfaceTableRow,
+    H8_INTERFACE_TABLE_PAYLOAD_PARSE_MAX_BYTES, H8_INTERFACE_TABLE_PAYLOAD_SUMMARY_MAX_BYTES,
 };
 
 use super::error::H8InterfaceTableRepoError;
@@ -205,8 +206,8 @@ impl MssqlH8InterfaceTableRepository {
     ) -> Result<(Vec<H8ErpInterfaceTableRow>, u64), H8InterfaceTableRepoError> {
         let spec = interface_table_spec(&query.table_key)
             .ok_or(H8InterfaceTableRepoError::ConnectorNotSupported)?;
-        let projection = projection_for(spec.table_key);
         let detail_mode = row_id.is_some();
+        let projection = projection_for(spec.table_key, detail_mode);
         let sync_statuses = query.sync_statuses();
         let mut filters = vec!["owner_id = @P1".to_string()];
         let mut next = 2u32;
@@ -375,7 +376,7 @@ impl MssqlH8InterfaceTableRepository {
                 .map_err(|err| H8InterfaceTableRepoError::Db(sanitize_db_error(err.to_string())))?;
             let mut mapped = Vec::with_capacity(rows.len());
             for row in rows {
-                mapped.push(map_row(row, connector.id, spec.table_key)?);
+                mapped.push(map_row(row, connector.id, spec.table_key, detail_mode)?);
             }
             Ok((mapped, total))
         })
@@ -448,11 +449,13 @@ impl H8InterfaceTableRepository for MssqlH8InterfaceTableRepository {
     }
 }
 
-fn projection_for(table_key: &str) -> &'static str {
-    match table_key {
-        "if_out_message" => "id, owner_id, CAST(NULL AS uniqueidentifier) AS warehouse_id, source_outbox_id AS business_key, event_type, external_ref, CAST(NULL AS nvarchar(64)) AS wms_resource_id, sync_status, retry_count, last_error, idempotency_key, payload_json, created_at, updated_at",
-        "if_in_product_master" | "if_in_product_change" => "id, owner_id, CAST(NULL AS uniqueidentifier) AS warehouse_id, external_doc_no AS business_key, CAST(NULL AS nvarchar(64)) AS event_type, CAST(NULL AS nvarchar(128)) AS external_ref, wms_resource_id, sync_status, retry_count, last_error, idempotency_key, payload_json, created_at, updated_at",
-        "if_in_outbound_order" => "id, owner_id, warehouse_id, external_doc_no AS business_key, CAST(NULL AS nvarchar(64)) AS event_type, CAST(NULL AS nvarchar(128)) AS external_ref, wms_resource_id, sync_status, retry_count, last_error, idempotency_key, payload_json, created_at, updated_at",
+fn projection_for(table_key: &str, detail_mode: bool) -> &'static str {
+    match (table_key, detail_mode) {
+        ("if_out_message", _) => "id, owner_id, CAST(NULL AS uniqueidentifier) AS warehouse_id, source_outbox_id AS business_key, event_type, external_ref, CAST(NULL AS nvarchar(64)) AS wms_resource_id, sync_status, retry_count, last_error, idempotency_key, payload_json, created_at, updated_at",
+        ("if_in_product_master", false) => "id, owner_id, CAST(NULL AS uniqueidentifier) AS warehouse_id, external_doc_no AS business_key, CAST(NULL AS nvarchar(64)) AS event_type, CAST(NULL AS nvarchar(128)) AS external_ref, wms_resource_id, sync_status, retry_count, last_error, idempotency_key, payload_json, created_at, updated_at, product_code, product_name, spec",
+        ("if_in_product_master", true) => "id, owner_id, CAST(NULL AS uniqueidentifier) AS warehouse_id, external_doc_no AS business_key, CAST(NULL AS nvarchar(64)) AS event_type, CAST(NULL AS nvarchar(128)) AS external_ref, wms_resource_id, sync_status, retry_count, last_error, idempotency_key, payload_json, created_at, updated_at, product_code, product_name, spec, approval_no, dosage_form, manufacturer, special_drug_category, storage_condition, udi_code, electronic_regulatory_code, CONVERT(nvarchar(64), length_mm) AS length_mm, CONVERT(nvarchar(64), width_mm) AS width_mm, CONVERT(nvarchar(64), height_mm) AS height_mm, CONVERT(nvarchar(64), volume_cm3) AS volume_cm3, CONVERT(nvarchar(64), weight_g) AS weight_g, packaging_json, CONVERT(nvarchar(64), schema_version) AS schema_version",
+        ("if_in_product_change", _) => "id, owner_id, CAST(NULL AS uniqueidentifier) AS warehouse_id, external_doc_no AS business_key, CAST(NULL AS nvarchar(64)) AS event_type, CAST(NULL AS nvarchar(128)) AS external_ref, wms_resource_id, sync_status, retry_count, last_error, idempotency_key, payload_json, created_at, updated_at",
+        ("if_in_outbound_order", _) => "id, owner_id, warehouse_id, external_doc_no AS business_key, CAST(NULL AS nvarchar(64)) AS event_type, CAST(NULL AS nvarchar(128)) AS external_ref, wms_resource_id, sync_status, retry_count, last_error, idempotency_key, payload_json, created_at, updated_at",
         _ => "id, owner_id, warehouse_id, external_doc_no AS business_key, CAST(NULL AS nvarchar(64)) AS event_type, external_ref, wms_resource_id, sync_status, retry_count, last_error, idempotency_key, payload_json, created_at, updated_at",
     }
 }
@@ -461,6 +464,7 @@ fn map_row(
     row: deadpool_tiberius_rustls::tiberius_rustls::Row,
     connector_id: Uuid,
     table_key: &str,
+    detail_mode: bool,
 ) -> Result<H8ErpInterfaceTableRow, H8InterfaceTableRepoError> {
     let id = row
         .get::<Uuid, _>("id")
@@ -482,6 +486,7 @@ fn map_row(
         owner_id,
         warehouse_id: row.get("warehouse_id"),
         business_key: row.get::<&str, _>("business_key").map(ToOwned::to_owned),
+        business_fields: product_master_business_fields(&row, table_key, detail_mode),
         event_type: row.get::<&str, _>("event_type").map(ToOwned::to_owned),
         external_ref: row.get::<&str, _>("external_ref").map(ToOwned::to_owned),
         wms_resource_id: row.get::<&str, _>("wms_resource_id").map(ToOwned::to_owned),
@@ -498,9 +503,98 @@ fn map_row(
     })
 }
 
+fn product_master_business_fields(
+    row: &deadpool_tiberius_rustls::tiberius_rustls::Row,
+    table_key: &str,
+    detail_mode: bool,
+) -> Vec<H8ErpInterfaceTableField> {
+    if table_key != "if_in_product_master" {
+        return Vec::new();
+    }
+    let field = |key: &str| H8ErpInterfaceTableField {
+        key: key.into(),
+        value: row.get::<&str, _>(key).map(ToOwned::to_owned),
+    };
+    let mut fields = vec![field("product_code"), field("product_name"), field("spec")];
+    if detail_mode {
+        fields.extend(
+            [
+                "approval_no",
+                "dosage_form",
+                "manufacturer",
+                "special_drug_category",
+                "storage_condition",
+                "udi_code",
+                "electronic_regulatory_code",
+                "length_mm",
+                "width_mm",
+                "height_mm",
+                "volume_cm3",
+                "weight_g",
+                "schema_version",
+            ]
+            .into_iter()
+            .map(field),
+        );
+        fields.push(H8ErpInterfaceTableField {
+            key: "packaging_levels".into(),
+            value: safe_packaging_levels(row.get::<&str, _>("packaging_json")),
+        });
+    }
+    fields
+}
+
+fn safe_packaging_levels(raw: Option<&str>) -> Option<String> {
+    let raw = raw?;
+    if raw.len() > H8_INTERFACE_TABLE_PAYLOAD_PARSE_MAX_BYTES {
+        return Some("[包装数据过大，已省略]".into());
+    }
+    let Ok(serde_json::Value::Array(levels)) = serde_json::from_str(raw) else {
+        return Some("[包装数据格式无效]".into());
+    };
+    if levels.is_empty() {
+        return Some("[包装数据格式无效]".into());
+    }
+    let mut safe = Vec::with_capacity(levels.len());
+    for level in levels {
+        let serde_json::Value::Object(level) = level else {
+            return Some("[包装数据格式无效]".into());
+        };
+        let (Some(unit), Some(ratio_to_base), Some(is_base), Some(is_default), Some(sort_order)) = (
+            level.get("unit").and_then(serde_json::Value::as_str),
+            level
+                .get("ratio_to_base")
+                .and_then(serde_json::Value::as_i64),
+            level.get("is_base").and_then(serde_json::Value::as_bool),
+            level.get("is_default").and_then(serde_json::Value::as_bool),
+            level.get("sort_order").and_then(serde_json::Value::as_i64),
+        ) else {
+            return Some("[包装数据格式无效]".into());
+        };
+        if unit.trim().is_empty() || ratio_to_base <= 0 {
+            return Some("[包装数据格式无效]".into());
+        }
+        safe.push(serde_json::json!({
+            "unit": unit,
+            "ratio_to_base": ratio_to_base,
+            "is_base": is_base,
+            "is_default": is_default,
+            "sort_order": sort_order,
+        }));
+    }
+    let Ok(serialized) = serde_json::to_string(&safe) else {
+        return Some("[包装数据格式无效]".into());
+    };
+    if serialized.len() > H8_INTERFACE_TABLE_PAYLOAD_SUMMARY_MAX_BYTES {
+        return Some("[包装数据过大，已省略]".into());
+    }
+    Some(serialized)
+}
+
 fn detail_from_row(row: H8ErpInterfaceTableRow) -> H8ErpInterfaceTableDetail {
-    let fields = [
+    let mut fields = [
         ("id", Some(row.row_id.clone())),
+        ("owner_id", Some(row.owner_id.to_string())),
         ("business_key", row.business_key.clone()),
         ("event_type", row.event_type.clone()),
         ("external_ref", row.external_ref.clone()),
@@ -522,7 +616,8 @@ fn detail_from_row(row: H8ErpInterfaceTableRow) -> H8ErpInterfaceTableDetail {
         key: key.into(),
         value,
     })
-    .collect();
+    .collect::<Vec<_>>();
+    fields.extend(row.business_fields.clone());
     H8ErpInterfaceTableDetail { row, fields }
 }
 
@@ -537,17 +632,69 @@ fn sanitize_db_error(message: String) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::projection_for;
+    use super::{projection_for, safe_packaging_levels};
 
     #[test]
     fn projections_only_reference_columns_present_in_each_interface_table() {
-        let outbound = projection_for("if_in_outbound_order");
+        let outbound = projection_for("if_in_outbound_order", false);
         assert!(outbound.contains("external_doc_no AS business_key"));
         assert!(outbound.contains("CAST(NULL AS nvarchar(128)) AS external_ref"));
         assert!(!outbound.contains(", external_ref, wms_resource_id"));
 
-        let out_message = projection_for("if_out_message");
+        let out_message = projection_for("if_out_message", false);
         assert!(out_message.contains("source_outbox_id AS business_key"));
         assert!(out_message.contains("CAST(NULL AS uniqueidentifier) AS warehouse_id"));
+    }
+
+    #[test]
+    fn product_master_projection_separates_list_summary_from_detail_fields() {
+        let list = projection_for("if_in_product_master", false);
+        assert!(list.contains("product_code"));
+        assert!(list.contains("product_name"));
+        assert!(list.contains("spec"));
+        assert!(!list.contains("packaging_json"));
+
+        let detail = projection_for("if_in_product_master", true);
+        assert!(detail.contains("approval_no"));
+        assert!(detail.contains("storage_condition"));
+        assert!(detail.contains("packaging_json"));
+        assert!(detail.contains("CONVERT(nvarchar(64), schema_version) AS schema_version"));
+    }
+
+    #[test]
+    fn packaging_summary_keeps_only_whitelisted_fields() {
+        let summary = safe_packaging_levels(Some(
+            r#"[{"unit":"片","ratio_to_base":1,"is_base":true,"is_default":false,"sort_order":1,"password":"do-not-show"}]"#,
+        ))
+        .expect("valid packaging summary");
+        assert!(summary.contains(r#""unit":"片""#));
+        assert!(!summary.contains("password"));
+        assert!(!summary.contains("do-not-show"));
+
+        assert_eq!(
+            safe_packaging_levels(Some(r#"{"unit":"片"}"#)).as_deref(),
+            Some("[包装数据格式无效]")
+        );
+    }
+
+    #[test]
+    fn packaging_summary_rejects_oversized_safe_output() {
+        let levels = (0..100)
+            .map(|sort_order| {
+                serde_json::json!({
+                    "unit": "超长包装单位名称".repeat(8),
+                    "ratio_to_base": sort_order + 1,
+                    "is_base": sort_order == 0,
+                    "is_default": sort_order == 1,
+                    "sort_order": sort_order,
+                })
+            })
+            .collect::<Vec<_>>();
+        let raw = serde_json::to_string(&levels).expect("serialize oversized packaging levels");
+
+        assert_eq!(
+            safe_packaging_levels(Some(&raw)).as_deref(),
+            Some("[包装数据过大，已省略]")
+        );
     }
 }

@@ -5961,6 +5961,8 @@ export interface components {
             wms_resource_id?: string | null;
         };
         H8ErpInterfaceTableRow: {
+            /** @description 按接口表白名单返回的业务摘要字段；禁止放入原始 payload。 */
+            business_fields: components["schemas"]["H8ErpInterfaceTableField"][];
             business_key?: string | null;
             /** Format: uuid */
             connector_id: string;

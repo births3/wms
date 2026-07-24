@@ -28,6 +28,10 @@ for (const token of [
   "最大跨度 31 天",
   "无写操作",
   "payload_summary",
+  "business_fields",
+  "product_code",
+  "product_name",
+  "packaging_levels",
   "external_ref",
   "probe_credentials_configured",
   "disabled: !connector.probe_credentials_configured",
@@ -42,8 +46,17 @@ for (const label of [
   "仓库 ID",
   "记录 ID",
   "报文摘要",
+  "商品编码",
+  "商品名称",
+  "规格",
+  "药品与监管",
+  "物流与包装",
+  "同步追踪",
+  "包装层级",
 ]) assert.match(page, new RegExp(label));
 assert.match(page, /key: "sync_status", label: "同步状态", type: "multiSelect"/);
+assert.match(page, /storageKey=\{`h8\.erp-interface-tables\.\$\{tableKey\}`\}/);
+assert.match(page, /<DataGrid\s+key=\{tableKey\}/);
 assert.doesNotMatch(page, /payload_json/);
 assert.match(connectorPage, /接口表探查账号（只读）/);
 assert.match(connectorPage, /expected_probe_config_version/);

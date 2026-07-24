@@ -13,6 +13,7 @@ type DevInterfaceRow = {
   owner_id: string;
   warehouse_id: string | null;
   business_key: string | null;
+  business_fields: Array<{ key: string; value: string | null }>;
   event_type: string | null;
   external_ref: string | null;
   wms_resource_id: string | null;
@@ -33,6 +34,7 @@ const rows: DevInterfaceRow[] = [
     owner_id: devOwnerId,
     warehouse_id: warehouseId,
     business_key: "ASN-20260719-001",
+    business_fields: [],
     event_type: "asn.received",
     external_ref: "ERP-ASN-001",
     wms_resource_id: "00000000-0000-0000-0000-00000000a001",
@@ -51,6 +53,7 @@ const rows: DevInterfaceRow[] = [
     owner_id: devOwnerId,
     warehouse_id: warehouseId,
     business_key: "ASN-20260719-002",
+    business_fields: [],
     event_type: "asn.received",
     external_ref: "ERP-ASN-002",
     wms_resource_id: null,
@@ -69,6 +72,7 @@ const rows: DevInterfaceRow[] = [
     owner_id: devOwnerId,
     warehouse_id: null,
     business_key: "OUT-20260719-001",
+    business_fields: [],
     event_type: "shipment.confirmed",
     external_ref: "ERP-OUT-001",
     wms_resource_id: null,
@@ -80,6 +84,49 @@ const rows: DevInterfaceRow[] = [
     updated_at: "2026-07-19T10:01:00.000Z",
     payload_summary: '{"message_type":"shipment.confirmed","outbox_id":"OUT-20260719-001"}',
   },
+  {
+    row_id: "00000000-0000-0000-0000-00000000f004",
+    connector_id: connectorId,
+    table_key: "if_in_product_master",
+    owner_id: devOwnerId,
+    warehouse_id: null,
+    business_key: "DEMO-PM-001",
+    business_fields: [
+      { key: "product_code", value: "DEMO-P-001" },
+      { key: "product_name", value: "演示商品-对乙酰氨基酚片" },
+      { key: "spec", value: "0.5g*24片" },
+    ],
+    event_type: null,
+    external_ref: null,
+    wms_resource_id: null,
+    sync_status: "pending",
+    retry_count: 0,
+    last_error: null,
+    idempotency_key: "h8-demo-pm-001",
+    created_at: "2026-07-19T11:00:00.000Z",
+    updated_at: "2026-07-19T11:00:00.000Z",
+    payload_summary: "{}",
+  },
+];
+
+const productMasterDetailFields = [
+  { key: "approval_no", value: "国药准字H000000" },
+  { key: "dosage_form", value: "片剂" },
+  { key: "manufacturer", value: "演示制药" },
+  { key: "special_drug_category", value: "普通药品" },
+  { key: "storage_condition", value: "常温保存" },
+  { key: "udi_code", value: "06912345678901" },
+  { key: "electronic_regulatory_code", value: "DEMO-REG-001" },
+  { key: "length_mm", value: "120" },
+  { key: "width_mm", value: "80" },
+  { key: "height_mm", value: "50" },
+  { key: "volume_cm3", value: "480" },
+  { key: "weight_g", value: "350.5" },
+  {
+    key: "packaging_levels",
+    value: '[{"unit":"片","ratio_to_base":1,"is_base":true,"is_default":false,"sort_order":1},{"unit":"盒","ratio_to_base":24,"is_base":false,"is_default":true,"sort_order":2}]',
+  },
+  { key: "schema_version", value: "1" },
 ];
 
 function filteredRows(url: URL): DevInterfaceRow[] {
@@ -145,9 +192,14 @@ export async function handleH8ErpInterfaceTableDevMock(
       sendError(res, 404, "H8_INTERFACE_TABLE_ROW_NOT_FOUND", "接口表行不存在");
       return true;
     }
+    const fields = Object.entries(row)
+      .filter(([key]) => key !== "business_fields")
+      .map(([key, value]) => ({ key, value: value == null ? null : String(value) }));
+    fields.push(...row.business_fields);
+    if (row.table_key === "if_in_product_master") fields.push(...productMasterDetailFields);
     sendJson(res, 200, {
       row,
-      fields: Object.entries(row).map(([key, value]) => ({ key, value: value == null ? null : String(value) })),
+      fields,
     });
     return true;
   }
