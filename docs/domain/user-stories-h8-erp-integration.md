@@ -331,13 +331,13 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
    - 详情 `GET /api/v1/h8/erp-interface-tables/rows/{row_id}`（**query 必填** `connector_id` + `table_key`；详情身份 = `connector_id` + `table_key` + `row_id`，禁止仅靠 UUID 跨表定位）
    - 仅接受结构化过滤；服务端参数化 SELECT。契约与实现须可证明**无** `UPDATE`/`INSERT`/`DELETE` 接口表路径。
 7. **核心/更多查询**：核心为连接、接口表、`sync_status`、时间范围；`sync_status` 使用公共 `QueryPanel` 多选控件，多个状态按“或”查询，API 用逗号分隔且每个值精确匹配。更多为按表适用的业务键（见映射表）。时间过滤默认落在 **`updated_at`**（便于发现长期 `pending`）；默认最近 7 天，跨度 ≤ 31 天；缺省时间窗由服务端补齐，无界查询 **400**。其他字段首版不做模糊匹配，避免全表扫描。
-8. **列表字段**：至少展示主键 `id`、业务键摘要（入站 `external_doc_no` / 出站 `source_outbox_id`）、`sync_status`、`retry_count`、`last_error` 摘要、`idempotency_key`、`created_at`/`updated_at`；入站表另展示可空 `wms_resource_id`，`if_out_message` 不虚构该列。完整 `payload_json` 不进列表。
-9. **详情**：Dialog 只展示脱敏字段和服务端生成的 `payload_summary`；摘要按 UTF-8 截断至 4096 字节。列表与详情 API 均不得返回原始 `payload_json`。首版不提供原文查看；确有原文排障需求时另立故事和权限。无编辑、无改 `sync_status` 或写操作控件。列表行与同键详情字段必须一致。
+8. **列表字段**：至少展示主键 `id`、业务键摘要（入站 `external_doc_no` / 出站 `source_outbox_id`）、`sync_status`、`retry_count`、`last_error` 摘要、`idempotency_key`、`created_at`/`updated_at`；入站表另展示可空 `wms_resource_id`，`if_out_message` 不虚构该列。选择 `if_in_product_master` 时改用商品业务列，默认展示外部单号、货主 ID、商品编码、商品名称、规格、同步状态、重试次数和更新时间，不能只显示控制列。完整 `payload_json` 不进列表。
+9. **详情**：Dialog 只展示服务端表级白名单字段和生成的 `payload_summary`；摘要按 UTF-8 截断至 4096 字节。`if_in_product_master` 详情按商品信息、药品与监管、物流与包装、同步追踪分区，覆盖商品编码/名称/规格、批准文号、剂型、生产厂家、特殊药品分类、储存条件、UDI/电子监管码、尺寸重量、契约版本和控制字段；包装层级以表格展示包装单位、基础单位换算、是否基础单位和是否默认单位。列表与详情 API 均不得返回原始 `payload_json`，包装 JSON 只允许经服务端字段白名单校验后作为 `packaging_levels` 返回，解析输入不超过 1 MiB、返回摘要不超过 4096 字节，超限只返回中文省略标记。首版不提供原文查看；确有原文排障需求时另立故事和权限。无编辑、无改 `sync_status` 或写操作控件。列表行与同键详情字段必须一致。
 10. **货主与仓库隔离**：强制当前货主；表有 `owner_id` 时 SQL 必须 `owner_id = 当前货主`。表有 `warehouse_id` 时：SQL 必须落在 **调用主体授权仓库 ∩ 连接 `warehouse_ids` 白名单**（连接白名单为空表示该货主全部仓，仍受主体仓权约束）。表无 `warehouse_id` 时，只有系统管理员或具备货主全仓数据范围的主体可查询，其他主体返回 403；审计过滤摘要须标明「无仓列」。跨货主数据不得返回。
 11. **分页、超时与限流**：强制分页，`page_size` ≤ 100；列表不得无界导出。单次外部查询复用 ADR-0018 超时策略，API 复用 H3 已认证端点限流，超限返回 429；不新增 H8 私有 QPS 配置。**不得**为降噪合并或省略 H2 审计事件。
 12. **审计**：每次列表与详情查询写入 H2 append-only 审计，记录操作者、货主、`connector_id`、`table_key`、过滤摘要、结果行数或是否命中；不记录密码、完整 payload。
 13. **账号权限（软件路径）**：Docker 和生产探查都必须使用与 Worker 写账号分离的 **SELECT-only** 专用账号。Docker 初始化需创建该账号；验收必须证明 `SELECT` 成功且 `INSERT`、`UPDATE`、`DELETE` 均被数据库拒绝，未满足时不得关闭软件路径。
-14. **页面证据**：登记页面级查询配置；真实浏览器 E2E 至少覆盖：有权限选连接与表并看到列表、同时选择两个 `sync_status` 并验证并集结果、打开详情、无权限 403/隐藏入口、只读无写按钮；查询区、表头、状态与详情字段使用中文业务文案。质量矩阵登记 `e2e_checks` / `e2e_screenshots`。
+14. **页面证据**：登记页面级查询配置；真实浏览器 E2E 至少覆盖：有权限选连接与表并看到列表、同时选择两个 `sync_status` 并验证并集结果、打开详情、无权限 403/隐藏入口、只读无写按钮；查询区、表头、状态与详情字段使用中文业务文案。商品主数据使用 V2 的 `DEMO-PM-001`，断言列表显示 `DEMO-P-001`、中文商品名称与规格，详情显示批准文号、厂家、储存条件、监管标识和“片/盒”包装层级，并单独留下真实截图。质量矩阵登记 `e2e_checks` / `e2e_screenshots`。
 15. **软件路径完成条件**：在 `deploy/docker-compose.h8-erp-if.yml` 启动的 MSSQL 接口库上，用演示/种子行（至少断言 `external_doc_no` 如 `DEMO-ASN-001` / `DEMO-PM-001` 与 `sync_status=pending` 可见）完成 API 单测或集成测 + 真实浏览器 E2E + 权限/审计单测 + SELECT-only 账号 DML 拒绝测试 + `gov-t1` 相关门禁后，可关闭本故事**软件路径**并在验收记录标记 `SOFTWARE_PATH_PASS`。客户正式接口库只读账号联调为可选增强，**不是**本故事软件路径关闭的必要条件。
 16. **非目标**：不做通用数据库浏览器；不做接口表行编辑/补单；不替代 003 监控与重放；不把 ERP DTO 放入业务 domain 聚合。
 
@@ -351,7 +351,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | 更多查询 | 按所选 `table_key` 动态显示适用字段：`external_doc_no` / `external_ref` / `source_outbox_id` / `idempotency_key` / `warehouse_id` / `event_type`，默认折叠 |
 | 标准动作入口 | 页头或 DataGrid 提供刷新、字段显示和视图；首版禁止无界导出 |
 | 私有动作入口 | 行内「详情」；首版无「重放」「改状态」 |
-| 详情展示方式 | Dialog 展示对象信息、控制列、错误摘要与服务端脱敏、限长的 payload 摘要；可选跳转 003 |
+| 详情展示方式 | Dialog 展示对象信息、控制列、错误摘要与服务端脱敏、限长的 payload 摘要；商品主数据按四区展示并将包装层级渲染为表格；可选跳转 003 |
 | 禁止常驻区域 | 不常驻 SQL 编辑器、完整报文面板、写操作表单 |
 
 ### 查询 API 最小约束
@@ -387,7 +387,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 |---|---|
 | L1 单元 | `table_key` 白名单、owner/仓过滤、单值/多值 `sync_status`、混入非法状态/不适用列 400、禁止 SQL 拼接 |
 | L2 API 契约 | 列表/详情 OpenAPI（含 `row_id` 联合键）、统一错误、api-client 同步 |
-| L3 业务流程 | Docker 种子 `DEMO-ASN-001` pending + `DEMO-ASN-002` failed → 双值多选返回并集 → 详情字段一致 |
+| L3 业务流程 | Docker 种子 `DEMO-ASN-001` pending + `DEMO-ASN-002` failed → 双值多选返回并集 → 详情字段一致；`DEMO-PM-001` 列表核心商品字段与详情包装层级可见 |
 | L4 错误路径 | 连接不可达、只读凭据缺失、secret 不可解析、未知表、入站+`acked`、跨货主、无仓表的仓库级主体、无界时间窗、超时、429 |
 | L5 数据一致 | 同键列表与详情一致；跳转 003 失败不破坏 004 |
 | L7 性能 | `page_size=100` 多表白名单 smoke；超时上限可触发 |
@@ -470,8 +470,9 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 |---|---|---|---|
 | AC1–AC12（入口、权限接线、连接选择、白名单 API、查询/详情、范围、分页、脱敏、审计代码、页面交互） | V0/V1/V2 | `PASS` | 领域/API 单测、OpenAPI/api-client、权限/菜单迁移、self-check；H2 持久化失败改为查询失败，不再静默丢审计 |
 | MENU-VISIBILITY（发布版本、权限、真实页面可见、刷新后复验） | V0/V3 | `PASS` | 管理员真实页面可见；仅有 `h8.erp_connector.read` 的新会话及刷新后均隐藏入口，直接 API 返回 403 |
-| AC14（页面证据：列表/筛选/详情/无写控件） | V1/V3 | `PASS` | 真实 Playwright 覆盖中文字段、`pending,failed` 双值多选请求，以及 `DEMO-ASN-001` pending + `DEMO-ASN-002` failed 的并集结果、详情、无写按钮、反向权限与 4 张截图 |
+| AC14（页面证据：列表/筛选/详情/无写控件） | V1/V3 | `PASS` | 真实 Playwright 覆盖中文字段、`pending,failed` 双值多选请求，以及 `DEMO-ASN-001` pending + `DEMO-ASN-002` failed 的并集结果、通用详情、商品详情、无写按钮、反向权限与 5 张截图 |
 | UI-SEMANTICS（中文文案与控件选择） | V0/V3 | `PASS` | 查询区、表头、状态和详情字段均为中文业务文案；同步状态使用公共多选控件，API 与结果断言覆盖两个值 |
+| BUSINESS-CONTENT（商品主数据业务内容） | V2/V3 | `PASS` | 同一 `DEMO-PM-001` 在 MSSQL、列表、详情和截图中可追踪；列表断言 `DEMO-P-001`、中文商品名称和规格，详情断言批准文号、厂家、储存条件、UDI 及“片/盒”包装表格；API/页面均不返回 `payload_json` |
 | AC13（SELECT-only 账号与 DML 拒绝） | V2 | `PASS` | Docker 证据工具验证 `DEMO-ASN-001` pending、`DEMO-ASN-002` failed、`DEMO-PM-001` pending 可 SELECT；实际 UPDATE/DELETE/INSERT 均被 MSSQL 拒绝且无残留 |
 | AC15（Docker DEMO 行列表→详情、真实权限/审计） | V2/V3 | `PASS` | `wms_h8_e2e` + `wms_erp_if` 完成列表→双状态并集→详情；PostgreSQL H2 观察到列表/详情事件、结果数/命中与脱敏过滤摘要 |
 
@@ -480,11 +481,11 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | 命令 | 结果 |
 |---|---|
 | `cargo test --manifest-path backend/Cargo.toml -p wms-domain --lib h8_erp` | `PASS`（40） |
-| `cargo test --manifest-path backend/Cargo.toml -p wms-domain --test h8_erp_interface_table` | `PASS`（3） |
+| `cargo test --manifest-path backend/Cargo.toml -p wms-domain --test h8_erp_interface_table` | `PASS`（4） |
 | `cargo test --manifest-path backend/Cargo.toml -p wms-api --lib h8_erp` | `PASS`（22） |
 | `pnpm --dir apps/web-admin run test:self-checks` | `PASS` |
 | `pnpm --dir apps/web-admin run test:e2e:h8-interface-dev` | `PASS`（1 条，3 张开发 E2E 截图） |
-| `pnpm --dir apps/web-admin run test:e2e:h8-interface-real` | `PASS`（2 条，4 张真实数据/权限截图） |
+| `pnpm --dir apps/web-admin run test:e2e:h8-interface-real` | `PASS`（3 条，5 张真实数据/权限截图） |
 | `sudo -n bash scripts/h8_erp_interface_sync/check_probe_readonly.sh` | `PASS`（SELECT + 3 条 DEMO 种子；UPDATE/DELETE/INSERT 拒绝；无残留） |
 | `cargo test --manifest-path backend/Cargo.toml -p wms-api persistent_audit_failure_is_not_swallowed --lib` | `PASS`（H2 持久化失败不得静默吞掉） |
 | `pnpm --dir apps/web-admin exec tsc --noEmit` / `pnpm --dir apps/web-admin run build` | `PASS`（仅既有依赖/产物体积警告） |

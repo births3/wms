@@ -1,5 +1,5 @@
 {
-  "collected_at": "2026-07-22T08:53:14+08:00",
+  "collected_at": "2026-07-24T08:35:32+08:00",
   "story": "US-H8-004",
   "scope": "Docker MSSQL software path: SELECT-only database boundary, real API/browser authorization, H2 persistent audit and screenshots",
   "ok": true,
@@ -30,12 +30,14 @@
       "name": "real_browser_and_permission",
       "command": "pnpm --dir apps/web-admin run test:e2e:h8-interface-real",
       "ok": true,
-      "tests": 2,
+      "tests": 3,
       "assertions": [
         "admin filters sync_status=pending,failed through the Chinese label 同步状态",
         "multi-select OR semantics returns DEMO-ASN-001 pending and DEMO-ASN-002 failed",
         "query, grid, detail fields, status options and actions are displayed in Chinese",
         "detail exposes the Chinese label 报文摘要 without payload_json",
+        "DEMO-PM-001 list exposes product code, Chinese name and specification",
+        "DEMO-PM-001 detail exposes approval number, manufacturer, storage condition, UDI, schema version and 片/盒 packaging levels",
         "page has no write actions",
         "connector.read-only user has no menu after fresh login and refresh",
         "connector.read-only user receives API 403"
@@ -60,19 +62,23 @@
   "screenshots": [
     {
       "path": "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-list.png",
-      "sha256": "515659ce7f9d0c06c59fd1832db440ff9411e2a444cda86207ed9bad38ecf828"
+      "sha256": "d118583d50deeaa94b36202837ddd4033dc6a9a340db5ee1f1c31dc028ef5ce6"
     },
     {
       "path": "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-multi-status-filter.png",
-      "sha256": "4f4493ea4389e4aa0e4f555aad8c2bb109c44ea91e2eaf750e02c9037ece4a9a"
+      "sha256": "1fb7dca79ec6c326e15f45551812ef30d2002ea308ef51380e17f5b81271b554"
     },
     {
       "path": "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-detail.png",
-      "sha256": "1903151563cea43716d50ffe6592aec90bf0b1c44a607bd02aa6f851d2594c80"
+      "sha256": "06c138ff9d0adf6fbe6439a65651d49b550fbbef704098167ba2d5fdc9fe41d9"
+    },
+    {
+      "path": "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-product-master-detail.png",
+      "sha256": "5d0932a9137e6a00ac9f764140bf9eb3731ff0235a8645050feaf352338305cd"
     },
     {
       "path": "artifacts/screenshot-portal/real-web/h8-erp-interface-tables/interface-table-permission-denied.png",
-      "sha256": "7c254b778797c7cbc785d47d9a921c05c6c625de0cd7cac48157fbc891597f52"
+      "sha256": "d8b4b392ba9d59c9ec9e712db9292e72b737da421e34b052a6ddb28af89d9036"
     }
   ],
   "conclusion": "SOFTWARE_PATH_PASS",
