@@ -7,6 +7,9 @@
 ```bash
 export WMS_API_BASE=http://127.0.0.1:9002
 export WMS_TOKEN=<从 /api/v1/auth/login 获取的 access_token>
+export WMS_API_KEY=<H1 外部 API Key>
+export IDEMPOTENCY_KEY=<本次业务请求的稳定幂等键>
+export WMS_WAREHOUSE_ID=<调用主体授权仓库 ID>
 ```
 
 ## GET /api-docs
@@ -36,6 +39,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -49,6 +54,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/admin/menus/draft/nodes" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -64,6 +71,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -77,6 +86,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/admin/menus/publish" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -102,6 +113,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -125,6 +138,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/alert-definitions/change-requests" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -334,6 +349,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -378,6 +395,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -392,6 +411,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -405,6 +426,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/auth/api-keys/<api_key_id>/rotate" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -432,6 +455,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -455,6 +480,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/auth/me/password" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -490,6 +517,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -502,7 +531,9 @@ curl -sS \
   -X DELETE \
   "$WMS_API_BASE/api/v1/auth/roles/<role_id>" \
   -H \
-  "Authorization: Bearer $WMS_TOKEN"
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY"
 ```
 
 ## PUT /api/v1/auth/roles/{role_id}
@@ -513,6 +544,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/auth/roles/<role_id>" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -527,6 +560,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/auth/roles/<role_id>/permissions" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -552,6 +587,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -566,6 +603,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -579,6 +618,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/auth/user-roles/batch" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -604,6 +645,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -618,6 +661,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -631,6 +676,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/auth/users/<user_id>/status" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -660,6 +707,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -673,6 +722,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/billing/contracts" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -688,6 +739,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -701,6 +754,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/billing/statements" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -716,6 +771,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -729,6 +786,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/business-retention/jobs" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -774,6 +833,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -787,6 +848,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/code-generator/document-number-rules/<rule_code>/enabled" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -812,6 +875,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -825,6 +890,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/cold-chain/devices/<device_code>" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -840,6 +907,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -852,7 +921,9 @@ curl -sS \
   -X POST \
   "$WMS_API_BASE/api/v1/cold-chain/excursions" \
   -H \
-  "Authorization: Bearer $WMS_TOKEN" \
+  "X-WMS-API-Key: $WMS_API_KEY" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -890,7 +961,9 @@ curl -sS \
   -X POST \
   "$WMS_API_BASE/api/v1/cold-chain/readings" \
   -H \
-  "Authorization: Bearer $WMS_TOKEN" \
+  "X-WMS-API-Key: $WMS_API_KEY" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -973,6 +1046,128 @@ curl -sS \
   '{}'
 ```
 
+## GET /api/v1/config/erp-connectors
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/config/erp-connectors" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/config/erp-connectors
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/config/erp-connectors" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## DELETE /api/v1/config/erp-connectors/{id}
+
+```bash
+curl -sS \
+  -X DELETE \
+  "$WMS_API_BASE/api/v1/config/erp-connectors/<id>" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY"
+```
+
+## GET /api/v1/config/erp-connectors/{id}
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/config/erp-connectors/<id>" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## PATCH /api/v1/config/erp-connectors/{id}
+
+```bash
+curl -sS \
+  -X PATCH \
+  "$WMS_API_BASE/api/v1/config/erp-connectors/<id>" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/config/erp-connectors/{id}/activate
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/config/erp-connectors/<id>/activate" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/config/erp-connectors/{id}/disable
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/config/erp-connectors/<id>/disable" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/config/erp-connectors/{id}/test
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/config/erp-connectors/<id>/test" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/config/erp-connectors/{id}/versions/{version}
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/config/erp-connectors/<id>/versions/<version>" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
 ## GET /api/v1/dock-appointments
 
 ```bash
@@ -992,6 +1187,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -1005,6 +1202,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/dock-appointments/<id>" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -1020,6 +1219,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -1033,6 +1234,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/dock-appointments/<id>/cancel" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -1058,6 +1261,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -1072,6 +1277,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -1084,7 +1291,9 @@ curl -sS \
   -X DELETE \
   "$WMS_API_BASE/api/v1/docks/<id>" \
   -H \
-  "Authorization: Bearer $WMS_TOKEN"
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY"
 ```
 
 ## PATCH /api/v1/docks/{id}
@@ -1095,6 +1304,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/docks/<id>" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -1130,6 +1341,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -1143,6 +1356,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/drug-inspection/platforms/<platform_id>/status" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -1206,6 +1421,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -1230,6 +1447,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -1244,6 +1463,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -1257,6 +1478,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/express/waybills/<waybill_no>/cancel" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -1273,12 +1496,68 @@ curl -sS \
   "Authorization: Bearer $WMS_TOKEN"
 ```
 
+## GET /api/v1/h8/erp-interface-tables/connectors
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/h8/erp-interface-tables/connectors" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## GET /api/v1/h8/erp-interface-tables/rows
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/h8/erp-interface-tables/rows" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## GET /api/v1/h8/erp-interface-tables/rows/{row_id}
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/h8/erp-interface-tables/rows/<row_id>" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
 ## GET /api/v1/healthz
 
 ```bash
 curl -sS \
   -X GET \
   "$WMS_API_BASE/api/v1/healthz"
+```
+
+## GET /api/v1/inbound/putaway-strategy-profiles
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/inbound/putaway-strategy-profiles" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## PUT /api/v1/inbound/putaway-strategy-profiles
+
+```bash
+curl -sS \
+  -X PUT \
+  "$WMS_API_BASE/api/v1/inbound/putaway-strategy-profiles" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
 ```
 
 ## GET /api/v1/inbound/receiving-dashboard
@@ -1309,6 +1588,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/inbound/receiving-orders" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -1344,6 +1625,40 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/inbound/receiving-orders/{id}/cancel
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/inbound/receiving-orders/<id>/cancel" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/inbound/receiving-orders/{id}/force-close-shortage
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/inbound/receiving-orders/<id>/force-close-shortage" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -1357,6 +1672,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/inbound/receiving-orders/<id>/inspect" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -1382,6 +1699,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -1406,6 +1725,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -1419,6 +1740,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/inbound/receiving-orders/<id>/reject" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -1434,6 +1757,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -1445,6 +1770,354 @@ curl -sS \
 curl -sS \
   -X POST \
   "$WMS_API_BASE/api/v1/inbound/receiving-orders/<id>/sign" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/integration/erp-messages
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/integration/erp-messages" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/integration/erp-messages/inbound/asn
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/integration/erp-messages/inbound/asn" \
+  -H \
+  "X-WMS-API-Key: $WMS_API_KEY" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
+  "X-WMS-Warehouse-ID: $WMS_WAREHOUSE_ID" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/integration/erp-messages/inbound/outbound_order
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/integration/erp-messages/inbound/outbound_order" \
+  -H \
+  "X-WMS-API-Key: $WMS_API_KEY" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
+  "X-WMS-Warehouse-ID: $WMS_WAREHOUSE_ID" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/integration/erp-messages/inbound/product_change
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/integration/erp-messages/inbound/product_change" \
+  -H \
+  "X-WMS-API-Key: $WMS_API_KEY" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/integration/erp-messages/inbound/product_master
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/integration/erp-messages/inbound/product_master" \
+  -H \
+  "X-WMS-API-Key: $WMS_API_KEY" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/integration/erp-messages/inbound/return_order
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/integration/erp-messages/inbound/return_order" \
+  -H \
+  "X-WMS-API-Key: $WMS_API_KEY" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
+  "X-WMS-Warehouse-ID: $WMS_WAREHOUSE_ID" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/integration/erp-messages/lifecycle
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/integration/erp-messages/lifecycle" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/integration/erp-messages/payload-retention
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/integration/erp-messages/payload-retention" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/integration/erp-messages/payload-retention
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/integration/erp-messages/payload-retention" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/integration/erp-messages/purge
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/integration/erp-messages/purge" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/integration/erp-messages/stats
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/integration/erp-messages/stats" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## GET /api/v1/integration/erp-messages/worker-runtime
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/integration/erp-messages/worker-runtime" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## GET /api/v1/integration/erp-messages/worker-runtime/claim-decision
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/integration/erp-messages/worker-runtime/claim-decision" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/integration/erp-messages/worker-runtime/control
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/integration/erp-messages/worker-runtime/control" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/integration/erp-messages/worker-runtime/heartbeat
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/integration/erp-messages/worker-runtime/heartbeat" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/integration/erp-messages/{id}
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/integration/erp-messages/<id>" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/integration/erp-messages/{id}/claim
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/integration/erp-messages/<id>/claim" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/integration/erp-messages/{id}/payload
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/integration/erp-messages/<id>/payload" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/integration/erp-messages/{id}/receipt
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/integration/erp-messages/<id>/receipt" \
+  -H \
+  "X-WMS-API-Key: $WMS_API_KEY" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/integration/erp-messages/{id}/replay
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/integration/erp-messages/<id>/replay" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/inventory/abc
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/inventory/abc" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/inventory/abc
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/inventory/abc" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/inventory/abc/override
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/inventory/abc/override" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/inventory/alerts
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/inventory/alerts" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/inventory/alerts/generate-near-expiry
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/inventory/alerts/generate-near-expiry" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/inventory/alerts/{id}/handle
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/inventory/alerts/<id>/handle" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
@@ -1471,6 +2144,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/inventory/batches/expire" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -1510,6 +2185,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -1523,6 +2200,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/inventory/batches/recall/cancel" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -1538,9 +2217,21 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
+```
+
+## GET /api/v1/inventory/batches/{id}/shipped-customers
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/inventory/batches/<id>/shipped-customers" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
 ```
 
 ## GET /api/v1/inventory/batches/{id}/trace
@@ -1553,6 +2244,16 @@ curl -sS \
   "Authorization: Bearer $WMS_TOKEN"
 ```
 
+## GET /api/v1/inventory/counts
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/inventory/counts" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
 ## POST /api/v1/inventory/counts
 
 ```bash
@@ -1561,6 +2262,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/inventory/counts" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -1586,6 +2289,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -1600,9 +2305,21 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
+```
+
+## GET /api/v1/inventory/locations/history
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/inventory/locations/history" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
 ```
 
 ## GET /api/v1/inventory/maintenance/records
@@ -1624,6 +2341,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -1637,6 +2356,60 @@ curl -sS \
   "$WMS_API_BASE/api/v1/inventory/maintenance/tasks" \
   -H \
   "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/inventory/maintenance/tasks/generate
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/inventory/maintenance/tasks/generate" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/inventory/relocations
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/inventory/relocations" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/inventory/relocations
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/inventory/relocations" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/inventory/status-erp-outbox/process
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/inventory/status-erp-outbox/process" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
 ```
 
 ## GET /api/v1/inventory/status-transitions
@@ -1657,6 +2430,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/inventory/status-transitions/<from_status>/<to_status>" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -1692,6 +2467,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -1716,6 +2493,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -1729,6 +2508,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/master-data/customers/batch-sync" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -1754,6 +2535,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -1767,6 +2550,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/master-data/customers/<customer_id>/addresses/<address_id>" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -1792,6 +2577,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -1804,7 +2591,9 @@ curl -sS \
   -X DELETE \
   "$WMS_API_BASE/api/v1/master-data/customers/<id>" \
   -H \
-  "Authorization: Bearer $WMS_TOKEN"
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY"
 ```
 
 ## PATCH /api/v1/master-data/customers/{id}
@@ -1815,6 +2604,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/master-data/customers/<id>" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -1840,6 +2631,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -1854,6 +2647,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -1866,7 +2661,9 @@ curl -sS \
   -X DELETE \
   "$WMS_API_BASE/api/v1/master-data/locations/<id>" \
   -H \
-  "Authorization: Bearer $WMS_TOKEN"
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY"
 ```
 
 ## PATCH /api/v1/master-data/locations/{id}
@@ -1877,6 +2674,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/master-data/locations/<id>" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -1902,6 +2701,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -1916,6 +2717,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -1928,7 +2731,9 @@ curl -sS \
   -X DELETE \
   "$WMS_API_BASE/api/v1/master-data/products/<id>" \
   -H \
-  "Authorization: Bearer $WMS_TOKEN"
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY"
 ```
 
 ## GET /api/v1/master-data/products/{id}
@@ -1949,6 +2754,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/master-data/products/<id>" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -2022,6 +2829,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -2036,6 +2845,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -2048,7 +2859,9 @@ curl -sS \
   -X DELETE \
   "$WMS_API_BASE/api/v1/master-data/suppliers/<id>" \
   -H \
-  "Authorization: Bearer $WMS_TOKEN"
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY"
 ```
 
 ## PATCH /api/v1/master-data/suppliers/{id}
@@ -2059,6 +2872,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/master-data/suppliers/<id>" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -2084,6 +2899,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -2096,7 +2913,9 @@ curl -sS \
   -X DELETE \
   "$WMS_API_BASE/api/v1/master-data/warehouse-zones/<id>" \
   -H \
-  "Authorization: Bearer $WMS_TOKEN"
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY"
 ```
 
 ## PATCH /api/v1/master-data/warehouse-zones/{id}
@@ -2107,6 +2926,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/master-data/warehouse-zones/<id>" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -2132,6 +2953,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -2144,7 +2967,9 @@ curl -sS \
   -X DELETE \
   "$WMS_API_BASE/api/v1/master-data/warehouses/<id>" \
   -H \
-  "Authorization: Bearer $WMS_TOKEN"
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY"
 ```
 
 ## PATCH /api/v1/master-data/warehouses/{id}
@@ -2155,6 +2980,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/master-data/warehouses/<id>" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -2179,6 +3006,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/outbound/orders" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -2214,6 +3043,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -2228,6 +3059,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -2241,6 +3074,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/outbound/pick-tasks/<id>/complete" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -2266,6 +3101,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -2290,6 +3127,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -2303,6 +3142,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/packing/jobs" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -2318,6 +3159,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -2331,6 +3174,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/packing/jobs/<id>/weigh" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -2346,33 +3191,27 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
 ```
 
-## POST /api/v1/parameter-mapping/execute
+## POST /api/v1/parameter-mapping/map
 
 ```bash
 curl -sS \
   -X POST \
-  "$WMS_API_BASE/api/v1/parameter-mapping/execute" \
+  "$WMS_API_BASE/api/v1/parameter-mapping/map" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
   '{}'
-```
-
-## GET /api/v1/parameter-mapping/traces/{execution_id}
-
-```bash
-curl -sS \
-  -X GET \
-  "$WMS_API_BASE/api/v1/parameter-mapping/traces/<execution_id>" \
-  -H \
-  "Authorization: Bearer $WMS_TOKEN"
 ```
 
 ## GET /api/v1/print-templates/field-libraries
@@ -2418,6 +3257,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -2456,6 +3297,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -2480,9 +3323,21 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
+```
+
+## GET /api/v1/quality-liaisons/types/{type_code}
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/quality-liaisons/types/<type_code>" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
 ```
 
 ## PUT /api/v1/quality-liaisons/types/{type_code}
@@ -2493,6 +3348,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/quality-liaisons/types/<type_code>" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -2517,6 +3374,156 @@ curl -sS \
   "$WMS_API_BASE/api/v1/quality-liaisons/<id>/approval-callback" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/quality-liaisons/{id}/archive-sync-callback
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/quality-liaisons/<id>/archive-sync-callback" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/reconciliation/claims
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/reconciliation/claims" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/reconciliation/claims/{id}/failed
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/reconciliation/claims/<id>/failed" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/reconciliation/claims/{id}/renew
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/reconciliation/claims/<id>/renew" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/reconciliation/items
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/reconciliation/items" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## POST /api/v1/reconciliation/items/isolation
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/reconciliation/items/isolation" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/reconciliation/items/{id}/resolve
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/reconciliation/items/<id>/resolve" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## GET /api/v1/reconciliation/rule
+
+```bash
+curl -sS \
+  -X GET \
+  "$WMS_API_BASE/api/v1/reconciliation/rule" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN"
+```
+
+## PUT /api/v1/reconciliation/rule
+
+```bash
+curl -sS \
+  -X PUT \
+  "$WMS_API_BASE/api/v1/reconciliation/rule" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
+  "Content-Type: application/json" \
+  -d \
+  '{}'
+```
+
+## POST /api/v1/reconciliation/runs
+
+```bash
+curl -sS \
+  -X POST \
+  "$WMS_API_BASE/api/v1/reconciliation/runs" \
+  -H \
+  "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -2596,6 +3603,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -2609,6 +3618,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/retail/replenishment-suggestions" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -2654,6 +3665,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -2678,6 +3691,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -2691,6 +3706,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/stock-adjustments/loss-orders/<id>/quality-approval" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -2706,6 +3723,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -2719,6 +3738,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/stock-adjustments/surplus-orders" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -2744,6 +3765,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -2758,6 +3781,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -2771,6 +3796,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/stock-adjustments/surplus-orders/<id>/start" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -2806,6 +3833,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -2819,6 +3848,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/system-dictionaries/<dict_code>/items/<item_code>/disable" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -2854,6 +3885,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -2877,6 +3910,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/task-engine/task-groups/<task_group_code>" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -2902,6 +3937,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -2915,6 +3952,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/task-engine/task-types/<task_type_code>/enabled" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -2940,6 +3979,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -2953,6 +3994,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/task-engine/tasks/<task_id>/transitions" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -2978,6 +4021,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -2991,6 +4036,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/tms/dispatches" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -3006,6 +4053,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -3019,6 +4068,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/tms/transit-temperature-readings" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -3048,6 +4099,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -3061,6 +4114,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/wechat-notify/approvals/<approval_id>/callback" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -3086,6 +4141,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -3110,6 +4167,8 @@ curl -sS \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
   -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H \
   "Content-Type: application/json" \
   -d \
   '{}'
@@ -3123,6 +4182,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/wechat-notify/send" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
@@ -3147,6 +4208,8 @@ curl -sS \
   "$WMS_API_BASE/api/v1/wechat-notify/settings" \
   -H \
   "Authorization: Bearer $WMS_TOKEN" \
+  -H \
+  "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -H \
   "Content-Type: application/json" \
   -d \
