@@ -214,18 +214,57 @@ pub async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
         r#"
         INSERT INTO products (
             id, owner_id, product_code, product_name, specification, dosage_form,
-            storage_condition, special_drug_category, approval_no, manufacturer, status
+            storage_condition, special_drug_category, approval_no, manufacturer, status,
+            udi_code, electronic_regulatory_code,
+            length_mm, width_mm, height_mm, volume_cm3, weight_g
         )
         VALUES (
             '00000000-0000-0000-0000-000000001001', '00000000-0000-0000-0000-000000000001',
             'P-M1-E2E-001', 'E2E 冷藏胰岛素', '10ml*1支', '注射剂',
-            'cold', 'none', '国药准字E2E001', 'E2E 示例药业', 'active'
+            'cold', 'none', '国药准字E2E001', 'E2E 示例药业', 'active',
+            '06901234567891', '81000000000000000001',
+            120, 100, 30, 360, 180
         )
         ON CONFLICT (owner_id, product_code) DO UPDATE
         SET product_name = EXCLUDED.product_name,
             specification = EXCLUDED.specification,
             storage_condition = EXCLUDED.storage_condition,
             updated_at = now()
+        "#,
+    )
+    .execute(pool)
+    .await?;
+    sqlx::query(
+        r#"
+        INSERT INTO product_packaging_levels (
+            id, owner_id, product_id, unit_code, unit_name, ratio_to_base,
+            is_base, is_default, sort_order
+        )
+        VALUES
+            (
+                '00000000-0000-0000-0000-000000001011',
+                '00000000-0000-0000-0000-000000000001',
+                '00000000-0000-0000-0000-000000001001',
+                'piece', '支', 1, TRUE, FALSE, 1
+            ),
+            (
+                '00000000-0000-0000-0000-000000001012',
+                '00000000-0000-0000-0000-000000000001',
+                '00000000-0000-0000-0000-000000001001',
+                'box', '盒', 10, FALSE, TRUE, 2
+            ),
+            (
+                '00000000-0000-0000-0000-000000001013',
+                '00000000-0000-0000-0000-000000000001',
+                '00000000-0000-0000-0000-000000001001',
+                'case', '箱', 200, FALSE, FALSE, 3
+            )
+        ON CONFLICT (owner_id, product_id, unit_code) DO UPDATE
+        SET unit_name = EXCLUDED.unit_name,
+            ratio_to_base = EXCLUDED.ratio_to_base,
+            is_base = EXCLUDED.is_base,
+            is_default = EXCLUDED.is_default,
+            sort_order = EXCLUDED.sort_order
         "#,
     )
     .execute(pool)
@@ -731,5 +770,6 @@ pub async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
     .execute(pool)
     .await?;
     crate::wms_api_e2e_seed::seed_hal_alert_capabilities(pool).await?;
+    crate::wms_api_e2e_seed_mrc::seed_mrc_data(pool).await?;
     Ok(())
 }

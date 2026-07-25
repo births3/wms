@@ -34,6 +34,7 @@ use wms_api::{
     h8_erp_connectors::{h8_erp_connector_router, H8ErpConnectorAppState},
     h8_erp_interface_tables::{h8_erp_interface_table_router, H8ErpInterfaceTableAppState},
     h8_erp_messages::{h8_erp_message_router, H8ErpMessageAppState},
+    h8_inbound::{h8_inbound_router, H8InboundAppState},
     inventory_status_config_handlers::{
         inventory_status_config_router, InventoryStatusConfigAppState,
     },
@@ -41,6 +42,7 @@ use wms_api::{
     parameter_mapping::{parameter_mapping_router, ParameterMappingAppState},
     print_template_handlers::{print_template_router, PrintTemplateAppState},
     quality_liaison_handlers::{quality_liaison_router, QualityLiaisonAppState},
+    reconciliation_handlers::{reconciliation_router, ReconciliationAppState},
     reports_handlers::mount_reports,
     resilience::{resilience_middleware, resilience_status, ResilienceState},
     role_management::{role_management_router, RoleManagementState},
@@ -295,6 +297,9 @@ fn app(
         .merge(h8_erp_message_router(H8ErpMessageAppState::with_postgres(
             shared_pool.clone(),
         )))
+        .merge(h8_inbound_router(H8InboundAppState::with_postgres(
+            shared_pool.clone(),
+        )))
         .merge(drug_inspection_router(
             DrugInspectionAppState::with_postgres(shared_pool.clone()),
         ))
@@ -324,6 +329,9 @@ fn app(
         ))
         .merge(quality_liaison_router(
             QualityLiaisonAppState::with_postgres(shared_pool.clone()),
+        ))
+        .merge(reconciliation_router(
+            ReconciliationAppState::with_postgres(shared_pool.clone()),
         ))
         .merge(alert_definition_router(
             AlertDefinitionAppState::with_postgres(shared_pool.clone()),

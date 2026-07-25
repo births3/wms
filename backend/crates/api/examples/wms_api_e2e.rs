@@ -37,6 +37,7 @@ use wms_api::{
     master_data_handlers::{master_data_router, MasterDataAppState},
     print_template_handlers::{print_template_router, PrintTemplateAppState},
     quality_liaison_handlers::{quality_liaison_router, QualityLiaisonAppState},
+    reconciliation_handlers::{reconciliation_router, ReconciliationAppState},
     role_management::{role_management_router, RoleManagementState},
     system_dictionary_handlers::{system_dictionary_router, SystemDictionaryAppState},
     task_engine_handlers::{task_engine_router, TaskEngineAppState},
@@ -51,6 +52,8 @@ use wms_domain::HealthzResponse;
 mod wms_api_e2e_seed;
 #[path = "support/wms_api_e2e_seed_data.rs"]
 mod wms_api_e2e_seed_data;
+#[path = "support/wms_api_e2e_seed_mrc.rs"]
+mod wms_api_e2e_seed_mrc;
 
 const BIND_ADDR_ENV: &str = "WMS_BIND_ADDR";
 const DATABASE_URL_ENV: &str = "DATABASE_URL";
@@ -109,6 +112,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         )))
         .merge(quality_liaison_router(
             QualityLiaisonAppState::with_postgres(pool.clone()),
+        ))
+        .merge(reconciliation_router(
+            ReconciliationAppState::with_postgres(pool.clone()),
         ))
         .merge(alert_definition_router(
             AlertDefinitionAppState::with_postgres(pool.clone()),
