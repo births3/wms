@@ -304,7 +304,7 @@ Wave 1（接口定义 + Mock）→ Wave 2（真实对接第一个 ERP）
 | 渲染层 | 服务端按分类生成 PDF、哈希并写入 H-FILE | 选择物理打印机 |
 | 任务层 | 队列、严格顺序、重打、暂停、改派、主备 Agent 和审计 | 把结果不明当失败自动重打 |
 | Agent 层 | 下载冻结清单/PDF、校验哈希、调用本地打印后台、持久日志与重连对账 | 解释业务规则或渲染模板 |
-| 设备层 | 仓库打印机、纸盒、纸张能力、测试结果和设备租约 | 跨仓共享 |
+| 设备层 | 仓库打印机、纸盒、纸张能力、测试结果和设备租约 | 跨物理打印站点引用 |
 
 详细决策见 [ADR-0039](../adr/0039-print-suite-and-agent.md)。
 
@@ -350,6 +350,9 @@ HTTP handler
   `X-Forwarded-For`。
 - 普通 HTTP 例外只覆盖 Agent 任务领取、获授权 PDF 下载和 `/agent-releases` 更新下载；
   Web、H-FILE 通用上传/下载和其他模块仍按 ADR-0031 使用 HTTPS。
+- Agent 下载 PDF 必须走 H9 专用机器接口；服务端校验任务、Agent、站点和货主仓映射后，
+  以 H-FILE 稳定文件 ID 流式返回内容。不得把 H-FILE 通用下载地址降级为 HTTP，也不得向
+  Agent 暴露可绕过 H9 鉴权的长期文件 URL。
 - 跨网段、公网、无线访客网或其他不可信网络必须启用 HTTPS，本例外不得继承。
 
 ### 默认运行阈值
@@ -374,6 +377,11 @@ HTTP handler
   版本。版本只允许向前，错误版本以更高版本重新发布。
 - WMS 固定 `/agent-releases` 提供当前 pilot/stable、相邻增量、完整包、清单和 SHA-256；
   下载复用 Agent 机器 API Key 与精确源 IP 白名单，不允许匿名访问。
+- Velopack Rust 内置 `HttpSource` 当前
+  [只接收基础 URL](https://docs.rs/velopack/latest/velopack/sources/struct.HttpSource.html)，
+  不能直接承载本项目的机器 API Key。Agent 必须实现最小 `UpdateSource` 适配器，复用同一
+  受控 HTTP 客户端读取发布清单和包并注入 Agent 鉴权；不得为了迁就内置静态源放开匿名
+  下载。实现时固定并复核 Velopack 版本。
 - 发布脚本/CI 校验临时文件后原子发布不可变包；WMS 进程只读。pilot 提升 stable 只修改
   数据库通道指向，复用同一包和 SHA-256，管理端不能上传可执行文件。
 - 每次启动默认 stable；stable 可直接选择更新，pilot 必须在线登录具备 Agent 管理权限的
@@ -385,6 +393,10 @@ HTTP handler
   并包含通道、原版本、目标版本、SHA-256 和结果。
 - 正式环境明确接受普通 HTTP + SHA-256 且没有发布者验真。SHA-256 不是来源证明；信任边界
   扩大或发生包替换事件时必须重新评估 HTTPS 或代码签名。
+- Windows 无签名程序可能触发 SmartScreen 或杀毒软件警告；真实客户端验收必须记录安装和
+  更新是否被拦截以及受控部署方式。失败时保留旧版本并告警，禁止客户端自动关闭或绕过系统
+  防护。该运行风险见
+  [Velopack Code Signing](https://docs.velopack.io/packaging/signing)。
 - 首个正式版本前直接更新/重装测试 Agent；正式发布后的破坏性协议变更按 ADR-0016
   两阶段升级。
 

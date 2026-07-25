@@ -67,6 +67,20 @@
 | 47 | 条码 | barcode | 一维码或二维码的统称，用于 PDA 扫码识别商品/库位/托盘/ASN 等 | — |
 | 48 | 鉴权 | authentication | API 调用时验证调用方身份的过程（如 API Key / JWT） | — |
 | 49 | 签收 | sign-off | 客户/门店收到货物后的签字确认反馈（出库末端动作） | — |
+| 50 | 销退 | sales-return | 客户退货给我们（销售退回），走退货入库流程 | — |
+| 51 | 采退 | purchase-return | 我们退货给供应商（采购退回），验收不合格后的处置方式之一 | — |
+| 52 | 库存锁定 | stock-lock | 波次分配后对库存数量的锁定（状态仍为"合格"，但锁定数量不可被其他订单分配），发货后释放并扣减 | 拣选占用 |
+| 53 | 容器 | lpn | 仓库中所有物理载具的统称（托盘/周转箱/出库箱/保温箱/盲标签），每个容器一个唯一 ID（LPN 码）全程跟踪 | 货箱（太窄） |
+| 54 | LPN | lpn-code | License Plate Number，容器的唯一标识码 | 箱号、托盘码（统一用 LPN 码） |
+| 55 | TMS | transport-management | Transport Management System，外部运输管理系统，主管车辆排班/路径规划/在途监控/温控；WMS 通过 M10 与之集成，仅做出库订单推送 + 调度结果接收（v10 边界）| — |
+| 56 | RTM | requirements-traceability | Requirements Traceability Matrix，需求追溯矩阵；本项目用于 GSP 法规条款 → 用户故事的双向追溯（详见 docs/compliance/）| — |
+| 57 | RPO | recovery-point-objective | Recovery Point Objective，灾难恢复时可容忍的最大数据丢失窗口；H10 数据库备份目标 ≤ 5 分钟 | — |
+| 58 | RTO | recovery-time-objective | Recovery Time Objective，灾难恢复时可容忍的最大停机时长；H10 全库恢复目标 ≤ 2 小时 | — |
+| 59 | PITR | point-in-time-recovery | Point-in-Time Recovery，恢复到任意指定时点的备份能力；H10 用于误操作回滚 | — |
+| 60 | 召回 | recall | 药品召回流程：药监召回通知或企业自查发现质量问题后，对已售出商品发起回收的合规动作；含一/二/三级分级 | — |
+| 61 | 召回标记 | recall-flag | 库存批次的召回状态字段（M3-002 §7 `recall_flag`）：标识该批次是否被纳入召回；标记后批次自动隔离，不可出库 | — |
+| 62 | 召回级别 | recall-level | 药品召回的法规分级：一级（24h 内启动）/ 二级（48h）/ 三级（72h）；由 M-QL "召回"类型联系单按法规依据带出 | — |
+| 63 | 召回流程 | recall-flow | 完整召回流程：药监通知/自查 → M-QL 召回联系单 → M-TC 反查影响批次/客户 → M3 库存隔离 → H4 通知客户回收 → M-SA 报损/销毁 → ERP 报告药监局 | — |
 | 64 | 随货同行单号 | delivery-note-number | H9 在截单时为冻结后的出库订单集合生成的唯一归集号；不等同于 ERP 订单组号 | — |
 | 65 | 截单 | cutoff | 到达受控截止时间或执行授权人工操作后，冻结本次随货同行单订单集合的动作 | — |
 | 66 | 打印组套 | print-suite | 面向客户要求的版本化打印方案，定义单据分类、模板、份数、顺序、就绪策略和逻辑输出槽 | — |
@@ -92,22 +106,10 @@
 | 日期 | 版本 | 变更 |
 |------|------|------|
 | 2026-05-16 | v1 | 初版（21 个术语） |
+| 2026-05-17 | v2 | v25 加 GSP 法规用语 ↔ WMS 命名映射表（9 项）+ 关联 gsp-field-traceability.md |
 | 2026-07-25 | v3 | 增加 H9 随货同行单号、截单、打印组套、打印项、逻辑输出槽和 Print Agent 术语 |
 | 2026-07-25 | v4 | 增加 H9 物理打印站点术语，明确多货主打印资源边界 |
-| 50 | 销退 | sales-return | 客户退货给我们（销售退回），走退货入库流程 | — |
-| 51 | 采退 | purchase-return | 我们退货给供应商（采购退回），验收不合格后的处置方式之一 | — |
-| 52 | 库存锁定 | stock-lock | 波次分配后对库存数量的锁定（状态仍为"合格"，但锁定数量不可被其他订单分配），发货后释放并扣减 | 拣选占用 |
-| 53 | 容器 | lpn | 仓库中所有物理载具的统称（托盘/周转箱/出库箱/保温箱/盲标签），每个容器一个唯一 ID（LPN 码）全程跟踪 | 货箱（太窄） |
-| 54 | LPN | lpn-code | License Plate Number，容器的唯一标识码 | 箱号、托盘码（统一用 LPN 码） |
-| 55 | TMS | transport-management | Transport Management System，外部运输管理系统，主管车辆排班/路径规划/在途监控/温控；WMS 通过 M10 与之集成，仅做出库订单推送 + 调度结果接收（v10 边界）| — |
-| 56 | RTM | requirements-traceability | Requirements Traceability Matrix，需求追溯矩阵；本项目用于 GSP 法规条款 → 用户故事的双向追溯（详见 docs/compliance/）| — |
-| 57 | RPO | recovery-point-objective | Recovery Point Objective，灾难恢复时可容忍的最大数据丢失窗口；H10 数据库备份目标 ≤ 5 分钟 | — |
-| 58 | RTO | recovery-time-objective | Recovery Time Objective，灾难恢复时可容忍的最大停机时长；H10 全库恢复目标 ≤ 2 小时 | — |
-| 59 | PITR | point-in-time-recovery | Point-in-Time Recovery，恢复到任意指定时点的备份能力；H10 用于误操作回滚 | — |
-| 60 | 召回 | recall | 药品召回流程：药监召回通知或企业自查发现质量问题后，对已售出商品发起回收的合规动作；含一/二/三级分级 | — |
-| 61 | 召回标记 | recall-flag | 库存批次的召回状态字段（M3-002 §7 `recall_flag`）：标识该批次是否被纳入召回；标记后批次自动隔离，不可出库 | — |
-| 62 | 召回级别 | recall-level | 药品召回的法规分级：一级（24h 内启动）/ 二级（48h）/ 三级（72h）；由 M-QL "召回"类型联系单按法规依据带出 | — |
-| 63 | 召回流程 | recall-flow | 完整召回流程：药监通知/自查 → M-QL 召回联系单 → M-TC 反查影响批次/客户 → M3 库存隔离 → H4 通知客户回收 → M-SA 报损/销毁 → ERP 报告药监局 | — |
+| 2026-07-25 | v5 | 修复 50～63 号术语和 v2 记录误落在变更记录表中的结构错误 |
 
 ---
 
@@ -128,4 +130,3 @@
 | 验收记录 | M2-003 验收记录 + M-DI 药检单 + M2-004 双人签字 | 三个故事共同实现 |
 | 销售记录 | M4-001 出库订单 + M-DI 药检单 + M6-001 流水账 | 多故事共同实现 |
 | 温度记录 / 温湿度记录 | 温湿度记录（M3-004 / M5-002）| GSP 不同条款混用，WMS 统一为温湿度记录 |
-| 2026-05-17 | v2 | v25 加 GSP 法规用语 ↔ WMS 命名映射表（9 项）+ 关联 gsp-field-traceability.md |

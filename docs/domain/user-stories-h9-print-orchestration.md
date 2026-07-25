@@ -227,6 +227,8 @@
     代码签名。
 18. 首个正式版本前直接更新并重装测试 Agent；正式发布后的破坏性协议变更按 ADR-0016
     两阶段执行，禁止永久维护双协议。
+19. 无签名 Windows 客户端必须用真实机器验证 SmartScreen/杀毒软件对安装和更新的影响；
+    被拦截时保留旧版本并告警，禁止客户端自动关闭或绕过系统防护。
 
 ## 跨故事约束
 
@@ -237,6 +239,8 @@
    API Key 和精确源 IP，禁止信任 X-Forwarded-For；Agent 使用静态 IP 或 DHCP 保留地址。
    这是仅覆盖 Agent 任务领取、获授权 PDF 下载和 `/agent-releases` 更新下载的 ADR-0031
    窄范围例外，Web、H-FILE 通用上传/下载和其他模块仍必须使用 HTTPS。
+   Agent 下载 PDF 走 H9 专用机器接口，由服务端校验任务和站点映射后解析 H-FILE 稳定文件
+   引用；不得把 H-FILE 通用下载接口降级为 HTTP 或向 Agent 暴露长期文件 URL。
 4. **分层**：服务端遵守 handler → service → domain/repository；本地 Agent 的 React UI
    不直接读取凭据、文件或调用 Windows 打印 API。
 5. **不可冒充证据**：浏览器预览、PDF 生成、mock 打印机和本地静态截图都不能替代真实
