@@ -2,8 +2,9 @@ use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 use wms_domain::{
-    CreateQualityLiaisonRequest, QualityLiaisonApprovalCallbackRequest, QualityLiaisonOrder,
-    QualityLiaisonTypeConfig, UpsertQualityLiaisonTypeRequest,
+    CompleteArchiveRevisionRequest, CreateQualityLiaisonRequest,
+    QualityLiaisonApprovalCallbackRequest, QualityLiaisonOrder, QualityLiaisonTypeConfig,
+    UpsertQualityLiaisonTypeRequest,
 };
 
 use crate::{
@@ -368,6 +369,17 @@ impl PgQualityLiaisonRepository {
         if current.status != "pending_approval" {
             return Err(QualityLiaisonError::AlreadyClosed);
         }
+        let liaison_status = if status == "approved"
+            && current
+                .business_payload
+                .get("action")
+                .and_then(serde_json::Value::as_str)
+                == Some("publish_archive_revision")
+        {
+            "pending_erp_sync"
+        } else {
+            status
+        };
         let approval_id = current
             .approval_record_id
             .ok_or(QualityLiaisonError::InvalidRequest)?;
@@ -413,7 +425,7 @@ impl PgQualityLiaisonRepository {
         ))
         .bind(ctx.owner_id)
         .bind(order_id)
-        .bind(status)
+        .bind(liaison_status)
         .bind(ctx.user_id)
         .bind(&request.opinion)
         .bind(now)
@@ -463,6 +475,198 @@ impl PgQualityLiaisonRepository {
         .ok_or(QualityLiaisonError::NotFound)?;
         Ok(row.into())
     }
+
+    pub async fn complete_archive_revision_sync(
+        &self,
+        ctx: &AuthContext,
+        order_id: Uuid,
+        mut request: CompleteArchiveRevisionRequest,
+        now: DateTime<Utc>,
+        idempotency_key: &str,
+    ) -> Result<IdempotentQualityLiaisonMutation<QualityLiaisonOrder>, QualityLiaisonError> {
+        request.product_code = request.product_code.trim().to_string();
+        request.field_name = request.field_name.trim().to_string();
+        request.new_value = request.new_value.trim().to_string();
+        if request.product_code.is_empty()
+            || request.field_name.is_empty()
+            || request.new_value.is_empty()
+        {
+            return Err(QualityLiaisonError::InvalidRequest);
+        }
+        let hash = request_hash(&serde_json::json!({
+            "action":"complete_archive_revision_sync",
+            "order_id":order_id,
+            "request":request,
+        }))?;
+        let mut tx = self.pool.begin().await.map_err(map_database_error)?;
+        lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
+        if let Some(value) =
+            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &hash, now).await?
+        {
+            return Ok(IdempotentQualityLiaisonMutation {
+                value,
+                replayed: true,
+            });
+        }
+        let current = load_order_for_update(&mut tx, ctx.owner_id, order_id).await?;
+        let payload = &current.business_payload;
+        let asn_id = payload_uuid(payload, "asn_id")?;
+        let warehouse_id = payload_uuid(payload, "warehouse_id")?;
+        if current.type_code != "archive_revision"
+            || current.status != "pending_erp_sync"
+            || payload.get("action").and_then(serde_json::Value::as_str)
+                != Some("publish_archive_revision")
+            || current.related_document_type != "asn"
+            || request.asn_id != asn_id
+            || payload_text(payload, "product_code")? != request.product_code
+            || payload_text(payload, "field_name")? != request.field_name
+            || payload_text(payload, "new_value")? != request.new_value
+            || ctx
+                .warehouse_scope
+                .is_some_and(|scope| scope != warehouse_id)
+        {
+            return Err(QualityLiaisonError::BusinessActionInvalid);
+        }
+        let product: serde_json::Value = sqlx::query_scalar(
+            r#"
+            SELECT jsonb_build_object(
+                'product_name', product_name,
+                'approval_no', approval_no,
+                'specification', specification,
+                'dosage_form', dosage_form,
+                'manufacturer', manufacturer,
+                'status', status,
+                'storage_condition', storage_condition,
+                'special_drug_category', special_drug_category,
+                'attrs', attrs
+            )
+              FROM products
+             WHERE owner_id = $1 AND id = $2 AND product_code = $3
+            "#,
+        )
+        .bind(ctx.owner_id)
+        .bind(request.product_id)
+        .bind(&request.product_code)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(map_database_error)?
+        .ok_or(QualityLiaisonError::BusinessActionInvalid)?;
+        if product_field_value(&product, &request.field_name).and_then(serde_json::Value::as_str)
+            != Some(request.new_value.as_str())
+        {
+            return Err(QualityLiaisonError::BusinessActionInvalid);
+        }
+        let outbox_succeeded: bool = sqlx::query_scalar(
+            r#"
+            SELECT EXISTS(
+                SELECT 1 FROM archive_revision_erp_feedback_outbox
+                 WHERE owner_id = $1 AND liaison_id = $2 AND asn_id = $3
+                   AND product_code = $4 AND field_name = $5 AND status = 'succeeded'
+            )
+            "#,
+        )
+        .bind(ctx.owner_id)
+        .bind(order_id)
+        .bind(asn_id)
+        .bind(&request.product_code)
+        .bind(&request.field_name)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(map_database_error)?;
+        if !outbox_succeeded {
+            return Err(QualityLiaisonError::BusinessActionInvalid);
+        }
+        let transitioned = sqlx::query(
+            r#"
+            UPDATE receiving_orders
+               SET status = 'inspecting', updated_at = $4
+             WHERE owner_id = $1 AND id = $2 AND warehouse_id = $3
+               AND status = 'archive_replenishing'
+            "#,
+        )
+        .bind(ctx.owner_id)
+        .bind(asn_id)
+        .bind(warehouse_id)
+        .bind(now)
+        .execute(&mut *tx)
+        .await
+        .map_err(map_database_error)?;
+        if transitioned.rows_affected() != 1 {
+            return Err(QualityLiaisonError::BusinessActionInvalid);
+        }
+        let row = sqlx::query_as::<_, QualityLiaisonOrderRow>(&format!(
+            r#"
+            UPDATE quality_liaison_orders
+               SET status = 'landed', updated_at = $3, version = version + 1
+             WHERE owner_id = $1 AND id = $2 AND status = 'pending_erp_sync'
+             RETURNING {}
+            "#,
+            order_columns()
+        ))
+        .bind(ctx.owner_id)
+        .bind(order_id)
+        .bind(now)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(map_database_error)?
+        .ok_or(QualityLiaisonError::BusinessActionInvalid)?;
+        let value: QualityLiaisonOrder = row.into();
+        finish_mutation(
+            &mut tx,
+            ctx,
+            idempotency_key,
+            &hash,
+            "POST",
+            "/api/v1/quality-liaisons/{id}/archive-sync-callback",
+            "quality_liaison_order",
+            value.id,
+            &value,
+            "complete_archive_revision_sync",
+            now,
+        )
+        .await?;
+        tx.commit().await.map_err(map_database_error)?;
+        Ok(IdempotentQualityLiaisonMutation {
+            value,
+            replayed: false,
+        })
+    }
+}
+
+fn payload_uuid(payload: &serde_json::Value, key: &str) -> Result<Uuid, QualityLiaisonError> {
+    payload
+        .get(key)
+        .and_then(serde_json::Value::as_str)
+        .and_then(|value| Uuid::parse_str(value).ok())
+        .ok_or(QualityLiaisonError::BusinessActionInvalid)
+}
+
+fn payload_text<'a>(
+    payload: &'a serde_json::Value,
+    key: &str,
+) -> Result<&'a str, QualityLiaisonError> {
+    payload
+        .get(key)
+        .and_then(serde_json::Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or(QualityLiaisonError::BusinessActionInvalid)
+}
+
+fn product_field_value<'a>(
+    product: &'a serde_json::Value,
+    field_name: &str,
+) -> Option<&'a serde_json::Value> {
+    let column = match field_name {
+        "approval_number" | "approval_no" => "approval_no",
+        "spec" | "specification" => "specification",
+        "special_drug_category_code" | "special_drug_category" => "special_drug_category",
+        "product_name" | "dosage_form" | "manufacturer" | "status" | "storage_condition" => {
+            field_name
+        }
+        other => return product.get("attrs")?.get(other),
+    };
+    product.get(column)
 }
 
 impl From<QualityLiaisonTypeRow> for QualityLiaisonTypeConfig {

@@ -9,8 +9,9 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 use wms_domain::{
-    CreateQualityLiaisonRequest, ErrorResponse, QualityLiaisonApprovalCallbackRequest,
-    QualityLiaisonOrder, QualityLiaisonTypeConfig, UpsertQualityLiaisonTypeRequest,
+    CompleteArchiveRevisionRequest, CreateQualityLiaisonRequest, ErrorResponse,
+    QualityLiaisonApprovalCallbackRequest, QualityLiaisonOrder, QualityLiaisonTypeConfig,
+    UpsertQualityLiaisonTypeRequest,
 };
 
 use crate::{
@@ -22,6 +23,7 @@ const READ_PERMISSION: &str = "mql.quality-liaison.read";
 const WRITE_PERMISSION: &str = "mql.quality-liaison.write";
 const CONFIG_PERMISSION: &str = "mql.quality-liaison.config";
 const APPROVE_PERMISSION: &str = "mql.quality-liaison.approve";
+const ARCHIVE_SYNC_PERMISSION: &str = "h8.erp_connector.write";
 
 #[derive(Clone, Debug)]
 pub struct QualityLiaisonAppState {
@@ -153,6 +155,10 @@ pub fn quality_liaison_router(state: QualityLiaisonAppState) -> Router {
             "/api/v1/quality-liaisons/:id/approval-callback",
             post(approval_callback_handler),
         )
+        .route(
+            "/api/v1/quality-liaisons/:id/archive-sync-callback",
+            post(archive_sync_callback_handler),
+        )
         .with_state(state)
 }
 
@@ -218,6 +224,27 @@ async fn approval_callback_handler(
     let result = state
         .repository
         .apply_approval_callback(
+            &ctx,
+            order_id,
+            request,
+            Utc::now(),
+            idempotency_key(&headers)?,
+        )
+        .await?;
+    Ok(Json(result.value))
+}
+
+async fn archive_sync_callback_handler(
+    ctx: AuthContext,
+    State(state): State<QualityLiaisonAppState>,
+    Path(order_id): Path<Uuid>,
+    headers: HeaderMap,
+    Json(request): Json<CompleteArchiveRevisionRequest>,
+) -> Result<Json<QualityLiaisonOrder>, QualityLiaisonHandlerError> {
+    ctx.require_permission(ARCHIVE_SYNC_PERMISSION)?;
+    let result = state
+        .repository
+        .complete_archive_revision_sync(
             &ctx,
             order_id,
             request,

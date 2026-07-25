@@ -464,6 +464,24 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
     assert!(ship_replay.replayed);
     assert_eq!(ship_replay.value.id, shipped.id);
 
+    let shipment_outbox: (i64, serde_json::Value) = sqlx::query_as(
+        r#"
+        SELECT COUNT(*) OVER (), payload
+          FROM shipment_confirm_erp_feedback_outbox
+         WHERE owner_id = $1 AND outbound_order_id = $2
+        "#,
+    )
+    .bind(owner_id)
+    .bind(order.id)
+    .fetch_one(&pool)
+    .await
+    .expect("shipment confirmation outbox");
+    assert_eq!(shipment_outbox.0, 1);
+    assert_eq!(shipment_outbox.1["warehouse_id"], order.warehouse_id.to_string());
+    assert_eq!(shipment_outbox.1["outbound_order_id"], order.id.to_string());
+    assert_eq!(shipment_outbox.1["wms_order_no"], order.wms_order_no);
+    assert_eq!(shipment_outbox.1["package_count"], 1);
+
     let counts: (i64, i64, i64, i64) = sqlx::query_as(
         r#"
         SELECT

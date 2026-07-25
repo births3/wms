@@ -54,6 +54,10 @@ pub async fn ship_outbound_order(
                 deduct_inventory_for_outbound(&mut tx, ctx.owner_id, order_id, line, now).await?;
             }
         }
+        let shipment_id = Uuid::new_v4();
+        let shipped_at = req.shipped_at.unwrap_or(now);
+        let package_count =
+            i32::try_from(req.package_count).map_err(|_| Wave4RepositoryError::InvalidQuantity)?;
         sqlx::query(
             r#"
             UPDATE outbound_order_lines
@@ -75,13 +79,13 @@ pub async fn ship_outbound_order(
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             "#,
         )
-        .bind(Uuid::new_v4())
+        .bind(shipment_id)
         .bind(ctx.owner_id)
         .bind(order_id)
         .bind(&req.carrier_type)
         .bind(&req.handover_to)
-        .bind(i32::try_from(req.package_count).map_err(|_| Wave4RepositoryError::InvalidQuantity)?)
-        .bind(req.shipped_at.unwrap_or(now))
+        .bind(package_count)
+        .bind(shipped_at)
         .execute(&mut *tx)
         .await
         .map_err(map_insert_error)?;
@@ -103,6 +107,34 @@ pub async fn ship_outbound_order(
         .await
         .map_err(map_db_error)?;
         let shipped = load_outbound_order(&mut tx, ctx.owner_id, order_id).await?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO shipment_confirm_erp_feedback_outbox (
+                id, owner_id, shipment_id, outbound_order_id, payload
+            )
+            VALUES ($1, $2, $3, $4, $5)
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(ctx.owner_id)
+        .bind(shipment_id)
+        .bind(order_id)
+        .bind(serde_json::json!({
+            "warehouse_id": shipped.warehouse_id,
+            "shipment_id": shipment_id,
+            "outbound_order_id": shipped.id,
+            "wms_order_no": shipped.wms_order_no,
+            "erp_order_no": shipped.erp_order_no,
+            "carrier_type": req.carrier_type,
+            "handover_to": req.handover_to,
+            "package_count": package_count,
+            "shipped_at": shipped_at,
+            "lines": shipped.lines,
+        }))
+        .execute(&mut *tx)
+        .await
+        .map_err(map_db_error)?;
 
         store_idempotency_success(
             &mut tx,

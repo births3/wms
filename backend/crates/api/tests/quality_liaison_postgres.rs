@@ -229,6 +229,9 @@ async fn type_config_create_and_approval_callback_are_atomic_and_idempotent(pool
     );
 }
 
+#[path = "quality_liaison_postgres/archive_revision.rs"]
+mod archive_revision;
+
 #[sqlx::test(migrations = "../../migrations")]
 async fn quality_liaison_api_enforces_permissions_and_designated_approver(pool: PgPool) {
     let owner_id = Uuid::new_v4();

@@ -86,7 +86,7 @@ pub fn line_exceeds_variance_threshold(book_qty: i64, variance_qty: i64) -> bool
     abs_var.saturating_mul(10_000) > book_qty.saturating_mul(INVENTORY_COUNT_VARIANCE_RATIO_BPS)
 }
 
-pub fn count_requires_elevated_approval<'a, I>(lines: I) -> bool
+pub fn count_requires_elevated_approval<I>(lines: I) -> bool
 where
     I: IntoIterator<Item = (i64, i64)>,
 {

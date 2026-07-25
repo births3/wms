@@ -49,6 +49,15 @@ pub struct QualityLiaisonApprovalCallbackRequest {
     pub external_approval_id: String,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CompleteArchiveRevisionRequest {
+    pub asn_id: Uuid,
+    pub product_id: Uuid,
+    pub product_code: String,
+    pub field_name: String,
+    pub new_value: String,
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize, ToSchema)]
 pub struct QualityLiaisonOrder {
     pub id: Uuid,
