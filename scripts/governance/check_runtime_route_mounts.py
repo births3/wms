@@ -66,9 +66,9 @@ STRICT_ROUTE_MOUNT_SPECS = (
     ),
     RouteMountSpec(
         name="M-PM 参数对照",
-        openapi_path="/api/v1/parameter-mapping/execute",
-        tokens=("parameter_mapping_router(", "ParameterMappingAppState", "parameter_mapping_handlers"),
-        files=(REPO_ROOT / "backend" / "crates" / "api" / "src" / "parameter_mapping_handlers.rs",),
+        openapi_path="/api/v1/parameter-mapping/map",
+        tokens=("parameter_mapping_router(", "ParameterMappingAppState", "parameter_mapping"),
+        files=(REPO_ROOT / "backend" / "crates" / "api" / "src" / "parameter_mapping.rs",),
     ),
 )
 

@@ -236,3 +236,42 @@ def test_check_openapi_contract_requires_idempotency_key_or_exemption():
     ))
 
     assert any(issue.kind == "missing_idempotency_contract" for issue in issues)
+
+
+def test_curl_example_uses_declared_api_key_security_instead_of_bearer():
+    """外部 API operation 的 curl 必须使用其声明的 API Key。"""
+    from generate_openapi_curl_examples import curl_for
+
+    parts = curl_for(
+        "post",
+        "/api/v1/integration/erp-messages/{id}/receipt",
+        {
+            "security": [{"ColdChainApiKeyAuth": []}],
+            "parameters": [
+                {"name": "X-WMS-API-Key", "in": "header", "required": True},
+            ],
+        },
+    )
+
+    assert '"X-WMS-API-Key: $WMS_API_KEY"' in parts
+    assert '"Authorization: Bearer $WMS_TOKEN"' not in parts
+
+
+def test_curl_example_includes_required_idempotency_header_once():
+    """operation 必填幂等头不得从生成示例中丢失或重复。"""
+    from generate_openapi_curl_examples import curl_for
+
+    parts = curl_for(
+        "post",
+        "/api/v1/integration/erp-messages/{id}/receipt",
+        {
+            "security": [{"ColdChainApiKeyAuth": []}],
+            "parameters": [
+                {"name": "Idempotency-Key", "in": "header", "required": True},
+                {"name": "X-WMS-API-Key", "in": "header", "required": True},
+            ],
+        },
+    )
+
+    assert parts.count('"Idempotency-Key: $IDEMPOTENCY_KEY"') == 1
+    assert parts.count('"X-WMS-API-Key: $WMS_API_KEY"') == 1

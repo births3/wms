@@ -302,17 +302,19 @@ def collect_items() -> list[EvidenceItem]:
     mpm_ok = (
         file_contains(
             "backend/crates/api/src/parameter_mapping.rs",
-            "pub struct ParameterMappingService",
-            "pub fn add_dictionary",
-            "pub fn add_rule",
-            "pub fn execute",
-            "pub fn trace",
-            "pending_mapping",
-            "maps_irregular_erp_payload_and_traces_execution",
+            "parameter_mapping_dictionaries",
+            "parameter_mapping_rules",
+            "parameter_mapping_queue",
+            "pub fn parameter_mapping_router",
         )
         and openapi_has(
-            ["/api/v1/parameter-mapping/execute", "/api/v1/parameter-mapping/traces/{execution_id}"],
-            ["MappingDictionary", "MappingRule", "MappingQueueItem", "ExecuteMappingRequest", "MappingTraceResponse"],
+            [
+                "/api/v1/parameter-mapping/map",
+                "/api/v1/parameter-mapping/rules",
+                "/api/v1/parameter-mapping/queue",
+                "/api/v1/parameter-mapping/traces/{execution_id}",
+            ],
+            ["MapParameterRequest", "MapParameterResponse"],
         )
     )
     items.append(EvidenceItem(

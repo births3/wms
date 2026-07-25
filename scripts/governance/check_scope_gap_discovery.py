@@ -240,6 +240,21 @@ def has_menu_screenshot_evidence(story: dict[str, Any], page_id: str, *, validat
     return False
 
 
+def missing_e2e_screenshot_evidence_refs(story: dict[str, Any]) -> list[str]:
+    evidence_refs = story.get("evidence_refs")
+    records = story.get("e2e_screenshots")
+    if not isinstance(evidence_refs, list) or not isinstance(records, list):
+        return []
+    missing = {
+        value
+        for record in records
+        if isinstance(record, dict)
+        for field in ("spec", "screenshot")
+        if isinstance(value := record.get(field), str) and value and value not in evidence_refs
+    }
+    return sorted(missing)
+
+
 def validate_screenshot_legacy_pages(pages: set[str]) -> set[str]:
     additions = pages - LEGACY_SCREENSHOT_PAGE_CEILING
     if additions:
@@ -473,6 +488,18 @@ def scan_scope_gaps(
             module = story_module(story_id) if story_id.startswith("US-") else str(story.get("module", "")).upper()
             if not should_scan_module(module):
                 continue
+            missing_refs = missing_e2e_screenshot_evidence_refs(story)
+            if missing_refs:
+                gaps.append(
+                    ScopeGap(
+                        severity="block",
+                        kind="declared_e2e_screenshot_missing_evidence_ref",
+                        module=module,
+                        story_id=story_id or "-",
+                        file=rel(MATRIX),
+                        message=f"已声明的 E2E 截图证据未进入 evidence_refs：{', '.join(missing_refs)}",
+                    )
+                )
             for page_id in story.get("frontend_pages", []):
                 if isinstance(page_id, str) and page_id:
                     stories_by_page.setdefault(page_id, []).append(story)

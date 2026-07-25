@@ -156,6 +156,12 @@ def test_quality_matrix_registers_alert_module_and_navigation_check():
     )
 
 
+def test_quality_matrix_registers_reconciliation_module():
+    from check_quality_matrix import ALLOWED_MODULES
+
+    assert "RC" in ALLOWED_MODULES
+
+
 def test_quality_matrix_accepts_h9_field_library_slice():
     """H9 字段库第一切片必须能独立进入质量矩阵。"""
     from check_quality_matrix import check_story

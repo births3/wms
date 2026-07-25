@@ -100,6 +100,7 @@ ALLOWED_MODULES = {
     "H10",
     "TE",
     "AL",
+    "RC",
 }
 STORY_TYPE_LAYERS = {
     "read_only": {"L1", "L2", "L3", "L8"},
