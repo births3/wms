@@ -62,7 +62,8 @@
 | [ADR-0036](0036-print-template-engine.md) | H9 打印模板引擎方案 | Accepted | H9 从 M2 拆出为横向能力；首期 hiprint WebComponent + OpenAPI 字段库 + 数据库字段元数据 + 浏览器预览打印 |
 | [ADR-0037](0037-lightweight-governance-control-chain.md) | 轻量治理控制链（G1-G4） | Accepted | 在 ADR-0003 上增加决策→规则→门禁→证据控制链；复用现有资产，Tier 与 context 正交，治理强度跟随风险 |
 | [ADR-0038](0038-pre-v1-compatibility-policy.md) | 首个正式版本前不保留版本兼容层 | Accepted | 发布前只维护当前契约与 migration 基线；发布后按 ADR-0016 启用 L9 与兼容迁移 |
-| ADR-0039+ | 未分配 | 后续按需新建 |
+| [ADR-0039](0039-print-suite-and-agent.md) | H9 打印组套与 Print Agent | Accepted | H9 第二阶段：随货同行单归集、打印组套、分类 PDF、物理打印站点、站点机器身份、多 Agent 与 Windows 客户端 |
+| ADR-0040+ | 未分配 | 后续按需新建 |
 
 > 编号永不复用。空缺编号必须在此表登记原因。
 
