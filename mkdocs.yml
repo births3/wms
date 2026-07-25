@@ -172,6 +172,8 @@ nav:
     - ADR-0037 轻量治理控制链: adr/0037-lightweight-governance-control-chain.md
     - ADR-0038 首版前兼容策略: adr/0038-pre-v1-compatibility-policy.md
     - ADR-0039 打印组套与 Print Agent: adr/0039-print-suite-and-agent.md
+    - ADR-0040 Print Agent 机器协议: adr/0040-print-agent-machine-protocol.md
+    - ADR-0041 H9 打印编排细化: adr/0041-print-orchestration-refinement.md
     - 技术 Spike:
       - Spike 索引: spikes/README.md
       - SPIKE-001 Axum + JWT: spikes/spike-001-axum-jwt.md

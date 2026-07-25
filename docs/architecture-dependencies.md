@@ -4,8 +4,8 @@
 > ROADMAP 的波次划分、ADR-0007 的执行顺序、worktree 并行决策，都基于本文档。
 > 修改本文档必须经过 PR，并同步检查是否需要更新 ADR-0007 与 ROADMAP.md。
 
-- 版本：v0.3
-- 日期：2026-07-05
+- 版本：v3.6
+- 日期：2026-07-25
 - 关联：`docs/governance.md`、`docs/adr/0007-roadmap-v03-boundary-alignment.md`、`ROADMAP.md`
 
 ---
@@ -38,7 +38,7 @@
 | H6 | 状态机引擎 | state-machine | 多业务模块状态机统一引擎（详见 infra/technical-specs.md）|
 | H7 | 导入导出引擎 | import-export | Excel/CSV 数据导入导出统一引擎 |
 | H8 | ERP 防腐层 | erp-acl | WMS↔ERP 接口表 + 反馈回写（含档案补录通道），详见 [H8 用户故事](domain/user-stories-h8-erp-integration.md) |
-| H9 | 打印模板引擎 | print-template | 标签/单据模板统一能力；首期 hiprint WebComponent + 浏览器预览打印，详见 [ADR-0036](adr/0036-print-template-engine.md) 与 [H9 用户故事](domain/user-stories-h9-print-template.md) |
+| H9 | 打印模板与组套编排 | print-template | 模板、归集、组套、分类 PDF、Print Agent 与设备编排；依赖 H1/H2/H3/H6/H-FILE、M1、M-CG、M4，详见 [ADR-0036](adr/0036-print-template-engine.md)、[ADR-0039](adr/0039-print-suite-and-agent.md)、[ADR-0040](adr/0040-print-agent-machine-protocol.md)、[ADR-0041](adr/0041-print-orchestration-refinement.md)、[模板故事](domain/user-stories-h9-print-template.md) 与 [编排故事](domain/user-stories-h9-print-orchestration.md) |
 | H10 | 数据库备份与恢复 | db-backup | 全量+WAL+异地 + 加密+演练；与 H2 共同保障 GSP 数据完整性（详见 infra/technical-specs.md）|
 | **H-DOCK** | **月台预约管理（v3.1 新增）** | **dock-management** | **月台档案 + 预约调度 + 实到对账；可启用开关（默认关闭，3PL/冷链优先仓启用）；GSP 6.83/8.116/9.121** |
 | **H-AL** | **告警引擎（v3.1 新增）** | **alert-engine** | **告警分级/升级/生命周期/路由/静默；调用 H4 通道；GSP 5.71 触发响应时间合规** |
@@ -199,7 +199,7 @@ graph TD
 
     ```mermaid
     flowchart TD
-        L0["第 0 层 横向能力（业务模块的基础设施）<br/>H1 权限/多租户 · H2 审计追踪 · H3 OpenAPI 契约<br/>H4 企业微信 · H5 快递 · H6 状态机 · H7 导入导出<br/>H8 ERP 防腐层 · H9 打印模板 · H10 数据库备份"]
+        L0["第 0 层 横向能力（业务模块的基础设施）<br/>H1 权限/多租户 · H2 审计追踪 · H3 OpenAPI 契约<br/>H4 企业微信 · H5 快递 · H6 状态机 · H7 导入导出<br/>H8 ERP 防腐层 · H9 打印编排 · H10 数据库备份"]
         L1["第 1 层 业务底座<br/>M1 基础档案（商品/供应商/客户/仓库/库位）"]
         L2["第 2 层 核心业务流程（线性依赖：入→存→出）<br/>M2 入库 → M3 库存质量 → M4 出库"]
         L3["第 3 层 横向叠加能力<br/>M5 冷链（叠加在 M3）· M6 报表审计（贯穿 M2/M3/M4）"]
@@ -224,7 +224,7 @@ graph TD
 
     ```
     flowchart TD
-        L0["第 0 层 横向能力（业务模块的基础设施）<br/>H1 权限/多租户 · H2 审计追踪 · H3 OpenAPI 契约<br/>H4 企业微信 · H5 快递 · H6 状态机 · H7 导入导出<br/>H8 ERP 防腐层 · H9 打印模板 · H10 数据库备份"]
+        L0["第 0 层 横向能力（业务模块的基础设施）<br/>H1 权限/多租户 · H2 审计追踪 · H3 OpenAPI 契约<br/>H4 企业微信 · H5 快递 · H6 状态机 · H7 导入导出<br/>H8 ERP 防腐层 · H9 打印编排 · H10 数据库备份"]
         L1["第 1 层 业务底座<br/>M1 基础档案（商品/供应商/客户/仓库/库位）"]
         L2["第 2 层 核心业务流程（线性依赖：入→存→出）<br/>M2 入库 → M3 库存质量 → M4 出库"]
         L3["第 3 层 横向叠加能力<br/>M5 冷链（叠加在 M3）· M6 报表审计（贯穿 M2/M3/M4）"]
@@ -431,3 +431,4 @@ docs/architecture-dependencies.md（本文档，依赖唯一真相源）
 | 2026-05-29 | v3.3 | 横向能力 13 → 14：新增 H-FILE 统一附件/文件能力（提升 infra/file-storage.md 为正式横向能力）；登记关联 ADR-0031；复核 15 命中→9 真附件需求模块 |
 | 2026-05-29 | v3.4 | 横向能力 14 → 15：新增 H-APV 审批引擎（契约先行，引擎延后）；登记关联 ADR-0032；复核 27 命中→22 真审批编排模块 |
 | 2026-05-29 | v3.5 | 横向能力 15 → 16：新增 H-SCH 调度引擎（契约先行，引擎延后）；登记关联 ADR-0033；复核 25 命中→14 真定时调度模块；明确不接管 M-TE/H10 |
+| 2026-07-25 | v3.6 | H9 从模板能力扩展为打印组套与 Print Agent 编排；登记 ADR-0039/0040/0041 及 H6、H-FILE、M1、M-CG、M4 依赖 |

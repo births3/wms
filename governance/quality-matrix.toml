@@ -1839,7 +1839,7 @@ title = "随货同行单归集与截单"
 module = "H9"
 story_file = "docs/domain/user-stories-h9-print-orchestration.md"
 types = ["write", "config_rule", "api_change", "frontend_interaction", "critical_path", "audit_compliance"]
-reason = "需求和验收标准已确认；尚未实现归集规则、截单、随货同行单号、页面、API、PostgreSQL 并发与真实数据 E2E。"
+reason = "货主+仓库+地址硬边界、M1 print_document_category 限定编号主题与 M-CG 同事务 no-gap 发号已确认；尚未实现规则、截单、随货同行单号、页面、API、PostgreSQL 并发与真实数据 E2E。"
 owner = "H9 打印能力负责人"
 resume_when = "完成原型走查和 OpenAPI 草案后，以并发截单、地址隔离、幂等和 H2 审计为第一批 outside-in TDD 切片。"
 
@@ -1859,7 +1859,7 @@ title = "打印组套配置与就绪策略"
 module = "H9"
 story_file = "docs/domain/user-stories-h9-print-orchestration.md"
 types = ["write", "config_rule", "api_change", "frontend_interaction", "critical_path", "audit_compliance"]
-reason = "组套、地址优先级、单据完整性和版本语义已确认；尚未实现页面、API、模型、文件引用和真实数据 E2E。"
+reason = "组套、地址优先级、M1 print_document_category 来源模式、单据完整性和版本语义已确认；尚未实现页面、API、模型、文件引用和真实数据 E2E。"
 owner = "H9 打印能力负责人"
 resume_when = "完成组套配置原型与字段草案后，实现不可变发布版本、唯一匹配和单据就绪状态机。"
 
@@ -1879,9 +1879,9 @@ title = "打印任务队列、顺序与重打"
 module = "H9"
 story_file = "docs/domain/user-stories-h9-print-orchestration.md"
 types = ["write", "concurrent_resource", "api_change", "frontend_interaction", "critical_path", "hardware_runtime", "audit_compliance"]
-reason = "任务、严格顺序、重打、暂停、改派和结果不明边界已确认；队列、页面、API、并发和真实打印机证据未实现。"
+reason = "组套/打印项/尝试/租约状态和合法迁移、严格串行、普通暂停/紧急停止分流、失败推进、重打、改派与结果不明边界已确认；H6 定义、队列、页面、API、并发和真实打印机证据未实现。"
 owner = "H9 打印能力负责人"
-resume_when = "先完成无硬件任务状态机和 PostgreSQL 并发测试，再接真实 Windows Agent 与打印机 S4 证据。"
+resume_when = "先完成含 operator_pause_applied 的无硬件任务状态机和 PostgreSQL 并发测试，再接真实 Windows Agent 与打印机 S4 证据。"
 
 [[deferred_stories]]
 id = "US-H9-011"
@@ -1891,7 +1891,7 @@ story_file = "docs/domain/user-stories-h9-print-orchestration.md"
 types = ["write", "config_rule", "api_change", "frontend_interaction", "concurrent_resource", "hardware_runtime", "audit_compliance"]
 reason = "物理打印站点、货主仓映射、纸盒和租约语义已确认；维护页、模型、测试打印、租约并发和真实设备证据未实现。"
 owner = "H9 打印能力负责人"
-resume_when = "按已确认站点模型完成安全评审；取得 Windows 打印机和多纸盒测试环境后，实现设备维护、租约和指定纸盒测试打印闭环。"
+resume_when = "按 ADR-0040 的站点机器边界设计接口；取得 Windows 打印机和多纸盒测试环境后，实现设备维护、租约和指定纸盒测试打印闭环。"
 
 [[deferred_stories]]
 id = "US-H9-012"
@@ -1899,9 +1899,9 @@ title = "Print Agent 注册、状态与设备映射"
 module = "H9"
 story_file = "docs/domain/user-stories-h9-print-orchestration.md"
 types = ["write", "config_rule", "api_change", "frontend_interaction", "integration", "hardware_runtime", "runtime_guard", "audit_compliance"]
-reason = "站点级 H9 机器身份、H1 凭据生命周期复用、Agent 状态、心跳和输出映射已确认；专用鉴权上下文、页面、协议、客户端和硬件证据未实现。"
+reason = "ADR-0040 已确认首次激活、专用 listener 白名单、H1 owner-scoped Key 分离、跨 owner 权限/H2 归属、H9 机器幂等、秘密不重显和 pilot 授权；MachineAuthContext、页面、协议、客户端和硬件证据均未实现。"
 owner = "H9 打印能力负责人"
-resume_when = "按已确认站点机器身份完成安全评审，再冻结 Agent 注册和长轮询 OpenAPI，实现状态测试门和一个逻辑输出槽纵向切片。"
+resume_when = "按 ADR-0040 冻结 Agent 激活、机器凭据、跨 owner 鉴权/审计、机器幂等、心跳、长轮询和结果回报 OpenAPI，实现状态测试门和一个逻辑输出槽纵向切片。"
 
 [[deferred_stories]]
 id = "US-H9-013"
@@ -1909,9 +1909,9 @@ title = "多 Agent 分配与故障降级"
 module = "H9"
 story_file = "docs/domain/user-stories-h9-print-orchestration.md"
 types = ["write", "config_rule", "concurrent_resource", "api_change", "frontend_interaction", "hardware_runtime", "runtime_guard", "audit_compliance"]
-reason = "地址/客户/线路优先级、同站点主备和降级已确认；分配规则、租约、故障转移、页面和多 Agent S4 证据未实现。"
+reason = "地址/客户/线路优先级、同站点主备及 ADR-0041 在线交接、租约策略、assignment_epoch/lease_token fencing 已确认；分配规则、租约、故障转移、页面和多 Agent S4 证据未实现。"
 owner = "H9 打印能力负责人"
-resume_when = "按已确认站点模型完成单 Agent 主链后，实现同站点主备规则、结果不明阻断和双 Agent 故障恢复测试。"
+resume_when = "按已确认站点模型完成单 Agent 主链后，实现同站点主备规则、离线先对账、在线持久化交接、租约释放权限、代次 fencing 和双 Agent 网络分区/故障恢复测试。"
 
 [[deferred_stories]]
 id = "US-H9-014"
@@ -1929,9 +1929,9 @@ title = "Print Agent 客户端与启动更新"
 module = "H9"
 story_file = "docs/domain/user-stories-h9-print-orchestration.md"
 types = ["write", "integration", "api_change", "frontend_interaction", "hardware_runtime", "release_runtime", "runtime_guard", "audit_compliance"]
-reason = "Windows、Tauri 2、React/Rust、Velopack、pilot/stable、不可变发布、SHA-256 和正式环境无发布者验真的残余风险均已确认；客户端、发布链路和运行证据尚未创建。"
+reason = "Windows、Tauri 2、React/Rust、Velopack、不可变发布、SHA-256、无发布者验真残余风险、pilot 短期授权、全局版本专用权限和机器下载协议均已由 ADR-0040 确认；客户端、发布链路和运行证据尚未创建。"
 owner = "H9 打印能力负责人"
-resume_when = "创建最小 Windows Agent 与只读 /agent-releases 发布链路，验证空闲启动、pilot 权限、SHA-256 失败关闭、完整包回退、最低版本和未决任务跳过，并保留无发布者验真的风险声明。"
+resume_when = "按 ADR-0040 创建最小 Windows Agent 与只读 /agent-releases 发布链路，验证恢复前禁用自动应用、pilot 授权绑定、全局版本权限/空 owner 集拒绝、SHA-256 失败关闭、完整包回退、最低版本和未决任务跳过，并保留无发布者验真的风险声明。"
 
 [[deferred_stories]]
 id = "US-M2-002"
@@ -3572,9 +3572,9 @@ id = "US-CG-001"
 title = "编码规则配置"
 module = "CG"
 types = ["write", "config_rule", "frontend_interaction"]
-reason = "PC 规则管理页、M1 单据类型字典绑定、真实 PostgreSQL API、真实浏览器动作和本地门户截图已验证，截图需由 PR 附件或 CI artifact 长期归档；但配置审批、规则变更审计展示以及发布前跨业务模块接入验收仍未完成，暂不能关闭故事。"
+reason = "PC 规则管理页、M1 单据类型字典绑定、真实 PostgreSQL API、真实浏览器动作和本地门户截图已验证，截图需由 PR 附件或 CI artifact 长期归档；但配置审批、规则变更审计展示、H9 限定编号主题以及发布前跨业务模块接入验收仍未完成，暂不能关闭故事。"
 owner = "CG 模块负责人"
-resume_when = "补齐配置审批、规则变更审计展示，并完成 M2/M3/M4 创建单据接入及真实 PostgreSQL/E2E/截图证据后移入 stories。"
+resume_when = "补齐配置审批、规则变更审计展示，完成 H9 `print_document_category:delivery_note` 限定主题、M2/M3/M4 创建单据接入及真实 PostgreSQL/E2E/截图证据后移入 stories。"
 frontend_pages = ["mcg-numbering"]
 navigation_checks = ["pnpm --dir prototypes exec playwright test --config=playwright-web-admin-mcg-real-config.ts"]
 e2e_checks = [
@@ -3602,9 +3602,9 @@ evidence_refs = [
 id = "US-CG-002"
 title = "编码生成服务"
 module = "CG"
-reason = "已完成 M-CG 同事务 no-gap 生成服务、M2 ASN 自动编号、M4 出库单按 M1 单据类型字典校验与同事务自动编号，并接入 M4 PC 出库订单列表、创建、详情和波次创建真实 API，临时数据库浏览器 E2E 已产生订单/详情/波次截图；仍缺配置审批、规则变更审计展示、M4 其他动作真实 API、M3/其他创建方接入及正式版证据，不能关闭故事。"
+reason = "已完成 M-CG 同事务 no-gap 生成服务、M2 ASN 自动编号、M4 出库单按 M1 单据类型字典校验与同事务自动编号，并接入 M4 PC 出库订单列表、创建、详情和波次创建真实 API，临时数据库浏览器 E2E 已产生订单/详情/波次截图；仍缺 H9 `print_document_category:delivery_note` 限定主题、配置审批、规则变更审计展示、M4 其他动作真实 API、M3/其他创建方接入及正式版证据，不能关闭故事。"
 owner = "CG 模块负责人"
-resume_when = "补齐配置审批、规则变更审计展示、M4 其他动作真实 API、M3/其他创建方接入，并完成并发、异常、真实浏览器和正式版发布证据后移入 stories。"
+resume_when = "补齐 H9 `print_document_category:delivery_note` 限定主题、配置审批、规则变更审计展示、M4 其他动作真实 API、M3/其他创建方接入，并完成并发、异常、真实浏览器和正式版发布证据后移入 stories。"
 frontend_pages = ["mcg-numbering"]
 navigation_checks = ["node apps/web-admin/self-checks/mcg-document-numbering-slice-self-check.mjs", "node apps/web-admin/self-checks/m4-outbound-create-api-self-check.mjs"]
 e2e_checks = [

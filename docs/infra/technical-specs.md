@@ -306,7 +306,9 @@ Wave 1（接口定义 + Mock）→ Wave 2（真实对接第一个 ERP）
 | Agent 层 | 下载冻结清单/PDF、校验哈希、调用本地打印后台、持久日志与重连对账 | 解释业务规则或渲染模板 |
 | 设备层 | 仓库打印机、纸盒、纸张能力、测试结果和设备租约 | 跨物理打印站点引用 |
 
-详细决策见 [ADR-0039](../adr/0039-print-suite-and-agent.md)。
+业务架构基线见 [ADR-0039](../adr/0039-print-suite-and-agent.md)，业务细化与局部取代见
+[ADR-0041](../adr/0041-print-orchestration-refinement.md)，机器身份和协议见
+[ADR-0040](../adr/0040-print-agent-machine-protocol.md)。
 
 ### 服务端组件
 
@@ -315,24 +317,48 @@ HTTP handler
   -> print orchestration service
      -> print domain（归集、组套、状态与顺序）
      -> repository（PostgreSQL / H2 审计）
+     -> M-CG port（事务内生成随货同行单号）
+     -> H6 port（不可变状态定义与迁移校验）
      -> H-FILE port
      -> render worker queue
      -> Agent long-poll queue
 ```
 
-- Render Worker 只生成分类 PDF，不直连仓库打印机。
+- Render Worker 只生成 `rendered` 分类 PDF，不直连仓库打印机；`external_file` 分类由 H9
+  校验并引用 H-FILE 中的权威文件。
+- 打印分类使用 M1 `print_document_category`，以 `source_mode` 区分服务端渲染和外部权威
+  PDF；`print_template_type` 只描述需要字段库的模板类型。随货同行单号以受控限定名
+  `print_document_category:delivery_note` 调用 M-CG，不伪装成 M2/M4 `document_type`。
 - 任务服务保存组套、模板、规则、输出映射和 Agent 分配快照。
-- 写操作使用 H1 权限、H2 审计和 L11 幂等；并发截单、任务领取和设备租约使用数据库约束或锁。
+- Web 写操作使用 H1 权限，机器写操作使用 H9 `MachineAuthContext`；Web 与机器业务/安全
+  写操作进入 H2，所有写请求都有 L11 重放保护。高频遥测不逐次写 H2，且按下文使用序号
+  去重而不累积通用幂等行。并发截单、任务领取和设备租约使用数据库约束或锁。
 - 运行指标至少覆盖归集等待、渲染失败、队列时长、打印失败、结果不明、Agent 心跳、
   设备租约、对账冲突和磁盘阈值。
+
+### 状态持久化
+
+| H6 编码 | 实体 | 初始态 | 终态 | H9 持久化状态 |
+|---|---|---|---|---|
+| `h9_print_suite` | 组套实例 | `waiting_documents` | `completed`、`failed`、`cancelled` | `waiting_documents`、`queued`、`preparing`、`running`、`paused`、`awaiting_reconciliation`、`awaiting_manual_confirmation`、`completed`、`failed`、`cancelled` |
+| `h9_print_item` | 打印项 | `pending` | `succeeded`、`skipped`、`cancelled` | `pending`、`printing`、`succeeded`、`failed`、`result_unknown`、`skipped`、`cancelled` |
+| `h9_print_attempt` | 打印尝试 | `created` | `succeeded`、`failed` | `created`、`submitted`、`succeeded`、`failed`、`result_unknown` |
+| `h9_device_lease` | 设备租约 | `active` | `released` | `active`、`released` |
+
+- 上述状态图在 H6 注册为不可变定义；H9 在同一事务内完成迁移校验、业务状态写入、事件和
+  H2 审计。
+- 打印项严格串行。失败项只有在非必需且冻结策略允许时才能跳过；`result_unknown` 必须进入
+  对账或人工确认，禁止自动重打、改派、跳过或释放租约。
+- 每次重打创建新打印尝试；既有尝试不得复用、删除或回退，状态只按 H6 合法前进。完整迁移以
+  [H9 用户故事](../domain/user-stories-h9-print-orchestration.md)“状态机与合法迁移”章节为准。
 
 ### Print Agent
 
 首期平台为 Windows，客户端使用 Tauri 2 + React/Rust：
 
 - React 仅显示本地状态和操作入口。
-- Rust 持有 API Key、执行 HTTP 长轮询、下载与校验 PDF、调用 Windows 打印后台、维护缓存
-  和持久日志。
+- Rust 从 Windows Credential Manager 读取 H9 机器凭据，执行 HTTP 长轮询、下载与校验
+  PDF、调用 Windows 打印后台、维护缓存和持久日志；React 和日志不得读取明文凭据。
 - Agent 是登录自启动托盘程序，不安装 Windows Service；进程退出即离线。
 - 一次只运行一个打印组套实例；开始前完整下载清单、PDF 和哈希。
 - 断网后只完成当前实例，重连后先对账再接单。
@@ -342,17 +368,54 @@ HTTP handler
 ### 网络与身份
 
 - Agent 主动连接 WMS，WMS 不向仓库终端发起入站连接。
-- 每个 Agent 使用独立 H1 API Key 并绑定 `agent_id + print_site_id`；凭据生命周期复用 H1，
-  鉴权使用 H9 专用机器身份上下文，不构造普通 owner-scoped `AuthContext`。
+- 每个 Agent 使用独立 H9 机器凭据并绑定 `agent_id + print_site_id`；H9 复用 H1 的密钥
+  哈希、过期、轮换、吊销、失败锁定和审计规则，但使用独立凭据记录与
+  `MachineAuthContext`，不放宽 H1 `owner_id` 约束，也不构造普通 owner-scoped
+  `AuthContext`。
+- 管理端以密码学安全随机数生成器创建至少 128 bit 熵的短期单次注册码，并绑定 Agent、站点、
+  精确源 IP 和有效期。激活是唯一预凭据普通 HTTP 例外，只校验注册码与 socket peer IP；
+  失败按请求 Agent 标识/IP 限流并锁定告警。能解析到 Agent/站点时按映射 owner 写 H2；
+  无法归属的探测只写脱敏安全日志和指标，不伪造 owner，也不记录注册码或秘密。明文机器
+  密钥只返回一次，响应丢失时吊销并重新注册。
+- 首版凭据轮换先暂停 Agent 并确认没有未决任务，吊销旧凭据后复用新注册码重新激活；不建设
+  在线双凭据切换协议。新秘密写入 Windows Credential Manager 失败时保持暂停并重新注册。
 - Agent 只按 `agent_id` 领取已分配任务，不得传入或选择 `owner_id`；服务端校验任务的
   `owner_id + warehouse_id` 属于本站显式映射后，才允许下载清单和 PDF。
-- 普通 HTTP 只允许受控仓库局域网例外；同时校验精确源 IP 白名单，不读取客户端提供的
-  `X-Forwarded-For`。
-- 普通 HTTP 例外只覆盖 Agent 任务领取、获授权 PDF 下载和 `/agent-releases` 更新下载；
-  Web、H-FILE 通用上传/下载和其他模块仍按 ADR-0031 使用 HTTPS。
+- 每次分配递增 `assignment_epoch`，设备租约使用不可复用 `lease_token`；预载、启动打印项
+  和结果上报必须匹配当前二者。迟到代次不得推进正常状态，结果转入对账并告警。
+- suspected/offline Agent 的运行中组套通过 H6 `agent_connection_lost` 进入等待对账，即使
+  断联发生在首项提交前或两项之间也不得故障转移。安全转移要求旧 Agent 在线并持久化确认
+  停止/交接；租约释放始终先满足无打印中、结果不明或待对账的硬守卫，再要求冻结策略允许
+  `safe_auto`，或授权用户提供原因并二次确认；服务端最后在同一事务释放旧占用/租约、递增
+  代次并领取同站点兼容备用 Agent 与新租约。
+- 站点至少存在一条有效货主仓映射后才允许激活。Web 端站点/Agent 读写和单 Agent pilot
+  动作由 H9 service 通过 H1 port 对映射前后 owner 并集逐一鉴权。pilot 提升 stable 和
+  全局最低版本变更还要求 `h9.agent_version.global.write`，并校验全部未删除站点映射的
+  owner 并集；任一缺少权限即整体 403，owner 并集为空时返回 409 且不得修改全局版本，
+  只写脱敏安全日志/指标，不伪造 owner 写 H2。
+- 机器协议使用由 WMS 进程直接终止 HTTP 的独立端口专用局域网 listener，只挂载 H9 机器
+  白名单并拒绝其他路由。Agent 必须直连且禁止经过会改写源地址的 L7 代理、网关或 NAT。
+  机器路由同时校验机器凭据和 listener 读取的 socket peer 精确源 IP，不读取
+  `X-Forwarded-For`、`X-Real-IP` 或客户端自报地址，也不复用 H1 owner-scoped 中间件。
+- 机器端点白名单只含心跳/运行/磁盘/设备状态、长轮询/任务领取/冻结清单、获授权 PDF
+  下载、打印结果/重连对账和 `/agent-releases`。Web、H-FILE 通用上传/下载和其他模块
+  仍按 ADR-0031 使用 HTTPS。
 - Agent 下载 PDF 必须走 H9 专用机器接口；服务端校验任务、Agent、站点和货主仓映射后，
   以 H-FILE 稳定文件 ID 流式返回内容。不得把 H-FILE 通用下载地址降级为 HTTP，也不得向
   Agent 暴露可绕过 H9 鉴权的长期文件 URL。
+- 所有机器写请求都携带 `Idempotency-Key`，客户端重试必须复用原键。非遥测命令还携带
+  端点对应资源标识和请求哈希；打印结果绑定任务和尝试。同键不同载荷拒绝，已经进入后续
+  状态的尝试不得再次触发物理打印。
+- 非遥测命令写入 H9 自有机器幂等记录，作用域由 `activation_code_id` 或 `credential_id`、
+  `method`、`resource_id`、`Idempotency-Key` 和 `request_hash` 组成，不复用 owner 必填的
+  共享业务幂等表。心跳、磁盘和设备读数重试仍复用原 `Idempotency-Key`，但不落通用幂等行，
+  服务端改用 `agent_id + boot_id + sequence` 单调更新，避免积累无界幂等行。
+- 任务/尝试动作按任务快照 owner 写 H2；站点、Agent、凭据与安全动作按映射前后 owner 并集
+  分别写 H2，全局版本动作按全部未删除站点映射 owner 分别写 H2；同一动作的事件复用 H2 既有
+  `request_id`。高频遥测不逐次审计，只有运行状态跃迁、阈值告警和安全事件进入 H2。
+- 机器事件写既有 `AuditActor` 时使用 `actor_id = agent_id`、事件时冻结的 Agent 编码/名称
+  和 `jti = h9-machine:<credential_id>`；可解析的预凭据激活使用
+  `jti = h9-activation:<activation_code_id>`。Web 动作仍使用用户 `AuthContext`。
 - 跨网段、公网、无线访客网或其他不可信网络必须启用 HTTPS，本例外不得继承。
 
 ### 默认运行阈值
@@ -371,21 +434,32 @@ HTTP handler
 
 ### 客户端更新
 
-- 管理端发布当前、推荐和最低版本及下载地址。
-- Agent 只在启动且没有运行中、结果不明或等待对账任务时检查更新。
+- 初始安装包由已登录且具备 Agent 管理权限的 H1 用户从常规 HTTPS Web 端点下载当前 stable
+  完整包，不复用普通 HTTP `/agent-releases`，也不能选择 pilot；管理端同时发布当前、
+  推荐和最低版本及下载地址。
+- `VelopackApp::build().set_auto_apply_on_startup(false).run()` 必须作为主程序最先执行的启动
+  钩子；Velopack 的默认启动自动应用必须关闭。钩子返回后，Agent 先扫描本地缓存并完成
+  恢复/对账，确认没有运行中、结果不明或等待对账任务，才显式检查、下载和应用更新；已经
+  下载的待应用包也不得在恢复检查前替换版本。该顺序以
+  [VelopackApp Rust API](https://docs.rs/velopack/latest/velopack/struct.VelopackApp.html)
+  为实现约束。
 - 使用 Velopack 增量包；增量或 SHA-256 校验失败时只再尝试一次完整包，仍失败则保留当前
   版本。版本只允许向前，错误版本以更高版本重新发布。
 - WMS 固定 `/agent-releases` 提供当前 pilot/stable、相邻增量、完整包、清单和 SHA-256；
-  下载复用 Agent 机器 API Key 与精确源 IP 白名单，不允许匿名访问。
+  下载复用 H9 机器凭据与 socket peer 精确源 IP 白名单，不允许匿名访问。
 - Velopack Rust 内置 `HttpSource` 当前
   [只接收基础 URL](https://docs.rs/velopack/latest/velopack/sources/struct.HttpSource.html)，
-  不能直接承载本项目的机器 API Key。Agent 必须实现最小 `UpdateSource` 适配器，复用同一
+  不能直接承载本项目的机器凭据。Agent 必须实现最小 `UpdateSource` 适配器，复用同一
   受控 HTTP 客户端读取发布清单和包并注入 Agent 鉴权；不得为了迁就内置静态源放开匿名
   下载。实现时固定并复核 Velopack 版本。
 - 发布脚本/CI 校验临时文件后原子发布不可变包；WMS 进程只读。pilot 提升 stable 只修改
-  数据库通道指向，复用同一包和 SHA-256，管理端不能上传可执行文件。
-- 每次启动默认 stable；stable 可直接选择更新，pilot 必须在线登录具备 Agent 管理权限的
-  H1 用户。pilot 选择只对本次启动有效，不保存通道。
+  数据库通道指向，复用同一包和 SHA-256，管理端不能上传可执行文件。提升 stable 和变更
+  全局最低版本前，H9 必须校验专用平台权限 `h9.agent_version.global.write`，并通过 H1
+  port 校验操作者对全部未删除站点映射 owner 都有 Agent 管理权限；任一鉴权失败整体 403，
+  owner 并集为空时返回 409。成功后按该 owner 并集分别写 H2、复用同一 `request_id`。
+- 每次启动默认 stable；stable 可直接选择更新。pilot 必须由在线 H1 用户鉴权端点签发绑定
+  `agent_id + startup_id + target_version + SHA-256` 的短期服务端授权；机器凭据不能创建
+  该授权，用户 token 和密码只驻留内存。pilot 选择只对本次启动有效，不保存通道。
 - 最低版本由具备 Agent 管理权限的用户独立维护，并在影响预览后二次确认；低于最低版本的
   Agent 完成恢复/对账后停止领取新任务。在线目录只保留当前 pilot/stable 和相邻增量，
   不建设更新并发调度器。
@@ -603,7 +677,7 @@ Wave 0（基础脚本）→ Wave 1（接入 PostgreSQL + WAL 归档配置）→ 
             H6[H6 状态机引擎]
             H7[H7 导入导出]
             H8[H8 ERP 防腐层]
-            H9[H9 打印模板]
+            H9[H9 打印编排]
             H10[H10 数据库备份]
         end
         subgraph HORIZ["已有横向模块（用户故事）"]
@@ -651,7 +725,7 @@ Wave 0（基础脚本）→ Wave 1（接入 PostgreSQL + WAL 归档配置）→ 
             H6[H6 状态机引擎]
             H7[H7 导入导出]
             H8[H8 ERP 防腐层]
-            H9[H9 打印模板]
+            H9[H9 打印编排]
             H10[H10 数据库备份]
         end
         subgraph HORIZ["已有横向模块（用户故事）"]

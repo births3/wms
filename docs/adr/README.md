@@ -63,7 +63,9 @@
 | [ADR-0037](0037-lightweight-governance-control-chain.md) | 轻量治理控制链（G1-G4） | Accepted | 在 ADR-0003 上增加决策→规则→门禁→证据控制链；复用现有资产，Tier 与 context 正交，治理强度跟随风险 |
 | [ADR-0038](0038-pre-v1-compatibility-policy.md) | 首个正式版本前不保留版本兼容层 | Accepted | 发布前只维护当前契约与 migration 基线；发布后按 ADR-0016 启用 L9 与兼容迁移 |
 | [ADR-0039](0039-print-suite-and-agent.md) | H9 打印组套与 Print Agent | Accepted | H9 第二阶段：随货同行单归集、打印组套、分类 PDF、物理打印站点、站点机器身份、多 Agent 与 Windows 客户端 |
-| ADR-0040+ | 未分配 | 后续按需新建 |
+| [ADR-0040](0040-print-agent-machine-protocol.md) | H9 Print Agent 机器身份与协议闭环 | Accepted | H9 专用机器凭据、首次激活、机器端点白名单、socket peer IP、秘密不重放和 pilot 授权 |
+| [ADR-0041](0041-print-orchestration-refinement.md) | H9 打印编排细化与 ADR-0039 局部取代 | Accepted | 三键归集硬边界、渲染/外部 PDF 来源、必需项失败和安全备用 Agent 状态路径 |
+| ADR-0042+ | 未分配 | 后续按需新建 |
 
 > 编号永不复用。空缺编号必须在此表登记原因。
 
