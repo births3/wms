@@ -1,3 +1,4 @@
+# @governance: skip-page-size 同一 Worker 协议回归夹具集中复用；后续按消息族机械拆分，不以删测试降规模。
 """H8 worker 纯逻辑单测（无 Docker / 无 DB）。"""
 
 from __future__ import annotations
@@ -6,6 +7,7 @@ import json
 import unittest
 from unittest.mock import patch
 
+import worker_mssql
 from channel_failover import (
     map_channel_mode_to_transport,
     production_allows_simultaneous_dual_write,
@@ -25,6 +27,7 @@ from sync_worker import (
     Settings,
     WorkerHttpError,
     is_retryable_worker_error,
+    load_runtime_settings,
     resolve_inbound_route,
     validate_row_schema_version,
 )
@@ -41,21 +44,20 @@ from worker_route import (
 from worker_mssql import claim_rows, requeue_replay_row
 
 
-def settings() -> Settings:
+def settings(config_version: int = 1) -> Settings:
     return Settings(
         mssql_host="localhost",
         mssql_port="1433",
         mssql_user="test",
         mssql_password="test",
         mssql_database="test",
-        mssql_container="test",
         api_base="http://wms.test",
         api_token="token",
         poll_interval=1,
         max_retry=5,
         batch_size=1,
-        use_sqlcmd=True,
         connector_id="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        connector_config_version=config_version,
         worker_id="worker-test",
         worker_version="test-1",
         heartbeat_ttl_seconds=15,
@@ -63,6 +65,268 @@ def settings() -> Settings:
 
 
 class TestInboundCorePipeline(unittest.TestCase):
+    def test_sqlcmd_json_output_uses_unbounded_text_without_header_conflict(
+        self,
+    ) -> None:
+        completed = type(
+            "Completed",
+            (),
+            {"returncode": 0, "stdout": "[]", "stderr": ""},
+        )()
+        with patch.object(worker_mssql.subprocess, "run", return_value=completed) as run:
+            self.assertEqual(worker_mssql.sqlcmd_query(settings(), "SELECT 1"), "[]")
+
+        command = run.call_args.args[0]
+        self.assertEqual(command[0], "sqlcmd")
+        self.assertEqual(command[command.index("-S") + 1], "tcp:localhost,1433")
+        self.assertEqual(command[command.index("-y") + 1], "0")
+        self.assertEqual(command[command.index("-w") + 1], "65535")
+        self.assertNotIn("-h", command)
+
+    def test_runtime_settings_are_frozen_from_connector_snapshot_and_secret_alias(
+        self,
+    ) -> None:
+        calls: list[str] = []
+
+        def fake_http(_settings, _method, path, _body, _key):
+            calls.append(path)
+            if path.endswith(settings().connector_id):
+                return (
+                    200,
+                    {
+                        "id": settings().connector_id,
+                        "status": "active",
+                        "config_version": 7,
+                    },
+                    "",
+                )
+            return (
+                200,
+                {
+                    "id": settings().connector_id,
+                    "owner_id": "owner-1",
+                    "connector_code": "ERP-ONE",
+                    "warehouse_ids": [],
+                    "directions": ["inbound", "outbound"],
+                    "message_types": ["asn", "shipment_confirm"],
+                    "channel_mode": "interface_table",
+                    "interface_db_host": "erp-sql.internal",
+                    "interface_db_port": 1433,
+                    "interface_db_name": "erp_if",
+                    "interface_db_username": "h8_worker",
+                    "interface_db_password_alias": "vault://h8/erp-if",
+                    "config_version": 7,
+                },
+                "",
+            )
+
+        with patch.dict(
+            "os.environ",
+            {"WMS_H8_SECRET_ALIASES": '{"vault://h8/erp-if":"snapshot-secret"}'},
+            clear=False,
+        ):
+            loaded = load_runtime_settings(settings(), http_json_fn=fake_http)
+
+        self.assertEqual(loaded.mssql_host, "erp-sql.internal")
+        self.assertEqual(loaded.mssql_port, "1433")
+        self.assertEqual(loaded.mssql_user, "h8_worker")
+        self.assertEqual(loaded.mssql_password, "snapshot-secret")
+        self.assertEqual(loaded.mssql_database, "erp_if")
+        self.assertEqual(loaded.connector_config_version, 7)
+        self.assertEqual(
+            calls,
+            [
+                f"/api/v1/config/erp-connectors/{settings().connector_id}",
+                f"/api/v1/config/erp-connectors/{settings().connector_id}/versions/7",
+            ],
+        )
+
+    def test_each_interface_table_message_runs_shared_canonical_pipeline(self) -> None:
+        import sync_worker
+
+        row = {
+            "id": "row-1",
+            "owner_id": "owner-1",
+            "warehouse_id": "warehouse-1",
+            "external_doc_no": "ERP-1",
+            "external_ref": "ERP-1",
+            "receipt_no": "R-1",
+            "document_type": "purchase_inbound",
+            "supplier_id": "supplier-1",
+            "customer_id": "customer-1",
+            "expected_arrival_at": "2026-07-23T00:00:00Z",
+            "product_id": "product-1",
+            "product_code": "P-1",
+            "product_name": "药品一",
+            "spec": "10mg*30片",
+            "special_drug_category": "普通药品",
+            "storage_condition": "normal",
+            "packaging_json": json.dumps(
+                [
+                    {
+                        "unit": "盒",
+                        "ratio_to_base": 1,
+                        "is_base": True,
+                        "is_default": True,
+                        "sort_order": 1,
+                    }
+                ],
+                ensure_ascii=False,
+            ),
+            "expected_qty": "1",
+            "planned_qty": "1",
+            "batch_no": "B-1",
+            "required_ship_at": "2026-07-23T00:00:00Z",
+            "field_name": "spec",
+            "new_value": "10mg",
+            "schema_version": "1",
+            "idempotency_key": "idem-1",
+            "retry_count": "0",
+            "created_at": "2026-07-23T00:00:00Z",
+        }
+        expected_paths = {
+            "asn": "/api/v1/inbound/receiving-orders",
+            "outbound_order": "/api/v1/outbound/orders",
+            "product_master": (
+                "/api/v1/integration/erp-messages/inbound/product_master"
+            ),
+            "return_order": "/api/v1/inbound/receiving-orders",
+            "product_change": (
+                "/api/v1/integration/erp-messages/inbound/product_change"
+            ),
+        }
+
+        for message_type, (table, _handler) in HANDLERS.items():
+            with self.subTest(message_type=message_type):
+                binding = RouteBinding(
+                    connector_id=settings().connector_id,
+                    connector_code="SELF-ERP",
+                    config_version=1,
+                    channel="interface_table",
+                    message_type=message_type,
+                )
+                api_paths: list[str] = []
+
+                def business_http(_settings, _method, path, _body, _key):
+                    api_paths.append(path)
+                    if message_type in ("product_master", "product_change"):
+                        return 200, {"wms_resource_id": "resource-1"}, ""
+                    return 201, {"id": "resource-1"}, ""
+
+                def pipeline(
+                    worker_settings,
+                    actual_type,
+                    actual_row,
+                    handler,
+                    converter,
+                    **kwargs,
+                ):
+                    command = converter(
+                        actual_type, actual_row, kwargs["route_binding"]
+                    )
+                    return handler(worker_settings, command), object()
+
+                with (
+                    patch.object(
+                        sync_worker, "get_worker_claim_decision", return_value=True
+                    ),
+                    patch.object(sync_worker, "try_record_worker_heartbeat"),
+                    patch.object(sync_worker, "list_manual_replays", return_value=[]),
+                    patch.object(
+                        sync_worker, "claim_rows", return_value=[row]
+                    ) as claim,
+                    patch.object(
+                        sync_worker, "resolve_inbound_route", return_value=binding
+                    ),
+                    patch.object(
+                        sync_worker,
+                        "build_inbound_canonical_with_mpm",
+                        side_effect=lambda _settings, kind, source, route: (
+                            build_inbound_canonical(kind, source, route)
+                        ),
+                    ),
+                    patch.object(
+                        sync_worker, "run_inbound_pipeline", side_effect=pipeline
+                    ),
+                    patch.object(sync_worker, "http_json", side_effect=business_http),
+                    patch.object(sync_worker, "mark_row") as mark,
+                ):
+                    self.assertEqual(
+                        sync_worker.process_once(settings(), [message_type], False),
+                        1,
+                    )
+
+                claim.assert_called_once_with(settings(), table)
+                self.assertEqual(api_paths, [expected_paths[message_type]])
+                mark.assert_called_once_with(
+                    settings(), table, row["id"], "success", wms_id="resource-1"
+                )
+
+    def test_product_handler_posts_complete_shared_h8_rest_contract(self) -> None:
+        import sync_worker
+
+        command = build_inbound_canonical(
+            "product_master",
+            {
+                "id": "row-product-1",
+                "owner_id": "owner-1",
+                "external_doc_no": "ERP-PM-1",
+                "idempotency_key": "idem-product-1",
+                "schema_version": "1",
+                "created_at": "2026-07-23T00:00:00",
+                "product_code": "P-1",
+                "product_name": "药品一",
+                "spec": "10mg*30片",
+                "dosage_form": "薄膜衣片",
+                "manufacturer": "测试药业",
+                "special_drug_category": "普通药品",
+                "storage_condition": "2-8℃避光保存",
+                "udi_code": "06912345678901",
+                "electronic_regulatory_code": "REG-001",
+                "length_mm": "120",
+                "width_mm": "80",
+                "height_mm": "50",
+                "volume_cm3": "",
+                "weight_g": "350.5",
+                "packaging_json": json.dumps(
+                    [
+                        {
+                            "unit": "盒",
+                            "ratio_to_base": 1,
+                            "is_base": True,
+                            "is_default": True,
+                            "sort_order": 1,
+                        }
+                    ],
+                    ensure_ascii=False,
+                ),
+            },
+            RouteBinding(
+                connector_id=settings().connector_id,
+                connector_code="SELF-ERP",
+                config_version=1,
+                channel="interface_table",
+                message_type="product_master",
+            ),
+        )
+        calls: list[tuple[str, str, dict, str]] = []
+
+        def fake_http(_settings, method, path, body, idempotency_key):
+            calls.append((method, path, body, idempotency_key))
+            return 200, {"wms_resource_id": "product-1", "status": "succeeded"}, ""
+
+        with patch.object(sync_worker, "http_json", side_effect=fake_http):
+            resource_id = HANDLERS["product_master"][1](settings(), command)
+
+        self.assertEqual(resource_id, "product-1")
+        self.assertEqual(
+            calls[0][1],
+            "/api/v1/integration/erp-messages/inbound/product_master",
+        )
+        self.assertEqual(calls[0][2]["special_drug_category"], "普通药品")
+        self.assertEqual(calls[0][2]["packaging_levels"][0]["unit"], "盒")
+        self.assertEqual(calls[0][3], "idem-product-1")
+
     def test_manual_replay_http_calls_are_scoped_and_claimed(self) -> None:
         calls: list[tuple[str, str, dict | None]] = []
 
@@ -88,12 +352,8 @@ class TestInboundCorePipeline(unittest.TestCase):
                 )
             return 200, {"id": "message-1", "claimed_by": "worker-test"}, ""
 
-        messages = list_manual_replays(
-            settings(), "asn", http_json_fn=fake_http
-        )
-        claim_manual_replay(
-            settings(), str(messages[0]["id"]), http_json_fn=fake_http
-        )
+        messages = list_manual_replays(settings(), "asn", http_json_fn=fake_http)
+        claim_manual_replay(settings(), str(messages[0]["id"]), http_json_fn=fake_http)
 
         self.assertIn(f"connector_id={settings().connector_id}", calls[0][1])
         self.assertIn("replay_requested=true", calls[0][1])
@@ -160,9 +420,7 @@ class TestInboundCorePipeline(unittest.TestCase):
 
         self.assertEqual(order, ["requeue", "claim", "process"])
         list_replays.assert_called_once_with(settings(), "asn")
-        self.assertIs(
-            pipeline.call_args.args[4], sync_worker.build_inbound_canonical
-        )
+        self.assertTrue(callable(pipeline.call_args.args[4]))
 
     def test_requeue_replay_row_restores_terminal_row_with_original_key(self) -> None:
         with patch("worker_mssql.sqlcmd_query", return_value="ready") as query:
@@ -303,7 +561,7 @@ class TestInboundCorePipeline(unittest.TestCase):
             ) as pipeline,
             patch.object(sync_worker, "mark_row"),
         ):
-            self.assertEqual(sync_worker.process_once(settings(), ["asn"], False), 1)
+            self.assertEqual(sync_worker.process_once(settings(2), ["asn"], False), 1)
 
         resolve_current.assert_not_called()
         binding = pipeline.call_args.kwargs["route_binding"]
@@ -315,7 +573,9 @@ class TestInboundCorePipeline(unittest.TestCase):
         self.assertIn("created_from=1970-01-01T00%3A00%3A00Z", calls[0])
         self.assertIn(f"/{settings().connector_id}/versions/2", calls[1])
 
-    def test_product_rejects_unmapped_storage_condition_before_business_api(self) -> None:
+    def test_product_rejects_unmapped_storage_condition_before_business_api(
+        self,
+    ) -> None:
         row = {
             "id": "row-1",
             "owner_id": "owner-1",
@@ -356,6 +616,21 @@ class TestInboundCorePipeline(unittest.TestCase):
             "product_id": "product-1",
             "product_code": "P-1",
             "product_name": "药品一",
+            "spec": "10mg*30片",
+            "special_drug_category": "普通药品",
+            "storage_condition": "normal",
+            "packaging_json": json.dumps(
+                [
+                    {
+                        "unit": "盒",
+                        "ratio_to_base": 1,
+                        "is_base": True,
+                        "is_default": True,
+                        "sort_order": 1,
+                    }
+                ],
+                ensure_ascii=False,
+            ),
             "expected_qty": "1",
             "planned_qty": "1",
             "batch_no": "B-1",
@@ -385,6 +660,63 @@ class TestInboundCorePipeline(unittest.TestCase):
                         expected_retryable,
                     )
                     self.assertNotIn("response-secret", str(caught.exception))
+
+    def test_archive_product_change_closes_quality_liaison_after_m1_update(
+        self,
+    ) -> None:
+        row = {
+            "id": "row-archive-1",
+            "owner_id": "owner-1",
+            "external_doc_no": "ARCHIVE-1",
+            "idempotency_key": "idem-archive-1",
+            "product_id": "11111111-1111-1111-1111-111111111111",
+            "product_code": "P-ARCHIVE-001",
+            "field_name": "approval_number",
+            "new_value": "NEW-001",
+            "liaison_id": "22222222-2222-2222-2222-222222222222",
+            "asn_id": "33333333-3333-3333-3333-333333333333",
+        }
+        command = build_inbound_canonical(
+            "product_change",
+            row,
+            RouteBinding(
+                connector_id=settings().connector_id,
+                connector_code="SELF-ERP",
+                config_version=1,
+                channel="interface_table",
+                message_type="product_change",
+            ),
+        )
+        calls: list[tuple[str, str, dict | None, str]] = []
+
+        def fake_http(_settings, method, path, body, idempotency_key):
+            calls.append((method, path, body, idempotency_key))
+            return 200, {"wms_resource_id": row["product_id"]}, ""
+
+        with patch("sync_worker.http_json", side_effect=fake_http):
+            resource_id = HANDLERS["product_change"][1](settings(), command)
+
+        self.assertEqual(resource_id, row["product_id"])
+        self.assertEqual(
+            calls[0][1],
+            "/api/v1/integration/erp-messages/inbound/product_change",
+        )
+        self.assertEqual(
+            calls[0][2],
+            {
+                "schema_version": "1",
+                "external_ref": "ARCHIVE-1",
+                "correlation_id": "row-archive-1",
+                "occurred_at": "",
+                "product_id": row["product_id"],
+                "product_code": "P-ARCHIVE-001",
+                "field_name": "approval_number",
+                "new_value": "NEW-001",
+                "liaison_id": row["liaison_id"],
+                "asn_id": row["asn_id"],
+            },
+        )
+        self.assertEqual(calls[0][3], "idem-archive-1")
 
     def test_worker_error_summary_redacts_credentials(self) -> None:
         summary = sanitize_worker_error(
@@ -424,7 +756,7 @@ class TestInboundCorePipeline(unittest.TestCase):
             )
 
         binding = resolve_inbound_route(
-            settings(),
+            settings(3),
             "asn",
             {
                 "warehouse_id": "11111111-1111-1111-1111-111111111111",
@@ -437,6 +769,52 @@ class TestInboundCorePipeline(unittest.TestCase):
         self.assertEqual(binding.connector_code, "SELF-ERP")
         self.assertEqual(binding.config_version, 3)
         self.assertEqual(binding.channel, "interface_table")
+
+    def test_inbound_route_rejects_config_version_not_frozen_by_this_worker(
+        self,
+    ) -> None:
+        with self.assertRaises(WorkerHttpError) as caught:
+            resolve_inbound_route(
+                settings(2),
+                "asn",
+                {"idempotency_key": "idem-version-drift"},
+                http_json_fn=lambda *_args: (
+                    200,
+                    {
+                        "connector": {
+                            "id": settings().connector_id,
+                            "config_version": 3,
+                            "channel_mode": "interface_table",
+                            "connector_code": "SELF-ERP",
+                        }
+                    },
+                    "",
+                ),
+            )
+        self.assertEqual(caught.exception.status, 409)
+
+    def test_inbound_route_rejects_another_worker_connector(self) -> None:
+        def fake_http(*_args, **_kwargs):
+            return (
+                200,
+                {
+                    "connector": {
+                        "id": "ffffffff-ffff-ffff-ffff-ffffffffffff",
+                        "config_version": 1,
+                        "channel_mode": "interface_table",
+                        "connector_code": "OTHER-ERP",
+                    }
+                },
+                "",
+            )
+
+        with self.assertRaises(WorkerHttpError):
+            resolve_inbound_route(
+                settings(),
+                "asn",
+                {"idempotency_key": "idem-other"},
+                http_json_fn=fake_http,
+            )
 
     def test_only_transient_http_errors_are_retryable(self) -> None:
         self.assertTrue(is_retryable_worker_error(WorkerHttpError(0, "route", "down")))
@@ -521,25 +899,23 @@ class TestInboundCorePipeline(unittest.TestCase):
         claim.assert_not_called()
 
     def test_claim_rows_parses_interface_table_output(self) -> None:
-        raw = "|".join(
-            [
-                "row-1",
-                "ASN-1",
-                "owner-1",
-                "warehouse-1",
-                "supplier-1",
-                "P-1",
-                "2",
-                "2026-07-22T10:00:00",
-                "purchase_inbound",
-                "ERP-1",
-                "R-1",
-                "1",
-                "idem-1",
-                "0",
-                "2026-07-22T09:59:00",
-            ]
-        )
+        raw = json.dumps([{
+            "id": "row-1",
+            "external_doc_no": "ASN|1",
+            "owner_id": "owner-1",
+            "warehouse_id": "warehouse-1",
+            "supplier_id": "supplier-1",
+            "product_code": "P-1",
+            "expected_qty": "2",
+            "expected_arrival_at": "2026-07-22T10:00:00",
+            "document_type": "purchase_inbound",
+            "external_ref": "ERP-1",
+            "receipt_no": "R-1",
+            "schema_version": "1",
+            "idempotency_key": "idem-1",
+            "retry_count": "0",
+            "created_at": "2026-07-22T09:59:00",
+        }])
         with patch("worker_mssql.sqlcmd_query", return_value=raw) as query:
             rows = claim_rows(settings(), "if_in_asn")
         sql = query.call_args.args[1]
@@ -550,7 +926,8 @@ class TestInboundCorePipeline(unittest.TestCase):
         self.assertIn("UNICODE(LEFT(idempotency_key, 1))", sql)
         self.assertIn("% 4001", sql)
         self.assertIn("last_error IS NULL", sql)
-        self.assertEqual(rows[0]["external_doc_no"], "ASN-1")
+        self.assertIn("FOR JSON PATH", sql)
+        self.assertEqual(rows[0]["external_doc_no"], "ASN|1")
         self.assertEqual(rows[0]["schema_version"], "1")
         self.assertEqual(rows[0]["created_at"], "2026-07-22T09:59:00")
 

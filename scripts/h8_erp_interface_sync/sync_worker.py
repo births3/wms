@@ -6,14 +6,9 @@
   出站：WMS PG *erp_feedback_outbox → 通道 B(if_out_message) 和/或 通道 A(HTTP 回调)
 
 环境变量：
-  H8_MSSQL_HOST          默认 127.0.0.1
-  H8_MSSQL_PORT          默认 14333
-  H8_MSSQL_USER          默认 sa
-  H8_MSSQL_PASSWORD      默认 Wms_Erp_If_Dev_2026!
-  H8_MSSQL_DATABASE      默认 wms_erp_if
-  H8_MSSQL_CONTAINER     默认 wms-mssql-erp-if（sqlcmd 回退用）
   WMS_API_BASE           默认 http://127.0.0.1:8080
-  WMS_API_TOKEN          Bearer token（入站必填，除 --dry-run）
+  WMS_API_TOKEN          Bearer token（启动时读取不可变连接快照，必填）
+  WMS_H8_SECRET_ALIASES  secret alias 到真实凭据的本机映射
   H8_CONNECTOR_ID        本 Worker 唯一绑定的 H8 连接 UUID（必填）
   H8_WORKER_ID           默认主机名-PID
   H8_WORKER_VERSION      默认 1
@@ -32,10 +27,8 @@ import os
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
-import socket
-import uuid
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
@@ -45,12 +38,19 @@ if _sys_path not in sys.path:
     sys.path.insert(0, _sys_path)
 from exchange_lifecycle import record_preflight_failure, run_inbound_pipeline  # noqa: E402
 from inbound_canonical import (  # noqa: E402
+    CanonicalMappingError,
     H8CanonicalInboundCommand,
     build_inbound_canonical,
 )
 from outbound_publish import (  # noqa: E402
     process_outbound_once,
+    process_outbound_receipts,
+    process_outbound_receipt_timeouts,
     resolve_wms_db_url,
+)
+from reconciliation_pull import (  # noqa: E402
+    pull_due_reconciliation_snapshots,
+    pull_reconciliation_snapshot,
 )
 from worker_route import (  # noqa: E402
     RouteBinding,
@@ -66,74 +66,13 @@ from worker_route import (  # noqa: E402
     sanitize_worker_error,
     validate_row_schema_version,
 )
-from worker_mssql import claim_rows, mark_row, requeue_replay_row, sqlcmd_query  # noqa: E402
-
-# ---------------------------------------------------------------------------
-# 配置
-# ---------------------------------------------------------------------------
-
-
-def env(name: str, default: str | None = None) -> str:
-    value = os.environ.get(name, default)
-    if value is None or value == "":
-        raise SystemExit(f"missing env {name}")
-    return value
-
-
-@dataclass
-class Settings:
-    mssql_host: str
-    mssql_port: str
-    mssql_user: str
-    mssql_password: str
-    mssql_database: str
-    mssql_container: str
-    api_base: str
-    api_token: str | None
-    poll_interval: float
-    max_retry: int
-    batch_size: int
-    use_sqlcmd: bool
-    connector_id: str
-    worker_id: str
-    worker_version: str
-    heartbeat_ttl_seconds: int
-
-    @classmethod
-    def from_env(cls) -> "Settings":
-        use_sqlcmd = os.environ.get("H8_USE_SQLCMD", "1") != "0"
-        poll_interval = float(os.environ.get("H8_POLL_INTERVAL_SEC", "5"))
-        connector_id = env("H8_CONNECTOR_ID")
-        try:
-            uuid.UUID(connector_id)
-        except ValueError as exc:
-            raise SystemExit("H8_CONNECTOR_ID must be UUID") from exc
-        return cls(
-            mssql_host=os.environ.get("H8_MSSQL_HOST", "127.0.0.1"),
-            mssql_port=os.environ.get("H8_MSSQL_PORT", "14333"),
-            mssql_user=os.environ.get("H8_MSSQL_USER", "sa"),
-            mssql_password=os.environ.get("H8_MSSQL_PASSWORD", "Wms_Erp_If_Dev_2026!"),
-            mssql_database=os.environ.get("H8_MSSQL_DATABASE", "wms_erp_if"),
-            mssql_container=os.environ.get("H8_MSSQL_CONTAINER", "wms-mssql-erp-if"),
-            api_base=os.environ.get("WMS_API_BASE", "http://127.0.0.1:8080").rstrip(
-                "/"
-            ),
-            api_token=os.environ.get("WMS_API_TOKEN") or None,
-            poll_interval=poll_interval,
-            max_retry=int(os.environ.get("H8_MAX_RETRY", "5")),
-            batch_size=int(os.environ.get("H8_BATCH_SIZE", "10")),
-            use_sqlcmd=use_sqlcmd,
-            connector_id=connector_id,
-            worker_id=os.environ.get(
-                "H8_WORKER_ID", f"{socket.gethostname()}-{os.getpid()}"
-            ),
-            worker_version=os.environ.get("H8_WORKER_VERSION", "1"),
-            heartbeat_ttl_seconds=int(
-                os.environ.get(
-                    "H8_HEARTBEAT_TTL_SEC", str(max(15, int(poll_interval * 3)))
-                )
-            ),
-        )
+from worker_mssql import (  # noqa: E402
+    claim_rows,
+    mark_row,
+    requeue_replay_row,
+    sqlcmd_query,
+)
+from worker_settings import Settings, load_runtime_settings  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -173,6 +112,52 @@ def http_json(
         return exc.code, parsed, raw
     except urllib.error.URLError as exc:
         return 0, None, str(exc.reason)
+
+
+def build_inbound_canonical_with_mpm(
+    settings: Settings,
+    message_type: str,
+    row: dict[str, str],
+    binding: Any | None,
+    *,
+    http_json_fn: Callable[..., tuple[int, dict[str, Any] | None, str]] = http_json,
+) -> H8CanonicalInboundCommand:
+    """通过持久 M-PM 规整受控外部值，再建立 canonical 命令。"""
+    normalized_row = dict(row)
+    mapped_fields = []
+    if message_type in ("asn", "outbound_order", "return_order") and row.get(
+        "document_type"
+    ):
+        mapped_fields.append(("document_type", "document_type"))
+    for field, dict_code in mapped_fields:
+        source_value = (row.get(field) or "").strip()
+        if not source_value:
+            raise CanonicalMappingError(f"unmapped {field}")
+        body = {
+            "dict_code": dict_code,
+            "source_value": source_value,
+            "source_system": getattr(binding, "connector_code", None) or "ERP",
+            "source_record_id": row.get("external_ref")
+            or row.get("external_doc_no")
+            or row.get("id"),
+        }
+        idempotency_key = f"{row['idempotency_key']}:mpm:{dict_code}"
+        status, parsed, raw = http_json_fn(
+            settings,
+            "POST",
+            "/api/v1/parameter-mapping/map",
+            body,
+            idempotency_key,
+        )
+        if status != 200 or not isinstance(parsed, dict):
+            raise WorkerHttpError(status, "M-PM API", raw)
+        target = parsed.get("target_value")
+        if parsed.get("status") != "matched" or not isinstance(target, str) or not target:
+            if dict_code == "dosage_form":
+                continue
+            raise CanonicalMappingError(f"unmapped {dict_code} {source_value}")
+        normalized_row[field] = target
+    return build_inbound_canonical(message_type, normalized_row, binding)
 
 
 def resolve_inbound_route(
@@ -326,30 +311,40 @@ def handle_outbound(settings: Settings, command: H8CanonicalInboundCommand) -> s
 
 def handle_product(settings: Settings, command: H8CanonicalInboundCommand) -> str:
     fields = command.fields
-    attrs: dict[str, Any] = {
-        "storage_condition": fields["storage_condition"],
-        "source": "erp_interface",
-    }
     body = {
+        "schema_version": fields["schema_version"],
+        "external_ref": command.external_ref,
+        "correlation_id": command.correlation_id,
+        "occurred_at": command.occurred_at,
         "product_code": fields["product_code"],
         "product_name": fields["product_name"],
         "approval_no": fields["approval_no"],
         "spec": fields["spec"],
         "dosage_form": fields["dosage_form"],
         "manufacturer": fields["manufacturer"],
-        "special_drug_category_code": "none",
-        "attrs": attrs,
+        "special_drug_category": fields["special_drug_category"],
+        "udi_code": fields["udi_code"],
+        "electronic_regulatory_code": fields["electronic_regulatory_code"],
+        "length_mm": fields["length_mm"],
+        "width_mm": fields["width_mm"],
+        "height_mm": fields["height_mm"],
+        "volume_cm3": fields["volume_cm3"],
+        "weight_g": fields["weight_g"],
+        "packaging_levels": fields["packaging_levels"],
+        "storage_condition": fields["storage_condition"],
     }
     status, parsed, raw = http_json(
         settings,
         "POST",
-        "/api/v1/master-data/products",
+        "/api/v1/integration/erp-messages/inbound/product_master",
         body,
         command.idempotency_key,
     )
-    if status in (200, 201) and isinstance(parsed, dict) and parsed.get("id"):
-        return str(parsed["id"])
-    raise WorkerHttpError(status, "Product API", raw)
+    if status in (200, 201) and isinstance(parsed, dict) and parsed.get(
+        "wms_resource_id"
+    ):
+        return str(parsed["wms_resource_id"])
+    raise WorkerHttpError(status, "H8 product master API", raw)
 
 
 def handle_return(settings: Settings, command: H8CanonicalInboundCommand) -> str:
@@ -389,58 +384,35 @@ def handle_return(settings: Settings, command: H8CanonicalInboundCommand) -> str
 def handle_product_change(
     settings: Settings, command: H8CanonicalInboundCommand
 ) -> str:
-    """档案补录/主数据变更回写：按 product_id 或 list 匹配 product_code 后 PATCH。"""
+    """接口表商品变更复用共享 H8 REST 防腐层，统一 M-PM、审计与闭环。"""
     fields = command.fields
-    product_id = fields["product_id"]
-    if not product_id:
-        status, parsed, raw = http_json(
-            settings,
-            "GET",
-            "/api/v1/master-data/products",
-            None,
-            command.idempotency_key + "-list",
-        )
-        if status != 200 or not isinstance(parsed, dict):
-            raise WorkerHttpError(status, "list products", raw)
-        items = parsed.get("data") or parsed.get("items") or []
-        if not isinstance(items, list):
-            raise RuntimeError("products list shape unexpected")
-        code = fields["product_code"]
-        match = next(
-            (p for p in items if isinstance(p, dict) and p.get("product_code") == code),
-            None,
-        )
-        if not match or not match.get("id"):
-            raise RuntimeError(f"product_code {code} not found")
-        product_id = str(match["id"])
-
-    field = fields["field_name"].strip()
-    new_value = fields["new_value"]
-    body: dict[str, Any] = {}
-    # 常见字段映射到 UpdateProductRequest
-    if field in (
-        "product_name",
-        "approval_no",
-        "spec",
-        "dosage_form",
-        "manufacturer",
-        "status",
-        "special_drug_category_code",
-    ):
-        body[field] = new_value
+    body = {
+        "schema_version": "1",
+        "external_ref": command.external_ref,
+        "correlation_id": command.correlation_id,
+        "occurred_at": command.occurred_at,
+        "product_id": fields["product_id"],
+        "product_code": fields["product_code"],
+        "field_name": fields["field_name"],
+        "liaison_id": fields["liaison_id"],
+        "asn_id": fields["asn_id"],
+    }
+    if fields["field_name"] == "physical_dimensions":
+        body["physical_dimensions"] = fields["physical_dimensions"]
     else:
-        body["attrs"] = {field: new_value}
-
+        body["new_value"] = fields["new_value"]
     status, parsed, raw = http_json(
         settings,
-        "PATCH",
-        f"/api/v1/master-data/products/{product_id}",
+        "POST",
+        "/api/v1/integration/erp-messages/inbound/product_change",
         body,
         command.idempotency_key,
     )
-    if status in (200, 201) and isinstance(parsed, dict) and parsed.get("id"):
-        return str(parsed["id"])
-    raise WorkerHttpError(status, "Product change API", raw)
+    if status in (200, 201) and isinstance(parsed, dict) and parsed.get(
+        "wms_resource_id"
+    ):
+        return str(parsed["wms_resource_id"])
+    raise WorkerHttpError(status, "H8 product change API", raw)
 
 
 HANDLERS: dict[
@@ -462,6 +434,12 @@ def process_once(
 ) -> int:
     processed = 0
     heartbeat_directions = heartbeat_directions or ["inbound"]
+
+    def canonical_converter(
+        message_type: str, row: dict[str, str], binding: Any | None
+    ) -> H8CanonicalInboundCommand:
+        return build_inbound_canonical_with_mpm(settings, message_type, row, binding)
+
     for type_name in types:
         table, handler = HANDLERS[type_name]
         if not dry_run:
@@ -499,7 +477,7 @@ def process_once(
                         type_name,
                         row,
                         handler,
-                        build_inbound_canonical,
+                        canonical_converter,
                         dry_run=True,
                     )
                 except Exception as life_exc:  # noqa: BLE001
@@ -539,7 +517,7 @@ def process_once(
                     type_name,
                     row,
                     handler,
-                    build_inbound_canonical,
+                    canonical_converter,
                     route_binding=binding,
                     dry_run=False,
                 )
@@ -613,8 +591,51 @@ def main(argv: list[str] | None = None) -> int:
         default="asn,outbound_order,product_master,return_order,product_change",
         help="入站类型：asn,outbound_order,product_master,return_order,product_change",
     )
+    parser.add_argument("--reconcile-owner", help="一次性主动拉取该货主的 ERP 库存快照")
+    parser.add_argument("--reconcile-window", help="对账时间窗口幂等键")
+    parser.add_argument(
+        "--reconcile-due",
+        action="store_true",
+        help="由 H-SCH 单次触发当前 Worker 货主的到期库存快照拉取",
+    )
     args = parser.parse_args(argv)
-    settings = Settings.from_env()
+    bootstrap = Settings.from_env()
+    try:
+        settings = load_runtime_settings(bootstrap, http_json_fn=http_json)
+    except WorkerHttpError as error:
+        print(f"[h8] worker bootstrap failed: {error}", file=sys.stderr)
+        return 2
+    if args.reconcile_owner and args.reconcile_due:
+        print("--reconcile-owner and --reconcile-due are mutually exclusive", file=sys.stderr)
+        return 2
+    if args.reconcile_due:
+        if not args.once or not settings.api_token:
+            print(
+                "--reconcile-due requires --once and WMS_API_TOKEN",
+                file=sys.stderr,
+            )
+            return 2
+        run_ids = pull_due_reconciliation_snapshots(
+            settings,
+            http_json_fn=http_json,
+        )
+        print(f"[h8] reconciliation due runs={len(run_ids)}", flush=True)
+        return 0
+    if args.reconcile_owner:
+        if not args.once or not args.reconcile_window or not settings.api_token:
+            print(
+                "--reconcile-owner requires --once, --reconcile-window and WMS_API_TOKEN",
+                file=sys.stderr,
+            )
+            return 2
+        run_id = pull_reconciliation_snapshot(
+            settings,
+            args.reconcile_owner,
+            args.reconcile_window,
+            http_json_fn=http_json,
+        )
+        print(f"[h8] reconciliation run={run_id}", flush=True)
+        return 0
     need_in = args.direction in ("in", "both")
     need_out = args.direction in ("out", "both")
     wms_db = resolve_wms_db_url()
@@ -659,7 +680,20 @@ def main(argv: list[str] | None = None) -> int:
             or args.dry_run
             or get_worker_claim_decision(settings, "outbound")
         )
+        if need_out and wms_db and not args.dry_run:
+            # Pause blocks new claims/retries, but an ERP acknowledgement already in
+            # flight must still be consumed so accepted work can reach a terminal state.
+            n += process_outbound_receipts(
+                settings,
+                http_json_fn=http_json,
+            )
         if need_out and wms_db and outbound_allowed:
+            if not args.dry_run:
+                n += process_outbound_receipt_timeouts(
+                    settings,
+                    wms_db,
+                    http_json_fn=http_json,
+                )
             n += process_outbound_once(
                 database_url=wms_db,
                 sqlcmd_exec=lambda sql: sqlcmd_query(settings, sql),

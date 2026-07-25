@@ -85,10 +85,19 @@ BEGIN
         product_code      NVARCHAR(64)     NOT NULL,
         product_name      NVARCHAR(256)    NOT NULL,
         approval_no       NVARCHAR(64)     NULL,
-        spec              NVARCHAR(128)    NULL,
+        spec              NVARCHAR(128)    NOT NULL,
         dosage_form       NVARCHAR(64)     NULL,
         manufacturer      NVARCHAR(256)    NULL,
-        storage_condition NVARCHAR(32)     NULL,
+        special_drug_category NVARCHAR(64) NOT NULL,
+        storage_condition NVARCHAR(128)    NOT NULL,
+        udi_code          NVARCHAR(128)    NULL,
+        electronic_regulatory_code NVARCHAR(128) NULL,
+        length_mm         DECIMAL(18,3)    NULL,
+        width_mm          DECIMAL(18,3)    NULL,
+        height_mm         DECIMAL(18,3)    NULL,
+        volume_cm3        DECIMAL(18,3)    NULL,
+        weight_g          DECIMAL(18,3)    NULL,
+        packaging_json    NVARCHAR(MAX)    NOT NULL,
         schema_version    NVARCHAR(16)     NOT NULL CONSTRAINT DF_if_in_pm_sv DEFAULT N'1',
         payload_json      NVARCHAR(MAX)    NULL,
         sync_status       NVARCHAR(16)     NOT NULL CONSTRAINT DF_if_in_pm_st DEFAULT N'pending',
@@ -99,7 +108,9 @@ BEGIN
         created_at        DATETIME2        NOT NULL CONSTRAINT DF_if_in_pm_ca DEFAULT SYSUTCDATETIME(),
         updated_at        DATETIME2        NOT NULL CONSTRAINT DF_if_in_pm_ua DEFAULT SYSUTCDATETIME(),
         CONSTRAINT UQ_if_in_pm_idem UNIQUE (idempotency_key),
-        CONSTRAINT CK_if_in_pm_status CHECK (sync_status IN (N'pending', N'processing', N'success', N'failed', N'dead'))
+        CONSTRAINT CK_if_in_pm_status CHECK (sync_status IN (N'pending', N'processing', N'success', N'failed', N'dead')),
+        CONSTRAINT CK_if_in_pm_spec CHECK (LEN(LTRIM(RTRIM(spec))) > 0),
+        CONSTRAINT CK_if_in_pm_packaging_json CHECK (ISJSON(packaging_json) = 1)
     );
     CREATE INDEX IX_if_in_pm_poll ON dbo.if_in_product_master (sync_status, updated_at);
 END

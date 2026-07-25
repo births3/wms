@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import os
 import re
 import urllib.parse
 from dataclasses import dataclass
@@ -25,6 +27,7 @@ class RouteBinding:
     owner_id: str | None = None
     api_base_url: str | None = None
     channel_mode: str | None = None
+    bearer_secret_alias: str | None = None
 
 
 class WorkerHttpError(RuntimeError):
@@ -46,6 +49,38 @@ def sanitize_worker_error(raw: str, secrets: tuple[str | None, ...] = ()) -> str
         safe,
     )
     return safe[:500]
+
+
+def require_frozen_config_version(
+    settings: Any, config_version: int, operation: str
+) -> None:
+    try:
+        frozen_version = int(getattr(settings, "connector_config_version", 0))
+    except (TypeError, ValueError) as exc:
+        raise WorkerHttpError(500, operation, "worker snapshot version invalid") from exc
+    if frozen_version < 1 or config_version != frozen_version:
+        raise WorkerHttpError(409, operation, "connector config version changed")
+
+
+def resolve_bearer_token(alias: str | None) -> str:
+    """Resolve an ERP bearer alias without any cross-connector global fallback."""
+    if not alias:
+        raise WorkerHttpError(
+            503,
+            "ERP bearer secret",
+            "bearer_secret_alias required",
+        )
+    raw = os.environ.get("WMS_H8_SECRET_ALIASES") or os.environ.get("WMS_SECRETS_MAP")
+    try:
+        values = json.loads(raw) if raw else {}
+    except json.JSONDecodeError as exc:
+        raise WorkerHttpError(500, "ERP bearer secret", "secrets map invalid") from exc
+    if not isinstance(values, dict):
+        raise WorkerHttpError(500, "ERP bearer secret", "secrets map invalid")
+    value = values.get(alias)
+    if not isinstance(value, str) or not value.strip():
+        raise WorkerHttpError(503, "ERP bearer secret", "bearer secret unavailable")
+    return value.strip()
 
 
 def get_worker_claim_decision(
@@ -221,8 +256,11 @@ def resolve_inbound_route(
     connector_id = str(connector.get("id") or "")
     connector_code = str(connector.get("connector_code") or "")
     config_version = int(connector.get("config_version") or 0)
+    if connector_id != settings.connector_id:
+        raise WorkerHttpError(409, "route resolve", "connector scope changed")
     if not connector_id or not connector_code or config_version < 1:
         raise WorkerHttpError(502, "route resolve", "connector binding incomplete")
+    require_frozen_config_version(settings, config_version, "route resolve")
     return RouteBinding(
         connector_id=connector_id,
         connector_code=connector_code,
@@ -240,6 +278,7 @@ def resolve_outbound_route(
     idempotency_key: str,
     *,
     http_json_fn: HttpJsonFn,
+    require_owner_wide: bool = False,
 ) -> RouteBinding:
     """按货主上下文、仓库、方向和消息类型解析当前唯一出站连接。"""
     query = {"direction": "outbound", "message_type": message_type}
@@ -275,6 +314,7 @@ def resolve_outbound_route(
         raise WorkerHttpError(409, "outbound route resolve", "connector scope changed")
     if not connector_code or config_version < 1:
         raise WorkerHttpError(502, "outbound route resolve", "binding incomplete")
+    require_frozen_config_version(settings, config_version, "outbound route resolve")
     if channel_mode not in ("rest", "interface_table", "rest_primary_table_fallback"):
         raise WorkerHttpError(409, "outbound route resolve", "channel unavailable")
     if (
@@ -292,6 +332,10 @@ def resolve_outbound_route(
         raise WorkerHttpError(409, "outbound route resolve", "message type unavailable")
     if not isinstance(warehouse_ids, list):
         raise WorkerHttpError(409, "outbound route resolve", "warehouse scope missing")
+    if require_owner_wide and warehouse_ids:
+        raise WorkerHttpError(
+            409, "outbound route resolve", "owner-wide connector required"
+        )
     if warehouse_id and warehouse_ids and warehouse_id not in warehouse_ids:
         raise WorkerHttpError(409, "outbound route resolve", "warehouse unavailable")
 
@@ -306,6 +350,178 @@ def resolve_outbound_route(
             str(connector["api_base_url"]) if connector.get("api_base_url") else None
         ),
         channel_mode=channel_mode,
+        bearer_secret_alias=(
+            str(connector["bearer_secret_alias"])
+            if connector.get("bearer_secret_alias")
+            else None
+        ),
+    )
+
+
+def find_existing_outbound_message(
+    settings: Any,
+    message_type: str,
+    external_ref: str,
+    idempotency_key: str,
+    *,
+    http_json_fn: HttpJsonFn,
+) -> dict[str, Any] | None:
+    """按完整幂等身份读取唯一出站消息，供重试复用首次绑定。"""
+    path = "/api/v1/integration/erp-messages?" + urllib.parse.urlencode(
+        {
+            "direction": "outbound",
+            "message_type": message_type,
+            "external_ref": external_ref,
+            "idempotency_key": idempotency_key,
+            "created_from": "1970-01-01T00:00:00Z",
+            "limit": 2,
+        }
+    )
+    status, parsed, raw = http_json_fn(
+        settings,
+        "GET",
+        path,
+        None,
+        f"outbound-binding-{idempotency_key}",
+    )
+    if status != 200 or not isinstance(parsed, dict):
+        raise WorkerHttpError(status, "outbound message binding lookup", raw)
+    data = parsed.get("data")
+    if not isinstance(data, list):
+        raise WorkerHttpError(502, "outbound message binding lookup", "data missing")
+    if not data:
+        return None
+    if len(data) != 1 or not isinstance(data[0], dict):
+        raise WorkerHttpError(
+            409, "outbound message binding lookup", "binding is ambiguous"
+        )
+    message = data[0]
+    expected = {
+        "direction": "outbound",
+        "message_type": message_type,
+        "schema_version": "1",
+    }
+    if any(str(message.get(key) or "") != value for key, value in expected.items()):
+        raise WorkerHttpError(
+            409, "outbound message binding lookup", "binding identity changed"
+        )
+    return message
+
+
+def resolve_existing_outbound_binding(
+    settings: Any,
+    message_type: str,
+    owner_id: str,
+    warehouse_id: str | None,
+    external_ref: str,
+    idempotency_key: str,
+    *,
+    http_json_fn: HttpJsonFn,
+) -> RouteBinding | None:
+    """重试时加载消息首次冻结的连接版本，不重新解析当前 active 配置。"""
+    message = find_existing_outbound_message(
+        settings,
+        message_type,
+        external_ref,
+        idempotency_key,
+        http_json_fn=http_json_fn,
+    )
+    if message is None:
+        return None
+    connector_id = str(message.get("connector_id") or "")
+    connector_code = str(message.get("connector_code") or "")
+    try:
+        config_version = int(message.get("config_version") or 0)
+    except (TypeError, ValueError) as exc:
+        raise WorkerHttpError(
+            502, "outbound message binding lookup", "invalid config version"
+        ) from exc
+    if (
+        connector_id != settings.connector_id
+        or not connector_code
+        or config_version < 1
+    ):
+        raise WorkerHttpError(
+            409, "outbound message binding lookup", "binding incomplete"
+        )
+    require_frozen_config_version(
+        settings, config_version, "outbound message binding lookup"
+    )
+    message_warehouse_id = str(message.get("warehouse_id") or "").strip() or None
+    if message_warehouse_id != warehouse_id:
+        raise WorkerHttpError(
+            409, "outbound message binding lookup", "warehouse binding changed"
+        )
+    path = f"/api/v1/config/erp-connectors/{connector_id}/versions/{config_version}"
+    status, snapshot, raw = http_json_fn(
+        settings,
+        "GET",
+        path,
+        None,
+        f"outbound-connector-version-{connector_id}-{config_version}",
+    )
+    if status != 200 or not isinstance(snapshot, dict):
+        raise WorkerHttpError(status, "outbound connector version lookup", raw)
+    expected_snapshot = {
+        "id": connector_id,
+        "owner_id": owner_id,
+        "connector_code": connector_code,
+        "config_version": config_version,
+    }
+    if any(snapshot.get(key) != value for key, value in expected_snapshot.items()):
+        raise WorkerHttpError(
+            409, "outbound connector version lookup", "binding changed"
+        )
+    channel_mode = str(snapshot.get("channel_mode") or "")
+    if channel_mode not in ("rest", "interface_table", "rest_primary_table_fallback"):
+        raise WorkerHttpError(
+            409, "outbound connector version lookup", "channel unavailable"
+        )
+    channel = "interface_table" if channel_mode == "interface_table" else "rest"
+    if str(message.get("channel") or "") != channel:
+        raise WorkerHttpError(
+            409, "outbound connector version lookup", "message channel changed"
+        )
+    directions = snapshot.get("directions")
+    message_types = snapshot.get("message_types")
+    warehouse_ids = snapshot.get("warehouse_ids")
+    if not isinstance(directions, list) or "outbound" not in directions:
+        raise WorkerHttpError(
+            409, "outbound connector version lookup", "direction unavailable"
+        )
+    if not isinstance(message_types, list) or message_type not in message_types:
+        raise WorkerHttpError(
+            409, "outbound connector version lookup", "message type unavailable"
+        )
+    if not isinstance(warehouse_ids, list):
+        raise WorkerHttpError(
+            409, "outbound connector version lookup", "warehouse scope missing"
+        )
+    if warehouse_id and warehouse_ids and warehouse_id not in warehouse_ids:
+        raise WorkerHttpError(
+            409, "outbound connector version lookup", "warehouse unavailable"
+        )
+    api_base_url = (
+        str(snapshot["api_base_url"]) if snapshot.get("api_base_url") else None
+    )
+    if channel_mode in ("rest", "rest_primary_table_fallback") and not api_base_url:
+        raise WorkerHttpError(
+            409, "outbound connector version lookup", "ERP API base missing"
+        )
+    return RouteBinding(
+        connector_id=connector_id,
+        connector_code=connector_code,
+        config_version=config_version,
+        channel=channel,
+        message_type=message_type,
+        owner_id=owner_id,
+        api_base_url=api_base_url,
+        channel_mode=channel_mode,
+        bearer_secret_alias=(
+            str(snapshot["bearer_secret_alias"])
+            if snapshot.get("bearer_secret_alias")
+            else None
+        ),
     )
 
 
@@ -416,6 +632,7 @@ def resolve_existing_inbound_binding(
         ) from exc
     if not connector_id or not connector_code or config_version < 1:
         return None
+    require_frozen_config_version(settings, config_version, "message binding lookup")
     binding = RouteBinding(
         connector_id=connector_id,
         connector_code=connector_code,

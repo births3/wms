@@ -19,6 +19,6 @@ VOLUME ["/data"]
 EXPOSE 8080
 
 HEALTHCHECK --interval=5s --timeout=3s --retries=12 --start-period=8s \
-  CMD python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=2)"
+  CMD python3 -c "import os, urllib.request; token=os.environ['ERP_VENDOR_BEARER_TOKEN']; req=urllib.request.Request('http://127.0.0.1:8080/healthz', headers={'Authorization': 'Bearer '+token}); urllib.request.urlopen(req, timeout=2)"
 
 CMD ["python3", "/app/server.py"]

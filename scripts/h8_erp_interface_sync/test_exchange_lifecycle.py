@@ -93,6 +93,7 @@ class TestExchangeLifecycle(unittest.TestCase):
             "external_ref": "ERP-1",
             "idempotency_key": "idem-asn-1",
             "schema_version": "1",
+            "warehouse_id": "11111111-1111-1111-1111-111111111111",
         }
         wms_id, life = run_inbound_pipeline(
             FakeSettings(),
@@ -120,12 +121,21 @@ class TestExchangeLifecycle(unittest.TestCase):
         self.assertEqual(posts[0]["body"]["connector_id"], "connector-1")
         self.assertEqual(posts[0]["body"]["config_version"], 3)
         self.assertEqual(posts[0]["body"]["schema_version"], "1")
+        self.assertTrue(
+            all(
+                post["body"]["warehouse_id"]
+                == "11111111-1111-1111-1111-111111111111"
+                for post in posts
+            )
+        )
         self.assertEqual(posts[0]["body"]["payload"], row)
         self.assertTrue(all("payload" not in post["body"] for post in posts[1:]))
         self.assertEqual(posts[2]["body"]["stage"], "business_api")
         self.assertEqual(posts[2]["body"]["result"], "started")
         self.assertEqual(posts[3]["body"]["result"], "ok")
+        self.assertEqual(posts[3]["body"]["wms_resource_id"], "wms-res-1")
         self.assertEqual(posts[-1]["body"]["stage"], "receipt")
+        self.assertEqual(posts[-1]["body"]["wms_resource_id"], "wms-res-1")
         self.assertEqual(life.message_id, "00000000-0000-0000-0000-0000000000aa")
 
     def test_inbound_failure_emits_final_failure(self) -> None:
@@ -210,7 +220,7 @@ class TestExchangeLifecycle(unittest.TestCase):
             posts.append(body)
             return 200, {"id": "out-1"}, "{}"
 
-        def send() -> None:
+        def send(_life) -> None:
             return None
 
         life = run_outbound_pipeline(
@@ -225,11 +235,11 @@ class TestExchangeLifecycle(unittest.TestCase):
         )
         self.assertEqual(
             [s for s, _ in life.stages_emitted],
-            ["receive", "convert", "send", "send", "receipt"],
+            ["receive", "convert", "send", "send"],
         )
         self.assertEqual(
             [post["stage"] for post in posts],
-            ["receive", "convert", "send", "send", "receipt"],
+            ["receive", "convert", "send", "send"],
         )
         self.assertEqual(posts[0]["payload"], {"qty": 1})
         self.assertEqual(posts[0]["connector_id"], "connector-1")

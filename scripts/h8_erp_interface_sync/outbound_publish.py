@@ -7,10 +7,23 @@ import os
 import subprocess
 import urllib.error
 import urllib.request
+import uuid
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from worker_route import resolve_outbound_route, sanitize_worker_error
+from outbound_receipts import (
+    process_receipt_timeouts,
+    process_table_receipts,
+    requeue_outbox,
+)
+from worker_route import (
+    WorkerHttpError,
+    resolve_bearer_token,
+    resolve_existing_outbound_binding,
+    resolve_outbound_route,
+    sanitize_worker_error,
+)
+from worker_mssql import list_acked_outbound, mark_outbound_receipt_recorded
 
 # table + external_ref 列 + 可选档案补录专用
 # message_type 与 US-H8-002 受控出站目录对齐
@@ -44,6 +57,7 @@ OUTBOX_SOURCES: list[dict[str, str]] = [
         "table": "reconciliation_erp_feedback_outbox",
         "ref_col": "recon_doc_no",
         "callback_path": "/reconciliation-diff",
+        "special_retry": "bounded",
         "message_type": "reconciliation_diff",
     },
     {
@@ -168,23 +182,75 @@ def claim_wms_outbox(
     if connector_id:
         if not message_type:
             raise ValueError("message_type required with connector_id")
-        extra_where += f"""
- AND o.owner_id = (
-   SELECT owner_id
-     FROM h8_erp_connectors
-    WHERE id = '{sql_escape_pg(connector_id)}'::uuid
-      AND status = 'active'
-      AND 'outbound' = ANY(directions)
-      AND '{sql_escape_pg(message_type)}' = ANY(message_types)
-      AND (
-        cardinality(warehouse_ids) = 0
-        OR EXISTS (
-          SELECT 1
-            FROM unnest(warehouse_ids) AS route_warehouse_id
-           WHERE route_warehouse_id::text = o.payload ->> 'warehouse_id'
+        connector_sql = sql_escape_pg(connector_id)
+        message_type_sql = sql_escape_pg(message_type)
+        idempotency_expr = (
+            f"'out:{sql_escape_pg(table)}:' || o.id::text"
         )
-      )
+        extra_where += f"""
+ AND (
+   EXISTS (
+     SELECT 1
+       FROM h8_erp_messages message
+      WHERE message.owner_id = o.owner_id
+        AND message.direction = 'outbound'
+        AND message.message_type = '{message_type_sql}'
+        AND message.idempotency_key = {idempotency_expr}
+        AND message.connector_id = '{connector_sql}'::uuid
+   )
+   OR (
+     NOT EXISTS (
+       SELECT 1
+         FROM h8_erp_messages message
+        WHERE message.owner_id = o.owner_id
+          AND message.idempotency_key = {idempotency_expr}
+     )
+     AND o.owner_id = (
+       SELECT owner_id
+         FROM h8_erp_connectors
+        WHERE id = '{connector_sql}'::uuid
+          AND status = 'active'
+          AND 'outbound' = ANY(directions)
+          AND '{message_type_sql}' = ANY(message_types)
+          AND (
+            cardinality(warehouse_ids) = 0
+            OR EXISTS (
+              SELECT 1
+                FROM unnest(warehouse_ids) AS route_warehouse_id
+               WHERE route_warehouse_id::text = o.payload ->> 'warehouse_id'
+            )
+          )
+     )
+   )
  )"""
+
+    # Worker 在认领后崩溃时，下一轮必须先收口已耗尽的有界重试行。
+    if special_retry == "bounded" and has_max:
+        psql_query(
+            database_url,
+            f"""
+WITH exhausted AS (
+  UPDATE {table}
+     SET status = 'dead',
+         last_error = COALESCE(last_error, 'outbound retry exhausted'),
+         next_attempt_at = now(),
+         updated_at = now()
+   WHERE status IN ('pending', 'failed')
+     AND attempt_count >= max_attempts
+   RETURNING id, owner_id
+)
+INSERT INTO h4_notification_records
+  (id, owner_id, event_type, dedupe_key, recipient, channel, content,
+   content_summary, status, failure_reason, created_at, updated_at)
+SELECT gen_random_uuid(), owner_id, 'rc.reconciliation.erp_feedback_dead',
+       id::text, 'warehouse_manager', 'wechat',
+       '库存对账反馈 ERP 重试耗尽，请检查连接与差异处理状态',
+       '库存对账反馈 ERP 重试耗尽，请检查连接与差异处理状态',
+       'retrying', 'awaiting_wechat_delivery', now(), now()
+  FROM exhausted
+ON CONFLICT (owner_id, event_type, recipient, dedupe_key) DO NOTHING;
+""",
+        )
 
     # dead 标记：档案过 deadline 或超 max
     if special_retry == "archive" and has_deadline:
@@ -215,6 +281,7 @@ WITH cte AS (
 upd AS (
   UPDATE {table} o
      SET attempt_count = o.attempt_count + 1,
+         next_attempt_at = now() + interval '5 minutes',
          updated_at = now()
     FROM cte
    WHERE o.id = cte.id
@@ -285,9 +352,9 @@ def mark_wms_outbox(
     row_id: str,
     *,
     succeeded: bool,
+    attempt_count: int,
     error: str | None = None,
     special_retry: str | None = None,
-    attempt_count: int = 0,
     max_attempts: int = 5,
     release_dry_run: bool = False,
 ) -> None:
@@ -300,7 +367,8 @@ UPDATE {table}
        last_error = NULL,
        next_attempt_at = now(),
        updated_at = now()
- WHERE id = '{sql_escape_pg(row_id)}'::uuid;
+ WHERE id = '{sql_escape_pg(row_id)}'::uuid
+   AND attempt_count = {int(attempt_count)};
 """
         psql_query(database_url, sql)
         return
@@ -310,12 +378,38 @@ UPDATE {table}
    SET status = 'succeeded',
        last_error = NULL,
        updated_at = now()
- WHERE id = '{sql_escape_pg(row_id)}'::uuid;
+ WHERE id = '{sql_escape_pg(row_id)}'::uuid
+   AND attempt_count = {int(attempt_count)};
 """
     else:
         err = sql_escape_pg((error or "h8 publish failed")[:900])
-        exhausted = special_retry == "archive" and attempt_count >= max_attempts
+        exhausted = special_retry in {"archive", "bounded"} and attempt_count >= max_attempts
         if exhausted:
+            if special_retry == "bounded":
+                sql = f"""
+WITH exhausted AS (
+  UPDATE {table}
+     SET status = 'dead',
+         last_error = '{err}',
+         next_attempt_at = now(),
+         updated_at = now()
+   WHERE id = '{sql_escape_pg(row_id)}'::uuid
+     AND attempt_count = {int(attempt_count)}
+   RETURNING id, owner_id
+)
+INSERT INTO h4_notification_records
+  (id, owner_id, event_type, dedupe_key, recipient, channel, content,
+   content_summary, status, failure_reason, created_at, updated_at)
+SELECT gen_random_uuid(), owner_id, 'rc.reconciliation.erp_feedback_dead',
+       id::text, 'warehouse_manager', 'wechat',
+       '库存对账反馈 ERP 重试耗尽，请检查连接与差异处理状态',
+       '库存对账反馈 ERP 重试耗尽，请检查连接与差异处理状态',
+       'retrying', 'awaiting_wechat_delivery', now(), now()
+  FROM exhausted
+ON CONFLICT (owner_id, event_type, recipient, dedupe_key) DO NOTHING;
+"""
+                psql_query(database_url, sql)
+                return
             status_sql = "status = 'dead'"
             next_attempt_sql = "now()"
         else:
@@ -327,9 +421,46 @@ UPDATE {table}
        next_attempt_at = {next_attempt_sql},
        updated_at = now(),
        {status_sql}
- WHERE id = '{sql_escape_pg(row_id)}'::uuid;
+ WHERE id = '{sql_escape_pg(row_id)}'::uuid
+   AND attempt_count = {int(attempt_count)};
 """
     psql_query(database_url, sql)
+
+
+def requeue_wms_outbox(database_url: str, idempotency_key: str) -> None:
+    requeue_outbox(
+        database_url,
+        idempotency_key,
+        allowed_tables={source["table"] for source in OUTBOX_SOURCES},
+        query_fn=psql_query,
+    )
+
+
+def process_outbound_receipt_timeouts(
+    settings: Any,
+    database_url: str,
+    *,
+    http_json_fn: Callable[..., tuple[int, Any, str]],
+) -> int:
+    return process_receipt_timeouts(
+        settings,
+        database_url,
+        http_json_fn=http_json_fn,
+        requeue_fn=requeue_wms_outbox,
+    )
+
+
+def process_outbound_receipts(
+    settings: Any,
+    *,
+    http_json_fn: Callable[..., tuple[int, Any, str]],
+) -> int:
+    return process_table_receipts(
+        settings,
+        http_json_fn=http_json_fn,
+        list_acked_fn=list_acked_outbound,
+        mark_recorded_fn=mark_outbound_receipt_recorded,
+    )
 
 
 def insert_if_out_sql(row: OutboxRow) -> str:
@@ -370,10 +501,23 @@ END
 """
 
 
-def http_callback_publish(base_url: str, row: OutboxRow) -> None:
+def http_callback_publish(
+    base_url: str,
+    row: OutboxRow,
+    lifecycle: Any,
+    bearer_token: str | None,
+) -> None:
     """通道 A：POST {base}{callback_path}。"""
+    if not lifecycle.message_id:
+        raise RuntimeError("H8 message binding required before ERP callback")
     url = base_url.rstrip("/") + row.callback_path
     body = {
+        "message_id": lifecycle.message_id,
+        "schema_version": lifecycle.schema_version,
+        "correlation_id": lifecycle.correlation_id,
+        "idempotency_key": lifecycle.idempotency_key,
+        "connector_id": lifecycle.connector_id,
+        "config_version": lifecycle.config_version,
         "event_type": row.event_type,
         "owner_id": row.owner_id,
         "source_outbox_table": row.table,
@@ -382,10 +526,17 @@ def http_callback_publish(base_url: str, row: OutboxRow) -> None:
         "payload": row.payload,
     }
     data = json.dumps(body).encode("utf-8")
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Idempotency-Key": lifecycle.idempotency_key,
+    }
+    if bearer_token:
+        headers["Authorization"] = f"Bearer {bearer_token}"
     req = urllib.request.Request(
         url,
         data=data,
-        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        headers=headers,
         method="POST",
     )
     try:
@@ -453,7 +604,7 @@ def process_outbound_once(
                 (
                     database_url,
                     os.environ.get("WMS_API_TOKEN"),
-                    os.environ.get("H8_MSSQL_PASSWORD"),
+                    getattr(settings, "mssql_password", None),
                 ),
             )
             print(f"[h8-out] skip claim {table}: {summary}", flush=True)
@@ -495,7 +646,7 @@ def process_outbound_once(
                         msg_type,
                         str(row.external_ref or row.id),
                         idem,
-                        lambda: None,
+                        lambda _lifecycle: None,
                         connector_id=connector_id,
                         route_binding=route_binding,
                         channel=lifecycle_channel,
@@ -509,6 +660,7 @@ def process_outbound_once(
                     table,
                     row.id,
                     succeeded=False,
+                    attempt_count=row.attempt_count,
                     release_dry_run=True,
                 )
                 print(f"[h8-out] dry-run release {table}/{row.id}", flush=True)
@@ -519,14 +671,31 @@ def process_outbound_once(
                     if route_http is None:
                         from sync_worker import http_json as route_http
 
-                    route_binding = resolve_outbound_route(
-                        settings,
-                        msg_type,
-                        row.owner_id,
-                        str(row.payload.get("warehouse_id") or "").strip() or None,
-                        idem,
-                        http_json_fn=route_http,
+                    warehouse_id = (
+                        str(row.payload.get("warehouse_id") or "").strip() or None
                     )
+                    route_binding = (
+                        resolve_existing_outbound_binding(
+                            settings,
+                            msg_type,
+                            row.owner_id,
+                            warehouse_id,
+                            str(row.external_ref or row.id),
+                            idem,
+                            http_json_fn=route_http,
+                        )
+                        if row.attempt_count > 1
+                        else None
+                    )
+                    if route_binding is None:
+                        route_binding = resolve_outbound_route(
+                            settings,
+                            msg_type,
+                            row.owner_id,
+                            warehouse_id,
+                            idem,
+                            http_json_fn=route_http,
+                        )
                     from channel_failover import map_channel_mode_to_transport
 
                     active_transport = map_channel_mode_to_transport(
@@ -536,27 +705,34 @@ def process_outbound_once(
                     lifecycle_channel = route_binding.channel
 
                 # 默认参数绑定当前 row，避免循环闭包误用末行
-                def _http(active: OutboxRow = row) -> None:
+                def _http(lifecycle: Any, active: OutboxRow = row) -> None:
                     if not active_callback_base:
                         raise RuntimeError("connector api_base_url required for REST")
-                    http_callback_publish(active_callback_base, active)
+                    http_callback_publish(
+                        active_callback_base,
+                        active,
+                        lifecycle,
+                        resolve_bearer_token(
+                            route_binding.bearer_secret_alias if route_binding else None
+                        ),
+                    )
 
-                def _table(active: OutboxRow = row) -> None:
+                def _table(_lifecycle: Any, active: OutboxRow = row) -> None:
                     if sqlcmd_exec is None:
                         raise RuntimeError("sqlcmd_exec required for table transport")
                     sqlcmd_exec(insert_if_out_sql(active))
 
                 from exchange_lifecycle import run_outbound_pipeline
 
-                def _send() -> None:
+                def _send(lifecycle: Any) -> None:
                     publish_with_failover(
                         transport=active_transport,
-                        publish_http=_http,
-                        publish_table=_table,
+                        publish_http=lambda: _http(lifecycle),
+                        publish_table=lambda: _table(lifecycle),
                         http_max_attempts=attempts,
                     )
 
-                # US-H8-002 AC11：真实出站路径 receive→convert→send→receipt
+                # US-H8-002 AC11：技术发送后等待 ERP 业务回执，不伪造 receipt
                 run_outbound_pipeline(
                     life_settings,
                     msg_type,
@@ -569,7 +745,13 @@ def process_outbound_once(
                     payload=row.payload,
                     dry_run=False,
                 )
-                mark_wms_outbox(database_url, table, row.id, succeeded=True)
+                mark_wms_outbox(
+                    database_url,
+                    table,
+                    row.id,
+                    succeeded=True,
+                    attempt_count=row.attempt_count,
+                )
                 print(
                     f"[h8-out] published {table}/{row.id} "
                     f"(transport={active_transport})",
@@ -581,7 +763,7 @@ def process_outbound_once(
                     (
                         database_url,
                         os.environ.get("WMS_API_TOKEN"),
-                        os.environ.get("H8_MSSQL_PASSWORD"),
+                        getattr(settings, "mssql_password", None),
                     ),
                 )
                 mark_wms_outbox(

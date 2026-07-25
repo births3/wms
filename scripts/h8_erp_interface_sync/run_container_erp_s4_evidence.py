@@ -2,6 +2,7 @@
 """对容器化 ERP 厂商做 S4 风格证据采集。
 
 前置：
+  export H8_ERP_VENDOR_BEARER_TOKEN='replace-with-local-test-token'
   cd deploy && docker compose -f docker-compose.h8-erp-vendor.yml up -d --build
 
 场景：
@@ -41,6 +42,13 @@ def http_json(
 ) -> tuple[int, dict]:
     data = None if body is None else json.dumps(body).encode("utf-8")
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
+    bearer = (
+        os.environ.get("H8_ERP_VENDOR_BEARER_TOKEN")
+        or os.environ.get("ERP_VENDOR_BEARER_TOKEN")
+        or ""
+    ).strip()
+    if bearer:
+        headers["Authorization"] = f"Bearer {bearer}"
     admin = os.environ.get("ERP_VENDOR_ADMIN_TOKEN", "").strip()
     if admin and "/_admin/" in url:
         headers["X-ERP-Admin-Token"] = admin

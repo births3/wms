@@ -30,7 +30,12 @@ from outbound_publish import (  # noqa: E402
     process_outbound_once,
     resolve_wms_db_url,
 )
-from sync_worker import Settings, sqlcmd_query  # noqa: E402
+from sync_worker import (  # noqa: E402
+    Settings,
+    http_json as worker_http_json,
+    load_runtime_settings,
+    sqlcmd_query,
+)
 
 EVIDENCE = ROOT / "docs" / "retros" / "h8-local-integration-evidence.json"
 VENDOR = os.environ.get("ERP_CALLBACK_BASE", "http://127.0.0.1:18092").rstrip("/")
@@ -40,6 +45,13 @@ OUTBOX = "receiving_putaway_erp_feedback_outbox"
 def http_json(method: str, url: str, body: dict | None = None) -> tuple[int, dict]:
     data = None if body is None else json.dumps(body).encode("utf-8")
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
+    bearer = (
+        os.environ.get("H8_ERP_VENDOR_BEARER_TOKEN")
+        or os.environ.get("ERP_VENDOR_BEARER_TOKEN")
+        or ""
+    ).strip()
+    if bearer:
+        headers["Authorization"] = f"Bearer {bearer}"
     # 与厂商容器可选 ERP_VENDOR_ADMIN_TOKEN 对齐
     admin = os.environ.get("ERP_VENDOR_ADMIN_TOKEN", "").strip()
     if admin and "/_admin/" in url:
@@ -226,7 +238,10 @@ def main() -> int:
         print("DATABASE_URL or WMS_DB_URL required", file=sys.stderr)
         return 2
 
-    settings = Settings.from_env()
+    settings = load_runtime_settings(
+        Settings.from_env(),
+        http_json_fn=worker_http_json,
+    )
     steps: list[dict] = []
 
     v = ensure_vendor()
