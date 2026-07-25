@@ -492,6 +492,7 @@ evidence_refs = [
   "backend/crates/api/tests/m3_recall_postgres.rs",
   "backend/crates/api/tests/m3_ops_closeout_postgres.rs",
   "apps/web-admin/src/pages/inventory/M3BatchManagementPage.tsx",
+  "prototypes/e2e/web-admin-m2-real.spec.ts",
   "artifacts/screenshot-portal/real-web/m2-inbound/inventory-trace.png",
 ]
 
@@ -552,6 +553,7 @@ evidence_refs = [
   "backend/crates/api/tests/m3_status_allocation_postgres.rs",
   "backend/crates/api/tests/m3_ops_closeout_postgres.rs",
   "apps/web-admin/src/pages/inventory/M3InventoryStatusConfigPage.tsx",
+  "prototypes/e2e/web-admin-m3-real.spec.ts",
   "artifacts/screenshot-portal/real-web/m3-status-config/owner-transition-saved.png",
 ]
 
@@ -1830,6 +1832,106 @@ audit = "模板解析为只读行为，不单独写审计；模板保存和打�
 [stories.tests]
 required_layers = ["L1", "L2", "L3", "L7", "L8", "L9"]
 covered_layers = ["L1", "L2", "L3", "L7", "L8", "L9"]
+
+[[deferred_stories]]
+id = "US-H9-006"
+title = "随货同行单归集与截单"
+module = "H9"
+story_file = "docs/domain/user-stories-h9-print-orchestration.md"
+types = ["write", "config_rule", "api_change", "frontend_interaction", "critical_path", "audit_compliance"]
+reason = "需求和验收标准已确认；尚未实现归集规则、截单、随货同行单号、页面、API、PostgreSQL 并发与真实数据 E2E。"
+owner = "H9 打印能力负责人"
+resume_when = "完成原型走查和 OpenAPI 草案后，以并发截单、地址隔离、幂等和 H2 审计为第一批 outside-in TDD 切片。"
+
+[[deferred_stories]]
+id = "US-H9-007"
+title = "归集维度规则配置"
+module = "H9"
+story_file = "docs/domain/user-stories-h9-print-orchestration.md"
+types = ["write", "config_rule", "api_change", "frontend_interaction", "audit_compliance"]
+reason = "需求和受控字段边界已确认；尚未实现规则版本、样本测试、发布页面、API、数据库和治理检查。"
+owner = "H9 打印能力负责人"
+resume_when = "登记可归集字段白名单并完成配置型页面原型后，实现规则发布、版本快照和地址隔离测试。"
+
+[[deferred_stories]]
+id = "US-H9-008"
+title = "打印组套配置与就绪策略"
+module = "H9"
+story_file = "docs/domain/user-stories-h9-print-orchestration.md"
+types = ["write", "config_rule", "api_change", "frontend_interaction", "critical_path", "audit_compliance"]
+reason = "组套、地址优先级、单据完整性和版本语义已确认；尚未实现页面、API、模型、文件引用和真实数据 E2E。"
+owner = "H9 打印能力负责人"
+resume_when = "完成组套配置原型与字段草案后，实现不可变发布版本、唯一匹配和单据就绪状态机。"
+
+[[deferred_stories]]
+id = "US-H9-009"
+title = "分类 PDF 渲染与留存"
+module = "H9"
+story_file = "docs/domain/user-stories-h9-print-orchestration.md"
+types = ["write", "integration", "api_change", "frontend_interaction", "audit_compliance"]
+reason = "分类 PDF 与 H-FILE 边界已确认；尚未实现 Render Worker、分类 PDF、哈希、保留策略、API 和测试。"
+owner = "H9 打印能力负责人"
+resume_when = "冻结 H-FILE 接口和 PDF 输入契约后，实现单分类渲染幂等切片，再扩展部分/全部分类打印。"
+
+[[deferred_stories]]
+id = "US-H9-010"
+title = "打印任务队列、顺序与重打"
+module = "H9"
+story_file = "docs/domain/user-stories-h9-print-orchestration.md"
+types = ["write", "concurrent_resource", "api_change", "frontend_interaction", "critical_path", "hardware_runtime", "audit_compliance"]
+reason = "任务、严格顺序、重打、暂停、改派和结果不明边界已确认；队列、页面、API、并发和真实打印机证据未实现。"
+owner = "H9 打印能力负责人"
+resume_when = "先完成无硬件任务状态机和 PostgreSQL 并发测试，再接真实 Windows Agent 与打印机 S4 证据。"
+
+[[deferred_stories]]
+id = "US-H9-011"
+title = "打印机、纸盒与设备租约"
+module = "H9"
+story_file = "docs/domain/user-stories-h9-print-orchestration.md"
+types = ["write", "config_rule", "api_change", "frontend_interaction", "concurrent_resource", "hardware_runtime", "audit_compliance"]
+reason = "物理打印站点、货主仓映射、纸盒和租约语义已确认；维护页、模型、测试打印、租约并发和真实设备证据未实现。"
+owner = "H9 打印能力负责人"
+resume_when = "按已确认站点模型完成安全评审；取得 Windows 打印机和多纸盒测试环境后，实现设备维护、租约和指定纸盒测试打印闭环。"
+
+[[deferred_stories]]
+id = "US-H9-012"
+title = "Print Agent 注册、状态与设备映射"
+module = "H9"
+story_file = "docs/domain/user-stories-h9-print-orchestration.md"
+types = ["write", "config_rule", "api_change", "frontend_interaction", "integration", "hardware_runtime", "runtime_guard", "audit_compliance"]
+reason = "站点级 H9 机器身份、H1 凭据生命周期复用、Agent 状态、心跳和输出映射已确认；专用鉴权上下文、页面、协议、客户端和硬件证据未实现。"
+owner = "H9 打印能力负责人"
+resume_when = "按已确认站点机器身份完成安全评审，再冻结 Agent 注册和长轮询 OpenAPI，实现状态测试门和一个逻辑输出槽纵向切片。"
+
+[[deferred_stories]]
+id = "US-H9-013"
+title = "多 Agent 分配与故障降级"
+module = "H9"
+story_file = "docs/domain/user-stories-h9-print-orchestration.md"
+types = ["write", "config_rule", "concurrent_resource", "api_change", "frontend_interaction", "hardware_runtime", "runtime_guard", "audit_compliance"]
+reason = "地址/客户/线路优先级、同站点主备和降级已确认；分配规则、租约、故障转移、页面和多 Agent S4 证据未实现。"
+owner = "H9 打印能力负责人"
+resume_when = "按已确认站点模型完成单 Agent 主链后，实现同站点主备规则、结果不明阻断和双 Agent 故障恢复测试。"
+
+[[deferred_stories]]
+id = "US-H9-014"
+title = "Agent 断网对账与本地空间"
+module = "H9"
+story_file = "docs/domain/user-stories-h9-print-orchestration.md"
+types = ["write", "integration", "api_change", "frontend_interaction", "concurrent_resource", "hardware_runtime", "runtime_guard", "audit_compliance"]
+reason = "断网、重启、对账、本地缓存和空间阈值已确认；客户端日志、清理、冲突处置、页面和 S4 证据未实现。"
+owner = "H9 打印能力负责人"
+resume_when = "完成 Agent 基础客户端后，用可控断网、重启和磁盘阈值场景实现恢复与不重复打印证据。"
+
+[[deferred_stories]]
+id = "US-H9-015"
+title = "Print Agent 客户端与启动更新"
+module = "H9"
+story_file = "docs/domain/user-stories-h9-print-orchestration.md"
+types = ["write", "integration", "api_change", "frontend_interaction", "hardware_runtime", "release_runtime", "runtime_guard", "audit_compliance"]
+reason = "Windows、Tauri 2、React/Rust、Velopack、pilot/stable、不可变发布、SHA-256 和正式环境无发布者验真的残余风险均已确认；客户端、发布链路和运行证据尚未创建。"
+owner = "H9 打印能力负责人"
+resume_when = "创建最小 Windows Agent 与只读 /agent-releases 发布链路，验证空闲启动、pilot 权限、SHA-256 失败关闭、完整包回退、最低版本和未决任务跳过，并保留无发布者验真的风险声明。"
 
 [[deferred_stories]]
 id = "US-M2-002"
@@ -4632,6 +4734,10 @@ evidence_refs = [
   "artifacts/screenshot-portal/real-web/h8-erp-messages/worker-paused.png",
   "artifacts/screenshot-portal/real-web/h8-erp-messages/payload-retention.png",
   "artifacts/screenshot-portal/real-web/h8-erp-messages/payload-decrypted.png",
+  "artifacts/screenshot-portal/real-web/h8-erp-messages/message-list-real.png",
+  "artifacts/screenshot-portal/real-web/h8-erp-messages/dead-detail-real.png",
+  "artifacts/screenshot-portal/real-web/h8-erp-messages/payload-decrypted-real.png",
+  "artifacts/screenshot-portal/real-web/h8-erp-messages/readonly-real.png",
 ]
 reason = "消息/尝试声明式 RANGE 月分区、跨月全局 ID/幂等唯一、当前月/下月自动维护、日统计快照、最近 10k 完成尝试 P95、两级回执、claim 租约、普通 Worker 成功/失败完成尝试、ADR-0018 L2 next_retry_at 与 MSSQL 到期认领、档案补录 L3 的 5 次/5 分钟/24 小时边界、服务端精确高级查询、created_at+id 稳定游标分页、JWT 用户多仓列表/统计/详情裁剪、API Key 单仓操作约束、Worker 心跳健康、暂停恢复、权限审计、完整报文短期加密保留/授权解密/no-store/到期清理，以及本地 Docker MSSQL 死信/人工重放状态闭环均有真实 PostgreSQL、隔离 MSSQL 或关闭 dev-mock 的浏览器证据；AC10 已关闭，仍缺生产等价 dev/staging 的单货主单月 10M 消息+10M 完成尝试列表/统计 P95 原始证据，以及自研 ERP 故障恢复 S4。"
 owner = "H8 模块负责人"
