@@ -1,15 +1,119 @@
 #[allow(unused_imports)]
+use crate::h8_inbound::{
+    H8AsnInboundRequest, H8InboundResponse, H8OutboundOrderInboundRequest,
+    H8ProductChangeInboundRequest, H8ProductMasterInboundRequest, H8ReturnOrderInboundRequest,
+};
+#[allow(unused_imports)]
 use wms_domain::{
     ClaimH8ErpMessageRequest, CreateH8ErpConnectorRequest, ErrorResponse, H8DecryptedPayload,
-    H8ErpConnector, H8ErpConnectorListResponse, H8ErpConnectorRuntimeConfig,
-    H8ErpConnectorTestResult, H8ErpInterfaceTableConnectorOption, H8ErpInterfaceTableDetail,
-    H8ErpInterfaceTableListResponse, H8ErpMessage, H8ErpMessageDetail, H8ErpMessageListResponse,
-    H8ErpMessageStats, H8PayloadRetentionPolicy, H8WorkerClaimControl, H8WorkerClaimDecision,
-    H8WorkerHeartbeatRequest, H8WorkerRuntimeResponse, H8WorkerStatus, PurgeH8ErpMessagesRequest,
-    PurgeH8ErpMessagesResponse, ReplayH8ErpMessageRequest, SetH8WorkerClaimControlRequest,
-    UpdateH8ErpConnectorRequest, UpdateH8PayloadRetentionPolicyRequest,
-    UpsertH8ErpMessageLifecycleRequest,
+    H8ErpBusinessReceiptRequest, H8ErpConnector, H8ErpConnectorListResponse,
+    H8ErpConnectorRuntimeConfig, H8ErpConnectorTestResult, H8ErpInterfaceTableConnectorOption,
+    H8ErpInterfaceTableDetail, H8ErpInterfaceTableListResponse, H8ErpMessage, H8ErpMessageDetail,
+    H8ErpMessageListResponse, H8ErpMessageStats, H8PayloadRetentionPolicy, H8WorkerClaimControl,
+    H8WorkerClaimDecision, H8WorkerHeartbeatRequest, H8WorkerRuntimeResponse, H8WorkerStatus,
+    PurgeH8ErpMessagesRequest, PurgeH8ErpMessagesResponse, ReplayH8ErpMessageRequest,
+    SetH8WorkerClaimControlRequest, UpdateH8ErpConnectorRequest,
+    UpdateH8PayloadRetentionPolicyRequest, UpsertH8ErpMessageLifecycleRequest,
 };
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/integration/erp-messages/inbound/asn",
+    tag = "h8-erp",
+    params(
+        ("Idempotency-Key" = String, Header, description = "ERP 消息业务幂等键"),
+        ("X-WMS-Warehouse-ID" = uuid::Uuid, Header, description = "ERP 调用目标仓库，必须与 API Key 授权范围一致")
+    ),
+    request_body = H8AsnInboundRequest,
+    responses(
+        (status = 200, description = "ASN 已完成 M-PM 规整并提交 M2", body = H8InboundResponse),
+        (status = 400, description = "缺少幂等键", body = ErrorResponse),
+        (status = 401, description = "API Key 无效", body = ErrorResponse),
+        (status = 403, description = "scope、仓库或连接绑定不匹配", body = ErrorResponse),
+        (status = 409, description = "幂等键冲突或消息处理中", body = ErrorResponse),
+        (status = 422, description = "schema、路由、映射或业务校验失败", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn push_h8_asn() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/integration/erp-messages/inbound/outbound_order",
+    tag = "h8-erp",
+    params(
+        ("Idempotency-Key" = String, Header, description = "ERP 消息业务幂等键"),
+        ("X-WMS-Warehouse-ID" = uuid::Uuid, Header, description = "ERP 调用目标仓库，必须与 API Key 授权范围一致")
+    ),
+    request_body = H8OutboundOrderInboundRequest,
+    responses(
+        (status = 200, description = "出库订单已完成 M-PM 规整并提交 M4", body = H8InboundResponse),
+        (status = 400, description = "缺少幂等键", body = ErrorResponse),
+        (status = 401, description = "API Key 无效", body = ErrorResponse),
+        (status = 403, description = "scope、仓库或连接绑定不匹配", body = ErrorResponse),
+        (status = 409, description = "幂等键冲突或消息处理中", body = ErrorResponse),
+        (status = 422, description = "schema、路由、映射或业务校验失败", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn push_h8_outbound_order() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/integration/erp-messages/inbound/product_change",
+    tag = "h8-erp",
+    params(("Idempotency-Key" = String, Header, description = "ERP 消息业务幂等键")),
+    request_body = H8ProductChangeInboundRequest,
+    responses(
+        (status = 200, description = "商品变更已完成 M-PM 规整并提交 M1；档案补录消息同时完成 M-QL 回执", body = H8InboundResponse),
+        (status = 400, description = "缺少幂等键", body = ErrorResponse),
+        (status = 401, description = "API Key 无效", body = ErrorResponse),
+        (status = 403, description = "scope、货主全仓范围或连接绑定不匹配", body = ErrorResponse),
+        (status = 409, description = "幂等键冲突或消息处理中", body = ErrorResponse),
+        (status = 422, description = "schema、路由、映射、字段或档案补录回执校验失败", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn push_h8_product_change() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/integration/erp-messages/inbound/product_master",
+    tag = "h8-erp",
+    params(("Idempotency-Key" = String, Header, description = "ERP 消息业务幂等键")),
+    request_body = H8ProductMasterInboundRequest,
+    responses(
+        (status = 200, description = "商品主数据已完成 M-PM 规整并提交 M1", body = H8InboundResponse),
+        (status = 400, description = "缺少幂等键", body = ErrorResponse),
+        (status = 401, description = "API Key 无效", body = ErrorResponse),
+        (status = 403, description = "scope、货主全仓范围或连接绑定不匹配", body = ErrorResponse),
+        (status = 409, description = "幂等键冲突或消息处理中", body = ErrorResponse),
+        (status = 422, description = "schema、路由、映射或业务校验失败", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn push_h8_product_master() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/integration/erp-messages/inbound/return_order",
+    tag = "h8-erp",
+    params(
+        ("Idempotency-Key" = String, Header, description = "ERP 消息业务幂等键"),
+        ("X-WMS-Warehouse-ID" = uuid::Uuid, Header, description = "ERP 调用目标仓库，必须与 API Key 授权范围一致")
+    ),
+    request_body = H8ReturnOrderInboundRequest,
+    responses(
+        (status = 200, description = "退货申请已完成 M-PM 规整并提交 M2", body = H8InboundResponse),
+        (status = 400, description = "缺少幂等键", body = ErrorResponse),
+        (status = 401, description = "API Key 无效", body = ErrorResponse),
+        (status = 403, description = "scope、仓库或连接绑定不匹配", body = ErrorResponse),
+        (status = 409, description = "幂等键冲突或消息处理中", body = ErrorResponse),
+        (status = 422, description = "schema、路由、映射、原批号或业务校验失败", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn push_h8_return_order() {}
 
 #[utoipa::path(
     get,
@@ -409,6 +513,28 @@ pub(crate) fn get_h8_worker_claim_decision() {}
 )]
 #[allow(dead_code)]
 pub(crate) fn upsert_h8_erp_message_lifecycle() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/integration/erp-messages/{id}/receipt",
+    tag = "h8-erp",
+    params(
+        ("id" = uuid::Uuid, Path, description = "H8 出站消息 ID"),
+        ("Idempotency-Key" = String, Header, description = "必须与原出站消息幂等键一致"),
+        ("X-WMS-API-Key" = String, Header, description = "具备 inbound:push scope 的 ERP API Key"),
+    ),
+    request_body = H8ErpBusinessReceiptRequest,
+    responses(
+        (status = 200, description = "业务成功回执进入 acked；明确拒绝进入 dead", body = H8ErpMessage),
+        (status = 400, description = "回执绑定或结果非法", body = ErrorResponse),
+        (status = 401, description = "API Key 无效", body = ErrorResponse),
+        (status = 403, description = "scope、货主或仓库越权", body = ErrorResponse),
+        (status = 404, description = "消息不存在", body = ErrorResponse),
+        (status = 409, description = "消息状态不允许回执", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn record_h8_erp_business_receipt() {}
 
 #[utoipa::path(
     get,

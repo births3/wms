@@ -1,51 +1,48 @@
-//! Wave 2 M-PM parameter mapping runtime service.
-
-use std::{collections::BTreeMap, sync::Arc};
+//! M-PM persistent value mapping used by H8 before business API calls.
 
 use axum::{
     extract::State,
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::post,
     Json, Router,
 };
-use chrono::{DateTime, Utc};
-use serde_json::{Map, Value};
-use sqlx::PgPool;
-use tokio::sync::Mutex;
+use chrono::{Duration, Utc};
+use serde_json::Value;
+use sha2::{Digest, Sha256};
+use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{
-    ErrorResponse, ExecuteMappingRequest, ExecuteMappingResponse, MappingDictionary,
-    MappingQueueItem, MappingRule, MappingTraceResponse,
+    ErrorResponse, MapParameterRequest, MapParameterResponse, ParameterMappingStatus,
 };
 
 use crate::{
-    audit::{append_event, AuditDiff, AuditError, AuditWriteRequest},
+    audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
     auth::{AuthContext, AuthError},
 };
 
 const EXECUTE_PERMISSION: &str = "mpm.execute";
+const MAP_PATH: &str = "/api/v1/parameter-mapping/map";
 
 #[derive(Clone, Debug)]
 pub struct ParameterMappingAppState {
-    service: Arc<Mutex<ParameterMappingService>>,
     pool: PgPool,
 }
 
 impl ParameterMappingAppState {
     pub fn with_postgres(pool: PgPool) -> Self {
-        Self {
-            service: Arc::new(Mutex::new(ParameterMappingService::default())),
-            pool,
-        }
+        Self { pool }
     }
 }
 
 #[derive(Debug)]
 pub enum ParameterMappingHandlerError {
     Auth(AuthError),
-    Mapping(MappingError),
-    Audit(AuditError),
+    MissingIdempotencyKey,
+    IdempotencyConflict,
+    InvalidRequest,
+    DictionaryNotFound,
+    Persistence(String),
 }
 
 impl From<AuthError> for ParameterMappingHandlerError {
@@ -60,20 +57,30 @@ impl IntoResponse for ParameterMappingHandlerError {
             return error.into_response();
         }
         let (status, code, message) = match self {
-            Self::Mapping(MappingError::RawPayloadMustBeObject) => (
+            Self::MissingIdempotencyKey => (
+                StatusCode::BAD_REQUEST,
+                "PM_IDEMPOTENCY_REQUIRED",
+                "Idempotency-Key header is required",
+            ),
+            Self::IdempotencyConflict => (
+                StatusCode::CONFLICT,
+                "PM_IDEMPOTENCY_CONFLICT",
+                "Idempotency-Key was already used for a different request",
+            ),
+            Self::InvalidRequest => (
                 StatusCode::UNPROCESSABLE_ENTITY,
-                "PM_RAW_PAYLOAD_INVALID",
-                "raw_payload must be an object".to_string(),
+                "PM_REQUEST_INVALID",
+                "parameter mapping request is invalid",
             ),
-            Self::Mapping(MappingError::TraceNotFound) => (
+            Self::DictionaryNotFound => (
                 StatusCode::NOT_FOUND,
-                "PM_TRACE_NOT_FOUND",
-                "mapping trace not found".to_string(),
+                "PM_DICTIONARY_NOT_FOUND",
+                "parameter mapping dictionary was not found",
             ),
-            Self::Audit(error) => (
+            Self::Persistence(_) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "PM_AUDIT_FAILED",
-                format!("failed to append mapping audit: {error:?}"),
+                "PM_PERSISTENCE_FAILED",
+                "parameter mapping persistence failed",
             ),
             Self::Auth(_) => unreachable!(),
         };
@@ -81,7 +88,7 @@ impl IntoResponse for ParameterMappingHandlerError {
             status,
             Json(ErrorResponse {
                 code: code.to_string(),
-                message,
+                message: message.to_string(),
                 severity: "error".to_string(),
                 details: serde_json::json!({}),
                 trace_id: "unavailable".to_string(),
@@ -94,282 +101,371 @@ impl IntoResponse for ParameterMappingHandlerError {
 
 pub fn parameter_mapping_router(state: ParameterMappingAppState) -> Router {
     Router::new()
-        .route(
-            "/api/v1/parameter-mapping/execute",
-            post(execute_mapping_handler),
-        )
+        .route(MAP_PATH, post(map_parameter_handler))
         .with_state(state)
 }
 
-async fn execute_mapping_handler(
+async fn map_parameter_handler(
     ctx: AuthContext,
     State(state): State<ParameterMappingAppState>,
-    Json(req): Json<ExecuteMappingRequest>,
-) -> Result<Json<ExecuteMappingResponse>, ParameterMappingHandlerError> {
+    headers: HeaderMap,
+    Json(req): Json<MapParameterRequest>,
+) -> Result<Json<MapParameterResponse>, ParameterMappingHandlerError> {
     ctx.require_permission(EXECUTE_PERMISSION)?;
-    let source_system = req.source_system.clone();
-    let mut service = state.service.lock().await;
-    let mut next = service.clone();
-    let result = next
-        .execute(&ctx, req, Utc::now())
-        .map_err(ParameterMappingHandlerError::Mapping)?;
-    let audit = AuditWriteRequest::from_auth_context(
-        &ctx,
-        "execute_mapping",
-        "M-PM",
-        "parameter_mapping_execution",
-        result.execution_id.to_string(),
-        Some(AuditDiff::compute(
-            serde_json::json!({"source_system": source_system}),
-            serde_json::json!({
-                "unresolved_fields": &result.unresolved_fields,
-                "queue_item_id": result.queue_item_id,
-            }),
-        )),
+    let key = headers
+        .get("Idempotency-Key")
+        .and_then(|value| value.to_str().ok())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or(ParameterMappingHandlerError::MissingIdempotencyKey)?;
+    Ok(Json(map_parameter(&state, &ctx, &req, key).await?))
+}
+
+pub(crate) async fn map_parameter(
+    state: &ParameterMappingAppState,
+    ctx: &AuthContext,
+    req: &MapParameterRequest,
+    key: &str,
+) -> Result<MapParameterResponse, ParameterMappingHandlerError> {
+    validate_request(req)?;
+    let request_hash = format!(
+        "{:x}",
+        Sha256::digest(
+            serde_json::to_vec(req)
+                .map_err(|error| ParameterMappingHandlerError::Persistence(error.to_string()))?
+        )
     );
-    append_event(&state.pool, &audit)
+    let mut tx = state.pool.begin().await.map_err(db_error)?;
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))")
+        .bind(ctx.owner_id.to_string())
+        .bind(key)
+        .execute(&mut *tx)
         .await
-        .map_err(ParameterMappingHandlerError::Audit)?;
-    *service = next;
-    Ok(Json(result))
-}
+        .map_err(db_error)?;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum MappingError {
-    TraceNotFound,
-    RawPayloadMustBeObject,
-}
-
-#[derive(Clone, Debug)]
-struct MappingExecution {
-    execution_id: Uuid,
-    owner_id: Uuid,
-    source_system: String,
-    raw_payload: Value,
-    normalized_payload: Value,
-    applied_rule_ids: Vec<Uuid>,
-    unresolved_fields: Vec<String>,
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct ParameterMappingService {
-    dictionaries: BTreeMap<Uuid, MappingDictionary>,
-    rules: BTreeMap<Uuid, MappingRule>,
-    queue: BTreeMap<Uuid, MappingQueueItem>,
-    executions: BTreeMap<Uuid, MappingExecution>,
-}
-
-impl ParameterMappingService {
-    pub fn add_dictionary(
-        &mut self,
-        ctx: &AuthContext,
-        dictionary_code: impl Into<String>,
-        dictionary_name: impl Into<String>,
-        now: DateTime<Utc>,
-    ) -> MappingDictionary {
-        let dictionary = MappingDictionary {
-            id: Uuid::new_v4(),
-            owner_id: ctx.owner_id,
-            dictionary_code: dictionary_code.into(),
-            dictionary_name: dictionary_name.into(),
-            created_at: now,
-        };
-        self.dictionaries.insert(dictionary.id, dictionary.clone());
-        dictionary
+    if let Some(response) = replay_idempotent(&mut tx, ctx.owner_id, key, &request_hash).await? {
+        tx.commit().await.map_err(db_error)?;
+        return Ok(response);
     }
 
-    pub fn add_rule(
-        &mut self,
-        ctx: &AuthContext,
-        source_system: impl Into<String>,
-        external_field: impl Into<String>,
-        canonical_field: impl Into<String>,
-        transform: impl Into<String>,
-        now: DateTime<Utc>,
-    ) -> MappingRule {
-        let rule = MappingRule {
-            id: Uuid::new_v4(),
-            owner_id: ctx.owner_id,
-            source_system: source_system.into(),
-            external_field: external_field.into(),
-            canonical_field: canonical_field.into(),
-            transform: transform.into(),
-            created_at: now,
-        };
-        self.rules.insert(rule.id, rule.clone());
-        rule
+    let response = execute_mapping(&mut tx, ctx, req).await?;
+    let resource_id = response
+        .rule_id
+        .map(|id| id.to_string())
+        .unwrap_or_else(|| req.dict_code.clone());
+    append_event_in_tx(
+        &mut tx,
+        &AuditWriteRequest::from_auth_context(
+            ctx,
+            "map_parameter",
+            "M-PM",
+            "parameter_mapping",
+            resource_id.clone(),
+            Some(AuditDiff::compute(
+                serde_json::json!({
+                    "dict_code": req.dict_code,
+                    "source_system": req.source_system,
+                    "source_digest": format!("{:x}", Sha256::digest(req.source_value.as_bytes())),
+                }),
+                serde_json::json!({
+                    "status": response.status,
+                    "target_value": response.target_value,
+                    "rule_id": response.rule_id,
+                    "queued": response.queued,
+                }),
+            )),
+        ),
+    )
+    .await
+    .map_err(|error| ParameterMappingHandlerError::Persistence(format!("{error:?}")))?;
+    store_idempotent(
+        &mut tx,
+        ctx.owner_id,
+        key,
+        &request_hash,
+        &resource_id,
+        &response,
+    )
+    .await?;
+    tx.commit().await.map_err(db_error)?;
+    Ok(response)
+}
+
+fn validate_request(req: &MapParameterRequest) -> Result<(), ParameterMappingHandlerError> {
+    let source_system_len = req.source_system.as_deref().unwrap_or("*").trim().len();
+    if req.dict_code.trim().is_empty()
+        || req.dict_code.len() > 128
+        || req.source_value.trim().is_empty()
+        || req.source_value.len() > 2_000
+        || source_system_len == 0
+        || source_system_len > 128
+        || req
+            .source_record_id
+            .as_deref()
+            .is_some_and(|value| value.len() > 256)
+    {
+        return Err(ParameterMappingHandlerError::InvalidRequest);
+    }
+    Ok(())
+}
+
+#[derive(FromRow)]
+struct DictionaryRow {
+    id: Uuid,
+    target_values: Value,
+    case_sensitive: bool,
+    normalize_whitespace: bool,
+    default_strategy: String,
+    fallback_value: Option<String>,
+}
+
+#[derive(FromRow)]
+struct RuleRow {
+    id: Uuid,
+    target_value: String,
+    confidence: i32,
+}
+
+async fn execute_mapping(
+    tx: &mut Transaction<'_, Postgres>,
+    ctx: &AuthContext,
+    req: &MapParameterRequest,
+) -> Result<MapParameterResponse, ParameterMappingHandlerError> {
+    let dictionaries: Vec<DictionaryRow> = sqlx::query_as(
+        r#"
+        SELECT id, target_values, case_sensitive, normalize_whitespace,
+               default_strategy, fallback_value
+          FROM parameter_mapping_dictionaries
+         WHERE dict_code = $1 AND enabled
+           AND (owner_id = $2 OR owner_id IS NULL)
+         ORDER BY (owner_id IS NOT NULL) DESC
+        "#,
+    )
+    .bind(req.dict_code.trim())
+    .bind(ctx.owner_id)
+    .fetch_all(&mut **tx)
+    .await
+    .map_err(db_error)?;
+    let dictionary = dictionaries
+        .first()
+        .ok_or(ParameterMappingHandlerError::DictionaryNotFound)?;
+    let dictionary_ids = dictionaries
+        .iter()
+        .map(|candidate| candidate.id)
+        .collect::<Vec<_>>();
+    let source_system = req.source_system.as_deref().unwrap_or("*").trim();
+    let normalized = normalize_source(
+        &req.source_value,
+        dictionary.normalize_whitespace,
+        dictionary.case_sensitive,
+    );
+    let matches: Vec<RuleRow> = sqlx::query_as(
+        r#"
+        SELECT r.id, r.target_value, r.confidence,
+               (r.owner_id IS NOT NULL) AS owner_specific,
+               (r.source_system = $3) AS source_specific,
+               CASE r.match_type
+                   WHEN 'exact' THEN 1
+                   WHEN 'contains' THEN 2
+                   WHEN 'wildcard' THEN 3
+                   ELSE 4
+               END AS match_rank,
+               r.priority
+          FROM parameter_mapping_rules r
+         WHERE r.dictionary_id = ANY($1) AND r.enabled
+           AND (r.owner_id = $2 OR r.owner_id IS NULL)
+           AND (r.source_system = $3 OR r.source_system = '*')
+           AND (r.effective_from IS NULL OR r.effective_from <= now())
+           AND (r.effective_to IS NULL OR r.effective_to > now())
+           AND CASE r.match_type
+               WHEN 'exact' THEN r.normalized_source_pattern = $4
+               WHEN 'contains' THEN position(r.normalized_source_pattern IN $4) > 0
+               WHEN 'wildcard' THEN $4 LIKE replace(r.normalized_source_pattern, '*', '%')
+               WHEN 'regex' THEN CASE WHEN $6 THEN $5 ~ r.source_pattern ELSE $5 ~* r.source_pattern END
+               ELSE FALSE
+           END
+         ORDER BY owner_specific DESC, source_specific DESC, match_rank,
+                  r.priority, r.created_at DESC
+         LIMIT 1
+        "#,
+    )
+    .bind(&dictionary_ids)
+    .bind(ctx.owner_id)
+    .bind(source_system)
+    .bind(&normalized)
+    .bind(req.source_value.trim())
+    .bind(dictionary.case_sensitive)
+    .fetch_all(&mut **tx)
+    .await
+    .map_err(db_error)?;
+
+    if let Some(first) = matches.first() {
+        if !dictionaries
+            .iter()
+            .any(|candidate| target_is_allowed(&candidate.target_values, &first.target_value))
+        {
+            return Err(ParameterMappingHandlerError::Persistence(
+                "mapping rule target is not in dictionary values".to_string(),
+            ));
+        }
+        return Ok(MapParameterResponse {
+            status: ParameterMappingStatus::Matched,
+            target_value: Some(first.target_value.clone()),
+            rule_id: Some(first.id),
+            confidence: first.confidence,
+            fallback_used: false,
+            queued: false,
+        });
     }
 
-    pub fn execute(
-        &mut self,
-        ctx: &AuthContext,
-        req: ExecuteMappingRequest,
-        now: DateTime<Utc>,
-    ) -> Result<ExecuteMappingResponse, MappingError> {
-        let Some(raw_object) = req.raw_payload.as_object() else {
-            return Err(MappingError::RawPayloadMustBeObject);
-        };
-
-        let mut normalized = Map::new();
-        let mut unresolved_fields = Vec::new();
-        let mut applied_rule_ids = Vec::new();
-
-        for (field, value) in raw_object {
-            let matched_rule = self.rules.values().find(|rule| {
-                rule.owner_id == ctx.owner_id
-                    && rule.source_system == req.source_system
-                    && rule.external_field == *field
+    if dictionary.default_strategy == "fallback" {
+        let fallback = dictionary
+            .fallback_value
+            .clone()
+            .filter(|value| target_is_allowed(&dictionary.target_values, value));
+        if let Some(target_value) = fallback {
+            return Ok(MapParameterResponse {
+                status: ParameterMappingStatus::Matched,
+                target_value: Some(target_value),
+                rule_id: None,
+                confidence: 0,
+                fallback_used: true,
+                queued: false,
             });
-            if let Some(rule) = matched_rule {
-                normalized.insert(
-                    rule.canonical_field.clone(),
-                    apply_transform(value, &rule.transform),
-                );
-                applied_rule_ids.push(rule.id);
-            } else {
-                unresolved_fields.push(field.clone());
-            }
         }
-
-        unresolved_fields.sort();
-        let queue_item_id = if unresolved_fields.is_empty() {
-            None
-        } else {
-            let item = MappingQueueItem {
-                id: Uuid::new_v4(),
-                owner_id: ctx.owner_id,
-                source_system: req.source_system.clone(),
-                raw_payload: req.raw_payload.clone(),
-                status: "pending_mapping".to_string(),
-                created_at: now,
-            };
-            let id = item.id;
-            self.queue.insert(id, item);
-            Some(id)
-        };
-
-        let execution_id = Uuid::new_v4();
-        let normalized_payload = Value::Object(normalized);
-        self.executions.insert(
-            execution_id,
-            MappingExecution {
-                execution_id,
-                owner_id: ctx.owner_id,
-                source_system: req.source_system,
-                raw_payload: req.raw_payload,
-                normalized_payload: normalized_payload.clone(),
-                applied_rule_ids,
-                unresolved_fields: unresolved_fields.clone(),
-            },
-        );
-
-        Ok(ExecuteMappingResponse {
-            execution_id,
-            queue_item_id,
-            normalized_payload,
-            unresolved_fields,
-        })
+        return Err(ParameterMappingHandlerError::Persistence(
+            "mapping dictionary fallback is invalid".to_string(),
+        ));
     }
 
-    pub fn trace(
-        &self,
-        ctx: &AuthContext,
-        execution_id: Uuid,
-    ) -> Result<MappingTraceResponse, MappingError> {
-        let execution = self
-            .executions
-            .get(&execution_id)
-            .filter(|execution| execution.owner_id == ctx.owner_id)
-            .ok_or(MappingError::TraceNotFound)?;
-
-        Ok(MappingTraceResponse {
-            execution_id: execution.execution_id,
-            source_system: execution.source_system.clone(),
-            raw_payload: execution.raw_payload.clone(),
-            normalized_payload: execution.normalized_payload.clone(),
-            applied_rule_ids: execution.applied_rule_ids.clone(),
-            unresolved_fields: execution.unresolved_fields.clone(),
-        })
+    let queued = dictionary.default_strategy == "mark_unmapped";
+    if queued {
+        sqlx::query(
+            r#"
+            INSERT INTO parameter_mapping_queue (
+                id, owner_id, dictionary_id, source_system, source_record_id,
+                source_value, normalized_source_value
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7)
+            ON CONFLICT (owner_id, dictionary_id, normalized_source_value)
+            DO UPDATE SET occurrence_count = parameter_mapping_queue.occurrence_count + 1,
+                          last_seen_at = now(),
+                          source_system = EXCLUDED.source_system,
+                          source_record_id = EXCLUDED.source_record_id
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(ctx.owner_id)
+        .bind(dictionary.id)
+        .bind(source_system)
+        .bind(req.source_record_id.as_deref())
+        .bind(req.source_value.trim())
+        .bind(&normalized)
+        .execute(&mut **tx)
+        .await
+        .map_err(db_error)?;
     }
+    Ok(MapParameterResponse {
+        status: ParameterMappingStatus::Unmatched,
+        target_value: None,
+        rule_id: None,
+        confidence: 0,
+        fallback_used: false,
+        queued,
+    })
+}
 
-    pub fn pending_queue_len(&self, ctx: &AuthContext) -> usize {
-        self.queue
-            .values()
-            .filter(|item| item.owner_id == ctx.owner_id && item.status == "pending_mapping")
-            .count()
-    }
-
-    pub fn dictionary_count(&self, ctx: &AuthContext) -> usize {
-        self.dictionaries
-            .values()
-            .filter(|dictionary| dictionary.owner_id == ctx.owner_id)
-            .count()
+fn normalize_source(value: &str, whitespace: bool, case_sensitive: bool) -> String {
+    let normalized = if whitespace {
+        value
+            .replace('（', "(")
+            .replace('）', ")")
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+    } else {
+        value.to_string()
+    };
+    if case_sensitive {
+        normalized
+    } else {
+        normalized.to_lowercase()
     }
 }
 
-fn apply_transform(value: &Value, transform: &str) -> Value {
-    match (transform, value) {
-        ("trim", Value::String(text)) => Value::String(text.trim().to_string()),
-        ("upper", Value::String(text)) => Value::String(text.trim().to_ascii_uppercase()),
-        _ => value.clone(),
-    }
+fn target_is_allowed(target_values: &Value, target: &str) -> bool {
+    target_values
+        .as_array()
+        .is_some_and(|values| values.iter().any(|value| value.as_str() == Some(target)))
 }
 
-#[cfg(test)]
-mod tests {
-    use chrono::{TimeZone, Utc};
-    use serde_json::json;
-    use uuid::Uuid;
-    use wms_domain::ExecuteMappingRequest;
-
-    use super::ParameterMappingService;
-    use crate::auth::AuthContext;
-
-    fn ctx(owner_id: Uuid) -> AuthContext {
-        AuthContext {
-            user_id: Uuid::new_v4(),
-            owner_id,
-            actor_name: "tester".to_string(),
-            permissions: vec!["mpm.execute".to_string()],
-            jti: Uuid::new_v4().to_string(),
-            warehouse_scope: None,
-        }
+async fn replay_idempotent(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    key: &str,
+    request_hash: &str,
+) -> Result<Option<MapParameterResponse>, ParameterMappingHandlerError> {
+    let row: Option<(String, Value, chrono::DateTime<Utc>)> = sqlx::query_as(
+        "SELECT request_hash, response_body, expires_at FROM idempotency_request WHERE owner_id=$1 AND idempotency_key=$2 FOR UPDATE",
+    )
+    .bind(owner_id)
+    .bind(key)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(db_error)?;
+    let Some((stored_hash, response, expires_at)) = row else {
+        return Ok(None);
+    };
+    if expires_at <= Utc::now() {
+        sqlx::query("DELETE FROM idempotency_request WHERE owner_id=$1 AND idempotency_key=$2")
+            .bind(owner_id)
+            .bind(key)
+            .execute(&mut **tx)
+            .await
+            .map_err(db_error)?;
+        return Ok(None);
     }
-
-    #[test]
-    fn maps_irregular_erp_payload_and_traces_execution() {
-        let now = Utc
-            .with_ymd_and_hms(2026, 6, 4, 11, 0, 0)
-            .single()
-            .expect("valid time");
-        let ctx = ctx(Uuid::new_v4());
-        let mut service = ParameterMappingService::default();
-        service.add_dictionary(&ctx, "erp_product", "ERP 商品字段", now);
-        let rule = service.add_rule(&ctx, "ERP", "ITEM_NO", "product_code", "upper", now);
-        service.add_rule(&ctx, "ERP", "ITEM_NAME", "product_name", "trim", now);
-
-        let response = service
-            .execute(
-                &ctx,
-                ExecuteMappingRequest {
-                    source_system: "ERP".to_string(),
-                    raw_payload: json!({
-                        "ITEM_NO": " p-001 ",
-                        "ITEM_NAME": " 感冒灵颗粒 ",
-                        "UNKNOWN_COL": "legacy",
-                    }),
-                },
-                now,
-            )
-            .expect("execute mapping");
-
-        assert_eq!(response.normalized_payload["product_code"], "P-001");
-        assert_eq!(response.normalized_payload["product_name"], "感冒灵颗粒");
-        assert_eq!(response.unresolved_fields, vec!["UNKNOWN_COL"]);
-        assert_eq!(service.pending_queue_len(&ctx), 1);
-
-        let trace = service.trace(&ctx, response.execution_id).expect("trace");
-        assert!(trace.applied_rule_ids.contains(&rule.id));
-        assert_eq!(trace.raw_payload["UNKNOWN_COL"], "legacy");
+    if stored_hash != request_hash {
+        return Err(ParameterMappingHandlerError::IdempotencyConflict);
     }
+    serde_json::from_value(response)
+        .map(Some)
+        .map_err(|error| ParameterMappingHandlerError::Persistence(error.to_string()))
+}
+
+async fn store_idempotent(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    key: &str,
+    request_hash: &str,
+    resource_id: &str,
+    response: &MapParameterResponse,
+) -> Result<(), ParameterMappingHandlerError> {
+    sqlx::query(
+        r#"
+        INSERT INTO idempotency_request (
+            id, owner_id, idempotency_key, request_hash, method, path, status_code,
+            response_body, resource_type, resource_id, expires_at, created_at
+        ) VALUES ($1,$2,$3,$4,'POST',$5,200,$6,'parameter_mapping',$7,$8,$9)
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(owner_id)
+    .bind(key)
+    .bind(request_hash)
+    .bind(MAP_PATH)
+    .bind(
+        serde_json::to_value(response)
+            .map_err(|error| ParameterMappingHandlerError::Persistence(error.to_string()))?,
+    )
+    .bind(resource_id)
+    .bind(Utc::now() + Duration::hours(24))
+    .bind(Utc::now())
+    .execute(&mut **tx)
+    .await
+    .map_err(db_error)?;
+    Ok(())
+}
+
+fn db_error(error: sqlx::Error) -> ParameterMappingHandlerError {
+    ParameterMappingHandlerError::Persistence(error.to_string())
 }

@@ -483,13 +483,9 @@ pub(crate) fn list_driver_today_tasks() {}
 #[allow(dead_code)]
 pub(crate) fn get_store_dashboard() {}
 
-#[utoipa::path(post, path = "/api/v1/parameter-mapping/execute", tag = "parameter-mapping", request_body = ExecuteMappingRequest, responses((status = 200, description = "执行参数对照", body = ExecuteMappingResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(post, path = "/api/v1/parameter-mapping/map", tag = "parameter-mapping", params(("Idempotency-Key" = String, Header, description = "跨重试保持不变的幂等键")), request_body = MapParameterRequest, responses((status = 200, description = "执行参数对照", body = MapParameterResponse), (status = 400, description = "缺少幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 404, description = "字典不存在", body = ErrorResponse), (status = 409, description = "幂等键冲突", body = ErrorResponse), (status = 422, description = "请求无效", body = ErrorResponse)))]
 #[allow(dead_code)]
-pub(crate) fn execute_mapping() {}
-
-#[utoipa::path(get, path = "/api/v1/parameter-mapping/traces/{execution_id}", tag = "parameter-mapping", params(("execution_id" = uuid::Uuid, Path, description = "执行 ID")), responses((status = 200, description = "参数对照反向追溯", body = MappingTraceResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
-#[allow(dead_code)]
-pub(crate) fn trace_mapping() {}
+pub(crate) fn map_parameter() {}
 
 #[utoipa::path(post, path = "/api/v1/config-center/feature-flags/migrate", tag = "config-center", responses((status = 200, description = "迁移文件版 Feature Flag", body = FeatureFlagMigrationResult), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
