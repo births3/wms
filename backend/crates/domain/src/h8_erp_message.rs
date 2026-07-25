@@ -184,14 +184,7 @@ pub struct H8MessageEnvelope {
 
 impl H8MessageEnvelope {
     pub fn validate(&self) -> Result<(), H8MessageError> {
-        validate_direction(&self.direction)?;
-        validate_message_type_in_catalog(&self.message_type)?;
-        if self.direction == "inbound" && !is_inbound_message_type(&self.message_type) {
-            return Err(H8MessageError::UnknownMessageType);
-        }
-        if self.direction == "outbound" && !is_outbound_message_type(&self.message_type) {
-            return Err(H8MessageError::UnknownMessageType);
-        }
+        validate_message_direction(&self.direction, &self.message_type)?;
         validate_schema_version(&self.schema_version)?;
         if self.external_ref.trim().is_empty() {
             return Err(H8MessageError::FieldRequired("external_ref"));
@@ -214,6 +207,20 @@ impl H8MessageEnvelope {
         self.message_type = binding.message_type;
         self
     }
+}
+
+pub fn validate_message_direction(
+    direction: &str,
+    message_type: &str,
+) -> Result<(), H8MessageError> {
+    validate_direction(direction)?;
+    validate_message_type_in_catalog(message_type)?;
+    if (direction == "inbound" && !is_inbound_message_type(message_type))
+        || (direction == "outbound" && !is_outbound_message_type(message_type))
+    {
+        return Err(H8MessageError::UnknownMessageType);
+    }
+    Ok(())
 }
 
 /// 错误是否可自动重试（US-H8-002 AC9 / US-H8-003 AC5）。
@@ -577,7 +584,17 @@ pub struct UpsertH8ErpMessageLifecycleRequest {
     pub connector_code: Option<String>,
     pub config_version: Option<i64>,
     pub message_id: Option<Uuid>,
+    pub warehouse_id: Option<Uuid>,
+    pub wms_resource_id: Option<String>,
     pub payload: Option<serde_json::Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct H8ErpBusinessReceiptRequest {
+    pub result: String,
+    pub error_summary: Option<String>,
+    pub schema_version: String,
+    pub correlation_id: String,
 }
 
 /// 根据尝试样本估算 P95（最近似：排序后 95 分位）。

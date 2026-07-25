@@ -352,6 +352,8 @@ export function H1ApiKeyPage({ currentUser }: { currentUser: CurrentUser }) {
             <label className="grid gap-1 text-sm">作用域<select required multiple className="min-h-28 rounded-md border border-input bg-background px-3 py-2 text-sm" value={createForm.scopes} onChange={(event) => setCreateForm((current) => ({ ...current, scopes: Array.from(event.target.selectedOptions, (option) => option.value) }))} aria-label="API Key 作用域">
               <option value="master-data:write">master-data:write</option>
               <option value="inbound:push">inbound:push</option>
+              <option value="outbound:push">outbound:push</option>
+              <option value="return:push">return:push</option>
               <option value="tms:callback">tms:callback</option>
             </select></label>
             <label className="grid gap-1 text-sm">过期时间<span className="text-xs text-muted-foreground">留空使用默认 180 天</span><Input type="datetime-local" value={createForm.expiresAt} onChange={(event) => updateCreateForm("expiresAt", event.target.value)} /></label>

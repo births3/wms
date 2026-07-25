@@ -9,6 +9,7 @@ use wms_domain::{
 };
 
 use super::{error::H8ErpMessageRepoError, pg_rows::MessageRow};
+use crate::audit::{append_event_in_tx, AuditWriteRequest};
 
 pub(super) async fn transition_lifecycle_status(
     pool: &PgPool,
@@ -16,8 +17,10 @@ pub(super) async fn transition_lifecycle_status(
     id: Uuid,
     target: &str,
     error_summary: Option<&str>,
+    wms_resource_id: Option<&str>,
     actor: &str,
     now: DateTime<Utc>,
+    audit_requests: &[AuditWriteRequest],
 ) -> Result<H8ErpMessage, H8ErpMessageRepoError> {
     let mut tx = pool
         .begin()
@@ -40,17 +43,30 @@ pub(super) async fn transition_lifecycle_status(
     can_transition_message_status(&current.sync_status, target)
         .map_err(H8ErpMessageRepoError::Domain)?;
     let summary = error_summary.map(sanitize_error_summary);
-    let next_retry_at = (target == "failed").then(|| {
+    let receipt_retry =
+        current.sync_status == "awaiting_receipt" && matches!(target, "processing" | "dead");
+    let retry_increment = i32::from(target == "failed" || receipt_retry);
+    let retry_number = current.retry_count + retry_increment;
+    let next_retry_at = matches!(target, "failed" | "awaiting_receipt").then(|| {
         now + chrono::Duration::milliseconds(standard_retry_delay_millis(
-            current.retry_count + 1,
+            if target == "awaiting_receipt" {
+                current.retry_count + 1
+            } else {
+                retry_number
+            },
             &current.idempotency_key,
         ))
     });
     let next = sqlx::query_as::<_, MessageRow>(
         r#"UPDATE h8_erp_messages
            SET sync_status=$4, retry_count=retry_count+$5, next_retry_at=$6,
-               last_error_summary=$7, claimed_by=$8, lease_expires_at=$9,
-               completed_at=$10, updated_at=$11
+               last_error_summary=$7,
+               wms_resource_id=CASE WHEN $4='succeeded'
+                   THEN COALESCE(wms_resource_id, $8) ELSE wms_resource_id END,
+               claimed_by=$9, lease_expires_at=$10,
+               completed_at=$11,
+               acked_at=CASE WHEN $4='acked' THEN $12 ELSE acked_at END,
+               updated_at=$12
            WHERE owner_id=$1 AND id=$2 AND sync_status=$3
            RETURNING id, owner_id, warehouse_id, connector_id, connector_code, config_version,
                      direction, message_type, schema_version, channel, external_ref, wms_resource_id,
@@ -62,12 +78,13 @@ pub(super) async fn transition_lifecycle_status(
     .bind(id)
     .bind(&current.sync_status)
     .bind(target)
-    .bind(i32::from(target == "failed"))
+    .bind(retry_increment)
     .bind(next_retry_at)
     .bind(&summary)
+    .bind(wms_resource_id)
     .bind((target == "processing").then(|| actor.to_string()))
     .bind((target == "processing").then(|| now + chrono::Duration::minutes(10)))
-    .bind((target == "succeeded").then_some(now))
+    .bind(matches!(target, "succeeded" | "acked" | "dead").then_some(now))
     .bind(now)
     .fetch_optional(&mut *tx)
     .await
@@ -75,7 +92,23 @@ pub(super) async fn transition_lifecycle_status(
     .ok_or(H8ErpMessageRepoError::Domain(
         H8MessageError::IllegalTransition,
     ))?;
-    if matches!(target, "failed" | "succeeded") {
+    crate::reconciliation::advance_from_h8_receipt_in_tx(
+        &mut tx,
+        owner_id,
+        &current.idempotency_key,
+        target,
+        now,
+        audit_requests.first(),
+    )
+    .await
+    .map_err(|error| H8ErpMessageRepoError::Db(format!("M-RC 状态推进失败: {error:?}")))?;
+    let attempt_result = match (current.sync_status.as_str(), target) {
+        ("awaiting_receipt", "processing") => Some("failed"),
+        (_, "awaiting_receipt") => Some("succeeded"),
+        (_, "failed" | "succeeded" | "dead") => Some(target),
+        _ => None,
+    };
+    if let Some(attempt_result) = attempt_result {
         let attempt_no: i32 = sqlx::query_scalar(
             "SELECT COALESCE(MAX(attempt_no), 0) + 1 FROM h8_erp_message_attempts WHERE message_id=$1",
         )
@@ -96,12 +129,17 @@ pub(super) async fn transition_lifecycle_status(
         .bind(&current.channel)
         .bind(current.updated_at)
         .bind(now)
-        .bind(target)
+        .bind(attempt_result)
         .bind(summary)
         .bind(actor)
         .execute(&mut *tx)
         .await
         .map_err(|error| H8ErpMessageRepoError::Db(error.to_string()))?;
+    }
+    for audit_request in audit_requests {
+        append_event_in_tx(&mut tx, audit_request)
+            .await
+            .map_err(|error| H8ErpMessageRepoError::Db(format!("{error:?}")))?;
     }
     tx.commit()
         .await

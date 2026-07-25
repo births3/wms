@@ -5,7 +5,7 @@ use axum::{
     http::{Method, Request, StatusCode},
 };
 use chrono::Utc;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tower::ServiceExt;
 use uuid::Uuid;
 use wms_domain::{
@@ -14,7 +14,6 @@ use wms_domain::{
     H8_MESSAGE_DEAD_AUDIT_ACTION,
 };
 
-use crate::audit::AuditLog;
 use crate::auth::AuthContext;
 
 use super::audit::{
@@ -237,7 +236,7 @@ async fn preflight_schema_failure_still_records_receive_and_final_failure() {
     for stage in ["receive", "final_failure"] {
         let body = serde_json::json!({
             "stage": stage,
-            "result": "preflight_rejected",
+            "result": if stage == "receive" { "received" } else { "preflight_rejected" },
             "direction": "inbound",
             "message_type": "asn",
             "schema_version": "999",
@@ -318,11 +317,12 @@ async fn invalid_lifecycle_stage_is_rejected_before_message_insert() {
 async fn lifecycle_rejects_changes_to_existing_message_binding() {
     let state = H8ErpMessageAppState::with_memory();
     let owner = Uuid::new_v4();
-    let message = sample_message(owner, "processing");
+    let mut message = sample_message(owner, "processing");
+    message.warehouse_id = Some(Uuid::new_v4());
     state.repository.upsert_for_test(&message).await.unwrap();
     let base = serde_json::json!({
         "stage": "receive",
-        "result": "retry",
+        "result": "ok",
         "direction": message.direction,
         "message_type": message.message_type,
         "schema_version": message.schema_version,
@@ -332,7 +332,8 @@ async fn lifecycle_rejects_changes_to_existing_message_binding() {
         "channel": message.channel,
         "connector_id": message.connector_id,
         "connector_code": message.connector_code,
-        "config_version": message.config_version
+        "config_version": message.config_version,
+        "warehouse_id": message.warehouse_id
     });
 
     for (field, changed) in [
@@ -341,6 +342,7 @@ async fn lifecycle_rejects_changes_to_existing_message_binding() {
         ("channel", serde_json::json!("interface_table")),
         ("direction", serde_json::json!("outbound")),
         ("schema_version", serde_json::json!("999")),
+        ("warehouse_id", serde_json::json!(Uuid::new_v4())),
     ] {
         let mut body = base.clone();
         body[field] = changed;
@@ -357,6 +359,20 @@ async fn lifecycle_rejects_changes_to_existing_message_binding() {
             .unwrap();
         assert_eq!(response.status(), StatusCode::BAD_REQUEST, "{field}");
     }
+    let mut body = base;
+    body["wms_resource_id"] = serde_json::json!(" ");
+    let mut request = Request::builder()
+        .method(Method::POST)
+        .uri("/api/v1/integration/erp-messages/lifecycle")
+        .header("content-type", "application/json")
+        .body(Body::from(body.to_string()))
+        .unwrap();
+    request.extensions_mut().insert(test_ctx(owner));
+    let response = super::handlers::h8_erp_message_router(state.clone())
+        .oneshot(request)
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     assert!(snapshot_audit_actions(&state).is_empty());
 }
 
@@ -587,17 +603,8 @@ async fn purge_requires_retention_policy() {
 async fn purge_terminal_only_when_retention_set() {
     let memory = Arc::new(MemoryH8ErpMessageRepository::default());
     memory.set_retention_for_test(Uuid::nil(), 7);
-    let state = H8ErpMessageAppState {
-        repository: memory.clone(),
-        runtime_repository: Arc::new(
-            super::runtime_repository::MemoryH8WorkerRuntimeRepository::default(),
-        ),
-        payload_repository: Arc::new(
-            super::payload_repository::MemoryH8PayloadRepository::default(),
-        ),
-        audit_pool: None,
-        audit_log: Arc::new(Mutex::new(AuditLog::default())),
-    };
+    let mut state = H8ErpMessageAppState::with_memory();
+    state.repository = memory.clone();
     let owner = Uuid::nil();
     let mut old = sample_message(owner, "succeeded");
     old.updated_at = Utc::now() - chrono::Duration::days(30);
@@ -659,7 +666,7 @@ async fn mark_dead_writes_h2_dead_audit_action() {
     let ctx = test_ctx(owner);
     let dead = state
         .repository
-        .mark_dead(owner, msg.id, "auth: invalid", "worker", Utc::now())
+        .mark_dead(owner, msg.id, "auth: invalid", "worker", Utc::now(), &[])
         .await
         .unwrap();
     assert_eq!(dead.sync_status, "dead");

@@ -313,4 +313,20 @@ mod tests {
         );
         assert_eq!(scopes, vec!["inbound:push"]);
     }
+
+    #[test]
+    fn create_accepts_h8_outbound_and_return_scopes() {
+        let now = Utc::now();
+        let mut request = request();
+        request.scopes = vec![
+            "outbound:push".into(),
+            "outbound:receipt".into(),
+            "return:push".into(),
+        ];
+        let (_, scopes) = validate_create(&request, now).expect("H8 scopes should validate");
+        assert_eq!(
+            scopes,
+            vec!["outbound:push", "outbound:receipt", "return:push"]
+        );
+    }
 }

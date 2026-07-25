@@ -14,6 +14,12 @@ mod scope;
 mod state;
 
 #[cfg(test)]
+mod lifecycle_validation_tests;
+#[cfg(test)]
+mod outbound_lifecycle_reconciliation_tests;
+#[cfg(test)]
+mod outbound_lifecycle_tests;
+#[cfg(test)]
 mod partition_tests;
 #[cfg(test)]
 mod payload_tests;
@@ -25,7 +31,9 @@ mod replay_tests;
 mod tests;
 
 pub use handlers::h8_erp_message_router;
+pub(crate) use lifecycle::{apply_lifecycle_failure, apply_lifecycle_status};
 pub use state::H8ErpMessageAppState;
+pub(crate) use state::H8_RECEIPT_WRITE;
 
 /// AC10/16：每小时预建本月/下月分区并清除到期密文。
 pub async fn spawn_maintenance_job(pool: sqlx::PgPool) -> Result<(), sqlx::Error> {

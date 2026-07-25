@@ -5,7 +5,10 @@ use serde::Deserialize;
 use uuid::Uuid;
 use wms_domain::{H8ErpMessage, H8ErpMessageStats};
 
-use crate::auth::{AuthContext, AuthError};
+use crate::{
+    auth::{AuthContext, AuthError},
+    warehouse_scope::load_user_warehouse_scopes,
+};
 
 use super::{
     error::H8ErpMessageHandlerError,
@@ -30,22 +33,22 @@ pub(super) async fn authorized_warehouse_ids(
         }
         return Ok(Some(vec![scope]));
     }
-    // h8.erp_connector.write 当前仅授予系统管理员；管理员可查看全仓。
-    if ctx.has_permission(H8_MSG_WRITE) {
-        return Ok(requested.map(|warehouse_id| vec![warehouse_id]));
-    }
     let pool = state
         .audit_pool
         .as_ref()
-        .ok_or_else(|| AuthError::PermissionDenied("warehouse scope".into()))?;
-    let scopes: Vec<Uuid> = sqlx::query_scalar(
-        "SELECT warehouse_id FROM auth_user_warehouse_scopes WHERE user_id = $1 AND owner_id = $2 ORDER BY warehouse_id",
-    )
-    .bind(ctx.user_id)
-    .bind(ctx.owner_id)
-    .fetch_all(pool)
-    .await
-    .map_err(|error| super::error::H8ErpMessageRepoError::Db(error.to_string()))?;
+        .ok_or_else(|| AuthError::PermissionDenied("warehouse scope".into()));
+    let scopes = match pool {
+        Ok(pool) => load_user_warehouse_scopes(pool, ctx)
+            .await
+            .map_err(|error| super::error::H8ErpMessageRepoError::Db(error.to_string()))?,
+        Err(_) if ctx.has_permission(H8_MSG_WRITE) => {
+            return Ok(requested.map(|warehouse_id| vec![warehouse_id]));
+        }
+        Err(error) => return Err(error.into()),
+    };
+    if scopes.is_empty() && ctx.has_permission(H8_MSG_WRITE) {
+        return Ok(requested.map(|warehouse_id| vec![warehouse_id]));
+    }
     if scopes.is_empty() || requested.is_some_and(|warehouse_id| !scopes.contains(&warehouse_id)) {
         return Err(AuthError::PermissionDenied("warehouse scope".into()).into());
     }

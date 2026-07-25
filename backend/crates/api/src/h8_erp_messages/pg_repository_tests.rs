@@ -8,14 +8,29 @@ use chrono::{DateTime, Duration, Utc};
 use sqlx::PgPool;
 use tower::ServiceExt;
 use uuid::Uuid;
-use wms_domain::{standard_retry_delay_millis, H8ErpMessageListResponse, H8ErpMessageStats};
+use wms_domain::{
+    standard_retry_delay_millis, H8ErpMessage, H8ErpMessageListResponse, H8ErpMessageStats,
+};
 
-use crate::auth::AuthContext;
+use crate::{
+    auth::AuthContext,
+    h8_erp_connectors::{h8_erp_connector_router, H8ErpConnectorAppState},
+};
 
 use super::{
     handlers::h8_erp_message_router, pg_repository::PgH8ErpMessageRepository,
     repository::H8ErpMessageRepository, state::H8ErpMessageAppState,
 };
+
+type AttemptRow = (
+    i32,
+    String,
+    DateTime<Utc>,
+    Option<DateTime<Utc>>,
+    String,
+    Option<String>,
+    String,
+);
 
 fn test_ctx(owner_id: Uuid) -> AuthContext {
     AuthContext {
@@ -39,6 +54,16 @@ fn warehouse_reader_ctx(owner_id: Uuid, user_id: Uuid) -> AuthContext {
         permissions: vec!["h8.erp_connector.read".into()],
         jti: "h8-warehouse-reader-test".into(),
         warehouse_scope: None,
+    }
+}
+
+fn warehouse_worker_ctx(owner_id: Uuid, user_id: Uuid) -> AuthContext {
+    AuthContext {
+        permissions: vec![
+            "h8.erp_connector.read".into(),
+            "h8.erp_connector.write".into(),
+        ],
+        ..warehouse_reader_ctx(owner_id, user_id)
     }
 }
 
@@ -91,9 +116,109 @@ async fn jwt_warehouse_scopes_limit_message_list_detail_and_stats(pool: PgPool) 
             .unwrap();
     }
 
+    let allowed_connector_id = Uuid::new_v4();
+    let denied_connector_id = Uuid::new_v4();
+    for (connector_id, code, warehouse_id) in [
+        (allowed_connector_id, "H8-ROUTE-ALLOWED", allowed_warehouse),
+        (denied_connector_id, "H8-ROUTE-DENIED", denied_warehouse),
+    ] {
+        sqlx::query(
+            r#"INSERT INTO h8_erp_connectors
+               (id, owner_id, connector_code, connector_name, warehouse_ids, directions,
+                message_types, channel_mode, status, config_version)
+               VALUES ($1,$2,$3,$3,ARRAY[$4],ARRAY['inbound'],ARRAY['asn'],
+                       'interface_table','active',1)"#,
+        )
+        .bind(connector_id)
+        .bind(owner_id)
+        .bind(code)
+        .bind(warehouse_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    }
+
+    let route_app = h8_erp_connector_router(H8ErpConnectorAppState::with_postgres(pool.clone()));
+    for (warehouse_id, expected_status) in [
+        (allowed_warehouse, StatusCode::OK),
+        (denied_warehouse, StatusCode::FORBIDDEN),
+    ] {
+        let mut request = Request::builder()
+            .uri(format!(
+                "/api/v1/config/erp-connectors/route-resolve?direction=inbound&message_type=asn&warehouse_id={warehouse_id}"
+            ))
+            .body(Body::empty())
+            .unwrap();
+        request
+            .extensions_mut()
+            .insert(warehouse_worker_ctx(owner_id, user_id));
+        let response = route_app.clone().oneshot(request).await.unwrap();
+        assert_eq!(response.status(), expected_status);
+    }
+    let mut request = Request::builder()
+        .uri("/api/v1/config/erp-connectors/route-resolve?direction=inbound&message_type=asn")
+        .body(Body::empty())
+        .unwrap();
+    request
+        .extensions_mut()
+        .insert(warehouse_worker_ctx(owner_id, user_id));
+    let response = route_app.oneshot(request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+
+    let lifecycle_app = h8_erp_message_router(H8ErpMessageAppState::with_postgres(pool.clone()));
+    for (warehouse_id, connector_id, suffix, expected_status) in [
+        (
+            allowed_warehouse,
+            allowed_connector_id,
+            "allowed",
+            StatusCode::OK,
+        ),
+        (
+            denied_warehouse,
+            denied_connector_id,
+            "denied",
+            StatusCode::FORBIDDEN,
+        ),
+    ] {
+        let mut request = Request::builder()
+            .method(Method::POST)
+            .uri("/api/v1/integration/erp-messages/lifecycle")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                serde_json::json!({
+                    "stage": "receive",
+                    "result": "ok",
+                    "direction": "inbound",
+                    "message_type": "asn",
+                    "schema_version": "1",
+                    "channel": "interface_table",
+                    "external_ref": format!("ERP-JWT-{suffix}"),
+                    "idempotency_key": format!("idem-jwt-{suffix}"),
+                    "correlation_id": format!("corr-jwt-{suffix}"),
+                    "connector_id": connector_id,
+                    "connector_code": format!("H8-ROUTE-{}", suffix.to_ascii_uppercase()),
+                    "config_version": 1,
+                    "warehouse_id": warehouse_id
+                })
+                .to_string(),
+            ))
+            .unwrap();
+        request
+            .extensions_mut()
+            .insert(warehouse_worker_ctx(owner_id, user_id));
+        let response = lifecycle_app.clone().oneshot(request).await.unwrap();
+        assert_eq!(response.status(), expected_status);
+        if expected_status == StatusCode::OK {
+            let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+            let message: H8ErpMessage = serde_json::from_slice(&body).unwrap();
+            assert_eq!(message.warehouse_id, Some(allowed_warehouse));
+        }
+    }
+
     let allowed_id = Uuid::new_v4();
     let second_allowed_id = Uuid::new_v4();
     let denied_id = Uuid::new_v4();
+    let owner_level_id = Uuid::new_v4();
     for (id, warehouse_id, external_ref) in [
         (allowed_id, allowed_warehouse, "ERP-SCOPE-ALLOWED"),
         (
@@ -119,8 +244,32 @@ async fn jwt_warehouse_scopes_limit_message_list_detail_and_stats(pool: PgPool) 
         .await
         .unwrap();
     }
+    sqlx::query(
+        r#"INSERT INTO h8_erp_messages
+           (id, owner_id, connector_code, direction, message_type,
+            schema_version, channel, external_ref, idempotency_key, correlation_id,
+            sync_status, retry_count, payload_digest)
+           VALUES ($1,$2,'SELF-ERP','inbound','product_master','1','rest',
+                   'ERP-SCOPE-OWNER','ERP-SCOPE-OWNER','ERP-SCOPE-OWNER',
+                   'failed',0,'digest')"#,
+    )
+    .bind(owner_level_id)
+    .bind(owner_id)
+    .execute(&pool)
+    .await
+    .unwrap();
 
     let app = h8_erp_message_router(H8ErpMessageAppState::with_postgres(pool));
+    let mut request = Request::builder()
+        .uri(format!("/api/v1/integration/erp-messages/{owner_level_id}"))
+        .body(Body::empty())
+        .unwrap();
+    request
+        .extensions_mut()
+        .insert(warehouse_worker_ctx(owner_id, user_id));
+    let response = app.clone().oneshot(request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+
     let ctx = warehouse_reader_ctx(owner_id, user_id);
 
     let mut request = Request::builder()
@@ -132,7 +281,7 @@ async fn jwt_warehouse_scopes_limit_message_list_detail_and_stats(pool: PgPool) 
     assert_eq!(response.status(), StatusCode::OK);
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let listed: H8ErpMessageListResponse = serde_json::from_slice(&body).unwrap();
-    assert_eq!(listed.data.len(), 2);
+    assert_eq!(listed.data.len(), 3);
     assert!(listed.data.iter().any(|message| message.id == allowed_id));
     assert!(listed
         .data
@@ -166,7 +315,7 @@ async fn jwt_warehouse_scopes_limit_message_list_detail_and_stats(pool: PgPool) 
     assert_eq!(response.status(), StatusCode::OK);
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let stats: H8ErpMessageStats = serde_json::from_slice(&body).unwrap();
-    assert_eq!(stats.total, 2);
+    assert_eq!(stats.total, 3);
     assert_eq!(stats.failed, 2);
 }
 
@@ -490,7 +639,7 @@ async fn preflight_failure_persists_receive_and_final_failure_audit(pool: PgPool
     for stage in ["receive", "final_failure"] {
         let body = serde_json::json!({
             "stage": stage,
-            "result": "preflight_rejected",
+            "result": if stage == "receive" { "received" } else { "preflight_rejected" },
             "direction": "inbound",
             "message_type": "asn",
             "schema_version": "999",
@@ -555,7 +704,8 @@ async fn inbound_lifecycle_persists_failure_retry_and_success_status(pool: PgPoo
             "external_ref": "ERP-RETRY-PG-1",
             "idempotency_key": "idem-retry-pg-1",
             "correlation_id": "corr-retry-pg-1",
-            "channel": "interface_table"
+            "channel": "interface_table",
+            "wms_resource_id": (stage == "receipt").then_some("receiving-order-1")
         });
         let mut request = Request::builder()
             .method(Method::POST)
@@ -566,13 +716,22 @@ async fn inbound_lifecycle_persists_failure_retry_and_success_status(pool: PgPoo
         request.extensions_mut().insert(test_ctx(owner_id));
         let response = app.clone().oneshot(request).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK, "stage={stage}");
+        let returned: H8ErpMessage =
+            serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        assert_eq!(
+            returned.wms_resource_id.as_deref(),
+            (stage == "receipt").then_some("receiving-order-1"),
+            "stage={stage}"
+        );
 
-        let (status, next_retry_at, updated_at): (
+        let (status, next_retry_at, updated_at, wms_resource_id): (
             String,
             Option<DateTime<Utc>>,
             DateTime<Utc>,
+            Option<String>,
         ) = sqlx::query_as(
-            "SELECT sync_status, next_retry_at, updated_at FROM h8_erp_messages WHERE owner_id=$1 AND idempotency_key=$2",
+            "SELECT sync_status, next_retry_at, updated_at, wms_resource_id FROM h8_erp_messages WHERE owner_id=$1 AND idempotency_key=$2",
         )
         .bind(owner_id)
         .bind("idem-retry-pg-1")
@@ -588,6 +747,11 @@ async fn inbound_lifecycle_persists_failure_retry_and_success_status(pool: PgPoo
         } else {
             assert!(next_retry_at.is_none(), "stage={stage}");
         }
+        assert_eq!(
+            wms_resource_id.as_deref(),
+            (stage == "receipt").then_some("receiving-order-1"),
+            "stage={stage}"
+        );
         if stage == "final_failure" {
             let summary: String = sqlx::query_scalar(
                 "SELECT last_error_summary FROM h8_erp_messages WHERE owner_id=$1 AND idempotency_key=$2",
@@ -611,15 +775,7 @@ async fn inbound_lifecycle_persists_failure_retry_and_success_status(pool: PgPoo
         }
     }
 
-    let attempts: Vec<(
-        i32,
-        String,
-        DateTime<Utc>,
-        Option<DateTime<Utc>>,
-        String,
-        Option<String>,
-        String,
-    )> = sqlx::query_as(
+    let attempts: Vec<AttemptRow> = sqlx::query_as(
         r#"SELECT attempt_no, channel, started_at, finished_at, result, error_summary, actor
            FROM h8_erp_message_attempts
            WHERE owner_id=$1

@@ -5,7 +5,14 @@ use uuid::Uuid;
 
 use crate::common::PageMeta;
 
-pub const API_KEY_SCOPES: [&str; 3] = ["master-data:write", "inbound:push", "tms:callback"];
+pub const API_KEY_SCOPES: [&str; 6] = [
+    "master-data:write",
+    "inbound:push",
+    "outbound:push",
+    "outbound:receipt",
+    "return:push",
+    "tms:callback",
+];
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct ApiKey {

@@ -20,6 +20,15 @@ assert.match(page, /<Dialog/);
 assert.match(page, /创建 Key/);
 assert.match(page, /轮换/);
 assert.match(page, /吊销/);
+for (const scope of [
+  "master-data:write",
+  "inbound:push",
+  "outbound:push",
+  "return:push",
+  "tms:callback",
+]) {
+  assert.match(page, new RegExp(`<option value="${scope}">`));
+}
 for (const route of [
   "/api/v1/auth/api-keys",
   "/api/v1/auth/api-keys/{api_key_id}/rotate",

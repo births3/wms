@@ -20,11 +20,12 @@ use wms_domain::{
 
 use crate::auth::{AuthContext, AuthError};
 
-use super::audit::{
-    write_dead_entry_audit, write_exchange_lifecycle_audit, write_message_audit, write_owner_audit,
-};
+use super::audit::{write_message_audit, write_owner_audit};
 use super::error::H8ErpMessageHandlerError;
-use super::lifecycle::{apply_inbound_lifecycle_status, record_lifecycle, safe_lifecycle_result};
+use super::lifecycle::{
+    apply_lifecycle_status, mark_dead_with_audit, record_business_receipt, record_lifecycle,
+    safe_lifecycle_result,
+};
 use super::repository::H8ErpMessageCursor;
 use super::scope::{authorized_warehouse_ids, message_stats, require_message_warehouse_scope};
 use super::state::{H8ErpMessageAppState, H8_MSG_READ, H8_MSG_WRITE};
@@ -77,6 +78,10 @@ pub fn h8_erp_message_router(state: H8ErpMessageAppState) -> Router {
         .route(
             "/api/v1/integration/erp-messages/:id/claim",
             post(claim_message),
+        )
+        .route(
+            "/api/v1/integration/erp-messages/:id/receipt",
+            post(record_business_receipt),
         )
         .route(
             "/api/v1/integration/erp-messages/:id/dead",
@@ -551,19 +556,14 @@ async fn mark_dead_message(
     }
     let existing = state.repository.get(ctx.owner_id, id).await?;
     require_message_warehouse_scope(&state, &ctx, &existing).await?;
-    let actor = ctx.user_id.to_string();
-    let message = state
-        .repository
-        .mark_dead(
-            ctx.owner_id,
-            id,
-            body.error_summary.trim(),
-            &actor,
-            Utc::now(),
-        )
-        .await?;
-    // US-H8-003 AC6：进入 dead 必须写 H2
-    write_dead_entry_audit(&state, &ctx, &message).await?;
+    let message = mark_dead_with_audit(
+        &state,
+        &ctx,
+        existing,
+        body.error_summary.trim(),
+        Utc::now(),
+    )
+    .await?;
     Ok(Json(message))
 }
 
@@ -595,9 +595,8 @@ async fn record_lifecycle_upsert(
             "invalid exchange audit stage",
         ));
     }
-    wms_domain::validate_direction(body.direction.trim())
-        .map_err(super::error::H8ErpMessageRepoError::Domain)?;
-    wms_domain::validate_message_type_in_catalog(body.message_type.trim())
+    let lifecycle_result = safe_lifecycle_result(body.stage.trim(), body.result.trim())?;
+    wms_domain::validate_message_direction(body.direction.trim(), body.message_type.trim())
         .map_err(super::error::H8ErpMessageRepoError::Domain)?;
     wms_domain::validate_channel(body.channel.trim())
         .map_err(super::error::H8ErpMessageRepoError::Domain)?;
@@ -618,6 +617,17 @@ async fn record_lifecycle_upsert(
         validate_schema_version(body.schema_version.trim())
             .map_err(super::error::H8ErpMessageRepoError::Domain)?;
     }
+    let warehouse_id = body.warehouse_id.or(ctx.warehouse_scope);
+    let authorized_warehouses = authorized_warehouse_ids(&state, &ctx, warehouse_id).await?;
+    if warehouse_id.is_none()
+        && authorized_warehouses.is_some()
+        && matches!(
+            body.message_type.trim(),
+            "asn" | "outbound_order" | "return_order"
+        )
+    {
+        return Err(AuthError::PermissionDenied("warehouse scope required".into()).into());
+    }
     let now = Utc::now();
     let mut message = if let Some(id) = body.message_id {
         let message = state.repository.get(ctx.owner_id, id).await?;
@@ -637,10 +647,16 @@ async fn record_lifecycle_upsert(
             require_message_warehouse_scope(&state, &ctx, &m).await?;
             m
         } else {
+            if body.stage.trim() != "receive" {
+                return Err(super::error::H8ErpMessageRepoError::Domain(
+                    wms_domain::H8MessageError::IllegalTransition,
+                )
+                .into());
+            }
             let m = H8ErpMessage {
                 id: Uuid::new_v4(),
                 owner_id: ctx.owner_id,
-                warehouse_id: ctx.warehouse_scope,
+                warehouse_id,
                 connector_id: body.connector_id,
                 connector_code: body.connector_code.clone(),
                 config_version: body.config_version,
@@ -652,13 +668,13 @@ async fn record_lifecycle_upsert(
                 wms_resource_id: None,
                 idempotency_key: body.idempotency_key.trim().to_string(),
                 correlation_id: body.correlation_id.trim().to_string(),
-                sync_status: "processing".into(),
+                sync_status: "pending".into(),
                 retry_count: 0,
                 next_retry_at: None,
                 last_error_summary: None,
                 payload_digest: "worker-lifecycle".into(),
-                claimed_by: Some(format!("worker:{}", ctx.user_id)),
-                lease_expires_at: Some(now + chrono::Duration::minutes(10)),
+                claimed_by: None,
+                lease_expires_at: None,
                 created_at: now,
                 updated_at: now,
                 completed_at: None,
@@ -668,34 +684,39 @@ async fn record_lifecycle_upsert(
             m
         }
     };
-    let connector_changed = matches!(
-        (message.connector_id, body.connector_id),
-        (Some(bound), Some(requested)) if bound != requested
-    );
-    let version_changed = matches!(
-        (message.config_version, body.config_version),
-        (Some(bound), Some(requested)) if bound != requested
-    );
-    if connector_changed
-        || version_changed
+    if message.connector_id != body.connector_id
+        || message.connector_code != body.connector_code
+        || message.config_version != body.config_version
+        || message.warehouse_id != warehouse_id
         || message.direction != body.direction.trim()
         || message.message_type != body.message_type.trim()
         || message.schema_version != body.schema_version.trim()
         || message.channel != body.channel.trim()
+        || message.external_ref != body.external_ref.trim()
+        || message.idempotency_key != body.idempotency_key.trim()
+        || message.correlation_id != body.correlation_id.trim()
     {
         return Err(H8ErpMessageHandlerError::BadRequest(
             "message config binding must not change",
         ));
     }
-    let lifecycle_result = safe_lifecycle_result(body.stage.trim(), body.result.trim());
-    write_exchange_lifecycle_audit(&state, &ctx, &message, body.stage.trim(), &lifecycle_result)
-        .await?;
-    message = apply_inbound_lifecycle_status(
+    if body
+        .wms_resource_id
+        .as_ref()
+        .is_some_and(|resource_id| resource_id.trim().is_empty())
+    {
+        return Err(super::error::H8ErpMessageRepoError::Domain(
+            wms_domain::H8MessageError::FieldRequired("wms_resource_id"),
+        )
+        .into());
+    }
+    message = apply_lifecycle_status(
         &state,
         &ctx,
         message,
         body.stage.trim(),
         &lifecycle_result,
+        body.wms_resource_id.as_deref().map(str::trim),
         now,
     )
     .await?;

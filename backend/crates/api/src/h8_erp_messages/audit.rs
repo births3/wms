@@ -4,7 +4,8 @@
 
 use chrono::Utc;
 use wms_domain::{
-    is_exchange_audit_stage, message_audit_summary, H8ErpMessage, H8_MESSAGE_DEAD_AUDIT_ACTION,
+    is_exchange_audit_stage, message_audit_summary, normalize_exchange_lifecycle_result,
+    H8ErpMessage, H8_MESSAGE_DEAD_AUDIT_ACTION,
 };
 
 use crate::{
@@ -23,6 +24,19 @@ pub(crate) async fn write_message_audit(
     message: &H8ErpMessage,
     result: &str,
 ) -> Result<(), AuditError> {
+    let req = message_audit_request(ctx, action, message, result, Utc::now());
+    persist_audit(state.audit_pool.as_ref(), &req).await?;
+    append_memory_audit_requests(state, std::slice::from_ref(&req));
+    Ok(())
+}
+
+pub(crate) fn message_audit_request(
+    ctx: &AuthContext,
+    action: &str,
+    message: &H8ErpMessage,
+    result: &str,
+    occurred_at: chrono::DateTime<Utc>,
+) -> AuditWriteRequest {
     let after = message_audit_summary(
         action,
         message.id,
@@ -44,13 +58,18 @@ pub(crate) async fn write_message_audit(
         message.id.to_string(),
         Some(AuditDiff::compute(serde_json::Value::Null, after)),
     );
-    req.occurred_at = Utc::now();
-    persist_audit(state.audit_pool.as_ref(), &req).await?;
-    {
-        let mut log = lock_recover(&state.audit_log);
-        log.append_event(req);
+    req.occurred_at = occurred_at;
+    req
+}
+
+pub(crate) fn append_memory_audit_requests(
+    state: &H8ErpMessageAppState,
+    requests: &[AuditWriteRequest],
+) {
+    let mut log = lock_recover(&state.audit_log);
+    for request in requests {
+        log.append_event(request.clone());
     }
-    Ok(())
 }
 
 pub(crate) async fn write_owner_audit(
@@ -87,12 +106,51 @@ async fn persist_audit(
 }
 
 /// US-H8-003 AC6：进入 dead 时写 H2。
+#[cfg(test)]
 pub(crate) async fn write_dead_entry_audit(
     state: &H8ErpMessageAppState,
     ctx: &AuthContext,
     message: &H8ErpMessage,
 ) -> Result<(), AuditError> {
     write_message_audit(state, ctx, H8_MESSAGE_DEAD_AUDIT_ACTION, message, "dead").await
+}
+
+pub(crate) fn dead_entry_audit_request(
+    ctx: &AuthContext,
+    message: &H8ErpMessage,
+    occurred_at: chrono::DateTime<Utc>,
+) -> AuditWriteRequest {
+    message_audit_request(
+        ctx,
+        H8_MESSAGE_DEAD_AUDIT_ACTION,
+        message,
+        "dead",
+        occurred_at,
+    )
+}
+
+pub(crate) fn exchange_lifecycle_audit_request(
+    ctx: &AuthContext,
+    message: &H8ErpMessage,
+    stage: &str,
+    result: &str,
+    occurred_at: chrono::DateTime<Utc>,
+) -> Result<AuditWriteRequest, H8ErpMessageHandlerError> {
+    if !is_exchange_audit_stage(stage) {
+        return Err(H8ErpMessageHandlerError::BadRequest(
+            "invalid exchange audit stage",
+        ));
+    }
+    let result = normalize_exchange_lifecycle_result(stage, result).ok_or(
+        H8ErpMessageHandlerError::BadRequest("invalid exchange lifecycle result"),
+    )?;
+    Ok(message_audit_request(
+        ctx,
+        &format!("h8_exchange_{stage}"),
+        message,
+        &result,
+        occurred_at,
+    ))
 }
 
 /// US-H8-002 AC11：交换生命周期阶段审计。
@@ -103,13 +161,9 @@ pub(crate) async fn write_exchange_lifecycle_audit(
     stage: &str,
     result: &str,
 ) -> Result<(), H8ErpMessageHandlerError> {
-    if !is_exchange_audit_stage(stage) {
-        return Err(H8ErpMessageHandlerError::BadRequest(
-            "invalid exchange audit stage",
-        ));
-    }
-    let action = format!("h8_exchange_{stage}");
-    write_message_audit(state, ctx, &action, message, result).await?;
+    let request = exchange_lifecycle_audit_request(ctx, message, stage, result, Utc::now())?;
+    persist_audit(state.audit_pool.as_ref(), &request).await?;
+    append_memory_audit_requests(state, std::slice::from_ref(&request));
     Ok(())
 }
 

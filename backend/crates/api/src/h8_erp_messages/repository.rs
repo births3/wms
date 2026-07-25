@@ -13,6 +13,7 @@ use wms_domain::{
 };
 
 use super::error::H8ErpMessageRepoError;
+use crate::audit::AuditWriteRequest;
 use crate::sync::lock_recover;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -87,8 +88,10 @@ pub trait H8ErpMessageRepository: Send + Sync {
         id: Uuid,
         target: &str,
         error_summary: Option<&str>,
+        wms_resource_id: Option<&str>,
         actor: &str,
         now: DateTime<Utc>,
+        audit_requests: &[AuditWriteRequest],
     ) -> Result<H8ErpMessage, H8ErpMessageRepoError>;
 
     /// 进入 dead（AC6）；调用方须写 H2 审计。
@@ -99,6 +102,7 @@ pub trait H8ErpMessageRepository: Send + Sync {
         error_summary: &str,
         actor: &str,
         now: DateTime<Utc>,
+        audit_requests: &[AuditWriteRequest],
     ) -> Result<H8ErpMessage, H8ErpMessageRepoError>;
 
     /// 归档终态消息（不删除，保留策略清理另走 purge）。
@@ -432,6 +436,7 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
         error_summary: &str,
         actor: &str,
         now: DateTime<Utc>,
+        _audit_requests: &[AuditWriteRequest],
     ) -> Result<H8ErpMessage, H8ErpMessageRepoError> {
         let mut guard = lock_recover(&self.inner);
         let Some(msg) = guard
@@ -486,11 +491,13 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
         id: Uuid,
         target: &str,
         error_summary: Option<&str>,
+        wms_resource_id: Option<&str>,
         actor: &str,
         now: DateTime<Utc>,
+        _audit_requests: &[AuditWriteRequest],
     ) -> Result<H8ErpMessage, H8ErpMessageRepoError> {
         let mut guard = lock_recover(&self.inner);
-        let (next, started_at) = {
+        let (next, started_at, receipt_retry) = {
             let message = guard
                 .messages
                 .get_mut(&id)
@@ -499,23 +506,39 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
             can_transition_message_status(&message.sync_status, target)
                 .map_err(H8ErpMessageRepoError::Domain)?;
             let started_at = message.updated_at;
+            let receipt_retry = message.sync_status == "awaiting_receipt"
+                && matches!(target, "processing" | "dead");
+            let retry_increment = i32::from(target == "failed" || receipt_retry);
             message.sync_status = target.into();
-            message.retry_count += i32::from(target == "failed");
-            message.next_retry_at = (target == "failed").then(|| {
+            message.retry_count += retry_increment;
+            message.next_retry_at = matches!(target, "failed" | "awaiting_receipt").then(|| {
                 now + chrono::Duration::milliseconds(standard_retry_delay_millis(
-                    message.retry_count,
+                    if target == "awaiting_receipt" {
+                        message.retry_count + 1
+                    } else {
+                        message.retry_count
+                    },
                     &message.idempotency_key,
                 ))
             });
             message.last_error_summary = error_summary.map(sanitize_error_summary);
+            if target == "succeeded" && message.wms_resource_id.is_none() {
+                message.wms_resource_id = wms_resource_id.map(str::to_string);
+            }
             message.claimed_by = (target == "processing").then(|| actor.to_string());
             message.lease_expires_at =
                 (target == "processing").then(|| now + chrono::Duration::minutes(10));
-            message.completed_at = (target == "succeeded").then_some(now);
+            message.completed_at = matches!(target, "succeeded" | "acked" | "dead").then_some(now);
             message.updated_at = now;
-            (message.clone(), started_at)
+            (message.clone(), started_at, receipt_retry)
         };
-        if matches!(target, "failed" | "succeeded") {
+        let attempt_result = match (receipt_retry, target) {
+            (true, "processing") => Some("failed"),
+            (_, "awaiting_receipt") => Some("succeeded"),
+            (_, "failed" | "succeeded" | "dead") => Some(target),
+            _ => None,
+        };
+        if let Some(attempt_result) = attempt_result {
             let attempts = guard.attempts.entry(id).or_default();
             attempts.push(H8ErpMessageAttempt {
                 id: Uuid::new_v4(),
@@ -524,7 +547,7 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
                 channel: next.channel.clone(),
                 started_at,
                 finished_at: Some(now),
-                result: target.into(),
+                result: attempt_result.into(),
                 error_summary: error_summary.map(sanitize_error_summary),
                 actor: actor.into(),
             });
