@@ -161,7 +161,7 @@ nav:
     - ADR-0026 跨端契约管线: adr/0026-cross-end-contract-pipeline.md
     - ADR-0027 PDA 离线模型: adr/0027-pda-offline-model.md
     - ADR-0028 组件库抽离: adr/0028-component-library-extraction.md
-    - ADR-0029 前端原型先行: adr/0029-frontend-as-prototype-workflow.md
+    - ADR-0029 前端原型先行（历史）: adr/0029-frontend-as-prototype-workflow.md
     - ADR-0030 统一外部集成能力: adr/0030-integration-capability.md
     - ADR-0031 H-FILE 附件能力: adr/0031-file-attachment-capability.md
     - ADR-0032 H-APV 审批引擎: adr/0032-approval-engine.md
@@ -174,6 +174,8 @@ nav:
     - ADR-0039 打印组套与 Print Agent: adr/0039-print-suite-and-agent.md
     - ADR-0040 Print Agent 机器协议: adr/0040-print-agent-machine-protocol.md
     - ADR-0041 H9 打印编排细化: adr/0041-print-orchestration-refinement.md
+    - ADR-0042 药检单客户平台: adr/0042-drug-inspection-customer-portal.md
+    - ADR-0043 直接生产前端开发: adr/0043-direct-production-frontend-workflow.md
     - 技术 Spike:
       - Spike 索引: spikes/README.md
       - SPIKE-001 Axum + JWT: spikes/spike-001-axum-jwt.md
@@ -256,6 +258,7 @@ nav:
     - Wave 1 H2 开发环境: runbooks/wave-1-h2-dev-environment.md
     - H8 ERP 接口表同步: runbooks/h8-erp-interface-table-sync.md
     - H8 ERP 消息性能验收: runbooks/h8-erp-message-performance.md
+    - 药检单客户平台: runbooks/drug-inspection-customer-portal.md
     - Wave 1 运行证据: runbooks/wave-1-runtime-evidence.md
     - Wave 2 运行证据: runbooks/wave-2-runtime-evidence.md
     - Wave 2 预发布环境: runbooks/wave-2-staging-environment.md
