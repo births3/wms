@@ -1,0 +1,114 @@
+{
+  "collected_at": "2026-07-23T15:52:09.848281+00:00",
+  "story": "US-H8-002",
+  "acceptance": "AC7 failover L11",
+  "environment": "Docker MSSQL interface table",
+  "ok": true,
+  "message_checks": [
+    {
+      "ok": true,
+      "message_type": "putaway_complete",
+      "source_outbox_table": "receiving_putaway_erp_feedback_outbox",
+      "source_outbox_id": "1a2cdbe3-c9cb-4e42-987a-da9a297eb6fc",
+      "idempotency_key": "out:receiving_putaway_erp_feedback_outbox:1a2cdbe3-c9cb-4e42-987a-da9a297eb6fc",
+      "channels": [
+        "table_fallback",
+        "table_fallback"
+      ],
+      "rest_attempts": 4,
+      "table_attempts": 2,
+      "interface_row_count": 1,
+      "cleanup": "deleted acceptance row"
+    },
+    {
+      "ok": true,
+      "message_type": "inventory_status",
+      "source_outbox_table": "inventory_status_erp_feedback_outbox",
+      "source_outbox_id": "42943dcf-10f4-4123-8362-c5ff16da7a22",
+      "idempotency_key": "out:inventory_status_erp_feedback_outbox:42943dcf-10f4-4123-8362-c5ff16da7a22",
+      "channels": [
+        "table_fallback",
+        "table_fallback"
+      ],
+      "rest_attempts": 4,
+      "table_attempts": 2,
+      "interface_row_count": 1,
+      "cleanup": "deleted acceptance row"
+    },
+    {
+      "ok": true,
+      "message_type": "stock_adjustment",
+      "source_outbox_table": "stock_adjustment_erp_feedback_outbox",
+      "source_outbox_id": "f78f440a-0e36-46e8-890d-378550761835",
+      "idempotency_key": "out:stock_adjustment_erp_feedback_outbox:f78f440a-0e36-46e8-890d-378550761835",
+      "channels": [
+        "table_fallback",
+        "table_fallback"
+      ],
+      "rest_attempts": 4,
+      "table_attempts": 2,
+      "interface_row_count": 1,
+      "cleanup": "deleted acceptance row"
+    },
+    {
+      "ok": true,
+      "message_type": "archive_revision",
+      "source_outbox_table": "archive_revision_erp_feedback_outbox",
+      "source_outbox_id": "e51eac47-4970-4683-aa5c-96aacdab0189",
+      "idempotency_key": "out:archive_revision_erp_feedback_outbox:e51eac47-4970-4683-aa5c-96aacdab0189",
+      "channels": [
+        "table_fallback",
+        "table_fallback"
+      ],
+      "rest_attempts": 4,
+      "table_attempts": 2,
+      "interface_row_count": 1,
+      "cleanup": "deleted acceptance row"
+    },
+    {
+      "ok": true,
+      "message_type": "reconciliation_diff",
+      "source_outbox_table": "reconciliation_erp_feedback_outbox",
+      "source_outbox_id": "6d6f5939-d2cd-49ba-a9d6-de5c84c5e5ec",
+      "idempotency_key": "out:reconciliation_erp_feedback_outbox:6d6f5939-d2cd-49ba-a9d6-de5c84c5e5ec",
+      "channels": [
+        "table_fallback",
+        "table_fallback"
+      ],
+      "rest_attempts": 4,
+      "table_attempts": 2,
+      "interface_row_count": 1,
+      "cleanup": "deleted acceptance row"
+    },
+    {
+      "ok": true,
+      "message_type": "shipment_confirm",
+      "source_outbox_table": "shipment_confirm_erp_feedback_outbox",
+      "source_outbox_id": "86e34f9a-7157-4bdc-aa16-dd37f519af06",
+      "idempotency_key": "out:shipment_confirm_erp_feedback_outbox:86e34f9a-7157-4bdc-aa16-dd37f519af06",
+      "channels": [
+        "table_fallback",
+        "table_fallback"
+      ],
+      "rest_attempts": 4,
+      "table_attempts": 2,
+      "interface_row_count": 1,
+      "cleanup": "deleted acceptance row"
+    },
+    {
+      "ok": true,
+      "message_type": "inventory_snapshot",
+      "source_outbox_table": "inventory_snapshot_erp_feedback_outbox",
+      "source_outbox_id": "6cf17e30-5cd8-4b05-882f-58a515b43bd0",
+      "idempotency_key": "out:inventory_snapshot_erp_feedback_outbox:6cf17e30-5cd8-4b05-882f-58a515b43bd0",
+      "channels": [
+        "table_fallback",
+        "table_fallback"
+      ],
+      "rest_attempts": 4,
+      "table_attempts": 2,
+      "interface_row_count": 1,
+      "cleanup": "deleted acceptance row"
+    }
+  ]
+}
