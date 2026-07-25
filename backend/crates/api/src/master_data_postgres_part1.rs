@@ -1,3 +1,6 @@
+// @governance: skip-page-size - 拆分文件仍包含同一事务族，当前优先保持批量写、审计和幂等的原子边界。
+use std::collections::HashMap;
+
 use chrono::{DateTime, Duration, Utc};
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::{json, Value};
@@ -8,7 +11,8 @@ use wms_domain::{
     BatchCreateLocationsRequest, CreateCustomerAddressRequest, CreateCustomerRequest,
     CreateLocationRequest, CreateProductRequest, CreateSupplierRequest, CreateWarehouseRequest,
     CreateWarehouseZoneRequest, Customer, CustomerAddress, CustomerProfile, Location,
-    LocationListResponse, PageMeta, Product, SpecialDrugCategory, Supplier,
+    LocationListResponse, PageMeta, Product, ProductMappingTrace, ProductMappingTraceInput,
+    ProductPackagingLevel, ProductPackagingLevelInput, SpecialDrugCategory, Supplier,
     UpdateCustomerAddressRequest, UpdateCustomerRequest, UpdateLocationRequest,
     UpdateProductRequest, UpdateSupplierRequest, UpdateWarehouseRequest,
     UpdateWarehouseZoneRequest, UpsertCustomerProfileRequest, Warehouse, WarehouseZone,
@@ -18,9 +22,12 @@ use crate::{
     audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
     auth::AuthContext,
     master_data::{
-        normalize_supplier_uscc, product_attrs_with_default_source, validate_location_capacity,
-        validate_location_code, validate_product_storage_condition, validate_warehouse_type,
-        MasterDataError,
+        normalize_product_physical_patch, normalize_product_volume, normalize_supplier_uscc,
+        product_attrs_with_default_source, validate_create_product_fields,
+        validate_location_capacity, validate_location_code, validate_product_mapping_traces,
+        validate_product_packaging_levels, validate_product_storage_condition,
+        validate_product_update_transition,
+        validate_update_product_fields, validate_warehouse_type, MasterDataError,
     },
 };
 
@@ -43,15 +50,46 @@ struct ProductRow {
     product_name: String,
     specification: String,
     dosage_form: Option<String>,
-    storage_condition: String,
-    special_drug_category: String,
+    storage_condition: Option<String>,
+    special_drug_category: Option<String>,
     approval_no: Option<String>,
     manufacturer: Option<String>,
+    udi_code: Option<String>,
+    electronic_regulatory_code: Option<String>,
+    length_mm: Option<f64>,
+    width_mm: Option<f64>,
+    height_mm: Option<f64>,
+    volume_cm3: Option<f64>,
+    weight_g: Option<f64>,
     source: String,
     attrs: Value,
     status: String,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
+}
+
+#[derive(FromRow)]
+struct ProductPackagingLevelRow {
+    id: Uuid,
+    product_id: Uuid,
+    unit_code: String,
+    unit_name: String,
+    ratio_to_base: i64,
+    is_base: bool,
+    is_default: bool,
+    sort_order: i32,
+}
+
+#[derive(FromRow)]
+struct ProductMappingTraceRow {
+    id: Uuid,
+    product_id: Uuid,
+    field_name: String,
+    rule_id: Option<Uuid>,
+    source_system: String,
+    source_value: String,
+    target_value: Option<String>,
+    created_at: DateTime<Utc>,
 }
 
 #[derive(FromRow)]
@@ -149,7 +187,8 @@ impl PgMasterDataReadRepository {
             r#"
             SELECT id, owner_id, product_code, product_name, specification, dosage_form,
                    storage_condition, special_drug_category, approval_no, manufacturer,
-                   source, attrs, status, created_at, updated_at
+                   udi_code, electronic_regulatory_code, length_mm, width_mm, height_mm,
+                   volume_cm3, weight_g, source, attrs, status, created_at, updated_at
               FROM products
              WHERE owner_id = $1
              ORDER BY updated_at DESC, product_code
@@ -159,7 +198,46 @@ impl PgMasterDataReadRepository {
         .fetch_all(&self.pool)
         .await
         .map_err(map_db_error)?;
-        Ok(rows.into_iter().map(Product::from).collect())
+        let mut levels = load_product_packaging_levels_by_owner(&self.pool, ctx.owner_id).await?;
+        let mut traces = load_product_mapping_traces_by_owner(&self.pool, ctx.owner_id).await?;
+        Ok(rows
+            .into_iter()
+            .map(|row| {
+                let mut product = Product::from(row);
+                product.packaging_levels = levels.remove(&product.id).unwrap_or_default();
+                product.mapping_traces = traces.remove(&product.id).unwrap_or_default();
+                product
+            })
+            .collect())
+    }
+
+    pub async fn get_product_by_code(
+        &self,
+        ctx: &AuthContext,
+        product_code: &str,
+    ) -> Result<Product, MasterDataError> {
+        let row = sqlx::query_as::<_, ProductRow>(
+            r#"
+            SELECT id, owner_id, product_code, product_name, specification, dosage_form,
+                   storage_condition, special_drug_category, approval_no, manufacturer,
+                   udi_code, electronic_regulatory_code, length_mm, width_mm, height_mm,
+                   volume_cm3, weight_g, source, attrs, status, created_at, updated_at
+              FROM products
+             WHERE owner_id = $1 AND product_code = $2
+            "#,
+        )
+        .bind(ctx.owner_id)
+        .bind(product_code)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(map_db_error)?
+        .ok_or(MasterDataError::NotFound)?;
+        let mut product = Product::from(row);
+        product.packaging_levels =
+            load_product_packaging_levels(&self.pool, ctx.owner_id, product.id).await?;
+        product.mapping_traces =
+            load_product_mapping_traces(&self.pool, ctx.owner_id, product.id).await?;
+        Ok(product)
     }
 
     pub async fn create_product(
@@ -169,13 +247,67 @@ impl PgMasterDataReadRepository {
         now: DateTime<Utc>,
         idempotency_key: &str,
     ) -> Result<Product, MasterDataError> {
+        self.create_product_with_mapping_traces(ctx, req, Vec::new(), now, idempotency_key)
+            .await
+    }
+
+    pub async fn create_product_with_mapping_traces(
+        &self,
+        ctx: &AuthContext,
+        req: CreateProductRequest,
+        mapping_traces: Vec<ProductMappingTraceInput>,
+        now: DateTime<Utc>,
+        idempotency_key: &str,
+    ) -> Result<Product, MasterDataError> {
+        self.create_product_with_mapping_traces_status(
+            ctx,
+            req,
+            mapping_traces,
+            "active",
+            now,
+            idempotency_key,
+        )
+        .await
+    }
+
+    pub async fn create_product_with_mapping_traces_status(
+        &self,
+        ctx: &AuthContext,
+        req: CreateProductRequest,
+        mapping_traces: Vec<ProductMappingTraceInput>,
+        status: &str,
+        now: DateTime<Utc>,
+        idempotency_key: &str,
+    ) -> Result<Product, MasterDataError> {
+        validate_create_product_fields(&req)?;
+        if !matches!(status, "active" | "pending_mapping") {
+            return Err(MasterDataError::InvalidProductFields);
+        }
+        validate_product_mapping_traces(&mapping_traces)?;
+        if status == "active" {
+            validate_product_packaging_levels(&req.packaging_levels)?;
+        } else if !req.packaging_levels.is_empty() {
+            return Err(MasterDataError::InvalidProductPackaging);
+        }
+        let volume_cm3 = normalize_product_volume(
+            req.length_mm,
+            req.width_mm,
+            req.height_mm,
+            req.volume_cm3,
+            req.weight_g,
+        )?;
         let attrs = product_attrs_with_default_source(req.attrs.clone(), "api_import");
-        validate_product_storage_condition(&attrs)?;
-        let storage_condition = string_attr(&attrs, "storage_condition")
-            .ok_or(MasterDataError::InvalidStorageCondition)?;
+        let storage_condition = string_attr(&attrs, "storage_condition");
+        if status == "active" {
+            validate_product_storage_condition(&attrs)?;
+        } else if storage_condition.is_some() {
+            validate_product_storage_condition(&attrs)?;
+        }
         let request_hash = request_hash(&json!({
             "path": "/api/v1/master-data/products",
             "request": &req,
+            "mapping_traces": &mapping_traces,
+            "status": status,
         }))?;
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
@@ -192,52 +324,124 @@ impl PgMasterDataReadRepository {
             return Ok(value);
         }
         let id = Uuid::new_v4();
-        let specification = non_empty_or(req.spec, "-");
+        let specification = req.spec.trim().to_string();
+        let product_code = req.product_code.trim().to_string();
+        let product_name = req.product_name.trim().to_string();
+        let udi_code = req.udi_code.as_deref().map(str::trim);
         let source = string_attr(&attrs, "source").unwrap_or_else(|| "api_import".to_string());
-        let special_drug_category = non_empty_or(req.special_drug_category_code, "none");
-        ensure_enabled_dictionary_item(
-            &mut tx,
-            ctx.owner_id,
-            SPECIAL_DRUG_CATEGORY_DICT,
-            &special_drug_category,
-            now,
-        )
-        .await
-        .map_err(|_| MasterDataError::InvalidSpecialDrugCategory)?;
+        let special_drug_category = req
+            .special_drug_category_code
+            .filter(|value| !value.trim().is_empty());
+        if status == "active" && special_drug_category.is_none() {
+            return Err(MasterDataError::InvalidSpecialDrugCategory);
+        }
+        if let Some(category) = special_drug_category.as_deref() {
+            ensure_enabled_dictionary_item(
+                &mut tx,
+                ctx.owner_id,
+                SPECIAL_DRUG_CATEGORY_DICT,
+                category,
+                now,
+            )
+            .await
+            .map_err(|_| MasterDataError::InvalidSpecialDrugCategory)?;
+        }
         let row = sqlx::query_as::<_, ProductRow>(
             r#"
             INSERT INTO products (
                 id, owner_id, product_code, product_name, specification, dosage_form,
                 storage_condition, special_drug_category, approval_no, manufacturer,
-                source, attrs, status, created_at, updated_at
+                udi_code, electronic_regulatory_code, length_mm, width_mm, height_mm,
+                volume_cm3, weight_g, source, attrs, status, created_at, updated_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'active', $13, $13)
+            VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+                $14, $15, $16, $17, $18, $19, $20, $21, $21
+            )
+            ON CONFLICT (owner_id, product_code) DO UPDATE
+            SET product_name = EXCLUDED.product_name,
+                specification = EXCLUDED.specification,
+                dosage_form = EXCLUDED.dosage_form,
+                storage_condition = EXCLUDED.storage_condition,
+                special_drug_category = EXCLUDED.special_drug_category,
+                approval_no = EXCLUDED.approval_no,
+                manufacturer = EXCLUDED.manufacturer,
+                udi_code = EXCLUDED.udi_code,
+                electronic_regulatory_code = EXCLUDED.electronic_regulatory_code,
+                length_mm = EXCLUDED.length_mm,
+                width_mm = EXCLUDED.width_mm,
+                height_mm = EXCLUDED.height_mm,
+                volume_cm3 = EXCLUDED.volume_cm3,
+                weight_g = EXCLUDED.weight_g,
+                source = EXCLUDED.source,
+                attrs = EXCLUDED.attrs,
+                status = 'active',
+                updated_at = EXCLUDED.updated_at,
+                version = products.version + 1
+            WHERE products.status = 'pending_mapping'
+              AND EXCLUDED.status = 'active'
             RETURNING id, owner_id, product_code, product_name, specification, dosage_form,
                       storage_condition, special_drug_category, approval_no, manufacturer,
-                      source, attrs, status, created_at, updated_at
+                      udi_code, electronic_regulatory_code, length_mm, width_mm, height_mm,
+                      volume_cm3, weight_g, source, attrs, status, created_at, updated_at
             "#,
         )
         .bind(id)
         .bind(ctx.owner_id)
-        .bind(&req.product_code)
-        .bind(&req.product_name)
+        .bind(&product_code)
+        .bind(&product_name)
         .bind(&specification)
         .bind(&req.dosage_form)
-        .bind(&storage_condition)
-        .bind(&special_drug_category)
+        .bind(storage_condition.as_deref())
+        .bind(special_drug_category.as_deref())
         .bind(&req.approval_no)
         .bind(&req.manufacturer)
+        .bind(udi_code)
+        .bind(&req.electronic_regulatory_code)
+        .bind(req.length_mm)
+        .bind(req.width_mm)
+        .bind(req.height_mm)
+        .bind(volume_cm3)
+        .bind(req.weight_g)
         .bind(&source)
         .bind(&attrs)
+        .bind(status)
         .bind(now)
-        .fetch_one(&mut *tx)
+        .fetch_optional(&mut *tx)
         .await
-        .map_err(|error| map_catalog_write_error(error, &req.product_code))?;
-        let product = Product::from(row);
+        .map_err(|error| map_catalog_write_error(error, &product_code))?
+        .ok_or_else(|| MasterDataError::DuplicateCode(product_code.clone()))?;
+        let activated = row.id != id;
+        let mut product = Product::from(row);
+        if activated {
+            sqlx::query(
+                "DELETE FROM product_packaging_levels WHERE owner_id = $1 AND product_id = $2",
+            )
+            .bind(ctx.owner_id)
+            .bind(product.id)
+            .execute(&mut *tx)
+            .await
+            .map_err(map_db_error)?;
+        }
+        product.packaging_levels = insert_product_packaging_levels(
+            &mut tx,
+            ctx.owner_id,
+            product.id,
+            &req.packaging_levels,
+            now,
+        )
+        .await?;
+        product.mapping_traces =
+            insert_product_mapping_traces(&mut tx, ctx.owner_id, product.id, &mapping_traces, now)
+                .await?;
         append_master_data_audit(
             &mut tx,
             ctx,
-            "create_product",
+            if activated {
+                "activate_pending_mapping_product"
+            } else {
+                "create_product"
+            },
             "product",
             product.id,
             &product,
@@ -289,12 +493,24 @@ impl PgMasterDataReadRepository {
 
         let mut products = Vec::with_capacity(requests.len());
         for req in requests {
+            validate_create_product_fields(&req)?;
+            validate_product_packaging_levels(&req.packaging_levels)?;
+            let volume_cm3 = normalize_product_volume(
+                req.length_mm,
+                req.width_mm,
+                req.height_mm,
+                req.volume_cm3,
+                req.weight_g,
+            )?;
             let attrs = product_attrs_with_default_source(req.attrs.clone(), "api_import");
             validate_product_storage_condition(&attrs)?;
             let storage_condition = string_attr(&attrs, "storage_condition")
                 .ok_or(MasterDataError::InvalidStorageCondition)?;
             let id = Uuid::new_v4();
-            let specification = non_empty_or(req.spec, "-");
+            let specification = req.spec.trim().to_string();
+            let product_code = req.product_code.trim().to_string();
+            let product_name = req.product_name.trim().to_string();
+            let udi_code = req.udi_code.as_deref().map(str::trim);
             let source = string_attr(&attrs, "source").unwrap_or_else(|| "api_import".to_string());
             let special_drug_category = non_empty_or(req.special_drug_category_code, "none");
             ensure_enabled_dictionary_item(
@@ -311,31 +527,51 @@ impl PgMasterDataReadRepository {
                 INSERT INTO products (
                     id, owner_id, product_code, product_name, specification, dosage_form,
                     storage_condition, special_drug_category, approval_no, manufacturer,
-                    source, attrs, status, created_at, updated_at
+                    udi_code, electronic_regulatory_code, length_mm, width_mm, height_mm,
+                    volume_cm3, weight_g, source, attrs, status, created_at, updated_at
                 )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'active', $13, $13)
+                VALUES (
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+                    $14, $15, $16, $17, $18, $19, 'active', $20, $20
+                )
                 RETURNING id, owner_id, product_code, product_name, specification, dosage_form,
                           storage_condition, special_drug_category, approval_no, manufacturer,
-                          source, attrs, status, created_at, updated_at
+                          udi_code, electronic_regulatory_code, length_mm, width_mm, height_mm,
+                          volume_cm3, weight_g, source, attrs, status, created_at, updated_at
                 "#,
             )
             .bind(id)
             .bind(ctx.owner_id)
-            .bind(&req.product_code)
-            .bind(&req.product_name)
+            .bind(&product_code)
+            .bind(&product_name)
             .bind(&specification)
             .bind(&req.dosage_form)
             .bind(&storage_condition)
             .bind(&special_drug_category)
             .bind(&req.approval_no)
             .bind(&req.manufacturer)
+            .bind(udi_code)
+            .bind(&req.electronic_regulatory_code)
+            .bind(req.length_mm)
+            .bind(req.width_mm)
+            .bind(req.height_mm)
+            .bind(volume_cm3)
+            .bind(req.weight_g)
             .bind(&source)
             .bind(&attrs)
             .bind(now)
             .fetch_one(&mut *tx)
             .await
-            .map_err(|error| map_catalog_write_error(error, &req.product_code))?;
-            let product = Product::from(row);
+            .map_err(|error| map_catalog_write_error(error, &product_code))?;
+            let mut product = Product::from(row);
+            product.packaging_levels = insert_product_packaging_levels(
+                &mut tx,
+                ctx.owner_id,
+                product.id,
+                &req.packaging_levels,
+                now,
+            )
+            .await?;
             append_master_data_audit(
                 &mut tx,
                 ctx,

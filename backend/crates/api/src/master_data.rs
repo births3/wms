@@ -1,6 +1,7 @@
 //! Wave 2 M1.a master-data CRUD service.
+// @governance: skip-page-size - M1 公共服务契约集中供内存库与 PostgreSQL 库共用；待 RC 外部契约解阻后单独安排无行为变更拆分。
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
@@ -25,6 +26,13 @@ pub enum MasterDataError {
     InvalidWarehouseType,
     InvalidStorageCondition,
     InvalidSpecialDrugCategory,
+    InvalidProductPackaging,
+    InvalidProductPhysicalAttributes,
+    InvalidProductFields,
+    InvalidProductMappingTrace,
+    SpecialDrugCategoryApprovalRequired,
+    PendingMappingTransitionDenied,
+    DuplicateProductUdi,
     InvalidSupplierUscc,
     InvalidCustomerAddress,
     InvalidCustomerProfile,
@@ -122,21 +130,51 @@ impl MasterDataStore {
         req: CreateProductRequest,
         now: DateTime<Utc>,
     ) -> Result<Product, MasterDataError> {
+        validate_create_product_fields(&req)?;
+        validate_product_packaging_levels(&req.packaging_levels)?;
+        let volume_cm3 = normalize_product_volume(
+            req.length_mm,
+            req.width_mm,
+            req.height_mm,
+            req.volume_cm3,
+            req.weight_g,
+        )?;
         let attrs = product_attrs_with_default_source(req.attrs, "api_import");
         validate_product_storage_condition(&attrs)?;
         let special_drug_category_code = req
             .special_drug_category_code
             .unwrap_or_else(|| "none".to_string());
         validate_special_drug_category(&special_drug_category_code)?;
+        if let Some(udi_code) = req.udi_code.as_deref() {
+            if self.products.records.values().any(|product| {
+                product.owner_id == ctx.owner_id
+                    && product.udi_code.as_deref() == Some(udi_code.trim())
+            }) {
+                return Err(MasterDataError::DuplicateProductUdi);
+            }
+        }
         self.products.create(Product {
             id: Uuid::new_v4(),
             owner_id: ctx.owner_id,
-            product_code: req.product_code,
-            product_name: req.product_name,
+            product_code: req.product_code.trim().to_string(),
+            product_name: req.product_name.trim().to_string(),
             approval_no: req.approval_no,
             spec: req.spec,
             dosage_form: req.dosage_form,
             manufacturer: req.manufacturer,
+            udi_code: req.udi_code.map(|value| value.trim().to_string()),
+            electronic_regulatory_code: req.electronic_regulatory_code,
+            length_mm: req.length_mm,
+            width_mm: req.width_mm,
+            height_mm: req.height_mm,
+            volume_cm3,
+            weight_g: req.weight_g,
+            packaging_levels: req
+                .packaging_levels
+                .into_iter()
+                .map(product_packaging_level)
+                .collect(),
+            mapping_traces: Vec::new(),
             special_drug_category_code: Some(special_drug_category_code),
             status: "active".to_string(),
             attrs,
@@ -160,6 +198,13 @@ impl MasterDataStore {
         req: UpdateProductRequest,
         now: DateTime<Utc>,
     ) -> Result<Product, MasterDataError> {
+        validate_update_product_fields(&req)?;
+        let current = self.products.get(ctx.owner_id, id)?;
+        validate_product_update_transition(
+            current.special_drug_category_code.as_deref(),
+            &current.status,
+            &req,
+        )?;
         if let Some(attrs) = req.attrs.as_ref() {
             if attrs.get("storage_condition").is_some() {
                 validate_product_storage_condition(attrs)?;
@@ -168,21 +213,59 @@ impl MasterDataStore {
         if let Some(category) = req.special_drug_category_code.as_deref() {
             validate_special_drug_category(category)?;
         }
+        if let Some(levels) = req.packaging_levels.as_ref() {
+            validate_product_packaging_levels(levels)?;
+        }
+        if let Some(Some(udi_code)) = req.udi_code.as_ref() {
+            let normalized_udi = udi_code.trim();
+            if self.products.records.values().any(|product| {
+                product.owner_id == ctx.owner_id
+                    && product.id != id
+                    && product.udi_code.as_deref() == Some(normalized_udi)
+            }) {
+                return Err(MasterDataError::DuplicateProductUdi);
+            }
+        }
+        let physical = normalize_product_physical_patch(&req)?;
         self.products.update(ctx.owner_id, id, now, |product| {
             if let Some(value) = req.product_name {
                 product.product_name = value;
             }
             if let Some(value) = req.approval_no {
-                product.approval_no = Some(value);
+                product.approval_no = value;
             }
             if let Some(value) = req.spec {
-                product.spec = Some(value);
+                product.spec = value;
             }
             if let Some(value) = req.dosage_form {
-                product.dosage_form = Some(value);
+                product.dosage_form = value;
             }
             if let Some(value) = req.manufacturer {
-                product.manufacturer = Some(value);
+                product.manufacturer = value;
+            }
+            if let Some(value) = req.udi_code {
+                product.udi_code = value.map(|udi_code| udi_code.trim().to_string());
+            }
+            if let Some(value) = req.electronic_regulatory_code {
+                product.electronic_regulatory_code = value;
+            }
+            if let Some(value) = physical.length_mm {
+                product.length_mm = value;
+            }
+            if let Some(value) = physical.width_mm {
+                product.width_mm = value;
+            }
+            if let Some(value) = physical.height_mm {
+                product.height_mm = value;
+            }
+            if let Some(value) = physical.volume_cm3 {
+                product.volume_cm3 = value;
+            }
+            if let Some(value) = physical.weight_g {
+                product.weight_g = value;
+            }
+            if let Some(value) = req.packaging_levels {
+                product.packaging_levels = value.into_iter().map(product_packaging_level).collect();
             }
             if let Some(value) = req.special_drug_category_code {
                 product.special_drug_category_code = Some(value);
@@ -576,6 +659,202 @@ pub(crate) fn validate_special_drug_category(category: &str) -> Result<(), Maste
         Ok(())
     } else {
         Err(MasterDataError::InvalidSpecialDrugCategory)
+    }
+}
+
+pub(crate) fn validate_product_packaging_levels(
+    levels: &[wms_domain::ProductPackagingLevelInput],
+) -> Result<(), MasterDataError> {
+    let mut unit_codes = HashSet::new();
+    let mut sort_orders = HashSet::new();
+    let mut base_count = 0;
+    let mut default_count = 0;
+    for level in levels {
+        if level.unit_code.trim().is_empty()
+            || level.unit_name.trim().is_empty()
+            || level.ratio_to_base <= 0
+            || level.sort_order < 0
+            || !unit_codes.insert(level.unit_code.trim())
+            || !sort_orders.insert(level.sort_order)
+            || (level.is_base && level.ratio_to_base != 1)
+        {
+            return Err(MasterDataError::InvalidProductPackaging);
+        }
+        base_count += i32::from(level.is_base);
+        default_count += i32::from(level.is_default);
+    }
+    if levels.is_empty() || base_count != 1 || default_count != 1 {
+        return Err(MasterDataError::InvalidProductPackaging);
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_create_product_fields(
+    req: &CreateProductRequest,
+) -> Result<(), MasterDataError> {
+    if req.product_code.trim().is_empty()
+        || req.product_name.trim().is_empty()
+        || req.spec.trim().is_empty()
+        || req
+            .udi_code
+            .as_deref()
+            .is_some_and(|value| value.trim().is_empty())
+    {
+        return Err(MasterDataError::InvalidProductFields);
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_update_product_fields(
+    req: &UpdateProductRequest,
+) -> Result<(), MasterDataError> {
+    if req
+        .product_name
+        .as_deref()
+        .is_some_and(|value| value.trim().is_empty())
+        || req
+            .spec
+            .as_deref()
+            .is_some_and(|value| value.trim().is_empty())
+        || req
+            .approval_no
+            .as_ref()
+            .and_then(Option::as_deref)
+            .is_some_and(|value| value.trim().is_empty())
+        || req
+            .dosage_form
+            .as_ref()
+            .and_then(Option::as_deref)
+            .is_some_and(|value| value.trim().is_empty())
+        || req
+            .manufacturer
+            .as_ref()
+            .and_then(Option::as_deref)
+            .is_some_and(|value| value.trim().is_empty())
+        || req
+            .udi_code
+            .as_ref()
+            .and_then(Option::as_deref)
+            .is_some_and(|value| value.trim().is_empty())
+        || req
+            .electronic_regulatory_code
+            .as_ref()
+            .and_then(Option::as_deref)
+            .is_some_and(|value| value.trim().is_empty())
+    {
+        return Err(MasterDataError::InvalidProductFields);
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_product_update_transition(
+    current_special_drug_category: Option<&str>,
+    current_status: &str,
+    req: &UpdateProductRequest,
+) -> Result<(), MasterDataError> {
+    if req
+        .special_drug_category_code
+        .as_deref()
+        .is_some_and(|next| Some(next) != current_special_drug_category)
+    {
+        return Err(MasterDataError::SpecialDrugCategoryApprovalRequired);
+    }
+    if req.status.as_deref().is_some_and(|next| {
+        (current_status == "pending_mapping" && next != current_status)
+            || (current_status != "pending_mapping" && next == "pending_mapping")
+    }) {
+        return Err(MasterDataError::PendingMappingTransitionDenied);
+    }
+    Ok(())
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct ProductPhysicalPatch {
+    pub length_mm: Option<Option<f64>>,
+    pub width_mm: Option<Option<f64>>,
+    pub height_mm: Option<Option<f64>>,
+    pub volume_cm3: Option<Option<f64>>,
+    pub weight_g: Option<Option<f64>>,
+}
+
+pub(crate) fn normalize_product_physical_patch(
+    req: &UpdateProductRequest,
+) -> Result<ProductPhysicalPatch, MasterDataError> {
+    let dimensions_touched =
+        req.length_mm.is_some() || req.width_mm.is_some() || req.height_mm.is_some();
+    if dimensions_touched
+        && (req.length_mm.is_none() || req.width_mm.is_none() || req.height_mm.is_none())
+    {
+        return Err(MasterDataError::InvalidProductPhysicalAttributes);
+    }
+    let length_mm = req.length_mm.flatten();
+    let width_mm = req.width_mm.flatten();
+    let height_mm = req.height_mm.flatten();
+    let supplied_volume = req.volume_cm3.flatten();
+    let weight_g = req.weight_g.flatten();
+    let normalized_volume =
+        normalize_product_volume(length_mm, width_mm, height_mm, supplied_volume, weight_g)?;
+    Ok(ProductPhysicalPatch {
+        length_mm: req.length_mm,
+        width_mm: req.width_mm,
+        height_mm: req.height_mm,
+        volume_cm3: if dimensions_touched || req.volume_cm3.is_some() {
+            Some(normalized_volume)
+        } else {
+            None
+        },
+        weight_g: req.weight_g,
+    })
+}
+
+pub(crate) fn normalize_product_volume(
+    length_mm: Option<f64>,
+    width_mm: Option<f64>,
+    height_mm: Option<f64>,
+    volume_cm3: Option<f64>,
+    weight_g: Option<f64>,
+) -> Result<Option<f64>, MasterDataError> {
+    let dimensions = [length_mm, width_mm, height_mm];
+    let dimension_count = dimensions.iter().filter(|value| value.is_some()).count();
+    let valid = |value: f64| value.is_finite() && value > 0.0;
+    if dimension_count != 0 && dimension_count != 3
+        || dimensions.into_iter().flatten().any(|value| !valid(value))
+        || volume_cm3.is_some_and(|value| !valid(value))
+        || weight_g.is_some_and(|value| !valid(value))
+    {
+        return Err(MasterDataError::InvalidProductPhysicalAttributes);
+    }
+    Ok(volume_cm3.or_else(|| Some(length_mm? * width_mm? * height_mm? / 1_000.0)))
+}
+
+pub(crate) fn validate_product_mapping_traces(
+    traces: &[wms_domain::ProductMappingTraceInput],
+) -> Result<(), MasterDataError> {
+    if traces.iter().any(|trace| {
+        trace.field_name.trim().is_empty()
+            || trace.source_system.trim().is_empty()
+            || trace.source_value.trim().is_empty()
+            || trace
+                .target_value
+                .as_deref()
+                .is_some_and(|value| value.trim().is_empty())
+    }) {
+        return Err(MasterDataError::InvalidProductMappingTrace);
+    }
+    Ok(())
+}
+
+fn product_packaging_level(
+    value: wms_domain::ProductPackagingLevelInput,
+) -> wms_domain::ProductPackagingLevel {
+    wms_domain::ProductPackagingLevel {
+        id: Uuid::new_v4(),
+        unit_code: value.unit_code,
+        unit_name: value.unit_name,
+        ratio_to_base: value.ratio_to_base,
+        is_base: value.is_base,
+        is_default: value.is_default,
+        sort_order: value.sort_order,
     }
 }
 

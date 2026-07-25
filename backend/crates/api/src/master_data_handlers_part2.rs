@@ -52,6 +52,47 @@ impl IntoResponse for MasterDataHandlerError {
                 "M1_INVALID_SPECIAL_DRUG_CATEGORY",
                 "特殊药品分类必须使用已启用字典项",
             ),
+            MasterDataHandlerError::MasterData(MasterDataError::InvalidProductPackaging) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M1_INVALID_PRODUCT_PACKAGING",
+                "包装层级必须且只能包含一个基础单位和一个默认单位",
+            ),
+            MasterDataHandlerError::MasterData(
+                MasterDataError::InvalidProductPhysicalAttributes,
+            ) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M1_INVALID_PRODUCT_PHYSICAL_ATTRIBUTES",
+                "商品物理属性必须为正数，长宽高须成组填写",
+            ),
+            MasterDataHandlerError::MasterData(MasterDataError::InvalidProductFields) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M1_PRODUCT_FIELDS_INVALID",
+                "商品编码、名称和规格不能为空，UDI 传入时不能为空",
+            ),
+            MasterDataHandlerError::MasterData(MasterDataError::InvalidProductMappingTrace) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M1_PRODUCT_MAPPING_TRACE_INVALID",
+                "商品映射溯源字段不能为空",
+            ),
+            MasterDataHandlerError::MasterData(
+                MasterDataError::SpecialDrugCategoryApprovalRequired,
+            ) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M1_SPECIAL_DRUG_CATEGORY_APPROVAL_REQUIRED",
+                "特殊药品分类变更必须通过仓库主管和质量负责人双人审批",
+            ),
+            MasterDataHandlerError::MasterData(
+                MasterDataError::PendingMappingTransitionDenied,
+            ) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M1_PENDING_MAPPING_TRANSITION_DENIED",
+                "待映射商品只能通过受控参数映射闭环恢复",
+            ),
+            MasterDataHandlerError::MasterData(MasterDataError::DuplicateProductUdi) => (
+                StatusCode::CONFLICT,
+                "M1_PRODUCT_UDI_DUPLICATE",
+                "UDI 唯一码已存在",
+            ),
             MasterDataHandlerError::MasterData(MasterDataError::InvalidSupplierUscc) => (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "M1_USCC_FORMAT_INVALID",
@@ -214,6 +255,7 @@ async fn list_products_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
 ) -> Result<Json<ProductListResponse>, MasterDataHandlerError> {
+    ctx.require_permission(MASTER_DATA_READ_PERMISSION)?;
     let data = state.list_products(&ctx).await?;
     Ok(Json(ProductListResponse {
         page: page(data.len()),
@@ -227,7 +269,7 @@ async fn create_product_handler(
     headers: HeaderMap,
     Json(req): Json<CreateProductRequest>,
 ) -> Result<Json<Product>, MasterDataHandlerError> {
-    ctx.require_permission(MASTER_DATA_WRITE_PERMISSION)?;
+    require_internal_product_write(&ctx)?;
     let idempotency_key = idempotency_key_from_headers(&headers)?;
     Ok(Json(
         state
@@ -241,6 +283,7 @@ async fn get_product_handler(
     State(state): State<MasterDataAppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Product>, MasterDataHandlerError> {
+    ctx.require_permission(MASTER_DATA_READ_PERMISSION)?;
     Ok(Json(state.get_product(&ctx, id).await?))
 }
 
@@ -251,7 +294,7 @@ async fn update_product_handler(
     headers: HeaderMap,
     Json(req): Json<UpdateProductRequest>,
 ) -> Result<Json<Product>, MasterDataHandlerError> {
-    ctx.require_permission(MASTER_DATA_WRITE_PERMISSION)?;
+    require_internal_product_write(&ctx)?;
     let idempotency_key = idempotency_key_from_headers(&headers)?;
     Ok(Json(
         state
@@ -266,7 +309,7 @@ async fn delete_product_handler(
     Path(id): Path<Uuid>,
     headers: HeaderMap,
 ) -> Result<Json<Product>, MasterDataHandlerError> {
-    ctx.require_permission(MASTER_DATA_WRITE_PERMISSION)?;
+    require_internal_product_write(&ctx)?;
     let idempotency_key = idempotency_key_from_headers(&headers)?;
     Ok(Json(
         state
@@ -280,6 +323,14 @@ async fn delete_product_handler(
                     dosage_form: None,
                     manufacturer: None,
                     special_drug_category_code: None,
+                    udi_code: None,
+                    electronic_regulatory_code: None,
+                    length_mm: None,
+                    width_mm: None,
+                    height_mm: None,
+                    volume_cm3: None,
+                    weight_g: None,
+                    packaging_levels: None,
                     status: Some("disabled".into()),
                     attrs: None,
                 },

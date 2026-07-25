@@ -7,16 +7,20 @@ CREATE TABLE IF NOT EXISTS products (
     product_name           TEXT NOT NULL,
     specification          TEXT NOT NULL,
     dosage_form            TEXT,
-    storage_condition      TEXT NOT NULL,
-    special_drug_category  TEXT NOT NULL DEFAULT 'normal',
+    storage_condition      TEXT,
+    special_drug_category  TEXT,
     approval_no            TEXT,
     manufacturer           TEXT,
     status                 TEXT NOT NULL DEFAULT 'active',
     created_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
     version                BIGINT NOT NULL DEFAULT 1,
-    CHECK (storage_condition IN ('frozen', 'cold', 'cool', 'normal')),
+    CHECK (storage_condition IS NULL OR storage_condition IN ('frozen', 'cold', 'cool', 'normal')),
     CHECK (status IN ('active', 'disabled', 'pending_mapping')),
+    CHECK (
+        status = 'pending_mapping'
+        OR (storage_condition IS NOT NULL AND special_drug_category IS NOT NULL)
+    ),
     UNIQUE (owner_id, product_code)
 );
 
