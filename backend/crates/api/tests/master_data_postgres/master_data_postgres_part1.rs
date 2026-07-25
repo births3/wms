@@ -116,7 +116,7 @@ async fn products_are_read_from_postgres_by_owner(pool: PgPool) {
 
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].product_code, "P-M1-001");
-    assert_eq!(rows[0].spec.as_deref(), Some("10ml*1支"));
+    assert_eq!(rows[0].spec, "10ml*1支");
     assert_eq!(
         rows[0].special_drug_category_code.as_deref(),
         Some("none")
@@ -277,7 +277,16 @@ async fn product_routes_accept_custom_enabled_special_drug_category(pool: PgPool
             json!({
                 "product_code": "P-M1-CUSTOM-001",
                 "product_name": "自定义特殊药品",
+                "spec": "1盒",
                 "special_drug_category_code": custom_code,
+                "packaging_levels": [{
+                    "unit_code": "box",
+                    "unit_name": "盒",
+                    "ratio_to_base": 1,
+                    "is_base": true,
+                    "is_default": true,
+                    "sort_order": 1
+                }],
                 "attrs": { "storage_condition": "normal" }
             }),
             "m1-product-custom-category-create",
