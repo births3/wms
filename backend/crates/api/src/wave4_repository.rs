@@ -19,6 +19,7 @@ use crate::{
     audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
     auth::AuthContext,
     document_numbering::{GenerateDocumentNumberRequest, PgDocumentNumberingService},
+    h2_lifecycle::publish_event_in_tx,
     inventory::{STATUS_QUALIFIED, STATUS_QUARANTINED},
     outbound::{
         all_lines_reviewed_for_ship, short_pick_qty, status_after_pick, status_after_review,
@@ -57,6 +58,7 @@ pub enum Wave4RepositoryError {
     DuplicateCode,
     EmptySelection,
     InvalidDocumentType,
+    InvalidDeliveryAddress,
     BatchNotAffected(Uuid),
     InvalidStatus {
         expected: String,
@@ -124,6 +126,8 @@ struct OutboundOrderRow {
     wms_order_no: String,
     erp_order_no: Option<String>,
     customer_id: Uuid,
+    delivery_address_id: Uuid,
+    delivery_address_snapshot: serde_json::Value,
     warehouse_id: Uuid,
     required_ship_at: Option<DateTime<Utc>>,
     status: String,
@@ -187,6 +191,7 @@ struct TraceabilityOutboundReportEventRow {
 include!("wave4_repository_part1.rs");
 include!("wave4_repository_part2.rs");
 include!("wave4_repository_waves.rs");
+include!("wave4_repository_customer_portal.rs");
 
 async fn lock_outbound_order(
     tx: &mut Transaction<'_, Postgres>,
@@ -196,6 +201,7 @@ async fn lock_outbound_order(
     sqlx::query_as::<_, OutboundOrderRow>(
         r#"
         SELECT id, owner_id, document_type, wms_order_no, erp_order_no, customer_id,
+               delivery_address_id, delivery_address_snapshot,
                warehouse_id, required_ship_at, status, short_pick,
                created_at, updated_at
           FROM outbound_orders
@@ -249,6 +255,7 @@ async fn load_outbound_order(
     let row = sqlx::query_as::<_, OutboundOrderRow>(
         r#"
         SELECT id, owner_id, document_type, wms_order_no, erp_order_no, customer_id,
+               delivery_address_id, delivery_address_snapshot,
                warehouse_id, required_ship_at, status, short_pick,
                created_at, updated_at
           FROM outbound_orders
@@ -700,6 +707,8 @@ fn map_outbound_order(row: OutboundOrderRow, lines: Vec<OutboundOrderLine>) -> O
         wms_order_no: row.wms_order_no,
         erp_order_no: row.erp_order_no,
         customer_id: row.customer_id,
+        delivery_address_id: row.delivery_address_id,
+        delivery_address_snapshot: row.delivery_address_snapshot,
         warehouse_id: row.warehouse_id,
         required_ship_at: row.required_ship_at,
         status: row.status,

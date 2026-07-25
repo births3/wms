@@ -10,6 +10,10 @@ use wms_domain::{
     CreateOutboundOrderLineRequest, CreateOutboundOrderRequest, CreateOutboundWaveRequest,
 };
 
+#[path = "support/wave4.rs"]
+mod wave4_test_support;
+use wave4_test_support::seed_customer_delivery_address;
+
 fn ctx(owner_id: Uuid) -> AuthContext {
     AuthContext {
         user_id: Uuid::new_v4(),
@@ -54,6 +58,7 @@ async fn outbound_wave_release_persists_tasks_locks_audit_and_replays(pool: PgPo
         .single()
         .expect("valid time");
     seed_inventory(&pool, owner_id, now).await;
+    let (customer_id, delivery_address_id) = seed_customer_delivery_address(&pool, owner_id).await;
     let order = repo
         .create_outbound_order(
             &ctx,
@@ -61,7 +66,8 @@ async fn outbound_wave_release_persists_tasks_locks_audit_and_replays(pool: PgPo
                 document_type: "sales_outbound".to_string(),
                 wms_order_no: "WMS-WAVE-001".to_string(),
                 erp_order_no: None,
-                customer_id: Uuid::new_v4(),
+                customer_id,
+                delivery_address_id,
                 warehouse_id: Uuid::new_v4(),
                 required_ship_at: None,
                 lines: vec![CreateOutboundOrderLineRequest {
@@ -136,11 +142,13 @@ async fn h8_outbound_order_create_replays_without_duplicate_lines(pool: PgPool) 
         .with_ymd_and_hms(2026, 7, 23, 9, 30, 0)
         .single()
         .expect("valid time");
+    let (customer_id, delivery_address_id) = seed_customer_delivery_address(&pool, owner_id).await;
     let request = CreateOutboundOrderRequest {
         document_type: "sales_outbound".to_string(),
         wms_order_no: "WMS-H8-L11-001".to_string(),
         erp_order_no: Some("ERP-H8-L11-001".to_string()),
-        customer_id: Uuid::new_v4(),
+        customer_id,
+        delivery_address_id,
         warehouse_id: Uuid::new_v4(),
         required_ship_at: None,
         lines: vec![CreateOutboundOrderLineRequest {

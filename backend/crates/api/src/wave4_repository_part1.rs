@@ -16,6 +16,7 @@ pub fn new(pool: PgPool) -> Self {
         let rows = sqlx::query_as::<_, OutboundOrderRow>(
             r#"
             SELECT id, owner_id, document_type, wms_order_no, erp_order_no, customer_id,
+                   delivery_address_id, delivery_address_snapshot,
                    warehouse_id, required_ship_at, status, short_pick,
                    created_at, updated_at
               FROM outbound_orders
@@ -55,6 +56,7 @@ pub fn new(pool: PgPool) -> Self {
         let row = sqlx::query_as::<_, OutboundOrderRow>(
             r#"
             SELECT id, owner_id, document_type, wms_order_no, erp_order_no, customer_id,
+                   delivery_address_id, delivery_address_snapshot,
                    warehouse_id, required_ship_at, status, short_pick,
                    created_at, updated_at
               FROM outbound_orders
@@ -97,6 +99,27 @@ pub fn new(pool: PgPool) -> Self {
 
         let order_id = Uuid::new_v4();
         ensure_outbound_document_type(&mut tx, ctx.owner_id, &req.document_type).await?;
+        let delivery_address_snapshot: serde_json::Value = sqlx::query_scalar(
+            r#"
+            SELECT jsonb_build_object(
+                'province', province,
+                'city', city,
+                'district', district,
+                'detail_address', detail_address,
+                'contact_name', contact_name,
+                'contact_phone', contact_phone
+            )
+              FROM customer_addresses
+             WHERE owner_id = $1 AND customer_id = $2 AND id = $3
+            "#,
+        )
+        .bind(ctx.owner_id)
+        .bind(req.customer_id)
+        .bind(req.delivery_address_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(map_db_error)?
+        .ok_or(Wave4RepositoryError::InvalidDeliveryAddress)?;
         let wms_order_no = if req.wms_order_no.trim().is_empty() {
             PgDocumentNumberingService::new()
                 .generate_in_tx(
@@ -120,10 +143,11 @@ pub fn new(pool: PgPool) -> Self {
         sqlx::query(
             r#"
             INSERT INTO outbound_orders (
-                id, owner_id, document_type, wms_order_no, erp_order_no, customer_id, warehouse_id,
+                id, owner_id, document_type, wms_order_no, erp_order_no, customer_id,
+                delivery_address_id, delivery_address_snapshot, warehouse_id,
                 required_ship_at, status, short_pick, created_at, updated_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, FALSE, $10, $10)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, FALSE, $12, $12)
             "#,
         )
         .bind(order_id)
@@ -132,6 +156,8 @@ pub fn new(pool: PgPool) -> Self {
         .bind(&wms_order_no)
         .bind(&req.erp_order_no)
         .bind(req.customer_id)
+        .bind(req.delivery_address_id)
+        .bind(delivery_address_snapshot)
         .bind(req.warehouse_id)
         .bind(req.required_ship_at)
         .bind(OUTBOUND_STATUS_CONFIRMED)

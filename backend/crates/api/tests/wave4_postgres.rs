@@ -19,7 +19,7 @@ use wms_domain::{
 
 #[path = "support/wave4.rs"]
 mod support;
-use support::seed_inventory_batch;
+use support::{seed_customer_delivery_address, seed_inventory_batch};
 
 fn ctx(owner_id: Uuid) -> AuthContext {
     AuthContext {
@@ -143,19 +143,23 @@ async fn seed_temperature_excursion(
 }
 
 async fn create_read_order(
+    pool: &PgPool,
     repo: &PgWave4Repository,
     ctx: &AuthContext,
     wms_order_no: &str,
     erp_order_no: &str,
     now: chrono::DateTime<Utc>,
 ) -> OutboundOrder {
+    let (customer_id, delivery_address_id) =
+        seed_customer_delivery_address(pool, ctx.owner_id).await;
     repo.create_outbound_order(
         ctx,
         CreateOutboundOrderRequest {
             document_type: "sales_outbound".to_string(),
             wms_order_no: wms_order_no.to_string(),
             erp_order_no: Some(erp_order_no.to_string()),
-            customer_id: Uuid::new_v4(),
+            customer_id,
+            delivery_address_id,
             warehouse_id: Uuid::new_v4(),
             required_ship_at: Some(now),
             lines: vec![CreateOutboundOrderLineRequest {
@@ -191,8 +195,24 @@ async fn outbound_order_reads_are_owner_scoped_filterable_and_include_lines(pool
         .single()
         .expect("valid time");
 
-    let first = create_read_order(&repo, &owner_ctx, "WMS-R-READ-001", "ERP-READ-001", now).await;
-    let second = create_read_order(&repo, &owner_ctx, "WMS-R-READ-002", "ERP-READ-002", now).await;
+    let first = create_read_order(
+        &pool,
+        &repo,
+        &owner_ctx,
+        "WMS-R-READ-001",
+        "ERP-READ-001",
+        now,
+    )
+    .await;
+    let second = create_read_order(
+        &pool,
+        &repo,
+        &owner_ctx,
+        "WMS-R-READ-002",
+        "ERP-READ-002",
+        now,
+    )
+    .await;
     seed_outbound_inventory(
         &pool,
         owner_id,
@@ -215,7 +235,15 @@ async fn outbound_order_reads_are_owner_scoped_filterable_and_include_lines(pool
     .await
     .expect("second order should enter wave");
 
-    create_read_order(&repo, &other_ctx, "WMS-R-READ-OTHER", "ERP-READ-001", now).await;
+    create_read_order(
+        &pool,
+        &repo,
+        &other_ctx,
+        "WMS-R-READ-OTHER",
+        "ERP-READ-001",
+        now,
+    )
+    .await;
 
     let confirmed = repo
         .list_outbound_orders(&owner_ctx, Some("confirmed"), None, Some(10))

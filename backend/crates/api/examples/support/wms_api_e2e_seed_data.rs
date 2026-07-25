@@ -165,6 +165,36 @@ pub async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
             "h8.erp_interface_table.read",
             "H8 ERP 接口表探查只读",
         ),
+        (
+            "00000000-0000-0000-0000-00000000012c",
+            "m-di.document.read",
+            "药检资料查看",
+        ),
+        (
+            "00000000-0000-0000-0000-00000000012d",
+            "m-di.document.write",
+            "药检资料录入",
+        ),
+        (
+            "00000000-0000-0000-0000-00000000012e",
+            "m-di.document.review",
+            "药检单审核",
+        ),
+        (
+            "00000000-0000-0000-0000-00000000012f",
+            "m-di.stamp.manage",
+            "药检图章配置",
+        ),
+        (
+            "00000000-0000-0000-0000-000000000130",
+            "m-di.stamp.review",
+            "药检图章审核",
+        ),
+        (
+            "00000000-0000-0000-0000-000000000131",
+            "m-di.requirement-rule.manage",
+            "药检单验收规则维护",
+        ),
     ] {
         let permission_id: Uuid = sqlx::query_scalar(
             r#"
@@ -257,6 +287,28 @@ pub async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
         SET customer_name = EXCLUDED.customer_name,
             customer_type = EXCLUDED.customer_type,
             contact_name = EXCLUDED.contact_name,
+            updated_at = now()
+        "#,
+    )
+    .execute(pool)
+    .await?;
+    sqlx::query(
+        r#"
+        INSERT INTO customer_addresses (
+            id, owner_id, customer_id, province, city, district,
+            detail_address, contact_name, contact_phone, is_default
+        )
+        VALUES (
+            '00000000-0000-0000-0000-000000001211',
+            '00000000-0000-0000-0000-000000000001',
+            '00000000-0000-0000-0000-000000001201',
+            '上海市', '上海市', '浦东新区', 'E2E 园区客户收货处',
+            '李客户', '13800000000', TRUE
+        )
+        ON CONFLICT (id) DO UPDATE
+        SET detail_address = EXCLUDED.detail_address,
+            contact_name = EXCLUDED.contact_name,
+            contact_phone = EXCLUDED.contact_phone,
             updated_at = now()
         "#,
     )

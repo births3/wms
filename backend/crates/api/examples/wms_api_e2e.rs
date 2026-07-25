@@ -1,6 +1,6 @@
 //! Test-only HTTP entrypoint for real-data web-admin E2E.
 
-use std::{env, error::Error, io, net::SocketAddr, sync::Arc};
+use std::{env, error::Error, io, net::SocketAddr, path::PathBuf, sync::Arc};
 
 use axum::middleware::from_fn_with_state;
 use axum::{routing::get, Json, Router};
@@ -25,9 +25,16 @@ use wms_api::{
     dock_appointment_handlers::{dock_appointment_router, DockAppointmentAppState},
     dock_handlers::{dock_router, DockAppState},
     document_numbering_handlers::{document_numbering_router, DocumentNumberingAppState},
+    drug_inspection_copy_service::spawn_drug_inspection_copy_worker,
+    drug_inspection_document_handlers::{
+        drug_inspection_document_router, DrugInspectionDocumentAppState,
+    },
     drug_inspection_handlers::{drug_inspection_router, DrugInspectionAppState},
+    drug_inspection_portal_bridge::spawn_drug_inspection_portal_bridge,
+    drug_inspection_stamp_handlers::{drug_inspection_stamp_router, DrugInspectionStampAppState},
     dual_person_policy_handlers::{dual_person_policy_router, DualPersonPolicyAppState},
     feature_flags::FeatureFlagRegistry,
+    file_attachment_handlers::{file_attachment_router, FileAttachmentAppState},
     h8_erp_connectors::{h8_erp_connector_router, H8ErpConnectorAppState},
     h8_erp_interface_tables::{h8_erp_interface_table_router, H8ErpInterfaceTableAppState},
     h8_erp_messages::{h8_erp_message_router, H8ErpMessageAppState},
@@ -58,6 +65,7 @@ const WMS_DB_URL_ENV: &str = "WMS_DB_URL";
 const E2E_SEED_ENV: &str = "WMS_E2E_SEED";
 const REDIS_URL_ENV: &str = "WMS_REDIS_URL";
 const DEFAULT_BIND_ADDR: &str = "127.0.0.1:19080";
+const E2E_ATTACHMENT_ROOT_ENV: &str = "WMS_E2E_ATTACHMENT_ROOT";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -100,6 +108,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let h8_connector_state = H8ErpConnectorAppState::with_postgres(pool.clone());
+    let attachment_root = env::var(E2E_ATTACHMENT_ROOT_ENV)
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| env::temp_dir().join("wms-drug-inspection-e2e-attachments"));
+    spawn_drug_inspection_copy_worker(pool.clone(), attachment_root.clone());
+    if let (Ok(portal_url), Ok(projection_key)) = (
+        env::var("WMS_MDI_PORTAL_URL"),
+        env::var("WMS_MDI_PORTAL_PROJECTION_KEY"),
+    ) {
+        spawn_drug_inspection_portal_bridge(pool.clone(), portal_url, projection_key);
+    }
     let app = Router::new()
         .route("/api/v1/healthz", get(healthz))
         .merge(auth_router(AuthAppState::new(pool.clone())))
@@ -142,6 +160,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
         )))
         .merge(drug_inspection_router(
             DrugInspectionAppState::with_postgres(pool.clone()),
+        ))
+        .merge(drug_inspection_document_router(
+            DrugInspectionDocumentAppState::with_postgres(pool.clone()),
+        ))
+        .merge(drug_inspection_stamp_router(
+            DrugInspectionStampAppState::with_local_storage(pool.clone(), attachment_root.clone()),
+        ))
+        .merge(file_attachment_router(
+            FileAttachmentAppState::with_local_storage(pool.clone(), attachment_root),
         ))
         .merge(document_numbering_router(
             DocumentNumberingAppState::with_postgres(pool.clone()),

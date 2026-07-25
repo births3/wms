@@ -127,12 +127,16 @@ pub async fn seed_m9_m10_capabilities(pool: &PgPool) -> Result<(), sqlx::Error> 
     sqlx::query(
         r#"
         INSERT INTO outbound_orders (
-            id, owner_id, wms_order_no, erp_order_no, customer_id, warehouse_id,
+            id, owner_id, wms_order_no, erp_order_no, customer_id,
+            delivery_address_id, delivery_address_snapshot, warehouse_id,
             required_ship_at, status, short_pick, document_type
         )
         VALUES (
             '00000000-0000-0000-0000-000000001701', $1, 'OUT-M10-E2E-001', 'ERP-M10-E2E-001',
-            '00000000-0000-0000-0000-000000001201', '00000000-0000-0000-0000-000000001301',
+            '00000000-0000-0000-0000-000000001201',
+            '00000000-0000-0000-0000-000000001211',
+            '{"province":"上海市","city":"上海市","district":"浦东新区","detail_address":"E2E 园区客户收货处","contact_name":"李客户","contact_phone":"13800000000"}'::jsonb,
+            '00000000-0000-0000-0000-000000001301',
             '2026-07-14T12:00:00Z', 'created', FALSE, 'sales_outbound'
         )
         ON CONFLICT (owner_id, wms_order_no) DO UPDATE
@@ -206,12 +210,15 @@ pub async fn seed_m4_review_data(pool: &PgPool) -> Result<(), sqlx::Error> {
         r#"
         INSERT INTO outbound_orders (
             id, owner_id, document_type, wms_order_no, erp_order_no, customer_id,
+            delivery_address_id, delivery_address_snapshot,
             warehouse_id, required_ship_at, status, short_pick
         )
         VALUES (
             '00000000-0000-0000-0000-000000001702', $1, 'sales_outbound',
             'OUT-M4-REVIEW-E2E-001', 'ERP-M4-REVIEW-E2E-001',
             '00000000-0000-0000-0000-000000001201',
+            '00000000-0000-0000-0000-000000001211',
+            '{"province":"上海市","city":"上海市","district":"浦东新区","detail_address":"E2E 园区客户收货处","contact_name":"李客户","contact_phone":"13800000000"}'::jsonb,
             '00000000-0000-0000-0000-000000001301',
             '2026-07-14T12:00:00Z', 'picked', FALSE
         )

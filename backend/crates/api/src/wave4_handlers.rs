@@ -115,6 +115,7 @@ impl IntoResponse for Wave4HandlerError {
             | Wave4HandlerError::Repository(Wave4RepositoryError::BatchNotAffected(_))
             | Wave4HandlerError::Repository(Wave4RepositoryError::InvalidQuantity)
             | Wave4HandlerError::Repository(Wave4RepositoryError::InvalidDocumentType)
+            | Wave4HandlerError::Repository(Wave4RepositoryError::InvalidDeliveryAddress)
             | Wave4HandlerError::Repository(Wave4RepositoryError::InvalidTraceabilityEvent)
             | Wave4HandlerError::Repository(Wave4RepositoryError::ShortPickNotReplenished)
             | Wave4HandlerError::Repository(Wave4RepositoryError::ReviewValidation(_))
@@ -648,6 +649,7 @@ mod tests {
                 wms_order_no: "WMS-R-20260604-001".to_string(),
                 erp_order_no: Some("ERP-SO-001".to_string()),
                 customer_id: Uuid::new_v4(),
+                delivery_address_id: Uuid::new_v4(),
                 warehouse_id: Uuid::new_v4(),
                 required_ship_at: None,
                 lines: vec![],
@@ -679,6 +681,7 @@ mod tests {
                 wms_order_no: "WMS-R-20260604-002".to_string(),
                 erp_order_no: Some("ERP-SO-002".to_string()),
                 customer_id: Uuid::new_v4(),
+                delivery_address_id: Uuid::new_v4(),
                 warehouse_id: Uuid::new_v4(),
                 required_ship_at: None,
                 lines: vec![],

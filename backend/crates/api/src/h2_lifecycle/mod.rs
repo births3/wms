@@ -10,6 +10,7 @@ pub use archive::{
     audit_target_tier, list_audit_partition_states, run_audit_archive_cycle,
     sync_audit_partition_states,
 };
+pub(crate) use event_bus::publish_event_in_tx;
 pub use event_bus::{
     acknowledge_event_delivery, pending_event_deliveries, publish_event, record_delivery_failure,
     replay_events, upsert_event_subscription,

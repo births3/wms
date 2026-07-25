@@ -88,7 +88,7 @@ async fn seed_inventory(pool: &PgPool, owner_id: Uuid, qty: i64) -> (Uuid, Uuid,
 async fn seed_outbound_order(pool: &PgPool, owner_id: Uuid) -> Uuid {
     let order_id = Uuid::new_v4();
     sqlx::query(
-        "INSERT INTO outbound_orders (id, owner_id, wms_order_no, customer_id, warehouse_id, status) VALUES ($1, $2, 'M3-COUNT-OUT', $3, $4, 'confirmed')",
+        "INSERT INTO outbound_orders (id, owner_id, wms_order_no, customer_id, delivery_address_id, delivery_address_snapshot, warehouse_id, status) VALUES ($1, $2, 'M3-COUNT-OUT', $3, gen_random_uuid(), '{}'::jsonb, $4, 'confirmed')",
     )
     .bind(order_id)
     .bind(owner_id)

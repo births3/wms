@@ -1,0 +1,736 @@
+openapi: 3.0.3
+info:
+  title: WMS 药检单客户平台 API
+  version: 0.1.0
+  description: >
+    独立客户平台契约。客户请求只访问客户平台查询库；WMS 仅通过带
+    X-Projection-Key 的内部投影入口写入只读模型。
+servers:
+  - url: /
+tags:
+  - name: auth
+  - name: orders
+  - name: downloads
+  - name: exports
+  - name: users
+  - name: projections
+paths:
+  /health:
+    get:
+      operationId: portalHealth
+      responses:
+        "200":
+          description: 服务可用
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+  /api/v1/auth/login:
+    post:
+      tags: [auth]
+      operationId: portalLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/internal/projections:
+    post:
+      tags: [projections]
+      operationId: ingestPortalProjection
+      security:
+        - projectionKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectionRequest"
+      responses:
+        "200":
+          description: 投影成功或事件已幂等消费
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectionResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /api/v1/addresses:
+    get:
+      tags: [orders]
+      operationId: listPortalAddresses
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 当前账号可见地址
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AddressSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/orders:
+    get:
+      tags: [orders]
+      operationId: listPortalOrders
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: address_id
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [shipped, signed]
+        - in: query
+          name: keyword
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 授权地址下已发货或已签收订单
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OrderSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/orders/{order_id}:
+    get:
+      tags: [orders]
+      operationId: getPortalOrder
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: 订单、批号和可见药检单版本
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/v1/report-versions/{report_version_id}/download:
+    post:
+      tags: [downloads]
+      operationId: authorizePortalReportDownload
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ReportVersionId"
+      responses:
+        "200":
+          description: 15 分钟有效下载地址
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DownloadUrl"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/v1/files/{token}:
+    get:
+      tags: [downloads]
+      operationId: downloadPortalFile
+      parameters:
+        - in: path
+          name: token
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 已授权的 PDF 或 ZIP 字节
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "410":
+          description: 下载地址已过期
+  /api/v1/exports:
+    get:
+      tags: [exports]
+      operationId: listPortalExports
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 当前账号导出任务
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ExportJob"
+    post:
+      tags: [exports]
+      operationId: createPortalExport
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateExportRequest"
+      responses:
+        "200":
+          description: 已创建异步导出任务
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportJob"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/v1/exports/{export_id}/download:
+    post:
+      tags: [downloads, exports]
+      operationId: authorizePortalExportDownload
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ExportId"
+      responses:
+        "200":
+          description: 15 分钟有效 ZIP 下载地址
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DownloadUrl"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "410":
+          description: 导出记录已过 7 天保留期
+  /api/v1/users:
+    get:
+      tags: [users]
+      operationId: listPortalUsers
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 当前客户组织账号
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PortalUser"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [users]
+      operationId: createPortalUser
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "200":
+          description: 账号已创建
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PortalUser"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: 用户名已存在
+  /api/v1/users/{user_id}:
+    put:
+      tags: [users]
+      operationId: updatePortalUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+      responses:
+        "200":
+          description: 账号、地址范围和历史权限已更新
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PortalUser"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    projectionKey:
+      type: apiKey
+      in: header
+      name: X-Projection-Key
+  parameters:
+    OrderId:
+      in: path
+      name: order_id
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ReportVersionId:
+      in: path
+      name: report_version_id
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ExportId:
+      in: path
+      name: export_id
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    Unauthorized:
+      description: 未登录、令牌失效或账号已停用
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: 没有客户、地址、历史版本或管理员权限
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: 资源不存在或不在授权范围
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ValidationError:
+      description: 请求字段或 200 份/2GB 等受控上限不满足
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+          format: password
+          writeOnly: true
+    LoginResponse:
+      type: object
+      required: [access_token, expires_at, user]
+      properties:
+        access_token:
+          type: string
+          writeOnly: true
+        expires_at:
+          type: string
+          format: date-time
+        user:
+          $ref: "#/components/schemas/PortalUser"
+    PortalUser:
+      type: object
+      required:
+        - id
+        - customer_id
+        - username
+        - display_name
+        - role
+        - status
+        - can_view_report_history
+        - address_ids
+      properties:
+        id:
+          type: string
+          format: uuid
+        customer_id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        display_name:
+          type: string
+        role:
+          type: string
+          enum: [customer_admin, customer_user]
+        status:
+          type: string
+          enum: [active, disabled, locked]
+        can_view_report_history:
+          type: boolean
+        address_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+    CreateUserRequest:
+      type: object
+      required:
+        - username
+        - display_name
+        - password
+        - role
+        - can_view_report_history
+        - address_ids
+      properties:
+        username:
+          type: string
+          minLength: 3
+        display_name:
+          type: string
+          minLength: 1
+        password:
+          type: string
+          format: password
+          minLength: 12
+          writeOnly: true
+        role:
+          type: string
+          enum: [customer_admin, customer_user]
+        can_view_report_history:
+          type: boolean
+          default: false
+        address_ids:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+    UpdateUserRequest:
+      type: object
+      required:
+        - display_name
+        - role
+        - status
+        - can_view_report_history
+        - address_ids
+      properties:
+        display_name:
+          type: string
+          minLength: 1
+        role:
+          type: string
+          enum: [customer_admin, customer_user]
+        status:
+          type: string
+          enum: [active, disabled]
+        can_view_report_history:
+          type: boolean
+        address_ids:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+    ProjectionRequest:
+      type: object
+      required: [event_id, event_type, occurred_at, payload]
+      properties:
+        event_id:
+          type: string
+          format: uuid
+        event_type:
+          type: string
+          enum:
+            - customer_order.snapshot
+            - customer.upsert
+            - customer_address.upsert
+            - outbound_order.upsert
+            - drug_inspection_report.upsert
+        occurred_at:
+          type: string
+          format: date-time
+        payload:
+          type: object
+          additionalProperties: true
+    ProjectionResponse:
+      type: object
+      required: [event_id, duplicate, status]
+      properties:
+        event_id:
+          type: string
+          format: uuid
+        duplicate:
+          type: boolean
+        status:
+          type: string
+          enum: [succeeded]
+    AddressSummary:
+      type: object
+      required: [id, address_code, address_name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        address_code:
+          type: string
+        address_name:
+          type: string
+    OrderSummary:
+      type: object
+      required:
+        - id
+        - order_no
+        - status
+        - delivery_address_id
+        - address_name
+        - shipped_at
+        - line_count
+        - available_report_count
+        - pending_report_count
+      properties:
+        id:
+          type: string
+          format: uuid
+        order_no:
+          type: string
+        status:
+          type: string
+          enum: [shipped, signed]
+        delivery_address_id:
+          type: string
+          format: uuid
+        address_name:
+          type: string
+        shipped_at:
+          type: string
+          format: date-time
+        signed_at:
+          type: string
+          format: date-time
+          nullable: true
+        line_count:
+          type: integer
+          format: int64
+        available_report_count:
+          type: integer
+          format: int64
+        pending_report_count:
+          type: integer
+          format: int64
+    OrderDetail:
+      allOf:
+        - $ref: "#/components/schemas/OrderSummary"
+        - type: object
+          required: [address_snapshot, lines]
+          properties:
+            address_snapshot:
+              type: object
+              additionalProperties: true
+            lines:
+              type: array
+              items:
+                $ref: "#/components/schemas/OrderLine"
+    OrderLine:
+      type: object
+      required: [id, product_id, product_code, product_name, batch_no, quantity, reports]
+      properties:
+        id:
+          type: string
+          format: uuid
+        product_id:
+          type: string
+          format: uuid
+        product_code:
+          type: string
+        product_name:
+          type: string
+        batch_no:
+          type: string
+        quantity:
+          type: number
+          format: double
+        reports:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReportSummary"
+    ReportSummary:
+      type: object
+      required:
+        - id
+        - report_id
+        - version_number
+        - report_no
+        - status
+        - is_current
+        - customer_copy_status
+        - digitally_signed_original
+        - confirmed_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        report_id:
+          type: string
+          format: uuid
+        version_number:
+          type: integer
+        report_no:
+          type: string
+        status:
+          type: string
+          enum: [confirmed, superseded]
+        is_current:
+          type: boolean
+        modification_reason:
+          type: string
+          nullable: true
+        customer_copy_status:
+          type: string
+          enum: [queued, processing, available, failed]
+        customer_copy_file_name:
+          type: string
+          nullable: true
+        customer_copy_size:
+          type: integer
+          format: int64
+          nullable: true
+        digitally_signed_original:
+          type: boolean
+        confirmed_at:
+          type: string
+          format: date-time
+    CreateExportRequest:
+      type: object
+      required: [order_ids]
+      properties:
+        order_ids:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+        include_history:
+          type: boolean
+          default: false
+    ExportJob:
+      type: object
+      required:
+        - id
+        - include_history
+        - status
+        - requested_order_count
+        - report_file_count
+        - missing_count
+        - total_size
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        include_history:
+          type: boolean
+        status:
+          type: string
+          enum: [queued, processing, completed, failed]
+        requested_order_count:
+          type: integer
+        report_file_count:
+          type: integer
+          maximum: 200
+        missing_count:
+          type: integer
+        total_size:
+          type: integer
+          format: int64
+          maximum: 2147483648
+        result_file_name:
+          type: string
+          nullable: true
+        last_error:
+          type: string
+          nullable: true
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+          nullable: true
+    DownloadUrl:
+      type: object
+      required: [url, file_name, expires_at]
+      properties:
+        url:
+          type: string
+          description: 15 分钟临时地址，不得持久化
+        file_name:
+          type: string
+        expires_at:
+          type: string
+          format: date-time

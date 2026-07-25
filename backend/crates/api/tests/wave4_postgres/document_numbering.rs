@@ -28,6 +28,8 @@ async fn outbound_order_generates_number_when_request_omits_wms_number(pool: PgP
     .execute(&pool)
     .await
     .expect("outbound numbering rule should be seeded");
+    let (customer_id, delivery_address_id) =
+        seed_customer_delivery_address(&pool, owner_id).await;
 
     let order = PgWave4Repository::new(pool.clone())
         .create_outbound_order(
@@ -36,7 +38,8 @@ async fn outbound_order_generates_number_when_request_omits_wms_number(pool: PgP
                 document_type: "sales_outbound".to_string(),
                 wms_order_no: String::new(),
                 erp_order_no: Some("ERP-OUT-001".to_string()),
-                customer_id: Uuid::new_v4(),
+                customer_id,
+                delivery_address_id,
                 warehouse_id: Uuid::new_v4(),
                 required_ship_at: Some(now),
                 lines: vec![CreateOutboundOrderLineRequest {
@@ -84,6 +87,7 @@ async fn outbound_order_rejects_non_outbound_document_type(pool: PgPool) {
             wms_order_no: "OUT-INVALID-TYPE".to_string(),
             erp_order_no: None,
             customer_id: Uuid::new_v4(),
+            delivery_address_id: Uuid::new_v4(),
             warehouse_id: Uuid::new_v4(),
             required_ship_at: None,
             lines: vec![CreateOutboundOrderLineRequest {

@@ -11,6 +11,8 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
         .single()
         .expect("valid time");
     seed_outbound_inventory(&pool, owner_id, "P-OUT-001", "B-OUT-001", 10, now).await;
+    let (customer_id, delivery_address_id) =
+        seed_customer_delivery_address(&pool, owner_id).await;
     sqlx::query(
         "INSERT INTO products (id, owner_id, product_code, product_name, specification, storage_condition, special_drug_category, status) VALUES ($1, $2, 'P-OUT-001', '出库复核策略商品', '1 unit', 'normal', 'none', 'active')",
     )
@@ -59,7 +61,8 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
                 document_type: "sales_outbound".to_string(),
                 wms_order_no: "WMS-R-20260605-001".to_string(),
                 erp_order_no: Some("ERP-SO-001".to_string()),
-                customer_id: Uuid::new_v4(),
+                customer_id,
+                delivery_address_id,
                 warehouse_id: Uuid::new_v4(),
                 required_ship_at: None,
                 lines: vec![CreateOutboundOrderLineRequest {

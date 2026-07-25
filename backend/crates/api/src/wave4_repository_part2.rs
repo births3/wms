@@ -103,6 +103,12 @@ pub async fn ship_outbound_order(
         .await
         .map_err(map_db_error)?;
         let shipped = load_outbound_order(&mut tx, ctx.owner_id, order_id).await?;
+        publish_customer_portal_order_snapshot(
+            &mut tx,
+            &shipped,
+            req.shipped_at.unwrap_or(now),
+        )
+        .await?;
 
         store_idempotency_success(
             &mut tx,
