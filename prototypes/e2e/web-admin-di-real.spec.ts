@@ -40,6 +40,8 @@ async function openPage(page: import("@playwright/test").Page) {
   const target = navigation.getByRole("button", { name: /药检平台/ });
   const section = navigation.getByRole("button", { name: "入库业务", exact: true });
   if ((await section.getAttribute("aria-expanded")) !== "true") await section.click();
+  const group = navigation.getByRole("button", { name: "入库作业", exact: true });
+  if ((await group.getAttribute("aria-expanded")) !== "true") await group.click();
   await expect(target).toBeVisible();
   await target.click();
 }

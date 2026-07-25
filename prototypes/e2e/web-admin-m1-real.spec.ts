@@ -29,7 +29,7 @@ test("M1 管理端读取真实后端数据", async ({ page }) => {
     { group: "仓储资料", menu: /M1 仓库管理/, title: "M1 仓库管理", text: "WH-M1-E2E-001", shot: "warehouses.png" },
     { group: "仓储资料", menu: /M1 库区管理/, title: "M1 库区管理", text: "A01", shot: "zones.png" },
     { group: "仓储资料", menu: /M1 库位管理/, title: "M1 库位管理", text: "A01-01-02-03", shot: "locations.png" },
-    { group: "系统配置", menu: /M1 (功能开关|Feature Flag)/, title: "功能开关 / 配置中心", text: "m3_inventory_batches_config_center_smoke", shot: "feature-flags.png" },
+    { group: "系统配置", menu: /M1 (功能开关|Feature Flag)/, title: "配置中心", text: "m3_inventory_batches_config_center_smoke", shot: "feature-flags.png" },
     { group: "系统配置", menu: /M1 系统字典/, title: "M1 系统字典", text: "purchase_inbound", shot: "dictionary.png" },
   ];
 
@@ -68,7 +68,7 @@ test("M1 管理端读取真实后端数据", async ({ page }) => {
         fullPage: false,
       });
     }
-    if (item.title === "功能开关 / 配置中心") {
+    if (item.title === "配置中心") {
       await page.getByRole("button", { name: "从文件源迁移" }).click();
     }
     if (item.title === "M1 仓库管理") {
@@ -78,7 +78,7 @@ test("M1 管理端读取真实后端数据", async ({ page }) => {
       await expect(page.getByText(item.text).first()).toBeVisible();
     }
     await page.screenshot({ path: path.join(artifactsDir, item.shot), fullPage: false });
-    if (item.title === "功能开关 / 配置中心") {
+    if (item.title === "配置中心") {
       fs.mkdirSync(featureFlagEvidenceDir, { recursive: true });
       await page.evaluate(() => window.scrollTo(0, 0));
       await page.screenshot({ path: path.join(featureFlagEvidenceDir, "feature-flags-current.png"), fullPage: false });
@@ -128,7 +128,7 @@ test("M1 管理端读取真实后端数据", async ({ page }) => {
         path: path.join(artifactsDir, "business-partners-supplier-invalid-qualification.png"),
         fullPage: false,
       });
-      await supplierDialog.getByLabel("统一社会信用代码").fill("91350211M000100Y49");
+      await supplierDialog.getByLabel("统一社会信用代码").fill("91350100M000100Y43");
       await supplierDialog.getByLabel("联系人").fill("E2E 供应商联系人");
       const supplierUpdate = page.waitForResponse(
         (response) => response.url().includes("/api/v1/master-data/suppliers/") && response.request().method() === "PATCH",
@@ -335,7 +335,7 @@ test("M1 供应商资质 PC 真实维护", async ({ page }) => {
   await expect(supplierDialog.getByRole("button", { name: "保存", exact: true })).toBeDisabled();
   await page.screenshot({ path: path.join(artifactsDir, "supplier-qualification-invalid.png"), fullPage: false });
 
-  await supplierDialog.getByLabel("统一社会信用代码").fill("91350211M000100Y49");
+  await supplierDialog.getByLabel("统一社会信用代码").fill("91350100M000100Y43");
   await supplierDialog.getByLabel("联系人").fill("E2E 供应商联系人");
   const updateResponse = page.waitForResponse(
     (response) => response.url().includes("/api/v1/master-data/suppliers/") && response.request().method() === "PATCH",
@@ -416,8 +416,8 @@ test("M1 供应商批量导入调用原子批量接口", async ({ page }) => {
   await page.getByRole("button", { name: "供入", exact: true }).click();
   await page.getByRole("textbox", { name: "批量导入供应商" }).fill([
     "supplier_code,supplier_name,license_no,contact_name",
-    `${firstCode},E2E 批量供应商一,91310000MA1FL3L80L,联系人一`,
-    `${secondCode},E2E 批量供应商二,91110108MA01ABCD1F,联系人二`,
+    `${firstCode},E2E 批量供应商一,91310110666007217T,联系人一`,
+    `${secondCode},E2E 批量供应商二,91110108MA01ABCD1E,联系人二`,
   ].join("\n"));
   const batchResponse = page.waitForResponse(
     (response) => response.url().endsWith("/api/v1/master-data/suppliers/batch-sync")

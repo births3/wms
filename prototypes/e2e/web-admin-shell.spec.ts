@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const artifactsDir = path.resolve("../apps/web-admin/.e2e-artifacts/shell-dev/screenshots");
+const inboundDocumentsArtifactsDir = path.resolve("../artifacts/screenshot-portal/real-web/m2-inbound-documents");
 
 test("dev mock 保留主数据分页和入库动作状态", async ({ request }) => {
   const productsResponse = await request.get("/api/v1/master-data/products");
@@ -472,4 +473,40 @@ test("M-CG 单据号规则可查询并打开新增弹窗", async ({ page }) => {
   await expect(page.getByRole("dialog")).toContainText("新增单据号规则");
   await page.getByRole("button", { name: "取消" }).click();
   await page.screenshot({ path: path.join(artifactsDir, "mcg-numbering.png"), fullPage: false });
+});
+
+test("入库资料录入使用开发 Mock 查询并上传上游随货同行单", async ({ page }) => {
+  fs.mkdirSync(inboundDocumentsArtifactsDir, { recursive: true });
+  await page.goto("/");
+  await page.getByRole("button", { name: "登录" }).click();
+  await expect(page.getByRole("heading", { name: "运营总览" })).toBeVisible();
+
+  await page.getByRole("button", { name: "入库业务", exact: true }).click();
+  await page.getByRole("button", { name: "入库作业", exact: true }).click();
+  await page.getByRole("button", { name: "入库资料录入 m2-inbound-documents", exact: true }).click();
+
+  const pageRoot = page.locator("section").filter({ has: page.getByRole("heading", { name: "入库资料录入" }) });
+  await expect(pageRoot.getByLabel("实际收货时间开始")).not.toHaveValue("");
+  await expect(pageRoot.getByRole("button", { name: /药检单不齐/ })).toBeVisible();
+  await pageRoot.getByRole("button", { name: /药检单不齐/ }).click();
+  await pageRoot.getByRole("button", { name: /上游随货同行单不齐/ }).click();
+  await expect(pageRoot.getByText(/共 \d+ 个 ASN/)).toBeVisible();
+
+  await pageRoot.getByRole("button", { name: "录入资料" }).first().click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("tab", { name: "上游随货同行单" }).click();
+  await dialog.locator('input[type="file"]').setInputFiles({
+    name: "upstream-delivery.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("%PDF-1.4 mock"),
+  });
+  const reason = dialog.getByLabel("修改原因");
+  if (await reason.count()) await reason.fill("补充供应商盖章版本");
+  await dialog.getByRole("button", { name: "上传并完成录入" }).click();
+  await expect(dialog.getByText(/已关联 \d+ 个 ASN/)).toBeVisible();
+  await dialog.evaluate((element) => { element.scrollTop = 0; });
+  await page.screenshot({
+    path: path.join(inboundDocumentsArtifactsDir, "inbound-documents-uploaded.png"),
+    fullPage: false,
+  });
 });
