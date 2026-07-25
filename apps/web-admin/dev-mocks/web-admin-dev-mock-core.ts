@@ -13,6 +13,7 @@ import { handlePrintInventoryDevMock } from "./web-admin-dev-mock-print-inventor
 import { handleDocumentNumberingDevMock } from "./document-numbering-dev-mock";
 import { handleOutboundDevMock } from "./outbound-dev-mock";
 import { handleDockDevMock } from "./dock-dev-mock";
+import { handleReconciliationDevMock } from "./reconciliation-dev-mock";
 
 import {
   asNullableString,
@@ -180,6 +181,10 @@ async function tryHandleDevMockRoute(
   }
   if (pathname.startsWith("/api/v1/dock-appointments")) {
     await handleDockDevMock(req, res, pathname);
+    return true;
+  }
+  if (pathname.startsWith("/api/v1/reconciliation")) {
+    await handleReconciliationDevMock(req, res, pathname);
     return true;
   }
   if (pathname.startsWith("/api/v1/wechat-notify")) {

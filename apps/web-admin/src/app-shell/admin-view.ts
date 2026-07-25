@@ -16,6 +16,7 @@ export type AdminView =
   | "m3-counts"
   | "m3-maintenance"
   | "m3-relocations"
+  | "mrc-reconciliation"
   | "mte-task-types"
   | "mte-task-groups"
   | "mte-task-dispatch"

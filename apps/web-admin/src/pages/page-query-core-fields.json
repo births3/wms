@@ -366,6 +366,16 @@
       "more": []
     },
     {
+      "id": "mrc-reconciliation",
+      "title": "M-RC 库存对账",
+      "required": true,
+      "source": "apps/web-admin/src/pages/reconciliation/MrcReconciliationPage.tsx",
+      "fieldConstant": "mRcReconciliationQueryFields",
+      "coreConstant": "mRcReconciliationCoreQueryFieldKeys",
+      "core": ["productCode", "differenceType", "resolutionStatus"],
+      "more": ["batchNo"]
+    },
+    {
       "id": "mte-task-types",
       "title": "M-TE 任务类型配置",
       "required": true,

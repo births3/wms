@@ -80,10 +80,15 @@ async function listInventoryBatches(query: InventoryBatchQuery): Promise<Invento
   return result.data.data;
 }
 
-export function useInventoryBatchesQuery(query: InventoryBatchQuery = {}) {
+export function useInventoryBatchesQuery(
+  query: InventoryBatchQuery = {},
+  options: { enabled?: boolean; retry?: boolean } = {},
+) {
   return useQuery<InventoryBatch[], ApiError>({
     queryKey: [...inventoryBatchesQueryKey, query],
     queryFn: () => listInventoryBatches(query),
+    enabled: options.enabled ?? true,
+    retry: options.retry,
   });
 }
 

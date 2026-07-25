@@ -120,6 +120,7 @@ const menuSections: Array<{ label: string; items: SidebarMenuItem<AdminView>[] }
       { id: "m3-counts", title: "M3 库存盘点", subtitle: "盘点单 / 差异审批", icon: ClipboardList },
       { id: "m3-maintenance", title: "M3 在库养护", subtitle: "计划 / 任务执行", icon: ClipboardList },
       { id: "m3-relocations", title: "M3 库内移库", subtitle: "库位转移", icon: Layers },
+      { id: "mrc-reconciliation", title: "M-RC 库存对账", subtitle: "ERP 差异 / 隔离 / 处置", icon: ClipboardList },
       { id: "mte-task-types", title: "M-TE 任务类型配置", subtitle: "任务 / 调度参数", icon: ClipboardList },
       { id: "mte-task-groups", title: "M-TE 任务组资格", subtitle: "仓库 / 类型 / 人员", icon: Users },
       { id: "mte-task-dispatch", title: "M-TE 任务调度", subtitle: "分派 / 下发 / 处置", icon: ClipboardList },
@@ -181,7 +182,7 @@ const defaultMenuTree: SidebarMenuTreeSection<AdminView>[] = [
     label: "出库业务",
     groups: [{ label: "出库作业", items: [menuItem("m4-orders"), menuItem("m4-waves"), menuItem("m4-review"), menuItem("m4-returns")] }],
   },
-  { label: "库内业务", groups: [{ label: "库存管理", items: [menuItem("m3-batches"), menuItem("m3-location-history"), menuItem("m3-status-config"), menuItem("m3-counts"), menuItem("m3-maintenance"), menuItem("m3-relocations"), menuItem("mte-task-dispatch"), menuItem("mte-task-groups"), menuItem("mte-task-types")] }] },
+  { label: "库内业务", groups: [{ label: "库存管理", items: [menuItem("m3-batches"), menuItem("m3-location-history"), menuItem("m3-status-config"), menuItem("m3-counts"), menuItem("m3-maintenance"), menuItem("m3-relocations"), menuItem("mrc-reconciliation"), menuItem("mte-task-dispatch"), menuItem("mte-task-groups"), menuItem("mte-task-types")] }] },
   { label: "增值业务", groups: [{ label: "增值作业", items: [menuItem("m9-billing-rules"), menuItem("m10-route-plans")] }] },
   {
     label: "基础能力",

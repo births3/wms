@@ -17,6 +17,7 @@ import { M3LocationHistoryPage } from "@/pages/inventory/M3LocationHistoryPage";
 import { M3InventoryCountPage } from "@/pages/inventory/M3InventoryCountPage";
 import { M3MaintenancePage } from "@/pages/inventory/M3MaintenancePage";
 import { M3RelocationPage } from "@/pages/inventory/M3RelocationPage";
+import { MrcReconciliationPage } from "@/pages/reconciliation/MrcReconciliationPage";
 import { M1MasterDataPage, type MasterDataViewId } from "@/pages/master-data/M1MasterDataPage";
 import { M4OutboundPage, type M4OutboundMode } from "@/pages/outbound/M4OutboundPage";
 import { H2AuditTrailPage, H3ApiContractPage } from "@/pages/platform/HorizontalCapabilityPages";
@@ -95,6 +96,7 @@ export function renderAdminView(
   if (view === "m3-counts") return <M3InventoryCountPage />;
   if (view === "m3-maintenance") return <M3MaintenancePage />;
   if (view === "m3-relocations") return <M3RelocationPage />;
+  if (view === "mrc-reconciliation") return <MrcReconciliationPage currentUser={currentUser} />;
   if (view === "mte-task-types") return <TaskTypeConfigPage />;
   if (view === "mte-task-groups") return <TaskGroupConfigPage />;
   if (view === "mte-task-dispatch") return <TaskDispatchPage />;
