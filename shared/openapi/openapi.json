@@ -9748,6 +9748,516 @@
         }
       }
     },
+    "/api/v1/integration/erp-messages/inbound/asn": {
+      "post": {
+        "tags": [
+          "h8-erp"
+        ],
+        "operationId": "push_h8_asn",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "ERP 消息业务幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-WMS-Warehouse-ID",
+            "in": "header",
+            "description": "ERP 调用目标仓库，必须与 API Key 授权范围一致",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/H8AsnInboundRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "ASN 已完成 M-PM 规整并提交 M2",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H8InboundResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API Key 无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "scope、仓库或连接绑定不匹配",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "幂等键冲突或消息处理中",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "schema、路由、映射或业务校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ColdChainApiKeyAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/integration/erp-messages/inbound/outbound_order": {
+      "post": {
+        "tags": [
+          "h8-erp"
+        ],
+        "operationId": "push_h8_outbound_order",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "ERP 消息业务幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-WMS-Warehouse-ID",
+            "in": "header",
+            "description": "ERP 调用目标仓库，必须与 API Key 授权范围一致",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/H8OutboundOrderInboundRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "出库订单已完成 M-PM 规整并提交 M4",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H8InboundResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API Key 无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "scope、仓库或连接绑定不匹配",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "幂等键冲突或消息处理中",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "schema、路由、映射或业务校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ColdChainApiKeyAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/integration/erp-messages/inbound/product_change": {
+      "post": {
+        "tags": [
+          "h8-erp"
+        ],
+        "operationId": "push_h8_product_change",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "ERP 消息业务幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/H8ProductChangeInboundRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "商品变更已完成 M-PM 规整并提交 M1；档案补录消息同时完成 M-QL 回执",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H8InboundResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API Key 无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "scope、货主全仓范围或连接绑定不匹配",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "幂等键冲突或消息处理中",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "schema、路由、映射、字段或档案补录回执校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ColdChainApiKeyAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/integration/erp-messages/inbound/product_master": {
+      "post": {
+        "tags": [
+          "h8-erp"
+        ],
+        "operationId": "push_h8_product_master",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "ERP 消息业务幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/H8ProductMasterInboundRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "商品主数据已完成 M-PM 规整并提交 M1",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H8InboundResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API Key 无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "scope、货主全仓范围或连接绑定不匹配",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "幂等键冲突或消息处理中",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "schema、路由、映射或业务校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ColdChainApiKeyAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/integration/erp-messages/inbound/return_order": {
+      "post": {
+        "tags": [
+          "h8-erp"
+        ],
+        "operationId": "push_h8_return_order",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "ERP 消息业务幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-WMS-Warehouse-ID",
+            "in": "header",
+            "description": "ERP 调用目标仓库，必须与 API Key 授权范围一致",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/H8ReturnOrderInboundRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "退货申请已完成 M-PM 规整并提交 M2",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H8InboundResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API Key 无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "scope、仓库或连接绑定不匹配",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "幂等键冲突或消息处理中",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "schema、路由、映射、原批号或业务校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ColdChainApiKeyAuth": []
+          }
+        ]
+      }
+    },
     "/api/v1/integration/erp-messages/lifecycle": {
       "post": {
         "tags": [
@@ -10542,6 +11052,121 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/integration/erp-messages/{id}/receipt": {
+      "post": {
+        "tags": [
+          "h8-erp"
+        ],
+        "operationId": "record_h8_erp_business_receipt",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "H8 出站消息 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "必须与原出站消息幂等键一致",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-WMS-API-Key",
+            "in": "header",
+            "description": "具备 inbound:push scope 的 ERP API Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/H8ErpBusinessReceiptRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "业务成功回执进入 acked；明确拒绝进入 dead",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/H8ErpMessage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "回执绑定或结果非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API Key 无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "scope、货主或仓库越权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "消息不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "消息状态不允许回执",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ColdChainApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/integration/erp-messages/{id}/replay": {
@@ -16100,17 +16725,28 @@
         }
       }
     },
-    "/api/v1/parameter-mapping/execute": {
+    "/api/v1/parameter-mapping/map": {
       "post": {
         "tags": [
           "parameter-mapping"
         ],
-        "operationId": "execute_mapping",
+        "operationId": "map_parameter",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "跨重试保持不变的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ExecuteMappingRequest"
+                "$ref": "#/components/schemas/MapParameterRequest"
               }
             }
           },
@@ -16122,7 +16758,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ExecuteMappingResponse"
+                  "$ref": "#/components/schemas/MapParameterResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -16136,42 +16782,29 @@
                 }
               }
             }
-          }
-        },
-        "x-idempotency-exempt-reason": "参数对照执行使用业务追踪 ID，L11 幂等运行时证据后续切片补齐。"
-      }
-    },
-    "/api/v1/parameter-mapping/traces/{execution_id}": {
-      "get": {
-        "tags": [
-          "parameter-mapping"
-        ],
-        "operationId": "trace_mapping",
-        "parameters": [
-          {
-            "name": "execution_id",
-            "in": "path",
-            "description": "执行 ID",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "参数对照反向追溯",
+          },
+          "404": {
+            "description": "字典不存在",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MappingTraceResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
           },
-          "401": {
-            "description": "未登录",
+          "409": {
+            "description": "幂等键冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求无效",
             "content": {
               "application/json": {
                 "schema": {
@@ -17101,6 +17734,923 @@
           },
           "422": {
             "description": "审批结论或意见非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/quality-liaisons/{id}/archive-sync-callback": {
+      "post": {
+        "tags": [
+          "quality-liaison"
+        ],
+        "operationId": "complete_archive_revision_sync",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "档案补录质量联系单 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "H8 Worker 回执幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteArchiveRevisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "M-QL 已落地且 M2 ASN 已恢复验收",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QualityLiaisonOrder"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "缺少 H8 写权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "联系单不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "ERP 出站、商品值或 ASN 关联校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reconciliation/claims": {
+      "post": {
+        "tags": [
+          "reconciliation"
+        ],
+        "operationId": "claim_reconciliation_window",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "服务 Worker 本轮认领幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimReconciliationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconciliationClaimResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reconciliation/claims/{id}/failed": {
+      "post": {
+        "tags": [
+          "reconciliation"
+        ],
+        "operationId": "fail_reconciliation_claim",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "调度认领 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "失败上报幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FailReconciliationClaimRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconciliationClaimMutation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reconciliation/claims/{id}/renew": {
+      "post": {
+        "tags": [
+          "reconciliation"
+        ],
+        "operationId": "renew_reconciliation_claim",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "调度认领 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "本次续租幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenewReconciliationClaimRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconciliationClaimMutation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reconciliation/items": {
+      "get": {
+        "tags": [
+          "reconciliation"
+        ],
+        "operationId": "list_reconciliation_items",
+        "parameters": [
+          {
+            "name": "product_code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "batch_no",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "difference_type",
+            "in": "query",
+            "description": "逗号分隔差异类型；管理端多选控件提交 canonical CSV。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "resolution_status",
+            "in": "query",
+            "description": "逗号分隔处理状态；管理端多选控件提交 canonical CSV。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconciliationItemListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reconciliation/items/isolation": {
+      "post": {
+        "tags": [
+          "reconciliation"
+        ],
+        "operationId": "set_reconciliation_isolation",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetIsolationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reconciliation/items/{id}/resolve": {
+      "post": {
+        "tags": [
+          "reconciliation"
+        ],
+        "operationId": "resolve_reconciliation_item",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "对账差异 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveReconciliationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconciliationItem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reconciliation/rule": {
+      "get": {
+        "tags": [
+          "reconciliation"
+        ],
+        "operationId": "get_reconciliation_rule",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconciliationRule"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "reconciliation"
+        ],
+        "operationId": "upsert_reconciliation_rule",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertReconciliationRuleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconciliationRule"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reconciliation/runs": {
+      "post": {
+        "tags": [
+          "reconciliation"
+        ],
+        "operationId": "run_reconciliation",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitReconciliationRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconciliationRun"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -23196,6 +24746,22 @@
           }
         }
       },
+      "ClaimReconciliationRequest": {
+        "type": "object",
+        "required": [
+          "worker_id",
+          "lease_seconds"
+        ],
+        "properties": {
+          "lease_seconds": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "worker_id": {
+            "type": "string"
+          }
+        }
+      },
       "ColdChainDevice": {
         "type": "object",
         "required": [
@@ -23236,6 +24802,35 @@
           },
           "status": {
             "type": "string"
+          }
+        }
+      },
+      "CompleteArchiveRevisionRequest": {
+        "type": "object",
+        "required": [
+          "asn_id",
+          "product_id",
+          "product_code",
+          "field_name",
+          "new_value"
+        ],
+        "properties": {
+          "asn_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "field_name": {
+            "type": "string"
+          },
+          "new_value": {
+            "type": "string"
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },
@@ -24282,6 +25877,8 @@
         "required": [
           "product_code",
           "product_name",
+          "spec",
+          "packaging_levels",
           "attrs"
         ],
         "properties": {
@@ -24298,9 +25895,29 @@
             "type": "string",
             "nullable": true
           },
+          "electronic_regulatory_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "height_mm": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "length_mm": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
           "manufacturer": {
             "type": "string",
             "nullable": true
+          },
+          "packaging_levels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductPackagingLevelInput"
+            }
           },
           "product_code": {
             "type": "string"
@@ -24309,11 +25926,29 @@
             "type": "string"
           },
           "spec": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "special_drug_category_code": {
             "type": "string",
+            "nullable": true
+          },
+          "udi_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "volume_cm3": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "weight_g": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "width_mm": {
+            "type": "number",
+            "format": "double",
             "nullable": true
           }
         }
@@ -25708,6 +27343,26 @@
           "warehouse"
         ]
       },
+      "ErpInventorySnapshotItem": {
+        "type": "object",
+        "required": [
+          "product_code",
+          "batch_no",
+          "qty_on_hand"
+        ],
+        "properties": {
+          "batch_no": {
+            "type": "string"
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "qty_on_hand": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "ErrorResponse": {
         "type": "object",
         "description": "统一错误响应。",
@@ -25800,53 +27455,6 @@
         "properties": {
           "error": {
             "type": "string"
-          }
-        }
-      },
-      "ExecuteMappingRequest": {
-        "type": "object",
-        "required": [
-          "source_system",
-          "raw_payload"
-        ],
-        "properties": {
-          "raw_payload": {
-            "type": "object",
-            "description": "自由结构 JSON 对象。",
-            "additionalProperties": true
-          },
-          "source_system": {
-            "type": "string"
-          }
-        }
-      },
-      "ExecuteMappingResponse": {
-        "type": "object",
-        "required": [
-          "execution_id",
-          "normalized_payload",
-          "unresolved_fields"
-        ],
-        "properties": {
-          "execution_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "normalized_payload": {
-            "type": "object",
-            "description": "自由结构 JSON 对象。",
-            "additionalProperties": true
-          },
-          "queue_item_id": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
-          },
-          "unresolved_fields": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
           }
         }
       },
@@ -26198,6 +27806,26 @@
           "weight_grams": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "FailReconciliationClaimRequest": {
+        "type": "object",
+        "required": [
+          "claim_token",
+          "stage",
+          "error_code"
+        ],
+        "properties": {
+          "claim_token": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "error_code": {
+            "$ref": "#/components/schemas/ReconciliationClaimFailureCode"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/ReconciliationClaimFailureStage"
           }
         }
       },
@@ -26919,6 +28547,62 @@
           }
         }
       },
+      "H8AsnInboundRequest": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "external_ref",
+          "correlation_id",
+          "occurred_at",
+          "warehouse_id",
+          "receipt_no",
+          "document_type",
+          "supplier_id",
+          "product_code",
+          "expected_qty",
+          "expected_arrival_at"
+        ],
+        "properties": {
+          "correlation_id": {
+            "type": "string"
+          },
+          "document_type": {
+            "type": "string"
+          },
+          "expected_arrival_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expected_qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "external_ref": {
+            "type": "string"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "receipt_no": {
+            "type": "string"
+          },
+          "schema_version": {
+            "type": "string"
+          },
+          "supplier_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "H8DecryptedPayload": {
         "type": "object",
         "required": [
@@ -26936,6 +28620,29 @@
             "format": "uuid"
           },
           "payload": {
+            "type": "string"
+          }
+        }
+      },
+      "H8ErpBusinessReceiptRequest": {
+        "type": "object",
+        "required": [
+          "result",
+          "schema_version",
+          "correlation_id"
+        ],
+        "properties": {
+          "correlation_id": {
+            "type": "string"
+          },
+          "error_summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "result": {
+            "type": "string"
+          },
+          "schema_version": {
             "type": "string"
           }
         }
@@ -27743,6 +29450,94 @@
           }
         }
       },
+      "H8InboundResponse": {
+        "type": "object",
+        "required": [
+          "message_id",
+          "wms_resource_id",
+          "status",
+          "replayed"
+        ],
+        "properties": {
+          "message_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string"
+          },
+          "wms_resource_id": {
+            "type": "string"
+          }
+        }
+      },
+      "H8OutboundOrderInboundRequest": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "external_ref",
+          "correlation_id",
+          "occurred_at",
+          "warehouse_id",
+          "document_type",
+          "customer_id",
+          "product_code",
+          "batch_no",
+          "planned_qty"
+        ],
+        "properties": {
+          "batch_no": {
+            "type": "string"
+          },
+          "correlation_id": {
+            "type": "string"
+          },
+          "customer_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "document_type": {
+            "type": "string"
+          },
+          "erp_order_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "external_ref": {
+            "type": "string"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "planned_qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "required_ship_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "schema_version": {
+            "type": "string"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "wms_order_no": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
       "H8PayloadRetentionPolicy": {
         "type": "object",
         "required": [
@@ -27766,6 +29561,278 @@
           "updated_at": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "H8PhysicalDimensionsInput": {
+        "type": "object",
+        "required": [
+          "length_mm",
+          "width_mm",
+          "height_mm"
+        ],
+        "properties": {
+          "height_mm": {
+            "type": "number",
+            "format": "double"
+          },
+          "length_mm": {
+            "type": "number",
+            "format": "double"
+          },
+          "width_mm": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "H8ProductChangeInboundRequest": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "external_ref",
+          "correlation_id",
+          "occurred_at",
+          "product_code",
+          "field_name"
+        ],
+        "properties": {
+          "asn_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "correlation_id": {
+            "type": "string"
+          },
+          "external_ref": {
+            "type": "string"
+          },
+          "field_name": {
+            "type": "string"
+          },
+          "liaison_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "new_value": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "physical_dimensions": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/H8PhysicalDimensionsInput"
+              }
+            ],
+            "nullable": true
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "schema_version": {
+            "type": "string"
+          }
+        }
+      },
+      "H8ProductMasterInboundRequest": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "external_ref",
+          "correlation_id",
+          "occurred_at",
+          "product_code",
+          "product_name",
+          "spec",
+          "special_drug_category",
+          "packaging_levels",
+          "storage_condition"
+        ],
+        "properties": {
+          "approval_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "correlation_id": {
+            "type": "string"
+          },
+          "dosage_form": {
+            "type": "string",
+            "nullable": true
+          },
+          "electronic_regulatory_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "external_ref": {
+            "type": "string"
+          },
+          "height_mm": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "length_mm": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "manufacturer": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "packaging_levels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/H8ProductPackagingLevelInput"
+            }
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "product_name": {
+            "type": "string"
+          },
+          "schema_version": {
+            "type": "string"
+          },
+          "spec": {
+            "type": "string"
+          },
+          "special_drug_category": {
+            "type": "string"
+          },
+          "storage_condition": {
+            "type": "string"
+          },
+          "udi_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "volume_cm3": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "weight_g": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "width_mm": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          }
+        }
+      },
+      "H8ProductPackagingLevelInput": {
+        "type": "object",
+        "required": [
+          "unit",
+          "ratio_to_base",
+          "is_base",
+          "is_default",
+          "sort_order"
+        ],
+        "properties": {
+          "is_base": {
+            "type": "boolean"
+          },
+          "is_default": {
+            "type": "boolean"
+          },
+          "ratio_to_base": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sort_order": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unit": {
+            "type": "string",
+            "description": "ERP 包装单位源值，进入 M1 前必须经 M-PM `unit_pack` 规整。"
+          }
+        }
+      },
+      "H8ReturnOrderInboundRequest": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "external_ref",
+          "correlation_id",
+          "occurred_at",
+          "warehouse_id",
+          "document_type",
+          "customer_id",
+          "product_code",
+          "expected_qty",
+          "expected_arrival_at",
+          "batch_no"
+        ],
+        "properties": {
+          "batch_no": {
+            "type": "string"
+          },
+          "correlation_id": {
+            "type": "string"
+          },
+          "customer_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "document_type": {
+            "type": "string"
+          },
+          "expected_arrival_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expected_qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "external_ref": {
+            "type": "string"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "receipt_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "schema_version": {
+            "type": "string"
+          },
+          "supplier_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },
@@ -29530,153 +31597,60 @@
           }
         }
       },
-      "MappingDictionary": {
+      "MapParameterRequest": {
         "type": "object",
-        "description": "M-PM 参数对照字典。",
+        "description": "M-PM 单值映射请求；外部自由文本不得直接进入业务模块。",
         "required": [
-          "id",
-          "owner_id",
-          "dictionary_code",
-          "dictionary_name",
-          "created_at"
+          "dict_code",
+          "source_value"
         ],
         "properties": {
-          "created_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "dictionary_code": {
+          "dict_code": {
             "type": "string"
           },
-          "dictionary_name": {
+          "source_record_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "source_system": {
+            "type": "string",
+            "nullable": true
+          },
+          "source_value": {
             "type": "string"
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "owner_id": {
-            "type": "string",
-            "format": "uuid"
           }
         }
       },
-      "MappingQueueItem": {
+      "MapParameterResponse": {
         "type": "object",
-        "description": "M-PM 待映射队列项。",
         "required": [
-          "id",
-          "owner_id",
-          "source_system",
-          "raw_payload",
           "status",
-          "created_at"
+          "confidence",
+          "fallback_used",
+          "queued"
         ],
         "properties": {
-          "created_at": {
+          "confidence": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "fallback_used": {
+            "type": "boolean"
+          },
+          "queued": {
+            "type": "boolean"
+          },
+          "rule_id": {
             "type": "string",
-            "format": "date-time"
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "owner_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "raw_payload": {
-            "type": "object",
-            "description": "自由结构 JSON 对象。",
-            "additionalProperties": true
-          },
-          "source_system": {
-            "type": "string"
+            "format": "uuid",
+            "nullable": true
           },
           "status": {
-            "type": "string"
-          }
-        }
-      },
-      "MappingRule": {
-        "type": "object",
-        "description": "M-PM 字段映射规则。",
-        "required": [
-          "id",
-          "owner_id",
-          "source_system",
-          "external_field",
-          "canonical_field",
-          "transform",
-          "created_at"
-        ],
-        "properties": {
-          "canonical_field": {
-            "type": "string"
+            "$ref": "#/components/schemas/ParameterMappingStatus"
           },
-          "created_at": {
+          "target_value": {
             "type": "string",
-            "format": "date-time"
-          },
-          "external_field": {
-            "type": "string"
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "owner_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "source_system": {
-            "type": "string"
-          },
-          "transform": {
-            "type": "string"
-          }
-        }
-      },
-      "MappingTraceResponse": {
-        "type": "object",
-        "required": [
-          "execution_id",
-          "source_system",
-          "raw_payload",
-          "normalized_payload",
-          "applied_rule_ids",
-          "unresolved_fields"
-        ],
-        "properties": {
-          "applied_rule_ids": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          "execution_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "normalized_payload": {
-            "type": "object",
-            "description": "自由结构 JSON 对象。",
-            "additionalProperties": true
-          },
-          "raw_payload": {
-            "type": "object",
-            "description": "自由结构 JSON 对象。",
-            "additionalProperties": true
-          },
-          "source_system": {
-            "type": "string"
-          },
-          "unresolved_fields": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+            "nullable": true
           }
         }
       },
@@ -30068,6 +32042,14 @@
             "nullable": true
           }
         }
+      },
+      "ParameterMappingStatus": {
+        "type": "string",
+        "enum": [
+          "matched",
+          "unmatched",
+          "ambiguous"
+        ]
       },
       "PasswordChangeRequest": {
         "type": "object",
@@ -30707,6 +32689,9 @@
           "owner_id",
           "product_code",
           "product_name",
+          "spec",
+          "packaging_levels",
+          "mapping_traces",
           "status",
           "attrs",
           "created_at",
@@ -30733,20 +32718,51 @@
             "description": "剂型。",
             "nullable": true
           },
+          "electronic_regulatory_code": {
+            "type": "string",
+            "description": "电子监管码关联。",
+            "nullable": true
+          },
+          "height_mm": {
+            "type": "number",
+            "format": "double",
+            "description": "单品高度（毫米）。",
+            "nullable": true
+          },
           "id": {
             "type": "string",
             "format": "uuid",
             "description": "商品 ID。"
+          },
+          "length_mm": {
+            "type": "number",
+            "format": "double",
+            "description": "单品长度（毫米）。",
+            "nullable": true
           },
           "manufacturer": {
             "type": "string",
             "description": "生产企业。",
             "nullable": true
           },
+          "mapping_traces": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductMappingTrace"
+            },
+            "description": "经 M-PM 规整化字段的追加式溯源记录。"
+          },
           "owner_id": {
             "type": "string",
             "format": "uuid",
             "description": "货主 ID。"
+          },
+          "packaging_levels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductPackagingLevel"
+            },
+            "description": "包装层级，转换比统一相对基础单位。"
           },
           "product_code": {
             "type": "string",
@@ -30758,8 +32774,7 @@
           },
           "spec": {
             "type": "string",
-            "description": "规格。",
-            "nullable": true
+            "description": "规格。"
           },
           "special_drug_category_code": {
             "type": "string",
@@ -30770,10 +32785,33 @@
             "type": "string",
             "description": "启停状态。"
           },
+          "udi_code": {
+            "type": "string",
+            "description": "UDI 唯一码。",
+            "nullable": true
+          },
           "updated_at": {
             "type": "string",
             "format": "date-time",
             "description": "更新时间。"
+          },
+          "volume_cm3": {
+            "type": "number",
+            "format": "double",
+            "description": "单品体积（立方厘米）。",
+            "nullable": true
+          },
+          "weight_g": {
+            "type": "number",
+            "format": "double",
+            "description": "单品重量（克）。",
+            "nullable": true
+          },
+          "width_mm": {
+            "type": "number",
+            "format": "double",
+            "description": "单品宽度（毫米）。",
+            "nullable": true
           }
         }
       },
@@ -30792,6 +32830,148 @@
           },
           "page": {
             "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "ProductMappingTrace": {
+        "type": "object",
+        "description": "商品字段映射溯源。",
+        "required": [
+          "id",
+          "field_name",
+          "source_system",
+          "source_value",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "field_name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rule_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "source_system": {
+            "type": "string"
+          },
+          "source_value": {
+            "type": "string"
+          },
+          "target_value": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "ProductMappingTraceInput": {
+        "type": "object",
+        "description": "M-PM 规整化结果写入项，仅供受控防腐层调用。",
+        "required": [
+          "field_name",
+          "source_system",
+          "source_value"
+        ],
+        "properties": {
+          "field_name": {
+            "type": "string"
+          },
+          "rule_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "source_system": {
+            "type": "string"
+          },
+          "source_value": {
+            "type": "string"
+          },
+          "target_value": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "ProductPackagingLevel": {
+        "type": "object",
+        "description": "商品包装层级。",
+        "required": [
+          "id",
+          "unit_code",
+          "unit_name",
+          "ratio_to_base",
+          "is_base",
+          "is_default",
+          "sort_order"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "is_base": {
+            "type": "boolean"
+          },
+          "is_default": {
+            "type": "boolean"
+          },
+          "ratio_to_base": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sort_order": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unit_code": {
+            "type": "string"
+          },
+          "unit_name": {
+            "type": "string"
+          }
+        }
+      },
+      "ProductPackagingLevelInput": {
+        "type": "object",
+        "description": "商品包装层级写入项。",
+        "required": [
+          "unit_code",
+          "unit_name",
+          "ratio_to_base",
+          "is_base",
+          "is_default",
+          "sort_order"
+        ],
+        "properties": {
+          "is_base": {
+            "type": "boolean"
+          },
+          "is_default": {
+            "type": "boolean"
+          },
+          "ratio_to_base": {
+            "type": "integer",
+            "format": "int64",
+            "description": "相对基础单位的换算数量。"
+          },
+          "sort_order": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unit_code": {
+            "type": "string"
+          },
+          "unit_name": {
+            "type": "string"
           }
         }
       },
@@ -31886,6 +34066,272 @@
           }
         }
       },
+      "ReconciliationClaimFailureCode": {
+        "type": "string",
+        "enum": [
+          "erp_pull_failed",
+          "snapshot_submit_failed"
+        ]
+      },
+      "ReconciliationClaimFailureStage": {
+        "type": "string",
+        "enum": [
+          "pull",
+          "submit"
+        ]
+      },
+      "ReconciliationClaimMutation": {
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "lease_expires_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lease_expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "ReconciliationClaimResponse": {
+        "type": "object",
+        "properties": {
+          "claim": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReconciliationScheduleClaim"
+              }
+            ],
+            "nullable": true
+          }
+        }
+      },
+      "ReconciliationDisposition": {
+        "type": "string",
+        "enum": [
+          "wms_truth",
+          "erp_truth",
+          "known_difference"
+        ]
+      },
+      "ReconciliationInventoryAllocation": {
+        "type": "object",
+        "required": [
+          "inventory_batch_id",
+          "quantity"
+        ],
+        "properties": {
+          "inventory_batch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ReconciliationItem": {
+        "type": "object",
+        "required": [
+          "id",
+          "product_code",
+          "batch_no",
+          "wms_qty",
+          "erp_qty",
+          "difference_qty",
+          "difference_type",
+          "resolution_status",
+          "stock_adjustment_order_ids",
+          "created_at"
+        ],
+        "properties": {
+          "batch_no": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "difference_qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "difference_type": {
+            "type": "string"
+          },
+          "erp_qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "resolution_status": {
+            "type": "string"
+          },
+          "stock_adjustment_order_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "wms_qty": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ReconciliationItemListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReconciliationItem"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "ReconciliationRule": {
+        "type": "object",
+        "required": [
+          "interval_hours",
+          "enabled",
+          "updated_at"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "interval_hours": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ReconciliationRun": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "window_key",
+          "snapshot_at",
+          "matched_count",
+          "wms_more_count",
+          "erp_more_count",
+          "items",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "erp_more_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReconciliationItem"
+            }
+          },
+          "matched_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "snapshot_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "window_key": {
+            "type": "string"
+          },
+          "wms_more_count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ReconciliationScheduleClaim": {
+        "type": "object",
+        "required": [
+          "id",
+          "claim_token",
+          "owner_id",
+          "window_key",
+          "worker_id",
+          "attempt_no",
+          "lease_expires_at"
+        ],
+        "properties": {
+          "attempt_no": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "claim_token": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lease_expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "window_key": {
+            "type": "string"
+          },
+          "worker_id": {
+            "type": "string"
+          }
+        }
+      },
       "RejectReceivingOrderRequest": {
         "type": "object",
         "required": [
@@ -31932,6 +34378,27 @@
           "to_location_id": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "RenewReconciliationClaimRequest": {
+        "type": "object",
+        "required": [
+          "claim_token",
+          "worker_id",
+          "lease_seconds"
+        ],
+        "properties": {
+          "claim_token": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lease_seconds": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "worker_id": {
+            "type": "string"
           }
         }
       },
@@ -32111,6 +34578,23 @@
           },
           "version": {
             "$ref": "#/components/schemas/PrintTemplateVersion"
+          }
+        }
+      },
+      "ResolveReconciliationRequest": {
+        "type": "object",
+        "required": [
+          "disposition"
+        ],
+        "properties": {
+          "allocations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReconciliationInventoryAllocation"
+            }
+          },
+          "disposition": {
+            "$ref": "#/components/schemas/ReconciliationDisposition"
           }
         }
       },
@@ -32483,6 +34967,25 @@
           },
           "reason": {
             "type": "string"
+          }
+        }
+      },
+      "SetIsolationRequest": {
+        "type": "object",
+        "required": [
+          "item_ids",
+          "isolate"
+        ],
+        "properties": {
+          "isolate": {
+            "type": "boolean"
+          },
+          "item_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         }
       },
@@ -33165,6 +35668,39 @@
           "physical_qty": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "SubmitReconciliationRunRequest": {
+        "type": "object",
+        "required": [
+          "claim_id",
+          "claim_token",
+          "window_key",
+          "snapshot_at",
+          "items"
+        ],
+        "properties": {
+          "claim_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "claim_token": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ErpInventorySnapshotItem"
+            }
+          },
+          "snapshot_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "window_key": {
+            "type": "string"
           }
         }
       },
@@ -34652,8 +37188,29 @@
             "type": "string",
             "nullable": true
           },
+          "electronic_regulatory_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "height_mm": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "length_mm": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
           "manufacturer": {
             "type": "string",
+            "nullable": true
+          },
+          "packaging_levels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductPackagingLevelInput"
+            },
             "nullable": true
           },
           "product_name": {
@@ -34670,6 +37227,25 @@
           },
           "status": {
             "type": "string",
+            "nullable": true
+          },
+          "udi_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "volume_cm3": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "weight_g": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "width_mm": {
+            "type": "number",
+            "format": "double",
             "nullable": true
           }
         }
@@ -35284,6 +37860,15 @@
           },
           "stage": {
             "type": "string"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "wms_resource_id": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -35383,6 +37968,22 @@
           },
           "type_name": {
             "type": "string"
+          }
+        }
+      },
+      "UpsertReconciliationRuleRequest": {
+        "type": "object",
+        "required": [
+          "interval_hours",
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "interval_hours": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },

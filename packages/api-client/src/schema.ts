@@ -1860,6 +1860,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/integration/erp-messages/inbound/asn": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["push_h8_asn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integration/erp-messages/inbound/outbound_order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["push_h8_outbound_order"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integration/erp-messages/inbound/product_change": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["push_h8_product_change"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integration/erp-messages/inbound/product_master": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["push_h8_product_master"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integration/erp-messages/inbound/return_order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["push_h8_return_order"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/integration/erp-messages/lifecycle": {
         parameters: {
             query?: never;
@@ -2030,6 +2110,22 @@ export interface paths {
         get: operations["decrypt_h8_erp_message_payload"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integration/erp-messages/{id}/receipt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["record_h8_erp_business_receipt"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3028,7 +3124,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/parameter-mapping/execute": {
+    "/api/v1/parameter-mapping/map": {
         parameters: {
             query?: never;
             header?: never;
@@ -3037,23 +3133,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["execute_mapping"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/parameter-mapping/traces/{execution_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["trace_mapping"];
-        put?: never;
-        post?: never;
+        post: operations["map_parameter"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3230,6 +3310,150 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["apply_quality_liaison_approval"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/quality-liaisons/{id}/archive-sync-callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["complete_archive_revision_sync"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reconciliation/claims": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["claim_reconciliation_window"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reconciliation/claims/{id}/failed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["fail_reconciliation_claim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reconciliation/claims/{id}/renew": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["renew_reconciliation_claim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reconciliation/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_reconciliation_items"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reconciliation/items/isolation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["set_reconciliation_isolation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reconciliation/items/{id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["resolve_reconciliation_item"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reconciliation/rule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_reconciliation_rule"];
+        put: operations["upsert_reconciliation_rule"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reconciliation/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["run_reconciliation"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4677,6 +4901,11 @@ export interface components {
             lease_seconds?: number | null;
             worker_id: string;
         };
+        ClaimReconciliationRequest: {
+            /** Format: int64 */
+            lease_seconds: number;
+            worker_id: string;
+        };
         ColdChainDevice: {
             /** Format: date-time */
             calibration_due_at?: string | null;
@@ -4690,6 +4919,15 @@ export interface components {
             /** Format: uuid */
             owner_id: string;
             status: string;
+        };
+        CompleteArchiveRevisionRequest: {
+            /** Format: uuid */
+            asn_id: string;
+            field_name: string;
+            new_value: string;
+            product_code: string;
+            /** Format: uuid */
+            product_id: string;
         };
         CompletePickTaskRequest: {
             exception_code?: string | null;
@@ -5007,11 +5245,24 @@ export interface components {
                 [key: string]: unknown;
             };
             dosage_form?: string | null;
+            electronic_regulatory_code?: string | null;
+            /** Format: double */
+            height_mm?: number | null;
+            /** Format: double */
+            length_mm?: number | null;
             manufacturer?: string | null;
+            packaging_levels: components["schemas"]["ProductPackagingLevelInput"][];
             product_code: string;
             product_name: string;
-            spec?: string | null;
+            spec: string;
             special_drug_category_code?: string | null;
+            udi_code?: string | null;
+            /** Format: double */
+            volume_cm3?: number | null;
+            /** Format: double */
+            weight_g?: number | null;
+            /** Format: double */
+            width_mm?: number | null;
         };
         CreateQualityLiaisonRequest: {
             /** @description 自由结构 JSON 对象。 */
@@ -5447,6 +5698,12 @@ export interface components {
         };
         /** @enum {string} */
         DualPersonPolicyScope: "global" | "owner" | "warehouse";
+        ErpInventorySnapshotItem: {
+            batch_no: string;
+            product_code: string;
+            /** Format: int64 */
+            qty_on_hand: number;
+        };
         /** @description 统一错误响应。 */
         ErrorResponse: {
             /** @description 业务错误码。 */
@@ -5480,24 +5737,6 @@ export interface components {
         };
         EventDeliveryNackRequest: {
             error: string;
-        };
-        ExecuteMappingRequest: {
-            /** @description 自由结构 JSON 对象。 */
-            raw_payload: {
-                [key: string]: unknown;
-            };
-            source_system: string;
-        };
-        ExecuteMappingResponse: {
-            /** Format: uuid */
-            execution_id: string;
-            /** @description 自由结构 JSON 对象。 */
-            normalized_payload: {
-                [key: string]: unknown;
-            };
-            /** Format: uuid */
-            queue_item_id?: string | null;
-            unresolved_fields: string[];
         };
         ExecuteStockLossOrderRequest: {
             /** Format: uuid */
@@ -5608,6 +5847,12 @@ export interface components {
             waybill_no: string;
             /** Format: int64 */
             weight_grams: number;
+        };
+        FailReconciliationClaimRequest: {
+            /** Format: uuid */
+            claim_token: string;
+            error_code: components["schemas"]["ReconciliationClaimFailureCode"];
+            stage: components["schemas"]["ReconciliationClaimFailureStage"];
         };
         FeatureFlagArchiveRequest: {
             archive_ref: string;
@@ -5819,12 +6064,36 @@ export interface components {
             message: string;
             status: string;
         };
+        H8AsnInboundRequest: {
+            correlation_id: string;
+            document_type: string;
+            /** Format: date-time */
+            expected_arrival_at: string;
+            /** Format: int64 */
+            expected_qty: number;
+            external_ref: string;
+            /** Format: date-time */
+            occurred_at: string;
+            product_code: string;
+            receipt_no: string;
+            schema_version: string;
+            /** Format: uuid */
+            supplier_id: string;
+            /** Format: uuid */
+            warehouse_id: string;
+        };
         H8DecryptedPayload: {
             /** Format: date-time */
             expires_at: string;
             /** Format: uuid */
             message_id: string;
             payload: string;
+        };
+        H8ErpBusinessReceiptRequest: {
+            correlation_id: string;
+            error_summary?: string | null;
+            result: string;
+            schema_version: string;
         };
         H8ErpConnector: {
             api_base_url?: string | null;
@@ -6076,6 +6345,33 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        H8InboundResponse: {
+            /** Format: uuid */
+            message_id: string;
+            replayed: boolean;
+            status: string;
+            wms_resource_id: string;
+        };
+        H8OutboundOrderInboundRequest: {
+            batch_no: string;
+            correlation_id: string;
+            /** Format: uuid */
+            customer_id: string;
+            document_type: string;
+            erp_order_no?: string | null;
+            external_ref: string;
+            /** Format: date-time */
+            occurred_at: string;
+            /** Format: int64 */
+            planned_qty: number;
+            product_code: string;
+            /** Format: date-time */
+            required_ship_at?: string | null;
+            schema_version: string;
+            /** Format: uuid */
+            warehouse_id: string;
+            wms_order_no?: string | null;
+        };
         H8PayloadRetentionPolicy: {
             /** Format: uuid */
             connector_id: string;
@@ -6084,6 +6380,90 @@ export interface components {
             retention_days: number;
             /** Format: date-time */
             updated_at: string;
+        };
+        H8PhysicalDimensionsInput: {
+            /** Format: double */
+            height_mm: number;
+            /** Format: double */
+            length_mm: number;
+            /** Format: double */
+            width_mm: number;
+        };
+        H8ProductChangeInboundRequest: {
+            /** Format: uuid */
+            asn_id?: string | null;
+            correlation_id: string;
+            external_ref: string;
+            field_name: string;
+            /** Format: uuid */
+            liaison_id?: string | null;
+            new_value?: string | null;
+            /** Format: date-time */
+            occurred_at: string;
+            physical_dimensions?: components["schemas"]["H8PhysicalDimensionsInput"] | null;
+            product_code: string;
+            /** Format: uuid */
+            product_id?: string | null;
+            schema_version: string;
+        };
+        H8ProductMasterInboundRequest: {
+            approval_no?: string | null;
+            correlation_id: string;
+            dosage_form?: string | null;
+            electronic_regulatory_code?: string | null;
+            external_ref: string;
+            /** Format: double */
+            height_mm?: number | null;
+            /** Format: double */
+            length_mm?: number | null;
+            manufacturer?: string | null;
+            /** Format: date-time */
+            occurred_at: string;
+            packaging_levels: components["schemas"]["H8ProductPackagingLevelInput"][];
+            product_code: string;
+            product_name: string;
+            schema_version: string;
+            spec: string;
+            special_drug_category: string;
+            storage_condition: string;
+            udi_code?: string | null;
+            /** Format: double */
+            volume_cm3?: number | null;
+            /** Format: double */
+            weight_g?: number | null;
+            /** Format: double */
+            width_mm?: number | null;
+        };
+        H8ProductPackagingLevelInput: {
+            is_base: boolean;
+            is_default: boolean;
+            /** Format: int64 */
+            ratio_to_base: number;
+            /** Format: int32 */
+            sort_order: number;
+            /** @description ERP 包装单位源值，进入 M1 前必须经 M-PM `unit_pack` 规整。 */
+            unit: string;
+        };
+        H8ReturnOrderInboundRequest: {
+            batch_no: string;
+            correlation_id: string;
+            /** Format: uuid */
+            customer_id: string;
+            document_type: string;
+            /** Format: date-time */
+            expected_arrival_at: string;
+            /** Format: int64 */
+            expected_qty: number;
+            external_ref: string;
+            /** Format: date-time */
+            occurred_at: string;
+            product_code: string;
+            receipt_no?: string | null;
+            schema_version: string;
+            /** Format: uuid */
+            supplier_id?: string | null;
+            /** Format: uuid */
+            warehouse_id: string;
         };
         H8WorkerClaimControl: {
             /** Format: uuid */
@@ -6647,59 +7027,22 @@ export interface components {
             data: components["schemas"]["MaintenanceTask"][];
             page: components["schemas"]["PageMeta"];
         };
-        /** @description M-PM 参数对照字典。 */
-        MappingDictionary: {
-            /** Format: date-time */
-            created_at: string;
-            dictionary_code: string;
-            dictionary_name: string;
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            owner_id: string;
+        /** @description M-PM 单值映射请求；外部自由文本不得直接进入业务模块。 */
+        MapParameterRequest: {
+            dict_code: string;
+            source_record_id?: string | null;
+            source_system?: string | null;
+            source_value: string;
         };
-        /** @description M-PM 待映射队列项。 */
-        MappingQueueItem: {
-            /** Format: date-time */
-            created_at: string;
+        MapParameterResponse: {
+            /** Format: int32 */
+            confidence: number;
+            fallback_used: boolean;
+            queued: boolean;
             /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            owner_id: string;
-            /** @description 自由结构 JSON 对象。 */
-            raw_payload: {
-                [key: string]: unknown;
-            };
-            source_system: string;
-            status: string;
-        };
-        /** @description M-PM 字段映射规则。 */
-        MappingRule: {
-            canonical_field: string;
-            /** Format: date-time */
-            created_at: string;
-            external_field: string;
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            owner_id: string;
-            source_system: string;
-            transform: string;
-        };
-        MappingTraceResponse: {
-            applied_rule_ids: string[];
-            /** Format: uuid */
-            execution_id: string;
-            /** @description 自由结构 JSON 对象。 */
-            normalized_payload: {
-                [key: string]: unknown;
-            };
-            /** @description 自由结构 JSON 对象。 */
-            raw_payload: {
-                [key: string]: unknown;
-            };
-            source_system: string;
-            unresolved_fields: string[];
+            rule_id?: string | null;
+            status: components["schemas"]["ParameterMappingStatus"];
+            target_value?: string | null;
         };
         MarkInventoryRecallRequest: {
             approval_id: string;
@@ -6823,6 +7166,8 @@ export interface components {
             /** @description 下一页游标；为空表示无更多数据。 */
             next_cursor?: string | null;
         };
+        /** @enum {string} */
+        ParameterMappingStatus: "matched" | "unmatched" | "ambiguous";
         /** @description 修改当前用户密码。 */
         PasswordChangeRequest: {
             current_password: string;
@@ -7029,37 +7374,119 @@ export interface components {
             created_at: string;
             /** @description 剂型。 */
             dosage_form?: string | null;
+            /** @description 电子监管码关联。 */
+            electronic_regulatory_code?: string | null;
+            /**
+             * Format: double
+             * @description 单品高度（毫米）。
+             */
+            height_mm?: number | null;
             /**
              * Format: uuid
              * @description 商品 ID。
              */
             id: string;
+            /**
+             * Format: double
+             * @description 单品长度（毫米）。
+             */
+            length_mm?: number | null;
             /** @description 生产企业。 */
             manufacturer?: string | null;
+            /** @description 经 M-PM 规整化字段的追加式溯源记录。 */
+            mapping_traces: components["schemas"]["ProductMappingTrace"][];
             /**
              * Format: uuid
              * @description 货主 ID。
              */
             owner_id: string;
+            /** @description 包装层级，转换比统一相对基础单位。 */
+            packaging_levels: components["schemas"]["ProductPackagingLevel"][];
             /** @description 商品编码。 */
             product_code: string;
             /** @description 商品名称。 */
             product_name: string;
             /** @description 规格。 */
-            spec?: string | null;
+            spec: string;
             /** @description 特殊药品分类编码。 */
             special_drug_category_code?: string | null;
             /** @description 启停状态。 */
             status: string;
+            /** @description UDI 唯一码。 */
+            udi_code?: string | null;
             /**
              * Format: date-time
              * @description 更新时间。
              */
             updated_at: string;
+            /**
+             * Format: double
+             * @description 单品体积（立方厘米）。
+             */
+            volume_cm3?: number | null;
+            /**
+             * Format: double
+             * @description 单品重量（克）。
+             */
+            weight_g?: number | null;
+            /**
+             * Format: double
+             * @description 单品宽度（毫米）。
+             */
+            width_mm?: number | null;
         };
         ProductListResponse: {
             data: components["schemas"]["Product"][];
             page: components["schemas"]["PageMeta"];
+        };
+        /** @description 商品字段映射溯源。 */
+        ProductMappingTrace: {
+            /** Format: date-time */
+            created_at: string;
+            field_name: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            rule_id?: string | null;
+            source_system: string;
+            source_value: string;
+            target_value?: string | null;
+        };
+        /** @description M-PM 规整化结果写入项，仅供受控防腐层调用。 */
+        ProductMappingTraceInput: {
+            field_name: string;
+            /** Format: uuid */
+            rule_id?: string | null;
+            source_system: string;
+            source_value: string;
+            target_value?: string | null;
+        };
+        /** @description 商品包装层级。 */
+        ProductPackagingLevel: {
+            /** Format: uuid */
+            id: string;
+            is_base: boolean;
+            is_default: boolean;
+            /** Format: int64 */
+            ratio_to_base: number;
+            /** Format: int32 */
+            sort_order: number;
+            unit_code: string;
+            unit_name: string;
+        };
+        /** @description 商品包装层级写入项。 */
+        ProductPackagingLevelInput: {
+            is_base: boolean;
+            is_default: boolean;
+            /**
+             * Format: int64
+             * @description 相对基础单位的换算数量。
+             */
+            ratio_to_base: number;
+            /** Format: int32 */
+            sort_order: number;
+            unit_code: string;
+            unit_name: string;
         };
         PublishAdminMenuRequest: {
             note?: string | null;
@@ -7410,6 +7837,90 @@ export interface components {
             /** Format: int64 */
             period_days?: number | null;
         };
+        /** @enum {string} */
+        ReconciliationClaimFailureCode: "erp_pull_failed" | "snapshot_submit_failed";
+        /** @enum {string} */
+        ReconciliationClaimFailureStage: "pull" | "submit";
+        ReconciliationClaimMutation: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            lease_expires_at: string;
+            /** Format: uuid */
+            run_id?: string | null;
+            status: string;
+        };
+        ReconciliationClaimResponse: {
+            claim?: components["schemas"]["ReconciliationScheduleClaim"] | null;
+        };
+        /** @enum {string} */
+        ReconciliationDisposition: "wms_truth" | "erp_truth" | "known_difference";
+        ReconciliationInventoryAllocation: {
+            /** Format: uuid */
+            inventory_batch_id: string;
+            /** Format: int64 */
+            quantity: number;
+        };
+        ReconciliationItem: {
+            batch_no: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: int64 */
+            difference_qty: number;
+            difference_type: string;
+            /** Format: int64 */
+            erp_qty: number;
+            /** Format: uuid */
+            id: string;
+            product_code: string;
+            resolution_status: string;
+            stock_adjustment_order_ids: string[];
+            /** Format: int64 */
+            wms_qty: number;
+        };
+        ReconciliationItemListResponse: {
+            data: components["schemas"]["ReconciliationItem"][];
+            page: components["schemas"]["PageMeta"];
+        };
+        ReconciliationRule: {
+            enabled: boolean;
+            /** Format: int32 */
+            interval_hours: number;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        ReconciliationRun: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: int32 */
+            erp_more_count: number;
+            /** Format: uuid */
+            id: string;
+            items: components["schemas"]["ReconciliationItem"][];
+            /** Format: int32 */
+            matched_count: number;
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: date-time */
+            snapshot_at: string;
+            window_key: string;
+            /** Format: int32 */
+            wms_more_count: number;
+        };
+        ReconciliationScheduleClaim: {
+            /** Format: int32 */
+            attempt_no: number;
+            /** Format: uuid */
+            claim_token: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            lease_expires_at: string;
+            /** Format: uuid */
+            owner_id: string;
+            window_key: string;
+            worker_id: string;
+        };
         RejectReceivingOrderRequest: {
             reason: string;
         };
@@ -7424,6 +7935,13 @@ export interface components {
             to_location_code: string;
             /** Format: uuid */
             to_location_id: string;
+        };
+        RenewReconciliationClaimRequest: {
+            /** Format: uuid */
+            claim_token: string;
+            /** Format: int64 */
+            lease_seconds: number;
+            worker_id: string;
         };
         ReplaceRolePermissionsRequest: {
             permission_codes: string[];
@@ -7498,6 +8016,10 @@ export interface components {
         ResolvePrintTemplateResponse: {
             template: components["schemas"]["PrintTemplateSummary"];
             version: components["schemas"]["PrintTemplateVersion"];
+        };
+        ResolveReconciliationRequest: {
+            allocations?: components["schemas"]["ReconciliationInventoryAllocation"][];
+            disposition: components["schemas"]["ReconciliationDisposition"];
         };
         RetailReplenishmentSuggestion: {
             /** Format: date-time */
@@ -7611,6 +8133,10 @@ export interface components {
             /** Format: date-time */
             paused_until?: string | null;
             reason: string;
+        };
+        SetIsolationRequest: {
+            isolate: boolean;
+            item_ids: string[];
         };
         SetTaskTypeEnabledRequest: {
             enabled: boolean;
@@ -7813,6 +8339,16 @@ export interface components {
         SubmitInventoryCountLineRequest: {
             /** Format: int64 */
             physical_qty: number;
+        };
+        SubmitReconciliationRunRequest: {
+            /** Format: uuid */
+            claim_id: string;
+            /** Format: uuid */
+            claim_token: string;
+            items: components["schemas"]["ErpInventorySnapshotItem"][];
+            /** Format: date-time */
+            snapshot_at: string;
+            window_key: string;
         };
         /** @description 供应商基础档案。 */
         Supplier: {
@@ -8275,11 +8811,24 @@ export interface components {
                 [key: string]: unknown;
             };
             dosage_form?: string | null;
+            electronic_regulatory_code?: string | null;
+            /** Format: double */
+            height_mm?: number | null;
+            /** Format: double */
+            length_mm?: number | null;
             manufacturer?: string | null;
+            packaging_levels?: components["schemas"]["ProductPackagingLevelInput"][] | null;
             product_name?: string | null;
             spec?: string | null;
             special_drug_category_code?: string | null;
             status?: string | null;
+            udi_code?: string | null;
+            /** Format: double */
+            volume_cm3?: number | null;
+            /** Format: double */
+            weight_g?: number | null;
+            /** Format: double */
+            width_mm?: number | null;
         };
         UpdateReceivingOrderRequest: {
             /** Format: date-time */
@@ -8455,6 +9004,9 @@ export interface components {
             result: string;
             schema_version: string;
             stage: string;
+            /** Format: uuid */
+            warehouse_id?: string | null;
+            wms_resource_id?: string | null;
         };
         UpsertInventoryStatusTransitionRequest: {
             approval_sources: string[];
@@ -8485,6 +9037,11 @@ export interface components {
             timeout_seconds: number;
             type_code: string;
             type_name: string;
+        };
+        UpsertReconciliationRuleRequest: {
+            enabled: boolean;
+            /** Format: int32 */
+            interval_hours: number;
         };
         UpsertSystemDictionaryItemRequest: {
             /** Format: date-time */
@@ -15625,6 +16182,372 @@ export interface operations {
             };
         };
     };
+    push_h8_asn: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description ERP 消息业务幂等键 */
+                "Idempotency-Key": string;
+                /** @description ERP 调用目标仓库，必须与 API Key 授权范围一致 */
+                "X-WMS-Warehouse-ID": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["H8AsnInboundRequest"];
+            };
+        };
+        responses: {
+            /** @description ASN 已完成 M-PM 规整并提交 M2 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H8InboundResponse"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description API Key 无效 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description scope、仓库或连接绑定不匹配 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等键冲突或消息处理中 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description schema、路由、映射或业务校验失败 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    push_h8_outbound_order: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description ERP 消息业务幂等键 */
+                "Idempotency-Key": string;
+                /** @description ERP 调用目标仓库，必须与 API Key 授权范围一致 */
+                "X-WMS-Warehouse-ID": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["H8OutboundOrderInboundRequest"];
+            };
+        };
+        responses: {
+            /** @description 出库订单已完成 M-PM 规整并提交 M4 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H8InboundResponse"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description API Key 无效 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description scope、仓库或连接绑定不匹配 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等键冲突或消息处理中 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description schema、路由、映射或业务校验失败 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    push_h8_product_change: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description ERP 消息业务幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["H8ProductChangeInboundRequest"];
+            };
+        };
+        responses: {
+            /** @description 商品变更已完成 M-PM 规整并提交 M1；档案补录消息同时完成 M-QL 回执 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H8InboundResponse"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description API Key 无效 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description scope、货主全仓范围或连接绑定不匹配 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等键冲突或消息处理中 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description schema、路由、映射、字段或档案补录回执校验失败 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    push_h8_product_master: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description ERP 消息业务幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["H8ProductMasterInboundRequest"];
+            };
+        };
+        responses: {
+            /** @description 商品主数据已完成 M-PM 规整并提交 M1 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H8InboundResponse"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description API Key 无效 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description scope、货主全仓范围或连接绑定不匹配 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等键冲突或消息处理中 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description schema、路由、映射或业务校验失败 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    push_h8_return_order: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description ERP 消息业务幂等键 */
+                "Idempotency-Key": string;
+                /** @description ERP 调用目标仓库，必须与 API Key 授权范围一致 */
+                "X-WMS-Warehouse-ID": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["H8ReturnOrderInboundRequest"];
+            };
+        };
+        responses: {
+            /** @description 退货申请已完成 M-PM 规整并提交 M2 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H8InboundResponse"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description API Key 无效 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description scope、仓库或连接绑定不匹配 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等键冲突或消息处理中 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description schema、路由、映射、原批号或业务校验失败 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     upsert_h8_erp_message_lifecycle: {
         parameters: {
             query?: never;
@@ -16236,6 +17159,83 @@ export interface operations {
             };
             /** @description 加密主密钥不可用 */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    record_h8_erp_business_receipt: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 必须与原出站消息幂等键一致 */
+                "Idempotency-Key": string;
+                /** @description 具备 inbound:push scope 的 ERP API Key */
+                "X-WMS-API-Key": string;
+            };
+            path: {
+                /** @description H8 出站消息 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["H8ErpBusinessReceiptRequest"];
+            };
+        };
+        responses: {
+            /** @description 业务成功回执进入 acked；明确拒绝进入 dead */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H8ErpMessage"];
+                };
+            };
+            /** @description 回执绑定或结果非法 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description API Key 无效 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description scope、货主或仓库越权 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 消息不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 消息状态不允许回执 */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -20309,16 +21309,19 @@ export interface operations {
             };
         };
     };
-    execute_mapping: {
+    map_parameter: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description 跨重试保持不变的幂等键 */
+                "Idempotency-Key": string;
+            };
             path?: never;
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ExecuteMappingRequest"];
+                "application/json": components["schemas"]["MapParameterRequest"];
             };
         };
         responses: {
@@ -20328,7 +21331,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ExecuteMappingResponse"];
+                    "application/json": components["schemas"]["MapParameterResponse"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description 未登录 */
@@ -20340,31 +21352,26 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-        };
-    };
-    trace_mapping: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description 执行 ID */
-                execution_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 参数对照反向追溯 */
-            200: {
+            /** @description 字典不存在 */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MappingTraceResponse"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description 未登录 */
-            401: {
+            /** @description 幂等键冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 请求无效 */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -21117,6 +22124,640 @@ export interface operations {
                 };
             };
             /** @description 审批结论或意见非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    complete_archive_revision_sync: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description H8 Worker 回执幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 档案补录质量联系单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompleteArchiveRevisionRequest"];
+            };
+        };
+        responses: {
+            /** @description M-QL 已落地且 M2 ASN 已恢复验收 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QualityLiaisonOrder"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 缺少 H8 写权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 联系单不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description ERP 出站、商品值或 ASN 关联校验失败 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    claim_reconciliation_window: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 服务 Worker 本轮认领幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClaimReconciliationRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationClaimResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    fail_reconciliation_claim: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 失败上报幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 调度认领 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FailReconciliationClaimRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationClaimMutation"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    renew_reconciliation_claim: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 本次续租幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 调度认领 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenewReconciliationClaimRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationClaimMutation"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_reconciliation_items: {
+        parameters: {
+            query?: {
+                product_code?: string | null;
+                batch_no?: string | null;
+                /** @description 逗号分隔差异类型；管理端多选控件提交 canonical CSV。 */
+                difference_type?: string | null;
+                /** @description 逗号分隔处理状态；管理端多选控件提交 canonical CSV。 */
+                resolution_status?: string | null;
+                cursor?: string | null;
+                limit?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationItemListResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    set_reconciliation_isolation: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetIsolationRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": number;
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    resolve_reconciliation_item: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 对账差异 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveReconciliationRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationItem"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_reconciliation_rule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationRule"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    upsert_reconciliation_rule: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertReconciliationRuleRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationRule"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    run_reconciliation: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitReconciliationRunRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationRun"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             422: {
                 headers: {
                     [name: string]: unknown;

@@ -104,8 +104,7 @@ mod tests {
             "/api/v1/traceability/outbound-reports",
             "/api/v1/driver/tasks/today",
             "/api/v1/store/dashboard",
-            "/api/v1/parameter-mapping/execute",
-            "/api/v1/parameter-mapping/traces/{execution_id}",
+            "/api/v1/parameter-mapping/map",
             "/api/v1/config-center/feature-flags/migrate",
             "/api/v1/config-center/feature-flags/reconcile",
             "/api/v1/config-center/feature-flags/export",
@@ -159,6 +158,12 @@ mod tests {
             "/api/v1/inventory/maintenance/tasks",
             "/api/v1/inventory/maintenance/records",
             "/api/v1/task-engine/task-types/{task_type_code}/enabled",
+            "/api/v1/integration/erp-messages/inbound/asn",
+            "/api/v1/integration/erp-messages/inbound/outbound_order",
+            "/api/v1/integration/erp-messages/inbound/product_change",
+            "/api/v1/integration/erp-messages/inbound/product_master",
+            "/api/v1/integration/erp-messages/inbound/return_order",
+            "/api/v1/integration/erp-messages/{id}/receipt",
         ] {
             assert!(
                 json.contains(required_path),
@@ -195,7 +200,7 @@ mod tests {
             "\"ExpireInventoryBatchesRequest\"",
             "\"ColdChainDevice\"",
             "\"BillingContract\"",
-            "\"ExecuteMappingRequest\"",
+            "\"MapParameterRequest\"",
             "\"FeatureFlagBatchImportRequest\"",
             "\"FeatureFlagReconcileReport\"",
             "\"FeatureFlagArchiveResult\"",
@@ -260,6 +265,7 @@ mod tests {
             "\"ContainerRecovery\"",
             "\"ConfirmContainerRecoveryRequest\"",
             "\"H4WechatSettingsTestResponse\"",
+            "\"H8ErpBusinessReceiptRequest\"",
         ] {
             assert!(
                 json.contains(required_schema),
@@ -296,6 +302,86 @@ mod tests {
             Some(&serde_json::json!(false)),
             "event_code should remain optional",
         );
+    }
+
+    #[test]
+    fn m1_product_specification_is_required_and_non_nullable() {
+        let doc: serde_json::Value = serde_json::from_str(
+            &ApiDoc::openapi()
+                .to_pretty_json()
+                .expect("openapi json should serialize"),
+        )
+        .expect("openapi json should parse as value");
+
+        for schema in [
+            "CreateProductRequest",
+            "Product",
+            "H8ProductMasterInboundRequest",
+        ] {
+            let required = doc
+                .pointer(&format!("/components/schemas/{schema}/required"))
+                .and_then(serde_json::Value::as_array)
+                .expect("product schema should declare required fields");
+            assert!(
+                required.iter().any(|field| field == "spec"),
+                "{schema}.spec must be required"
+            );
+            assert_eq!(
+                doc.pointer(&format!(
+                    "/components/schemas/{schema}/properties/spec/type"
+                )),
+                Some(&serde_json::json!("string")),
+                "{schema}.spec must be a non-null string"
+            );
+        }
+    }
+
+    #[test]
+    fn mrc_service_writes_require_claim_contract_and_authentication_responses() {
+        let doc: serde_json::Value = serde_json::from_str(
+            &ApiDoc::openapi()
+                .to_pretty_json()
+                .expect("openapi json should serialize"),
+        )
+        .expect("openapi json should parse as value");
+        let required = doc
+            .pointer("/components/schemas/SubmitReconciliationRunRequest/required")
+            .and_then(serde_json::Value::as_array)
+            .expect("M-RC submit schema should declare required fields");
+        for field in [
+            "claim_id",
+            "claim_token",
+            "window_key",
+            "snapshot_at",
+            "items",
+        ] {
+            assert!(
+                required.iter().any(|value| value == field),
+                "SubmitReconciliationRunRequest.{field} must be required"
+            );
+        }
+        assert_eq!(
+            doc.pointer(
+                "/paths/~1api~1v1~1reconciliation~1runs/post/requestBody/content/application~1json/schema/$ref",
+            ),
+            Some(&serde_json::json!(
+                "#/components/schemas/SubmitReconciliationRunRequest"
+            ))
+        );
+        for operation in [
+            "/paths/~1api~1v1~1reconciliation~1rule/put",
+            "/paths/~1api~1v1~1reconciliation~1claims/post",
+            "/paths/~1api~1v1~1reconciliation~1claims~1{id}~1renew/post",
+            "/paths/~1api~1v1~1reconciliation~1claims~1{id}~1failed/post",
+            "/paths/~1api~1v1~1reconciliation~1runs/post",
+            "/paths/~1api~1v1~1reconciliation~1items~1isolation/post",
+            "/paths/~1api~1v1~1reconciliation~1items~1{id}~1resolve/post",
+        ] {
+            assert!(
+                doc.pointer(&format!("{operation}/responses/401")).is_some(),
+                "protected M-RC write should declare 401: {operation}"
+            );
+        }
     }
 
     #[test]
@@ -381,20 +467,43 @@ mod tests {
             );
         }
 
-        for cold_chain_operation in [
+        for external_api_key_operation in [
             "/paths/~1api~1v1~1cold-chain~1readings/post",
             "/paths/~1api~1v1~1cold-chain~1excursions/post",
+            "/paths/~1api~1v1~1integration~1erp-messages~1inbound~1asn/post",
+            "/paths/~1api~1v1~1integration~1erp-messages~1inbound~1outbound_order/post",
+            "/paths/~1api~1v1~1integration~1erp-messages~1inbound~1return_order/post",
+            "/paths/~1api~1v1~1integration~1erp-messages~1{id}~1receipt/post",
         ] {
             let security = doc
-                .pointer(&format!("{cold_chain_operation}/security"))
+                .pointer(&format!("{external_api_key_operation}/security"))
                 .and_then(serde_json::Value::as_array)
-                .expect("cold-chain external operation should declare security");
+                .expect("external operation should declare security");
             assert!(
                 security
                     .iter()
                     .any(|requirement| requirement.get(COLD_CHAIN_API_KEY_SCHEME).is_some()),
-                "cold-chain external operation should require API key",
+                "external operation should require API key",
             );
+        }
+        for operation in [
+            "/paths/~1api~1v1~1integration~1erp-messages~1inbound~1asn/post",
+            "/paths/~1api~1v1~1integration~1erp-messages~1inbound~1outbound_order/post",
+            "/paths/~1api~1v1~1integration~1erp-messages~1inbound~1return_order/post",
+        ] {
+            let parameters = doc
+                .pointer(&format!("{operation}/parameters"))
+                .and_then(serde_json::Value::as_array)
+                .expect("H8 inbound operation should declare headers");
+            for name in ["Idempotency-Key", "X-WMS-Warehouse-ID"] {
+                assert!(
+                    parameters.iter().any(|parameter| {
+                        parameter.get("name").and_then(serde_json::Value::as_str) == Some(name)
+                            && parameter.get("required") == Some(&serde_json::json!(true))
+                    }),
+                    "H8 inbound operation should require {name}",
+                );
+            }
         }
 
         let login_idempotency_pointer =
