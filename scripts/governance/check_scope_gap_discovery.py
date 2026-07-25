@@ -79,7 +79,7 @@ LEGACY_SCREENSHOT_PAGE_CEILING = frozenset(
 STORY_HEADING_RE = re.compile(r"^##\s+(US-[A-Z0-9]+-\d{3})[：:]\s*(.+?)\s*$", re.MULTILINE)
 MENU_ITEM_RE = re.compile(r'\{\s*id:\s*"([^"]+)"\s*,\s*title:\s*"([^"]+)"')
 MENU_TREE_ITEM_RE = re.compile(r'menuItem\("([^"]+)"\)')
-VIEW_LITERAL_RE = re.compile(r'"(dashboard|[a-z][a-z0-9]+-[a-z0-9-]+)"')
+VIEW_LITERAL_RE = re.compile(r'"(dashboard|[a-z][a-z0-9]*-[a-z0-9-]+)"')
 DEV_MOCK_MENU_PAGE_RE = re.compile(r'\["([^"]+)",\s*"[^"]+",\s*"[^"]+"\]')
 
 
@@ -203,7 +203,9 @@ def has_frontend_e2e_checks(story: dict[str, Any]) -> bool:
 def has_real_frontend_e2e_check(story: dict[str, Any]) -> bool:
     checks = story.get("e2e_checks")
     return isinstance(checks, list) and any(
-        isinstance(item, str) and ("test:e2e:" in item or "playwright test" in item)
+        isinstance(item, str)
+        and "real" in item.lower()
+        and ("test:e2e:" in item or "playwright test" in item or item.startswith("just "))
         for item in checks
     )
 
@@ -222,7 +224,11 @@ def has_menu_screenshot_evidence(story: dict[str, Any], page_id: str, *, validat
             continue
         spec = record.get("spec")
         screenshot = record.get("screenshot")
-        if not isinstance(spec, str) or not spec.startswith("prototypes/e2e/") or not spec.endswith(".spec.ts"):
+        if (
+            not isinstance(spec, str)
+            or not spec.startswith("prototypes/e2e/")
+            or not spec.endswith("-real.spec.ts")
+        ):
             continue
         if (
             not isinstance(screenshot, str)
@@ -478,9 +484,9 @@ def scan_scope_gaps(
                     stories_by_page.setdefault(page_id, []).append(story)
         for page_id in sorted(admin_navigation.menu_sections):
             module = page_module(page_id)
-            if not should_scan_module(module) or page_id in screenshot_legacy_pages:
-                continue
             stories = stories_by_page.get(page_id, [])
+            if page_id in screenshot_legacy_pages or (not should_scan_module(module) and not stories):
+                continue
             if any(
                 has_menu_screenshot_evidence(story, page_id, validate_files=validate_screenshot_files)
                 for story in stories

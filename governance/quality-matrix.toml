@@ -97,6 +97,47 @@ database_objects = ["alert_definitions", "alert_definition_triggers", "quality_l
 test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test alert_definition_postgres --test alert_definition_repository_postgres --test alert_definition_change_postgres -- --test-threads=1", "pnpm --dir apps/web-admin run test:e2e:hal-real"]
 evidence_refs = ["backend/crates/api/tests/alert_definition_change_postgres.rs", "prototypes/e2e/web-admin-hal-real.spec.ts", "artifacts/screenshot-portal/real-web/h-al-alert-definitions/alert-definition-approved.png"]
 
+[evidence_profiles.DI]
+backend_files = [
+  "backend/crates/api/src/file_attachment_repository.rs",
+  "backend/crates/api/src/drug_inspection_document_repository/mod.rs",
+  "backend/crates/api/src/drug_inspection_copy_service.rs",
+  "backend/crates/api/src/drug_inspection_portal_bridge.rs",
+  "backend/crates/customer-portal-api/src/lib.rs",
+]
+database_objects = [
+  "attachments",
+  "drug_inspection_reports",
+  "drug_inspection_report_versions",
+  "drug_inspection_asn_links",
+  "upstream_delivery_documents",
+  "drug_inspection_stamp_versions",
+  "drug_inspection_customer_copy_jobs",
+  "drug_inspection_requirement_rules",
+  "drug_inspection_acceptance_validations",
+  "portal_projection_events",
+  "portal_orders",
+  "portal_report_versions",
+  "portal_audit_events",
+  "audit_event",
+  "idempotency_request",
+]
+test_checks = [
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test h_file_attachment_postgres --test drug_inspection_documents_postgres --test drug_inspection_acceptance_postgres -- --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-customer-portal-api --test customer_portal_postgres -- --test-threads=1",
+  "pnpm --dir prototypes exec playwright test --config=playwright-web-admin-mdi-real-config.ts",
+  "pnpm --dir prototypes exec playwright test --config=playwright-customer-portal-real-config.ts",
+]
+evidence_refs = [
+  "backend/crates/api/tests/h_file_attachment_postgres.rs",
+  "backend/crates/api/tests/drug_inspection_documents_postgres.rs",
+  "backend/crates/api/tests/drug_inspection_acceptance_postgres.rs",
+  "backend/crates/customer-portal-api/tests/customer_portal_postgres.rs",
+  "prototypes/e2e/web-admin-mdi-real.spec.ts",
+  "prototypes/e2e/customer-portal-real.spec.ts",
+  "shared/openapi/customer-portal-openapi.yaml",
+]
+
 [[stories]]
 id = "US-M1-011"
 title = "系统字典中心"
@@ -1841,7 +1882,7 @@ story_file = "docs/domain/user-stories-h9-print-orchestration.md"
 types = ["write", "config_rule", "api_change", "frontend_interaction", "critical_path", "audit_compliance"]
 reason = "货主+仓库+地址硬边界、M1 print_document_category 限定编号主题与 M-CG 同事务 no-gap 发号已确认；尚未实现规则、截单、随货同行单号、页面、API、PostgreSQL 并发与真实数据 E2E。"
 owner = "H9 打印能力负责人"
-resume_when = "完成原型走查和 OpenAPI 草案后，以并发截单、地址隔离、幂等和 H2 审计为第一批 outside-in TDD 切片。"
+resume_when = "完成生产前端走查和 OpenAPI 草案后，以并发截单、地址隔离、幂等和 H2 审计为第一批 outside-in TDD 切片。"
 
 [[deferred_stories]]
 id = "US-H9-007"
@@ -1851,7 +1892,7 @@ story_file = "docs/domain/user-stories-h9-print-orchestration.md"
 types = ["write", "config_rule", "api_change", "frontend_interaction", "audit_compliance"]
 reason = "需求和受控字段边界已确认；尚未实现规则版本、样本测试、发布页面、API、数据库和治理检查。"
 owner = "H9 打印能力负责人"
-resume_when = "登记可归集字段白名单并完成配置型页面原型后，实现规则发布、版本快照和地址隔离测试。"
+resume_when = "登记可归集字段白名单并完成配置型生产前端走查后，实现规则发布、版本快照和地址隔离测试。"
 
 [[deferred_stories]]
 id = "US-H9-008"
@@ -1861,7 +1902,7 @@ story_file = "docs/domain/user-stories-h9-print-orchestration.md"
 types = ["write", "config_rule", "api_change", "frontend_interaction", "critical_path", "audit_compliance"]
 reason = "组套、地址优先级、M1 print_document_category 来源模式、单据完整性和版本语义已确认；尚未实现页面、API、模型、文件引用和真实数据 E2E。"
 owner = "H9 打印能力负责人"
-resume_when = "完成组套配置原型与字段草案后，实现不可变发布版本、唯一匹配和单据就绪状态机。"
+resume_when = "完成组套配置生产前端走查与字段草案后，实现不可变发布版本、唯一匹配和单据就绪状态机。"
 
 [[deferred_stories]]
 id = "US-H9-009"
@@ -2284,7 +2325,7 @@ reason = "多方案、绑定、Top N、启停与 rule_priority 已参与推荐�
 owner = "M2 入库模块负责人"
 resume_when = "补齐 ABC/品类/效期规则在推荐中的可验证效果，并取得企业微信 dev/staging 通知回执后重新验收。"
 
-[[stories]]
+[[deferred_stories]]
 id = "US-M4-001"
 title = "出库订单管理"
 module = "M4"
@@ -2298,24 +2339,9 @@ api_paths = [
   "POST /api/v1/outbound/orders",
   "GET /api/v1/outbound/orders/{id}",
 ]
-
-[stories.dimensions]
-requirement = "verified"
-fields = "verified"
-frontend = "verified"
-api = "verified"
-backend = "verified"
-database = "verified"
-security = "verified"
-audit = "verified"
-tests = "verified"
-evidence = "verified"
-docs = "verified"
-governance = "verified"
-
-[stories.tests]
-required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
-covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
+reason = "现有出库订单切片尚未覆盖新增必填 delivery_address_id、不可变地址快照及其数据库、OpenAPI、前端和测试证据；该字段是 M-DI 客户地址授权的稳定边界，不能继续标记为全维度完成。"
+owner = "M4 出库模块负责人"
+resume_when = "补齐 delivery_address_id 和地址快照的数据库约束、ERP/WMS 契约、前端交互、历史解释及全层测试后重新验收。"
 
 # 以下延期项由全量范围治理登记；恢复后必须移入 [[stories]] 并补齐全维度证据。
 
@@ -3624,75 +3650,414 @@ evidence_refs = [
   "artifacts/screenshot-portal/real-web/m4-outbound/outbound-wave-detail.png",
 ]
 
-[[deferred_stories]]
+[[stories]]
 id = "US-DI-001"
-title = "药检单平台对接配置"
+title = "WMS 入库资料录入与药检单复用"
 module = "DI"
-types = ["write", "config_rule", "integration", "frontend_interaction"]
-frontend_pages = ["m-di-platforms"]
-navigation_checks = ["node apps/web-admin/self-checks/di-drug-inspection-slice-self-check.mjs"]
-e2e_checks = ["pnpm --dir prototypes exec playwright test --config=playwright-web-admin-h1-real-config.ts --grep 'M-DI 药检平台配置'"]
+story_file = "docs/domain/user-stories-mdi-drug-inspection.md"
+types = ["write", "api_change", "config_rule", "integration", "frontend_interaction", "critical_path", "audit_compliance"]
+frontend_pages = ["m2-inbound-documents", "m-di-platforms"]
+navigation_checks = [
+  "node apps/web-admin/self-checks/m2-inbound-documents-page-self-check.mjs",
+  "node apps/web-admin/self-checks/di-drug-inspection-slice-self-check.mjs",
+]
+e2e_checks = [
+  "pnpm --dir prototypes exec playwright test --config=playwright-web-admin-mdi-real-config.ts",
+  "pnpm --dir prototypes exec playwright test --config=playwright-web-admin-h1-real-config.ts --grep 'M-DI 药检平台配置'",
+]
 e2e_screenshots = [
+  { page = "m2-inbound-documents", spec = "prototypes/e2e/web-admin-mdi-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m-di/01-missing-quick-filter.png" },
+  { page = "m2-inbound-documents", spec = "prototypes/e2e/web-admin-mdi-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m-di/02-image-processing-preview.png" },
+  { page = "m2-inbound-documents", spec = "prototypes/e2e/web-admin-mdi-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m-di/04-rejected-draft-edited.png" },
+  { page = "m2-inbound-documents", spec = "prototypes/e2e/web-admin-mdi-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m-di/07-confirmed-report-reused.png" },
+  { page = "m2-inbound-documents", spec = "prototypes/e2e/web-admin-mdi-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m-di/08-upstream-multi-asn-selection.png" },
+  { page = "m2-inbound-documents", spec = "prototypes/e2e/web-admin-mdi-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m-di/09-persisted-complete-list.png" },
   { page = "m-di-platforms", spec = "prototypes/e2e/web-admin-di-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m-di-platforms/platform-config.png" },
 ]
 api_paths = [
+  "POST /api/v1/attachments/uploads",
+  "PUT /api/v1/attachments/uploads/{upload_id}/content",
+  "POST /api/v1/attachments/confirm",
+  "GET /api/v1/drug-inspection/inbound-documents",
+  "GET /api/v1/drug-inspection/reports/reusable",
+  "POST /api/v1/drug-inspection/report-versions",
+  "POST /api/v1/drug-inspection/reports/{report_id}/reuse",
+  "POST /api/v1/drug-inspection/upstream-delivery-document-versions",
   "GET /api/v1/drug-inspection/platforms",
   "POST /api/v1/drug-inspection/platforms",
   "PATCH /api/v1/drug-inspection/platforms/{platform_id}/status",
 ]
-database_objects = ["drug_inspection_platforms", "idempotency_request", "audit_event"]
+database_objects = [
+  "h_file_upload_sessions",
+  "attachments",
+  "drug_inspection_reports",
+  "drug_inspection_report_versions",
+  "drug_inspection_asn_links",
+  "upstream_delivery_documents",
+  "upstream_delivery_document_versions",
+  "upstream_delivery_document_files",
+  "upstream_delivery_document_asn_links",
+  "idempotency_request",
+  "audit_event",
+]
 test_checks = [
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test di_drug_inspection_platform_postgres -- --nocapture",
-  "cargo test --manifest-path backend/Cargo.toml -p wms-domain --lib drug_inspection -- --nocapture",
-  "just openapi-check",
-  "python3 scripts/governance/check_error_codes.py",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test h_file_attachment_postgres --test drug_inspection_documents_postgres -- --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test drug_inspection_openapi_contract",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test di_drug_inspection_platform_postgres -- --test-threads=1",
+  "node apps/web-admin/self-checks/m2-inbound-documents-page-self-check.mjs",
   "node apps/web-admin/self-checks/di-drug-inspection-slice-self-check.mjs",
+  "node apps/web-admin/src/pages/inbound/inbound-document-entry-model.test.ts",
   "pnpm --dir apps/web-admin exec tsc --noEmit",
+  "just openapi-check",
+  "pnpm --dir prototypes exec playwright test --config=playwright-web-admin-mdi-real-config.ts",
 ]
 evidence_refs = [
+  "docs/domain/user-stories-mdi-drug-inspection.md",
+  "docs/adr/0042-drug-inspection-customer-portal.md",
+  "backend/migrations/202607260001_h_file_attachments.sql",
+  "backend/migrations/202607260002_mdi_documents.sql",
+  "backend/crates/domain/src/drug_inspection_document.rs",
+  "backend/crates/api/src/file_attachment_repository.rs",
+  "backend/crates/api/src/drug_inspection_document_repository/mod.rs",
+  "backend/crates/api/tests/h_file_attachment_postgres.rs",
+  "backend/crates/api/tests/drug_inspection_openapi_contract.rs",
+  "backend/crates/api/tests/drug_inspection_documents_postgres.rs",
+  "apps/web-admin/src/pages/inbound/M2InboundDocumentsPage.tsx",
+  "apps/web-admin/src/features/drug-inspection/document-queries.ts",
+  "apps/web-admin/self-checks/m2-inbound-documents-page-self-check.mjs",
   "apps/web-admin/src/pages/drug-inspection/DrugInspectionPlatformPage.tsx",
-  "apps/web-admin/src/features/drug-inspection/drug-inspection-queries.ts",
   "apps/web-admin/self-checks/di-drug-inspection-slice-self-check.mjs",
+  "prototypes/e2e/web-admin-mdi-real.spec.ts",
   "prototypes/e2e/web-admin-di-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/m-di/01-missing-quick-filter.png",
+  "artifacts/screenshot-portal/real-web/m-di/02-image-processing-preview.png",
+  "artifacts/screenshot-portal/real-web/m-di/04-rejected-draft-edited.png",
+  "artifacts/screenshot-portal/real-web/m-di/07-confirmed-report-reused.png",
+  "artifacts/screenshot-portal/real-web/m-di/08-upstream-multi-asn-selection.png",
+  "artifacts/screenshot-portal/real-web/m-di/09-persisted-complete-list.png",
   "artifacts/screenshot-portal/real-web/m-di-platforms/platform-config.png",
-  "backend/crates/domain/src/drug_inspection.rs",
-  "backend/crates/api/src/drug_inspection_handlers.rs",
-  "backend/crates/api/src/drug_inspection_repository.rs",
-  "backend/crates/api/src/openapi_paths/drug_inspection.rs",
-  "backend/crates/api/tests/di_drug_inspection_platform_postgres.rs",
-  "backend/migrations/202607140009_mdi_drug_inspection_platforms.sql",
   "shared/openapi/openapi.json",
   "packages/api-client/src/schema.ts",
-  "docs/error-codes.md",
-  "backend/migrations/202607140011_mdi_mte_admin_menu.sql",
 ]
-reason = "已补药检平台配置后端和 PC 管理端切片：HTTP/HTTPS 地址、API Key/账号密码认证方式、Vault 凭证引用、超时和 connected/testing/disabled 状态校验；支持多平台、货主隔离、幂等、敏感字段脱敏、审计、真实 PostgreSQL、真实 PC API E2E 和截图，并已挂载 OpenAPI 与菜单迁移。仍缺真实药检平台连通性测试、二维码查询、报告存储与查看、验收联动、PDA E2E 和发布证据，不能标记完成。"
-owner = "DI 模块负责人"
-resume_when = "补齐真实药检平台联调、二维码查询、报告存储与验收联动，并通过 PDA/PC 全量 E2E、截图和发布证据后复核。"
 
-[[deferred_stories]]
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"]
+
+[[stories]]
 id = "US-DI-002"
-title = "扫码批量查询药检单"
+title = "药检单独立审核、版本与客户分发副本"
 module = "DI"
-reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
-owner = "DI 模块负责人"
-resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+story_file = "docs/domain/user-stories-mdi-drug-inspection.md"
+types = ["write", "api_change", "frontend_interaction", "critical_path", "concurrent_resource", "audit_compliance", "monitoring"]
+frontend_pages = ["m-di-review", "m-di-stamp"]
+navigation_checks = ["node apps/web-admin/self-checks/mdi-document-workflow-self-check.mjs"]
+e2e_checks = ["pnpm --dir prototypes exec playwright test --config=playwright-web-admin-mdi-real-config.ts"]
+e2e_screenshots = [
+  { page = "m-di-review", spec = "prototypes/e2e/web-admin-mdi-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m-di/03-review-reject-detail.png" },
+  { page = "m-di-review", spec = "prototypes/e2e/web-admin-mdi-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m-di/05-resubmitted-review.png" },
+  { page = "m-di-review", spec = "prototypes/e2e/web-admin-mdi-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m-di/06-version-chain-before-switch.png" },
+  { page = "m-di-stamp", spec = "prototypes/e2e/web-admin-mdi-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m-di/10-stamp-drag-resize.png" },
+  { page = "m-di-stamp", spec = "prototypes/e2e/web-admin-mdi-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m-di/11-stamp-pending-second-review.png" },
+  { page = "m-di-stamp", spec = "prototypes/e2e/web-admin-mdi-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m-di/12-stamp-published.png" },
+  { page = "m-di-stamp", spec = "prototypes/e2e/web-admin-mdi-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m-di/15-customer-copy-real-pdf.png" },
+  { page = "m-di-stamp", spec = "prototypes/e2e/web-admin-mdi-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m-di/16-copy-50mb-approval.png" },
+  { page = "m-di-stamp", spec = "prototypes/e2e/web-admin-mdi-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m-di/17-processing-rule-scope-choice.png" },
+]
+api_paths = [
+  "GET /api/v1/drug-inspection/review-queue",
+  "GET /api/v1/drug-inspection/reports/{report_id}/versions",
+  "POST /api/v1/drug-inspection/reports/{report_id}/corrections",
+  "PUT /api/v1/drug-inspection/report-versions/{version_id}",
+  "POST /api/v1/drug-inspection/report-versions/{version_id}/submit",
+  "POST /api/v1/drug-inspection/report-versions/{version_id}/review",
+  "POST /api/v1/drug-inspection/image-previews",
+  "GET /api/v1/drug-inspection/stamp-versions",
+  "POST /api/v1/drug-inspection/stamp-versions",
+  "POST /api/v1/drug-inspection/stamp-versions/{version_id}/submit",
+  "POST /api/v1/drug-inspection/stamp-versions/{version_id}/review",
+  "GET /api/v1/drug-inspection/customer-copy-jobs",
+  "POST /api/v1/drug-inspection/customer-copy-jobs/{job_id}/process",
+  "POST /api/v1/drug-inspection/customer-copy-jobs/{job_id}/oversize-approval",
+  "GET /api/v1/drug-inspection/processing-rule-versions",
+  "POST /api/v1/drug-inspection/processing-rule-versions",
+]
+database_objects = [
+  "drug_inspection_reports",
+  "drug_inspection_report_versions",
+  "drug_inspection_stamp_versions",
+  "drug_inspection_customer_copy_jobs",
+  "drug_inspection_processing_rule_versions",
+  "attachments",
+  "event_bus_event",
+  "event_bus_delivery",
+  "idempotency_request",
+  "audit_event",
+]
+test_checks = [
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test drug_inspection_documents_postgres -- --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --lib drug_inspection_copy_processor",
+  "node apps/web-admin/self-checks/mdi-document-workflow-self-check.mjs",
+  "pnpm --dir apps/web-admin exec tsc --noEmit",
+  "just openapi-check",
+  "pnpm --dir prototypes exec playwright test --config=playwright-web-admin-mdi-real-config.ts",
+]
+evidence_refs = [
+  "docs/domain/user-stories-mdi-drug-inspection.md",
+  "backend/migrations/202607260003_mdi_customer_copy.sql",
+  "backend/crates/api/src/drug_inspection_copy_processor.rs",
+  "backend/crates/api/src/drug_inspection_copy_service.rs",
+  "backend/crates/api/src/drug_inspection_document_repository/report.rs",
+  "backend/crates/api/src/drug_inspection_document_repository/stamp.rs",
+  "backend/crates/api/tests/drug_inspection_documents_postgres.rs",
+  "apps/web-admin/src/pages/drug-inspection/DrugInspectionReviewPage.tsx",
+  "apps/web-admin/src/pages/drug-inspection/DrugInspectionStampPage.tsx",
+  "apps/web-admin/self-checks/mdi-document-workflow-self-check.mjs",
+  "prototypes/e2e/web-admin-mdi-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/m-di/03-review-reject-detail.png",
+  "artifacts/screenshot-portal/real-web/m-di/05-resubmitted-review.png",
+  "artifacts/screenshot-portal/real-web/m-di/06-version-chain-before-switch.png",
+  "artifacts/screenshot-portal/real-web/m-di/10-stamp-drag-resize.png",
+  "artifacts/screenshot-portal/real-web/m-di/11-stamp-pending-second-review.png",
+  "artifacts/screenshot-portal/real-web/m-di/12-stamp-published.png",
+  "artifacts/screenshot-portal/real-web/m-di/15-customer-copy-real-pdf.png",
+  "artifacts/screenshot-portal/real-web/m-di/16-copy-50mb-approval.png",
+  "artifacts/screenshot-portal/real-web/m-di/17-processing-rule-scope-choice.png",
+  "shared/openapi/openapi.json",
+  "packages/api-client/src/schema.ts",
+]
 
-[[deferred_stories]]
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"]
+
+[[stories]]
 id = "US-DI-003"
-title = "药检单存储与查看"
+title = "独立客户药检单平台"
 module = "DI"
-reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
-owner = "DI 模块负责人"
-resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+story_file = "docs/domain/user-stories-mdi-drug-inspection.md"
+types = ["read_only", "write", "api_change", "frontend_interaction", "integration", "permission", "audit_compliance", "monitoring"]
+frontend_pages = []
+e2e_checks = ["pnpm --dir prototypes exec playwright test --config=playwright-customer-portal-real-config.ts"]
+e2e_screenshots = [
+  { page = "customer-portal-orders", spec = "prototypes/e2e/customer-portal-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/customer-portal/address-scope.png" },
+  { page = "customer-portal-orders", spec = "prototypes/e2e/customer-portal-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/customer-portal/order-batch-current.png" },
+  { page = "customer-portal-orders", spec = "prototypes/e2e/customer-portal-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/customer-portal/processing-state.png" },
+  { page = "customer-portal-orders", spec = "prototypes/e2e/customer-portal-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/customer-portal/history-visible.png" },
+  { page = "customer-portal-orders", spec = "prototypes/e2e/customer-portal-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/customer-portal/no-address-no-data.png" },
+  { page = "customer-portal-users", spec = "prototypes/e2e/customer-portal-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/customer-portal/multi-account-managed.png" },
+  { page = "customer-portal-exports", spec = "prototypes/e2e/customer-portal-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/customer-portal/batch-task-created.png" },
+  { page = "customer-portal-exports", spec = "prototypes/e2e/customer-portal-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/customer-portal/export-completed.png" },
+  { page = "customer-portal-exports", spec = "prototypes/e2e/customer-portal-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/customer-portal/export-2gb-rejected.png" },
+]
+api_paths = [
+  "POST /api/v1/auth/login",
+  "POST /api/v1/internal/projections",
+  "GET /api/v1/addresses",
+  "GET /api/v1/orders",
+  "GET /api/v1/orders/{order_id}",
+  "POST /api/v1/report-versions/{report_version_id}/download",
+  "GET /api/v1/files/{token}",
+  "GET /api/v1/exports",
+  "POST /api/v1/exports",
+  "POST /api/v1/exports/{export_id}/download",
+  "GET /api/v1/users",
+  "POST /api/v1/users",
+  "PUT /api/v1/users/{user_id}",
+]
+database_objects = [
+  "portal_customers",
+  "portal_customer_addresses",
+  "portal_users",
+  "portal_user_addresses",
+  "portal_orders",
+  "portal_order_lines",
+  "portal_report_versions",
+  "portal_projection_events",
+  "portal_download_sessions",
+  "portal_export_jobs",
+  "portal_export_job_orders",
+  "portal_audit_events",
+  "event_bus_event",
+  "event_bus_delivery",
+]
+test_checks = [
+  "cargo test --manifest-path backend/Cargo.toml -p wms-customer-portal-api --test customer_portal_postgres -- --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test drug_inspection_documents_postgres --test drug_inspection_acceptance_postgres -- --test-threads=1",
+  "pnpm --dir apps/customer-portal exec tsc --noEmit",
+  "pnpm --dir apps/customer-portal run build",
+  "pnpm --dir prototypes exec playwright test --config=playwright-customer-portal-real-config.ts",
+]
+evidence_refs = [
+  "docs/adr/0042-drug-inspection-customer-portal.md",
+  "docs/runbooks/drug-inspection-customer-portal.md",
+  "shared/openapi/customer-portal-openapi.yaml",
+  "backend/migrations/202607260004_mdi_portal_outbox.sql",
+  "backend/crates/api/src/drug_inspection_portal_bridge.rs",
+  "backend/crates/customer-portal-api/migrations/202607260001_portal.sql",
+  "backend/crates/customer-portal-api/src/projection.rs",
+  "backend/crates/customer-portal-api/src/query.rs",
+  "backend/crates/customer-portal-api/src/download.rs",
+  "backend/crates/customer-portal-api/src/export.rs",
+  "backend/crates/customer-portal-api/src/users.rs",
+  "backend/crates/customer-portal-api/tests/customer_portal_postgres.rs",
+  "apps/customer-portal/src/App.tsx",
+  "apps/customer-portal/src/OrdersPage.tsx",
+  "apps/customer-portal/src/ExportsPage.tsx",
+  "apps/customer-portal/src/UsersPage.tsx",
+  "prototypes/e2e/customer-portal-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/customer-portal/address-scope.png",
+  "artifacts/screenshot-portal/real-web/customer-portal/order-batch-current.png",
+  "artifacts/screenshot-portal/real-web/customer-portal/processing-state.png",
+  "artifacts/screenshot-portal/real-web/customer-portal/history-visible.png",
+  "artifacts/screenshot-portal/real-web/customer-portal/no-address-no-data.png",
+  "artifacts/screenshot-portal/real-web/customer-portal/multi-account-managed.png",
+  "artifacts/screenshot-portal/real-web/customer-portal/batch-task-created.png",
+  "artifacts/screenshot-portal/real-web/customer-portal/export-completed.png",
+  "artifacts/screenshot-portal/real-web/customer-portal/export-2gb-rejected.png",
+]
 
-[[deferred_stories]]
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+
+[[stories]]
 id = "US-DI-004"
-title = "药检单有效性校验"
+title = "药检单有效性与质量联动"
 module = "DI"
-reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
-owner = "DI 模块负责人"
-resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+story_file = "docs/domain/user-stories-mdi-drug-inspection.md"
+types = ["write", "api_change", "config_rule", "integration", "inventory_change", "frontend_interaction", "critical_path", "audit_compliance"]
+frontend_pages = ["m2-inspecting", "m3-batches", "m4-review"]
+navigation_checks = [
+  "node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs",
+  "node apps/web-admin/self-checks/m3-batch-management-slice-self-check.mjs",
+  "node apps/web-admin/self-checks/m4-outbound-datagrid-actions-self-check.mjs",
+]
+e2e_checks = ["pnpm --dir prototypes exec playwright test --config=playwright-web-admin-mdi-real-config.ts"]
+e2e_screenshots = [
+  { page = "m2-inspecting", spec = "prototypes/e2e/web-admin-mdi-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m-di/13-acceptance-missing-report-warning.png" },
+  { page = "m2-inspecting", spec = "prototypes/e2e/web-admin-mdi-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m-di/13-acceptance-rule-enabled.png" },
+  { page = "m2-inspecting", spec = "prototypes/e2e/web-admin-mdi-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m-di/14-acceptance-missing-report-blocked.png" },
+  { page = "m2-inspecting", spec = "prototypes/e2e/web-admin-mdi-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m-di/18-unqualified-quality-liaison-created.png" },
+  { page = "m3-batches", spec = "prototypes/e2e/web-admin-mdi-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m-di/19-quality-liaison-inventory-quarantined.png" },
+  { page = "m4-review", spec = "prototypes/e2e/web-admin-mdi-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m-di/20-customer-copy-failed-shipping-allowed.png" },
+]
+api_paths = [
+  "PUT /api/v1/drug-inspection/requirement-rules/current",
+  "POST /api/v1/inbound/receiving-orders/{id}/inspect",
+  "POST /api/v1/quality-liaisons/{id}/approval-callback",
+  "GET /api/v1/inventory/batches",
+  "GET /api/v1/outbound/orders/{id}/review",
+  "POST /api/v1/outbound/orders/{id}/review",
+  "POST /api/v1/outbound/orders/{id}/ship",
+]
+database_objects = [
+  "drug_inspection_requirement_rules",
+  "drug_inspection_acceptance_validations",
+  "drug_inspection_reports",
+  "drug_inspection_report_versions",
+  "quality_liaison_types",
+  "quality_liaison_orders",
+  "h4_approval_records",
+  "inventory_batches",
+  "inventory_status_changes",
+  "inventory_status_erp_feedback_outbox",
+  "outbound_orders",
+  "event_bus_event",
+  "audit_event",
+  "idempotency_request",
+]
+test_checks = [
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test drug_inspection_acceptance_postgres -- --test-threads=1",
+  "node apps/web-admin/self-checks/m4-outbound-datagrid-actions-self-check.mjs",
+  "pnpm --dir apps/web-admin exec tsc --noEmit",
+  "just openapi-check",
+  "pnpm --dir prototypes exec playwright test --config=playwright-web-admin-mdi-real-config.ts",
+]
+evidence_refs = [
+  "docs/domain/user-stories-mdi-drug-inspection.md",
+  "docs/domain/user-stories-m2-inbound-verify.md",
+  "docs/domain/user-stories-m4-outbound-order.md",
+  "backend/migrations/202607260005_mdi_acceptance_validation.sql",
+  "backend/migrations/202607140005_m3_inventory_status_transitions.sql",
+  "backend/crates/api/src/wave3_repository_helpers.rs",
+  "backend/crates/api/src/quality_liaison/actions.rs",
+  "backend/crates/api/src/wave4_repository.rs",
+  "backend/crates/api/tests/drug_inspection_acceptance_postgres.rs",
+  "apps/web-admin/src/pages/drug-inspection/DrugInspectionRequirementRulesCard.tsx",
+  "apps/web-admin/src/pages/outbound/M4OutboundActionDialog.tsx",
+  "apps/web-admin/src/pages/outbound/M4OutboundPage.tsx",
+  "apps/web-admin/self-checks/m4-outbound-datagrid-actions-self-check.mjs",
+  "prototypes/e2e/web-admin-mdi-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/m-di/13-acceptance-missing-report-warning.png",
+  "artifacts/screenshot-portal/real-web/m-di/13-acceptance-rule-enabled.png",
+  "artifacts/screenshot-portal/real-web/m-di/14-acceptance-missing-report-blocked.png",
+  "artifacts/screenshot-portal/real-web/m-di/18-unqualified-quality-liaison-created.png",
+  "artifacts/screenshot-portal/real-web/m-di/19-quality-liaison-inventory-quarantined.png",
+  "artifacts/screenshot-portal/real-web/m-di/20-customer-copy-failed-shipping-allowed.png",
+  "shared/openapi/openapi.json",
+  "packages/api-client/src/schema.ts",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"]
 
 [[deferred_stories]]
 id = "US-PK-001"

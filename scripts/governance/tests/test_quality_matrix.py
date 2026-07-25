@@ -156,6 +156,15 @@ def test_quality_matrix_registers_alert_module_and_navigation_check():
     )
 
 
+def test_quality_matrix_registers_drug_inspection_module_and_portal_contract():
+    """M-DI 完成故事必须允许登记独立客户平台 OpenAPI，而不是被当作未知模块/接口。"""
+    from check_quality_matrix import ALLOWED_MODULES, openapi_paths
+
+    assert "DI" in ALLOWED_MODULES
+    assert "POST /api/v1/internal/projections" in openapi_paths()
+    assert "POST /api/v1/report-versions/{report_version_id}/download" in openapi_paths()
+
+
 def test_quality_matrix_accepts_h9_field_library_slice():
     """H9 字段库第一切片必须能独立进入质量矩阵。"""
     from check_quality_matrix import check_story

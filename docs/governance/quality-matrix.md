@@ -14,9 +14,9 @@
 | 指标 | 数量 |
 |---|---:|
 | 故事总数 | 188 |
-| 已完成（已验证） | 52 |
-| 未完成 / 延期 | 136 |
-| 完成率 | 27.7% |
+| 已完成（已验证） | 55 |
+| 未完成 / 延期 | 133 |
+| 完成率 | 29.3% |
 
 > “已完成”表示故事已进入 `stories` 并通过矩阵维度门禁；延期故事中的局部代码、页面或测试切片不计入完成。
 
@@ -27,7 +27,7 @@
 | AL | 3 | 2 | 5 |
 | BA | 0 | 4 | 4 |
 | CG | 0 | 2 | 2 |
-| DI | 0 | 4 | 4 |
+| DI | 4 | 0 | 4 |
 | DOCK | 1 | 6 | 7 |
 | DR | 0 | 5 | 5 |
 | H1 | 7 | 0 | 7 |
@@ -42,7 +42,7 @@
 | M10 | 0 | 4 | 4 |
 | M2 | 1 | 8 | 9 |
 | M3 | 9 | 0 | 9 |
-| M4 | 1 | 10 | 11 |
+| M4 | 0 | 11 | 11 |
 | M5 | 0 | 3 | 3 |
 | M6 | 0 | 4 | 4 |
 | M8 | 0 | 2 | 2 |
@@ -104,11 +104,14 @@
 | US-H9-004 预览与浏览器打印 | H9 | S2 |
 | US-H9-005 业务模块接入规则 | H9 | S1 |
 | US-M2-008 收货进度看板 | M2 | S1 |
-| US-M4-001 出库订单管理 | M4 | S2 |
 | US-AL-001 告警定义注册 | AL | S3 |
 | US-AL-003 告警升级机制 | AL | S3 |
 | US-AL-004 告警看板与统计 | AL | S3 |
 | US-DOCK-001 月台档案管理 | DOCK | S2 |
+| US-DI-001 WMS 入库资料录入与药检单复用 | DI | S3 |
+| US-DI-002 药检单独立审核、版本与客户分发副本 | DI | S3 |
+| US-DI-003 独立客户药检单平台 | DI | S3 |
+| US-DI-004 药检单有效性与质量联动 | DI | S3 |
 | US-TE-001 任务类型配置 | TE | S2 |
 | US-TE-002 任务组与人员资格 | TE | S3 |
 | US-TE-004 任务优先级规则 | TE | S3 |
@@ -139,6 +142,7 @@
 | US-M2-006 收货异常处理 | M2 | S4 | L1、L2、L3、L4、L5、L6、L7、L8、L9、L10、L11 | 整单拒收、数量闭环、短少强制关闭以及条件式 M-QL/H4 记录已有实现与测试；但联络类型未配置时会静默跳过，且 M2 repository 直接写跨上下文表，销售退货批号级部分拒收、结构化异常、稳定性报告、真实企业微信通知和按供应商/商品/类型/批号统计仍未闭环。 |
 | US-M2-007 收货单据打印 | M2 | S4 | L1、L2、L3、L4、L5、L6、L7、L8、L9、L10、L11 | H9 业务数据聚合、PC 预览/打印记录和浏览器 E2E 已有；但 PDA 蓝牙打印机、PC 网络打印机、设备离线/补打队列及真实打印产物人工核对证据未完成，不能以浏览器截图替代硬件验收。 |
 | US-M2-010 上架策略配置 | M2 | S4 | L1、L2、L3、L4、L5、L6、L7、L8、L9、L10、L11 | 多方案、绑定、Top N、启停与 rule_priority 已参与推荐排序（同品/空库位/容量等）；ABC 分类、品类分区、效期隔离等规则仅部分落库未完整计算，企业微信真实通知证据也未完成。 |
+| US-M4-001 出库订单管理 | M4 | S2 | L1、L2、L3、L4、L5、L7、L8、L9、L11 | 现有出库订单切片尚未覆盖新增必填 delivery_address_id、不可变地址快照及其数据库、OpenAPI、前端和测试证据；该字段是 M-DI 客户地址授权的稳定边界，不能继续标记为全维度完成。 |
 | US-AL-002 告警触发与生命周期 | AL | - | - | 已完成 H2 事件订阅、JSON 条件匹配、静默去重、H4 重试与失败二级告警、生命周期状态机、PC 确认/处理/关闭/忽略、业务解除和 7 天自动关闭、权限、审计、OpenAPI、PostgreSQL 测试及真实 PC E2E。受 ADR-0027 Proposed 约束，生产 PDA 应用禁止启动，企微/PDA 点击确认、离线暂存恢复和真机证据尚不能补齐，因此不得整体关闭。 |
 | US-AL-005 告警通道与静默配置 | AL | - | - | 当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。 |
 | US-DOCK-002 预约创建 | DOCK | - | - | 当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。 |
@@ -199,10 +203,6 @@
 | US-BA-004 ERP 反馈批号调整结果 | BA | - | - | 当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。 |
 | US-CG-001 编码规则配置 | CG | S2 | L1、L2、L3、L4、L5、L7、L8、L9、L11 | PC 规则管理页、M1 单据类型字典绑定、真实 PostgreSQL API、真实浏览器动作和本地门户截图已验证，截图需由 PR 附件或 CI artifact 长期归档；但配置审批、规则变更审计展示、H9 限定编号主题以及发布前跨业务模块接入验收仍未完成，暂不能关闭故事。 |
 | US-CG-002 编码生成服务 | CG | - | - | 已完成 M-CG 同事务 no-gap 生成服务、M2 ASN 自动编号、M4 出库单按 M1 单据类型字典校验与同事务自动编号，并接入 M4 PC 出库订单列表、创建、详情和波次创建真实 API，临时数据库浏览器 E2E 已产生订单/详情/波次截图；仍缺 H9 `print_document_category:delivery_note` 限定主题、配置审批、规则变更审计展示、M4 其他动作真实 API、M3/其他创建方接入及正式版证据，不能关闭故事。 |
-| US-DI-001 药检单平台对接配置 | DI | S2 | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | 已补药检平台配置后端和 PC 管理端切片：HTTP/HTTPS 地址、API Key/账号密码认证方式、Vault 凭证引用、超时和 connected/testing/disabled 状态校验；支持多平台、货主隔离、幂等、敏感字段脱敏、审计、真实 PostgreSQL、真实 PC API E2E 和截图，并已挂载 OpenAPI 与菜单迁移。仍缺真实药检平台连通性测试、二维码查询、报告存储与查看、验收联动、PDA E2E 和发布证据，不能标记完成。 |
-| US-DI-002 扫码批量查询药检单 | DI | - | - | 当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。 |
-| US-DI-003 药检单存储与查看 | DI | - | - | 当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。 |
-| US-DI-004 药检单有效性校验 | DI | - | - | 当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。 |
 | US-PK-001 包装站工位管理 | PK | - | - | 当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。 |
 | US-PK-002 装箱作业 | PK | - | - | 当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。 |
 | US-PK-003 称重校验 | PK | - | - | 当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。 |
@@ -302,11 +302,14 @@
 | US-H9-004 预览与浏览器打印 | H9 | S2 | write、frontend_interaction、api_change | L1、L2、L3、L4、L5、L7、L8、L9、L11 | h9-print-templates | POST /api/v1/print-templates/preview<br>POST /api/v1/print-templates/print | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-H9-005 业务模块接入规则 | H9 | S1 | read_only、frontend_interaction、api_change | L1、L2、L3、L7、L8、L9 | h9-print-templates | POST /api/v1/print-templates/resolve | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:not_applicable<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-M2-008 收货进度看板 | M2 | S1 | read_only、frontend_interaction | L1、L2、L3、L7、L8 | m2-receiving | GET /api/v1/inbound/receiving-dashboard | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:not_applicable<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
-| US-M4-001 出库订单管理 | M4 | S2 | write、frontend_interaction、api_change | L1、L2、L3、L4、L5、L7、L8、L9、L11 | m4-orders | GET /api/v1/outbound/orders<br>POST /api/v1/outbound/orders<br>GET /api/v1/outbound/orders/{id} | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-AL-001 告警定义注册 | AL | S3 | read_only、write、api_change、frontend_interaction、config_rule、integration、audit_compliance | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | hal-alert-definitions | GET /api/v1/alert-definitions<br>GET /api/v1/alert-definitions/{id}<br>POST /api/v1/alert-definitions/change-requests<br>PUT /api/v1/quality-liaisons/types/{type_code}<br>POST /api/v1/quality-liaisons/{id}/approval-callback | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-AL-003 告警升级机制 | AL | S3 | read_only、write、api_change、frontend_interaction、config_rule、integration、audit_compliance | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | hal-alert-escalations | GET /api/v1/alert-escalation-rules<br>PUT /api/v1/alert-escalation-rules/{rule_code} | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-AL-004 告警看板与统计 | AL | S3 | read_only、write、api_change、frontend_interaction、integration、audit_compliance | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | hal-alert-dashboard | GET /api/v1/alerts/active<br>GET /api/v1/alerts/statistics<br>GET /api/v1/alerts/gsp-report<br>GET /api/v1/alerts/changes<br>POST /api/v1/alerts/exports<br>GET /api/v1/alerts/exports/{id}<br>GET /api/v1/alerts/exports/{token}/download | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-DOCK-001 月台档案管理 | DOCK | S2 | write、api_change、frontend_interaction、integration | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | dock-management | GET /api/v1/docks<br>POST /api/v1/docks<br>POST /api/v1/docks/import<br>PATCH /api/v1/docks/{id}<br>DELETE /api/v1/docks/{id} | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
+| US-DI-001 WMS 入库资料录入与药检单复用 | DI | S3 | write、api_change、config_rule、integration、frontend_interaction、critical_path、audit_compliance | L1、L2、L3、L4、L5、L6、L7、L8、L9、L10、L11 | m2-inbound-documents、m-di-platforms | POST /api/v1/attachments/uploads<br>PUT /api/v1/attachments/uploads/{upload_id}/content<br>POST /api/v1/attachments/confirm<br>GET /api/v1/drug-inspection/inbound-documents<br>GET /api/v1/drug-inspection/reports/reusable<br>POST /api/v1/drug-inspection/report-versions<br>POST /api/v1/drug-inspection/reports/{report_id}/reuse<br>POST /api/v1/drug-inspection/upstream-delivery-document-versions<br>GET /api/v1/drug-inspection/platforms<br>POST /api/v1/drug-inspection/platforms<br>PATCH /api/v1/drug-inspection/platforms/{platform_id}/status | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
+| US-DI-002 药检单独立审核、版本与客户分发副本 | DI | S3 | write、api_change、frontend_interaction、critical_path、concurrent_resource、audit_compliance、monitoring | L1、L2、L3、L4、L5、L6、L7、L8、L9、L10、L11 | m-di-review、m-di-stamp | GET /api/v1/drug-inspection/review-queue<br>GET /api/v1/drug-inspection/reports/{report_id}/versions<br>POST /api/v1/drug-inspection/reports/{report_id}/corrections<br>PUT /api/v1/drug-inspection/report-versions/{version_id}<br>POST /api/v1/drug-inspection/report-versions/{version_id}/submit<br>POST /api/v1/drug-inspection/report-versions/{version_id}/review<br>POST /api/v1/drug-inspection/image-previews<br>GET /api/v1/drug-inspection/stamp-versions<br>POST /api/v1/drug-inspection/stamp-versions<br>POST /api/v1/drug-inspection/stamp-versions/{version_id}/submit<br>POST /api/v1/drug-inspection/stamp-versions/{version_id}/review<br>GET /api/v1/drug-inspection/customer-copy-jobs<br>POST /api/v1/drug-inspection/customer-copy-jobs/{job_id}/process<br>POST /api/v1/drug-inspection/customer-copy-jobs/{job_id}/oversize-approval<br>GET /api/v1/drug-inspection/processing-rule-versions<br>POST /api/v1/drug-inspection/processing-rule-versions | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
+| US-DI-003 独立客户药检单平台 | DI | S3 | read_only、write、api_change、frontend_interaction、integration、permission、audit_compliance、monitoring | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | - | POST /api/v1/auth/login<br>POST /api/v1/internal/projections<br>GET /api/v1/addresses<br>GET /api/v1/orders<br>GET /api/v1/orders/{order_id}<br>POST /api/v1/report-versions/{report_version_id}/download<br>GET /api/v1/files/{token}<br>GET /api/v1/exports<br>POST /api/v1/exports<br>POST /api/v1/exports/{export_id}/download<br>GET /api/v1/users<br>POST /api/v1/users<br>PUT /api/v1/users/{user_id} | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
+| US-DI-004 药检单有效性与质量联动 | DI | S3 | write、api_change、config_rule、integration、inventory_change、frontend_interaction、critical_path、audit_compliance | L1、L2、L3、L4、L5、L6、L7、L8、L9、L10、L11 | m2-inspecting、m3-batches、m4-review | PUT /api/v1/drug-inspection/requirement-rules/current<br>POST /api/v1/inbound/receiving-orders/{id}/inspect<br>POST /api/v1/quality-liaisons/{id}/approval-callback<br>GET /api/v1/inventory/batches<br>GET /api/v1/outbound/orders/{id}/review<br>POST /api/v1/outbound/orders/{id}/review<br>POST /api/v1/outbound/orders/{id}/ship | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-TE-001 任务类型配置 | TE | S2 | write、config_rule、frontend_interaction | L1、L2、L3、L4、L5、L7、L8、L9、L11 | mte-task-types | GET /api/v1/task-engine/task-types<br>PUT /api/v1/task-engine/task-types/{task_type_code}<br>PATCH /api/v1/task-engine/task-types/{task_type_code}/enabled | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-TE-002 任务组与人员资格 | TE | S3 | write、config_rule、frontend_interaction、audit_compliance | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | mte-task-groups | GET /api/v1/task-engine/task-groups<br>GET /api/v1/task-engine/workers<br>PUT /api/v1/task-engine/task-groups/{task_group_code} | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-TE-004 任务优先级规则 | TE | S3 | write、config_rule、frontend_interaction、api_change、audit_compliance | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | mte-task-types、mte-task-dispatch | GET /api/v1/task-engine/priority-rule<br>PUT /api/v1/task-engine/priority-rule<br>GET /api/v1/task-engine/tasks<br>POST /api/v1/task-engine/tasks/{task_id}/transitions | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
