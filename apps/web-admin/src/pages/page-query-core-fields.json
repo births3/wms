@@ -266,6 +266,36 @@
       "more": ["documentTypeFilter", "arrivalDate", "createdAt"]
     },
     {
+      "id": "m2-inbound-documents",
+      "title": "入库资料录入",
+      "required": true,
+      "source": "apps/web-admin/src/pages/inbound/M2InboundDocumentsPage.tsx",
+      "fieldConstant": "m2InboundDocumentsQueryFields",
+      "coreConstant": "m2InboundDocumentsCoreQueryFieldKeys",
+      "core": ["keyword", "actualReceivedAt"],
+      "more": ["supplierKeyword"]
+    },
+    {
+      "id": "m-di-review",
+      "title": "药检单审核",
+      "required": true,
+      "source": "apps/web-admin/src/pages/drug-inspection/DrugInspectionReviewPage.tsx",
+      "fieldConstant": "drugInspectionReviewQueryFields",
+      "coreConstant": "drugInspectionReviewCoreQueryFieldKeys",
+      "core": ["keyword"],
+      "more": []
+    },
+    {
+      "id": "m-di-stamp",
+      "title": "药检图章配置",
+      "required": true,
+      "source": "apps/web-admin/src/pages/drug-inspection/DrugInspectionStampPage.tsx",
+      "fieldConstant": "drugInspectionStampQueryFields",
+      "coreConstant": "drugInspectionStampCoreQueryFieldKeys",
+      "core": ["keyword", "status"],
+      "more": []
+    },
+    {
       "id": "m-di-platforms",
       "title": "M-DI 药检平台",
       "required": true,

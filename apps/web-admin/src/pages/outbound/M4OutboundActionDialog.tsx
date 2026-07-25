@@ -50,6 +50,7 @@ export interface OutboundCreateForm {
   wmsOrderNo: string;
   erpOrderNo: string;
   documentType: string;
+  deliveryAddressId: string;
   customerName: string;
   productCode: string;
   batchNo: string;
@@ -163,11 +164,12 @@ function toolbarAction(
   };
 }
 
-export function M4OutboundActionDialog({ action, target, createForm, documentTypeOptions, reviewOrder, reviewLoading, reviewError, reviewPolicy, reviewPolicyLoading, secondReviewerId, note, actionError, pending, setCreateForm, setSecondReviewerId, setNote, onClose, onSubmit }: {
+export function M4OutboundActionDialog({ action, target, createForm, documentTypeOptions, deliveryAddressOptions, reviewOrder, reviewLoading, reviewError, reviewPolicy, reviewPolicyLoading, secondReviewerId, note, actionError, pending, setCreateForm, setSecondReviewerId, setNote, onClose, onSubmit }: {
   action: ActionState | null;
   target: ActionTargetContext | null;
   createForm: OutboundCreateForm;
   documentTypeOptions: Array<{ value: string; label: string }>;
+  deliveryAddressOptions: Array<{ value: string; label: string }>;
   reviewOrder: OutboundOrder | null;
   reviewLoading: boolean;
   reviewError: string | null;
@@ -207,6 +209,11 @@ export function M4OutboundActionDialog({ action, target, createForm, documentTyp
               <div className="text-xs text-muted-foreground">当前状态：{target.statusText}</div>
             </div>
           )}
+          {action.kind === "ship" && (
+            <div className="md:col-span-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm" role="note">
+              客户药检副本处于暂缺、处理中或生成失败时不阻塞发货；客户平台将在副本可用后异步补齐。
+            </div>
+          )}
           {action.kind === "review" ? (
             <>
               <ReviewDetails order={reviewOrder} loading={reviewLoading} error={reviewError} />
@@ -241,6 +248,17 @@ export function M4OutboundActionDialog({ action, target, createForm, documentTyp
                 </select>
               </label>
               <TextField label="客户 / 门店" value={createForm.customerName} onChange={(customerName) => setCreateForm((value) => ({ ...value, customerName }))} />
+              <label className="grid gap-1 text-sm">配送地址
+                <select
+                  className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                  required
+                  value={createForm.deliveryAddressId}
+                  onChange={(event) => setCreateForm((value) => ({ ...value, deliveryAddressId: event.target.value }))}
+                >
+                  <option value="">请选择客户地址</option>
+                  {deliveryAddressOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              </label>
               <TextField label="商品编码" value={createForm.productCode} onChange={(productCode) => setCreateForm((value) => ({ ...value, productCode }))} />
               <TextField label="批号" value={createForm.batchNo} onChange={(batchNo) => setCreateForm((value) => ({ ...value, batchNo }))} />
               <TextField label="计划数量" type="number" value={createForm.plannedQty} onChange={(plannedQty) => setCreateForm((value) => ({ ...value, plannedQty }))} />

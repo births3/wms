@@ -1,4 +1,4 @@
-import { createApiClient, type paths } from "@wms/api-client";
+import { createApiClient, putBinary, type paths } from "@wms/api-client";
 
 import { readAccessToken } from "./auth-session";
 
@@ -29,4 +29,13 @@ export const api = createApiClient({
 
 export function setAuthTokenProvider(provider: AuthTokenProvider) {
   authTokenProvider = provider;
+}
+
+export function putApiBinary(url: string, file: File) {
+  return putBinary({
+    baseUrl: apiBaseUrl,
+    url,
+    contentType: file.type,
+    body: file,
+  });
 }

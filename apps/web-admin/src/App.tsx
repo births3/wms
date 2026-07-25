@@ -20,6 +20,7 @@ import {
   RefreshCw,
   Search,
   ShieldCheck,
+  Stamp,
   Truck,
   Users,
   Warehouse,
@@ -90,12 +91,15 @@ const menuSections: Array<{ label: string; items: SidebarMenuItem<AdminView>[] }
       { id: "dock-management", title: "M1 月台管理", subtitle: "月台 / 作业类型 / 温区", icon: MapPinned },
       { id: "m1-system-dictionary", title: "M1 系统字典", subtitle: "单据类型 / 特殊药品分类", icon: BookOpen },
       { id: "m1-feature-flags", title: "M1 功能开关", subtitle: "配置中心 / Feature Flag", icon: KeyRound },
+      { id: "m-di-stamp", title: "药检图章配置", subtitle: "拖动设计 / 双人发布", icon: Stamp },
     ],
   },
   {
     label: "入库业务",
     items: [
       { id: "m2-receiving", title: "M2 收货管理", subtitle: "ASN / 到货确认", icon: CheckCircle2 },
+      { id: "m2-inbound-documents", title: "入库资料录入", subtitle: "药检单 / 上游随货同行单", icon: ClipboardList },
+      { id: "m-di-review", title: "药检单审核", subtitle: "逐份确认 / 版本记录", icon: ShieldCheck },
       { id: "m2-inspecting", title: "M2 验收管理", subtitle: "批号 / 效期 / 签字", icon: ClipboardList },
       { id: "m2-putaway", title: "M2 上架管理", subtitle: "库位 / 数量确认", icon: PackageCheck },
       { id: "m2-putaway-strategy", title: "M2 上架策略", subtitle: "规则优先级 / 方案绑定", icon: ClipboardList },
@@ -170,12 +174,12 @@ const defaultMenuTree: SidebarMenuTreeSection<AdminView>[] = [
     groups: [
       { label: "主数据", items: [menuItem("m1-products"), menuItem("m1-business-partners")] },
       { label: "仓储资料", items: [menuItem("m1-warehouses"), menuItem("m1-zones"), menuItem("m1-locations"), menuItem("dock-management")] },
-      { label: "系统配置", items: [menuItem("m1-system-dictionary"), menuItem("m1-feature-flags")] },
+      { label: "系统配置", items: [menuItem("m1-system-dictionary"), menuItem("m1-feature-flags"), menuItem("m-di-stamp")] },
     ],
   },
   {
     label: "入库业务",
-    groups: [{ label: "入库作业", items: [menuItem("m2-receiving"), menuItem("m2-inspecting"), menuItem("m2-putaway"), menuItem("m2-putaway-strategy"), menuItem("m-di-platforms")] }],
+    groups: [{ label: "入库作业", items: [menuItem("m2-receiving"), menuItem("m2-inbound-documents"), menuItem("m-di-review"), menuItem("m2-inspecting"), menuItem("m2-putaway"), menuItem("m2-putaway-strategy"), menuItem("m-di-platforms")] }],
   },
   {
     label: "出库业务",
@@ -214,6 +218,7 @@ const adminMenuIconByKey: Record<string, LucideIcon> = {
   PanelLeftOpen,
   Printer,
   ShieldCheck,
+  Stamp,
   Truck,
   Users,
   Warehouse,

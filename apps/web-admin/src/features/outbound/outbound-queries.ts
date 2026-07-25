@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 export type OutboundOrder = components["schemas"]["OutboundOrder"];
 export type CreateOutboundOrderRequest = components["schemas"]["CreateOutboundOrderRequest"];
 export type ReviewOutboundOrderRequest = components["schemas"]["ReviewOutboundOrderRequest"];
+export type ShipOutboundOrderRequest = components["schemas"]["ShipOutboundOrderRequest"];
 export type OutboundWave = components["schemas"]["OutboundWave"];
 export type CreateOutboundWaveRequest = components["schemas"]["CreateOutboundWaveRequest"];
 
@@ -70,6 +71,27 @@ export function useReviewOutboundOrderMutation() {
     onSuccess: (order) => {
       void queryClient.invalidateQueries({ queryKey: outboundOrdersQueryKey });
       void queryClient.invalidateQueries({ queryKey: [...outboundOrdersQueryKey, "review", order.id] });
+    },
+  });
+}
+
+export function useShipOutboundOrderMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<OutboundOrder, ApiError, { orderId: string; request: ShipOutboundOrderRequest }>({
+    mutationFn: async ({ orderId, request }) => {
+      const result = await api.POST("/api/v1/outbound/orders/{id}/ship", {
+        params: {
+          path: { id: orderId },
+          header: { "Idempotency-Key": idempotencyKey("web-m4-ship") },
+        },
+        body: request,
+      });
+      if (!result.data) throw new ApiError(result.error, "发货交接失败", result.response.status);
+      return result.data;
+    },
+    onSuccess: (order) => {
+      void queryClient.invalidateQueries({ queryKey: outboundOrdersQueryKey });
+      void queryClient.invalidateQueries({ queryKey: [...outboundOrdersQueryKey, "detail", order.id] });
     },
   });
 }

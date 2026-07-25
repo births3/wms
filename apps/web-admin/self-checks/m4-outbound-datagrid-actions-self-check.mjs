@@ -5,12 +5,16 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
+const appShell = readFileSync(resolve(root, "src/App.tsx"), "utf8");
 const pageFile = readFileSync(resolve(root, "src/pages/outbound/M4OutboundPage.tsx"), "utf8");
 const actionDialog = readFileSync(resolve(root, "src/pages/outbound/M4OutboundActionDialog.tsx"), "utf8");
 const page = `${pageFile}\n${actionDialog}`;
 const parts = readFileSync(resolve(root, "src/pages/outbound/M4OutboundPageParts.tsx"), "utf8");
 const detail = readFileSync(resolve(root, "src/pages/outbound/M4OutboundDetailDialog.tsx"), "utf8");
+const queries = readFileSync(resolve(root, "src/features/outbound/outbound-queries.ts"), "utf8");
+const model = readFileSync(resolve(root, "src/pages/outbound/m4-outbound-page-model.ts"), "utf8");
 
+assert.match(appShell, /id:\s*"m4-review"/, "管理端菜单应登记 m4-review 复核发货视图");
 const pageHeaderStart = page.indexOf("<PageHeader");
 const queryPanelStart = page.indexOf("<QueryPanel", pageHeaderStart);
 
@@ -86,6 +90,21 @@ assert.match(canReviewOrderBody(), /picked_short/, "复核应允许 picked_short
 assert.doesNotMatch(canReviewOrderBody(), /inventory_locked|reviewed|shipped/, "未拣选完成、已复核或已发货订单不得复核");
 assert.match(canShipOrderBody(), /reviewed/, "交接应允许 reviewed");
 assert.doesNotMatch(canShipOrderBody(), /inventory_locked|shipped/, "未复核/已发货不得交接");
+assert.match(
+  model,
+  /mode === "review"[\s\S]*new Set\(\[[^\]]*"picked"[^\]]*"picked_short"[^\]]*"reviewed"[^\]]*"reviewed_short"[^\]]*"shipped"[^\]]*\]\)/,
+  "复核发货列表必须保留已复核与已发货订单，才能闭环真实发货交接并展示结果",
+);
+assert.doesNotMatch(
+  pageFile,
+  /mode !== "review" \|\| order\.status === "picked"/,
+  "M4 页面不得在统一筛选后再次把复核发货列表裁成仅已拣选订单",
+);
+assert.match(queries, /useShipOutboundOrderMutation/, "发货交接必须有真实 POST mutation");
+assert.match(queries, /\/api\/v1\/outbound\/orders\/\{id\}\/ship/, "发货 mutation 必须调用正式 ship API");
+assert.match(pageFile, /shipOutboundOrderMutation\.mutateAsync/, "发货交接不能只改页面内存状态");
+assert.doesNotMatch(pageFile, /action\.kind === "ship"\)\s*updateOrder/, "发货交接不得用本地 updateOrder 冒充成功");
+assert.match(actionDialog, /客户药检副本.*不.*发货|发货.*不.*客户药检副本/, "发货弹窗应明确客户药检副本不参与发货阻断");
 assert.match(canApproveReturnBody(), /pending_approval/, "审批仅待审批");
 assert.match(canRejectReturnBody(), /pending_approval/, "驳回仅待审批");
 assert.match(canPickReturnBody(), /approved/, "拣货仅已审批");

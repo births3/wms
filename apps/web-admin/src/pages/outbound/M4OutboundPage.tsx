@@ -40,14 +40,18 @@ import {
   useOutboundWaveQuery,
   useOutboundWavesQuery,
   useReviewOutboundOrderMutation,
+  useShipOutboundOrderMutation,
   type CreateOutboundOrderRequest,
   type CreateOutboundWaveRequest,
 } from "@/features/outbound/outbound-queries";
 import { useCurrentUserQuery } from "@/features/auth/auth-queries";
-import { useMasterDataRowsQuery, useSystemDictionaryItemOptionsQuery } from "@/features/master-data/master-data-queries";
+import {
+  useCustomerAddressesQuery,
+  useMasterDataRowsQuery,
+  useSystemDictionaryItemOptionsQuery,
+} from "@/features/master-data/master-data-queries";
 import {
   useDualPersonPolicyQueries,
-  type DualPersonPolicy,
 } from "@/features/validation-rules/dual-person-policy-queries";
 import {
   BatchNoCell,
@@ -71,6 +75,19 @@ import {
   statusOptions,
   type M4OutboundMode,
 } from "./m4-outbound-page-model";
+import {
+  formatDate,
+  isUuid,
+  makeOrder,
+  makeReturn,
+  outboundCustomerId as customerId,
+  outboundOwnerId as ownerId,
+  outboundWarehouseId as warehouseId,
+  strictestDualPersonPolicy,
+  toInteger,
+  waveLineCount,
+  waveQty,
+} from "./m4-outbound-page-helpers";
 
 export type { M4OutboundMode } from "./m4-outbound-page-model";
 
@@ -78,10 +95,6 @@ interface M4OutboundPageProps {
   mode: M4OutboundMode;
   onBack: () => void;
 }
-
-const ownerId = "00000000-0000-0000-0000-000000000001";
-const warehouseId = "00000000-0000-0000-0000-000000003001";
-const customerId = "00000000-0000-0000-0000-000000004001";
 
 const m4OutboundStatusOptions = [
   { value: "draft", label: "草稿" },
@@ -164,6 +177,7 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
     wmsOrderNo: "",
     erpOrderNo: "ERP-SO-NEW",
     documentType: "sales_outbound",
+    deliveryAddressId: "",
     customerName: "连锁门店 A",
     productCode: "P-M4-NEW",
     batchNo: "BATCH-OUT-202607",
@@ -176,6 +190,7 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
   const createOutboundWaveMutation = useCreateOutboundWaveMutation();
   const cancelOutboundWaveMutation = useCancelOutboundWaveMutation();
   const reviewOutboundOrderMutation = useReviewOutboundOrderMutation();
+  const shipOutboundOrderMutation = useShipOutboundOrderMutation();
   const currentUserQuery = useCurrentUserQuery(true);
   const orderDetailQuery = useOutboundOrderQuery(detailTarget?.kind === "order" ? detailTarget.value.id : null);
   const waveDetailQuery = useOutboundWaveQuery(detailTarget?.kind === "wave" ? detailTarget.value.id : null);
@@ -207,6 +222,14 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
     : null;
   const reviewNeedsSecond = reviewPolicy === "dual_scan" || reviewPolicy === "dual_scan_with_approval";
   const documentTypeOptionsQuery = useSystemDictionaryItemOptionsQuery("document_type", mode === "orders");
+  const deliveryAddressesQuery = useCustomerAddressesQuery(mode === "orders" ? customerId : null);
+  const deliveryAddressOptions = React.useMemo(
+    () => (deliveryAddressesQuery.data ?? []).map((address) => ({
+      value: address.id,
+      label: `${address.province}${address.city}${address.district}${address.detail_address} · ${address.contact_name}`,
+    })),
+    [deliveryAddressesQuery.data],
+  );
   const documentTypeOptions = React.useMemo(
     () => (documentTypeOptionsQuery.data ?? [])
       .filter(([value]) => value === "sales_outbound" || value === "purchase_return_outbound")
@@ -244,6 +267,14 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
   }, [wavesQuery.data, wavesQuery.error, wavesQuery.isPending]);
 
   React.useEffect(() => {
+    const firstAddressId = deliveryAddressesQuery.data?.[0]?.id;
+    if (!firstAddressId) return;
+    setCreateForm((value) => value.deliveryAddressId
+      ? value
+      : { ...value, deliveryAddressId: firstAddressId });
+  }, [deliveryAddressesQuery.data]);
+
+  React.useEffect(() => {
     if (!lastEvent) return;
     const timer = window.setTimeout(() => setLastEvent(null), 3000);
     return () => window.clearTimeout(timer);
@@ -251,10 +282,7 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
 
   const meta = pageMeta(mode);
   const normalizedQuery = normalizeM4OutboundQueryValue(appliedQuery);
-  const filteredOrders = (mode === "review"
-    ? filterOrders(orders, normalizedQuery, "orders")
-    : filterOrders(orders, normalizedQuery, mode)
-  ).filter((order) => mode !== "review" || order.status === "picked" || order.status === "picked_short");
+  const filteredOrders = filterOrders(orders, normalizedQuery, mode);
   const filteredWaves = filterWaves(waves, normalizedQuery);
   const filteredReturns = filterReturns(returns, normalizedQuery);
   const selectedOrder = filteredOrders.find((item) => item.id === selectedId) ?? null;
@@ -456,6 +484,7 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
         wms_order_no: createForm.wmsOrderNo.trim(),
         erp_order_no: createForm.erpOrderNo.trim() || null,
         customer_id: customerId,
+        delivery_address_id: createForm.deliveryAddressId,
         warehouse_id: warehouseId,
         required_ship_at: createForm.requiredShipDate ? `${createForm.requiredShipDate}T09:00:00.000Z` : null,
         lines: [{
@@ -538,7 +567,21 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
       return;
     }
     if (action.kind === "print") setLastEvent("打印任务已提交");
-    if (action.kind === "ship") updateOrder(action.targetId, "shipped", "发货交接已完成");
+    if (action.kind === "ship") {
+      const shipped = await shipOutboundOrderMutation.mutateAsync({
+        orderId: action.targetId,
+        request: {
+          carrier_type: "third_party_express",
+          handover_to: "页面发货交接",
+          package_count: 1,
+          shipped_at: new Date().toISOString(),
+        },
+      });
+      setOrders((value) => value.map((item) => item.id === shipped.id ? shipped : item));
+      setSelectedId(shipped.id);
+      setLastEvent(`${shipped.wms_order_no} 发货交接已完成`);
+      return;
+    }
     if (action.kind === "release-wave") updateWave(action.targetId, "inventory_locked", "波次已下发");
     if (action.kind === "approve-return") updateReturn(action.targetId, "approved", "采购退货审批已通过");
     if (action.kind === "reject-return") updateReturn(action.targetId, "cancelled", "采购退货审批已驳回");
@@ -724,6 +767,7 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
         target={resolveActionTarget(activeAction)}
         createForm={createForm}
         documentTypeOptions={documentTypeOptions}
+        deliveryAddressOptions={deliveryAddressOptions}
         reviewOrder={activeAction?.kind === "review" ? reviewDetailQuery.data ?? null : null}
         reviewLoading={activeAction?.kind === "review" && reviewDetailQuery.isPending}
         reviewError={activeAction?.kind === "review" ? reviewDetailQuery.error?.message ?? null : null}
@@ -733,16 +777,21 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
         note={note}
         actionError={actionError ?? (
           activeAction?.kind === "create-order"
-            ? createOutboundOrderMutation.error?.message ?? documentTypeOptionsQuery.error?.message ?? null
+            ? createOutboundOrderMutation.error?.message
+              ?? documentTypeOptionsQuery.error?.message
+              ?? deliveryAddressesQuery.error?.message
+              ?? null
             : activeAction?.kind === "create-wave" ? createOutboundWaveMutation.error?.message ?? null
               : activeAction?.kind === "cancel-wave" ? cancelOutboundWaveMutation.error?.message ?? null
-                : activeAction?.kind === "review" ? reviewOutboundOrderMutation.error?.message ?? null : null
+                : activeAction?.kind === "review" ? reviewOutboundOrderMutation.error?.message ?? null
+                  : activeAction?.kind === "ship" ? shipOutboundOrderMutation.error?.message ?? null : null
         )}
         pending={
           (createOutboundOrderMutation.isPending && activeAction?.kind === "create-order")
           || (createOutboundWaveMutation.isPending && activeAction?.kind === "create-wave")
           || (cancelOutboundWaveMutation.isPending && activeAction?.kind === "cancel-wave")
           || (reviewOutboundOrderMutation.isPending && activeAction?.kind === "review")
+          || (shipOutboundOrderMutation.isPending && activeAction?.kind === "ship")
           || (reviewDetailQuery.isPending && activeAction?.kind === "review")
           || (reviewPolicyLoading && activeAction?.kind === "review")
         }
@@ -764,74 +813,4 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
       <M4OutboundDetailDialog target={renderedDetailTarget} open={detailOpen} onOpenChange={setDetailOpen} />
     </section>
   );
-}
-
-function makeOrder(id: string, wmsNo: string, erpNo: string, status: string, qty: number, shortPick: boolean, now = "2026-06-27T09:00:00.000Z"): OutboundOrder {
-  return {
-    id,
-    owner_id: ownerId,
-    document_type: "sales_outbound",
-    customer_id: customerId,
-    warehouse_id: warehouseId,
-    wms_order_no: wmsNo,
-    erp_order_no: erpNo,
-    required_ship_at: "2026-06-28T09:00:00.000Z",
-    status,
-    short_pick: shortPick,
-    created_at: now,
-    updated_at: now,
-    lines: [{ line_no: 1, product_code: "P-M4-001", batch_no: "BATCH-OUT-202606", planned_qty: qty, picked_qty: shortPick ? qty - 2 : qty, reviewed_qty: status === "reviewed" || status === "shipped" ? qty : 0, shipped_qty: status === "shipped" ? qty : 0, short_pick_qty: shortPick ? 2 : 0 }],
-  };
-}
-
-function makeReturn(returnNo: string): PurchaseReturnOrder {
-  const now = new Date().toISOString();
-  return {
-    id: crypto.randomUUID(),
-    return_no: returnNo,
-    document_type: "purchase_return_outbound",
-    source_purchase_order_no: "ASN-M2-PC-0001",
-    supplier_name: "华东医药供应商",
-    reason: "供应商召回",
-    approval_source: "purchase_return_approval",
-    status: "pending_approval",
-    product_code: "P-M4-001",
-    qty: 3,
-    created_at: now,
-    updated_at: now,
-  };
-}
-
-function totalPlannedQty(order: OutboundOrder) {
-  return (order.lines ?? []).reduce((sum, line) => sum + line.planned_qty, 0);
-}
-
-function waveQty(wave: OutboundWave, orders: OutboundOrder[]) {
-  const orderIds = wave.order_ids ?? [];
-  return orders.filter((order) => orderIds.includes(order.id)).reduce((sum, order) => sum + totalPlannedQty(order), 0);
-}
-
-function waveLineCount(wave: OutboundWave, orders: OutboundOrder[]) {
-  const orderIds = wave.order_ids ?? [];
-  return orders.filter((order) => orderIds.includes(order.id)).reduce((sum, order) => sum + (order.lines ?? []).length, 0);
-}
-
-function formatDate(value: string | null | undefined) {
-  if (!value) return "-";
-  return value.slice(0, 10);
-}
-
-function toInteger(value: string) {
-  const parsed = Number.parseInt(value, 10);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function isUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
-}
-
-function strictestDualPersonPolicy(policies: DualPersonPolicy[]): DualPersonPolicy {
-  if (policies.includes("dual_scan_with_approval")) return "dual_scan_with_approval";
-  if (policies.includes("dual_scan")) return "dual_scan";
-  return "single";
 }

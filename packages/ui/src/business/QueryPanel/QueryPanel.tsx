@@ -50,11 +50,21 @@ export interface QueryPanelSummaryItem {
   text: string;
 }
 
+export interface QueryPanelQuickFilter {
+  key: string;
+  label: string;
+  active?: boolean;
+  disabled?: boolean;
+}
+
 export interface QueryPanelProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "onReset"> {
   keyword?: string;
   keywordPlaceholder?: string;
   keywordAriaLabel?: string;
   onKeywordChange?: (value: string) => void;
+  quickFilters?: QueryPanelQuickFilter[];
+  quickFiltersAriaLabel?: string;
+  onQuickFilterClick?: (key: string) => void;
   fields?: QueryPanelField[];
   fieldOptions?: Record<string, QueryPanelOption[]>;
   defaultVisibleFieldKeys?: string[];
@@ -75,6 +85,9 @@ export const QueryPanel = React.forwardRef<HTMLDivElement, QueryPanelProps>(
       keywordPlaceholder = "搜索关键字",
       keywordAriaLabel = "搜索关键字",
       onKeywordChange,
+      quickFilters = [],
+      quickFiltersAriaLabel = "快捷筛选",
+      onQuickFilterClick,
       fields = [],
       fieldOptions,
       defaultVisibleFieldKeys,
@@ -94,6 +107,7 @@ export const QueryPanel = React.forwardRef<HTMLDivElement, QueryPanelProps>(
   ) => {
     const [expanded, setExpanded] = React.useState(false);
     const hasKeyword = onKeywordChange || keyword !== undefined;
+    const hasQuickFilters = quickFilters.length > 0;
     const hasFields = fields.length > 0;
     const hasActions = Boolean(onQuery || onReset || actions);
     const defaultVisibleKeys = React.useMemo(
@@ -122,30 +136,53 @@ export const QueryPanel = React.forwardRef<HTMLDivElement, QueryPanelProps>(
             contentClassName,
           )}
         >
-          {(hasKeyword || hasFields || children) && (
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              {hasKeyword && (
-                <label className="relative block">
-                  <span className="mb-1 block text-xs text-muted-foreground">{keywordAriaLabel}</span>
-                  <Search className="pointer-events-none absolute left-2.5 top-8 size-4 text-muted-foreground" aria-hidden />
-                  <Input
-                    value={keyword ?? ""}
-                    onChange={(event) => onKeywordChange?.(event.target.value)}
-                    placeholder={keywordPlaceholder}
-                    aria-label={keywordAriaLabel}
-                    className="h-9 pl-9 text-sm"
-                  />
-                </label>
+          {(hasKeyword || hasQuickFilters || hasFields || children) && (
+            <div className="space-y-3">
+              {hasQuickFilters && (
+                <div className="flex flex-wrap items-center gap-2" role="group" aria-label={quickFiltersAriaLabel}>
+                  <span className="text-xs text-muted-foreground">{quickFiltersAriaLabel}</span>
+                  {quickFilters.map((filter) => (
+                    <Button
+                      key={filter.key}
+                      type="button"
+                      size="sm"
+                      variant={filter.active ? "default" : "outline"}
+                      className="rounded-full"
+                      aria-pressed={filter.active === true}
+                      disabled={filter.disabled}
+                      onClick={() => onQuickFilterClick?.(filter.key)}
+                    >
+                      {filter.label}
+                    </Button>
+                  ))}
+                </div>
               )}
-              {visibleFields.map((field) => (
-                <QueryPanelFieldControl
-                  key={field.key}
-                  field={fieldOptions?.[field.key] ? { ...field, options: fieldOptions[field.key] } : field}
-                  value={value[field.key]}
-                  onChange={(nextValue) => updateField(field.key, nextValue)}
-                />
-              ))}
-              {children}
+              {(hasKeyword || hasFields || children) && (
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  {hasKeyword && (
+                    <label className="relative block">
+                      <span className="mb-1 block text-xs text-muted-foreground">{keywordAriaLabel}</span>
+                      <Search className="pointer-events-none absolute left-2.5 top-8 size-4 text-muted-foreground" aria-hidden />
+                      <Input
+                        value={keyword ?? ""}
+                        onChange={(event) => onKeywordChange?.(event.target.value)}
+                        placeholder={keywordPlaceholder}
+                        aria-label={keywordAriaLabel}
+                        className="h-9 pl-9 text-sm"
+                      />
+                    </label>
+                  )}
+                  {visibleFields.map((field) => (
+                    <QueryPanelFieldControl
+                      key={field.key}
+                      field={fieldOptions?.[field.key] ? { ...field, options: fieldOptions[field.key] } : field}
+                      value={value[field.key]}
+                      onChange={(nextValue) => updateField(field.key, nextValue)}
+                    />
+                  ))}
+                  {children}
+                </div>
+              )}
             </div>
           )}
           {hasActions && (

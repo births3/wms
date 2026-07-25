@@ -210,14 +210,18 @@ function devAdminMenuSeed(): DevAdminMenuNode[] {
       group(parent, "system", "系统配置", "BookOpen", 30, [
         ["m1-system-dictionary", "M1 系统字典", "BookOpen"],
         ["m1-feature-flags", "M1 Feature Flag", "KeyRound"],
+        ["m-di-stamp", "药检图章配置", "Stamp"],
       ]),
     ]),
     section("inbound", "入库业务", "CheckCircle2", 30, (parent) => [
       group(parent, "inbound-work", "入库作业", "CheckCircle2", 10, [
         ["m2-receiving", "M2 收货管理", "CheckCircle2"],
+        ["m2-inbound-documents", "入库资料录入", "ClipboardList"],
+        ["m-di-review", "药检单审核", "ShieldCheck"],
         ["m2-inspecting", "M2 验收管理", "ClipboardList"],
         ["m2-putaway", "M2 上架管理", "PackageCheck"],
         ["m2-putaway-strategy", "M2 上架策略", "ClipboardList"],
+        ["m-di-platforms", "M-DI 药检平台", "KeyRound"],
       ]),
     ]),
     section("outbound", "出库业务", "ClipboardList", 40, (parent) => [
