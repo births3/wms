@@ -46,13 +46,20 @@ export function productRow(item: Product): MasterDataRow {
   const storageConditionCode = text(item.attrs.storage_condition);
   const storageConditionLabel = storageConditionDisplayLabel(storageConditionCode);
   const sourceValue = productSourceLabel(item.attrs.source);
-  const middlePackage = productAttrText(item.attrs, "middle_package");
-  const largePackage = productAttrText(item.attrs, "large_package");
-  const unitLengthMm = productAttrText(item.attrs, "unit_length_mm");
-  const unitWidthMm = productAttrText(item.attrs, "unit_width_mm");
-  const unitHeightMm = productAttrText(item.attrs, "unit_height_mm");
-  const unitWeightG = productAttrText(item.attrs, "unit_weight_g");
-  const unitVolumeCm3 = productAttrText(item.attrs, "unit_volume_cm3");
+  const packagingLevels = item.packaging_levels.map((level) => ({
+    id: level.id,
+    unitCode: level.unit_code,
+    unitName: level.unit_name,
+    ratioToBase: level.ratio_to_base,
+    isBase: level.is_base,
+    isDefault: level.is_default,
+    sortOrder: level.sort_order,
+  }));
+  const packagingText = packagingLevels
+    .map((level) =>
+      `${level.unitName} × ${level.ratioToBase}${level.isBase ? "（基础）" : ""}${level.isDefault ? "（默认）" : ""}`,
+    )
+    .join(" / ");
   return row({
     id: item.id,
     code: item.product_code,
@@ -73,17 +80,20 @@ export function productRow(item: Product): MasterDataRow {
       approvalNo: item.approval_no,
       attrs: item.attrs,
       dosageForm: item.dosage_form,
+      electronicRegulatoryCode: item.electronic_regulatory_code,
+      heightMm: numericText(item.height_mm),
+      lengthMm: numericText(item.length_mm),
       manufacturer: item.manufacturer,
+      mappingTraces: item.mapping_traces,
+      packagingLevels,
+      packagingText,
       specialDrugCategoryCode: item.special_drug_category_code,
       spec: item.spec,
       storageCondition: storageConditionCode === "-" ? null : storageConditionCode,
-      middlePackage,
-      largePackage,
-      unitLengthMm,
-      unitWidthMm,
-      unitHeightMm,
-      unitWeightG,
-      unitVolumeCm3,
+      udiCode: item.udi_code,
+      volumeCm3: numericText(item.volume_cm3),
+      weightG: numericText(item.weight_g),
+      widthMm: numericText(item.width_mm),
     },
   });
 }
@@ -292,12 +302,12 @@ function row(input: Omit<MasterDataRow, "searchText">): MasterDataRow {
   };
 }
 
-function productAttrText(attrs: Record<string, unknown>, key: string) {
-  return text(attrs[key]);
-}
-
 function isSearchTextValue(value: unknown): value is string | number {
   return typeof value === "string" || typeof value === "number";
+}
+
+function numericText(value: number | null | undefined) {
+  return value == null ? "" : String(value);
 }
 
 export function productSourceLabel(value: unknown) {

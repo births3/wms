@@ -9,6 +9,9 @@ export type MasterDataViewId =
   | "m1-system-dictionary";
 
 export type Product = components["schemas"]["Product"];
+export type ProductMappingTrace = components["schemas"]["ProductMappingTrace"];
+export type ProductPackagingLevel = components["schemas"]["ProductPackagingLevel"];
+export type ProductPackagingLevelInput = components["schemas"]["ProductPackagingLevelInput"];
 export type Supplier = components["schemas"]["Supplier"];
 export type Customer = components["schemas"]["Customer"];
 export type CustomerAddress = components["schemas"]["CustomerAddress"];
@@ -18,8 +21,6 @@ export type CustomerQualification = components["schemas"]["CustomerQualification
 export type Warehouse = components["schemas"]["Warehouse"];
 export type WarehouseZone = components["schemas"]["WarehouseZone"];
 export type Location = components["schemas"]["Location"];
-export type UpdateProductRequest = components["schemas"]["UpdateProductRequest"];
-export type CreateProductRequest = components["schemas"]["CreateProductRequest"];
 export type CreateSupplierRequest = components["schemas"]["CreateSupplierRequest"];
 export type UpdateSupplierRequest = components["schemas"]["UpdateSupplierRequest"];
 export type CreateCustomerRequest = components["schemas"]["CreateCustomerRequest"];
@@ -70,17 +71,30 @@ export interface ProductMasterDataFields {
   approvalNo?: string | null;
   attrs: Record<string, unknown>;
   dosageForm?: string | null;
+  electronicRegulatoryCode?: string | null;
+  heightMm: string;
+  lengthMm: string;
   manufacturer?: string | null;
+  mappingTraces: ProductMappingTrace[];
+  packagingLevels: ProductPackagingDisplayLevel[];
+  packagingText: string;
   specialDrugCategoryCode?: string | null;
-  spec?: string | null;
+  spec: string;
   storageCondition?: string | null;
-  middlePackage: string;
-  largePackage: string;
-  unitLengthMm: string;
-  unitWidthMm: string;
-  unitHeightMm: string;
-  unitWeightG: string;
-  unitVolumeCm3: string;
+  udiCode?: string | null;
+  volumeCm3: string;
+  weightG: string;
+  widthMm: string;
+}
+
+export interface ProductPackagingDisplayLevel {
+  id: string;
+  unitCode: string;
+  unitName: string;
+  ratioToBase: number;
+  isBase: boolean;
+  isDefault: boolean;
+  sortOrder: number;
 }
 
 export interface WarehouseMasterDataFields {

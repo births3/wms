@@ -38,8 +38,8 @@ try {
   const { isValidUnifiedSocialCreditCode, validateSupplierQualificationFields } = await server.ssrLoadModule(
     "/src/pages/master-data/supplier-qualification-validation.ts",
   );
-  assert.match(apiSource, /web-m1-product-create/);
-  assert.match(apiSource, /web-m1-product-update/);
+  assert.doesNotMatch(apiSource, /web-m1-product-create/);
+  assert.doesNotMatch(apiSource, /web-m1-product-update/);
   assert.match(apiSource, /web-m1-supplier-create/);
   assert.match(apiSource, /web-m1-supplier-update-/);
   assert.match(apiSource, /web-m1-customer-create/);
@@ -52,14 +52,14 @@ try {
   assert.equal(productSourceLabel("api_import"), "API接口导入");
   assert.equal(productSourceLabel("erp"), "API接口导入");
   assert.equal(productSourceLabel(undefined), "-");
-  assert.deepEqual(masterDataActionLabels("m1-products"), ["新建商品", "批量导入"]);
+  assert.deepEqual(masterDataActionLabels("m1-products"), []);
   assert.deepEqual(masterDataActionLabels("m1-business-partners"), [
     "新建供应商",
     "导入供应商",
     "新建客户",
     "导入客户",
   ]);
-  assert.equal(productTableClassName("m1-products"), "min-w-[2380px]");
+  assert.equal(productTableClassName("m1-products"), "min-w-[2800px]");
 
   const row = productRow({
     id: "00000000-0000-0000-0000-000000001001",
@@ -69,20 +69,41 @@ try {
     approval_no: "国药准字H20260001",
     spec: "10ml*1支",
     dosage_form: "注射剂",
+    electronic_regulatory_code: "REG-001",
+    height_mm: 30,
+    length_mm: 120,
     manufacturer: "鹏鹞示例药业",
+    mapping_traces: [],
+    packaging_levels: [
+      {
+        id: "level-piece",
+        unit_code: "piece",
+        unit_name: "支",
+        ratio_to_base: 1,
+        is_base: true,
+        is_default: false,
+        sort_order: 1,
+      },
+      {
+        id: "level-box",
+        unit_code: "box",
+        unit_name: "盒",
+        ratio_to_base: 10,
+        is_base: false,
+        is_default: true,
+        sort_order: 2,
+      },
+    ],
     special_drug_category_code: "none",
     status: "active",
     attrs: {
-      large_package: "20 件/大包",
-      middle_package: "10 件/中包",
       source: "api_import",
       storage_condition: "cold",
-      unit_height_mm: "30",
-      unit_length_mm: "120",
-      unit_volume_cm3: "360",
-      unit_weight_g: "180",
-      unit_width_mm: "100",
     },
+    udi_code: "06912345678901",
+    volume_cm3: 360,
+    weight_g: 180,
+    width_mm: 100,
     created_at: "2026-06-29T00:00:00.000Z",
     updated_at: "2026-06-29T00:00:00.000Z",
   });
@@ -95,14 +116,14 @@ try {
   assert.equal(storageConditionDisplayLabel("normal"), "常温");
   assert.equal(row.sourceValue, "API接口导入");
   assert.match(row.searchText, /api接口导入/i);
-  assert.equal(row.productFields.middlePackage, "10 件/中包");
-  assert.equal(row.productFields.largePackage, "20 件/大包");
-  assert.equal(row.productFields.unitLengthMm, "120");
-  assert.equal(row.productFields.unitWidthMm, "100");
-  assert.equal(row.productFields.unitHeightMm, "30");
-  assert.equal(row.productFields.unitWeightG, "180");
-  assert.equal(row.productFields.unitVolumeCm3, "360");
-  assert.match(row.searchText, /10 件\/中包/);
+  assert.equal(row.productFields.packagingLevels.length, 2);
+  assert.equal(row.productFields.packagingLevels[1].unitName, "盒");
+  assert.equal(row.productFields.lengthMm, "120");
+  assert.equal(row.productFields.widthMm, "100");
+  assert.equal(row.productFields.heightMm, "30");
+  assert.equal(row.productFields.weightG, "180");
+  assert.equal(row.productFields.volumeCm3, "360");
+  assert.match(row.searchText, /盒 × 10/);
   assert.match(row.searchText, /180/);
 
   const warehouse = warehouseRow({

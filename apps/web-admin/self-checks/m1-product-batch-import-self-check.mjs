@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { createServer } from "vite";
 
 const root = path.resolve(new URL("..", import.meta.url).pathname);
 const page = fs.readFileSync(path.join(root, "src/pages/master-data/M1MasterDataPage.tsx"), "utf8");
@@ -8,18 +9,35 @@ const api = fs.readFileSync(
   path.join(root, "src/features/master-data/master-data-queries/api.ts"),
   "utf8",
 );
-const dialog = fs.readFileSync(
-  path.join(root, "src/pages/master-data/ProductBatchImportDialog.tsx"),
+const devMock = fs.readFileSync(
+  path.join(root, "dev-mocks/web-admin-dev-mock-core.ts"),
   "utf8",
 );
 
-assert.match(page, /ProductBatchImportDialog/);
-assert.match(page, /setProductBatchImportOpen\(true\)/);
-assert.match(api, /export async function batchCreateProducts/);
-assert.match(api, /products\/batch-sync/);
-assert.match(dialog, /export function parseProductImportText/);
-assert.match(dialog, /已解析/);
-assert.match(dialog, /storage_condition/);
-assert.doesNotMatch(page, /批量导入入口已记录/);
+assert.match(page, /ERP 权威商品投影/);
+assert.match(page, /本页只读/);
+assert.doesNotMatch(page, /ProductBatchImportDialog/);
+assert.doesNotMatch(page, /ProductCreateDialog/);
+assert.doesNotMatch(api, /batchCreateProducts/);
+assert.doesNotMatch(api, /web-m1-product-create/);
+assert.doesNotMatch(api, /web-m1-product-update/);
+assert.match(devMock, /AUTH-005/);
+assert.doesNotMatch(devMock, /devCreateProduct/);
+assert.doesNotMatch(devMock, /handleProductUpdate/);
 
-console.log("m1 product batch import self-check passed");
+const server = await createServer({
+  root,
+  logLevel: "silent",
+  server: { middlewareMode: true },
+  appType: "custom",
+});
+try {
+  const { masterDataActionLabels } = await server.ssrLoadModule(
+    "/src/pages/master-data/m1-product-page-model.ts",
+  );
+  assert.deepEqual(masterDataActionLabels("m1-products"), []);
+} finally {
+  await server.close();
+}
+
+console.log("m1 ERP-only product projection self-check passed");

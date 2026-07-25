@@ -126,14 +126,14 @@ export function masterDataColumns(
 }
 
 export function masterDataActionLabels(viewId: MasterDataViewId) {
-  if (viewId === "m1-products") return ["新建商品", "批量导入"];
+  if (viewId === "m1-products") return [];
   if (viewId === "m1-business-partners") return ["新建供应商", "导入供应商", "新建客户", "导入客户"];
   return [];
 }
 
 export function productTableClassName(viewId: MasterDataViewId) {
   if (viewId === "m1-locations") return "min-w-[1720px]";
-  if (viewId === "m1-products") return "min-w-[2380px]";
+  if (viewId === "m1-products") return "min-w-[2800px]";
   if (viewId === "m1-business-partners") return "min-w-[1680px]";
   return "min-w-[1460px]";
 }
