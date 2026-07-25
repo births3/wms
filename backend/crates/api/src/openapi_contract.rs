@@ -24,6 +24,27 @@ struct IdempotencyExemptionGroup {
 
 const IDEMPOTENCY_EXEMPTION_GROUPS: &[IdempotencyExemptionGroup] = &[
     IdempotencyExemptionGroup {
+        operations: &[(
+            "/api/v1/attachments/uploads/{upload_id}/content",
+            PathItemType::Put,
+        )],
+        reason: "上传会话 ID 与令牌共同限定单一对象键，PUT 全量替换内容；重复同一请求得到相同字节与哈希。",
+    },
+    IdempotencyExemptionGroup {
+        operations: &[(
+            "/api/v1/drug-inspection/image-previews",
+            PathItemType::Post,
+        )],
+        reason: "图像预览只读取不可变附件并返回派生图片，不写入业务数据；使用 POST 承载处理参数。",
+    },
+    IdempotencyExemptionGroup {
+        operations: &[(
+            "/api/v1/drug-inspection/customer-copy-jobs/{job_id}/process",
+            PathItemType::Post,
+        )],
+        reason: "客户副本任务由 job_id、状态机与最大尝试次数受控认领；成功任务不能再次认领，失败任务重复调用表示显式重试。",
+    },
+    IdempotencyExemptionGroup {
         operations: &[("/api/v1/auth/login", PathItemType::Post)],
         reason: "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。",
     },
@@ -306,6 +327,18 @@ impl Modify for ContractSecurityAddon {
             "/api/v1/auth/login",
             PathItemType::Post,
             "登录接口用于签发 JWT，调用前尚无 Bearer token。",
+        );
+        mark_public_operation(
+            openapi,
+            "/api/v1/attachments/uploads/{upload_id}/content",
+            PathItemType::Put,
+            "附件上传使用 5 分钟上传会话令牌鉴权，不依赖 Bearer token。",
+        );
+        mark_public_operation(
+            openapi,
+            "/api/v1/attachments/{attachment_id}/content",
+            PathItemType::Get,
+            "附件下载使用 15 分钟下载会话令牌鉴权，不依赖 Bearer token。",
         );
 
         for path in [

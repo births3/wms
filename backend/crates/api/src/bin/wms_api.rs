@@ -26,10 +26,17 @@ use wms_api::{
     dock_appointment_handlers::{dock_appointment_router, DockAppointmentAppState},
     dock_handlers::{dock_router, DockAppState},
     document_numbering_handlers::{document_numbering_router, DocumentNumberingAppState},
+    drug_inspection_copy_service::spawn_drug_inspection_copy_worker,
+    drug_inspection_document_handlers::{
+        drug_inspection_document_router, DrugInspectionDocumentAppState,
+    },
     drug_inspection_handlers::{drug_inspection_router, DrugInspectionAppState},
+    drug_inspection_portal_bridge::spawn_drug_inspection_portal_bridge,
+    drug_inspection_stamp_handlers::{drug_inspection_stamp_router, DrugInspectionStampAppState},
     dual_person_policy_handlers::{dual_person_policy_router, DualPersonPolicyAppState},
     express::{express_router, ExpressAppState},
     feature_flags::FeatureFlagRegistry,
+    file_attachment_handlers::{file_attachment_router, FileAttachmentAppState},
     h2_lifecycle_handlers::{h2_lifecycle_router, H2LifecycleAppState},
     h8_erp_connectors::{h8_erp_connector_router, H8ErpConnectorAppState},
     h8_erp_interface_tables::{h8_erp_interface_table_router, H8ErpInterfaceTableAppState},
@@ -65,6 +72,7 @@ const DATABASE_URL_ENV: &str = "DATABASE_URL";
 const WMS_DB_URL_ENV: &str = "WMS_DB_URL";
 const DB_MAX_CONNECTIONS_ENV: &str = "WMS_DB_MAX_CONNECTIONS";
 const FEATURE_FLAGS_FILE_ENV: &str = "WMS_FEATURE_FLAGS_FILE";
+const H_FILE_STORAGE_ROOT_ENV: &str = "WMS_H_FILE_STORAGE_ROOT";
 const DEFAULT_BIND_ADDR: &str = "0.0.0.0:8080";
 const DEFAULT_DB_MAX_CONNECTIONS: u32 = 32;
 const DEFAULT_FEATURE_FLAGS_FILE: &str = "deploy/feature_flags.toml";
@@ -264,6 +272,16 @@ fn app(
         None => DualPersonPolicyAppState::with_postgres(shared_pool.clone()),
     };
     let h8_connector_state = H8ErpConnectorAppState::with_postgres(shared_pool.clone());
+    let attachment_root = env::var(H_FILE_STORAGE_ROOT_ENV)
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from("var/wms-attachments"));
+    spawn_drug_inspection_copy_worker(shared_pool.clone(), attachment_root.clone());
+    if let (Ok(portal_url), Ok(projection_key)) = (
+        env::var("WMS_MDI_PORTAL_URL"),
+        env::var("WMS_MDI_PORTAL_PROJECTION_KEY"),
+    ) {
+        spawn_drug_inspection_portal_bridge(shared_pool.clone(), portal_url, projection_key);
+    }
     Router::new()
         .route("/healthz", get(healthz))
         .route("/readyz", get(healthz))
@@ -297,6 +315,18 @@ fn app(
         )))
         .merge(drug_inspection_router(
             DrugInspectionAppState::with_postgres(shared_pool.clone()),
+        ))
+        .merge(drug_inspection_document_router(
+            DrugInspectionDocumentAppState::with_postgres(shared_pool.clone()),
+        ))
+        .merge(drug_inspection_stamp_router(
+            DrugInspectionStampAppState::with_local_storage(
+                shared_pool.clone(),
+                attachment_root.clone(),
+            ),
+        ))
+        .merge(file_attachment_router(
+            FileAttachmentAppState::with_local_storage(shared_pool.clone(), attachment_root),
         ))
         .merge(dock_router(DockAppState::with_postgres(
             shared_pool.clone(),
