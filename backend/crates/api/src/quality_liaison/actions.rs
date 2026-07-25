@@ -5,11 +5,14 @@ use wms_domain::{StockLossReason, SubmitAlertDefinitionChangeRequest};
 
 use crate::{
     alert_definition_repository::{apply_approved_change_in_tx, AlertDefinitionRepositoryError},
+    audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
     auth::AuthContext,
+    inventory::STATUS_QUARANTINED,
     stock_adjustment::quality_liaison::{
         create_approved_stock_loss_order_in_tx, ApprovedStockLossRequest,
     },
     stock_adjustment::StockAdjustmentError,
+    wave3_repository::PgWave3Repository,
 };
 
 use super::{QualityLiaisonError, QualityLiaisonOrderRow};
@@ -37,6 +40,9 @@ pub(super) async fn apply_approved_action_in_tx(
         return apply_approved_change_in_tx(tx, ctx, &change, now)
             .await
             .map_err(map_alert_definition_error);
+    }
+    if action == Some("quarantine_inventory_batches") {
+        return quarantine_inventory_batches(tx, ctx, liaison, now).await;
     }
     if action != Some("create_stock_loss") {
         return Ok(());
@@ -86,6 +92,156 @@ pub(super) async fn apply_approved_action_in_tx(
     })
 }
 
+async fn quarantine_inventory_batches(
+    tx: &mut Transaction<'_, Postgres>,
+    ctx: &AuthContext,
+    liaison: &QualityLiaisonOrderRow,
+    now: DateTime<Utc>,
+) -> Result<(), QualityLiaisonError> {
+    let batch_ids = liaison
+        .business_payload
+        .get("inventory_batch_ids")
+        .and_then(serde_json::Value::as_array)
+        .ok_or(QualityLiaisonError::BusinessActionInvalid)?
+        .iter()
+        .map(|value| {
+            value
+                .as_str()
+                .and_then(|id| Uuid::parse_str(id).ok())
+                .ok_or(QualityLiaisonError::BusinessActionInvalid)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    if batch_ids.is_empty() {
+        return Ok(());
+    }
+    type InventoryStatusRow = (Uuid, String, String, String, Uuid, i64);
+    let batches = sqlx::query_as::<_, InventoryStatusRow>(
+        r#"
+        SELECT id, product_code, batch_no, quality_status, location_id, qty_on_hand
+          FROM inventory_batches
+         WHERE owner_id = $1 AND id = ANY($2)
+         ORDER BY id
+         FOR UPDATE
+        "#,
+    )
+    .bind(ctx.owner_id)
+    .bind(&batch_ids)
+    .fetch_all(&mut **tx)
+    .await
+    .map_err(map_business_database_error)?;
+    if batches.len() != batch_ids.len() {
+        return Err(QualityLiaisonError::BusinessActionInvalid);
+    }
+    let target_enabled = crate::system_dictionary::effective_item_enabled_in_tx(
+        tx,
+        ctx.owner_id,
+        "inventory_quality_status",
+        STATUS_QUARANTINED,
+        now,
+    )
+    .await
+    .map_err(map_business_database_error)?;
+    if !target_enabled {
+        return Err(QualityLiaisonError::BusinessActionInvalid);
+    }
+    for (batch_id, product_code, batch_no, from_status, location_id, qty_on_hand) in batches {
+        if from_status == STATUS_QUARANTINED {
+            continue;
+        }
+        let allowed = crate::inventory_status_config::is_transition_allowed_in_tx(
+            tx,
+            ctx.owner_id,
+            &from_status,
+            STATUS_QUARANTINED,
+            "quality_liaison",
+        )
+        .await
+        .map_err(map_business_database_error)?;
+        if !allowed {
+            return Err(QualityLiaisonError::BusinessActionInvalid);
+        }
+        let status_change_id = Uuid::new_v4();
+        sqlx::query(
+            r#"
+            INSERT INTO inventory_status_changes (
+                id, owner_id, batch_id, from_status, to_status,
+                reason, approval_source, approval_id, occurred_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, 'quality_liaison', $7, $8)
+            "#,
+        )
+        .bind(status_change_id)
+        .bind(ctx.owner_id)
+        .bind(batch_id)
+        .bind(&from_status)
+        .bind(STATUS_QUARANTINED)
+        .bind("药检结论不合格，质量联系单审批后隔离")
+        .bind(liaison.id.to_string())
+        .bind(now)
+        .execute(&mut **tx)
+        .await
+        .map_err(map_business_database_error)?;
+        sqlx::query(
+            "UPDATE inventory_batches
+             SET quality_status = $3, updated_at = $4, version = version + 1
+             WHERE owner_id = $1 AND id = $2",
+        )
+        .bind(ctx.owner_id)
+        .bind(batch_id)
+        .bind(STATUS_QUARANTINED)
+        .bind(now)
+        .execute(&mut **tx)
+        .await
+        .map_err(map_business_database_error)?;
+        let warehouse_id: Option<Uuid> = sqlx::query_scalar(
+            "SELECT warehouse_id
+             FROM warehouse_locations
+             WHERE owner_id = $1 AND id = $2",
+        )
+        .bind(ctx.owner_id)
+        .bind(location_id)
+        .fetch_optional(&mut **tx)
+        .await
+        .map_err(map_business_database_error)?;
+        PgWave3Repository::enqueue_status_erp_feedback_in_tx(
+            tx,
+            ctx.owner_id,
+            warehouse_id,
+            batch_id,
+            Some(status_change_id),
+            &from_status,
+            STATUS_QUARANTINED,
+            &product_code,
+            &batch_no,
+            qty_on_hand,
+            "药检结论不合格，质量联系单审批后隔离",
+            now,
+        )
+        .await
+        .map_err(|error| QualityLiaisonError::BusinessAction(format!("{error:?}")))?;
+        let mut audit = AuditWriteRequest::from_auth_context(
+            ctx,
+            "m3.inventory_status.changed_by_quality_liaison",
+            "M3",
+            "inventory_batch",
+            batch_id.to_string(),
+            Some(AuditDiff::compute(
+                serde_json::json!({ "quality_status": from_status }),
+                serde_json::json!({
+                    "quality_status": STATUS_QUARANTINED,
+                    "approval_source": "quality_liaison",
+                    "approval_id": liaison.id,
+                }),
+            )),
+        );
+        audit.occurred_at = now;
+        append_event_in_tx(tx, &audit)
+            .await
+            .map_err(|error| QualityLiaisonError::Audit(format!("{error:?}")))?;
+    }
+    Ok(())
+}
+
 fn map_alert_definition_error(error: AlertDefinitionRepositoryError) -> QualityLiaisonError {
     match error {
         AlertDefinitionRepositoryError::Database(_) | AlertDefinitionRepositoryError::Audit(_) => {
@@ -93,6 +249,10 @@ fn map_alert_definition_error(error: AlertDefinitionRepositoryError) -> QualityL
         }
         _ => QualityLiaisonError::BusinessActionInvalid,
     }
+}
+
+fn map_business_database_error(error: sqlx::Error) -> QualityLiaisonError {
+    QualityLiaisonError::BusinessAction(error.to_string())
 }
 
 fn payload_uuid(payload: &serde_json::Value, key: &str) -> Result<Uuid, QualityLiaisonError> {

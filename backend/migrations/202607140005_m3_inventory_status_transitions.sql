@@ -46,7 +46,7 @@ INSERT INTO inventory_status_transitions (
 VALUES
     (
         '10000000-0000-0000-0000-000000000061', NULL, 'qualified', 'quarantined',
-        ARRAY['质量联系单', '对账差异', '养护异常', '温度超标事件', 'M-QL', 'M-RC', 'M3-MAINT', 'M5-TEMP_EXCURSION', 'M-TC'], TRUE
+        ARRAY['质量联系单', 'quality_liaison', '对账差异', '养护异常', '温度超标事件', 'M-QL', 'M-RC', 'M3-MAINT', 'M5-TEMP_EXCURSION', 'M-TC'], TRUE
     ),
     (
         '10000000-0000-0000-0000-000000000062', NULL, 'qualified', 'unqualified',

@@ -90,6 +90,8 @@ pub enum Wave3RepositoryError {
     InvalidDocumentType,
     InvalidBatchPolicy,
     InvalidQualityStatus,
+    DrugInspectionMissingBlocked,
+    DrugInspectionUnqualifiedBlocked,
     InvalidDeviceType,
     ActiveMonitoring,
     DuplicateTraceCode,
@@ -318,5 +320,6 @@ include!("wave3_repository_quality.rs");
 include!("wave3_repository_part2.rs");
 include!("wave3_repository_part2b.rs");
 include!("wave3_repository_part3.rs");
+include!("wave3_repository_drug_inspection.rs");
 
 include!("wave3_repository_helpers.rs");
