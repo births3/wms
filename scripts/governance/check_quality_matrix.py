@@ -112,13 +112,16 @@ STORY_TYPE_LAYERS = {
     "config_rule": {"L1", "L2", "L3", "L4", "L8", "L9"},
     "audit_compliance": {"L5", "L8", "L10", "L11"},
     "integration": {"L2", "L3", "L4", "L9", "L10"},
+    "permission": {"L8"},
+    "offline_sync": {f"L{index}" for index in range(1, 12)},
+    "monitoring": {"L1", "L2", "L3", "L7", "L10"},
     "runtime_guard": {"L1", "L2", "L4", "L5", "L7", "L8", "L9", "L10", "L11"},
     "pda_runtime": {f"L{index}" for index in range(1, 12)},
     "hardware_runtime": {f"L{index}" for index in range(1, 12)},
     "external_runtime": {f"L{index}" for index in range(1, 12)},
     "release_runtime": {f"L{index}" for index in range(1, 12)},
 }
-S4_TYPES = {"pda_runtime", "hardware_runtime", "external_runtime", "release_runtime"}
+S4_TYPES = {"pda_runtime", "hardware_runtime", "external_runtime", "release_runtime", "offline_sync"}
 S3_TYPES = {"inventory_change", "concurrent_resource", "critical_path", "audit_compliance"}
 
 
@@ -187,6 +190,20 @@ def check_module_completion(matrix: dict[str, Any], module: str) -> list[Issue]:
         )
         for story in matrix.get("deferred_stories", [])
         if isinstance(story, dict) and story.get("module") == module
+    ]
+
+
+def check_deferred_story(story: dict[str, Any]) -> list[Issue]:
+    """已声明类型的延期故事只能使用可推导验收要求的已知类型。"""
+    story_id = str(story.get("id", "<missing>"))
+    types = story.get("types")
+    if types is None:
+        return []
+    if not isinstance(types, list) or not types or not all(isinstance(item, str) for item in types):
+        return [Issue(story_id, "types", "types 必须是非空字符串数组")]
+    return [
+        Issue(story_id, "types", f"未知故事类型: {story_type}")
+        for story_type in sorted(set(types) - set(STORY_TYPE_LAYERS))
     ]
 
 
@@ -335,6 +352,15 @@ def scan(*, complete_module: str | None = None) -> list[Issue]:
             issues.append(Issue(story_id, "requirement", "故事 ID 重复"))
         seen.add(story_id)
         issues.extend(check_story(raw_story, story_files=known_story_files, openapi_paths=known_openapi_paths))
+    deferred = matrix.get("deferred_stories", [])
+    if not isinstance(deferred, list):
+        issues.append(Issue("<matrix>", "deferred_stories", "deferred_stories 必须是数组"))
+    else:
+        for raw_story in deferred:
+            if not isinstance(raw_story, dict):
+                issues.append(Issue("<matrix>", "deferred_stories", "deferred_stories 每项必须是对象"))
+                continue
+            issues.extend(check_deferred_story(raw_story))
     issues.extend(check_evidence_profiles(matrix, [story for story in stories if isinstance(story, dict)]))
     if complete_module:
         issues.extend(check_module_completion(matrix, complete_module))
@@ -365,7 +391,7 @@ def build_markdown(matrix: dict[str, Any]) -> str:
         "- 强门禁范围：M1、M2、M3、M4 和已进入执行的 H 层横向能力。",
         "- 状态只允许 `verified` 或 `not_applicable`；不适用必须在事实源写原因。",
         "- S2 测试层由故事类型自动推导。",
-        "- 验收深度由故事类型自动推导：S1 查询/展示，S2 普通写操作，S3 库存/并发/关键路径/GSP，S4 PDA/硬件/外部系统/发布。",
+        "- 验收深度由故事类型自动推导：S1 查询/展示，S2 普通写操作，S3 库存/并发/关键路径/GSP，S4 PDA/离线/硬件/外部系统/发布。",
         "",
         "## 状态摘要",
         "",
@@ -408,16 +434,21 @@ def build_markdown(matrix: dict[str, Any]) -> str:
                 "",
                 "## 未完成 / 延期故事",
                 "",
-                "| 故事 | 模块 | 当前原因 |",
-                "|---|---|---|",
+                "| 故事 | 模块 | 验收层级 | 测试层 | 当前原因 |",
+                "|---|---|---|---|---|",
             ]
         )
         for story in deferred:
+            types = story.get("types")
+            has_types = isinstance(types, list) and bool(types)
+            layers = derive_required_layers(types) if has_types else []
             lines.append(
-                "| {id} {title} | {module} | {reason} |".format(
+                "| {id} {title} | {module} | {level} | {layers} | {reason} |".format(
                     id=story.get("id", "-"),
                     title=story.get("title", "-"),
                     module=story.get("module", "-"),
+                    level=derive_acceptance_level(types) if has_types else "-",
+                    layers="、".join(layers) or "-",
                     reason=story.get("reason", "-"),
                 )
             )

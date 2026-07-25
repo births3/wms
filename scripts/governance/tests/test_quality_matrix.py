@@ -39,6 +39,15 @@ def test_quality_matrix_runtime_guard_requires_resilience_layers():
     ]
 
 
+def test_quality_matrix_derives_existing_deferred_special_types():
+    """既有延期故事的权限、离线和监控类型也必须得到确定测试层。"""
+    from check_quality_matrix import derive_acceptance_level, derive_required_layers
+
+    assert derive_required_layers(["permission"]) == ["L8"]
+    assert derive_required_layers(["monitoring"]) == ["L1", "L2", "L3", "L7", "L10"]
+    assert derive_acceptance_level(["offline_sync"]) == "S4"
+
+
 def test_quality_matrix_derives_acceptance_level_from_story_types():
     """验收深度必须由故事风险推导，不能由执行人手工降级。"""
     from check_quality_matrix import derive_acceptance_level
@@ -200,14 +209,42 @@ def test_quality_matrix_markdown_lists_deferred_stories():
                     "id": "US-H9-003",
                     "title": "模板设计与版本管理",
                     "module": "H9",
+                    "types": ["write", "frontend_interaction"],
                     "reason": "后续切片实现模板设计器。",
+                },
+                {
+                    "id": "US-H4-003",
+                    "title": "企业微信审批流对接",
+                    "module": "H4",
+                    "reason": "尚未分类。",
                 }
             ],
         }
     )
 
     assert "## 未完成 / 延期故事" in markdown
-    assert "| US-H9-003 模板设计与版本管理 | H9 | 后续切片实现模板设计器。 |" in markdown
+    assert (
+        "| US-H9-003 模板设计与版本管理 | H9 | S2 | "
+        "L1、L2、L3、L4、L5、L7、L8、L11 | 后续切片实现模板设计器。 |"
+    ) in markdown
+    assert "| US-H4-003 企业微信审批流对接 | H4 | - | - | 尚未分类。 |" in markdown
+
+
+def test_quality_matrix_rejects_unknown_deferred_story_types():
+    """延期故事一旦声明类型，就只能使用可推导验收要求的已知类型。"""
+    from check_quality_matrix import Issue, check_deferred_story
+
+    unknown = check_deferred_story(
+        {
+            "id": "US-H9-012",
+            "title": "Print Agent 注册",
+            "module": "H9",
+            "story_file": "docs/domain/user-stories-h9-print-orchestration.md",
+            "types": ["machine_magic"],
+        }
+    )
+
+    assert unknown == [Issue("US-H9-012", "types", "未知故事类型: machine_magic")]
 
 
 def test_quality_matrix_rejects_module_mismatch_and_missing_openapi_method():

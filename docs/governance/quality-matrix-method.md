@@ -28,7 +28,10 @@
 | S3 | 库存、状态、批号、冷链、GSP、并发资源和关键路径 | S2 + 并发、事务一致性、异常路径和性能证据 |
 | S4 | PDA、硬件、外部系统和发布 | S3 + 真实环境、真实设备或外部回执及人工验收证据 |
 
-验收层级由故事类型自动取最高级：`write` / `integration` 至少 S2，`inventory_change` / `concurrent_resource` / `critical_path` / `audit_compliance` 至少 S3，`pda_runtime` / `hardware_runtime` / `external_runtime` / `release_runtime` 为 S4。执行人不得手工降低层级。
+验收层级由故事类型自动取最高级：`write` / `integration` 至少 S2，`inventory_change` /
+`concurrent_resource` / `critical_path` / `audit_compliance` 至少 S3，`pda_runtime` /
+`offline_sync` / `hardware_runtime` / `external_runtime` / `release_runtime` 为 S4。
+`permission` 补 L8，`monitoring` 补 L10；执行人不得手工降低层级。
 
 ## 完成标准
 
