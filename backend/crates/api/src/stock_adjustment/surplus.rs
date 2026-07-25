@@ -29,12 +29,27 @@ impl PgStockAdjustmentRepository {
         now: DateTime<Utc>,
         idempotency_key: &str,
     ) -> Result<IdempotentStockSurplusMutation, StockAdjustmentError> {
+        let mut tx = self.pool.begin().await.map_err(map_database_error)?;
+        let outcome = self
+            .create_surplus_order_in_tx(&mut tx, ctx, request, now, idempotency_key)
+            .await?;
+        tx.commit().await.map_err(map_database_error)?;
+        Ok(outcome)
+    }
+
+    pub(crate) async fn create_surplus_order_in_tx(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        ctx: &AuthContext,
+        request: CreateStockSurplusOrderRequest,
+        now: DateTime<Utc>,
+        idempotency_key: &str,
+    ) -> Result<IdempotentStockSurplusMutation, StockAdjustmentError> {
         validate_surplus_create_request(&request)?;
         let hash = request_hash(&serde_json::json!({"action":"create_surplus","request":request}))?;
-        let mut tx = self.pool.begin().await.map_err(map_database_error)?;
-        lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
+        lock_idempotency_key(tx, ctx.owner_id, idempotency_key).await?;
         if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &hash, now).await?
+            replay_idempotency(tx, ctx.owner_id, idempotency_key, &hash, now).await?
         {
             return Ok(IdempotentStockSurplusMutation {
                 value,
@@ -47,7 +62,7 @@ impl PgStockAdjustmentRepository {
                 .as_deref()
                 .ok_or(StockAdjustmentError::InvalidRequest)?;
             lock_idempotency_key(
-                &mut tx,
+                tx,
                 ctx.owner_id,
                 &format!("erp-reference:{external_ref_value}"),
             )
@@ -58,7 +73,7 @@ impl PgStockAdjustmentRepository {
             ))
             .bind(ctx.owner_id)
             .bind(external_ref_value)
-            .fetch_optional(&mut *tx)
+            .fetch_optional(&mut **tx)
             .await
             .map_err(map_database_error)?;
             if let Some(row) = existing {
@@ -70,7 +85,7 @@ impl PgStockAdjustmentRepository {
                     return Err(StockAdjustmentError::IdempotencyConflict);
                 }
                 store_idempotency_success(
-                    &mut tx,
+                    tx,
                     ctx.owner_id,
                     idempotency_key,
                     &hash,
@@ -81,7 +96,6 @@ impl PgStockAdjustmentRepository {
                     now,
                 )
                 .await?;
-                tx.commit().await.map_err(map_database_error)?;
                 return Ok(IdempotentStockSurplusMutation {
                     value: order,
                     replayed: true,
@@ -111,14 +125,14 @@ impl PgStockAdjustmentRepository {
         .bind(ctx.owner_id)
         .bind(request.warehouse_id)
         .bind(request.batch_id)
-        .fetch_optional(&mut *tx)
+        .fetch_optional(&mut **tx)
         .await
         .map_err(map_database_error)?;
         let (product_code, batch_no) = batch.ok_or(StockAdjustmentError::NotFound)?;
         let order_id = Uuid::new_v4();
         let order_no = PgDocumentNumberingService::new()
             .generate_in_tx(
-                &mut tx,
+                tx,
                 ctx,
                 GenerateDocumentNumberRequest {
                     document_type: STOCK_SURPLUS_DOCUMENT_TYPE.to_string(),
@@ -164,12 +178,12 @@ impl PgStockAdjustmentRepository {
         .bind(request.requires_quality_approval)
         .bind(ctx.user_id)
         .bind(now)
-        .fetch_one(&mut *tx)
+        .fetch_one(&mut **tx)
         .await
         .map_err(map_database_error)?;
         let order = row_to_surplus_domain(row)?;
         append_order_audit(
-            &mut tx,
+            tx,
             ctx,
             "create_stock_surplus_order",
             order.id,
@@ -179,7 +193,7 @@ impl PgStockAdjustmentRepository {
         )
         .await?;
         store_idempotency_success(
-            &mut tx,
+            tx,
             ctx.owner_id,
             idempotency_key,
             &hash,
@@ -190,7 +204,6 @@ impl PgStockAdjustmentRepository {
             now,
         )
         .await?;
-        tx.commit().await.map_err(map_database_error)?;
         Ok(IdempotentStockSurplusMutation {
             value: order,
             replayed: false,
@@ -309,6 +322,15 @@ impl PgStockAdjustmentRepository {
         .await
         .map_err(map_database_error)?;
         let order = row_to_surplus_domain(row)?;
+        crate::reconciliation::advance_from_stock_adjustment_in_tx(
+            &mut tx,
+            ctx,
+            order.id,
+            order.status.as_str(),
+            now,
+        )
+        .await
+        .map_err(|error| StockAdjustmentError::Database(format!("M-RC 状态推进失败: {error:?}")))?;
         append_order_audit(
             &mut tx,
             ctx,
@@ -455,6 +477,15 @@ impl PgStockAdjustmentRepository {
         .await
         .map_err(map_database_error)?;
         let order = row_to_surplus_domain(row)?;
+        crate::reconciliation::advance_from_stock_adjustment_in_tx(
+            &mut tx,
+            ctx,
+            order.id,
+            order.status.as_str(),
+            now,
+        )
+        .await
+        .map_err(|error| StockAdjustmentError::Database(format!("M-RC 状态推进失败: {error:?}")))?;
         sqlx::query(
             r#"
             INSERT INTO stock_adjustment_erp_feedback_outbox (
