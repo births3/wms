@@ -49,6 +49,12 @@ database_objects = ["h8_erp_connectors", "audit_event", "dbo.if_in_asn", "dbo.if
 test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api h8_erp_interface_tables --lib", "pnpm --dir apps/web-admin run test:e2e:h8-interface-real", "scripts/h8_erp_interface_sync/check_probe_readonly.sh"]
 evidence_refs = ["prototypes/e2e/web-admin-h8-interface-tables-real.spec.ts", "docs/retros/h8-interface-table-software-path-evidence.json"]
 
+[evidence_profiles.RC]
+backend_files = ["backend/crates/api/src/reconciliation.rs", "backend/crates/api/src/reconciliation/progression.rs", "backend/crates/api/src/reconciliation_query.rs", "backend/crates/api/src/reconciliation_handlers.rs", "backend/crates/api/src/h8_erp_messages/pg_lifecycle.rs"]
+database_objects = ["reconciliation_rules", "reconciliation_runs", "reconciliation_items", "reconciliation_item_locks", "reconciliation_item_adjustments", "reconciliation_erp_feedback_outbox", "h8_erp_messages", "inventory_batches", "inventory_status_changes", "stock_adjustment_orders", "document_number_counters", "document_number_allocations", "h4_notification_records", "audit_event", "idempotency_request"]
+test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test reconciliation_postgres", "cargo test --manifest-path backend/Cargo.toml -p wms-api --test reconciliation_atomicity_postgres", "cargo test --manifest-path backend/Cargo.toml -p wms-api repeated_adjustment_completion_does_not_duplicate_progress_audit --lib", "cargo test --manifest-path backend/Cargo.toml -p wms-api reconciliation_waits_for_h8_ack_and_keeps_exception_isolated_on_dead --lib", "PYTHONPATH=scripts/h8_erp_interface_sync python3 -m unittest scripts/h8_erp_interface_sync/test_reconciliation_pull.py", "just web-admin-mrc-real-e2e"]
+evidence_refs = ["backend/crates/api/tests/reconciliation_postgres.rs", "backend/crates/api/tests/reconciliation_atomicity_postgres.rs", "backend/crates/api/src/reconciliation/progression.rs", "backend/crates/api/src/h8_erp_messages/outbound_lifecycle_reconciliation_tests.rs", "scripts/h8_erp_interface_sync/test_reconciliation_pull.py", "prototypes/e2e/web-admin-mrc-real.spec.ts", "artifacts/screenshot-portal/real-web/mrc-reconciliation/difference-list.png", "artifacts/screenshot-portal/real-web/mrc-reconciliation/actions-completed.png", "artifacts/screenshot-portal/real-web/mrc-reconciliation/adjustment-pending.png", "artifacts/screenshot-portal/real-web/mrc-reconciliation/exception-state.png"]
+
 [evidence_profiles.H9]
 backend_files = ["backend/crates/api/src/print_template_handlers.rs"]
 database_objects = ["print_templates", "print_template_versions", "print_records"]
@@ -62,8 +68,8 @@ test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test 
 evidence_refs = ["backend/crates/api/tests/wave3_postgres.rs", "prototypes/e2e/web-admin-m2-real.spec.ts"]
 
 [evidence_profiles.M3]
-backend_files = ["backend/crates/api/src/inventory.rs", "backend/crates/api/src/wave3_repository.rs"]
-database_objects = ["inventory_batches", "inventory_movements", "inventory_status_changes"]
+backend_files = ["backend/crates/api/src/inventory.rs", "backend/crates/api/src/wave3_repository.rs", "backend/crates/api/src/wave3_repository/inventory_count/approval.rs"]
+database_objects = ["inventory_counts", "inventory_count_lines", "inventory_batches", "inventory_movements", "inventory_status_changes", "inventory_snapshot_erp_feedback_outbox", "audit_event", "idempotency_request"]
 test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave3_postgres", "pnpm --dir apps/web-admin run test:e2e:m2-real"]
 evidence_refs = ["backend/crates/api/tests/wave3_postgres.rs", "prototypes/e2e/web-admin-m2-real.spec.ts"]
 
@@ -746,6 +752,7 @@ test_checks = [
 evidence_refs = [
   "backend/migrations/202607140008_m3_inventory_counts.sql",
   "backend/crates/api/src/wave3_repository/inventory_count.rs",
+  "backend/crates/api/src/wave3_repository/inventory_count/approval.rs",
   "backend/crates/api/src/wave3_handlers/inventory_count.rs",
   "backend/crates/api/tests/m3_inventory_count_postgres.rs",
   "apps/web-admin/src/pages/inventory/M3InventoryCountPage.tsx",
@@ -2806,33 +2813,63 @@ module = "M1"
 story_file = "docs/domain/user-stories-m1-master-data-product.md"
 types = ["write", "api_change", "frontend_interaction", "integration"]
 frontend_pages = ["m1-products"]
-api_paths = ["POST /api/v1/master-data/products/batch-sync"]
-database_objects = ["products", "audit_event", "idempotency_request"]
+api_paths = [
+  "GET /api/v1/master-data/products",
+  "POST /api/v1/master-data/products",
+  "PATCH /api/v1/master-data/products/{id}",
+  "DELETE /api/v1/master-data/products/{id}",
+  "POST /api/v1/master-data/products/batch-sync",
+  "POST /api/v1/integration/erp-messages/inbound/product_master",
+  "POST /api/v1/integration/erp-messages/inbound/product_change",
+]
+database_objects = ["products", "product_packaging_levels", "product_mapping_traces", "parameter_mapping_rules", "audit_event", "idempotency_request"]
 e2e_checks = ["just web-admin-m1-real-e2e"]
 e2e_screenshots = [
-  { page = "m1-products", spec = "prototypes/e2e/web-admin-m1-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m1-products/product-batch-import-current.png" },
+  { page = "m1-products", spec = "prototypes/e2e/web-admin-m1-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m1-products/product-read-only-contract-current.png" },
 ]
 test_checks = [
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m1_product_contract_postgres -- --test-threads=1",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test h8_inbound_product_master_postgres -- --test-threads=1",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test h8_inbound_product_change_postgres -- --test-threads=1",
   "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m1_product_batch_sync_postgres -- --test-threads=1",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test h8_inbound_asn_postgres asn_rest_rejects_pending_mapping_product_without_business_writes -- --exact --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --lib openapi_tests::tests::m1_product_specification_is_required_and_non_nullable -- --exact",
+  "PYTHONPATH=scripts/h8_erp_interface_sync python3 -m unittest test_inbound_canonical.TestInboundCanonical.test_product_master_requires_non_blank_spec_before_business_api",
+  "node apps/web-admin/self-checks/m1-product-edit-self-check.mjs",
   "node apps/web-admin/self-checks/m1-product-batch-import-self-check.mjs",
 ]
 evidence_refs = [
+  "backend/migrations/202607230002_mpm_persistent_mapping.sql",
+  "backend/migrations/202607230003_m1_complete_product_contract.sql",
+  "backend/crates/domain/src/master_dictionary.rs",
+  "backend/crates/api/src/master_data_handlers.rs",
   "backend/crates/api/src/master_data_handlers_part2.rs",
+  "backend/crates/api/src/master_data_handlers/batch_sync.rs",
   "backend/crates/api/src/master_data_postgres_part1.rs",
+  "backend/crates/api/src/master_data_postgres_part2.rs",
+  "backend/crates/api/src/master_data_postgres_part3.rs",
+  "backend/crates/api/src/h8_inbound/product_master.rs",
+  "backend/crates/api/src/h8_inbound/product_change.rs",
+  "backend/crates/api/tests/m1_product_contract_postgres.rs",
+  "backend/crates/api/tests/h8_inbound_product_master_postgres.rs",
+  "backend/crates/api/tests/h8_inbound_product_change_postgres.rs",
   "backend/crates/api/tests/m1_product_batch_sync_postgres.rs",
+  "backend/crates/api/tests/h8_inbound_asn_postgres.rs",
   "apps/web-admin/src/features/master-data/master-data-queries/api.ts",
   "apps/web-admin/src/pages/master-data/M1MasterDataPage.tsx",
-  "apps/web-admin/src/pages/master-data/ProductBatchImportDialog.tsx",
+  "apps/web-admin/src/pages/master-data/ProductEditTable.tsx",
+  "apps/web-admin/src/pages/master-data/m1-product-page-model.ts",
+  "apps/web-admin/self-checks/m1-product-edit-self-check.mjs",
   "apps/web-admin/self-checks/m1-product-batch-import-self-check.mjs",
   "prototypes/e2e/web-admin-m1-real.spec.ts",
-  "artifacts/screenshot-portal/real-web/m1-products/product-batch-import-current.png",
+  "artifacts/screenshot-portal/real-web/m1-products/product-read-only-contract-current.png",
   "backend/crates/api/src/openapi_paths/core.rs",
   "shared/openapi/openapi.json",
   "packages/api-client/src/schema.ts",
 ]
-reason = "已完成商品批量 API 同步后端切片及管理端批量导入解析预览：整批 PostgreSQL 事务、重复幂等回放、货主隔离、受控储存条件/特殊药品字典校验、API Key 中间件鉴权、请求审计和原子回滚均有真实 PostgreSQL 回归证据；管理端批量导入已直接调用原子批量接口，并由一次性 PostgreSQL 浏览器 E2E 验证两条请求、解析预览、页面回显和本地门户截图；截图按门禁不入库，长期证据仍须由 PR 附件或 CI artifact 归档；故事仍不能整体关闭，原生 xlsx 文件解析、M-PM 未匹配项展示、ERP 回写、PDA 和完整字段映射证据尚未闭环。"
+reason = "已完成结构化商品纵向切片：spec 在 M1/H8 Rust、Python canonical、MSSQL、OpenAPI/api-client、管理端 query 与 dev mock 全链为必填非空字符串，缺规格 REST 以 422 且 H8/M1 零写入；货主内 UDI、物理属性、多级包装、显式 null、事务审计和 L11 幂等均有真实 PostgreSQL 证据。H8 REST 与接口表 Worker 统一复用共享防腐层；M1 商品 POST/PATCH/DELETE/batch-sync 对 JWT 与 API Key 主体统一返回 403，GET 保持可用；必需映射未命中落 pending_mapping，并由真实 H8 ASN 入口证明不创建收货单。管理端与开发 Mock 均为 ERP 权威投影只读页，浏览器 E2E 验证无新增/编辑/导入动作并展示完整商品契约。故事仍保持延期：ERP 变更请求及批量预览尚未实现逐字段 M-PM 命中/未命中结果，特殊药品分类变更的仓库主管+质量负责人审批、PDA 离线扫码查询和自研 ERP dev/staging S4 尚未闭环。"
 owner = "M1 模块负责人"
-resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+resume_when = "补齐批量预览 M-PM 结果、特殊药品分类变更双人审批、PDA 离线扫码查询及自研 ERP dev/staging S4 后关闭延期。"
 
 [[deferred_stories]]
 id = "US-M1-002"
@@ -3284,9 +3321,9 @@ resume_when = "该故事进入已批准实施波次，并具备前端、API、�
 id = "US-M4-006"
 title = "发货与交接"
 module = "M4"
-reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+reason = "发货确认已具备整单库存实扣、发货记录、订单状态、审计、幂等及同事务 H8 发货确认 outbox；仍缺双人策略、司机/快递交接签名照片、冷链交接字段、PDA 与外部运行证据，故事不得整体关闭。"
 owner = "M4 模块负责人"
-resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+resume_when = "补齐双人策略、交接签名照片、冷链字段、PDA/外部运行和对应 L2-L11 证据后关闭。"
 
 [[deferred_stories]]
 id = "US-M4-007"
@@ -3770,9 +3807,9 @@ resume_when = "该故事进入已批准实施波次，并具备前端、API、�
 id = "US-MPM-004"
 title = "映射执行 API"
 module = "MPM"
-reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+reason = "已落地 PostgreSQL 持久单值映射 API、全局/货主规则优先级、四类匹配查询、未命中去重队列、L11 幂等、权限与同事务 H2 审计，并由真实 PostgreSQL 验证服务重建后规则仍生效；当前仅接通 H8 商品储存条件，仍缺批量接口、缓存失效、规则维护入口、完整字段追溯及其余调用方证据，故事保持延期。"
 owner = "MPM 模块负责人"
-resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+resume_when = "补齐批量映射、受控缓存与规则变更失效、规则维护和完整追溯，并完成各调用方 L3-L5/L8/L11 证据后复核。"
 
 [[deferred_stories]]
 id = "US-MPM-005"
@@ -3840,14 +3877,19 @@ module = "QL"
 story_file = "docs/domain/user-stories-mql-quality-liaison.md"
 types = ["write", "api_change", "integration", "audit_compliance"]
 api_paths = ["POST /api/v1/quality-liaisons/{id}/approval-callback"]
-database_objects = ["quality_liaison_orders", "h4_approval_records", "idempotency_request", "audit_event"]
-test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test quality_liaison_postgres type_config_create_and_approval_callback_are_atomic_and_idempotent -- --test-threads=1"]
+database_objects = ["quality_liaison_orders", "h4_approval_records", "archive_revision_erp_feedback_outbox", "idempotency_request", "audit_event"]
+test_checks = [
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test quality_liaison_postgres type_config_create_and_approval_callback_are_atomic_and_idempotent -- --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test quality_liaison_postgres archive_revision::approved_archive_revision_publishes_and_completed_callback_unlocks_asn -- --exact --test-threads=1",
+]
 evidence_refs = [
   "backend/crates/api/src/quality_liaison.rs",
+  "backend/crates/api/src/quality_liaison/actions.rs",
   "backend/crates/api/src/quality_liaison_handlers.rs",
   "backend/crates/api/tests/quality_liaison_postgres.rs",
+  "backend/crates/api/tests/quality_liaison_postgres/archive_revision.rs",
 ]
-reason = "已实现指定审批人、同意/拒绝、必填意见、H4 与 M-QL 状态原子回写、审计和幂等；仍缺企业微信外部回调签名验真、真实通知送达、审批超时提醒、档案补录 ERP 子状态及外部联调证据。"
+reason = "已实现指定审批人、同意/拒绝、必填意见、H4 与 M-QL 状态原子回写、审计和幂等；档案补录批准后进入待 ERP 同步并原子生成 H8 outbox。仍缺企业微信外部回调签名验真、真实通知送达、审批超时提醒、ERP 落地回调及外部联调证据。"
 owner = "QL 模块负责人"
 resume_when = "补齐企业微信签名回调与真实送达、超时提醒、档案补录 ERP 子状态和外部联调证据。"
 
@@ -3858,9 +3900,10 @@ module = "QL"
 story_file = "docs/domain/user-stories-mql-quality-liaison.md"
 types = ["write", "api_change", "integration", "runtime_guard", "audit_compliance"]
 api_paths = ["POST /api/v1/quality-liaisons/{id}/approval-callback", "POST /api/v1/stock-adjustments/loss-orders/{id}/execute"]
-database_objects = ["quality_liaison_orders", "h4_approval_records", "stock_adjustment_orders", "stock_adjustment_execution_records", "audit_event", "idempotency_request"]
+database_objects = ["quality_liaison_orders", "h4_approval_records", "stock_adjustment_orders", "stock_adjustment_execution_records", "archive_revision_erp_feedback_outbox", "audit_event", "idempotency_request"]
 test_checks = [
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test quality_liaison_postgres approved_destruction_disposition_creates_msa_order_with_quality_source -- --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test quality_liaison_postgres archive_revision::approved_archive_revision_publishes_single_warehouse_scoped_outbox -- --exact --test-threads=1",
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test stock_adjustment_postgres destruction_requires_quality_approval_second_operator_and_h4_approval -- --test-threads=1",
 ]
 evidence_refs = [
@@ -3868,9 +3911,10 @@ evidence_refs = [
   "backend/crates/api/src/stock_adjustment/quality_liaison.rs",
   "backend/crates/api/src/stock_adjustment.rs",
   "backend/crates/api/tests/quality_liaison_postgres.rs",
+  "backend/crates/api/tests/quality_liaison_postgres/archive_revision.rs",
   "backend/crates/api/tests/stock_adjustment_postgres.rs",
 ]
-reason = "已实现审批通过后同事务创建 M-SA 销毁报损单，并由 M-SA 执行链调用 M-VR 销毁节点双人/H4 策略；联动失败会回滚 H4 与 M-QL 状态。仍缺校验放行、验收不合格其他处置、养护异常、库存状态调整、档案补录 ERP 闭环和召回完整状态联动。"
+reason = "已实现审批通过后同事务创建 M-SA 销毁报损单，并由 M-SA 执行链调用 M-VR 销毁节点双人/H4 策略；档案补录审批已在同一事务内校验真实 ASN、收货记录、货主、仓库、商品和照片，进入待 ERP 同步并生成 H8 outbox；错误来源或缺少照片会回滚 H4 与 M-QL 状态，同键重放不重复 outbox。仍缺校验放行、验收不合格其他处置、养护异常、库存状态调整、档案补录 ERP 回写后的 M1/M-QL/M2 解锁和召回完整状态联动。"
 owner = "QL 模块负责人"
 resume_when = "补齐其余处置动作、ERP 异步重试/回执、召回状态联动及对应端到端证据。"
 
@@ -3882,21 +3926,115 @@ reason = "当前实现和证据不足以证明该故事全部验收标准，禁�
 owner = "QL 模块负责人"
 resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
 
-[[deferred_stories]]
+[[stories]]
 id = "US-RC-001"
 title = "定时对账任务"
 module = "RC"
-reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
-owner = "RC 模块负责人"
-resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+story_file = "docs/domain/user-stories-mrc-reconciliation.md"
+types = ["write", "config_rule", "api_change", "frontend_interaction", "integration", "runtime_guard", "audit_compliance"]
+frontend_pages = ["mrc-reconciliation"]
+e2e_checks = ["just web-admin-mrc-real-e2e"]
+e2e_screenshots = [
+  { page = "mrc-reconciliation", spec = "prototypes/e2e/web-admin-mrc-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/mrc-reconciliation/difference-list.png" },
+]
+api_paths = [
+  "GET /api/v1/reconciliation/rule",
+  "PUT /api/v1/reconciliation/rule",
+  "POST /api/v1/reconciliation/claims",
+  "POST /api/v1/reconciliation/claims/{id}/renew",
+  "POST /api/v1/reconciliation/claims/{id}/failed",
+  "POST /api/v1/reconciliation/runs",
+  "GET /api/v1/reconciliation/items",
+]
+database_objects = ["reconciliation_rules", "reconciliation_schedule_claims", "reconciliation_runs", "reconciliation_items", "h4_notification_records", "audit_event", "idempotency_request"]
+test_checks = [
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test reconciliation_postgres",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test reconciliation_scheduler_postgres",
+  "PYTHONPATH=scripts/h8_erp_interface_sync python3 -m unittest scripts/h8_erp_interface_sync/test_reconciliation_pull.py",
+  "pnpm --filter @wms/web-admin build",
+  "just web-admin-mrc-real-e2e",
+]
+evidence_refs = [
+  "backend/crates/api/tests/reconciliation_postgres.rs",
+  "backend/crates/api/tests/reconciliation_scheduler_postgres.rs",
+  "scripts/h8_erp_interface_sync/test_reconciliation_pull.py",
+  "prototypes/e2e/web-admin-mrc-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/mrc-reconciliation/difference-list.png",
+]
 
-[[deferred_stories]]
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+
+[[stories]]
 id = "US-RC-002"
 title = "差异处理"
 module = "RC"
-reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
-owner = "RC 模块负责人"
-resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+story_file = "docs/domain/user-stories-mrc-reconciliation.md"
+types = ["write", "inventory_change", "api_change", "frontend_interaction", "integration", "audit_compliance"]
+frontend_pages = ["mrc-reconciliation"]
+e2e_checks = ["just web-admin-mrc-real-e2e"]
+e2e_screenshots = [
+  { page = "mrc-reconciliation", spec = "prototypes/e2e/web-admin-mrc-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/mrc-reconciliation/actions-completed.png" },
+  { page = "mrc-reconciliation", spec = "prototypes/e2e/web-admin-mrc-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/mrc-reconciliation/adjustment-pending.png" },
+  { page = "mrc-reconciliation", spec = "prototypes/e2e/web-admin-mrc-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/mrc-reconciliation/exception-state.png" },
+]
+api_paths = [
+  "GET /api/v1/reconciliation/items",
+  "POST /api/v1/reconciliation/items/isolation",
+  "POST /api/v1/reconciliation/items/{id}/resolve",
+]
+database_objects = ["reconciliation_items", "reconciliation_item_locks", "reconciliation_item_adjustments", "reconciliation_erp_feedback_outbox", "h8_erp_messages", "inventory_batches", "inventory_status_changes", "stock_adjustment_orders", "document_number_counters", "document_number_allocations", "audit_event", "idempotency_request"]
+test_checks = [
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test reconciliation_postgres",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test reconciliation_atomicity_postgres",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api repeated_adjustment_completion_does_not_duplicate_progress_audit --lib",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api reconciliation_waits_for_h8_ack_and_keeps_exception_isolated_on_dead --lib",
+  "pnpm --filter @wms/web-admin build",
+  "just web-admin-mrc-real-e2e",
+]
+evidence_refs = [
+  "backend/crates/api/tests/reconciliation_postgres.rs",
+  "backend/crates/api/tests/reconciliation_atomicity_postgres.rs",
+  "backend/crates/api/src/reconciliation/progression.rs",
+  "backend/crates/api/src/h8_erp_messages/outbound_lifecycle_reconciliation_tests.rs",
+  "prototypes/e2e/web-admin-mrc-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/mrc-reconciliation/actions-completed.png",
+  "artifacts/screenshot-portal/real-web/mrc-reconciliation/adjustment-pending.png",
+  "artifacts/screenshot-portal/real-web/mrc-reconciliation/exception-state.png",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
 
 [[deferred_stories]]
 id = "US-RC-003"
@@ -4586,7 +4724,7 @@ evidence_refs = [
   "backend/crates/domain/src/h8_erp.rs",
   "backend/crates/api/src/h8_erp_connectors/mod.rs",
 ]
-reason = "US-H8-001 AC1-16 配置/运行时主链已实现：route-resolve、scope、幂等/乐观锁、在途 pause/resume、测试重叠校验、熔断半开证据、E2E 6 条。唯一未完成项是客户指定厂商正式 ERP 回执（ERP_CALLBACK_BASE）。"
+reason = "开发实现层 PASS：US-H8-001 AC1-16 的配置/运行时主链、route-resolve、scope、幂等/乐观锁、在途 pause/resume、测试重叠校验、熔断半开和真实浏览器 E2E 已覆盖。外部证据层 DEFERRED：尚缺客户指定厂商正式 ERP dev/staging 回执（ERP_CALLBACK_BASE）；该缺口不阻塞普通开发迭代，但阻塞故事整体完成与正式发布。"
 owner = "H8 模块负责人"
 resume_when = "使用客户正式 ERP_CALLBACK_BASE 归档请求、回执、重试和审计关联后，复核 AC7 并关闭延期。"
 
@@ -4607,9 +4745,23 @@ test_checks = [
   "cargo test --manifest-path backend/Cargo.toml -p wms-domain --lib h8_erp",
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --lib h8_erp_messages::",
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --lib h8_erp_connectors::tests::route_resolve_enforces_auth_context_warehouse_scope",
-  "PYTHONPATH=scripts/h8_erp_interface_sync python3 -m unittest test_h8_sync_worker test_exchange_lifecycle test_inbound_canonical test_outbound_routing test_inbound_terminal_state",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --lib api_key_service::tests::create_accepts_h8_outbound_and_return_scopes -- --exact",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --lib api_key_auth::tests::maps_scope_to_handler_permissions_without_admin_access -- --exact",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --lib api_key_auth::tests::h8_inbound_binds_warehouse_only_for_warehouse_scoped_messages -- --exact",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --lib openapi_tests::tests::openapi_declares_h3_security_and_idempotency_contract -- --exact",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test parameter_mapping_postgres -- --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test h8_inbound_asn_postgres -- --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test h8_inbound_outbound_order_postgres -- --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test h8_inbound_product_change_postgres -- --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test h8_inbound_product_master_postgres -- --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test h8_inbound_return_order_postgres -- --test-threads=1",
+  "PYTHONPATH=scripts/h8_erp_interface_sync python3 -m unittest test_h8_sync_worker test_exchange_lifecycle test_inbound_canonical test_outbound_routing test_outbound_receipts test_inbound_terminal_state test_failover_l11_evidence",
+  "sudo -n env H8_APPLY_SEED=1 bash deploy/h8-erp-if/wait-and-init.sh && sudo -n bash scripts/h8_erp_interface_sync/check_product_contract.sh",
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_smart_putaway_postgres smart_putaway_recommends_and_commits_owner_scoped_inventory_atomically -- --exact --test-threads=1",
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_ops_closeout_postgres status_change_enqueues_erp_outbox_and_process_succeeds -- --exact --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_inventory_count_postgres -- --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave4_postgres outbound_complete_pick_review_ship_replays_and_deducts_inventory -- --exact --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test quality_liaison_postgres archive_revision::approved_archive_revision_publishes_single_warehouse_scoped_outbox -- --exact --test-threads=1",
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_status_allocation_postgres -- --test-threads=1",
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test master_data_postgres h8_product_change_replays_without_duplicate_update_or_audit -- --exact --test-threads=1",
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_deferred_closeout_postgres_part2 h8_sales_return_create_replays_without_duplicate_order_or_audit -- --exact --test-threads=1",
@@ -4619,16 +4771,45 @@ test_checks = [
   "just openapi-check",
 ]
 evidence_refs = [
+  "deploy/h8-erp-if/init/01_schema.sql",
   "deploy/h8-erp-if/init/02_seed_example.sql",
   "backend/crates/domain/src/h8_erp_message.rs",
   "backend/crates/domain/src/h8_erp_exchange.rs",
   "backend/migrations/202607220001_h8_erp_message_receipts.sql",
   "backend/crates/api/src/h8_erp_connectors/handlers.rs",
   "backend/crates/api/src/h8_erp_connectors/tests.rs",
+  "backend/crates/api/src/warehouse_scope.rs",
+  "backend/crates/api/src/h8_erp_messages/handlers.rs",
+  "backend/crates/api/src/h8_erp_messages/scope.rs",
   "backend/crates/api/src/h8_erp_messages/replay_tests.rs",
   "backend/crates/api/src/h8_erp_messages/pg_repository_tests.rs",
   "backend/crates/api/src/h8_erp_messages/lifecycle.rs",
   "backend/crates/api/src/h8_erp_messages/pg_lifecycle.rs",
+  "backend/crates/api/src/h8_erp_messages/outbound_lifecycle_tests.rs",
+  "backend/crates/api/src/api_key_auth.rs",
+  "backend/crates/api/src/api_key_service.rs",
+  "backend/crates/api/src/openapi_contract.rs",
+  "backend/crates/api/src/openapi_tests.rs",
+  "backend/crates/domain/src/api_key.rs",
+  "backend/crates/api/src/openapi_paths/h8_erp.rs",
+  "shared/openapi/openapi.json",
+  "packages/api-client/src/schema.ts",
+  "docs/api/curl-examples.md",
+  "scripts/governance/generate_openapi_curl_examples.py",
+  "scripts/governance/tests/test_openapi_governance.py",
+  "backend/migrations/202607230002_mpm_persistent_mapping.sql",
+  "backend/crates/api/src/parameter_mapping.rs",
+  "backend/crates/api/tests/parameter_mapping_postgres.rs",
+  "backend/crates/api/src/h8_inbound.rs",
+  "backend/crates/api/src/h8_inbound/lifecycle.rs",
+  "backend/crates/api/src/h8_inbound/product_change.rs",
+  "backend/crates/api/src/h8_inbound/product_master.rs",
+  "backend/crates/api/src/h8_inbound/return_order.rs",
+  "backend/crates/api/tests/h8_inbound_asn_postgres.rs",
+  "backend/crates/api/tests/h8_inbound_outbound_order_postgres.rs",
+  "backend/crates/api/tests/h8_inbound_product_change_postgres.rs",
+  "backend/crates/api/tests/h8_inbound_product_master_postgres.rs",
+  "backend/crates/api/tests/h8_inbound_return_order_postgres.rs",
   "scripts/h8_erp_interface_sync/sync_worker.py",
   "scripts/h8_erp_interface_sync/worker_mssql.py",
   "scripts/h8_erp_interface_sync/worker_route.py",
@@ -4636,14 +4817,29 @@ evidence_refs = [
   "scripts/h8_erp_interface_sync/test_h8_sync_worker.py",
   "scripts/h8_erp_interface_sync/test_inbound_terminal_state.py",
   "scripts/h8_erp_interface_sync/test_exchange_lifecycle.py",
+  "scripts/h8_erp_interface_sync/test_outbound_receipts.py",
+  "scripts/h8_erp_interface_sync/worker_mssql.py",
   "scripts/h8_erp_interface_sync/inbound_canonical.py",
   "scripts/h8_erp_interface_sync/test_inbound_canonical.py",
   "scripts/h8_erp_interface_sync/test_outbound_routing.py",
+  "scripts/h8_erp_interface_sync/check_product_contract.sh",
+  "deploy/h8-erp-if/init/03_if_out_and_return.sql",
+  "scripts/h8_erp_interface_sync/run_failover_l11_evidence.py",
+  "scripts/h8_erp_interface_sync/test_failover_l11_evidence.py",
+  "docs/retros/h8-failover-l11-evidence.json",
   "backend/crates/api/src/wave3_repository_part1b.rs",
   "backend/crates/api/tests/m2_smart_putaway_postgres.rs",
   "backend/crates/api/src/wave3_repository/erp_outbox.rs",
   "backend/crates/api/src/wave3_repository_part2b.rs",
   "backend/crates/api/tests/m3_ops_closeout_postgres.rs",
+  "backend/crates/api/src/wave3_repository/inventory_count/approval.rs",
+  "backend/crates/api/tests/m3_inventory_count_postgres.rs",
+  "backend/crates/api/src/wave4_repository_part2.rs",
+  "backend/crates/api/tests/wave4_postgres/review.rs",
+  "backend/crates/api/src/quality_liaison/actions.rs",
+  "backend/crates/api/src/quality_liaison.rs",
+  "backend/crates/api/src/quality_liaison_handlers.rs",
+  "backend/crates/api/tests/quality_liaison_postgres/archive_revision.rs",
   "backend/crates/api/tests/master_data_postgres/h8_product_change_idempotency.rs",
   "backend/crates/api/tests/m2_deferred_closeout_postgres_part2.rs",
   "backend/crates/api/tests/wave4_wave_planning_postgres.rs",
@@ -4654,9 +4850,9 @@ evidence_refs = [
   "docs/retros/h8-asn-manual-replay-evidence.json",
   "docs/retros/h8-local-integration-evidence.json",
 ]
-reason = "ASN V2、本地主备、五类接口表 DTO 到 canonical 命令的统一转换、五类入站业务 API 及入库完成/库存状态/报损报溢三类已有出站生产者的 PostgreSQL 同键重放、入站唯一路由、首次配置绑定、不可变历史配置快照及 Worker 重试按原版本读取、Docker MSSQL 人工重放桥的原 Idempotency-Key 恢复、H8/MSSQL 死信同步、即时接管、原连接版本复用与成功回执、既有幂等消息绑定切换拒绝、schema_version 严格拒绝、预检失败 receive/final_failure H2 审计、审计失败阻断业务、五类入站业务 API 的 503/422 错误分类、共享错误出口凭据脱敏、未知 storage_condition 写入前拒绝、route-resolve 对已注入单仓范围的默认绑定和越权 403，以及出站按连接货主/目录/仓库收窄、逐消息唯一路由和现有三类生产者的仓库身份已验证；仍缺真实 M-PM 规则查询与映射、JWT 用户多仓范围与 Worker 身份接线、H8 成功消息业务资源引用、档案补录/对账差异/发货确认/库存快照四类生产者及其 L11、降级/回执 L11 与自研 ERP 双向 S4。"
+reason = "开发实现层 PASS：五类入站共享 H8 REST 防腐层与接口表 canonical 主流程；商品 spec 已收紧为 Rust/Python/MSSQL/OpenAPI/api-client 全链必填并覆盖缺失零写入，M1 四类商品直写拒绝 API Key、GET 保留，pending_mapping 商品经真实 H8 ASN 拒绝；完整商品/包装契约、M-PM 映射溯源、七类出站生产者和主动对账拉取均已覆盖。目录驱动测试逐类验证双通道 L2-L4，真实 Docker MSSQL 验证商品约束及七类出站降级 L11。外部证据层 DEFERRED：自研 ERP dev/staging 双向请求、两级回执、重试和审计关联留待外部环境具备后执行，不阻塞普通开发迭代。"
 owner = "H8 模块负责人"
-resume_when = "接入公共 JWT 用户多仓范围与 Worker 身份，完成剩余 Worker 运行接线和四组闭环逐消息 L2-L4/L11，再归档自研 ERP dev/staging 双向请求、两级回执、重试和审计关联后关闭延期。"
+resume_when = "归档自研 ERP dev/staging 双向请求、两级回执、重试和审计关联后关闭延期。"
 
 [[deferred_stories]]
 id = "US-H8-003"
@@ -4683,6 +4879,7 @@ e2e_screenshots = [
   { page = "h8-erp-messages", spec = "prototypes/e2e/web-admin-h8-messages.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-messages/failed-filter.png" },
   { page = "h8-erp-messages", spec = "prototypes/e2e/web-admin-h8-messages.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-messages/dead-detail.png" },
   { page = "h8-erp-messages", spec = "prototypes/e2e/web-admin-h8-messages.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-messages/replay-success.png" },
+  { page = "h8-erp-messages", spec = "prototypes/e2e/web-admin-h8-messages.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-messages/replay-idempotent.png" },
   { page = "h8-erp-messages", spec = "prototypes/e2e/web-admin-h8-messages.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-messages/readonly-no-replay.png" },
   { page = "h8-erp-messages", spec = "prototypes/e2e/web-admin-h8-messages.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-messages/worker-status.png" },
   { page = "h8-erp-messages", spec = "prototypes/e2e/web-admin-h8-messages.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h8-erp-messages/worker-paused.png" },
@@ -4729,6 +4926,7 @@ evidence_refs = [
   "artifacts/screenshot-portal/real-web/h8-erp-messages/failed-filter.png",
   "artifacts/screenshot-portal/real-web/h8-erp-messages/dead-detail.png",
   "artifacts/screenshot-portal/real-web/h8-erp-messages/replay-success.png",
+  "artifacts/screenshot-portal/real-web/h8-erp-messages/replay-idempotent.png",
   "artifacts/screenshot-portal/real-web/h8-erp-messages/readonly-no-replay.png",
   "artifacts/screenshot-portal/real-web/h8-erp-messages/worker-status.png",
   "artifacts/screenshot-portal/real-web/h8-erp-messages/worker-paused.png",
@@ -4739,7 +4937,7 @@ evidence_refs = [
   "artifacts/screenshot-portal/real-web/h8-erp-messages/payload-decrypted-real.png",
   "artifacts/screenshot-portal/real-web/h8-erp-messages/readonly-real.png",
 ]
-reason = "消息/尝试声明式 RANGE 月分区、跨月全局 ID/幂等唯一、当前月/下月自动维护、日统计快照、最近 10k 完成尝试 P95、两级回执、claim 租约、普通 Worker 成功/失败完成尝试、ADR-0018 L2 next_retry_at 与 MSSQL 到期认领、档案补录 L3 的 5 次/5 分钟/24 小时边界、服务端精确高级查询、created_at+id 稳定游标分页、JWT 用户多仓列表/统计/详情裁剪、API Key 单仓操作约束、Worker 心跳健康、暂停恢复、权限审计、完整报文短期加密保留/授权解密/no-store/到期清理，以及本地 Docker MSSQL 死信/人工重放状态闭环均有真实 PostgreSQL、隔离 MSSQL 或关闭 dev-mock 的浏览器证据；AC10 已关闭，仍缺生产等价 dev/staging 的单货主单月 10M 消息+10M 完成尝试列表/统计 P95 原始证据，以及自研 ERP 故障恢复 S4。"
+reason = "开发实现层 PASS：消息分区与全局唯一、日统计、两级回执、claim 租约、重试时间、精确查询、稳定游标、多仓裁剪、Worker 健康、暂停恢复、权限审计和加密报文保留均有 PostgreSQL、隔离 MSSQL 或真实浏览器证据。预发布运行层 DEFERRED：待补单货主单月 10M 消息+10M 完成尝试的列表/统计 P95 原始证据。外部证据层 DEFERRED：待补自研 ERP dev/staging 故障恢复、回执、重放和审计关联；两类延期均不阻塞普通开发迭代。"
 owner = "H8 模块负责人"
 resume_when = "按 H8 性能运行手册补生产等价 dev/staging 的 10M/10M 基线、列表 P95≤500ms、统计 P95≤1s 原始证据，再补自研 ERP dev/staging 的超时、死信、重放、回执和 H2 审计关联后关闭延期。"
 
