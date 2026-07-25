@@ -12,12 +12,15 @@ use super::repository::{
 pub const H8_CONFIG_READ: &str = "h8.erp_connector.read";
 pub const H8_CONFIG_WRITE: &str = "h8.erp_connector.write";
 
+type IdempotencyRecord = (String, u16, Value);
+type IdempotencyCache = Arc<Mutex<HashMap<String, IdempotencyRecord>>>;
+
 #[derive(Clone)]
 pub struct H8ErpConnectorAppState {
     pub repository: Arc<dyn H8ErpConnectorRepository>,
     pub audit_pool: Option<PgPool>,
     /// AC15：无 DB 时本地幂等缓存；有 pool 时优先写 `idempotency_request`
-    pub(crate) idempotency: Arc<Mutex<HashMap<String, (String, u16, Value)>>>,
+    pub(crate) idempotency: IdempotencyCache,
 }
 
 impl H8ErpConnectorAppState {
