@@ -161,11 +161,17 @@ test.describe.serial("独立客户药检单平台真实链路", () => {
     ]) {
       await page.getByRole("checkbox", { name: `选择订单 ${orderNo}` }).check();
     }
+    const createExportResponse = page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/api/v1/exports")
+        && response.request().method() === "POST",
+    );
     await page.getByTestId("portal-create-export").click();
+    const createdExport = await (await createExportResponse).json() as { id: string };
     await expect(page.getByText("批量任务已创建，可在导出中心查看进度")).toBeVisible();
     await page.screenshot({ path: path.join(evidenceDir, "batch-task-created.png"), fullPage: true });
     await page.getByRole("button", { name: "导出中心" }).first().click();
-    const completed = page.getByTestId("portal-export-completed").first();
+    const completed = page.locator(`tr[data-export-id="${createdExport.id}"]`);
     await expect(completed).toBeVisible({ timeout: 20_000 });
     await expect(completed).toContainText("1 份");
     await expect(completed).toContainText("1 项");

@@ -118,7 +118,10 @@ function ExportRow(props: {
   }[props.job.status];
   const StatusIcon = statusMeta.icon;
   return (
-    <tr data-testid={`portal-export-${props.job.status}`}>
+    <tr
+      data-testid={`portal-export-${props.job.status}`}
+      data-export-id={props.job.id}
+    >
       <td>{formatTime(props.job.created_at)}</td>
       <td>{props.job.requested_order_count}</td>
       <td>{props.job.report_file_count} 份</td>

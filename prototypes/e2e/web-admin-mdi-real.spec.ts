@@ -610,7 +610,11 @@ function readQualityLiaisonId(receiptNo: string) {
 
 function seedFailedCopyShippingFixture() {
   runPsql(
-    `INSERT INTO inventory_batches (
+    `DELETE FROM outbound_shipments
+       WHERE owner_id = :'owner_id'
+         AND outbound_order_id = :'order_id';
+
+       INSERT INTO inventory_batches (
          id, owner_id, product_code, batch_no, production_date, expiry_date,
          qty_on_hand, qty_locked, quality_status, location_id, location_code
        )
@@ -618,7 +622,13 @@ function seedFailedCopyShippingFixture() {
          md5('mdi-e2e-shipping-inventory')::uuid, :'owner_id',
          'P-M4-REVIEW-E2E-001', :'batch_no', '2026-01-01', '2028-01-01',
          8, 0, 'qualified', :'location_id', 'A01-01-02-03'
-       );
+       )
+       ON CONFLICT (id) DO UPDATE
+       SET qty_on_hand = EXCLUDED.qty_on_hand,
+           qty_locked = EXCLUDED.qty_locked,
+           quality_status = EXCLUDED.quality_status,
+           recall_flag = FALSE,
+           updated_at = now();
 
        INSERT INTO attachments (
          id, owner_id, module, entity_type, entity_id, file_name,
@@ -630,7 +640,10 @@ function seedFailedCopyShippingFixture() {
          'shipping-report.pdf', 'application/pdf', 12,
          'mdi-e2e/shipping/failed-copy.pdf',
          md5('mdi-e2e-shipping-copy-failed'), :'admin_id'
-       );
+       )
+       ON CONFLICT (id) DO UPDATE
+       SET storage_key = EXCLUDED.storage_key,
+           sha256 = EXCLUDED.sha256;
 
        INSERT INTO drug_inspection_reports (
          id, owner_id, product_id, batch_no, created_by
@@ -638,7 +651,11 @@ function seedFailedCopyShippingFixture() {
        VALUES (
          md5('mdi-e2e-shipping-report')::uuid, :'owner_id',
          '00000000-0000-0000-0000-000000001704', :'batch_no', :'admin_id'
-       );
+       )
+       ON CONFLICT (id) DO UPDATE
+       SET product_id = EXCLUDED.product_id,
+           batch_no = EXCLUDED.batch_no,
+           updated_at = now();
 
        INSERT INTO drug_inspection_report_versions (
          id, report_id, owner_id, version_number, report_no,
@@ -654,7 +671,15 @@ function seedFailedCopyShippingFixture() {
          md5('mdi-e2e-shipping-copy-failed'),
          'manual_upload', 'none', TRUE, 'confirmed', :'admin_id', now(),
          :'reviewer_id', now(), 'confirmed', 'failed'
-       );
+       )
+       ON CONFLICT (id) DO UPDATE
+       SET status = EXCLUDED.status,
+           qualified = EXCLUDED.qualified,
+           reviewed_by = EXCLUDED.reviewed_by,
+           reviewed_at = EXCLUDED.reviewed_at,
+           review_result = EXCLUDED.review_result,
+           customer_copy_status = EXCLUDED.customer_copy_status,
+           updated_at = now();
 
        UPDATE drug_inspection_reports
           SET current_version_id = md5('mdi-e2e-shipping-version')::uuid,
@@ -666,6 +691,7 @@ function seedFailedCopyShippingFixture() {
       reviewer_id: reviewUserId,
       location_id: inventoryLocationId,
       batch_no: m4ReviewBatch,
+      order_id: m4ReviewOrderId,
     },
   );
 }
@@ -771,6 +797,7 @@ function runPsql(sql: string, variables: Record<string, string> = {}) {
     "--dbname",
     connection.pathname.replace(/^\//, ""),
     "--quiet",
+    "--set=ON_ERROR_STOP=1",
     "--tuples-only",
     "--no-align",
     ...Object.entries(variables).map(([key, value]) => `--set=${key}=${value}`),
