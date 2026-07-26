@@ -377,6 +377,29 @@ for (const target of [
   });
 }
 
+test("DataGrid 单元格复制提示不被裁剪", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "登录" }).click();
+  await page.getByRole("button", { name: "入库业务", exact: true }).click();
+  await page.getByRole("button", { name: "入库作业", exact: true }).click();
+  await page.getByRole("button", { name: "M2 收货管理 m2-receiving", exact: true }).click();
+
+  await page.getByRole("button", { name: "复制预计到货" }).first().click();
+  const notice = page.getByRole("status").filter({ hasText: "已复制" });
+  await expect(notice).toHaveText("已复制");
+  const clipped = await notice.evaluate((element) => {
+    const noticeRect = element.getBoundingClientRect();
+    for (let ancestor = element.parentElement; ancestor; ancestor = ancestor.parentElement) {
+      const style = getComputedStyle(ancestor);
+      if (!/(auto|clip|hidden|scroll)/.test(`${style.overflowX} ${style.overflowY}`)) continue;
+      const ancestorRect = ancestor.getBoundingClientRect();
+      if (noticeRect.left < ancestorRect.left || noticeRect.right > ancestorRect.right) return true;
+    }
+    return false;
+  });
+  expect(clipped).toBe(false);
+});
+
 test("H1 菜单管理能通过三层菜单打开", async ({ page }) => {
   fs.mkdirSync(artifactsDir, { recursive: true });
 

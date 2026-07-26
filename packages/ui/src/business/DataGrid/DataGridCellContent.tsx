@@ -1,4 +1,5 @@
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { cn } from "../../lib/utils";
 import type { DataGridColumn } from "./data-grid-types";
 
@@ -69,13 +70,19 @@ export function DataGridCellContent<T>({
         onCopy();
       }}
     >
-      <div className="relative inline-block max-w-full align-middle">
+      <div className="inline-block max-w-full align-middle">
         <div className="min-w-0 truncate">{content}</div>
-        {cellNotice && (
-          <span className="pointer-events-none absolute left-full top-1/2 z-20 ml-2 -translate-y-1/2 whitespace-nowrap rounded-sm bg-foreground px-1.5 py-0.5 text-[11px] font-normal text-background shadow-sm">
-            {cellNotice}
-          </span>
-        )}
+        {cellNotice && typeof document !== "undefined"
+          ? createPortal(
+              <span
+                role="status"
+                className="pointer-events-none fixed bottom-4 right-4 z-[100] whitespace-nowrap rounded-md bg-foreground px-3 py-2 text-sm font-normal text-background shadow-lg"
+              >
+                {cellNotice}
+              </span>,
+              document.body,
+            )
+          : null}
       </div>
     </div>
   );
