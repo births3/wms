@@ -50,11 +50,11 @@ fn draft_request() -> GeneratePrintFieldLibraryDraftRequest {
 
 fn template_request(field_library_version_id: Uuid) -> SavePrintTemplateRequest {
     SavePrintTemplateRequest {
+        template_id: None,
         template_code: "m2_receiving_order_default".to_string(),
         template_name: "M2 收货单默认模板".to_string(),
         template_type_code: "asn".to_string(),
         scope: PrintTemplateScope::Global,
-        enabled: true,
         is_default: true,
         remark: None,
         field_library_version_id,
@@ -65,7 +65,6 @@ fn template_request(field_library_version_id: Uuid) -> SavePrintTemplateRequest 
         }],
         paper: json!({ "paperType": "A4" }),
         designer_version: "hiprint@0.4.0".to_string(),
-        publish: true,
     }
 }
 

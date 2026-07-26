@@ -610,7 +610,9 @@ pub async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
     sqlx::query(
         r#"
         INSERT INTO print_template_versions (
-            id, template_id, field_library_version_id, version_no, status,
+            id, template_id, field_library_version_id,
+            template_name, template_type_code, scope, is_default, remark,
+            version_no, status,
             hiprint_json, field_bindings, paper, designer_version, request_hash,
             created_by, published_at, published_by
         )
@@ -618,6 +620,11 @@ pub async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
             '00000000-0000-0000-0000-000000003902',
             templates.id,
             versions.id,
+            templates.template_name,
+            templates.template_type_code,
+            templates.scope,
+            templates.is_default,
+            templates.remark,
             1,
             'published',
             '{"panels":[{"index":0,"paperType":"A4","width":210,"height":297,"printElements":[{"options":{"field":"asn.code","title":"ASN 号","left":20,"top":20,"width":120,"height":20},"printElementType":{"type":"text"}}]}]}'::jsonb,
