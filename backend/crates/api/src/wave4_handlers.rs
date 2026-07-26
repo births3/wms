@@ -111,6 +111,11 @@ impl IntoResponse for Wave4HandlerError {
                 "M4_DUAL_PERSON_APPROVAL_REQUIRED",
                 "M-VR 策略要求先完成主管审批",
             ),
+            Wave4HandlerError::Repository(Wave4RepositoryError::RouteBindingUnavailable) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "H9_ROUTE_BINDING_UNAVAILABLE",
+                "送货地址没有唯一有效的线路绑定",
+            ),
             Wave4HandlerError::Repository(Wave4RepositoryError::EmptySelection)
             | Wave4HandlerError::Repository(Wave4RepositoryError::BatchNotAffected(_))
             | Wave4HandlerError::Repository(Wave4RepositoryError::InvalidQuantity)
@@ -649,6 +654,7 @@ mod tests {
                 erp_order_no: Some("ERP-SO-001".to_string()),
                 customer_id: Uuid::new_v4(),
                 warehouse_id: Uuid::new_v4(),
+                delivery_address_id: Uuid::new_v4(),
                 required_ship_at: None,
                 lines: vec![],
             }),
@@ -680,6 +686,7 @@ mod tests {
                 erp_order_no: Some("ERP-SO-002".to_string()),
                 customer_id: Uuid::new_v4(),
                 warehouse_id: Uuid::new_v4(),
+                delivery_address_id: Uuid::new_v4(),
                 required_ship_at: None,
                 lines: vec![],
             }),

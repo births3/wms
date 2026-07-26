@@ -106,6 +106,7 @@ pub struct H8OutboundOrderInboundRequest {
     pub document_type: String,
     pub erp_order_no: Option<String>,
     pub customer_id: Uuid,
+    pub delivery_address_id: Uuid,
     pub product_code: String,
     pub batch_no: String,
     pub planned_qty: i64,
@@ -390,6 +391,7 @@ fn validate_outbound_order_request(
     )?;
     if body.document_type.trim().is_empty()
         || body.customer_id.is_nil()
+        || body.delivery_address_id.is_nil()
         || body.product_code.trim().is_empty()
         || body.batch_no.trim().is_empty()
         || body.planned_qty <= 0
@@ -524,6 +526,10 @@ async fn canonical_outbound_order(
         Value::String(body.customer_id.to_string()),
     );
     fields.insert(
+        "delivery_address_id".to_string(),
+        Value::String(body.delivery_address_id.to_string()),
+    );
+    fields.insert(
         "product_code".to_string(),
         Value::String(body.product_code.clone()),
     );
@@ -650,6 +656,9 @@ fn outbound_order_request(
         warehouse_id: command
             .warehouse_id
             .ok_or_else(|| H8InboundError::Unprocessable("warehouse_id is required".to_string()))?,
+        delivery_address_id: string("delivery_address_id")?.parse().map_err(|_| {
+            H8InboundError::Unprocessable("delivery_address_id is invalid".to_string())
+        })?,
         required_ship_at: command
             .fields
             .get("required_ship_at")

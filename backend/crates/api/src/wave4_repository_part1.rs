@@ -140,6 +140,18 @@ pub fn new(pool: PgPool) -> Self {
         .await
         .map_err(map_insert_error)?;
 
+        freeze_outbound_route_in_tx(
+            &mut tx,
+            ctx.owner_id,
+            order_id,
+            req.warehouse_id,
+            req.customer_id,
+            req.delivery_address_id,
+            now,
+        )
+        .await
+        .map_err(map_route_freeze_error)?;
+
         for line in &req.lines {
             sqlx::query(
                 r#"

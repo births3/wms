@@ -25,6 +25,7 @@ use crate::{
         OUTBOUND_STATUS_CONFIRMED, OUTBOUND_STATUS_IN_WAVE, OUTBOUND_STATUS_REVIEWED,
         OUTBOUND_STATUS_REVIEWED_SHORT, OUTBOUND_STATUS_SHIPPED,
     },
+    print_orchestration::{freeze_outbound_route_in_tx, PrintOrchestrationError},
     traceability_code::{
         TraceabilityCodeService, TraceabilityPlatformResponse, TraceabilityReplayDecision,
     },
@@ -57,6 +58,7 @@ pub enum Wave4RepositoryError {
     DuplicateCode,
     EmptySelection,
     InvalidDocumentType,
+    RouteBindingUnavailable,
     BatchNotAffected(Uuid),
     InvalidStatus {
         expected: String,
@@ -795,6 +797,15 @@ fn map_db_error(error: sqlx::Error) -> Wave4RepositoryError {
         }
     }
     Wave4RepositoryError::Database(error.to_string())
+}
+
+fn map_route_freeze_error(error: PrintOrchestrationError) -> Wave4RepositoryError {
+    match error {
+        PrintOrchestrationError::RouteBindingNotFound
+        | PrintOrchestrationError::EffectivePeriodOverlap
+        | PrintOrchestrationError::InvalidRequest => Wave4RepositoryError::RouteBindingUnavailable,
+        other => Wave4RepositoryError::Database(format!("{other:?}")),
+    }
 }
 
 fn map_insert_error(error: sqlx::Error) -> Wave4RepositoryError {

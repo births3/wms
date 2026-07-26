@@ -271,6 +271,7 @@ pub struct CreateOutboundOrderRequest {
     pub erp_order_no: Option<String>,
     pub customer_id: Uuid,
     pub warehouse_id: Uuid,
+    pub delivery_address_id: Uuid,
     pub required_ship_at: Option<DateTime<Utc>>,
     pub lines: Vec<CreateOutboundOrderLineRequest>,
 }

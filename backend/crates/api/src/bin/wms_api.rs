@@ -40,6 +40,7 @@ use wms_api::{
     },
     master_data_handlers::{master_data_router, MasterDataAppState},
     parameter_mapping::{parameter_mapping_router, ParameterMappingAppState},
+    print_orchestration_handlers::{print_orchestration_router, PrintOrchestrationAppState},
     print_template_handlers::{print_template_router, PrintTemplateAppState},
     quality_liaison_handlers::{quality_liaison_router, QualityLiaisonAppState},
     reconciliation_handlers::{reconciliation_router, ReconciliationAppState},
@@ -132,6 +133,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     wms_api::api_key_expiry::spawn(pool.clone());
     wms_api::alert_engine_job::spawn(pool.clone());
     wms_api::inventory_expiry_job::spawn(pool.clone());
+    wms_api::print_orchestration_job::spawn(pool.clone());
     wms_api::h8_erp_messages::spawn_maintenance_job(pool.clone()).await?;
     wms_api::task_release_job::spawn(pool.clone());
     let config_center_state = ConfigCenterAppState::with_postgres(file_registry, pool.clone());
@@ -347,6 +349,9 @@ fn app(
         )))
         .merge(document_numbering_router(document_numbering_state))
         .merge(print_template_router(print_template_state))
+        .merge(print_orchestration_router(
+            PrintOrchestrationAppState::with_postgres(shared_pool.clone()),
+        ))
         .merge(wechat_notify_router(wechat_notify_state))
         .merge(express_router(express_state))
         .merge(wave3_router(wave3_state))
