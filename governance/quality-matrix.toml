@@ -1669,7 +1669,7 @@ id = "US-H9-001"
 title = "打印模板类型字典"
 module = "H9"
 story_file = "docs/domain/user-stories-h9-print-template.md"
-types = ["read_only", "config_rule", "frontend_interaction"]
+types = ["write", "config_rule", "frontend_interaction"]
 frontend_pages = ["m1-system-dictionary", "h9-print-templates"]
 api_paths = [
   "GET /api/v1/system-dictionaries/{dict_code}/items",
@@ -1679,6 +1679,23 @@ api_paths = [
 e2e_checks = [
   "node apps/web-admin/self-checks/h9-print-template-tree-self-check.mjs",
   "pnpm --dir apps/web-admin run test:e2e:h9-dev",
+  "just web-admin-m1-real-e2e",
+]
+e2e_screenshots = [
+  { page = "m1-system-dictionary", spec = "prototypes/e2e/web-admin-h9-template-type-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m1-system-dictionary/print-template-type-owner-override.png" },
+  { page = "h9-print-templates", spec = "prototypes/e2e/web-admin-h9-template-type-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h9-print-templates/template-type-tree.png" },
+]
+test_checks = [
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test system_dictionary_postgres --test print_template_postgres -- --test-threads=1",
+  "pnpm --dir apps/web-admin run build",
+]
+evidence_refs = [
+  "backend/crates/api/tests/system_dictionary_postgres.rs",
+  "backend/crates/api/tests/print_template_postgres.rs",
+  "prototypes/e2e/web-admin-h9-template-type-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/m1-system-dictionary/print-template-type-owner-override.png",
+  "artifacts/screenshot-portal/real-web/h9-print-templates/template-type-tree.png",
+  "docs/reviews/us-h9-001-acceptance-2026-07-26.md",
 ]
 
 [stories.dimensions]
@@ -1696,8 +1713,8 @@ docs = "verified"
 governance = "verified"
 
 [stories.tests]
-required_layers = ["L1", "L2", "L3", "L4", "L7", "L8", "L9"]
-covered_layers = ["L1", "L2", "L3", "L4", "L7", "L8", "L9"]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
 
 [[stories]]
 id = "US-H9-002"

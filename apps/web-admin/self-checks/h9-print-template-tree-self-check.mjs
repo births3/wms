@@ -9,6 +9,14 @@ const querySource = read("src/features/print-template/print-template-queries.ts"
 const designerSource = read("src/pages/print-template/H9TemplateDesignerDialog.tsx");
 const hiprintSource = read("src/pages/print-template/H9HiprintDesigner.tsx");
 const previewSource = read("src/pages/print-template/H9TemplatePreviewDialog.tsx");
+const dictionaryPageSource = read("src/pages/master-data/SystemDictionaryPage.tsx");
+const dictionaryPrintTypeFieldsSource = read(
+  "src/pages/master-data/PrintTemplateTypeFields.tsx",
+);
+const dictionaryPaneSource = read("../../packages/ui/src/business/SystemDictionaryTwoPane/SystemDictionaryTwoPane.tsx");
+const dictionaryLogicSource = read(
+  "../../packages/ui/src/business/SystemDictionaryTwoPane/system-dictionary-two-pane-logic.ts",
+);
 const devMockCoreSource = read("dev-mocks/web-admin-dev-mock-core.ts");
 const devMockSource = [
   devMockCoreSource,
@@ -84,6 +92,19 @@ assert.match(previewSource, /template\.getHtml/);
 assert.match(previewSource, /纸张方向/);
 assert.match(previewSource, /applyPreviewPaperDirection/);
 assert.match(previewSource, /templateRef\.current\?\.print/);
+assert.match(dictionaryPageSource, /activeGroup\.code === "print_template_type"/);
+assert.match(dictionaryPageSource, /m1\.system_dictionary\.write/);
+assert.match(dictionaryPageSource, /m1\.system_dictionary\.global\.write/);
+for (const label of ["字段库编码", "业务模块", "业务方向", "纸张类型", "默认作用域", "排序号"]) {
+  assert.match(`${dictionaryPageSource}\n${dictionaryPrintTypeFieldsSource}`, new RegExp(label));
+}
+assert.match(dictionaryPageSource, /sort_order/);
+assert.match(dictionaryPaneSource, /排序号/);
+assert.match(dictionaryLogicSource, /field_library_code: "字段库编码"/);
+assert.match(dictionaryLogicSource, /business_module: "业务模块"/);
+assert.match(dictionaryLogicSource, /business_direction: "业务方向"/);
+assert.match(dictionaryLogicSource, /paper_type: "纸张类型"/);
+assert.match(dictionaryLogicSource, /default_scope: "默认作用域"/);
 assert.match(devMockSource, /\/api\/v1\/print-templates\/field-libraries/);
 assert.match(devMockSource, /fieldDefinitions/);
 assert.match(devMockSource, /\/api\/v1\/print-templates\/templates/);
