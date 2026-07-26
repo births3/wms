@@ -5,8 +5,6 @@ import {
   QueryPanel,
   buildQueryPanelSummaryItems,
   type QueryPanelField,
-  type QueryPanelRangeValue,
-  type QueryPanelValue,
 } from "@wms/ui";
 
 import { useCurrentUserQuery } from "@/features/auth/auth-queries";
@@ -38,21 +36,19 @@ import {
 } from "./M2InboundDialogs";
 import { M2InboundDetailDialog } from "./M2InboundDetailDialog";
 import { M2InboundPrintDialog } from "./M2InboundPrintDialog";
-import {
-  createAsnBatchNo,
-  type InboundDocumentTypeFilter,
-} from "./m2-inbound-document-type";
+import { createAsnBatchNo } from "./m2-inbound-document-type";
 import {
   dateToIso,
   dateTimeToIso,
-  defaultCreatedDateRange,
-  defaultStatusFilter,
+  defaultM2InboundQueryValue,
   detailStageFromMode,
   filterOrders,
   inboundPageMeta,
   dualSignRequiredForPolicy,
   nextM2InboundSelectedId,
+  normalizeM2InboundQueryValue,
   productTemperatureAttribute,
+  queryValueFromUnknown,
   splitCodes,
   statusFilterOptions,
   temperatureControlFromProductAttribute,
@@ -61,7 +57,6 @@ import {
   type M2InboundQueryValue,
   type M2InboundMode,
   type OwnerContext,
-  type StatusFilter,
 } from "./m2-inbound-page-helpers";
 import { M2InboundOrderTable } from "./M2InboundOrderTable";
 import { M2InboundDashboardPage } from "./M2InboundDashboardPage";
@@ -225,6 +220,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
   const signMutation = useSignReceivingOrderMutation();
   const putawayMutation = usePutawayReceivingOrderMutation();
   const locationsQuery = useMasterDataRowsQuery("m1-locations", mode === "putaway");
+  const productsQuery = useMasterDataRowsQuery("m1-products", mode === "receiving");
 
   const orders = React.useMemo(
     () =>
@@ -306,7 +302,11 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
     secondSignerId: `例如 ${secondSignerExample}`,
     strategyNote: "例如 process=入库，node=验收，dual_scan",
   };
-  const currentProductTemperatureAttribute = productTemperatureAttribute(line?.product_code);
+  const currentProduct = productsQuery.data?.find((product) => product.code === line?.product_code);
+  const currentProductTemperatureAttribute = productTemperatureAttribute(
+    currentProduct?.productFields?.storageCondition,
+    line?.product_code,
+  );
   const currentTemperatureControl = temperatureControlFromProductAttribute(currentProductTemperatureAttribute);
   const pending =
     createMutation.isPending ||
@@ -345,9 +345,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
       shortageQty: "0",
       rejectedQty: "0",
       temperature: "",
-      temperatureControl: temperatureControlFromProductAttribute(
-        productTemperatureAttribute(firstLine?.product_code),
-      ),
+      temperatureControl: value.temperatureControl,
     }));
     setRejectForm({ reason: "" });
     setInspectForm(emptyInspectForm);
@@ -361,6 +359,14 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
       locationCode: "",
     }));
   }, [order?.id, currentUser?.user_id, currentUser?.username, currentUser?.display_name, dualSignRequiredByStrategy]);
+
+  React.useEffect(() => {
+    setReceiveForm((value) =>
+      value.temperatureControl === currentTemperatureControl
+        ? value
+        : { ...value, temperatureControl: currentTemperatureControl },
+    );
+  }, [order?.id, currentTemperatureControl]);
 
   async function refreshInbound(message = "入库列表已刷新") {
     await ordersQuery.refetch();
@@ -693,6 +699,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
           inspectForm={inspectForm}
           inspectExamples={inspectExamples}
           signForm={signForm}
+          secondSignature={order?.status === "awaiting_second_sign"}
           dualSignRequiredByStrategy={dualSignRequiredByStrategy}
           dualPolicyDescription={dualPolicyDescription}
           putawayForm={putawayForm}
@@ -768,60 +775,6 @@ function resolveSignerIdForSubmit(
 
 function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
-}
-
-function defaultM2InboundQueryValue(
-  mode: M2InboundMode,
-  currentOwner: OwnerContext,
-): M2InboundQueryValue {
-  const createdAt = defaultCreatedDateRange();
-  return {
-    keyword: "",
-    ownerKeyword: currentOwner.ownerCode,
-    documentTypeFilter: [],
-    statusFilter: defaultStatusFilter(mode),
-    arrivalDate: { from: "", to: "" },
-    createdAt,
-  };
-}
-
-function normalizeM2InboundQueryValue(
-  value: QueryPanelValue,
-  fallback: M2InboundQueryValue,
-  mode: M2InboundMode,
-): M2InboundQueryValue {
-  const rawStatusFilter = queryStringArray(value.statusFilter);
-  const statusFilter = rawStatusFilter.filter((item): item is StatusFilter[number] =>
-    statusFilterOptions(mode).some((option) => option.value === item),
-  );
-  return {
-    keyword: queryString(value.keyword),
-    ownerKeyword: queryString(value.ownerKeyword) || fallback.ownerKeyword,
-    documentTypeFilter: queryStringArray(value.documentTypeFilter) as InboundDocumentTypeFilter,
-    statusFilter: rawStatusFilter.length > 0 && statusFilter.length === 0 ? fallback.statusFilter : statusFilter,
-    arrivalDate: queryRange(value.arrivalDate),
-    createdAt: queryRange(value.createdAt, fallback.createdAt),
-  };
-}
-
-function queryString(value: QueryPanelValue[string]) {
-  return typeof value === "string" ? value : "";
-}
-
-function queryStringArray(value: QueryPanelValue[string]) {
-  return Array.isArray(value) ? value.filter((item) => typeof item === "string") : [];
-}
-
-function queryRange(value: QueryPanelValue[string], fallback?: QueryPanelRangeValue): QueryPanelRangeValue {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return fallback ?? { from: "", to: "" };
-  return {
-    from: typeof value.from === "string" ? value.from : fallback?.from ?? "",
-    to: typeof value.to === "string" ? value.to : fallback?.to ?? "",
-  };
-}
-
-function queryValueFromUnknown(value: unknown): QueryPanelValue {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as QueryPanelValue) : {};
 }
 
 function exampleText(value: string | number | null | undefined, fallback: string) {

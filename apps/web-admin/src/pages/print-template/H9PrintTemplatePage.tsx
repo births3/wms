@@ -32,7 +32,6 @@ import {
   usePrintTemplatesQuery,
   usePrintTemplateTypesQuery,
   usePreviewPrintTemplateMutation,
-  useRecordPrintTemplateMutation,
   useSavePrintTemplateMutation,
   useSetPrintTemplateEnabledMutation,
   type PrintFieldLibraryRow,
@@ -227,7 +226,6 @@ export function H9PrintTemplatePage({ currentUser }: { currentUser: CurrentUser 
   const enabledMutation = useSetPrintTemplateEnabledMutation();
   const versionsMutation = usePrintTemplateVersionsMutation();
   const previewMutation = usePreviewPrintTemplateMutation();
-  const printMutation = useRecordPrintTemplateMutation();
   const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(() => defaultH9QueryValue());
   const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(() => defaultH9QueryValue());
   const [selectedRowKeys, setSelectedRowKeys] = React.useState<string[]>([]);
@@ -243,7 +241,6 @@ export function H9PrintTemplatePage({ currentUser }: { currentUser: CurrentUser 
   const [notice, setNotice] = React.useState<Notice>(null);
   const canWriteTemplate = currentUser.permissions.includes("h9.print_template.write");
   const canPublishTemplate = currentUser.permissions.includes("h9.print_template.publish");
-  const canPrintTemplate = currentUser.permissions.includes("h9.print_template.print");
   const canMaintainFieldLibrary = canWriteTemplate;
   const canPublishFieldLibrary = canPublishTemplate;
   const canOpenFieldLibrary = canMaintainFieldLibrary || canPublishFieldLibrary;
@@ -450,21 +447,6 @@ export function H9PrintTemplatePage({ currentUser }: { currentUser: CurrentUser 
     }
   }
 
-  async function recordPrint() {
-    if (!preview) return;
-    await printMutation.mutateAsync({
-      template_code: preview.template_code,
-      template_type_code: preview.template_type_code,
-      business_module: preview.template_type_code.split("_")[0]?.toUpperCase() || "H9",
-      business_document_type: preview.template_type_code,
-      business_document_id: "H9-SAMPLE",
-      data: preview.data,
-      status: "printed",
-      failure_reason: null,
-    });
-    setNotice({ type: "success", text: "打印记录已写入" });
-  }
-
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
       <PageHeader
@@ -531,12 +513,6 @@ export function H9PrintTemplatePage({ currentUser }: { currentUser: CurrentUser 
             createAction={canWriteTemplate ? createAction : undefined}
             editAction={canWriteTemplate ? editAction : undefined}
             disableAction={canWriteTemplate ? disableAction : undefined}
-            printAction={canPrintTemplate ? {
-              label: "打印",
-              description: "预览并打印选中模板",
-              disabled: (context) => context.selectedRowKeys.length !== 1,
-              onClick: (context) => void previewTemplate(context.selectedRowKeys[0]),
-            } : undefined}
             toolbarActions={toolbarActions}
             queryState={appliedQuery}
             querySummaryItems={querySummaryItems}
@@ -573,7 +549,6 @@ export function H9PrintTemplatePage({ currentUser }: { currentUser: CurrentUser 
         open={previewOpen}
         preview={preview}
         onOpenChange={setPreviewOpen}
-        onPrint={recordPrint}
       />
     </section>
   );
