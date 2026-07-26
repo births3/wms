@@ -9,12 +9,19 @@ use crate::common::PageMeta;
 /// 收货单明细。
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct ReceivingOrderLine {
+    /// 明细行号
     pub line_no: u32,
+    /// 商品主数据 ID
     pub product_id: Option<Uuid>,
+    /// 商品编码
     pub product_code: String,
+    /// 预计数量
     pub expected_qty: i64,
+    /// 批号
     pub batch_no: Option<String>,
+    /// 生产日期
     pub production_date: Option<String>,
+    /// 有效期至
     pub expiry_date: Option<String>,
 }
 
@@ -40,12 +47,19 @@ pub struct ReceivingOrder {
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct CreateReceivingOrderRequest {
+    /// 收货单号
     pub receipt_no: String,
+    /// 单据类型
     pub document_type: String,
+    /// 供应商 ID
     pub supplier_id: Option<Uuid>,
+    /// 仓库 ID
     pub warehouse_id: Uuid,
+    /// 外部来源号
     pub external_ref: Option<String>,
+    /// 预计到货时间
     pub expected_arrival_at: Option<DateTime<Utc>>,
+    /// 收货明细
     pub lines: Vec<ReceivingOrderLine>,
 }
 

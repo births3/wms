@@ -3156,6 +3156,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/print-templates/field-libraries/drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["generate_print_field_library_draft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/print-templates/field-libraries/{version_id}/fields": {
         parameters: {
             query?: never;
@@ -3166,6 +3182,38 @@ export interface paths {
         get: operations["list_print_field_definitions"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-templates/field-libraries/{version_id}/fields/{field_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["update_print_field_definition"];
+        trace?: never;
+    };
+    "/api/v1/print-templates/field-libraries/{version_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["publish_print_field_library"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5277,15 +5325,28 @@ export interface components {
             type_code: string;
         };
         CreateReceivingOrderRequest: {
+            /** @description 单据类型 */
             document_type: string;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @description 预计到货时间
+             */
             expected_arrival_at?: string | null;
+            /** @description 外部来源号 */
             external_ref?: string | null;
+            /** @description 收货明细 */
             lines: components["schemas"]["ReceivingOrderLine"][];
+            /** @description 收货单号 */
             receipt_no: string;
-            /** Format: uuid */
+            /**
+             * Format: uuid
+             * @description 供应商 ID
+             */
             supplier_id?: string | null;
-            /** Format: uuid */
+            /**
+             * Format: uuid
+             * @description 仓库 ID
+             */
             warehouse_id: string;
         };
         CreateRetailReplenishmentSuggestionRequest: {
@@ -5912,6 +5973,12 @@ export interface components {
             contract_id: string;
             period_end: string;
             period_start: string;
+        };
+        GeneratePrintFieldLibraryDraftRequest: {
+            business_module: string;
+            library_code: string;
+            library_name: string;
+            source_schema: string;
         };
         GspAlertLifecycleRecord: {
             alert: components["schemas"]["AlertInstance"];
@@ -7189,19 +7256,27 @@ export interface components {
             table_name: string;
         };
         PrintFieldDefinition: {
+            description: string;
             display_name: string;
+            example_value?: unknown;
             field_path: string;
             field_type: string;
+            formatting_rule?: string | null;
             group_code: string;
             group_name: string;
             /** Format: uuid */
             id: string;
+            is_table_detail: boolean;
             /** Format: uuid */
             library_version_id: string;
-            metadata: unknown;
+            masking_rule?: string | null;
+            printable: boolean;
+            sensitive: boolean;
             /** Format: int32 */
             sort_order: number;
             source_schema: string;
+            supports_barcode: boolean;
+            supports_qrcode: boolean;
         };
         PrintFieldDefinitionListResponse: {
             data: components["schemas"]["PrintFieldDefinition"][];
@@ -7212,21 +7287,50 @@ export interface components {
             page: components["schemas"]["PageMeta"];
         };
         PrintFieldLibrarySummary: {
+            business_module: string;
             /** Format: date-time */
             created_at: string;
+            /** Format: uuid */
+            created_by: string;
             /** Format: int64 */
             field_count: number;
             /** Format: uuid */
             id: string;
             /** Format: uuid */
+            latest_published_version_id?: string | null;
+            /** Format: int32 */
+            latest_published_version_no?: number | null;
+            /** Format: uuid */
             latest_version_id: string;
+            latest_version_status: string;
             library_code: string;
             library_name: string;
             /** Format: date-time */
-            published_at: string;
+            published_at?: string | null;
             /** Format: uuid */
-            published_by: string;
+            published_by?: string | null;
             source_schema: string;
+            /** Format: int32 */
+            version_no: number;
+        };
+        PrintFieldLibraryVersion: {
+            business_module: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            created_by: string;
+            /** Format: uuid */
+            id: string;
+            library_code: string;
+            /** Format: uuid */
+            library_id: string;
+            library_name: string;
+            /** Format: date-time */
+            published_at?: string | null;
+            /** Format: uuid */
+            published_by?: string | null;
+            source_schema: string;
+            status: string;
             /** Format: int32 */
             version_no: number;
         };
@@ -7772,15 +7876,28 @@ export interface components {
         };
         /** @description 收货单明细。 */
         ReceivingOrderLine: {
+            /** @description 批号 */
             batch_no?: string | null;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description 预计数量
+             */
             expected_qty: number;
+            /** @description 有效期至 */
             expiry_date?: string | null;
-            /** Format: int32 */
+            /**
+             * Format: int32
+             * @description 明细行号
+             */
             line_no: number;
+            /** @description 商品编码 */
             product_code: string;
-            /** Format: uuid */
+            /**
+             * Format: uuid
+             * @description 商品主数据 ID
+             */
             product_id?: string | null;
+            /** @description 生产日期 */
             production_date?: string | null;
         };
         ReceivingOrderListResponse: {
@@ -8804,6 +8921,22 @@ export interface components {
             used_volume_cm3?: number | null;
             /** Format: uuid */
             zone_id?: string | null;
+        };
+        UpdatePrintFieldDefinitionRequest: {
+            description: string;
+            display_name: string;
+            example_value?: unknown;
+            formatting_rule?: string | null;
+            group_code: string;
+            group_name: string;
+            is_table_detail: boolean;
+            masking_rule?: string | null;
+            printable: boolean;
+            sensitive: boolean;
+            /** Format: int32 */
+            sort_order: number;
+            supports_barcode: boolean;
+            supports_qrcode: boolean;
         };
         /** @description 更新商品请求。 */
         UpdateProductRequest: {
@@ -21423,6 +21556,78 @@ export interface operations {
             };
         };
     };
+    generate_print_field_library_draft: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GeneratePrintFieldLibraryDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description 从当前 OpenAPI schema 生成字段库草稿 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintFieldLibraryVersion"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description schema 不存在或请求非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     list_print_field_definitions: {
         parameters: {
             query?: never;
@@ -21455,6 +21660,172 @@ export interface operations {
             };
             /** @description 权限不足 */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_print_field_definition: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 字段库版本 ID */
+                version_id: string;
+                /** @description 字段定义 ID */
+                field_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePrintFieldDefinitionRequest"];
+            };
+        };
+        responses: {
+            /** @description 更新草稿字段元数据 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintFieldDefinition"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 字段库版本或字段不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 已发布版本不可修改或幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 字段元数据非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    publish_print_field_library: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 字段库版本 ID */
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 发布字段库草稿 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintFieldLibraryVersion"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 字段库版本不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 已发布版本不可重复改写或幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 字段路径已不在当前 OpenAPI schema */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

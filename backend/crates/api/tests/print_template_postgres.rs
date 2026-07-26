@@ -1,15 +1,17 @@
 use chrono::{TimeZone, Utc};
 use serde_json::json;
 use sqlx::PgPool;
+use utoipa::OpenApi;
 use uuid::Uuid;
 use wms_api::{
     auth::AuthContext,
     print_template::{
-        PgPrintTemplateRepository, PrintFieldDefinitionInput, PrintTemplateBinding,
+        GeneratePrintFieldLibraryDraftRequest, PgPrintTemplateRepository, PrintTemplateBinding,
         PrintTemplatePreviewRequest, PrintTemplatePrintRequest, PrintTemplateScope,
-        PublishPrintFieldLibraryRequest, SavePrintTemplateRequest,
+        SavePrintTemplateRequest, UpdatePrintFieldDefinitionRequest,
     },
     system_dictionary::PgSystemDictionaryRepository,
+    ApiDoc,
 };
 use wms_domain::{
     DisableSystemDictionaryItemRequest, PRINT_TEMPLATE_TYPE_ASN,
@@ -27,31 +29,78 @@ fn ctx(owner_id: Uuid) -> AuthContext {
     }
 }
 
-fn field(display_name: &str) -> PrintFieldDefinitionInput {
-    PrintFieldDefinitionInput {
-        field_path: "asn.code".to_string(),
-        field_type: "string".to_string(),
+fn field_library_request() -> GeneratePrintFieldLibraryDraftRequest {
+    GeneratePrintFieldLibraryDraftRequest {
+        library_code: "m2_acceptance_record".to_string(),
+        library_name: "M2 验收记录字段库".to_string(),
+        business_module: "M2".to_string(),
         source_schema: "ReceivingOrder".to_string(),
-        display_name: display_name.to_string(),
-        group_code: "order".to_string(),
-        group_name: "订单信息".to_string(),
-        metadata: json!({
-            "sample_value": "ASN-202607050001",
-            "printable": true,
-            "sensitive": false,
-            "support_barcode": true
-        }),
-        sort_order: 10,
     }
 }
 
-fn publish_request(display_name: &str) -> PublishPrintFieldLibraryRequest {
-    PublishPrintFieldLibraryRequest {
-        library_code: "m2_acceptance_record".to_string(),
-        library_name: "M2 验收记录字段库".to_string(),
-        source_schema: "ReceivingOrder".to_string(),
-        fields: vec![field(display_name)],
-    }
+async fn published_library(
+    repo: &PgPrintTemplateRepository,
+    pool: &PgPool,
+    auth: &AuthContext,
+    display_name: &str,
+    now: chrono::DateTime<Utc>,
+    key: &str,
+) -> wms_api::print_template::PrintFieldLibraryVersion {
+    let openapi = serde_json::to_value(ApiDoc::openapi()).expect("OpenAPI should serialize");
+    let draft = repo
+        .generate_field_library_draft(
+            pool,
+            auth,
+            field_library_request(),
+            &openapi,
+            now,
+            &format!("{key}-draft"),
+        )
+        .await
+        .expect("field library draft should generate");
+    let field = repo
+        .list_field_version_fields(pool, draft.value.id)
+        .await
+        .expect("generated fields should list")
+        .into_iter()
+        .find(|field| field.field_path == "receipt_no")
+        .expect("receipt_no should be generated");
+    repo.update_field_definition(
+        pool,
+        auth,
+        draft.value.id,
+        field.id,
+        UpdatePrintFieldDefinitionRequest {
+            display_name: display_name.to_string(),
+            group_code: "order".to_string(),
+            group_name: "订单信息".to_string(),
+            description: "收货单号".to_string(),
+            example_value: Some(json!("ASN-202607050001")),
+            printable: true,
+            sensitive: false,
+            masking_rule: None,
+            formatting_rule: None,
+            supports_barcode: true,
+            supports_qrcode: false,
+            is_table_detail: false,
+            sort_order: 10,
+        },
+        now,
+        &format!("{key}-field"),
+    )
+    .await
+    .expect("draft field metadata should update");
+    repo.publish_field_library_draft(
+        pool,
+        auth,
+        draft.value.id,
+        &openapi,
+        now,
+        &format!("{key}-publish"),
+    )
+    .await
+    .expect("field library should publish")
+    .value
 }
 
 fn template_request(field_library_version_id: Uuid) -> SavePrintTemplateRequest {
@@ -72,7 +121,7 @@ fn template_request(field_library_version_id: Uuid) -> SavePrintTemplateRequest 
                     "printElements": [
                         {
                             "options": {
-                                "field": "asn.code",
+                                "field": "receipt_no",
                                 "title": "ASN 号",
                                 "left": 20,
                                 "top": 20,
@@ -86,7 +135,7 @@ fn template_request(field_library_version_id: Uuid) -> SavePrintTemplateRequest 
             ]
         }),
         field_bindings: vec![PrintTemplateBinding {
-            field_path: "asn.code".to_string(),
+            field_path: "receipt_no".to_string(),
             required: true,
         }],
         paper: json!({ "paperType": "A4", "width": 210, "height": 297 }),
@@ -105,16 +154,15 @@ async fn disabled_print_template_type_rejects_new_template(pool: PgPool) {
         .with_ymd_and_hms(2026, 7, 7, 8, 0, 0)
         .single()
         .expect("valid time");
-    let field_library = print_templates
-        .publish_field_library(
-            &pool,
-            &auth,
-            publish_request("ASN 号"),
-            now,
-            "h9-disabled-type-field-library",
-        )
-        .await
-        .expect("field library should publish");
+    let field_library = published_library(
+        &print_templates,
+        &pool,
+        &auth,
+        "ASN 号",
+        now,
+        "h9-disabled-type-field-library",
+    )
+    .await;
     dictionaries
         .disable_item(
             &auth,
@@ -130,7 +178,7 @@ async fn disabled_print_template_type_rejects_new_template(pool: PgPool) {
         .await
         .expect("template type should disable");
 
-    let mut request = template_request(field_library.value.id);
+    let mut request = template_request(field_library.id);
     request.template_type_code = PRINT_TEMPLATE_TYPE_ASN.to_string();
     let error = print_templates
         .save_template(
@@ -159,54 +207,59 @@ async fn published_field_library_versions_are_immutable_idempotent_and_audited(p
         .single()
         .expect("valid time");
 
-    let first = repo
-        .publish_field_library(
-            &pool,
-            &auth,
-            publish_request("ASN 号"),
-            now,
-            "h9-field-publish-1",
-        )
-        .await
-        .expect("first publish should create version");
-    assert_eq!(first.value.version_no, 1);
-    assert!(!first.replayed);
+    let first = published_library(&repo, &pool, &auth, "ASN 号", now, "h9-field-publish-1").await;
+    assert_eq!(first.version_no, 1);
 
+    let openapi = serde_json::to_value(ApiDoc::openapi()).expect("OpenAPI should serialize");
     let replay = repo
-        .publish_field_library(
+        .publish_field_library_draft(
             &pool,
             &auth,
-            publish_request("ASN 号"),
+            first.id,
+            &openapi,
             now,
-            "h9-field-publish-1",
+            "h9-field-publish-1-publish",
         )
         .await
         .expect("same idempotency key should replay first publish");
-    assert_eq!(replay.value.id, first.value.id);
+    assert_eq!(replay.value.id, first.id);
     assert!(replay.replayed);
 
-    let second = repo
-        .publish_field_library(
-            &pool,
-            &auth,
-            publish_request("ASN 编号"),
-            now + chrono::Duration::minutes(1),
-            "h9-field-publish-2",
-        )
-        .await
-        .expect("changed field metadata should create a new version");
-    assert_eq!(second.value.version_no, 2);
+    let second = published_library(
+        &repo,
+        &pool,
+        &auth,
+        "ASN 编号",
+        now + chrono::Duration::minutes(1),
+        "h9-field-publish-2",
+    )
+    .await;
+    assert_eq!(second.version_no, 2);
 
     let first_fields = repo
-        .list_field_version_fields(&pool, first.value.id)
+        .list_field_version_fields(&pool, first.id)
         .await
         .expect("first version fields should be queryable");
     let second_fields = repo
-        .list_field_version_fields(&pool, second.value.id)
+        .list_field_version_fields(&pool, second.id)
         .await
         .expect("second version fields should be queryable");
-    assert_eq!(first_fields[0].display_name, "ASN 号");
-    assert_eq!(second_fields[0].display_name, "ASN 编号");
+    assert_eq!(
+        first_fields
+            .iter()
+            .find(|field| field.field_path == "receipt_no")
+            .expect("first receipt_no")
+            .display_name,
+        "ASN 号"
+    );
+    assert_eq!(
+        second_fields
+            .iter()
+            .find(|field| field.field_path == "receipt_no")
+            .expect("second receipt_no")
+            .display_name,
+        "ASN 编号"
+    );
 
     let libraries = repo
         .list_field_libraries(&pool)
@@ -215,7 +268,7 @@ async fn published_field_library_versions_are_immutable_idempotent_and_audited(p
     assert_eq!(libraries.len(), 1);
     assert_eq!(libraries[0].library_code, "m2_acceptance_record");
     assert_eq!(libraries[0].version_no, 2);
-    assert_eq!(libraries[0].field_count, 1);
+    assert_eq!(libraries[0].field_count, second_fields.len() as i64);
 
     let audit_count: i64 = sqlx::query_scalar(
         r#"
@@ -230,7 +283,7 @@ async fn published_field_library_versions_are_immutable_idempotent_and_audited(p
     .fetch_one(&pool)
     .await
     .expect("audit count should query");
-    assert_eq!(audit_count, 2);
+    assert_eq!(audit_count, 6);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -242,28 +295,27 @@ async fn print_template_versions_are_listed_by_template_and_owner(pool: PgPool) 
         .with_ymd_and_hms(2026, 7, 7, 10, 0, 0)
         .single()
         .expect("valid time");
-    let field_library = repo
-        .publish_field_library(
-            &pool,
-            &auth,
-            publish_request("ASN 号"),
-            now,
-            "h9-field-publish-version-list",
-        )
-        .await
-        .expect("field library should publish");
+    let field_library = published_library(
+        &repo,
+        &pool,
+        &auth,
+        "ASN 号",
+        now,
+        "h9-field-publish-version-list",
+    )
+    .await;
 
     let first = repo
         .save_template(
             &pool,
             &auth,
-            template_request(field_library.value.id),
+            template_request(field_library.id),
             now + chrono::Duration::minutes(1),
             "h9-template-version-list-1",
         )
         .await
         .expect("first template version should save");
-    let mut second_request = template_request(field_library.value.id);
+    let mut second_request = template_request(field_library.id);
     second_request.template_name = "M2 ASN 调整模板".to_string();
     let second = repo
         .save_template(
@@ -303,22 +355,21 @@ async fn hiprint_template_publish_preview_and_print_are_versioned_idempotent_and
         .with_ymd_and_hms(2026, 7, 7, 9, 0, 0)
         .single()
         .expect("valid time");
-    let field_library = repo
-        .publish_field_library(
-            &pool,
-            &auth,
-            publish_request("ASN 号"),
-            now,
-            "h9-field-publish-template",
-        )
-        .await
-        .expect("field library should publish");
+    let field_library = published_library(
+        &repo,
+        &pool,
+        &auth,
+        "ASN 号",
+        now,
+        "h9-field-publish-template",
+    )
+    .await;
 
     let saved = repo
         .save_template(
             &pool,
             &auth,
-            template_request(field_library.value.id),
+            template_request(field_library.id),
             now + chrono::Duration::minutes(1),
             "h9-template-save-1",
         )
@@ -333,7 +384,7 @@ async fn hiprint_template_publish_preview_and_print_are_versioned_idempotent_and
         .save_template(
             &pool,
             &auth,
-            template_request(field_library.value.id),
+            template_request(field_library.id),
             now + chrono::Duration::minutes(1),
             "h9-template-save-1",
         )
@@ -350,7 +401,7 @@ async fn hiprint_template_publish_preview_and_print_are_versioned_idempotent_and
                 template_code: Some("m2_asn_default".to_string()),
                 template_type_code: PRINT_TEMPLATE_TYPE_ASN.to_string(),
                 business_document_id: "ASN-202607070001".to_string(),
-                data: json!({ "asn": { "code": "ASN-202607070001" } }),
+                data: json!({ "receipt_no": "ASN-202607070001" }),
             },
         )
         .await
@@ -374,7 +425,7 @@ async fn hiprint_template_publish_preview_and_print_are_versioned_idempotent_and
     assert_eq!(
         missing,
         wms_api::print_template::PrintTemplateError::TemplateFieldMissing(vec![
-            "asn.code".to_string()
+            "receipt_no".to_string()
         ])
     );
 
@@ -388,7 +439,7 @@ async fn hiprint_template_publish_preview_and_print_are_versioned_idempotent_and
                 business_module: "M2".to_string(),
                 business_document_type: "m2_asn".to_string(),
                 business_document_id: "ASN-202607070001".to_string(),
-                data: json!({ "asn": { "code": "ASN-202607070001" } }),
+                data: json!({ "receipt_no": "ASN-202607070001" }),
                 status: "printed".to_string(),
                 failure_reason: None,
             },
@@ -409,7 +460,7 @@ async fn hiprint_template_publish_preview_and_print_are_versioned_idempotent_and
                 template_code: Some("m2_asn_default".to_string()),
                 template_type_code: PRINT_TEMPLATE_TYPE_ASN.to_string(),
                 business_document_id: "ASN-202607070003".to_string(),
-                data: json!({ "asn": { "code": "ASN-202607070003" } }),
+                data: json!({ "receipt_no": "ASN-202607070003" }),
             },
         )
         .await

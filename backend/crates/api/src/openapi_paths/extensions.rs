@@ -67,6 +67,24 @@ pub(crate) fn resend_h4_notification_record() {}
 pub(crate) fn list_print_field_libraries() {}
 
 #[utoipa::path(
+    post,
+    path = "/api/v1/print-templates/field-libraries/drafts",
+    tag = "print-template",
+    params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")),
+    request_body = GeneratePrintFieldLibraryDraftRequest,
+    responses(
+        (status = 200, description = "从当前 OpenAPI schema 生成字段库草稿", body = PrintFieldLibraryVersion),
+        (status = 400, description = "缺少幂等键", body = ErrorResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+        (status = 409, description = "幂等冲突", body = ErrorResponse),
+        (status = 422, description = "schema 不存在或请求非法", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn generate_print_field_library_draft() {}
+
+#[utoipa::path(
     get,
     path = "/api/v1/print-templates/field-libraries/{version_id}/fields",
     tag = "print-template",
@@ -79,6 +97,50 @@ pub(crate) fn list_print_field_libraries() {}
 )]
 #[allow(dead_code)]
 pub(crate) fn list_print_field_definitions() {}
+
+#[utoipa::path(
+    patch,
+    path = "/api/v1/print-templates/field-libraries/{version_id}/fields/{field_id}",
+    tag = "print-template",
+    params(
+        ("version_id" = uuid::Uuid, Path, description = "字段库版本 ID"),
+        ("field_id" = uuid::Uuid, Path, description = "字段定义 ID"),
+        ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")
+    ),
+    request_body = UpdatePrintFieldDefinitionRequest,
+    responses(
+        (status = 200, description = "更新草稿字段元数据", body = PrintFieldDefinition),
+        (status = 400, description = "缺少幂等键", body = ErrorResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+        (status = 404, description = "字段库版本或字段不存在", body = ErrorResponse),
+        (status = 409, description = "已发布版本不可修改或幂等冲突", body = ErrorResponse),
+        (status = 422, description = "字段元数据非法", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn update_print_field_definition() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/print-templates/field-libraries/{version_id}/publish",
+    tag = "print-template",
+    params(
+        ("version_id" = uuid::Uuid, Path, description = "字段库版本 ID"),
+        ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")
+    ),
+    responses(
+        (status = 200, description = "发布字段库草稿", body = PrintFieldLibraryVersion),
+        (status = 400, description = "缺少幂等键", body = ErrorResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+        (status = 404, description = "字段库版本不存在", body = ErrorResponse),
+        (status = 409, description = "已发布版本不可重复改写或幂等冲突", body = ErrorResponse),
+        (status = 422, description = "字段路径已不在当前 OpenAPI schema", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn publish_print_field_library() {}
 
 #[utoipa::path(
     get,

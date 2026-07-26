@@ -3,12 +3,13 @@ pub use crate::document_numbering::{
     UpsertDocumentNumberRuleRequest,
 };
 pub use crate::print_template::{
-    PrintFieldDefinition, PrintFieldDefinitionListResponse, PrintFieldLibraryListResponse,
-    PrintFieldLibrarySummary, PrintRecord, PrintTemplateBinding, PrintTemplateListResponse,
-    PrintTemplatePreviewRequest, PrintTemplatePreviewResponse, PrintTemplatePrintRequest,
-    PrintTemplateScope, PrintTemplateSummary, PrintTemplateVersion,
-    PrintTemplateVersionListResponse, ResolvePrintTemplateRequest, ResolvePrintTemplateResponse,
-    SavePrintTemplateRequest,
+    GeneratePrintFieldLibraryDraftRequest, PrintFieldDefinition, PrintFieldDefinitionListResponse,
+    PrintFieldLibraryListResponse, PrintFieldLibrarySummary, PrintFieldLibraryVersion, PrintRecord,
+    PrintTemplateBinding, PrintTemplateListResponse, PrintTemplatePreviewRequest,
+    PrintTemplatePreviewResponse, PrintTemplatePrintRequest, PrintTemplateScope,
+    PrintTemplateSummary, PrintTemplateVersion, PrintTemplateVersionListResponse,
+    ResolvePrintTemplateRequest, ResolvePrintTemplateResponse, SavePrintTemplateRequest,
+    UpdatePrintFieldDefinitionRequest,
 };
 pub use crate::role_management::{
     BatchAssignRolesRequest, BatchAssignRolesResponse, CreateRoleRequest, CreateUserRequest,

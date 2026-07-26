@@ -1,42 +1,3 @@
-fn validate_publish_request(
-    req: &PublishPrintFieldLibraryRequest,
-) -> Result<(), PrintTemplateError> {
-    if req.library_code.trim().is_empty() {
-        return Err(PrintTemplateError::InvalidRequest(
-            "library_code is required".to_string(),
-        ));
-    }
-    if req.library_name.trim().is_empty() {
-        return Err(PrintTemplateError::InvalidRequest(
-            "library_name is required".to_string(),
-        ));
-    }
-    if req.source_schema.trim().is_empty() {
-        return Err(PrintTemplateError::InvalidRequest(
-            "source_schema is required".to_string(),
-        ));
-    }
-    if req.fields.is_empty() {
-        return Err(PrintTemplateError::InvalidRequest(
-            "fields are required".to_string(),
-        ));
-    }
-    let mut paths = BTreeSet::new();
-    for field in &req.fields {
-        if field.field_path.trim().is_empty() {
-            return Err(PrintTemplateError::InvalidRequest(
-                "field_path is required".to_string(),
-            ));
-        }
-        if !paths.insert(field.field_path.as_str()) {
-            return Err(PrintTemplateError::InvalidRequest(format!(
-                "duplicate field_path: {}",
-                field.field_path
-            )));
-        }
-    }
-    Ok(())
-}
 fn validate_template_request(req: &SavePrintTemplateRequest) -> Result<(), PrintTemplateError> {
     if req.template_code.trim().is_empty() {
         return Err(PrintTemplateError::InvalidRequest(
@@ -173,65 +134,6 @@ fn value_at_path<'a>(data: &'a Value, path: &str) -> Option<&'a Value> {
     } else {
         Some(current)
     }
-}
-
-async fn upsert_library_for_update(
-    tx: &mut Transaction<'_, Postgres>,
-    req: &PublishPrintFieldLibraryRequest,
-    now: DateTime<Utc>,
-) -> Result<Uuid, PrintTemplateError> {
-    let existing: Option<(Uuid,)> = sqlx::query_as(
-        r#"
-        SELECT id
-          FROM print_field_libraries
-         WHERE library_code = $1
-         FOR UPDATE
-        "#,
-    )
-    .bind(&req.library_code)
-    .fetch_optional(&mut **tx)
-    .await
-    .map_err(map_db_error)?;
-
-    if let Some((id,)) = existing {
-        sqlx::query(
-            r#"
-            UPDATE print_field_libraries
-               SET library_name = $1,
-                   source_schema = $2,
-                   updated_at = $3,
-                   version = version + 1
-             WHERE id = $4
-            "#,
-        )
-        .bind(&req.library_name)
-        .bind(&req.source_schema)
-        .bind(now)
-        .bind(id)
-        .execute(&mut **tx)
-        .await
-        .map_err(map_db_error)?;
-        return Ok(id);
-    }
-
-    let id = Uuid::new_v4();
-    sqlx::query(
-        r#"
-        INSERT INTO print_field_libraries (
-            id, library_code, library_name, source_schema, created_at, updated_at
-        )
-        VALUES ($1, $2, $3, $4, $5, $5)
-        "#,
-    )
-    .bind(id)
-    .bind(&req.library_code)
-    .bind(&req.library_name)
-    .bind(&req.source_schema)
-    .bind(now)
-    .execute(&mut **tx)
-    .await
-    .map_err(map_db_error)?;
-    Ok(id)
 }
 
 async fn next_version_no(

@@ -100,23 +100,6 @@ async fn store_idempotency_success<T: Serialize>(
     Ok(())
 }
 
-async fn append_publish_audit(
-    tx: &mut Transaction<'_, Postgres>,
-    ctx: &AuthContext,
-    version: &PrintFieldLibraryVersion,
-    now: DateTime<Utc>,
-) -> Result<(), PrintTemplateError> {
-    append_h9_audit(
-        tx,
-        ctx,
-        "publish_field_library",
-        "print_field_library",
-        version.id,
-        now,
-    )
-    .await
-}
-
 async fn append_h9_audit(
     tx: &mut Transaction<'_, Postgres>,
     ctx: &AuthContext,
@@ -124,6 +107,7 @@ async fn append_h9_audit(
     resource_type: &str,
     resource_id: Uuid,
     now: DateTime<Utc>,
+    diff: Option<AuditDiff>,
 ) -> Result<(), PrintTemplateError> {
     let mut audit = AuditWriteRequest::from_auth_context(
         ctx,
@@ -131,7 +115,7 @@ async fn append_h9_audit(
         "H9",
         resource_type,
         resource_id.to_string(),
-        None,
+        diff,
     );
     audit.occurred_at = now;
     append_event_in_tx(tx, &audit)

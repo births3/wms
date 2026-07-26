@@ -2630,8 +2630,8 @@
           }
         },
         "security": [],
-        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。",
-        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。"
+        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。",
+        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。"
       }
     },
     "/api/v1/auth/logout": {
@@ -16856,6 +16856,97 @@
         }
       }
     },
+    "/api/v1/print-templates/field-libraries/drafts": {
+      "post": {
+        "tags": [
+          "print-template"
+        ],
+        "operationId": "generate_print_field_library_draft",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GeneratePrintFieldLibraryDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "从当前 OpenAPI schema 生成字段库草稿",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintFieldLibraryVersion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "schema 不存在或请求非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/print-templates/field-libraries/{version_id}/fields": {
       "get": {
         "tags": [
@@ -16897,6 +16988,228 @@
           },
           "403": {
             "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/print-templates/field-libraries/{version_id}/fields/{field_id}": {
+      "patch": {
+        "tags": [
+          "print-template"
+        ],
+        "operationId": "update_print_field_definition",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "description": "字段库版本 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "field_id",
+            "in": "path",
+            "description": "字段定义 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePrintFieldDefinitionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "更新草稿字段元数据",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintFieldDefinition"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "字段库版本或字段不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "已发布版本不可修改或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "字段元数据非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/print-templates/field-libraries/{version_id}/publish": {
+      "post": {
+        "tags": [
+          "print-template"
+        ],
+        "operationId": "publish_print_field_library",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "description": "字段库版本 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "发布字段库草稿",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintFieldLibraryVersion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "字段库版本不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "已发布版本不可重复改写或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "字段路径已不在当前 OpenAPI schema",
             "content": {
               "application/json": {
                 "schema": {
@@ -26000,34 +26313,41 @@
         ],
         "properties": {
           "document_type": {
-            "type": "string"
+            "type": "string",
+            "description": "单据类型"
           },
           "expected_arrival_at": {
             "type": "string",
             "format": "date-time",
+            "description": "预计到货时间",
             "nullable": true
           },
           "external_ref": {
             "type": "string",
+            "description": "外部来源号",
             "nullable": true
           },
           "lines": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ReceivingOrderLine"
-            }
+            },
+            "description": "收货明细"
           },
           "receipt_no": {
-            "type": "string"
+            "type": "string",
+            "description": "收货单号"
           },
           "supplier_id": {
             "type": "string",
             "format": "uuid",
+            "description": "供应商 ID",
             "nullable": true
           },
           "warehouse_id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "仓库 ID"
           }
         }
       },
@@ -28047,6 +28367,29 @@
             "type": "string"
           },
           "period_start": {
+            "type": "string"
+          }
+        }
+      },
+      "GeneratePrintFieldLibraryDraftRequest": {
+        "type": "object",
+        "required": [
+          "library_code",
+          "library_name",
+          "business_module",
+          "source_schema"
+        ],
+        "properties": {
+          "business_module": {
+            "type": "string"
+          },
+          "library_code": {
+            "type": "string"
+          },
+          "library_name": {
+            "type": "string"
+          },
+          "source_schema": {
             "type": "string"
           }
         }
@@ -32132,18 +32475,33 @@
           "display_name",
           "group_code",
           "group_name",
-          "metadata",
+          "description",
+          "printable",
+          "sensitive",
+          "supports_barcode",
+          "supports_qrcode",
+          "is_table_detail",
           "sort_order"
         ],
         "properties": {
+          "description": {
+            "type": "string"
+          },
           "display_name": {
             "type": "string"
+          },
+          "example_value": {
+            "nullable": true
           },
           "field_path": {
             "type": "string"
           },
           "field_type": {
             "type": "string"
+          },
+          "formatting_rule": {
+            "type": "string",
+            "nullable": true
           },
           "group_code": {
             "type": "string"
@@ -32155,17 +32513,35 @@
             "type": "string",
             "format": "uuid"
           },
+          "is_table_detail": {
+            "type": "boolean"
+          },
           "library_version_id": {
             "type": "string",
             "format": "uuid"
           },
-          "metadata": {},
+          "masking_rule": {
+            "type": "string",
+            "nullable": true
+          },
+          "printable": {
+            "type": "boolean"
+          },
+          "sensitive": {
+            "type": "boolean"
+          },
           "sort_order": {
             "type": "integer",
             "format": "int32"
           },
           "source_schema": {
             "type": "string"
+          },
+          "supports_barcode": {
+            "type": "boolean"
+          },
+          "supports_qrcode": {
+            "type": "boolean"
           }
         }
       },
@@ -32211,18 +32587,26 @@
           "id",
           "library_code",
           "library_name",
+          "business_module",
           "source_schema",
           "latest_version_id",
           "version_no",
+          "latest_version_status",
           "field_count",
           "created_at",
-          "published_at",
-          "published_by"
+          "created_by"
         ],
         "properties": {
+          "business_module": {
+            "type": "string"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "created_by": {
+            "type": "string",
+            "format": "uuid"
           },
           "field_count": {
             "type": "integer",
@@ -32232,9 +32616,22 @@
             "type": "string",
             "format": "uuid"
           },
+          "latest_published_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "latest_published_version_no": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
           "latest_version_id": {
             "type": "string",
             "format": "uuid"
+          },
+          "latest_version_status": {
+            "type": "string"
           },
           "library_code": {
             "type": "string"
@@ -32244,13 +32641,77 @@
           },
           "published_at": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "nullable": true
           },
           "published_by": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "nullable": true
           },
           "source_schema": {
+            "type": "string"
+          },
+          "version_no": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PrintFieldLibraryVersion": {
+        "type": "object",
+        "required": [
+          "id",
+          "library_id",
+          "library_code",
+          "library_name",
+          "business_module",
+          "source_schema",
+          "version_no",
+          "status",
+          "created_at",
+          "created_by"
+        ],
+        "properties": {
+          "business_module": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "created_by": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "library_code": {
+            "type": "string"
+          },
+          "library_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "library_name": {
+            "type": "string"
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "published_by": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "source_schema": {
+            "type": "string"
+          },
+          "status": {
             "type": "string"
           },
           "version_no": {
@@ -33856,31 +34317,38 @@
         "properties": {
           "batch_no": {
             "type": "string",
+            "description": "批号",
             "nullable": true
           },
           "expected_qty": {
             "type": "integer",
-            "format": "int64"
+            "format": "int64",
+            "description": "预计数量"
           },
           "expiry_date": {
             "type": "string",
+            "description": "有效期至",
             "nullable": true
           },
           "line_no": {
             "type": "integer",
             "format": "int32",
+            "description": "明细行号",
             "minimum": 0
           },
           "product_code": {
-            "type": "string"
+            "type": "string",
+            "description": "商品编码"
           },
           "product_id": {
             "type": "string",
             "format": "uuid",
+            "description": "商品主数据 ID",
             "nullable": true
           },
           "production_date": {
             "type": "string",
+            "description": "生产日期",
             "nullable": true
           }
         }
@@ -37173,6 +37641,65 @@
             "type": "string",
             "format": "uuid",
             "nullable": true
+          }
+        }
+      },
+      "UpdatePrintFieldDefinitionRequest": {
+        "type": "object",
+        "required": [
+          "display_name",
+          "group_code",
+          "group_name",
+          "description",
+          "printable",
+          "sensitive",
+          "supports_barcode",
+          "supports_qrcode",
+          "is_table_detail",
+          "sort_order"
+        ],
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "example_value": {
+            "nullable": true
+          },
+          "formatting_rule": {
+            "type": "string",
+            "nullable": true
+          },
+          "group_code": {
+            "type": "string"
+          },
+          "group_name": {
+            "type": "string"
+          },
+          "is_table_detail": {
+            "type": "boolean"
+          },
+          "masking_rule": {
+            "type": "string",
+            "nullable": true
+          },
+          "printable": {
+            "type": "boolean"
+          },
+          "sensitive": {
+            "type": "boolean"
+          },
+          "sort_order": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "supports_barcode": {
+            "type": "boolean"
+          },
+          "supports_qrcode": {
+            "type": "boolean"
           }
         }
       },
