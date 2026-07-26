@@ -627,7 +627,7 @@ pub async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
             templates.remark,
             1,
             'published',
-            '{"panels":[{"index":0,"paperType":"A4","width":210,"height":297,"printElements":[{"options":{"field":"asn.code","title":"ASN 号","left":20,"top":20,"width":120,"height":20},"printElementType":{"type":"text"}}]}]}'::jsonb,
+            '{"panels":[{"index":0,"paperType":"A4","width":210,"height":297,"printElements":[{"options":{"field":"asn.code","title":"ASN 号","left":20,"top":20,"width":260,"height":20},"printElementType":{"type":"text"}}]}]}'::jsonb,
             '[{"field_path":"asn.code","required":true},{"field_path":"product.code","required":false}]'::jsonb,
             '{"paperType":"A4","width":210,"height":297,"direction":"portrait"}'::jsonb,
             'hiprint@0.4.0',
