@@ -91,7 +91,7 @@ async fn seed_asn_references(
         .product_code
         .clone();
     let product_id: Uuid = sqlx::query_scalar(
-        "INSERT INTO products (id, owner_id, product_code, product_name, specification, storage_condition, attrs, status) VALUES ($1, $2, $3, 'M2 Test Product', '1 unit', 'normal', '{\"unit_volume_cm3\": 1}', 'active') ON CONFLICT (owner_id, product_code) DO UPDATE SET attrs = EXCLUDED.attrs, status = 'active' RETURNING id",
+        "INSERT INTO products (id, owner_id, product_code, product_name, specification, storage_condition, volume_cm3, status) VALUES ($1, $2, $3, 'M2 Test Product', '1 unit', 'normal', 1, 'active') ON CONFLICT (owner_id, product_code) DO UPDATE SET volume_cm3 = EXCLUDED.volume_cm3, status = 'active' RETURNING id",
     )
     .bind(Uuid::new_v4())
     .bind(owner_id)

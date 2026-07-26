@@ -58,7 +58,7 @@ async fn seed_loss_fixture(pool: &PgPool, category: &str) -> (Uuid, Uuid, Uuid, 
     .await
     .expect("warehouse should seed");
     sqlx::query(
-        "INSERT INTO products (id, owner_id, product_code, product_name, specification, storage_condition, special_drug_category, attrs, status) VALUES ($1, $2, $3, '报损测试商品', '1 unit', 'normal', $4, '{\"unit_volume_cm3\":100}', 'active')",
+        "INSERT INTO products (id, owner_id, product_code, product_name, specification, storage_condition, special_drug_category, volume_cm3, status) VALUES ($1, $2, $3, '报损测试商品', '1 unit', 'normal', $4, 100, 'active')",
     )
     .bind(product_id)
     .bind(owner_id)

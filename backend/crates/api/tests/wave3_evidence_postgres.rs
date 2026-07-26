@@ -57,7 +57,7 @@ fn receiving_order_req(receipt_no: &str) -> CreateReceivingOrderRequest {
 
 async fn seed_product(pool: &PgPool, owner_id: Uuid, product_code: &str) {
     sqlx::query(
-        "INSERT INTO products (id, owner_id, product_code, product_name, specification, storage_condition, attrs, status) VALUES ($1, $2, $3, 'Evidence Product', '1 unit', 'normal', '{\"unit_volume_cm3\": 1}', 'active')",
+        "INSERT INTO products (id, owner_id, product_code, product_name, specification, storage_condition, volume_cm3, status) VALUES ($1, $2, $3, 'Evidence Product', '1 unit', 'normal', 1, 'active')",
     )
     .bind(Uuid::new_v4())
     .bind(owner_id)
