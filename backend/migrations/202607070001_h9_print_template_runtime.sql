@@ -7,6 +7,10 @@ CREATE TABLE IF NOT EXISTS print_templates (
     template_name       TEXT NOT NULL,
     template_type_code  TEXT NOT NULL,
     scope               TEXT NOT NULL CHECK (scope IN ('global', 'owner')),
+    CHECK (
+        (scope = 'global' AND owner_id = '00000000-0000-0000-0000-000000000000'::uuid)
+        OR (scope = 'owner' AND owner_id <> '00000000-0000-0000-0000-000000000000'::uuid)
+    ),
     enabled             BOOLEAN NOT NULL DEFAULT TRUE,
     is_default          BOOLEAN NOT NULL DEFAULT FALSE,
     remark              TEXT,

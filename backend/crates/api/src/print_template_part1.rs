@@ -72,6 +72,13 @@ impl PrintTemplateScope {
     }
 }
 
+fn template_owner_id(ctx: &AuthContext, scope: &PrintTemplateScope) -> Uuid {
+    match scope {
+        PrintTemplateScope::Global => Uuid::nil(),
+        PrintTemplateScope::Owner => ctx.owner_id,
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize, ToSchema)]
 pub struct GeneratePrintFieldLibraryDraftRequest {
     pub library_code: String,
@@ -439,11 +446,13 @@ impl PgPrintTemplateRepository {
                  ORDER BY version_no DESC
                  LIMIT 1
               ) latest_versions ON TRUE
-             WHERE templates.owner_id = $1
+             WHERE (templates.scope = 'owner' AND templates.owner_id = $1)
+                OR (templates.scope = 'global' AND templates.owner_id = $2)
              ORDER BY latest_versions.template_type_code ASC, templates.template_code ASC
             "#,
         )
         .bind(ctx.owner_id)
+        .bind(Uuid::nil())
         .fetch_all(pool)
         .await
         .map_err(map_db_error)?;
@@ -484,13 +493,17 @@ impl PgPrintTemplateRepository {
                 versions.published_by
               FROM print_template_versions versions
               JOIN print_templates templates ON templates.id = versions.template_id
-             WHERE templates.owner_id = $1
-               AND templates.id = $2
+             WHERE templates.id = $2
+               AND (
+                    (templates.scope = 'owner' AND templates.owner_id = $1)
+                    OR (templates.scope = 'global' AND templates.owner_id = $3)
+               )
              ORDER BY versions.version_no DESC
             "#,
         )
         .bind(ctx.owner_id)
         .bind(template_id)
+        .bind(Uuid::nil())
         .fetch_all(pool)
         .await
         .map_err(map_db_error)?;
@@ -538,7 +551,9 @@ impl PgPrintTemplateRepository {
             )]));
         }
 
-        let (template_id, enabled) = upsert_template_for_update(&mut tx, ctx, &req, now).await?;
+        let template_owner_id = template_owner_id(ctx, &req.scope);
+        let (template_id, enabled) =
+            upsert_template_for_update(&mut tx, ctx, &req, template_owner_id, now).await?;
         let version_no = next_template_version_no(&mut tx, template_id).await?;
         let version_id = Uuid::new_v4();
         let row = sqlx::query_as::<_, PrintTemplateVersionRow>(
@@ -601,7 +616,7 @@ impl PgPrintTemplateRepository {
         .bind(now)
         .bind(ctx.user_id)
         .bind(&req.template_code)
-        .bind(ctx.owner_id)
+        .bind(template_owner_id)
         .bind(enabled)
         .fetch_one(&mut *tx)
         .await

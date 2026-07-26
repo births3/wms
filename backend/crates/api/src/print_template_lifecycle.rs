@@ -80,7 +80,10 @@ impl PgPrintTemplateRepository {
                    updated_by = $7,
                    version = version + 1
              WHERE id = $8
-               AND owner_id = $9
+               AND (
+                    (scope = 'owner' AND owner_id = $9)
+                    OR (scope = 'global' AND owner_id = $10)
+               )
             "#,
         )
         .bind(&before.template_name)
@@ -92,6 +95,7 @@ impl PgPrintTemplateRepository {
         .bind(ctx.user_id)
         .bind(template_id)
         .bind(ctx.owner_id)
+        .bind(Uuid::nil())
         .execute(&mut *tx)
         .await
         .map_err(map_db_error)?;
@@ -185,7 +189,10 @@ impl PgPrintTemplateRepository {
                    updated_by = $3,
                    version = version + 1
              WHERE id = $4
-               AND owner_id = $5
+               AND (
+                    (scope = 'owner' AND owner_id = $5)
+                    OR (scope = 'global' AND owner_id = $6)
+               )
             "#,
         )
         .bind(enabled)
@@ -193,6 +200,7 @@ impl PgPrintTemplateRepository {
         .bind(ctx.user_id)
         .bind(template_id)
         .bind(ctx.owner_id)
+        .bind(Uuid::nil())
         .execute(&mut *tx)
         .await
         .map_err(map_db_error)?;

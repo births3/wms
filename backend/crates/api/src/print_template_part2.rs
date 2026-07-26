@@ -151,8 +151,17 @@ async fn effective_template_type_field_library_code_in_tx(
     template_type_code: &str,
     now: DateTime<Utc>,
 ) -> Result<Option<String>, PrintTemplateError> {
-    sqlx::query_scalar(
-        r#"
+    sqlx::query_scalar(EFFECTIVE_TEMPLATE_TYPE_FIELD_LIBRARY_SQL)
+        .bind(owner_id)
+        .bind(SYSTEM_DICTIONARY_PRINT_TEMPLATE_TYPE)
+        .bind(template_type_code)
+        .bind(now)
+        .fetch_optional(&mut **tx)
+        .await
+        .map_err(map_db_error)
+}
+
+const EFFECTIVE_TEMPLATE_TYPE_FIELD_LIBRARY_SQL: &str = r#"
         WITH scoped_items AS (
             SELECT item.enabled,
                    item.params,
@@ -175,15 +184,47 @@ async fn effective_template_type_field_library_code_in_tx(
           FROM scoped_items
          WHERE scope_rank = 1
            AND enabled = TRUE
+        "#;
+
+async fn validate_resolved_template(
+    pool: &PgPool,
+    ctx: &AuthContext,
+    version: &PrintTemplateVersion,
+) -> Result<(), PrintTemplateError> {
+    let library: Option<(String, String)> = sqlx::query_as(
+        r#"
+        SELECT versions.status, libraries.library_code
+          FROM print_field_library_versions versions
+          JOIN print_field_libraries libraries ON libraries.id = versions.library_id
+         WHERE versions.id = $1
         "#,
     )
-    .bind(owner_id)
-    .bind(SYSTEM_DICTIONARY_PRINT_TEMPLATE_TYPE)
-    .bind(template_type_code)
-    .bind(now)
-    .fetch_optional(&mut **tx)
+    .bind(version.field_library_version_id)
+    .fetch_optional(pool)
     .await
-    .map_err(map_db_error)
+    .map_err(map_db_error)?;
+    let Some((status, library_code)) = library else {
+        return Err(PrintTemplateError::FieldLibraryNotPublished);
+    };
+    if status != "published" {
+        return Err(PrintTemplateError::FieldLibraryNotPublished);
+    }
+    let expected_library_code: String =
+        sqlx::query_scalar(EFFECTIVE_TEMPLATE_TYPE_FIELD_LIBRARY_SQL)
+        .bind(ctx.owner_id)
+        .bind(SYSTEM_DICTIONARY_PRINT_TEMPLATE_TYPE)
+        .bind(&version.template_type_code)
+        .bind(Utc::now())
+        .fetch_optional(pool)
+        .await
+        .map_err(map_db_error)?
+        .ok_or(PrintTemplateError::TemplateDisabled)?;
+    if expected_library_code != library_code {
+        return Err(PrintTemplateError::TemplateFieldMismatch(vec![format!(
+            "field_library_code:{library_code}"
+        )]));
+    }
+    Ok(())
 }
 
 fn validate_required_fields(
@@ -303,6 +344,7 @@ async fn upsert_template_for_update(
     tx: &mut Transaction<'_, Postgres>,
     ctx: &AuthContext,
     req: &SavePrintTemplateRequest,
+    template_owner_id: Uuid,
     now: DateTime<Utc>,
 ) -> Result<(Uuid, bool), PrintTemplateError> {
     if let Some(template_id) = req.template_id {
@@ -315,7 +357,7 @@ async fn upsert_template_for_update(
              FOR UPDATE
             "#,
         )
-        .bind(ctx.owner_id)
+        .bind(template_owner_id)
         .bind(template_id)
         .fetch_optional(&mut **tx)
         .await
@@ -341,7 +383,7 @@ async fn upsert_template_for_update(
         )
         "#,
     )
-    .bind(ctx.owner_id)
+    .bind(template_owner_id)
     .bind(&req.template_code)
     .fetch_one(&mut **tx)
     .await
@@ -362,7 +404,7 @@ async fn upsert_template_for_update(
         "#,
     )
     .bind(id)
-    .bind(ctx.owner_id)
+    .bind(template_owner_id)
     .bind(&req.template_code)
     .bind(&req.template_name)
     .bind(&req.template_type_code)
@@ -438,14 +480,20 @@ async fn resolve_template_version(
                  ORDER BY version_no DESC
                  LIMIT 1
               ) versions ON TRUE
-             WHERE templates.owner_id = $1
-               AND templates.template_code = $2
-               AND templates.template_type_code = $3
+         WHERE templates.template_code = $2
+           AND templates.template_type_code = $3
+           AND (
+                (templates.scope = 'owner' AND templates.owner_id = $1)
+                OR (templates.scope = 'global' AND templates.owner_id = $4)
+           )
+         ORDER BY CASE templates.scope WHEN 'owner' THEN 0 ELSE 1 END
+         LIMIT 1
             "#,
         )
         .bind(ctx.owner_id)
         .bind(code)
         .bind(template_type_code)
+        .bind(Uuid::nil())
         .fetch_optional(pool)
         .await
         .map_err(map_db_error)?
@@ -454,6 +502,7 @@ async fn resolve_template_version(
         if !version.enabled {
             return Err(PrintTemplateError::TemplateDisabled);
         }
+        validate_resolved_template(pool, ctx, &version).await?;
         return Ok(version);
     }
 
@@ -489,23 +538,29 @@ async fn resolve_template_version(
              ORDER BY version_no DESC
              LIMIT 1
           ) versions ON TRUE
-         WHERE templates.owner_id = $1
-           AND templates.template_type_code = $2
+         WHERE templates.template_type_code = $2
            AND templates.enabled = TRUE
+           AND templates.is_default = TRUE
+           AND (
+                (templates.scope = 'owner' AND templates.owner_id = $1)
+                OR (templates.scope = 'global' AND templates.owner_id = $3)
+           )
          ORDER BY
            CASE templates.scope WHEN 'owner' THEN 0 ELSE 1 END,
-           templates.is_default DESC,
            templates.updated_at DESC
          LIMIT 1
         "#,
     )
     .bind(ctx.owner_id)
     .bind(template_type_code)
+    .bind(Uuid::nil())
     .fetch_optional(pool)
     .await
     .map_err(map_db_error)?
     .ok_or(PrintTemplateError::TemplateNotFound)?;
-    PrintTemplateVersion::try_from(row)
+    let version = PrintTemplateVersion::try_from(row)?;
+    validate_resolved_template(pool, ctx, &version).await?;
+    Ok(version)
 }
 
 async fn template_version_in_tx(
@@ -540,15 +595,19 @@ async fn template_version_in_tx(
             versions.published_by
           FROM print_template_versions versions
           JOIN print_templates templates ON templates.id = versions.template_id
-         WHERE templates.owner_id = $1
-           AND templates.id = $2
+         WHERE templates.id = $2
            AND versions.id = $3
+           AND (
+                (templates.scope = 'owner' AND templates.owner_id = $1)
+                OR (templates.scope = 'global' AND templates.owner_id = $4)
+           )
          FOR UPDATE OF templates, versions
         "#,
     )
     .bind(owner_id)
     .bind(template_id)
     .bind(version_id)
+    .bind(Uuid::nil())
     .fetch_optional(&mut **tx)
     .await
     .map_err(map_db_error)?
@@ -591,13 +650,17 @@ async fn template_summary_in_tx(
              ORDER BY version_no DESC
              LIMIT 1
           ) latest_versions ON TRUE
-         WHERE templates.owner_id = $1
-           AND templates.id = $2
+         WHERE templates.id = $2
+           AND (
+                (templates.scope = 'owner' AND templates.owner_id = $1)
+                OR (templates.scope = 'global' AND templates.owner_id = $3)
+           )
          FOR UPDATE OF templates
         "#,
     )
     .bind(owner_id)
     .bind(template_id)
+    .bind(Uuid::nil())
     .fetch_optional(&mut **tx)
     .await
     .map_err(map_db_error)?
