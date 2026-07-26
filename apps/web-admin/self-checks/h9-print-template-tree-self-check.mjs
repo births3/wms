@@ -9,6 +9,7 @@ const querySource = read("src/features/print-template/print-template-queries.ts"
 const designerSource = read("src/pages/print-template/H9TemplateDesignerDialog.tsx");
 const hiprintSource = read("src/pages/print-template/H9HiprintDesigner.tsx");
 const previewSource = read("src/pages/print-template/H9TemplatePreviewDialog.tsx");
+const fieldLibrarySource = read("src/pages/print-template/H9FieldLibraryDialog.tsx");
 const dictionaryPageSource = read("src/pages/master-data/SystemDictionaryPage.tsx");
 const dictionaryPrintTypeFieldsSource = read(
   "src/pages/master-data/PrintTemplateTypeFields.tsx",
@@ -40,6 +41,9 @@ assert.match(pageSource, /version-history/);
 assert.match(pageSource, /版本历史/);
 assert.match(pageSource, /H9TemplateDesignerDialog/);
 assert.match(pageSource, /H9TemplatePreviewDialog/);
+assert.match(pageSource, /H9FieldLibraryDialog/);
+assert.match(pageSource, /h9\.print_template\.write/);
+assert.match(pageSource, /h9\.print_template\.publish/);
 assert.match(querySource, /usePrintTemplateTypesQuery/);
 assert.match(querySource, /usePrintTemplatesQuery/);
 assert.match(querySource, /usePrintFieldDefinitionsQuery/);
@@ -48,9 +52,15 @@ assert.match(querySource, /useResolvePrintTemplateMutation/);
 assert.match(querySource, /usePrintTemplateVersionsMutation/);
 assert.match(querySource, /usePreviewPrintTemplateMutation/);
 assert.match(querySource, /useRecordPrintTemplateMutation/);
+assert.match(querySource, /useGeneratePrintFieldLibraryDraftMutation/);
+assert.match(querySource, /useUpdatePrintFieldDefinitionMutation/);
+assert.match(querySource, /usePublishPrintFieldLibraryMutation/);
 assert.match(querySource, /print_template_type/);
 assert.match(querySource, /\/api\/v1\/print-templates\/field-libraries/);
 assert.match(querySource, /\/api\/v1\/print-templates\/field-libraries\/\{version_id\}\/fields/);
+assert.match(querySource, /\/api\/v1\/print-templates\/field-libraries\/drafts/);
+assert.match(querySource, /\/api\/v1\/print-templates\/field-libraries\/\{version_id\}\/fields\/\{field_id\}/);
+assert.match(querySource, /\/api\/v1\/print-templates\/field-libraries\/\{version_id\}\/publish/);
 assert.match(querySource, /\/api\/v1\/print-templates\/templates/);
 assert.match(querySource, /\/api\/v1\/print-templates\/templates\/\{template_id\}\/versions/);
 assert.match(querySource, /\/api\/v1\/print-templates\/resolve/);
@@ -92,6 +102,26 @@ assert.match(previewSource, /template\.getHtml/);
 assert.match(previewSource, /纸张方向/);
 assert.match(previewSource, /applyPreviewPaperDirection/);
 assert.match(previewSource, /templateRef\.current\?\.print/);
+for (const label of [
+  "字段库编码",
+  "字段库名称",
+  "业务模块",
+  "来源 Schema",
+  "显示名称",
+  "分组编码",
+  "分组名称",
+  "说明",
+  "示例值",
+  "脱敏规则",
+  "格式化规则",
+  "支持条码",
+  "支持二维码",
+  "表格明细字段",
+]) {
+  assert.match(fieldLibrarySource, new RegExp(label));
+}
+assert.match(fieldLibrarySource, /latestVersionId/);
+assert.match(designerSource, /publishedVersionId/);
 assert.match(dictionaryPageSource, /activeGroup\.code === "print_template_type"/);
 assert.match(dictionaryPageSource, /m1\.system_dictionary\.write/);
 assert.match(dictionaryPageSource, /m1\.system_dictionary\.global\.write/);

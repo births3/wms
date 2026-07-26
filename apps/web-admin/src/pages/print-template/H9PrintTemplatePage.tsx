@@ -22,8 +22,9 @@ import {
   type QueryPanelValue,
   type TreeCatalogNode,
 } from "@wms/ui";
-import { Copy, Eye, History } from "lucide-react";
+import { Copy, Database, Eye, History } from "lucide-react";
 
+import type { CurrentUser } from "@/features/auth/auth-queries";
 import {
   usePrintFieldLibrariesQuery,
   usePrintTemplateVersionsMutation,
@@ -41,6 +42,7 @@ import {
 } from "@/features/print-template/print-template-queries";
 
 import { H9TemplateDesignerDialog, type H9TemplateDesignerMode } from "./H9TemplateDesignerDialog";
+import { H9FieldLibraryDialog } from "./H9FieldLibraryDialog";
 import { H9TemplatePreviewDialog } from "./H9TemplatePreviewDialog";
 
 const h9PrintTemplateQueryFields: QueryPanelField[] = [
@@ -196,7 +198,7 @@ const columns: DataGridColumn<PrintTemplateRow>[] = [
 
 type Notice = { type: "success" | "error"; text: string } | null;
 
-export function H9PrintTemplatePage() {
+export function H9PrintTemplatePage({ currentUser }: { currentUser: CurrentUser }) {
   const librariesQuery = usePrintFieldLibrariesQuery();
   const templatesQuery = usePrintTemplatesQuery();
   const templateTypesQuery = usePrintTemplateTypesQuery();
@@ -214,8 +216,12 @@ export function H9PrintTemplatePage() {
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [preview, setPreview] = React.useState<PrintTemplatePreviewResponse | null>(null);
   const [historyOpen, setHistoryOpen] = React.useState(false);
+  const [fieldLibraryOpen, setFieldLibraryOpen] = React.useState(false);
   const [historyVersions, setHistoryVersions] = React.useState<PrintTemplateVersion[]>([]);
   const [notice, setNotice] = React.useState<Notice>(null);
+  const canMaintainFieldLibrary = currentUser.permissions.includes("h9.print_template.write");
+  const canPublishFieldLibrary = currentUser.permissions.includes("h9.print_template.publish");
+  const canOpenFieldLibrary = canMaintainFieldLibrary || canPublishFieldLibrary;
   const treeNodes = React.useMemo(
     () => buildH9TreeNodes(templateTypesQuery.data ?? [], librariesQuery.data ?? []),
     [librariesQuery.data, templateTypesQuery.data],
@@ -404,6 +410,12 @@ export function H9PrintTemplatePage() {
       <PageHeader
         title="H9 打印模板"
         subtitle="字段库、模板类型和 hiprint 模板设计入口"
+        actions={canOpenFieldLibrary ? (
+          <Button type="button" variant="outline" onClick={() => setFieldLibraryOpen(true)}>
+            <Database className="size-4" aria-hidden />
+            字段库管理
+          </Button>
+        ) : null}
       />
       <NoticePanel notice={notice} />
 
@@ -489,6 +501,13 @@ export function H9PrintTemplatePage() {
         }}
         onSave={saveTemplate}
       />
+      <H9FieldLibraryDialog
+        open={fieldLibraryOpen}
+        libraries={librariesQuery.data ?? []}
+        canMaintain={canMaintainFieldLibrary}
+        canPublish={canPublishFieldLibrary}
+        onOpenChange={setFieldLibraryOpen}
+      />
       <VersionHistoryDialog open={historyOpen} versions={historyVersions} onOpenChange={setHistoryOpen} />
       <H9TemplatePreviewDialog
         open={previewOpen}
@@ -531,7 +550,7 @@ function buildH9TreeNodes(
   const libraryByCode = new Map(libraries.map((library) => [library.libraryCode, library]));
   return templateTypes.map((type) => {
     const library = libraryByCode.get(type.fieldLibraryCode);
-    const libraryNode: TreeCatalogNode = library
+    const libraryNode: TreeCatalogNode = library?.publishedVersionId
       ? {
           id: h9LibraryNodeId(library.libraryCode),
           label: library.libraryName,
@@ -539,9 +558,9 @@ function buildH9TreeNodes(
           badge: `${library.fieldCount} 字段`,
           children: [
             {
-              id: h9VersionNodeId(library.latestVersionId),
-              label: `v${library.versionNo}`,
-              description: formatDateTime(library.publishedAt),
+              id: h9VersionNodeId(library.publishedVersionId),
+              label: `v${library.publishedVersionNo}`,
+              description: library.sourceSchema,
               badge: "已发布",
             },
           ],

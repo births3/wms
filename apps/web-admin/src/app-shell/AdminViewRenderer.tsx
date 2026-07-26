@@ -116,7 +116,7 @@ export function renderAdminView(
   if (view === "hal-alert-definitions") return <AlertDefinitionPage />;
   if (view === "hal-alert-escalations") return <AlertEscalationPage />;
   if (view === "h5-express") return <H5ExpressPage />;
-  if (view === "h9-print-templates") return <H9PrintTemplatePage />;
+  if (view === "h9-print-templates") return <H9PrintTemplatePage currentUser={currentUser} />;
   if (view === "mcg-numbering") return <MCGDocumentNumberingPage />;
   return null;
 }

@@ -67,7 +67,8 @@ export function H9TemplateDesignerDialog({
   const selectedType = templateTypes.find((type) => type.code === templateTypeCode) ?? firstType;
   const selectedLibrary =
     libraries.find((library) => library.libraryCode === selectedType?.fieldLibraryCode) ?? libraries[0] ?? null;
-  const fieldsQuery = usePrintFieldDefinitionsQuery(selectedLibrary?.latestVersionId ?? null);
+  const selectedLibraryVersionId = selectedLibrary?.publishedVersionId ?? null;
+  const fieldsQuery = usePrintFieldDefinitionsQuery(selectedLibraryVersionId);
   const fields = fieldsQuery.data ?? [];
   const busy = fieldsQuery.isPending;
 
@@ -83,7 +84,7 @@ export function H9TemplateDesignerDialog({
       lastLibraryVersionIdRef.current = null;
       return;
     }
-    const libraryVersionId = selectedLibrary?.latestVersionId ?? null;
+    const libraryVersionId = selectedLibraryVersionId;
     if (initialTemplate) {
       lastLibraryVersionIdRef.current = libraryVersionId;
       return;
@@ -93,7 +94,7 @@ export function H9TemplateDesignerDialog({
     lastLibraryVersionIdRef.current = libraryVersionId;
     setBoundFields([fields[0].fieldPath]);
     setJsonText(JSON.stringify(defaultTemplateJson(fields[0].fieldPath, currentPaper()), null, 2));
-  }, [fields, initialTemplate, open, selectedLibrary?.latestVersionId]);
+  }, [fields, initialTemplate, open, selectedLibraryVersionId]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -147,7 +148,7 @@ export function H9TemplateDesignerDialog({
         enabled,
         is_default: isDefault,
         remark: "PC Web hiprint 设计器保存",
-        field_library_version_id: selectedLibrary?.latestVersionId ?? "",
+        field_library_version_id: selectedLibraryVersionId ?? "",
         hiprint_json: hiprintJson,
         field_bindings: boundFields.map((fieldPath, index) => ({ field_path: fieldPath, required: index === 0 })),
         paper,
@@ -183,7 +184,9 @@ export function H9TemplateDesignerDialog({
   const fieldBindingPanel = (
     <>
       <div className="text-xs text-muted-foreground">
-        {selectedLibrary ? `${selectedLibrary.libraryName} v${selectedLibrary.versionNo}` : "未绑定字段库"}
+        {selectedLibrary?.publishedVersionId
+          ? `${selectedLibrary.libraryName} v${selectedLibrary.publishedVersionNo}`
+          : "未绑定已发布字段库"}
       </div>
       <div className="mt-3 max-h-72 overflow-auto">
         {fields.map((field) => (
