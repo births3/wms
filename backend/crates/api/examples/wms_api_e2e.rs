@@ -52,6 +52,8 @@ use wms_domain::HealthzResponse;
 mod wms_api_e2e_seed;
 #[path = "support/wms_api_e2e_seed_data.rs"]
 mod wms_api_e2e_seed_data;
+#[path = "support/wms_api_e2e_seed_h9.rs"]
+mod wms_api_e2e_seed_h9;
 #[path = "support/wms_api_e2e_seed_mrc.rs"]
 mod wms_api_e2e_seed_mrc;
 
