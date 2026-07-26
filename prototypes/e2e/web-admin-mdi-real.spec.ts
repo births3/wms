@@ -52,6 +52,8 @@ test("M-DI 真实上传、退回修改、双人确认、复用、版本和上游
   await createReceivedAsn(page, secondReceipt, [batchA]);
 
   await openDocuments(page, runTag);
+  await expect(page.getByRole("navigation").getByRole("button", { name: /入库资料录入/ }))
+    .toHaveAttribute("aria-current", "page");
   await expect(page.locator("tbody tr").filter({ hasText: firstReceipt })).toBeVisible();
   await expect(page.locator("tbody tr").filter({ hasText: secondReceipt })).toBeVisible();
   await page.getByRole("button", { name: /药检单不齐/ }).click();

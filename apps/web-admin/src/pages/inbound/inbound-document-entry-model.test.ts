@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 
 import {
-  buildConfirmationDocumentRows,
   defaultInboundDocumentQuery,
   filterInboundDocumentRows,
   validateDrugInspectionFile,
@@ -55,36 +54,6 @@ assert.deepEqual(defaultInboundDocumentQuery("2026-07-26"), {
   missingDrugInspection: false,
   missingUpstreamDelivery: false,
 });
-
-const confirmationRows = buildConfirmationDocumentRows([
-  {
-    id: "1",
-    owner_id: "owner-1",
-    receipt_no: "ASN-2026-001",
-    document_type: "purchase_inbound",
-    external_ref: "PO-2026-001",
-    supplier_id: "supplier-1",
-    status: "completed",
-    updated_at: "2026-07-25T10:00:00.000Z",
-    created_at: "2026-07-24T10:00:00.000Z",
-    lines: [{ product_code: "P-001", batch_no: null }],
-  },
-  {
-    id: "2",
-    owner_id: "owner-1",
-    receipt_no: "SR-2026-001",
-    document_type: "sales_return",
-    external_ref: "RETURN-001",
-    supplier_id: null,
-    status: "completed",
-    updated_at: "2026-07-25T10:00:00.000Z",
-    created_at: "2026-07-24T10:00:00.000Z",
-    lines: [{ product_code: "P-002", batch_no: "SR-B-001" }],
-  },
-]);
-assert.equal(confirmationRows.length, 1);
-assert.equal(confirmationRows[0]?.purchaseOrderNo, "PO-2026-001");
-assert.ok(confirmationRows[0]?.batchNos.length);
 
 assert.equal(validateUpstreamDeliveryFiles([
   { name: "delivery.pdf", size: 1024, type: "application/pdf" },

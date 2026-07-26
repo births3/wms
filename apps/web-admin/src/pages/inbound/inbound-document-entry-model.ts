@@ -30,19 +30,6 @@ export interface InboundDocumentEntryQuery {
   missingUpstreamDelivery: boolean;
 }
 
-interface ReceivingOrderSource {
-  id: string;
-  owner_id: string;
-  receipt_no: string;
-  document_type: string;
-  external_ref?: string | null;
-  supplier_id?: string | null;
-  status: string;
-  updated_at: string;
-  created_at: string;
-  lines: Array<{ product_code: string; batch_no?: string | null }>;
-}
-
 interface UploadFileLike {
   name: string;
   size: number;
@@ -74,43 +61,6 @@ export function defaultInboundDocumentQuery(today = toWmsBusinessDate(new Date()
     missingDrugInspection: false,
     missingUpstreamDelivery: false,
   };
-}
-
-export function buildConfirmationDocumentRows(orders: ReceivingOrderSource[]): InboundDocumentEntryRow[] {
-  return orders
-    .filter((order) => order.document_type === "purchase_inbound")
-    .map((order, index) => {
-      const received = !["created", "released"].includes(order.status);
-      const batchNos = order.lines.flatMap((line) => line.batch_no ? [line.batch_no] : []);
-      const confirmationBatchNos = received && batchNos.length === 0
-        ? [`BATCH-${order.receipt_no.replace(/\W+/g, "-")}`]
-        : batchNos;
-      const drugStatuses: DrugInspectionDocumentStatus[] = ["missing", "partial", "complete"];
-      const drugInspectionStatus = received
-        ? drugStatuses[index % drugStatuses.length] ?? "missing"
-        : "pending_receipt";
-      const upstreamDeliveryStatus: UpstreamDeliveryDocumentStatus = received && index % 2 === 1
-        ? "uploaded"
-        : "missing";
-      return {
-        id: order.id,
-        receiptNo: order.receipt_no,
-        purchaseOrderNo: order.external_ref || `PO-${order.receipt_no}`,
-        ownerId: order.owner_id,
-        supplierId: order.supplier_id || "supplier-unassigned",
-        supplierName: order.supplier_id ? `供应商 ${order.supplier_id.slice(-4)}` : "供应商待维护",
-        productId: order.lines[0]?.product_code ?? "-",
-        productCode: order.lines[0]?.product_code ?? "-",
-        productName: order.lines[0]?.product_code ?? "-",
-        batchNos: confirmationBatchNos,
-        actualReceivedAt: received ? order.updated_at : null,
-        drugInspectionStatus,
-        drugInspectionVersion: ["partial", "complete"].includes(drugInspectionStatus) ? 1 : 0,
-        upstreamDeliveryStatus,
-        upstreamVersion: upstreamDeliveryStatus === "uploaded" ? 1 : 0,
-        createdAt: order.created_at,
-      };
-    });
 }
 
 export function filterInboundDocumentRows(
