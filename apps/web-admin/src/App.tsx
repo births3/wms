@@ -94,7 +94,6 @@ const menuSections: Array<{ label: string; items: SidebarMenuItem<AdminView>[] }
       { id: "dock-management", title: "M1 月台管理", subtitle: "月台 / 作业类型 / 温区", icon: MapPinned },
       { id: "m1-system-dictionary", title: "M1 系统字典", subtitle: "单据类型 / 特殊药品分类", icon: BookOpen },
       { id: "m1-feature-flags", title: "M1 功能开关", subtitle: "配置中心 / Feature Flag", icon: KeyRound },
-      { id: "m-di-stamp", title: "药检图章配置", subtitle: "拖动设计 / 双人发布", icon: Stamp },
     ],
   },
   {
@@ -107,6 +106,7 @@ const menuSections: Array<{ label: string; items: SidebarMenuItem<AdminView>[] }
       { id: "m2-putaway", title: "M2 上架管理", subtitle: "库位 / 数量确认", icon: PackageCheck },
       { id: "m2-putaway-strategy", title: "M2 上架策略", subtitle: "规则优先级 / 方案绑定", icon: ClipboardList },
       { id: "m-di-platforms", title: "M-DI 药检平台", subtitle: "平台 / 认证 / 状态", icon: KeyRound },
+      { id: "m-di-stamp", title: "药检图章配置", subtitle: "拖动设计 / 双人发布", icon: Stamp },
     ],
   },
   {
@@ -177,12 +177,15 @@ const defaultMenuTree: SidebarMenuTreeSection<AdminView>[] = [
     groups: [
       { label: "主数据", items: [menuItem("m1-products"), menuItem("m1-business-partners")] },
       { label: "仓储资料", items: [menuItem("m1-warehouses"), menuItem("m1-zones"), menuItem("m1-locations"), menuItem("dock-management")] },
-      { label: "系统配置", items: [menuItem("m1-system-dictionary"), menuItem("m1-feature-flags"), menuItem("m-di-stamp")] },
+      { label: "系统配置", items: [menuItem("m1-system-dictionary"), menuItem("m1-feature-flags")] },
     ],
   },
   {
     label: "入库业务",
-    groups: [{ label: "入库作业", items: [menuItem("m2-receiving"), menuItem("m2-inbound-documents"), menuItem("m-di-review"), menuItem("m2-inspecting"), menuItem("m2-putaway"), menuItem("m2-putaway-strategy"), menuItem("m-di-platforms")] }],
+    groups: [
+      { label: "入库作业", items: [menuItem("m2-receiving"), menuItem("m2-inspecting"), menuItem("m2-putaway"), menuItem("m2-putaway-strategy")] },
+      { label: "入库资料", items: [menuItem("m2-inbound-documents"), menuItem("m-di-review"), menuItem("m-di-platforms"), menuItem("m-di-stamp")] },
+    ],
   },
   {
     label: "出库业务",

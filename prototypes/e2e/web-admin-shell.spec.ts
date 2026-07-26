@@ -482,7 +482,15 @@ test("入库资料录入使用开发 Mock 查询并上传上游随货同行单",
   await expect(page.getByRole("heading", { name: "运营总览" })).toBeVisible();
 
   await page.getByRole("button", { name: "入库业务", exact: true }).click();
-  await page.getByRole("button", { name: "入库作业", exact: true }).click();
+  await page.getByRole("button", { name: "入库资料", exact: true }).click();
+  for (const menuName of [
+    "入库资料录入 m2-inbound-documents",
+    "药检单审核 m-di-review",
+    "M-DI 药检平台 m-di-platforms",
+    "药检图章配置 m-di-stamp",
+  ]) {
+    await expect(page.getByRole("button", { name: menuName, exact: true })).toBeVisible();
+  }
   await page.getByRole("button", { name: "入库资料录入 m2-inbound-documents", exact: true }).click();
 
   const pageRoot = page.locator("section").filter({ has: page.getByRole("heading", { name: "入库资料录入" }) });

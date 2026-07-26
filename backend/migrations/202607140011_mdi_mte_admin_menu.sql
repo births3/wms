@@ -6,10 +6,10 @@ INSERT INTO admin_menu_draft_nodes (
 VALUES
     (
         '00000000-0000-0000-0000-000000130026',
-        '00000000-0000-0000-0000-000000120005',
+        '00000000-0000-0000-0000-000000120018',
         3,
         'inbound.drug_inspection_platforms',
-        'inbound/operation/drug_inspection_platforms',
+        'inbound/documents/drug_inspection_platforms',
         'M-DI 药检平台',
         'm-di-platforms',
         'KeyRound',

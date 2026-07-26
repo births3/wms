@@ -62,6 +62,30 @@ async fn seeded_drug_inspection_menu_nodes_can_be_saved(pool: PgPool) {
         .single()
         .expect("valid time");
 
+    let (published, _) = service
+        .list_published_tree(&pool, &auth)
+        .await
+        .expect("published drug inspection menu should list");
+    for view_id in [
+        "m2-inbound-documents",
+        "m-di-review",
+        "m-di-platforms",
+        "m-di-stamp",
+    ] {
+        assert!(has_page_in_group(
+            &published,
+            "入库业务",
+            "入库资料",
+            view_id
+        ));
+    }
+    assert!(!has_page_in_group(
+        &published,
+        "基础档案",
+        "系统配置",
+        "m-di-stamp"
+    ));
+
     for (node_id, view_id, icon_key, permission_key, actions) in [
         (
             "00000000-0000-0000-0000-000000130090",

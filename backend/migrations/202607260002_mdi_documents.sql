@@ -206,10 +206,10 @@ INSERT INTO admin_menu_draft_nodes (
 VALUES
     (
         '00000000-0000-0000-0000-000000130090',
-        '00000000-0000-0000-0000-000000120005',
+        '00000000-0000-0000-0000-000000120018',
         3,
-        'inbound.documents',
-        'inbound/operation/documents',
+        'inbound.document_entry',
+        'inbound/documents/entry',
         '入库资料录入',
         'm2-inbound-documents',
         'ClipboardList',
@@ -219,10 +219,10 @@ VALUES
     ),
     (
         '00000000-0000-0000-0000-000000130091',
-        '00000000-0000-0000-0000-000000120005',
+        '00000000-0000-0000-0000-000000120018',
         3,
         'inbound.drug_inspection_review',
-        'inbound/operation/drug_inspection_review',
+        'inbound/documents/drug_inspection_review',
         '药检单审核',
         'm-di-review',
         'ShieldCheck',

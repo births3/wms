@@ -111,6 +111,7 @@ VALUES
     ('00000000-0000-0000-0000-000000120003', '00000000-0000-0000-0000-000000110002', 2, 'master_data.warehouse', 'master_data/warehouse', '仓储资料', NULL, 'Warehouse', 'menu.master_data.warehouse', 20, TRUE),
     ('00000000-0000-0000-0000-000000120004', '00000000-0000-0000-0000-000000110002', 2, 'master_data.config', 'master_data/config', '系统配置', NULL, 'BookOpen', 'menu.master_data.config', 30, TRUE),
     ('00000000-0000-0000-0000-000000120005', '00000000-0000-0000-0000-000000110003', 2, 'inbound.operation', 'inbound/operation', '入库作业', NULL, 'CheckCircle2', 'menu.inbound.operation', 10, TRUE),
+    ('00000000-0000-0000-0000-000000120018', '00000000-0000-0000-0000-000000110003', 2, 'inbound.documents', 'inbound/documents', '入库资料', NULL, 'ClipboardList', 'menu.inbound.documents', 20, TRUE),
     ('00000000-0000-0000-0000-000000120006', '00000000-0000-0000-0000-000000110004', 2, 'outbound.operation', 'outbound/operation', '出库作业', NULL, 'ClipboardList', 'menu.outbound.operation', 10, TRUE),
     ('00000000-0000-0000-0000-000000120007', '00000000-0000-0000-0000-000000110005', 2, 'inventory.management', 'inventory/management', '库存管理', NULL, 'Layers', 'menu.inventory.management', 10, TRUE),
     ('00000000-0000-0000-0000-000000120008', '00000000-0000-0000-0000-000000110006', 2, 'platform.h1', 'platform/h1', 'H1 权限租户', NULL, 'ShieldCheck', 'menu.platform.h1', 10, TRUE),

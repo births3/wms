@@ -104,10 +104,10 @@ INSERT INTO admin_menu_draft_nodes (
 )
 VALUES (
     '00000000-0000-0000-0000-000000130092',
-    '00000000-0000-0000-0000-000000120004',
+    '00000000-0000-0000-0000-000000120018',
     3,
-    'master_data.drug_inspection_stamp',
-    'master_data/config/drug_inspection_stamp',
+    'inbound.drug_inspection_stamp',
+    'inbound/documents/drug_inspection_stamp',
     '药检图章配置',
     'm-di-stamp',
     'Stamp',
