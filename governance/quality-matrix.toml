@@ -1837,14 +1837,36 @@ title = "预览与浏览器打印"
 module = "H9"
 story_file = "docs/domain/user-stories-h9-print-template.md"
 types = ["write", "frontend_interaction", "api_change"]
-frontend_pages = ["h9-print-templates"]
+frontend_pages = ["m2-receiving", "m2-inspecting"]
 api_paths = [
   "POST /api/v1/print-templates/preview",
   "POST /api/v1/print-templates/print",
 ]
 e2e_checks = [
   "node apps/web-admin/self-checks/h9-print-template-tree-self-check.mjs",
-  "pnpm --dir apps/web-admin run test:e2e:h9-dev",
+  "node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs",
+  "just web-admin-m2-real-e2e",
+]
+e2e_screenshots = [
+  { page = "m2-receiving", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/receiving-print-preview.png" },
+  { page = "m2-receiving", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/browser-print-result-confirmation.png" },
+  { page = "m2-inspecting", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/inspection-print-preview.png" },
+]
+test_checks = [
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test print_field_library_postgres --test print_template_postgres -- --test-threads=1",
+  "pnpm --dir apps/web-admin run build",
+  "just openapi-check",
+]
+evidence_refs = [
+  "backend/crates/api/tests/print_template_postgres/browser_print.rs",
+  "backend/crates/api/src/print_template_printing.rs",
+  "apps/web-admin/src/pages/print-template/H9TemplatePreviewDialog.tsx",
+  "apps/web-admin/src/pages/inbound/M2InboundPrintDialog.tsx",
+  "prototypes/e2e/web-admin-m2-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/m2-inbound/receiving-print-preview.png",
+  "artifacts/screenshot-portal/real-web/m2-inbound/browser-print-result-confirmation.png",
+  "artifacts/screenshot-portal/real-web/m2-inbound/inspection-print-preview.png",
+  "docs/reviews/us-h9-004-acceptance-2026-07-26.md",
 ]
 
 [stories.dimensions]

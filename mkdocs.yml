@@ -206,6 +206,7 @@ nav:
     - US-H9-001 打印模板类型字典验收 (2026-07-26): reviews/us-h9-001-acceptance-2026-07-26.md
     - US-H9-002 字段库生成与元数据维护验收 (2026-07-26): reviews/us-h9-002-acceptance-2026-07-26.md
     - US-H9-003 模板设计与版本管理验收 (2026-07-26): reviews/us-h9-003-acceptance-2026-07-26.md
+    - US-H9-004 预览与浏览器打印验收 (2026-07-26): reviews/us-h9-004-acceptance-2026-07-26.md
     - M2 入库模块整体审查 (2026-07-18): reviews/m2-overall-review-2026-07-18.md
     - M3 库存模块整体审查 (2026-07-18): reviews/m3-overall-review-2026-07-18.md
     - 延期故事快速闭环审计 (2026-07-15): reviews/deferred-story-closure-audit-2026-07-15.md
