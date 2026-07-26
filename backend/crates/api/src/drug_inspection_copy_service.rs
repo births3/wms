@@ -125,7 +125,7 @@ impl DrugInspectionCopyService {
             tx.commit().await.map_err(map_db_error)?;
             return Ok(replayed);
         }
-        let row: Option<(
+        type ClaimedJobRow = (
             Uuid,
             Uuid,
             Uuid,
@@ -133,7 +133,8 @@ impl DrugInspectionCopyService {
             Option<Uuid>,
             Option<String>,
             Option<i64>,
-        )> = sqlx::query_as(
+        );
+        let row: Option<ClaimedJobRow> = sqlx::query_as(
             r#"
                 SELECT job.report_version_id, version.uploaded_by, version.id, job.status,
                        job.candidate_file_id, job.candidate_hash, job.candidate_size

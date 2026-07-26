@@ -45,6 +45,7 @@ pub async fn seed_customer_delivery_address(pool: &PgPool, owner_id: Uuid) -> (U
     (customer_id, address_id)
 }
 
+#[allow(dead_code)]
 pub async fn seed_inventory_batch(
     pool: &PgPool,
     owner_id: Uuid,

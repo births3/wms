@@ -264,10 +264,10 @@ fn idempotency_key(headers: &HeaderMap) -> Result<String, FileAttachmentHandlerE
         .ok_or(FileAttachmentHandlerError::IdempotencyRequired)
 }
 
-fn header_value<'a>(
-    headers: &'a HeaderMap,
+fn header_value(
+    headers: &HeaderMap,
     name: header::HeaderName,
-) -> Result<&'a str, FileAttachmentHandlerError> {
+) -> Result<&str, FileAttachmentHandlerError> {
     headers
         .get(name)
         .and_then(|value| value.to_str().ok())

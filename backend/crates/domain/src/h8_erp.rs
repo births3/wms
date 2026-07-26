@@ -979,10 +979,7 @@ mod tests {
         let mut b = sample_connector(Uuid::new_v4(), vec![], "active");
         b.directions = vec!["inbound".into()];
         b.message_types = vec!["asn".into()];
-        assert!(matches!(
-            resolve_active_connector(std::slice::from_ref(&a), None, "inbound", "asn"),
-            Ok(_)
-        ));
+        assert!(resolve_active_connector(std::slice::from_ref(&a), None, "inbound", "asn").is_ok());
         assert_eq!(
             resolve_active_connector(&[a.clone(), b], None, "inbound", "asn"),
             Err(H8ErpConnectorError::RouteOverlap)

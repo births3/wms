@@ -438,8 +438,16 @@ impl PgAlertDashboardService {
         owner_id: Uuid,
         id: Uuid,
     ) -> Result<AlertExportJob, AlertDashboardError> {
-        let row: (String, String, i64, Uuid, Option<String>, DateTime<Utc>, Option<DateTime<Utc>>) =
-            sqlx::query_as(
+        type ExportRow = (
+            String,
+            String,
+            i64,
+            Uuid,
+            Option<String>,
+            DateTime<Utc>,
+            Option<DateTime<Utc>>,
+        );
+        let row: ExportRow = sqlx::query_as(
                 "SELECT status, format, row_count, download_token, email_notification_status, created_at, completed_at FROM alert_report_exports WHERE owner_id = $1 AND id = $2",
             )
             .bind(owner_id)

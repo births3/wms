@@ -86,10 +86,12 @@ fn require_key_version(key_version: &str) -> Result<&str, H8ErpMessageRepoError>
     Ok(key_version)
 }
 
+type StoredPayload = (Uuid, String, DateTime<Utc>, String);
+
 #[derive(Default)]
 pub struct MemoryH8PayloadRepository {
     policies: Mutex<HashMap<(Uuid, Uuid), H8PayloadRetentionPolicy>>,
-    payloads: Mutex<HashMap<(Uuid, Uuid), (Uuid, String, DateTime<Utc>, String)>>,
+    payloads: Mutex<HashMap<(Uuid, Uuid), StoredPayload>>,
 }
 
 #[axum::async_trait]

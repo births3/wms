@@ -611,7 +611,7 @@ async fn inbound_lifecycle_persists_failure_retry_and_success_status(pool: PgPoo
         }
     }
 
-    let attempts: Vec<(
+    type AttemptRow = (
         i32,
         String,
         DateTime<Utc>,
@@ -619,7 +619,8 @@ async fn inbound_lifecycle_persists_failure_retry_and_success_status(pool: PgPoo
         String,
         Option<String>,
         String,
-    )> = sqlx::query_as(
+    );
+    let attempts: Vec<AttemptRow> = sqlx::query_as(
         r#"SELECT attempt_no, channel, started_at, finished_at, result, error_summary, actor
            FROM h8_erp_message_attempts
            WHERE owner_id=$1
