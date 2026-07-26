@@ -527,4 +527,4 @@ async fn sales_return_requires_the_original_batch(pool: PgPool) {
     ));
 }
 
-include!("m2_deferred_closeout_postgres_part2.rs");
+include!("m2_deferred_closeout_postgres_included/part2.rs");
