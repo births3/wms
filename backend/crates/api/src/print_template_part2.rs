@@ -83,6 +83,18 @@ fn validate_print_request(req: &PrintTemplatePrintRequest) -> Result<(), PrintTe
             "print status must be printed, cancelled or failed".to_string(),
         ));
     }
+    if req.status == "failed"
+        && req
+            .failure_reason
+            .as_deref()
+            .map(str::trim)
+            .filter(|reason| !reason.is_empty())
+            .is_none()
+    {
+        return Err(PrintTemplateError::InvalidRequest(
+            "failed print requires failure_reason".to_string(),
+        ));
+    }
     Ok(())
 }
 
@@ -180,7 +192,7 @@ fn validate_required_fields(
 ) -> Result<(), PrintTemplateError> {
     let missing: Vec<String> = bindings
         .iter()
-        .filter(|binding| binding.required && value_at_path(data, &binding.field_path).is_none())
+        .filter(|binding| binding.required && !required_path_present(data, &binding.field_path))
         .map(|binding| binding.field_path.clone())
         .collect();
     if missing.is_empty() {
@@ -190,19 +202,83 @@ fn validate_required_fields(
     }
 }
 
-fn value_at_path<'a>(data: &'a Value, path: &str) -> Option<&'a Value> {
-    let mut current = data;
-    for part in path.split('.') {
-        if part.is_empty() {
-            return None;
+fn required_path_present(data: &Value, path: &str) -> bool {
+    let parts: Vec<&str> = path.split('.').collect();
+    !parts.is_empty()
+        && parts.iter().all(|part| !part.is_empty())
+        && required_parts_present(data, &parts)
+}
+
+fn required_parts_present(data: &Value, parts: &[&str]) -> bool {
+    let Some((part, remaining)) = parts.split_first() else {
+        return !data.is_null();
+    };
+    if let Some(key) = part.strip_suffix("[]") {
+        return data
+            .get(key)
+            .and_then(Value::as_array)
+            .is_some_and(|items| {
+                !items.is_empty()
+                    && items
+                        .iter()
+                        .all(|item| required_parts_present(item, remaining))
+            });
+    }
+    data.get(*part)
+        .is_some_and(|value| required_parts_present(value, remaining))
+}
+
+fn mask_sensitive_fields(data: &mut Value, fields: &[PrintFieldDefinition]) {
+    for field in fields.iter().filter(|field| field.sensitive) {
+        let parts: Vec<&str> = field.field_path.split('.').collect();
+        mask_parts(data, &parts, field.masking_rule.as_deref());
+    }
+}
+
+fn mask_parts(data: &mut Value, parts: &[&str], rule: Option<&str>) {
+    let Some((part, remaining)) = parts.split_first() else {
+        mask_value(data, rule);
+        return;
+    };
+    if let Some(key) = part.strip_suffix("[]") {
+        if let Some(items) = data.get_mut(key).and_then(Value::as_array_mut) {
+            for item in items {
+                mask_parts(item, remaining, rule);
+            }
         }
-        current = current.get(part)?;
+        return;
     }
-    if current.is_null() {
-        None
+    if let Some(value) = data.get_mut(*part) {
+        mask_parts(value, remaining, rule);
+    }
+}
+
+fn mask_value(value: &mut Value, rule: Option<&str>) {
+    if value.is_null() {
+        return;
+    }
+    let Some(text) = value.as_str() else {
+        *value = Value::String("******".to_string());
+        return;
+    };
+    let Some(keep) = rule
+        .and_then(|rule| rule.strip_prefix("keep_last_"))
+        .and_then(|value| value.parse::<usize>().ok())
+        .filter(|keep| *keep > 0)
+    else {
+        *value = Value::String("******".to_string());
+        return;
+    };
+    let characters: Vec<char> = text.chars().collect();
+    *value = Value::String(if characters.len() <= keep {
+        "*".repeat(characters.len().max(1))
     } else {
-        Some(current)
-    }
+        format!(
+            "{}{}",
+            "*".repeat(characters.len() - keep),
+            characters[characters.len() - keep..].iter().collect::<String>()
+        )
+    });
 }
 
 async fn next_version_no(

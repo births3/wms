@@ -360,6 +360,7 @@ async fn print_template_versions_are_listed_by_template_and_owner(pool: PgPool) 
 }
 
 include!("print_template_postgres/version_lifecycle.rs");
+include!("print_template_postgres/browser_print.rs");
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn template_http_separates_write_publish_and_enabled_permissions(pool: PgPool) {

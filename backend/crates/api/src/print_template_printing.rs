@@ -9,6 +9,11 @@ impl PgPrintTemplateRepository {
             resolve_template_version(pool, ctx, &req.template_code, &req.template_type_code)
                 .await?;
         validate_required_fields(&version.field_bindings, &req.data)?;
+        let mut data = req.data;
+        let fields = self
+            .list_field_version_fields(pool, version.field_library_version_id)
+            .await?;
+        mask_sensitive_fields(&mut data, &fields);
         Ok(PrintTemplatePreviewResponse {
             template_id: version.template_id,
             template_version_id: version.id,
@@ -19,7 +24,7 @@ impl PgPrintTemplateRepository {
             hiprint_json: version.hiprint_json,
             field_bindings: version.field_bindings,
             paper: version.paper,
-            data: req.data,
+            data,
         })
     }
 
@@ -57,7 +62,18 @@ impl PgPrintTemplateRepository {
                 business_document_id, status, failure_reason, retry_count, printed_at,
                 operator_id, created_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, $9, $10, $9)
+            VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8,
+                (
+                    SELECT COUNT(*)::INT
+                      FROM print_records
+                     WHERE owner_id = $2
+                       AND business_module = $4
+                       AND business_document_type = $5
+                       AND business_document_id = $6
+                ),
+                $9, $10, $9
+            )
             RETURNING id, owner_id, template_version_id, business_module, business_document_type,
                       business_document_id, status, failure_reason, retry_count, printed_at,
                       operator_id, created_at
