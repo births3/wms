@@ -25,6 +25,7 @@ import { H5ExpressPage } from "@/pages/express/H5ExpressPage";
 import { AlertDefinitionPage } from "@/pages/alert-engine/AlertDefinitionPage";
 import { AlertDashboardPage } from "@/pages/alert-engine/AlertDashboardPage";
 import { AlertEscalationPage } from "@/pages/alert-engine/AlertEscalationPage";
+import { H9DeliveryNoteAggregationPage } from "@/pages/print-orchestration/H9DeliveryNoteAggregationPage";
 import { H9PrintTemplatePage } from "@/pages/print-template/H9PrintTemplatePage";
 import { MCGDocumentNumberingPage } from "@/pages/document-numbering/MCGDocumentNumberingPage";
 import { DockManagementPage } from "@/pages/dock/DockManagementPage";
@@ -116,6 +117,7 @@ export function renderAdminView(
   if (view === "hal-alert-definitions") return <AlertDefinitionPage />;
   if (view === "hal-alert-escalations") return <AlertEscalationPage />;
   if (view === "h5-express") return <H5ExpressPage />;
+  if (view === "h9-delivery-note-aggregation") return <H9DeliveryNoteAggregationPage currentUser={currentUser} />;
   if (view === "h9-print-templates") return <H9PrintTemplatePage currentUser={currentUser} />;
   if (view === "mcg-numbering") return <MCGDocumentNumberingPage />;
   return null;

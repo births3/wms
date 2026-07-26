@@ -236,6 +236,16 @@
       "more": []
     },
     {
+      "id": "h9-delivery-note-aggregation",
+      "title": "作业·随货同行单归集",
+      "required": true,
+      "source": "apps/web-admin/src/pages/print-orchestration/H9DeliveryNoteAggregationPage.tsx",
+      "fieldConstant": "h9DeliveryNoteQueryFields",
+      "coreConstant": "h9DeliveryNoteCoreQueryFieldKeys",
+      "core": ["warehouseId", "keyword"],
+      "more": ["customerId", "routeCode", "deliveryAddressId"]
+    },
+    {
       "id": "h9-print-templates",
       "title": "H9 打印模板",
       "required": true,

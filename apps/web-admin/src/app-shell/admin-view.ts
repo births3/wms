@@ -42,5 +42,6 @@ export type AdminView =
   | "h8-erp-connectors"
   | "h8-erp-messages"
   | "h8-erp-interface-tables"
+  | "h9-delivery-note-aggregation"
   | "h9-print-templates"
   | "mcg-numbering";
