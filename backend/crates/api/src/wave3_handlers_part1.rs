@@ -508,6 +508,12 @@ async fn postgres_putaway_handler_commits_inventory_and_audit(pool: PgPool) {
     let zone_id = Uuid::new_v4();
     let location_id = Uuid::new_v4();
     let location_code = format!("M2-HANDLER-LOC-{}", &location_id.to_string()[..8]);
+    sqlx::query("INSERT INTO auth_owners (id, owner_code, owner_name) VALUES ($1, $2, '上架处理器测试货主') ON CONFLICT (id) DO NOTHING")
+        .bind(owner_id)
+        .bind(format!("M2-PUTAWAY-{}", &owner_id.to_string()[..8]))
+        .execute(&pool)
+        .await
+        .expect("seed putaway owner");
     sqlx::query("INSERT INTO warehouses (id, owner_id, warehouse_code, warehouse_name, warehouse_type, status) VALUES ($1,$2,'WH-HANDLER-PUTAWAY','W','normal','active')")
             .bind(warehouse_id).bind(owner_id).execute(&pool).await.expect("seed warehouse");
     sqlx::query("INSERT INTO warehouse_zones (id, owner_id, warehouse_id, zone_code, zone_name, temperature_zone, quality_color, status) VALUES ($1,$2,$3,'M2-HANDLER-ZONE','Z','normal','qualified_green','active')")
