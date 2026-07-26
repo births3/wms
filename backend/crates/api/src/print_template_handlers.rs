@@ -20,7 +20,8 @@ use crate::{
         PrintRecord, PrintTemplateError, PrintTemplateListResponse, PrintTemplatePreviewRequest,
         PrintTemplatePreviewResponse, PrintTemplatePrintRequest, PrintTemplateVersion,
         PrintTemplateVersionListResponse, ResolvePrintTemplateRequest,
-        ResolvePrintTemplateResponse, SavePrintTemplateRequest, UpdatePrintFieldDefinitionRequest,
+        ResolvePrintTemplateResponse, SavePrintTemplateRequest, SetPrintTemplateEnabledRequest,
+        UpdatePrintFieldDefinitionRequest,
     },
     ApiDoc,
 };
@@ -84,6 +85,22 @@ impl IntoResponse for PrintTemplateHandlerError {
                 "打印模板不存在",
                 serde_json::json!({}),
             ),
+            PrintTemplateHandlerError::PrintTemplate(
+                PrintTemplateError::TemplateVersionNotFound,
+            ) => (
+                StatusCode::NOT_FOUND,
+                "H9_TEMPLATE_VERSION_NOT_FOUND",
+                "打印模板版本不存在",
+                serde_json::json!({}),
+            ),
+            PrintTemplateHandlerError::PrintTemplate(
+                PrintTemplateError::TemplateVersionNotLatest,
+            ) => (
+                StatusCode::CONFLICT,
+                "H9_TEMPLATE_VERSION_NOT_LATEST",
+                "只能发布最新的打印模板草稿",
+                serde_json::json!({}),
+            ),
             PrintTemplateHandlerError::PrintTemplate(PrintTemplateError::TemplateDisabled) => (
                 StatusCode::CONFLICT,
                 "H9_TEMPLATE_DISABLED",
@@ -134,6 +151,20 @@ impl IntoResponse for PrintTemplateHandlerError {
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "H9_TEMPLATE_JSON_INVALID",
                 "hiprint 模板 JSON 非法",
+                serde_json::json!({}),
+            ),
+            PrintTemplateHandlerError::PrintTemplate(PrintTemplateError::TemplateDuplicate) => (
+                StatusCode::CONFLICT,
+                "H9_TEMPLATE_DUPLICATE",
+                "打印模板编码已存在",
+                serde_json::json!({}),
+            ),
+            PrintTemplateHandlerError::PrintTemplate(
+                PrintTemplateError::PublishedTemplateImmutable,
+            ) => (
+                StatusCode::CONFLICT,
+                "H9_TEMPLATE_PUBLISHED_IMMUTABLE",
+                "已发布模板版本不可修改",
                 serde_json::json!({}),
             ),
             PrintTemplateHandlerError::PrintTemplate(
@@ -221,6 +252,14 @@ pub fn print_template_router(state: PrintTemplateAppState) -> Router {
         .route(
             "/api/v1/print-templates/templates/:template_id/versions",
             get(list_print_template_versions_handler),
+        )
+        .route(
+            "/api/v1/print-templates/templates/:template_id/versions/:version_id/publish",
+            post(publish_print_template_handler),
+        )
+        .route(
+            "/api/v1/print-templates/templates/:template_id/enabled",
+            patch(set_print_template_enabled_handler),
         )
         .route(
             "/api/v1/print-templates/resolve",
@@ -378,11 +417,7 @@ async fn save_print_template_handler(
     headers: HeaderMap,
     Json(req): Json<SavePrintTemplateRequest>,
 ) -> Result<Json<PrintTemplateVersion>, PrintTemplateHandlerError> {
-    if req.publish {
-        require_any_permission(&ctx, &[PUBLISH_PERMISSION])?;
-    } else {
-        require_any_permission(&ctx, &[WRITE_PERMISSION, PUBLISH_PERMISSION])?;
-    }
+    require_any_permission(&ctx, &[WRITE_PERMISSION])?;
     let idempotency_key = idempotency_key_from_headers(&headers)?;
     let result = state
         .repository
@@ -411,6 +446,51 @@ async fn list_print_template_versions_handler(
         },
         data,
     }))
+}
+
+async fn publish_print_template_handler(
+    ctx: AuthContext,
+    State(state): State<PrintTemplateAppState>,
+    Path((template_id, version_id)): Path<(uuid::Uuid, uuid::Uuid)>,
+    headers: HeaderMap,
+) -> Result<Json<PrintTemplateVersion>, PrintTemplateHandlerError> {
+    require_any_permission(&ctx, &[PUBLISH_PERMISSION])?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
+    let result = state
+        .repository
+        .publish_template_draft(
+            &state.pool,
+            &ctx,
+            template_id,
+            version_id,
+            Utc::now(),
+            &idempotency_key,
+        )
+        .await?;
+    Ok(Json(result.value))
+}
+
+async fn set_print_template_enabled_handler(
+    ctx: AuthContext,
+    State(state): State<PrintTemplateAppState>,
+    Path(template_id): Path<uuid::Uuid>,
+    headers: HeaderMap,
+    Json(req): Json<SetPrintTemplateEnabledRequest>,
+) -> Result<Json<crate::print_template::PrintTemplateSummary>, PrintTemplateHandlerError> {
+    require_any_permission(&ctx, &[WRITE_PERMISSION])?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
+    let result = state
+        .repository
+        .set_template_enabled(
+            &state.pool,
+            &ctx,
+            template_id,
+            req.enabled,
+            Utc::now(),
+            &idempotency_key,
+        )
+        .await?;
+    Ok(Json(result.value))
 }
 
 async fn resolve_print_template_handler(

@@ -36,7 +36,11 @@ pub enum PrintTemplateError {
     TemplateFieldMismatch(Vec<String>),
     TemplateFieldMissing(Vec<String>),
     TemplateJsonInvalid,
+    TemplateDuplicate,
     TemplateNotFound,
+    TemplateVersionNotFound,
+    TemplateVersionNotLatest,
+    PublishedTemplateImmutable,
     Audit(String),
     Database(String),
     Serialize(String),
@@ -170,11 +174,11 @@ pub struct PrintTemplateBinding {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize, ToSchema)]
 pub struct SavePrintTemplateRequest {
+    pub template_id: Option<Uuid>,
     pub template_code: String,
     pub template_name: String,
     pub template_type_code: String,
     pub scope: PrintTemplateScope,
-    pub enabled: bool,
     pub is_default: bool,
     pub remark: Option<String>,
     pub field_library_version_id: Uuid,
@@ -182,7 +186,11 @@ pub struct SavePrintTemplateRequest {
     pub field_bindings: Vec<PrintTemplateBinding>,
     pub paper: Value,
     pub designer_version: String,
-    pub publish: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize, ToSchema)]
+pub struct SetPrintTemplateEnabledRequest {
+    pub enabled: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize, ToSchema)]
@@ -406,13 +414,13 @@ impl PgPrintTemplateRepository {
             SELECT
                 templates.id,
                 templates.template_code,
-                templates.template_name,
-                templates.template_type_code,
+                latest_versions.template_name,
+                latest_versions.template_type_code,
                 templates.owner_id,
-                templates.scope,
+                latest_versions.scope,
                 templates.enabled,
-                templates.is_default,
-                templates.remark,
+                latest_versions.is_default,
+                latest_versions.remark,
                 latest_versions.id AS latest_version_id,
                 latest_versions.version_no AS latest_version_no,
                 latest_versions.status AS latest_version_status,
@@ -423,14 +431,16 @@ impl PgPrintTemplateRepository {
                 latest_versions.published_at
               FROM print_templates templates
               JOIN LATERAL (
-                SELECT id, version_no, status, field_library_version_id, designer_version, published_at
+                SELECT
+                    id, template_name, template_type_code, scope, is_default, remark,
+                    version_no, status, field_library_version_id, designer_version, published_at
                   FROM print_template_versions
                  WHERE template_id = templates.id
                  ORDER BY version_no DESC
                  LIMIT 1
               ) latest_versions ON TRUE
              WHERE templates.owner_id = $1
-             ORDER BY templates.template_type_code ASC, templates.template_code ASC
+             ORDER BY latest_versions.template_type_code ASC, templates.template_code ASC
             "#,
         )
         .bind(ctx.owner_id)
@@ -454,13 +464,13 @@ impl PgPrintTemplateRepository {
                 versions.id,
                 templates.id AS template_id,
                 templates.template_code,
-                templates.template_name,
-                templates.template_type_code,
+                versions.template_name,
+                versions.template_type_code,
                 templates.owner_id,
-                templates.scope,
+                versions.scope,
                 templates.enabled,
-                templates.is_default,
-                templates.remark,
+                versions.is_default,
+                versions.remark,
                 versions.field_library_version_id,
                 versions.version_no,
                 versions.status,
@@ -498,7 +508,7 @@ impl PgPrintTemplateRepository {
         idempotency_key: &str,
     ) -> Result<IdempotentMutation<PrintTemplateVersion>, PrintTemplateError> {
         validate_template_request(&req)?;
-        validate_field_library_and_bindings(pool, &req).await?;
+        let field_library_code = validate_field_library_and_bindings(pool, &req).await?;
         let request_hash = json_request_hash(&serde_json::json!({
             "request": &req,
         }))?;
@@ -512,47 +522,52 @@ impl PgPrintTemplateRepository {
                 replayed: true,
             });
         }
-        if !crate::system_dictionary::effective_item_enabled_in_tx(
+        let Some(expected_library_code) = effective_template_type_field_library_code_in_tx(
             &mut tx,
             ctx.owner_id,
-            SYSTEM_DICTIONARY_PRINT_TEMPLATE_TYPE,
             &req.template_type_code,
             now,
         )
-        .await
-        .map_err(map_db_error)?
-        {
+        .await?
+        else {
             return Err(PrintTemplateError::TemplateDisabled);
+        };
+        if expected_library_code != field_library_code {
+            return Err(PrintTemplateError::TemplateFieldMismatch(vec![format!(
+                "field_library_code:{field_library_code}"
+            )]));
         }
 
-        let template_id = upsert_template_for_update(&mut tx, ctx, &req, now).await?;
+        let (template_id, enabled) = upsert_template_for_update(&mut tx, ctx, &req, now).await?;
         let version_no = next_template_version_no(&mut tx, template_id).await?;
         let version_id = Uuid::new_v4();
-        let status = if req.publish { "published" } else { "draft" };
         let row = sqlx::query_as::<_, PrintTemplateVersionRow>(
             r#"
             INSERT INTO print_template_versions (
-                id, template_id, field_library_version_id, version_no, status,
+                id, template_id, field_library_version_id,
+                template_name, template_type_code, scope, is_default, remark,
+                version_no, status,
                 hiprint_json, field_bindings, paper, designer_version, request_hash,
                 created_at, created_by, published_at, published_by
             )
             VALUES (
-                $1, $2, $3, $4, $5,
-                $6, $7, $8, $9, $10,
-                $11, $12, CASE WHEN $5 = 'published' THEN $11 ELSE NULL END,
-                CASE WHEN $5 = 'published' THEN $12 ELSE NULL END
+                $1, $2, $3,
+                $4, $5, $6, $7, $8,
+                $9, 'draft',
+                $10, $11, $12, $13, $14,
+                $15, $16, NULL, NULL
             )
             RETURNING
                 id,
                 template_id,
-                $13::TEXT AS template_code,
-                $14::TEXT AS template_name,
-                $15::TEXT AS template_type_code,
-                $16::UUID AS owner_id,
-                $17::TEXT AS scope,
-                $18::BOOLEAN AS enabled,
-                $19::BOOLEAN AS is_default,
-                $20::TEXT AS remark,
+                $17::TEXT AS template_code,
+                template_name,
+                template_type_code,
+                $18::UUID AS owner_id,
+                scope,
+                $19::BOOLEAN AS enabled,
+                is_default,
+                remark,
                 field_library_version_id,
                 version_no,
                 status,
@@ -569,8 +584,12 @@ impl PgPrintTemplateRepository {
         .bind(version_id)
         .bind(template_id)
         .bind(req.field_library_version_id)
+        .bind(&req.template_name)
+        .bind(&req.template_type_code)
+        .bind(req.scope.as_str())
+        .bind(req.is_default)
+        .bind(&req.remark)
         .bind(version_no)
-        .bind(status)
         .bind(&req.hiprint_json)
         .bind(
             serde_json::to_value(&req.field_bindings)
@@ -582,13 +601,8 @@ impl PgPrintTemplateRepository {
         .bind(now)
         .bind(ctx.user_id)
         .bind(&req.template_code)
-        .bind(&req.template_name)
-        .bind(&req.template_type_code)
         .bind(ctx.owner_id)
-        .bind(req.scope.as_str())
-        .bind(req.enabled)
-        .bind(req.is_default)
-        .bind(req.remark.as_deref())
+        .bind(enabled)
         .fetch_one(&mut *tx)
         .await
         .map_err(map_db_error)?;
@@ -613,7 +627,11 @@ impl PgPrintTemplateRepository {
             "print_template",
             version.id,
             now,
-            None,
+            Some(AuditDiff::compute(
+                Value::Null,
+                serde_json::to_value(&version)
+                    .map_err(|error| PrintTemplateError::Serialize(error.to_string()))?,
+            )),
         )
         .await?;
         tx.commit().await.map_err(map_db_error)?;
@@ -655,114 +673,6 @@ impl PgPrintTemplateRepository {
         Ok(ResolvePrintTemplateResponse {
             template: summary,
             version,
-        })
-    }
-
-    pub async fn preview_template(
-        &self,
-        pool: &PgPool,
-        ctx: &AuthContext,
-        req: PrintTemplatePreviewRequest,
-    ) -> Result<PrintTemplatePreviewResponse, PrintTemplateError> {
-        let version =
-            resolve_template_version(pool, ctx, &req.template_code, &req.template_type_code)
-                .await?;
-        validate_required_fields(&version.field_bindings, &req.data)?;
-        Ok(PrintTemplatePreviewResponse {
-            template_id: version.template_id,
-            template_version_id: version.id,
-            template_code: version.template_code,
-            template_name: version.template_name,
-            template_type_code: version.template_type_code,
-            version_no: version.version_no,
-            hiprint_json: version.hiprint_json,
-            field_bindings: version.field_bindings,
-            paper: version.paper,
-            data: req.data,
-        })
-    }
-
-    pub async fn record_print(
-        &self,
-        pool: &PgPool,
-        ctx: &AuthContext,
-        req: PrintTemplatePrintRequest,
-        now: DateTime<Utc>,
-        idempotency_key: &str,
-    ) -> Result<IdempotentMutation<PrintRecord>, PrintTemplateError> {
-        validate_print_request(&req)?;
-        let version =
-            resolve_template_version(pool, ctx, &req.template_code, &req.template_type_code)
-                .await?;
-        validate_required_fields(&version.field_bindings, &req.data)?;
-        let request_hash = json_request_hash(&serde_json::json!({
-            "request": &req,
-        }))?;
-        let mut tx = pool.begin().await.map_err(map_db_error)?;
-        lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash, now).await?
-        {
-            return Ok(IdempotentMutation {
-                value,
-                replayed: true,
-            });
-        }
-
-        let record = sqlx::query_as::<_, PrintRecord>(
-            r#"
-            INSERT INTO print_records (
-                id, owner_id, template_version_id, business_module, business_document_type,
-                business_document_id, status, failure_reason, retry_count, printed_at,
-                operator_id, created_at
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, $9, $10, $9)
-            RETURNING id, owner_id, template_version_id, business_module, business_document_type,
-                      business_document_id, status, failure_reason, retry_count, printed_at,
-                      operator_id, created_at
-            "#,
-        )
-        .bind(Uuid::new_v4())
-        .bind(ctx.owner_id)
-        .bind(version.id)
-        .bind(&req.business_module)
-        .bind(&req.business_document_type)
-        .bind(&req.business_document_id)
-        .bind(&req.status)
-        .bind(&req.failure_reason)
-        .bind(now)
-        .bind(ctx.user_id)
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(map_db_error)?;
-
-        store_idempotency_success(
-            &mut tx,
-            ctx.owner_id,
-            idempotency_key,
-            &request_hash,
-            "POST",
-            "/api/v1/print-templates/print",
-            "print_record",
-            &record,
-            now,
-        )
-        .await?;
-        append_h9_audit(
-            &mut tx,
-            ctx,
-            "print_template",
-            "print_record",
-            record.id,
-            now,
-            None,
-        )
-        .await?;
-        tx.commit().await.map_err(map_db_error)?;
-
-        Ok(IdempotentMutation {
-            value: record,
-            replayed: false,
         })
     }
 }

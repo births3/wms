@@ -189,6 +189,48 @@ pub(crate) fn save_print_template() {}
 
 #[utoipa::path(
     post,
+    path = "/api/v1/print-templates/templates/{template_id}/versions/{version_id}/publish",
+    tag = "print-template",
+    params(
+        ("template_id" = uuid::Uuid, Path, description = "打印模板 ID"),
+        ("version_id" = uuid::Uuid, Path, description = "草稿版本 ID"),
+        ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")
+    ),
+    responses(
+        (status = 200, description = "发布打印模板草稿版本", body = PrintTemplateVersion),
+        (status = 400, description = "缺少幂等键", body = ErrorResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+        (status = 404, description = "模板或版本不存在", body = ErrorResponse),
+        (status = 409, description = "版本不是最新草稿、已发布、模板类型停用或幂等冲突", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn publish_print_template() {}
+
+#[utoipa::path(
+    patch,
+    path = "/api/v1/print-templates/templates/{template_id}/enabled",
+    tag = "print-template",
+    params(
+        ("template_id" = uuid::Uuid, Path, description = "打印模板 ID"),
+        ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")
+    ),
+    request_body = SetPrintTemplateEnabledRequest,
+    responses(
+        (status = 200, description = "停用或启用打印模板主数据", body = PrintTemplateSummary),
+        (status = 400, description = "缺少幂等键", body = ErrorResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+        (status = 404, description = "模板不存在", body = ErrorResponse),
+        (status = 409, description = "幂等冲突", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn set_print_template_enabled() {}
+
+#[utoipa::path(
+    post,
     path = "/api/v1/print-templates/resolve",
     tag = "print-template",
     request_body = ResolvePrintTemplateRequest,

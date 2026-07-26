@@ -9,7 +9,7 @@ pub use crate::print_template::{
     PrintTemplatePreviewResponse, PrintTemplatePrintRequest, PrintTemplateScope,
     PrintTemplateSummary, PrintTemplateVersion, PrintTemplateVersionListResponse,
     ResolvePrintTemplateRequest, ResolvePrintTemplateResponse, SavePrintTemplateRequest,
-    UpdatePrintFieldDefinitionRequest,
+    SetPrintTemplateEnabledRequest, UpdatePrintFieldDefinitionRequest,
 };
 pub use crate::role_management::{
     BatchAssignRolesRequest, BatchAssignRolesResponse, CreateRoleRequest, CreateUserRequest,
