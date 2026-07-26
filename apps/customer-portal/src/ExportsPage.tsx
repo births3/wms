@@ -28,12 +28,12 @@ export function ExportsPage(props: { session: LoginResponse }) {
   });
 
   return (
-    <div className="space-y-5" data-testid="portal-exports-page">
-      <section className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+    <div className="portal-page" data-testid="portal-exports-page">
+      <section className="portal-page-header">
         <div>
-          <div className="text-sm font-medium text-emerald-700">异步批量处理</div>
-          <h1 className="mt-1 text-2xl font-semibold">导出中心</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <div className="portal-eyebrow">异步批量处理</div>
+          <h1 className="portal-page-title">导出中心</h1>
+          <p className="portal-page-description">
             ZIP 保留 7 天，每次点击下载都会重新生成 15 分钟有效的授权地址。
           </p>
         </div>
@@ -49,19 +49,27 @@ export function ExportsPage(props: { session: LoginResponse }) {
       </section>
 
       {download.error ? (
-        <div role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div role="alert" className="portal-alert portal-alert-error">
           {download.error.message}
         </div>
       ) : null}
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <section className="portal-table-shell">
+        <div className="portal-table-toolbar">
+          <div>
+            <div className="portal-table-title">最近导出任务</div>
+            <div className="portal-table-subtitle">
+              共 {exportsQuery.data?.length ?? 0} 项，处理中任务会自动刷新
+            </div>
+          </div>
+        </div>
         {exportsQuery.isPending ? (
-          <div className="grid min-h-48 place-items-center text-sm text-slate-500">
+          <div className="portal-empty-state">
             正在读取导出任务…
           </div>
         ) : exportsQuery.data?.length ? (
           <div className="overflow-x-auto">
-            <table className="portal-table">
+            <table className="portal-table portal-responsive-table">
               <thead>
                 <tr>
                   <th>创建时间</th>
@@ -86,7 +94,7 @@ export function ExportsPage(props: { session: LoginResponse }) {
             </table>
           </div>
         ) : (
-          <div className="grid min-h-56 place-items-center px-6 text-center">
+          <div className="portal-empty-state">
             <div>
               <Archive className="mx-auto size-10 text-slate-300" />
               <div className="mt-3 text-sm font-medium text-slate-700">暂无导出任务</div>
@@ -97,9 +105,12 @@ export function ExportsPage(props: { session: LoginResponse }) {
           </div>
         )}
       </section>
-      <div className="rounded-xl border border-slate-200 bg-white p-4 text-xs leading-6 text-slate-500">
-        同一报告版本被多个订单引用时，ZIP 仅放一份 PDF；清单会保留每个订单、商品和批号，
-        资料暂缺项不会被静默忽略。单次最多 200 份且不超过 2GB。
+      <div className="portal-note">
+        <Archive className="size-4 shrink-0" />
+        <span>
+          同一报告版本被多个订单引用时，ZIP 仅放一份 PDF；清单会保留每个订单、商品和批号，
+          资料暂缺项不会被静默忽略。单次最多 200 份且不超过 2GB。
+        </span>
       </div>
     </div>
   );
@@ -122,22 +133,24 @@ function ExportRow(props: {
       data-testid={`portal-export-${props.job.status}`}
       data-export-id={props.job.id}
     >
-      <td>{formatTime(props.job.created_at)}</td>
-      <td>{props.job.requested_order_count}</td>
-      <td>{props.job.report_file_count} 份</td>
-      <td>
+      <td data-label="创建时间">{formatTime(props.job.created_at)}</td>
+      <td data-label="订单数">{props.job.requested_order_count}</td>
+      <td data-label="药检单">{props.job.report_file_count} 份</td>
+      <td data-label="缺失项">
         <span className={props.job.missing_count ? "font-medium text-amber-700" : ""}>
           {props.job.missing_count} 项
         </span>
       </td>
-      <td>
+      <td data-label="状态">
         <StatusBadge status={statusMeta.status} size="sm" label={statusMeta.label} />
         {props.job.last_error ? (
           <div className="mt-1 max-w-xs text-xs text-red-600">{props.job.last_error}</div>
         ) : null}
       </td>
-      <td>{props.job.expires_at ? formatTime(props.job.expires_at) : "—"}</td>
-      <td>
+      <td data-label="保留至">
+        {props.job.expires_at ? formatTime(props.job.expires_at) : "—"}
+      </td>
+      <td data-mobile="action">
         <Button
           type="button"
           size="sm"

@@ -44,12 +44,12 @@ export function UsersPage(props: { session: LoginResponse }) {
   });
 
   return (
-    <div className="space-y-5" data-testid="portal-users-page">
-      <section className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+    <div className="portal-page" data-testid="portal-users-page">
+      <section className="portal-page-header">
         <div>
-          <div className="text-sm font-medium text-emerald-700">客户多账号</div>
-          <h1 className="mt-1 text-2xl font-semibold">客户账号</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <div className="portal-eyebrow">客户多账号</div>
+          <h1 className="portal-page-title">客户账号</h1>
+          <p className="portal-page-description">
             普通账号按一个或多个稳定客户地址授权；未授权地址不返回数据。
           </p>
         </div>
@@ -59,7 +59,13 @@ export function UsersPage(props: { session: LoginResponse }) {
         </Button>
       </section>
 
-      {open ? (
+      {open && addresses.isPending ? (
+        <div className="portal-form-panel portal-empty-state">正在读取可授权地址…</div>
+      ) : open && addresses.error ? (
+        <div role="alert" className="portal-alert portal-alert-error">
+          {addresses.error.message}
+        </div>
+      ) : open ? (
         <CreateUserForm
           addresses={addresses.data ?? []}
           pending={create.isPending}
@@ -69,14 +75,29 @@ export function UsersPage(props: { session: LoginResponse }) {
         />
       ) : null}
       {update.error ? (
-        <div role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+        <div role="alert" className="portal-alert portal-alert-error">
           {update.error.message}
         </div>
       ) : null}
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="portal-table">
+      <section className="portal-table-shell">
+        <div className="portal-table-toolbar">
+          <div>
+            <div className="portal-table-title">账号与授权范围</div>
+            <div className="portal-table-subtitle">
+              共 {users.data?.length ?? 0} 个账号
+            </div>
+          </div>
+        </div>
+        {users.isPending ? (
+          <div className="portal-empty-state">正在读取客户账号…</div>
+        ) : users.error ? (
+          <div role="alert" className="portal-alert portal-alert-error">
+            {users.error.message}
+          </div>
+        ) : users.data?.length ? (
+          <div className="overflow-x-auto">
+          <table className="portal-table portal-responsive-table">
             <thead>
               <tr>
                 <th>账号</th>
@@ -91,9 +112,9 @@ export function UsersPage(props: { session: LoginResponse }) {
             <tbody>
               {users.data?.map((user) => (
                 <tr key={user.id}>
-                  <td className="font-medium">{user.username}</td>
-                  <td>{user.display_name}</td>
-                  <td>
+                  <td data-label="账号" className="font-medium">{user.username}</td>
+                  <td data-label="显示名称">{user.display_name}</td>
+                  <td data-label="角色">
                     <span className="flex items-center gap-2">
                       {user.role === "customer_admin" ? (
                         <ShieldCheck className="size-4 text-emerald-700" />
@@ -103,26 +124,26 @@ export function UsersPage(props: { session: LoginResponse }) {
                       {user.role === "customer_admin" ? "客户管理员" : "普通账号"}
                     </span>
                   </td>
-                  <td>
+                  <td data-label="地址范围">
                     {user.role === "customer_admin"
                       ? "全部客户地址"
                       : `${user.address_ids.length} 个地址`}
                   </td>
-                  <td>
+                  <td data-label="历史版本">
                     <StatusBadge
                       status={user.can_view_report_history ? "completed" : "isolated"}
                       size="sm"
                       label={user.can_view_report_history ? "可查看" : "仅当前版本"}
                     />
                   </td>
-                  <td>
+                  <td data-label="状态">
                     <StatusBadge
                       status={user.status === "active" ? "completed" : "pending"}
                       size="sm"
                       label={user.status === "active" ? "启用" : user.status === "locked" ? "已锁定" : "停用"}
                     />
                   </td>
-                  <td>
+                  <td data-mobile="action">
                     <div className="flex flex-wrap gap-2">
                       <Button
                         type="button"
@@ -154,7 +175,10 @@ export function UsersPage(props: { session: LoginResponse }) {
               ))}
             </tbody>
           </table>
-        </div>
+          </div>
+        ) : (
+          <div className="portal-empty-state">暂无客户账号</div>
+        )}
       </section>
     </div>
   );
@@ -193,9 +217,17 @@ function CreateUserForm(props: {
   };
   return (
     <form
-      className="rounded-2xl border border-emerald-200 bg-white p-5 shadow-sm"
+      className="portal-form-panel"
       onSubmit={submit}
     >
+      <div className="portal-form-heading">
+        <div>
+          <div className="portal-table-title">创建客户账号</div>
+          <div className="portal-table-subtitle">
+            账号权限仅在所选地址范围内生效
+          </div>
+        </div>
+      </div>
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="用户名">
           <Input value={username} onChange={(event) => setUsername(event.target.value)} required />
@@ -232,7 +264,7 @@ function CreateUserForm(props: {
             {props.addresses.map((address) => (
               <label
                 key={address.id}
-                className="flex items-center gap-2 rounded-lg border border-slate-200 p-3 text-sm"
+                className="portal-choice-card"
               >
                 <Checkbox
                   checked={addressIds.includes(address.id)}
@@ -255,7 +287,7 @@ function CreateUserForm(props: {
         允许查看药检单历史版本和更正记录
       </label>
       {props.error ? (
-        <div role="alert" className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+        <div role="alert" className="portal-alert portal-alert-error mt-4">
           {props.error.message}
         </div>
       ) : null}

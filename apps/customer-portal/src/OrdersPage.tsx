@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
@@ -68,6 +68,11 @@ export function OrdersPage(props: {
   const allVisibleSelected =
     Boolean(orders.data?.length) &&
     orders.data?.every((order) => selected.includes(order.id));
+  const orderCount = orders.data?.length ?? 0;
+  const availableCount =
+    orders.data?.reduce((total, order) => total + order.available_report_count, 0) ?? 0;
+  const pendingCount =
+    orders.data?.reduce((total, order) => total + order.pending_report_count, 0) ?? 0;
   const toggleAll = (checked: boolean) => {
     const visibleIds = orders.data?.map((order) => order.id) ?? [];
     setSelected((current) =>
@@ -78,12 +83,12 @@ export function OrdersPage(props: {
   };
 
   return (
-    <div className="space-y-5" data-testid="portal-orders-page">
-      <section className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+    <div className="portal-page" data-testid="portal-orders-page">
+      <section className="portal-page-header">
         <div>
-          <div className="text-sm font-medium text-emerald-700">订单资料</div>
-          <h1 className="mt-1 text-2xl font-semibold">订单与药检单</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <div className="portal-eyebrow">订单资料</div>
+          <h1 className="portal-page-title">订单与药检单</h1>
+          <p className="portal-page-description">
             从已发货或已签收订单进入商品批号资料，不提供跨订单批号查询。
           </p>
         </div>
@@ -97,53 +102,87 @@ export function OrdersPage(props: {
         </Button>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="grid gap-3 md:grid-cols-[minmax(220px,1fr)_220px_160px_auto]">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-2.5 size-4 text-slate-400" />
-            <Input
-              value={keywordInput}
-              onChange={(event) => setKeywordInput(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") setKeyword(keywordInput.trim());
-              }}
-              className="pl-9"
-              placeholder="订单号 / 商品 / 批号"
-              aria-label="订单关键词"
-            />
-          </div>
-          <select
-            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-            value={addressId}
-            onChange={(event) => setAddressId(event.target.value)}
-            aria-label="客户地址"
-            data-testid="portal-address-filter"
+      <section className="portal-summary-grid" aria-label="订单资料概览">
+        <SummaryMetric
+          icon={<Package className="size-5" />}
+          label="当前订单"
+          value={orderCount}
+          suffix="单"
+        />
+        <SummaryMetric
+          icon={<FileText className="size-5" />}
+          label="可下载资料"
+          value={availableCount}
+          suffix="份"
+          tone="success"
+        />
+        <SummaryMetric
+          icon={<FileClock className="size-5" />}
+          label="暂缺或处理中"
+          value={pendingCount}
+          suffix="项"
+          tone={pendingCount ? "warning" : "neutral"}
+        />
+      </section>
+
+      <section className="portal-filter-panel">
+        <div className="portal-filter-grid">
+          <label className="portal-filter-field">
+            <span>关键词</span>
+            <span className="relative">
+              <Search className="portal-input-icon" />
+              <Input
+                value={keywordInput}
+                onChange={(event) => setKeywordInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") setKeyword(keywordInput.trim());
+                }}
+                className="pl-9"
+                placeholder="订单号 / 商品 / 批号"
+                aria-label="订单关键词"
+              />
+            </span>
+          </label>
+          <label className="portal-filter-field">
+            <span>客户地址</span>
+            <select
+              value={addressId}
+              onChange={(event) => setAddressId(event.target.value)}
+              aria-label="客户地址"
+              data-testid="portal-address-filter"
+            >
+              <option value="">全部授权地址</option>
+              {addresses.data?.map((address) => (
+                <option key={address.id} value={address.id}>
+                  {address.address_code} · {address.address_name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="portal-filter-field">
+            <span>订单状态</span>
+            <select
+              value={status}
+              onChange={(event) => setStatus(event.target.value)}
+              aria-label="订单状态"
+            >
+              <option value="">全部状态</option>
+              <option value="shipped">已发货</option>
+              <option value="signed">已签收</option>
+            </select>
+          </label>
+          <Button
+            type="button"
+            className="portal-filter-action"
+            onClick={() => setKeyword(keywordInput.trim())}
           >
-            <option value="">全部授权地址</option>
-            {addresses.data?.map((address) => (
-              <option key={address.id} value={address.id}>
-                {address.address_code} · {address.address_name}
-              </option>
-            ))}
-          </select>
-          <select
-            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-            value={status}
-            onChange={(event) => setStatus(event.target.value)}
-            aria-label="订单状态"
-          >
-            <option value="">全部状态</option>
-            <option value="shipped">已发货</option>
-            <option value="signed">已签收</option>
-          </select>
-          <Button type="button" onClick={() => setKeyword(keywordInput.trim())}>
             查询
           </Button>
         </div>
       </section>
 
       {message ? (
-        <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        <div className="portal-alert portal-alert-success">
           <span className="flex items-center gap-2">
             <CheckCircle2 className="size-4" />
             {message}
@@ -154,8 +193,8 @@ export function OrdersPage(props: {
         </div>
       ) : null}
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-col justify-between gap-3 border-b border-slate-200 px-4 py-3 sm:flex-row sm:items-center">
+      <section className="portal-table-shell">
+        <div className="portal-table-toolbar">
           <div className="flex items-center gap-3 text-sm text-slate-600">
             <Checkbox
               checked={allVisibleSelected}
@@ -196,7 +235,7 @@ export function OrdersPage(props: {
           <ErrorBanner error={orders.error} />
         ) : orders.data?.length ? (
           <div className="overflow-x-auto">
-            <table className="portal-table">
+            <table className="portal-table portal-responsive-table">
               <thead>
                 <tr>
                   <th className="w-12">选择</th>
@@ -243,6 +282,27 @@ export function OrdersPage(props: {
   );
 }
 
+function SummaryMetric(props: {
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+  suffix: string;
+  tone?: "neutral" | "success" | "warning";
+}) {
+  return (
+    <article className="portal-summary-card" data-tone={props.tone ?? "neutral"}>
+      <span className="portal-summary-icon">{props.icon}</span>
+      <span>
+        <span className="portal-summary-label">{props.label}</span>
+        <strong className="portal-summary-value">
+          {props.value}
+          <small>{props.suffix}</small>
+        </strong>
+      </span>
+    </article>
+  );
+}
+
 function OrderRow(props: {
   order: OrderSummary;
   checked: boolean;
@@ -253,29 +313,31 @@ function OrderRow(props: {
   const pending = props.order.pending_report_count;
   return (
     <tr data-testid={`portal-order-${props.order.order_no}`}>
-      <td>
+      <td data-mobile="select">
         <Checkbox
           checked={props.checked}
           onCheckedChange={(value) => props.onCheck(value === true)}
           aria-label={`选择订单 ${props.order.order_no}`}
         />
       </td>
-      <td className="font-medium text-slate-900">{props.order.order_no}</td>
-      <td>
+      <td data-label="订单号" className="font-medium text-slate-900">
+        {props.order.order_no}
+      </td>
+      <td data-label="客户地址">
         <span className="flex items-center gap-1.5">
           <MapPin className="size-4 text-slate-400" />
           {props.order.address_name}
         </span>
       </td>
-      <td>
+      <td data-label="状态">
         <StatusBadge
           status={props.order.status === "signed" ? "completed" : "in_progress"}
           size="sm"
           label={props.order.status === "signed" ? "已签收" : "已发货"}
         />
       </td>
-      <td>{formatTime(props.order.shipped_at)}</td>
-      <td>
+      <td data-label="发货时间">{formatTime(props.order.shipped_at)}</td>
+      <td data-label="资料状态">
         <div className="flex flex-wrap gap-2">
           {available ? (
             <span className="text-xs font-medium text-emerald-700">{available} 份可下载</span>
@@ -285,7 +347,7 @@ function OrderRow(props: {
           ) : null}
         </div>
       </td>
-      <td>
+      <td data-mobile="action">
         <Button type="button" variant="outline" size="sm" onClick={props.onOpen}>
           查看资料
         </Button>
@@ -299,6 +361,8 @@ function OrderDetailPanel(props: {
   orderId: string;
   onClose: () => void;
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
   const detail = useQuery({
     queryKey: ["portal-order", props.orderId],
     queryFn: () => getOrder(props.token, props.orderId),
@@ -317,17 +381,58 @@ function OrderDetailPanel(props: {
     () => detail.data?.lines.flatMap((line) => line.reports) ?? [],
     [detail.data],
   );
+  useEffect(() => {
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        props.onClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
+        'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusable?.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", closeOnEscape);
+    closeButtonRef.current?.focus();
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", closeOnEscape);
+      previousFocus?.focus();
+    };
+  }, [props.onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/45 p-3 sm:p-8" role="dialog" aria-modal="true">
-      <div className="ml-auto flex h-full w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-start justify-between border-b border-slate-200 px-6 py-5">
+    <div
+      className="portal-dialog-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="portal-order-detail-title"
+      aria-describedby="portal-order-detail-description"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) props.onClose();
+      }}
+    >
+      <div className="portal-dialog-panel" ref={dialogRef}>
+        <div className="portal-dialog-header">
           <div>
-            <div className="text-sm font-medium text-emerald-700">订单批号详情</div>
-            <h2 className="mt-1 text-xl font-semibold">
+            <div className="portal-eyebrow">订单批号详情</div>
+            <h2 id="portal-order-detail-title" className="portal-dialog-title">
               {detail.data?.order_no ?? "正在读取…"}
             </h2>
-            <p className="mt-1 text-sm text-slate-500">
+            <p id="portal-order-detail-description" className="portal-dialog-description">
               资料下载前会再次校验客户、地址、订单、商品和批号范围。
             </p>
           </div>
@@ -337,23 +442,24 @@ function OrderDetailPanel(props: {
             size="sm"
             aria-label="关闭订单详情"
             onClick={props.onClose}
+            ref={closeButtonRef}
           >
             <X className="size-4" />
           </Button>
         </div>
-        <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50 p-6">
+        <div className="portal-dialog-body">
           {detail.isPending ? <EmptyState text="正在读取订单批号…" /> : null}
           {detail.error ? <ErrorBanner error={detail.error} /> : null}
           {downloadError ? <ErrorBanner error={new Error(downloadError)} /> : null}
           {detail.data?.lines.map((line) => (
             <article
               key={line.id}
-              className="rounded-2xl border border-slate-200 bg-white p-5"
+              className="portal-batch-card"
               data-testid={`portal-batch-${line.batch_no}`}
             >
               <div className="flex flex-col justify-between gap-3 sm:flex-row">
                 <div className="flex gap-3">
-                  <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-700">
+                  <div className="portal-batch-icon">
                     <Package className="size-5" />
                   </div>
                   <div>
@@ -399,7 +505,7 @@ function ReportRow(props: { report: ReportSummary; onDownload: () => void }) {
     failed: "生成失败",
   }[report.customer_copy_status];
   return (
-    <div className="rounded-xl border border-slate-200 p-4" data-testid={`portal-report-v${report.version_number}`}>
+    <div className="portal-report-card" data-testid={`portal-report-v${report.version_number}`}>
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div className="flex items-start gap-3">
           <FileText className="mt-0.5 size-5 text-emerald-700" />
@@ -444,7 +550,7 @@ function ReportRow(props: { report: ReportSummary; onDownload: () => void }) {
 
 function EmptyState(props: { text: string }) {
   return (
-    <div className="grid min-h-40 place-items-center px-6 py-10 text-sm text-slate-500">
+    <div className="portal-empty-state">
       {props.text}
     </div>
   );
@@ -452,7 +558,7 @@ function EmptyState(props: { text: string }) {
 
 function ErrorBanner(props: { error: unknown }) {
   return (
-    <div role="alert" className="m-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+    <div role="alert" className="portal-alert portal-alert-error m-4">
       {props.error instanceof Error ? props.error.message : "请求失败"}
     </div>
   );

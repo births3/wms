@@ -4,6 +4,7 @@ import "@wms/ui/styles/globals.css";
 
 import { App } from "./App";
 import "./portal.css";
+import "./portal-responsive.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {
