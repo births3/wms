@@ -13,6 +13,7 @@ import { handlePrintInventoryDevMock } from "./web-admin-dev-mock-print-inventor
 import { handleDocumentNumberingDevMock } from "./document-numbering-dev-mock";
 import { handleOutboundDevMock } from "./outbound-dev-mock";
 import { handleDockDevMock } from "./dock-dev-mock";
+import { handleDrugInspectionDocumentDevMock } from "./drug-inspection-document-dev-mock";
 
 import {
   asNullableString,
@@ -92,40 +93,6 @@ const devPutawayStrategyProfiles: Array<Record<string, unknown>> = [
     updated_at: "2026-07-18T00:00:00.000Z",
   },
 ];
-
-function devInboundDocumentRows() {
-  const statuses = ["missing", "partial", "complete"];
-  return allDevOrders()
-    .filter((order) => order.document_type === "purchase_inbound" && order.status !== "released")
-    .slice(0, 6)
-    .map((order, index) => {
-      const product = devSeedProducts[index % devSeedProducts.length];
-      const drugInspectionStatus = statuses[index % statuses.length] ?? "missing";
-      const upstreamUploaded = index % 2 === 1;
-      return {
-        asn_id: order.id,
-        receipt_no: order.receipt_no,
-        purchase_order_no: order.external_ref ?? `PO-${order.receipt_no}`,
-        owner_id: devOwnerId,
-        supplier_id: devSupplier.id,
-        supplier_name: devSupplier.supplier_name,
-        product_id: product?.id ?? "00000000-0000-0000-0000-000000001001",
-        product_code: product?.product_code ?? "-",
-        product_name: product?.product_name ?? "-",
-        batch_nos: [
-          `BATCH-${order.receipt_no.slice(-4)}-A`,
-          ...(index === 1 ? [`BATCH-${order.receipt_no.slice(-4)}-B`] : []),
-        ],
-        actual_received_at: order.updated_at,
-        drug_inspection_status: drugInspectionStatus,
-        drug_inspection_version: drugInspectionStatus === "missing" ? 0 : 1,
-        upstream_delivery_status: upstreamUploaded ? "uploaded" : "missing",
-        upstream_version: upstreamUploaded ? 1 : 0,
-        upstream_document_id: upstreamUploaded ? order.id : null,
-        created_at: order.created_at,
-      };
-    });
-}
 
 const {
   devCreatedCustomers,
@@ -232,10 +199,11 @@ async function tryHandleDevMockRoute(
   if (pathname.startsWith("/api/v1/outbound")) {
     if (await handleOutboundDevMock(req, res, pathname)) return true;
   }
-  if (req.method === "GET" && pathname === "/api/v1/drug-inspection/inbound-documents") {
-    const data = devInboundDocumentRows();
-    sendJson(res, 200, { data, page: { count: data.length, next_cursor: null } });
-    return true;
+  if (
+    pathname.startsWith("/api/v1/drug-inspection")
+    || pathname.startsWith("/api/v1/attachments")
+  ) {
+    if (await handleDrugInspectionDocumentDevMock(req, res, pathname)) return true;
   }
 
   if (req.method === "POST" && pathname === "/api/v1/auth/login") {
