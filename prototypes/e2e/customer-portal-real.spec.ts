@@ -132,26 +132,37 @@ test.describe.serial("独立客户药检单平台真实链路", () => {
   });
 
   test("多地址、订单批号、当前版本、单份下载和真实 ZIP", async ({ page }) => {
-    await login(page, "portal-multi");
+    await login(page, "portal-multi", "login-desktop.png");
     await searchRun(page);
     await expect(page.locator("tbody tr")).toHaveCount(5);
     await expect(page.getByRole("combobox", { name: "客户地址" }).locator("option")).toHaveCount(3);
     await page.getByRole("combobox", { name: "客户地址" }).selectOption(addressA);
     await expect(page.locator("tbody tr")).toHaveCount(3);
-    await page.screenshot({ path: path.join(evidenceDir, "address-scope.png"), fullPage: true });
+    await capture(page, "address-scope.png");
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.getByRole("navigation", { name: "客户平台导航" })).toBeVisible();
+    await capture(page, "orders-mobile.png");
+    await page.setViewportSize({ width: 1280, height: 720 });
 
     await page.getByTestId(`portal-order-${runTag}-A-001`).getByRole("button", { name: "查看资料" }).click();
     await expect(page.getByTestId("portal-batch-BATCH-A")).toBeVisible();
     await expect(page.getByText(`${runTag}-REPORT-V2`)).toBeVisible();
     await expect(page.getByText(`${runTag}-REPORT-V1`)).toHaveCount(0);
-    await page.screenshot({ path: path.join(evidenceDir, "order-batch-current.png"), fullPage: true });
+    const closeDetail = page.getByRole("button", { name: "关闭订单详情" });
+    await expect(closeDetail).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expect(page.getByRole("button", { name: "下载 PDF" })).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(closeDetail).toBeFocused();
+    await capture(page, "order-batch-current.png");
     const reportDownload = page.waitForEvent("download");
     await page.getByRole("button", { name: "下载 PDF" }).click();
     const reportFile = await reportDownload;
     const reportPath = path.join(evidenceDir, "downloaded-current.pdf");
     await reportFile.saveAs(reportPath);
     expect(fs.readFileSync(reportPath, "utf8")).toContain("真实客户药检单当前版本");
-    await page.getByRole("button", { name: "关闭订单详情" }).click();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
 
     await page.getByRole("combobox", { name: "客户地址" }).selectOption("");
     for (const orderNo of [
@@ -169,13 +180,13 @@ test.describe.serial("独立客户药检单平台真实链路", () => {
     await page.getByTestId("portal-create-export").click();
     const createdExport = await (await createExportResponse).json() as { id: string };
     await expect(page.getByText("批量任务已创建，可在导出中心查看进度")).toBeVisible();
-    await page.screenshot({ path: path.join(evidenceDir, "batch-task-created.png"), fullPage: true });
+    await capture(page, "batch-task-created.png");
     await page.getByRole("button", { name: "导出中心" }).first().click();
     const completed = page.locator(`tr[data-export-id="${createdExport.id}"]`);
     await expect(completed).toBeVisible({ timeout: 20_000 });
     await expect(completed).toContainText("1 份");
     await expect(completed).toContainText("1 项");
-    await page.screenshot({ path: path.join(evidenceDir, "export-completed.png"), fullPage: true });
+    await capture(page, "export-completed.png");
     const zipDownload = page.waitForEvent("download");
     await completed.getByRole("button", { name: "下载 ZIP" }).click();
     const zip = await zipDownload;
@@ -195,7 +206,7 @@ test.describe.serial("独立客户药检单平台真实链路", () => {
     await page.getByTestId(`portal-order-${runTag}-B-PROCESSING`).getByRole("button", { name: "查看资料" }).click();
     await expect(page.getByText(`${runTag}-PROCESSING`)).toBeVisible();
     await expect(page.getByRole("button", { name: "处理中" })).toBeDisabled();
-    await page.screenshot({ path: path.join(evidenceDir, "processing-state.png"), fullPage: true });
+    await capture(page, "processing-state.png");
 
     await relogin(page, "portal-history");
     await searchRun(page);
@@ -203,7 +214,7 @@ test.describe.serial("独立客户药检单平台真实链路", () => {
     await expect(page.getByText(`${runTag}-REPORT-V1`)).toBeVisible();
     await expect(page.getByText("历史版本", { exact: true })).toBeVisible();
     await expect(page.getByText("更正原因：更正前版本")).toBeVisible();
-    await page.screenshot({ path: path.join(evidenceDir, "history-visible.png"), fullPage: true });
+    await capture(page, "history-visible.png");
 
     await relogin(page, "portal-none");
     await searchRun(page);
@@ -218,7 +229,7 @@ test.describe.serial("独立客户药检单平台真实链路", () => {
       return response.status;
     }, orderA);
     expect(crossScope).toBe(404);
-    await page.screenshot({ path: path.join(evidenceDir, "no-address-no-data.png"), fullPage: true });
+    await capture(page, "no-address-no-data.png");
   });
 
   test("客户管理员可建多账号，2GB 超限在页面明确拒绝", async ({ page }) => {
@@ -232,7 +243,7 @@ test.describe.serial("独立客户药检单平台真实链路", () => {
     await page.getByText("A · 上海浦东一店").click();
     await page.getByRole("button", { name: "保存账号" }).click();
     await expect(page.getByText(account)).toBeVisible();
-    await page.screenshot({ path: path.join(evidenceDir, "multi-account-created.png"), fullPage: true });
+    await capture(page, "multi-account-created.png");
     const accountRow = page.locator("tbody tr").filter({ hasText: account });
     await accountRow.getByRole("button", { name: "开启历史" }).click();
     await expect(accountRow.getByText("可查看")).toBeVisible();
@@ -247,23 +258,31 @@ test.describe.serial("独立客户药检单平台真实链路", () => {
       return response.status;
     }, account);
     expect(disabledLoginStatus).toBe(401);
-    await page.screenshot({ path: path.join(evidenceDir, "multi-account-managed.png"), fullPage: true });
+    await capture(page, "multi-account-managed.png");
 
     await page.getByRole("button", { name: "订单与药检单" }).click();
     await searchRun(page);
     await page.getByRole("checkbox", { name: `选择订单 ${runTag}-A-OVERSIZE` }).check();
     await page.getByTestId("portal-create-export").click();
     await expect(page.getByRole("alert")).toContainText("不超过 2GB");
-    await page.screenshot({ path: path.join(evidenceDir, "export-2gb-rejected.png"), fullPage: true });
+    await capture(page, "export-2gb-rejected.png");
   });
 });
 
-async function login(page: Page, username: string) {
+async function login(page: Page, username: string, screenshotName?: string) {
   await page.goto("/");
+  if (screenshotName) {
+    await capture(page, screenshotName);
+  }
   await page.getByLabel("用户名").fill(username);
   await page.getByLabel("密码").fill("CorrectHorse1!");
   await page.getByTestId("portal-login").click();
   await expect(page.getByRole("heading", { name: "订单与药检单" })).toBeVisible();
+}
+
+async function capture(page: Page, name: string) {
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({ path: path.join(evidenceDir, name), fullPage: true });
 }
 
 async function relogin(page: Page, username: string) {
