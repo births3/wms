@@ -22,7 +22,7 @@ function bindAddr(url: string) {
 
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: /web-admin-(?:m1|h9-template-type|h9-field-library|h9-template-version)-real\.spec\.ts/,
+  testMatch: /web-admin-(?:m1|h9-template-type|h9-field-library|h9-template-version|h9-delivery-note-aggregation)-real\.spec\.ts/,
   timeout: 60_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,
@@ -62,6 +62,7 @@ export default defineConfig({
       env: {
         ...process.env,
         WMS_WEB_ADMIN_E2E_API_URL: apiURL,
+        WMS_WEB_ADMIN_DEV_MOCK: "0",
       },
     },
   ],
