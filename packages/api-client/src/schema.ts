@@ -3140,6 +3140,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/print-orchestration/cutoff-plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_cutoff_plans"];
+        put?: never;
+        post: operations["create_cutoff_plan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-orchestration/cutoff-plans/{plan_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["publish_cutoff_plan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-orchestration/delivery-note-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_delivery_note_candidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-orchestration/delivery-note-groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_delivery_note_groups"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-orchestration/delivery-note-groups/manual-cutoff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["manual_delivery_note_cutoff"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-orchestration/route-bindings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_route_bindings"];
+        put?: never;
+        post: operations["publish_route_binding"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/print-templates/field-libraries": {
         parameters: {
             query?: never;
@@ -5151,6 +5247,24 @@ export interface components {
             license_no?: string | null;
             source?: string | null;
         };
+        /** @description 创建 H9 截单计划草稿。 */
+        CreateCutoffPlanRequest: {
+            /** Format: uuid */
+            customer_id?: string | null;
+            /** Format: date-time */
+            effective_from: string;
+            /** Format: date-time */
+            effective_to?: string | null;
+            exceptions: components["schemas"]["CutoffDateException"][];
+            name: string;
+            route_code?: string | null;
+            scope: components["schemas"]["CutoffPlanScope"];
+            /** Format: int32 */
+            utc_offset_minutes: number;
+            /** Format: uuid */
+            warehouse_id: string;
+            weekly_schedule: components["schemas"]["WeeklyCutoffSlot"][];
+        };
         CreateDockAppointmentRequest: {
             appointment_no: string;
             /** Format: uuid */
@@ -5284,6 +5398,8 @@ export interface components {
         CreateOutboundOrderRequest: {
             /** Format: uuid */
             customer_id: string;
+            /** Format: uuid */
+            delivery_address_id: string;
             document_type: string;
             erp_order_no?: string | null;
             lines: components["schemas"]["CreateOutboundOrderLineRequest"][];
@@ -5598,9 +5714,132 @@ export interface components {
             certificate_type: string;
             expires_at?: string | null;
         };
+        /** @description 截单计划的例外日期；空时间表示当天不截单。 */
+        CutoffDateException: {
+            cutoff_time?: string | null;
+            /** Format: date */
+            date: string;
+        };
+        /** @description H9 截单计划。 */
+        CutoffPlan: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            customer_id?: string | null;
+            /** Format: date-time */
+            effective_from: string;
+            /** Format: date-time */
+            effective_to?: string | null;
+            exceptions: components["schemas"]["CutoffDateException"][];
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** Format: uuid */
+            owner_id: string;
+            route_code?: string | null;
+            scope: components["schemas"]["CutoffPlanScope"];
+            status: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: int32 */
+            utc_offset_minutes: number;
+            /** Format: uuid */
+            warehouse_id: string;
+            weekly_schedule: components["schemas"]["WeeklyCutoffSlot"][];
+        };
+        /** @description H9 截单计划列表。 */
+        CutoffPlanListResponse: {
+            data: components["schemas"]["CutoffPlan"][];
+        };
+        /**
+         * @description 截单计划匹配层级；枚举顺序不代表运行优先级。
+         * @enum {string}
+         */
+        CutoffPlanScope: "customer" | "route" | "owner_warehouse";
         DeleteRoleResponse: {
             /** Format: uuid */
             id: string;
+        };
+        /** @description H9 待截单出库订单。 */
+        DeliveryNoteCandidate: {
+            /** Format: date-time */
+            created_at: string;
+            customer_code: string;
+            /** Format: uuid */
+            customer_id: string;
+            customer_name: string;
+            delivery_address: string;
+            /** Format: uuid */
+            delivery_address_id: string;
+            erp_order_no?: string | null;
+            /** Format: uuid */
+            outbound_order_id: string;
+            route_code: string;
+            warehouse_code: string;
+            /** Format: uuid */
+            warehouse_id: string;
+            warehouse_name: string;
+            wms_order_no: string;
+        };
+        /** @description H9 待截单订单列表。 */
+        DeliveryNoteCandidateListResponse: {
+            data: components["schemas"]["DeliveryNoteCandidate"][];
+        };
+        /** @description H9 已冻结的随货同行单归集结果。 */
+        DeliveryNoteGroup: {
+            /** Format: uuid */
+            customer_id: string;
+            /** Format: date-time */
+            cutoff_at: string;
+            cutoff_mode: string;
+            /** Format: uuid */
+            cutoff_plan_id?: string | null;
+            cutoff_reason?: string | null;
+            /** Format: uuid */
+            delivery_address_id: string;
+            delivery_note_no: string;
+            /** Format: uuid */
+            id: string;
+            order_ids: string[];
+            /** Format: uuid */
+            owner_id: string;
+            route_code: string;
+            /** Format: date-time */
+            scheduled_cutoff_at?: string | null;
+            /** Format: uuid */
+            warehouse_id: string;
+        };
+        /** @description H9 随货同行单归集结果列表项。 */
+        DeliveryNoteGroupListItem: {
+            customer_code: string;
+            /** Format: uuid */
+            customer_id: string;
+            customer_name: string;
+            /** Format: date-time */
+            cutoff_at: string;
+            cutoff_mode: string;
+            /** Format: uuid */
+            cutoff_plan_id?: string | null;
+            cutoff_reason?: string | null;
+            delivery_address: string;
+            /** Format: uuid */
+            delivery_address_id: string;
+            delivery_note_no: string;
+            /** Format: uuid */
+            id: string;
+            order_ids: string[];
+            order_nos: string[];
+            route_code: string;
+            /** Format: date-time */
+            scheduled_cutoff_at?: string | null;
+            warehouse_code: string;
+            /** Format: uuid */
+            warehouse_id: string;
+            warehouse_name: string;
+        };
+        /** @description H9 随货同行单归集结果列表。 */
+        DeliveryNoteGroupListResponse: {
+            data: components["schemas"]["DeliveryNoteGroupListItem"][];
         };
         DisableSystemDictionaryItemRequest: {
             disabled_reason?: string | null;
@@ -6456,6 +6695,8 @@ export interface components {
             correlation_id: string;
             /** Format: uuid */
             customer_id: string;
+            /** Format: uuid */
+            delivery_address_id: string;
             document_type: string;
             erp_order_no?: string | null;
             external_ref: string;
@@ -7126,6 +7367,15 @@ export interface components {
             data: components["schemas"]["MaintenanceTask"][];
             page: components["schemas"]["PageMeta"];
         };
+        /** @description H9 授权人工截单命令。 */
+        ManualDeliveryNoteCutoffRequest: {
+            /** Format: uuid */
+            delivery_address_id: string;
+            order_ids: string[];
+            reason: string;
+            /** Format: uuid */
+            warehouse_id: string;
+        };
         /** @description M-PM 单值映射请求；外部自由文本不得直接进入业务模块。 */
         MapParameterRequest: {
             dict_code: string;
@@ -7626,6 +7876,20 @@ export interface components {
         };
         PublishAdminMenuRequest: {
             note?: string | null;
+        };
+        /** @description H9 送货地址线路绑定发布命令。 */
+        PublishRouteBindingRequest: {
+            /** Format: uuid */
+            customer_id: string;
+            /** Format: uuid */
+            delivery_address_id: string;
+            /** Format: date-time */
+            effective_from: string;
+            /** Format: date-time */
+            effective_to?: string | null;
+            route_code: string;
+            /** Format: uuid */
+            warehouse_id: string;
         };
         PurgeH8ErpMessagesRequest: {
             /** @description 必须为 true；且货主已配置 retention_days 才允许清理终态消息。 */
@@ -8244,6 +8508,35 @@ export interface components {
             expires_at?: string | null;
             /** Format: int64 */
             grace_period_days?: number | null;
+        };
+        /** @description H9 已发布的送货地址线路绑定。 */
+        RouteBinding: {
+            /** Format: date-time */
+            created_at: string;
+            customer_code: string;
+            /** Format: uuid */
+            customer_id: string;
+            customer_name: string;
+            delivery_address: string;
+            /** Format: uuid */
+            delivery_address_id: string;
+            /** Format: date-time */
+            effective_from: string;
+            /** Format: date-time */
+            effective_to?: string | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            route_code: string;
+            warehouse_code: string;
+            /** Format: uuid */
+            warehouse_id: string;
+            warehouse_name: string;
+        };
+        /** @description H9 线路绑定列表。 */
+        RouteBindingListResponse: {
+            data: components["schemas"]["RouteBinding"][];
         };
         SavePrintTemplateRequest: {
             designer_version: string;
@@ -9375,6 +9668,16 @@ export interface components {
         WarehouseZoneListResponse: {
             data: components["schemas"]["WarehouseZone"][];
             page: components["schemas"]["PageMeta"];
+        };
+        /** @description 截单计划的一条结构化周计划。 */
+        WeeklyCutoffSlot: {
+            /** @description Local time in HH:MM. */
+            cutoff_time: string;
+            /**
+             * Format: int32
+             * @description ISO weekday: Monday=1, Sunday=7.
+             */
+            weekday: number;
         };
         WeighPackJobRequest: {
             /** Format: int64 */
@@ -21543,6 +21846,457 @@ export interface operations {
                 };
             };
             /** @description 请求无效 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_cutoff_plans: {
+        parameters: {
+            query?: {
+                /** @description 可选仓库筛选 */
+                warehouse_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 截单计划列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CutoffPlanListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印编排读取权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_cutoff_plan: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCutoffPlanRequest"];
+            };
+        };
+        responses: {
+            /** @description 截单计划草稿创建成功或幂等重放 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CutoffPlan"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印编排维护权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 截单计划参数或主数据非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    publish_cutoff_plan: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 截单计划 ID */
+                plan_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 截单计划发布成功或幂等重放 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CutoffPlan"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印编排维护权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 截单计划不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 状态非法或同级有效期重叠 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_delivery_note_candidates: {
+        parameters: {
+            query?: {
+                /** @description 可选仓库筛选 */
+                warehouse_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 待截单真实出库订单列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryNoteCandidateListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印编排读取权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_delivery_note_groups: {
+        parameters: {
+            query?: {
+                /** @description 可选仓库筛选 */
+                warehouse_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 随货同行单归集结果列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryNoteGroupListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印编排读取权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    manual_delivery_note_cutoff: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualDeliveryNoteCutoffRequest"];
+            };
+        };
+        responses: {
+            /** @description 人工截单成功或幂等重放 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryNoteGroup"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印编排维护权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 订单不存在或尚未冻结线路 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 订单已截单或编号规则未配置 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 参数或归集硬边界非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_route_bindings: {
+        parameters: {
+            query?: {
+                /** @description 可选仓库筛选 */
+                warehouse_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 线路绑定列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RouteBindingListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印编排读取权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    publish_route_binding: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishRouteBindingRequest"];
+            };
+        };
+        responses: {
+            /** @description 线路绑定发布成功或幂等重放 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RouteBinding"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印编排维护权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 同一地址的有效期重叠 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 线路绑定参数或主数据非法 */
             422: {
                 headers: {
                     [name: string]: unknown;

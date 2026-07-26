@@ -16816,6 +16816,618 @@
         }
       }
     },
+    "/api/v1/print-orchestration/cutoff-plans": {
+      "get": {
+        "tags": [
+          "print-orchestration"
+        ],
+        "operationId": "list_cutoff_plans",
+        "parameters": [
+          {
+            "name": "warehouse_id",
+            "in": "query",
+            "description": "可选仓库筛选",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "截单计划列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CutoffPlanListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印编排读取权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "print-orchestration"
+        ],
+        "operationId": "create_cutoff_plan",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCutoffPlanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "截单计划草稿创建成功或幂等重放",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CutoffPlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印编排维护权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "截单计划参数或主数据非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/print-orchestration/cutoff-plans/{plan_id}/publish": {
+      "post": {
+        "tags": [
+          "print-orchestration"
+        ],
+        "operationId": "publish_cutoff_plan",
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "description": "截单计划 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "截单计划发布成功或幂等重放",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CutoffPlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印编排维护权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "截单计划不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态非法或同级有效期重叠",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/print-orchestration/delivery-note-candidates": {
+      "get": {
+        "tags": [
+          "print-orchestration"
+        ],
+        "operationId": "list_delivery_note_candidates",
+        "parameters": [
+          {
+            "name": "warehouse_id",
+            "in": "query",
+            "description": "可选仓库筛选",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "待截单真实出库订单列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryNoteCandidateListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印编排读取权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/print-orchestration/delivery-note-groups": {
+      "get": {
+        "tags": [
+          "print-orchestration"
+        ],
+        "operationId": "list_delivery_note_groups",
+        "parameters": [
+          {
+            "name": "warehouse_id",
+            "in": "query",
+            "description": "可选仓库筛选",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "随货同行单归集结果列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryNoteGroupListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印编排读取权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/print-orchestration/delivery-note-groups/manual-cutoff": {
+      "post": {
+        "tags": [
+          "print-orchestration"
+        ],
+        "operationId": "manual_delivery_note_cutoff",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualDeliveryNoteCutoffRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "人工截单成功或幂等重放",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryNoteGroup"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印编排维护权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "订单不存在或尚未冻结线路",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "订单已截单或编号规则未配置",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "参数或归集硬边界非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/print-orchestration/route-bindings": {
+      "get": {
+        "tags": [
+          "print-orchestration"
+        ],
+        "operationId": "list_route_bindings",
+        "parameters": [
+          {
+            "name": "warehouse_id",
+            "in": "query",
+            "description": "可选仓库筛选",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "线路绑定列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RouteBindingListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印编排读取权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "print-orchestration"
+        ],
+        "operationId": "publish_route_binding",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishRouteBindingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "线路绑定发布成功或幂等重放",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RouteBinding"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印编排维护权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "同一地址的有效期重叠",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "线路绑定参数或主数据非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
     "/api/v1/print-templates/field-libraries": {
       "get": {
         "tags": [
@@ -25808,6 +26420,65 @@
           }
         }
       },
+      "CreateCutoffPlanRequest": {
+        "type": "object",
+        "description": "创建 H9 截单计划草稿。",
+        "required": [
+          "name",
+          "warehouse_id",
+          "scope",
+          "utc_offset_minutes",
+          "weekly_schedule",
+          "exceptions",
+          "effective_from"
+        ],
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "effective_from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "effective_to": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "exceptions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CutoffDateException"
+            }
+          },
+          "name": {
+            "type": "string"
+          },
+          "route_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "scope": {
+            "$ref": "#/components/schemas/CutoffPlanScope"
+          },
+          "utc_offset_minutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "weekly_schedule": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WeeklyCutoffSlot"
+            }
+          }
+        }
+      },
       "CreateDockAppointmentRequest": {
         "type": "object",
         "required": [
@@ -26258,10 +26929,15 @@
           "wms_order_no",
           "customer_id",
           "warehouse_id",
+          "delivery_address_id",
           "lines"
         ],
         "properties": {
           "customer_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "delivery_address_id": {
             "type": "string",
             "format": "uuid"
           },
@@ -27242,6 +27918,130 @@
           }
         }
       },
+      "CutoffDateException": {
+        "type": "object",
+        "description": "截单计划的例外日期；空时间表示当天不截单。",
+        "required": [
+          "date"
+        ],
+        "properties": {
+          "cutoff_time": {
+            "type": "string",
+            "nullable": true
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "CutoffPlan": {
+        "type": "object",
+        "description": "H9 截单计划。",
+        "required": [
+          "id",
+          "owner_id",
+          "name",
+          "warehouse_id",
+          "scope",
+          "utc_offset_minutes",
+          "weekly_schedule",
+          "exceptions",
+          "effective_from",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "customer_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "effective_from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "effective_to": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "exceptions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CutoffDateException"
+            }
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "route_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "scope": {
+            "$ref": "#/components/schemas/CutoffPlanScope"
+          },
+          "status": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "utc_offset_minutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "weekly_schedule": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WeeklyCutoffSlot"
+            }
+          }
+        }
+      },
+      "CutoffPlanListResponse": {
+        "type": "object",
+        "description": "H9 截单计划列表。",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CutoffPlan"
+            }
+          }
+        }
+      },
+      "CutoffPlanScope": {
+        "type": "string",
+        "description": "截单计划匹配层级；枚举顺序不代表运行优先级。",
+        "enum": [
+          "customer",
+          "route",
+          "owner_warehouse"
+        ]
+      },
       "DeleteRoleResponse": {
         "type": "object",
         "required": [
@@ -27251,6 +28051,267 @@
           "id": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "DeliveryNoteCandidate": {
+        "type": "object",
+        "description": "H9 待截单出库订单。",
+        "required": [
+          "outbound_order_id",
+          "wms_order_no",
+          "warehouse_id",
+          "warehouse_code",
+          "warehouse_name",
+          "customer_id",
+          "customer_code",
+          "customer_name",
+          "delivery_address_id",
+          "delivery_address",
+          "route_code",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "customer_code": {
+            "type": "string"
+          },
+          "customer_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "customer_name": {
+            "type": "string"
+          },
+          "delivery_address": {
+            "type": "string"
+          },
+          "delivery_address_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "erp_order_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "outbound_order_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "route_code": {
+            "type": "string"
+          },
+          "warehouse_code": {
+            "type": "string"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "warehouse_name": {
+            "type": "string"
+          },
+          "wms_order_no": {
+            "type": "string"
+          }
+        }
+      },
+      "DeliveryNoteCandidateListResponse": {
+        "type": "object",
+        "description": "H9 待截单订单列表。",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeliveryNoteCandidate"
+            }
+          }
+        }
+      },
+      "DeliveryNoteGroup": {
+        "type": "object",
+        "description": "H9 已冻结的随货同行单归集结果。",
+        "required": [
+          "id",
+          "owner_id",
+          "warehouse_id",
+          "customer_id",
+          "delivery_address_id",
+          "route_code",
+          "delivery_note_no",
+          "cutoff_mode",
+          "cutoff_at",
+          "order_ids"
+        ],
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cutoff_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cutoff_mode": {
+            "type": "string"
+          },
+          "cutoff_plan_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "cutoff_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "delivery_address_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "delivery_note_no": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "order_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "route_code": {
+            "type": "string"
+          },
+          "scheduled_cutoff_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "DeliveryNoteGroupListItem": {
+        "type": "object",
+        "description": "H9 随货同行单归集结果列表项。",
+        "required": [
+          "id",
+          "delivery_note_no",
+          "warehouse_id",
+          "warehouse_code",
+          "warehouse_name",
+          "customer_id",
+          "customer_code",
+          "customer_name",
+          "delivery_address_id",
+          "delivery_address",
+          "route_code",
+          "cutoff_mode",
+          "cutoff_at",
+          "order_ids",
+          "order_nos"
+        ],
+        "properties": {
+          "customer_code": {
+            "type": "string"
+          },
+          "customer_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "customer_name": {
+            "type": "string"
+          },
+          "cutoff_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cutoff_mode": {
+            "type": "string"
+          },
+          "cutoff_plan_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "cutoff_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "delivery_address": {
+            "type": "string"
+          },
+          "delivery_address_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "delivery_note_no": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "order_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "order_nos": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "route_code": {
+            "type": "string"
+          },
+          "scheduled_cutoff_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "warehouse_code": {
+            "type": "string"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "warehouse_name": {
+            "type": "string"
+          }
+        }
+      },
+      "DeliveryNoteGroupListResponse": {
+        "type": "object",
+        "description": "H9 随货同行单归集结果列表。",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeliveryNoteGroupListItem"
+            }
           }
         }
       },
@@ -30029,6 +31090,7 @@
           "warehouse_id",
           "document_type",
           "customer_id",
+          "delivery_address_id",
           "product_code",
           "batch_no",
           "planned_qty"
@@ -30041,6 +31103,10 @@
             "type": "string"
           },
           "customer_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "delivery_address_id": {
             "type": "string",
             "format": "uuid"
           },
@@ -32142,6 +33208,36 @@
           }
         }
       },
+      "ManualDeliveryNoteCutoffRequest": {
+        "type": "object",
+        "description": "H9 授权人工截单命令。",
+        "required": [
+          "warehouse_id",
+          "delivery_address_id",
+          "order_ids",
+          "reason"
+        ],
+        "properties": {
+          "delivery_address_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "order_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "reason": {
+            "type": "string"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "MapParameterRequest": {
         "type": "object",
         "description": "M-PM 单值映射请求；外部自由文本不得直接进入业务模块。",
@@ -33644,6 +34740,43 @@
           "note": {
             "type": "string",
             "nullable": true
+          }
+        }
+      },
+      "PublishRouteBindingRequest": {
+        "type": "object",
+        "description": "H9 送货地址线路绑定发布命令。",
+        "required": [
+          "warehouse_id",
+          "customer_id",
+          "delivery_address_id",
+          "route_code",
+          "effective_from"
+        ],
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "delivery_address_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "effective_from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "effective_to": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "route_code": {
+            "type": "string"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },
@@ -35506,6 +36639,93 @@
             "type": "integer",
             "format": "int64",
             "nullable": true
+          }
+        }
+      },
+      "RouteBinding": {
+        "type": "object",
+        "description": "H9 已发布的送货地址线路绑定。",
+        "required": [
+          "id",
+          "owner_id",
+          "warehouse_id",
+          "warehouse_code",
+          "warehouse_name",
+          "customer_id",
+          "customer_code",
+          "customer_name",
+          "delivery_address_id",
+          "delivery_address",
+          "route_code",
+          "effective_from",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "customer_code": {
+            "type": "string"
+          },
+          "customer_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "customer_name": {
+            "type": "string"
+          },
+          "delivery_address": {
+            "type": "string"
+          },
+          "delivery_address_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "effective_from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "effective_to": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "route_code": {
+            "type": "string"
+          },
+          "warehouse_code": {
+            "type": "string"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "warehouse_name": {
+            "type": "string"
+          }
+        }
+      },
+      "RouteBindingListResponse": {
+        "type": "object",
+        "description": "H9 线路绑定列表。",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RouteBinding"
+            }
           }
         }
       },
@@ -39236,6 +40456,26 @@
           }
         }
       },
+      "WeeklyCutoffSlot": {
+        "type": "object",
+        "description": "截单计划的一条结构化周计划。",
+        "required": [
+          "weekday",
+          "cutoff_time"
+        ],
+        "properties": {
+          "cutoff_time": {
+            "type": "string",
+            "description": "Local time in HH:MM."
+          },
+          "weekday": {
+            "type": "integer",
+            "format": "int32",
+            "description": "ISO weekday: Monday=1, Sunday=7.",
+            "minimum": 0
+          }
+        }
+      },
       "WeighPackJobRequest": {
         "type": "object",
         "required": [
@@ -39334,6 +40574,10 @@
     {
       "name": "print-template",
       "description": "H9 打印模板引擎"
+    },
+    {
+      "name": "print-orchestration",
+      "description": "H9 随货同行单归集与打印编排"
     },
     {
       "name": "inbound",
