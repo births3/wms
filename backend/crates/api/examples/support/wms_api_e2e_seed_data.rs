@@ -146,6 +146,16 @@ pub async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
             "H9 打印模板发布",
         ),
         (
+            "00000000-0000-0000-0000-00000000012e",
+            "h9.print_orchestration.read",
+            "H9 打印编排读取",
+        ),
+        (
+            "00000000-0000-0000-0000-00000000012f",
+            "h9.print_orchestration.write",
+            "H9 打印编排维护",
+        ),
+        (
             "00000000-0000-0000-0000-000000000122",
             "mcg.document_numbering.read",
             "M-CG 单据号规则读取",
@@ -502,7 +512,7 @@ pub async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
             'm2_acceptance_record',
             'M2 验收记录字段库',
             'M2',
-            'ReceivingOrder'
+            'ReceivingOrderPrintData'
         )
         ON CONFLICT (library_code) DO NOTHING
         "#,
@@ -520,7 +530,7 @@ pub async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
             libraries.id,
             1,
             'draft',
-            'ReceivingOrder',
+            'ReceivingOrderPrintData',
             'M2',
             'wms-api-e2e-m2-acceptance-v1',
             '00000000-0000-0000-0000-000000000101'
@@ -554,12 +564,12 @@ pub async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
         CROSS JOIN (VALUES
             (
                 '00000000-0000-0000-0000-000000004803'::uuid,
-                'asn.code', 'string', 'ReceivingOrder', 'ASN 号', 'order', '订单信息',
+                'order.receipt_no', 'string', 'ReceivingOrderPrintData', 'ASN 号', 'order', '订单信息',
                 TRUE, FALSE, 10
             ),
             (
                 '00000000-0000-0000-0000-000000004804'::uuid,
-                'product.code', 'string', 'ReceivingOrderLine', '商品编码', 'product', '商品信息',
+                'order.lines[].product_code', 'string', 'ReceivingOrderPrintData', '商品编码', 'product', '商品信息',
                 TRUE, FALSE, 20
             )
         ) AS seed(
@@ -596,7 +606,7 @@ pub async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
         )
         VALUES (
             '00000000-0000-0000-0000-000000003802',
-            '00000000-0000-0000-0000-000000000001',
+            '00000000-0000-0000-0000-000000000000',
             'm2_acceptance_e2e', 'M2 验收记录 E2E 模板', 'acceptance_record', 'global',
             TRUE, TRUE, '真实数据 E2E 验收记录模板',
             '00000000-0000-0000-0000-000000000101',
@@ -627,8 +637,8 @@ pub async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
             templates.remark,
             1,
             'published',
-            '{"panels":[{"index":0,"paperType":"A4","width":210,"height":297,"printElements":[{"options":{"field":"asn.code","title":"ASN 号","left":20,"top":20,"width":260,"height":20},"printElementType":{"type":"text"}}]}]}'::jsonb,
-            '[{"field_path":"asn.code","required":true},{"field_path":"product.code","required":false}]'::jsonb,
+            '{"panels":[{"index":0,"paperType":"A4","width":210,"height":297,"printElements":[{"options":{"field":"order.receipt_no","title":"ASN 号","left":20,"top":20,"width":260,"height":20},"printElementType":{"type":"text"}}]}]}'::jsonb,
+            '[{"field_path":"order.receipt_no","required":true},{"field_path":"order.lines[].product_code","required":false}]'::jsonb,
             '{"paperType":"A4","width":210,"height":297,"direction":"portrait"}'::jsonb,
             'hiprint@0.4.0',
             'wms-api-e2e-m2-acceptance-template-v1',
@@ -639,7 +649,7 @@ pub async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
         JOIN print_field_libraries libraries ON libraries.library_code = 'm2_acceptance_record'
         JOIN print_field_library_versions versions
           ON versions.library_id = libraries.id AND versions.version_no = 1
-        WHERE templates.owner_id = '00000000-0000-0000-0000-000000000001'
+        WHERE templates.owner_id = '00000000-0000-0000-0000-000000000000'
           AND templates.template_code = 'm2_acceptance_e2e'
         ON CONFLICT (template_id, version_no) DO NOTHING
         "#,
@@ -647,7 +657,8 @@ pub async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
     .execute(pool)
     .await?;
 
-    crate::wms_api_e2e_seed_h9::seed_h9_asn_print_template(pool).await?;
+    crate::wms_api_e2e_seed_h9::seed_h9_business_print_templates(pool).await?;
+    crate::wms_api_e2e_seed_h9::seed_h9_delivery_note_aggregation(pool).await?;
     sqlx::query(
         r#"
         INSERT INTO document_number_rules (

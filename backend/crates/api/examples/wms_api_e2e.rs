@@ -35,6 +35,7 @@ use wms_api::{
         inventory_status_config_router, InventoryStatusConfigAppState,
     },
     master_data_handlers::{master_data_router, MasterDataAppState},
+    print_orchestration_handlers::{print_orchestration_router, PrintOrchestrationAppState},
     print_template_handlers::{print_template_router, PrintTemplateAppState},
     quality_liaison_handlers::{quality_liaison_router, QualityLiaisonAppState},
     reconciliation_handlers::{reconciliation_router, ReconciliationAppState},
@@ -180,6 +181,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .merge(print_template_router(PrintTemplateAppState::with_postgres(
             pool.clone(),
         )))
+        .merge(print_orchestration_router(
+            PrintOrchestrationAppState::with_postgres(pool.clone()),
+        ))
         .merge(role_management_router(RoleManagementState::new(
             pool.clone(),
             revocation_store.clone(),
