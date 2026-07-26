@@ -22,7 +22,7 @@ function bindAddr(url: string) {
 
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: /web-admin-(?:m1|h9-template-type|h9-field-library)-real\.spec\.ts/,
+  testMatch: /web-admin-(?:m1|h9-template-type|h9-field-library|h9-template-version)-real\.spec\.ts/,
   timeout: 60_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,
