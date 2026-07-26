@@ -19,6 +19,7 @@ export type PrintTemplatePreviewRequest = components["schemas"]["PrintTemplatePr
 export type PrintTemplatePreviewResponse = components["schemas"]["PrintTemplatePreviewResponse"];
 export type PrintTemplatePrintRequest = components["schemas"]["PrintTemplatePrintRequest"];
 export type SavePrintTemplateRequest = components["schemas"]["SavePrintTemplateRequest"];
+export type SetPrintTemplateEnabledRequest = components["schemas"]["SetPrintTemplateEnabledRequest"];
 
 export interface PrintFieldLibraryRow {
   id: string;
@@ -136,6 +137,26 @@ export function useSavePrintTemplateMutation() {
   });
 }
 
+export function usePublishPrintTemplateMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: publishPrintTemplate,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: printTemplateQueryKey });
+    },
+  });
+}
+
+export function useSetPrintTemplateEnabledMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: setPrintTemplateEnabled,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: printTemplateQueryKey });
+    },
+  });
+}
+
 export function useGeneratePrintFieldLibraryDraftMutation() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -236,6 +257,51 @@ async function savePrintTemplate(request: SavePrintTemplateRequest) {
   });
   if (!result.data) {
     throw new ApiError(result.error, "保存打印模板失败", result.response.status);
+  }
+  return result.data;
+}
+
+async function publishPrintTemplate({
+  templateId,
+  versionId,
+}: {
+  templateId: string;
+  versionId: string;
+}) {
+  const result = await api.POST(
+    "/api/v1/print-templates/templates/{template_id}/versions/{version_id}/publish",
+    {
+      params: {
+        path: { template_id: templateId, version_id: versionId },
+        header: { "Idempotency-Key": idempotencyKey("web-h9-template-publish") },
+      },
+    },
+  );
+  if (!result.data) {
+    throw new ApiError(result.error, "发布打印模板失败", result.response.status);
+  }
+  return result.data;
+}
+
+async function setPrintTemplateEnabled({
+  templateId,
+  body,
+}: {
+  templateId: string;
+  body: SetPrintTemplateEnabledRequest;
+}) {
+  const result = await api.PATCH(
+    "/api/v1/print-templates/templates/{template_id}/enabled",
+    {
+      body,
+      params: {
+        path: { template_id: templateId },
+        header: { "Idempotency-Key": idempotencyKey("web-h9-template-enabled") },
+      },
+    },
+  );
+  if (!result.data) {
+    throw new ApiError(result.error, "停启打印模板失败", result.response.status);
   }
   return result.data;
 }

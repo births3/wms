@@ -22,17 +22,19 @@ import {
   type QueryPanelValue,
   type TreeCatalogNode,
 } from "@wms/ui";
-import { Copy, Database, Eye, History } from "lucide-react";
+import { Copy, Database, Eye, History, Upload } from "lucide-react";
 
 import type { CurrentUser } from "@/features/auth/auth-queries";
 import {
   usePrintFieldLibrariesQuery,
+  usePublishPrintTemplateMutation,
   usePrintTemplateVersionsMutation,
   usePrintTemplatesQuery,
   usePrintTemplateTypesQuery,
   usePreviewPrintTemplateMutation,
   useRecordPrintTemplateMutation,
   useSavePrintTemplateMutation,
+  useSetPrintTemplateEnabledMutation,
   type PrintFieldLibraryRow,
   type PrintTemplatePreviewResponse,
   type PrintTemplateRow,
@@ -110,6 +112,24 @@ const columns: DataGridColumn<PrintTemplateRow>[] = [
     copyValue: (row) => `v${row.latestVersionNo}`,
     filter: { type: "numberRange" },
     render: (row) => `v${row.latestVersionNo}`,
+  },
+  {
+    key: "latestVersionStatus",
+    header: "版本状态",
+    width: 120,
+    minWidth: 100,
+    sortable: true,
+    sortValue: (row) => row.latestVersionStatus,
+    filterValue: (row) => row.latestVersionStatus,
+    copyValue: (row) => row.latestVersionStatus === "published" ? "已发布" : "草稿",
+    filter: { type: "multiSelect", options: [{ label: "已发布", value: "published" }, { label: "草稿", value: "draft" }] },
+    render: (row) => (
+      <StatusBadge
+        status={row.latestVersionStatus === "published" ? "completed" : "pending"}
+        label={row.latestVersionStatus === "published" ? "已发布" : "草稿"}
+        size="sm"
+      />
+    ),
   },
   {
     key: "scope",
@@ -203,6 +223,8 @@ export function H9PrintTemplatePage({ currentUser }: { currentUser: CurrentUser 
   const templatesQuery = usePrintTemplatesQuery();
   const templateTypesQuery = usePrintTemplateTypesQuery();
   const saveMutation = useSavePrintTemplateMutation();
+  const publishMutation = usePublishPrintTemplateMutation();
+  const enabledMutation = useSetPrintTemplateEnabledMutation();
   const versionsMutation = usePrintTemplateVersionsMutation();
   const previewMutation = usePreviewPrintTemplateMutation();
   const printMutation = useRecordPrintTemplateMutation();
@@ -219,8 +241,11 @@ export function H9PrintTemplatePage({ currentUser }: { currentUser: CurrentUser 
   const [fieldLibraryOpen, setFieldLibraryOpen] = React.useState(false);
   const [historyVersions, setHistoryVersions] = React.useState<PrintTemplateVersion[]>([]);
   const [notice, setNotice] = React.useState<Notice>(null);
-  const canMaintainFieldLibrary = currentUser.permissions.includes("h9.print_template.write");
-  const canPublishFieldLibrary = currentUser.permissions.includes("h9.print_template.publish");
+  const canWriteTemplate = currentUser.permissions.includes("h9.print_template.write");
+  const canPublishTemplate = currentUser.permissions.includes("h9.print_template.publish");
+  const canPrintTemplate = currentUser.permissions.includes("h9.print_template.print");
+  const canMaintainFieldLibrary = canWriteTemplate;
+  const canPublishFieldLibrary = canPublishTemplate;
   const canOpenFieldLibrary = canMaintainFieldLibrary || canPublishFieldLibrary;
   const treeNodes = React.useMemo(
     () => buildH9TreeNodes(templateTypesQuery.data ?? [], librariesQuery.data ?? []),
@@ -263,18 +288,34 @@ export function H9PrintTemplatePage({ currentUser }: { currentUser: CurrentUser 
   const disableAction: DataGridDisableAction = {
     label: selectedRow?.enabled === false ? "启用" : "停用",
     description: selectedRow?.enabled === false ? "启用选中模板" : "停用选中模板",
-    disabled: (context) => context.selectedRowKeys.length !== 1 || versionsMutation.isPending || saveMutation.isPending,
+    disabled: (context) => context.selectedRowKeys.length !== 1 || enabledMutation.isPending,
     onClick: (context) => void toggleTemplateEnabled(context.selectedRowKeys[0]),
   };
-  const toolbarActions: DataGridToolbarAction[] = [
-    {
+  const toolbarActions: DataGridToolbarAction[] = [];
+  if (canWriteTemplate) {
+    toolbarActions.push({
       key: "copy-template",
       label: "复制",
       description: "复制选中模板并生成副本",
       icon: <Copy className="size-4" aria-hidden />,
       disabled: (context) => context.selectedRowKeys.length !== 1 || versionsMutation.isPending,
       onClick: (context) => void openDesignerFromRow(context.selectedRowKeys[0], "copy"),
-    },
+    });
+  }
+  if (canPublishTemplate) {
+    toolbarActions.push({
+      key: "publish-template",
+      label: "发布",
+      description: "发布选中模板的最新草稿",
+      icon: <Upload className="size-4" aria-hidden />,
+      disabled: (context) =>
+        context.selectedRowKeys.length !== 1
+        || selectedTemplateRow(context.selectedRowKeys)?.latestVersionStatus !== "draft"
+        || publishMutation.isPending,
+      onClick: (context) => void publishTemplate(context.selectedRowKeys[0]),
+    });
+  }
+  toolbarActions.push(
     {
       key: "version-history",
       label: "版本",
@@ -291,7 +332,7 @@ export function H9PrintTemplatePage({ currentUser }: { currentUser: CurrentUser 
       disabled: (context) => context.selectedRowKeys.length !== 1,
       onClick: (context) => void previewTemplate(context.selectedRowKeys[0]),
     },
-  ];
+  );
 
   async function refreshLibraries() {
     setNotice(null);
@@ -316,7 +357,7 @@ export function H9PrintTemplatePage({ currentUser }: { currentUser: CurrentUser 
 
   async function saveTemplate(request: SavePrintTemplateRequest) {
     const saved = await saveMutation.mutateAsync(request);
-    setNotice({ type: "success", text: `${saved.template_code} 已保存` });
+    setNotice({ type: "success", text: `${saved.template_code} 草稿已保存` });
   }
 
   function selectedTemplateRow(keys: string[]) {
@@ -342,12 +383,31 @@ export function H9PrintTemplatePage({ currentUser }: { currentUser: CurrentUser 
 
   async function toggleTemplateEnabled(rowId: string) {
     try {
-      const latest = await latestTemplateVersion(rowId);
-      if (!window.confirm(`确认${latest.enabled ? "停用" : "启用"}模板「${latest.template_name}」？`)) return;
-      const saved = await saveMutation.mutateAsync(saveRequestFromVersion(latest, { enabled: !latest.enabled }));
+      const row = templateById.get(rowId);
+      if (!row) return;
+      if (!window.confirm(`确认${row.enabled ? "停用" : "启用"}模板「${row.templateName}」？`)) return;
+      const saved = await enabledMutation.mutateAsync({
+        templateId: row.id,
+        body: { enabled: !row.enabled },
+      });
       setNotice({ type: "success", text: `${saved.template_code} 已${saved.enabled ? "启用" : "停用"}` });
     } catch (errorValue) {
       setNotice({ type: "error", text: errorValue instanceof Error ? errorValue.message : "停启模板失败" });
+    }
+  }
+
+  async function publishTemplate(rowId: string) {
+    const row = templateById.get(rowId);
+    if (!row || row.latestVersionStatus !== "draft") return;
+    if (!window.confirm(`确认发布模板「${row.templateName}」的 v${row.latestVersionNo} 草稿？`)) return;
+    try {
+      const published = await publishMutation.mutateAsync({
+        templateId: row.id,
+        versionId: row.latestVersionId,
+      });
+      setNotice({ type: "success", text: `${published.template_code} v${published.version_no} 已发布` });
+    } catch (errorValue) {
+      setNotice({ type: "error", text: errorValue instanceof Error ? errorValue.message : "发布模板失败" });
     }
   }
 
@@ -468,15 +528,15 @@ export function H9PrintTemplatePage({ currentUser }: { currentUser: CurrentUser 
             }
             exportFileBaseName="H9 打印模板"
             refreshAction={refreshAction}
-            createAction={createAction}
-            editAction={editAction}
-            disableAction={disableAction}
-            printAction={{
+            createAction={canWriteTemplate ? createAction : undefined}
+            editAction={canWriteTemplate ? editAction : undefined}
+            disableAction={canWriteTemplate ? disableAction : undefined}
+            printAction={canPrintTemplate ? {
               label: "打印",
               description: "预览并打印选中模板",
               disabled: (context) => context.selectedRowKeys.length !== 1,
               onClick: (context) => void previewTemplate(context.selectedRowKeys[0]),
-            }}
+            } : undefined}
             toolbarActions={toolbarActions}
             queryState={appliedQuery}
             querySummaryItems={querySummaryItems}
@@ -638,27 +698,6 @@ function formatDateTime(value: string) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
-}
-
-function saveRequestFromVersion(
-  version: PrintTemplateVersion,
-  patch: Partial<Pick<SavePrintTemplateRequest, "enabled">> = {},
-): SavePrintTemplateRequest {
-  return {
-    template_code: version.template_code,
-    template_name: version.template_name,
-    template_type_code: version.template_type_code,
-    scope: version.scope,
-    enabled: patch.enabled ?? version.enabled,
-    is_default: version.is_default,
-    remark: version.remark ?? null,
-    field_library_version_id: version.field_library_version_id,
-    hiprint_json: version.hiprint_json,
-    field_bindings: version.field_bindings,
-    paper: version.paper,
-    designer_version: version.designer_version,
-    publish: version.status === "published",
-  };
 }
 
 function VersionHistoryDialog({

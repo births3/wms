@@ -277,6 +277,37 @@ export async function handlePrintInventoryDevMock(
     sendJson(res, 200, { data, page: { count: data.length, next_cursor: null } });
     return true;
   }
+  const publishTemplate = pathname.match(
+    /^\/api\/v1\/print-templates\/templates\/([^/]+)\/versions\/([^/]+)\/publish$/,
+  );
+  if (req.method === "POST" && publishTemplate) {
+    const published = publishTemplateVersion(
+      decodeURIComponent(publishTemplate[1]),
+      decodeURIComponent(publishTemplate[2]),
+    );
+    sendJson(
+      res,
+      published ? 200 : 404,
+      published ?? { code: "H9_TEMPLATE_VERSION_NOT_FOUND", message: "打印模板版本不存在" },
+    );
+    return true;
+  }
+  const templateEnabled = pathname.match(
+    /^\/api\/v1\/print-templates\/templates\/([^/]+)\/enabled$/,
+  );
+  if (req.method === "PATCH" && templateEnabled) {
+    const body = await readJsonBody(req);
+    const updated = setTemplateEnabled(
+      decodeURIComponent(templateEnabled[1]),
+      asBoolean(body.enabled, true),
+    );
+    sendJson(
+      res,
+      updated ? 200 : 404,
+      updated ?? { code: "H9_TEMPLATE_NOT_FOUND", message: "打印模板不存在" },
+    );
+    return true;
+  }
   if (req.method === "POST" && pathname === "/api/v1/print-templates/templates") {
     sendJson(res, 200, await saveTemplate(req));
     return true;
@@ -462,10 +493,13 @@ async function saveTemplate(req: IncomingMessage) {
   const now = new Date().toISOString();
   const code = asString(body.template_code, "h9_template");
   const typeCode = asString(body.template_type_code, "asn");
-  const existing = templates().find(
-    (item) => item.template_code === code && item.template_type_code === typeCode,
-  );
-  const previous = existing ? templateVersions(existing.id) : [];
+  const requestedTemplateId = asNullableString(body.template_id);
+  const existing = requestedTemplateId
+    ? templates().find((item) => item.id === requestedTemplateId)
+    : undefined;
+  const previous = existing
+    ? devPrintTemplateVersions.get(existing.id) ?? [existing]
+    : [];
   const template: DevPrintTemplate = {
     id: existing?.id ?? crypto.randomUUID(),
     template_code: code,
@@ -473,12 +507,12 @@ async function saveTemplate(req: IncomingMessage) {
     template_type_code: typeCode,
     owner_id: devOwnerId,
     scope: asString(body.scope, "global") === "owner" ? "owner" : "global",
-    enabled: asBoolean(body.enabled, true),
+    enabled: existing?.enabled ?? true,
     is_default: asBoolean(body.is_default, true),
     remark: asNullableString(body.remark),
     latest_version_id: crypto.randomUUID(),
     latest_version_no: (existing?.latest_version_no ?? 0) + 1,
-    latest_version_status: asBoolean(body.publish, true) ? "published" : "draft",
+    latest_version_status: "draft",
     field_library_version_id: asString(
       body.field_library_version_id,
       fieldLibraries()[0].latest_version_id,
@@ -486,16 +520,56 @@ async function saveTemplate(req: IncomingMessage) {
     designer_version: asString(body.designer_version, "hiprint@0.4.0"),
     created_at: existing?.created_at ?? now,
     updated_at: now,
-    published_at: asBoolean(body.publish, true) ? now : null,
+    published_at: null,
     hiprint_json: asRecord(body.hiprint_json),
     field_bindings: bindings(body.field_bindings),
     paper: asRecord(body.paper),
   };
+  storeTemplate(template);
+  devPrintTemplateVersions.set(template.id, [template, ...previous]);
+  return templateVersion(template);
+}
+
+function publishTemplateVersion(templateId: string, versionId: string) {
+  const current = templates().find((item) => item.id === templateId);
+  if (
+    !current
+    || current.latest_version_id !== versionId
+    || current.latest_version_status !== "draft"
+  ) return null;
+  const versions = [...(devPrintTemplateVersions.get(templateId) ?? [current])];
+  const index = versions.findIndex((version) => version.latest_version_id === versionId);
+  if (index < 0) return null;
+  const published = {
+    ...versions[index],
+    latest_version_status: "published",
+    published_at: new Date().toISOString(),
+  };
+  versions[index] = published;
+  devPrintTemplateVersions.set(templateId, versions);
+  if (current.latest_version_id === versionId) storeTemplate(published);
+  return templateVersion(published);
+}
+
+function setTemplateEnabled(templateId: string, enabled: boolean) {
+  const current = templates().find((item) => item.id === templateId);
+  if (!current) return null;
+  const updated = { ...current, enabled, updated_at: new Date().toISOString() };
+  storeTemplate(updated);
+  const versions = devPrintTemplateVersions.get(templateId);
+  if (versions) {
+    devPrintTemplateVersions.set(
+      templateId,
+      versions.map((version) => ({ ...version, enabled })),
+    );
+  }
+  return updated;
+}
+
+function storeTemplate(template: DevPrintTemplate) {
   const index = devCreatedPrintTemplates.findIndex((item) => item.id === template.id);
   if (index >= 0) devCreatedPrintTemplates[index] = template;
   else devCreatedPrintTemplates.unshift(template);
-  devPrintTemplateVersions.set(template.id, [template, ...previous]);
-  return templateVersion(template);
 }
 
 function templateVersions(templateId: string) {
@@ -555,6 +629,7 @@ function printRecord(body: Record<string, unknown>) {
 function templateVersion(template: DevPrintTemplate) {
   return {
     ...template,
+    id: template.latest_version_id,
     template_id: template.id,
     version_no: template.latest_version_no,
     status: template.latest_version_status,

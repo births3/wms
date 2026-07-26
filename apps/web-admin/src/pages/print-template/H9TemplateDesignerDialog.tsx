@@ -51,9 +51,8 @@ export function H9TemplateDesignerDialog({
   const [templateName, setTemplateName] = React.useState("M2 ASN 默认模板");
   const [templateTypeCode, setTemplateTypeCode] = React.useState(firstType?.code ?? "m2_asn");
   const [scope, setScope] = React.useState<"global" | "owner">("global");
-  const [enabled, setEnabled] = React.useState(true);
   const [isDefault, setIsDefault] = React.useState(true);
-  const [publish, setPublish] = React.useState(true);
+  const [remark, setRemark] = React.useState("PC Web hiprint 设计器保存");
   const [paperPreset, setPaperPreset] = React.useState<PaperPreset>("A4");
   const [paperDirection, setPaperDirection] = React.useState<PaperDirection>("portrait");
   const [customPaperWidth, setCustomPaperWidth] = React.useState("100");
@@ -66,7 +65,7 @@ export function H9TemplateDesignerDialog({
   const formRef = React.useRef<HTMLFormElement | null>(null);
   const selectedType = templateTypes.find((type) => type.code === templateTypeCode) ?? firstType;
   const selectedLibrary =
-    libraries.find((library) => library.libraryCode === selectedType?.fieldLibraryCode) ?? libraries[0] ?? null;
+    libraries.find((library) => library.libraryCode === selectedType?.fieldLibraryCode) ?? null;
   const selectedLibraryVersionId = selectedLibrary?.publishedVersionId ?? null;
   const fieldsQuery = usePrintFieldDefinitionsQuery(selectedLibraryVersionId);
   const fields = fieldsQuery.data ?? [];
@@ -107,9 +106,8 @@ export function H9TemplateDesignerDialog({
       setTemplateName("M2 ASN 默认模板");
       setTemplateTypeCode(firstType?.code ?? "m2_asn");
       setScope("global");
-      setEnabled(true);
       setIsDefault(true);
-      setPublish(true);
+      setRemark("PC Web hiprint 设计器保存");
       setPaperPreset("A4");
       setPaperDirection("portrait");
       setCustomPaperWidth("100");
@@ -123,9 +121,8 @@ export function H9TemplateDesignerDialog({
     setTemplateName(mode === "copy" ? `${initialTemplate.template_name} 副本` : initialTemplate.template_name);
     setTemplateTypeCode(initialTemplate.template_type_code);
     setScope(initialTemplate.scope);
-    setEnabled(mode === "copy" ? true : initialTemplate.enabled);
     setIsDefault(initialTemplate.is_default);
-    setPublish(initialTemplate.status === "published");
+    setRemark(initialTemplate.remark ?? "");
     setPaperPreset(paperControls.paperPreset);
     setPaperDirection(paperControls.paperDirection);
     setCustomPaperWidth(paperControls.customPaperWidth);
@@ -141,19 +138,18 @@ export function H9TemplateDesignerDialog({
       const paper = currentPaper();
       const hiprintJson = applyPaperToTemplateJson(designerRef.current?.getJson() ?? parseJson(jsonText), paper);
       const request: SavePrintTemplateRequest = {
+        template_id: mode === "edit" ? initialTemplate?.template_id ?? null : null,
         template_code: requiredText(templateCode, "模板编码"),
         template_name: requiredText(templateName, "模板名称"),
         template_type_code: requiredText(templateTypeCode, "模板类型"),
         scope,
-        enabled,
         is_default: isDefault,
-        remark: "PC Web hiprint 设计器保存",
+        remark: remark.trim() || null,
         field_library_version_id: selectedLibraryVersionId ?? "",
         hiprint_json: hiprintJson,
         field_bindings: boundFields.map((fieldPath, index) => ({ field_path: fieldPath, required: index === 0 })),
         paper,
         designer_version: "hiprint@0.4.0",
-        publish,
       };
       await onSave(request);
       onOpenChange(false);
@@ -225,6 +221,13 @@ export function H9TemplateDesignerDialog({
           <option value="owner">货主覆盖</option>
         </select>
       </Field>
+      <Field label="备注">
+        <Input className="h-8" value={remark} onChange={(event) => setRemark(event.target.value)} />
+      </Field>
+      <label className="flex h-8 items-center gap-2 text-sm">
+        <input type="checkbox" checked={isDefault} onChange={(event) => setIsDefault(event.target.checked)} />
+        默认模板
+      </label>
       <Field label="纸张大小">
         <select
           className="h-8 w-full rounded-md border bg-background px-2 text-sm"
@@ -285,12 +288,12 @@ export function H9TemplateDesignerDialog({
     </div>
   );
   const dialogTitle = mode === "edit" ? "修改打印模板" : mode === "copy" ? "复制打印模板" : "新增打印模板";
-  const saveLabel = mode === "edit" ? "保存版本" : "保存";
+  const saveLabel = mode === "edit" ? "保存新草稿" : "保存草稿";
   const designSessionKey = open
     ? `${mode}:${initialTemplate?.id ?? "new"}:${initialTemplate?.template_code ?? "create"}`
     : "closed";
   const formSaveDisabled =
-    designerReadyState !== "ready" || !selectedLibrary || boundFields.length === 0;
+    designerReadyState !== "ready" || !selectedLibraryVersionId || boundFields.length === 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -298,7 +301,7 @@ export function H9TemplateDesignerDialog({
         <form ref={formRef} className="flex flex-col gap-4" onSubmit={submit}>
           <DialogHeader>
             <DialogTitle>{dialogTitle}</DialogTitle>
-            <DialogDescription>使用 hiprint 设计模板，保存模板主数据、字段绑定和版本。</DialogDescription>
+            <DialogDescription>使用 hiprint 设计模板并保存草稿；发布需在模板列表中单独执行。</DialogDescription>
           </DialogHeader>
 
           <H9HiprintDesigner
@@ -313,7 +316,7 @@ export function H9TemplateDesignerDialog({
             onCancel={() => onOpenChange(false)}
             onSave={() => formRef.current?.requestSubmit()}
             saveLabel={saveLabel}
-            saveDisabled={!selectedLibrary || boundFields.length === 0}
+            saveDisabled={!selectedLibraryVersionId || boundFields.length === 0}
           />
 
           <div className="rounded-md border bg-background">
@@ -342,10 +345,6 @@ export function H9TemplateDesignerDialog({
           )}
 
           <DialogFooter>
-            <label className="mr-auto flex items-center gap-2 text-sm text-muted-foreground">
-              <input type="checkbox" checked={publish} onChange={(event) => setPublish(event.target.checked)} />
-              保存后发布
-            </label>
             <DialogClose asChild>
               <Button type="button" variant="outline">取消</Button>
             </DialogClose>
@@ -362,10 +361,10 @@ export function H9TemplateDesignerDialog({
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <Label>{label}</Label>
+    <Label className="flex flex-col items-stretch gap-1.5">
+      <span>{label}</span>
       {children}
-    </div>
+    </Label>
   );
 }
 
