@@ -30,6 +30,7 @@ export const DocumentType: Story = {
             name: "采购入库",
             source: "global",
             enabled: true,
+            sortOrder: 10,
             params: {
               direction: "inbound",
               workflow_template: "inbound_standard",
@@ -41,6 +42,7 @@ export const DocumentType: Story = {
             name: "销售退货",
             source: "owner_override",
             enabled: true,
+            sortOrder: 20,
             params: {
               direction: "inbound",
               workflow_template: "return_inbound",

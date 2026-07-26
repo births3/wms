@@ -25,7 +25,9 @@ import {
   type SystemDictionaryPaneItem,
   type UpsertSystemDictionaryItemRequest,
 } from "@/features/master-data/master-data-queries";
+import type { CurrentUser } from "@/features/auth/auth-queries";
 import { DualPersonPolicyMatrix } from "./DualPersonPolicyMatrix";
+import { PrintTemplateTypeFields } from "./PrintTemplateTypeFields";
 
 interface SystemDictionaryMeta {
   title: string;
@@ -36,6 +38,7 @@ interface SystemDictionaryMeta {
 
 interface M1SystemDictionaryPageProps {
   meta: SystemDictionaryMeta;
+  currentUser: CurrentUser;
 }
 
 type ActiveDialog = "upsert" | "disable" | null;
@@ -45,6 +48,7 @@ interface ItemFormState {
   itemName: string;
   ownerId: string;
   enabled: boolean;
+  sortOrder: string;
   paramsText: string;
   effectiveFrom: string;
   effectiveTo: string;
@@ -68,6 +72,7 @@ const emptyItemForm: ItemFormState = {
   itemName: "",
   ownerId: "",
   enabled: true,
+  sortOrder: "0",
   paramsText: "{}",
   effectiveFrom: "",
   effectiveTo: "",
@@ -80,7 +85,7 @@ const emptyDisableForm: DisableFormState = {
   reason: "",
 };
 
-export function M1SystemDictionaryPage({ meta }: M1SystemDictionaryPageProps) {
+export function M1SystemDictionaryPage({ meta, currentUser }: M1SystemDictionaryPageProps) {
   const groupsQuery = useSystemDictionaryGroupsQuery();
   const upsertMutation = useUpsertSystemDictionaryItemMutation();
   const disableMutation = useDisableSystemDictionaryItemMutation();
@@ -98,6 +103,9 @@ export function M1SystemDictionaryPage({ meta }: M1SystemDictionaryPageProps) {
     groups[0] ??
     emptySystemDictionaryGroups[0];
   const pending = upsertMutation.isPending || disableMutation.isPending;
+  const canOwnerWrite = currentUser.permissions.includes("m1.system_dictionary.write");
+  const canGlobalWrite = currentUser.permissions.includes("m1.system_dictionary.global.write");
+  const canMaintain = canOwnerWrite || canGlobalWrite;
 
   React.useEffect(() => {
     if (groups.some((group) => group.code === selectedDictCode)) return;
@@ -111,7 +119,10 @@ export function M1SystemDictionaryPage({ meta }: M1SystemDictionaryPageProps) {
 
   function openCreateDialog() {
     setEditingItemCode(null);
-    setItemForm(emptyItemForm);
+    setItemForm({
+      ...emptyItemForm,
+      ownerId: canOwnerWrite && !canGlobalWrite ? currentUser.owner_id : "",
+    });
     setDialogError(null);
     setActiveDialog("upsert");
   }
@@ -123,6 +134,7 @@ export function M1SystemDictionaryPage({ meta }: M1SystemDictionaryPageProps) {
       itemName: item.name,
       ownerId: item.ownerId ?? "",
       enabled: item.enabled,
+      sortOrder: String(item.sortOrder),
       paramsText: JSON.stringify(item.params, null, 2),
       effectiveFrom: isoToDateTimeLocal(item.effectiveFrom),
       effectiveTo: isoToDateTimeLocal(item.effectiveTo),
@@ -151,6 +163,7 @@ export function M1SystemDictionaryPage({ meta }: M1SystemDictionaryPageProps) {
         item_name: requiredText(itemForm.itemName, "名称"),
         owner_id: nullableText(itemForm.ownerId),
         enabled: itemForm.enabled,
+        sort_order: parseNonNegativeInteger(itemForm.sortOrder, "排序号"),
         params: parseJsonObject(itemForm.paramsText),
         effective_from: dateTimeLocalToIsoOrNull(itemForm.effectiveFrom),
         effective_to: dateTimeLocalToIsoOrNull(itemForm.effectiveTo),
@@ -224,17 +237,17 @@ export function M1SystemDictionaryPage({ meta }: M1SystemDictionaryPageProps) {
         loading={groupsQuery.isPending}
         error={groupsQuery.error?.message}
         onRefresh={refreshRows}
-        headerActions={
+        headerActions={canMaintain ? (
           <Button type="button" size="sm" onClick={openCreateDialog}>
             <Plus className="size-4" aria-hidden />
             新增
           </Button>
-        }
-        renderItemActions={(item) => {
+        ) : null}
+        renderItemActions={canMaintain ? (item) => {
           const actionItem = activeGroup.items.find(
             (candidate) => candidate.code === item.code && candidate.source === item.source,
           );
-          if (!actionItem) return null;
+          if (!actionItem || (actionItem.ownerId ? !canOwnerWrite : !canGlobalWrite)) return null;
           return (
             <>
               <Button type="button" variant="outline" size="sm" onClick={() => openUpsertDialog(actionItem)}>
@@ -253,7 +266,7 @@ export function M1SystemDictionaryPage({ meta }: M1SystemDictionaryPageProps) {
               </Button>
             </>
           );
-        }}
+        } : undefined}
         emptyTitle={meta.emptyTitle}
         emptyDescription={
           groupsQuery.isPending
@@ -348,6 +361,12 @@ function DictionaryDialogs({
               value={itemForm.ownerId}
               onChange={(ownerId) => onItemFormChange((value) => ({ ...value, ownerId }))}
             />
+            <TextField
+              label="排序号"
+              type="number"
+              value={itemForm.sortOrder}
+              onChange={(sortOrder) => onItemFormChange((value) => ({ ...value, sortOrder }))}
+            />
             <div className="flex items-center gap-2 self-end rounded-md border px-3 py-2">
               <Checkbox
                 id="dictionary-item-enabled"
@@ -372,25 +391,34 @@ function DictionaryDialogs({
               value={itemForm.effectiveTo}
               onChange={(effectiveTo) => onItemFormChange((value) => ({ ...value, effectiveTo }))}
             />
-            <label className="grid gap-1 text-xs text-muted-foreground md:col-span-2">
-              <span>
-                参数 JSON
-                <span className="ml-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                  高级
-                </span>
-              </span>
-              <textarea
-                className={[
-                  "min-h-40 rounded-md border border-input bg-background px-3 py-2",
-                  "font-mono text-sm text-foreground shadow-sm",
-                  "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-                ].join(" ")}
+            {activeGroup.code === "print_template_type" ? (
+              <PrintTemplateTypeFields
                 value={itemForm.paramsText}
-                onChange={(event) =>
-                  onItemFormChange((value) => ({ ...value, paramsText: event.target.value }))
+                onChange={(paramsText) =>
+                  onItemFormChange((current) => ({ ...current, paramsText }))
                 }
               />
-            </label>
+            ) : (
+              <label className="grid gap-1 text-xs text-muted-foreground md:col-span-2">
+                <span>
+                  参数 JSON
+                  <span className="ml-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                    高级
+                  </span>
+                </span>
+                <textarea
+                  className={[
+                    "min-h-40 rounded-md border border-input bg-background px-3 py-2",
+                    "font-mono text-sm text-foreground shadow-sm",
+                    "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                  ].join(" ")}
+                  value={itemForm.paramsText}
+                  onChange={(event) =>
+                    onItemFormChange((value) => ({ ...value, paramsText: event.target.value }))
+                  }
+                />
+              </label>
+            )}
             <DialogFooter className="md:col-span-2">
               <CancelButton />
               <Button type="submit" disabled={pending}>
@@ -478,6 +506,12 @@ function requiredText(value: string, field: string) {
 function nullableText(value: string) {
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
+}
+
+function parseNonNegativeInteger(value: string, field: string) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) throw new Error(`${field}必须是非负整数`);
+  return parsed;
 }
 
 function parseJsonObject(value: string): Record<string, unknown> {

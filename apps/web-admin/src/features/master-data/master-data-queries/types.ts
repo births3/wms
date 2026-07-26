@@ -147,6 +147,7 @@ export interface SystemDictionaryPaneItem {
   name: string;
   source: string;
   enabled: boolean;
+  sortOrder: number;
   ownerId?: string | null;
   params: Record<string, unknown>;
   effectiveFrom?: string | null;

@@ -218,6 +218,7 @@ export interface DevSystemDictionaryItem {
   params: Record<string, unknown>;
   source: string;
   enabled: boolean;
+  sort_order: number;
   effective_from: string | null;
   effective_to: string | null;
   disabled_reason: string | null;
@@ -272,6 +273,7 @@ function devSystemDictionaryItem(
   itemCode: string,
   itemName: string,
   params: Record<string, unknown>,
+  sortOrder = 0,
 ): DevSystemDictionaryItem {
   return {
     id,
@@ -282,6 +284,7 @@ function devSystemDictionaryItem(
     params,
     source: "global",
     enabled: true,
+    sort_order: sortOrder,
     effective_from: null,
     effective_to: null,
     disabled_reason: null,
@@ -614,13 +617,20 @@ export const devSystemDictionaryItemsByCode: Record<string, DevSystemDictionaryI
     }),
   ],
   print_template_type: [
-    devSystemDictionaryItem("00000000-0000-0000-0000-000000001801", "print_template_type", "asn", "ASN 单", {
-      business_direction: "inbound",
-      business_module: "M2",
-      default_scope: "global",
-      field_library_code: "m2_asn",
-      paper_type: "a4",
-    }),
+    devSystemDictionaryItem(
+      "00000000-0000-0000-0000-000000001801",
+      "print_template_type",
+      "asn",
+      "ASN 单",
+      {
+        business_direction: "inbound",
+        business_module: "M2",
+        default_scope: "global",
+        field_library_code: "m2_asn",
+        paper_type: "a4",
+      },
+      10,
+    ),
     devSystemDictionaryItem(
       "00000000-0000-0000-0000-000000001802",
       "print_template_type",
@@ -633,6 +643,7 @@ export const devSystemDictionaryItemsByCode: Record<string, DevSystemDictionaryI
         field_library_code: "m2_acceptance_record",
         paper_type: "a4",
       },
+      20,
     ),
     devSystemDictionaryItem(
       "00000000-0000-0000-0000-000000001803",
@@ -646,6 +657,7 @@ export const devSystemDictionaryItemsByCode: Record<string, DevSystemDictionaryI
         field_library_code: "m4_delivery_note",
         paper_type: "a4",
       },
+      30,
     ),
     devSystemDictionaryItem(
       "00000000-0000-0000-0000-000000001804",
@@ -659,14 +671,22 @@ export const devSystemDictionaryItemsByCode: Record<string, DevSystemDictionaryI
         field_library_code: "m1_location_label",
         paper_type: "label",
       },
+      40,
     ),
-    devSystemDictionaryItem("00000000-0000-0000-0000-000000001805", "print_template_type", "lpn_label", "LPN 标签", {
-      business_direction: "label",
-      business_module: "M3",
-      default_scope: "global",
-      field_library_code: "m3_lpn_label",
-      paper_type: "label",
-    }),
+    devSystemDictionaryItem(
+      "00000000-0000-0000-0000-000000001805",
+      "print_template_type",
+      "lpn_label",
+      "LPN 标签",
+      {
+        business_direction: "label",
+        business_module: "M3",
+        default_scope: "global",
+        field_library_code: "m3_lpn_label",
+        paper_type: "label",
+      },
+      50,
+    ),
     devSystemDictionaryItem(
       "00000000-0000-0000-0000-000000001806",
       "print_template_type",
@@ -679,6 +699,7 @@ export const devSystemDictionaryItemsByCode: Record<string, DevSystemDictionaryI
         field_library_code: "m1_product_label",
         paper_type: "label",
       },
+      60,
     ),
   ],
   special_drug_category: [

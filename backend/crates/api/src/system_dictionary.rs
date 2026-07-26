@@ -4,13 +4,14 @@ use chrono::{DateTime, Duration, Utc};
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use sqlx::{FromRow, PgPool, Postgres, Transaction};
+use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{
     DisableSystemDictionaryItemRequest, SystemDictionaryCategory, SystemDictionaryImpactPreview,
     SystemDictionaryImpactReference, SystemDictionaryItem, UpsertSystemDictionaryItemRequest,
     DOCUMENT_TYPE_PURCHASE_INBOUND, DOCUMENT_TYPE_PURCHASE_RETURN_OUTBOUND,
     DOCUMENT_TYPE_SALES_OUTBOUND, DOCUMENT_TYPE_SALES_RETURN, SYSTEM_DICTIONARY_DOCUMENT_TYPE,
+    SYSTEM_DICTIONARY_PRINT_TEMPLATE_TYPE,
 };
 
 use crate::{
@@ -18,8 +19,10 @@ use crate::{
     auth::AuthContext,
 };
 
+mod system_dictionary_rows;
 mod system_dictionary_validation;
 
+use system_dictionary_rows::{SystemDictionaryCategoryRow, SystemDictionaryItemRow};
 use system_dictionary_validation::{allowed_owner_params, validate_params};
 
 #[derive(Clone, Debug)]
@@ -39,43 +42,12 @@ pub enum SystemDictionaryError {
     InvalidScope,
     CrossOwnerAccess,
     InvalidEffectiveWindow,
+    PrintTemplateFieldLibraryRequired,
     ParamInvalid { field: String, message: String },
     IdempotencyConflict,
     Audit(String),
     Database(String),
     Serialize(String),
-}
-
-#[derive(FromRow)]
-struct SystemDictionaryCategoryRow {
-    dict_code: String,
-    dict_name: String,
-    enabled: bool,
-    control_level: String,
-    param_schema: Value,
-    scope_mode: String,
-    override_policy: Value,
-    sort_order: i32,
-    remark: Option<String>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
-}
-
-#[derive(Clone, FromRow)]
-struct SystemDictionaryItemRow {
-    id: Uuid,
-    dict_code: String,
-    item_code: String,
-    item_name: String,
-    enabled: bool,
-    owner_id: Option<Uuid>,
-    params: Value,
-    effective_from: Option<DateTime<Utc>>,
-    effective_to: Option<DateTime<Utc>>,
-    source: String,
-    disabled_reason: Option<String>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
 }
 
 impl PgSystemDictionaryRepository {
@@ -100,6 +72,7 @@ impl PgSystemDictionaryRepository {
                     item_name,
                     enabled,
                     owner_id,
+                    sort_order,
                     params,
                     effective_from,
                     effective_to,
@@ -119,12 +92,12 @@ impl PgSystemDictionaryRepository {
                    AND (effective_from IS NULL OR effective_from <= $3)
                    AND (effective_to IS NULL OR effective_to > $3)
             )
-            SELECT id, dict_code, item_code, item_name, enabled, owner_id, params,
+            SELECT id, dict_code, item_code, item_name, enabled, owner_id, sort_order, params,
                    effective_from, effective_to, source, disabled_reason, created_at, updated_at
               FROM scoped_items
              WHERE scope_rank = 1
                AND enabled = TRUE
-             ORDER BY item_code
+             ORDER BY sort_order, item_code
             "#,
         )
         .bind(dict_code)
@@ -193,6 +166,22 @@ impl PgSystemDictionaryRepository {
                 return Err(SystemDictionaryError::InvalidEffectiveWindow);
             }
         }
+        if req.sort_order < 0 {
+            return Err(SystemDictionaryError::ParamInvalid {
+                field: "sort_order".to_string(),
+                message: "排序号必须是非负整数".to_string(),
+            });
+        }
+        if dict_code == SYSTEM_DICTIONARY_PRINT_TEMPLATE_TYPE
+            && req.enabled
+            && req
+                .params
+                .get("field_library_code")
+                .and_then(Value::as_str)
+                .is_none_or(|value| value.trim().is_empty())
+        {
+            return Err(SystemDictionaryError::PrintTemplateFieldLibraryRequired);
+        }
         ensure_request_owner(ctx, req.owner_id)?;
 
         let request_hash = request_hash(&serde_json::json!({
@@ -229,21 +218,23 @@ impl PgSystemDictionaryRepository {
                 UPDATE system_dictionary_items
                    SET item_name = $1,
                        enabled = $2,
-                       params = $3,
-                       effective_from = $4,
-                       effective_to = $5,
-                       source = $6,
+                       sort_order = $3,
+                       params = $4,
+                       effective_from = $5,
+                       effective_to = $6,
+                       source = $7,
                        disabled_reason = CASE WHEN $2 THEN NULL ELSE disabled_reason END,
-                       updated_at = $7,
+                       updated_at = $8,
                        version = version + 1
-                 WHERE id = $8 AND dict_code = $9 AND owner_id IS NOT DISTINCT FROM $10
-                 RETURNING id, dict_code, item_code, item_name, enabled, owner_id, params,
+                 WHERE id = $9 AND dict_code = $10 AND owner_id IS NOT DISTINCT FROM $11
+                 RETURNING id, dict_code, item_code, item_name, enabled, owner_id, sort_order, params,
                            effective_from, effective_to, source, disabled_reason,
                            created_at, updated_at
                 "#,
             )
             .bind(&req.item_name)
             .bind(req.enabled)
+            .bind(req.sort_order)
             .bind(&req.params)
             .bind(req.effective_from)
             .bind(req.effective_to)
@@ -259,11 +250,11 @@ impl PgSystemDictionaryRepository {
             sqlx::query_as::<_, SystemDictionaryItemRow>(
                 r#"
                 INSERT INTO system_dictionary_items (
-                    id, dict_code, item_code, item_name, enabled, owner_id, params,
+                    id, dict_code, item_code, item_name, enabled, owner_id, sort_order, params,
                     effective_from, effective_to, source, created_at, updated_at
                 )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11)
-                RETURNING id, dict_code, item_code, item_name, enabled, owner_id, params,
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $12)
+                RETURNING id, dict_code, item_code, item_name, enabled, owner_id, sort_order, params,
                           effective_from, effective_to, source, disabled_reason,
                           created_at, updated_at
                 "#,
@@ -274,6 +265,7 @@ impl PgSystemDictionaryRepository {
             .bind(&req.item_name)
             .bind(req.enabled)
             .bind(req.owner_id)
+            .bind(req.sort_order)
             .bind(&req.params)
             .bind(req.effective_from)
             .bind(req.effective_to)
@@ -347,7 +339,7 @@ impl PgSystemDictionaryRepository {
              WHERE dict_code = $3
                AND item_code = $4
                AND owner_id IS NOT DISTINCT FROM $5
-             RETURNING id, dict_code, item_code, item_name, enabled, owner_id, params,
+             RETURNING id, dict_code, item_code, item_name, enabled, owner_id, sort_order, params,
                        effective_from, effective_to, source, disabled_reason,
                        created_at, updated_at
             "#,
@@ -496,7 +488,7 @@ async fn load_item_for_update(
 ) -> Result<Option<SystemDictionaryItemRow>, SystemDictionaryError> {
     sqlx::query_as::<_, SystemDictionaryItemRow>(
         r#"
-        SELECT id, dict_code, item_code, item_name, enabled, owner_id, params,
+        SELECT id, dict_code, item_code, item_name, enabled, owner_id, sort_order, params,
                effective_from, effective_to, source, disabled_reason, created_at, updated_at
           FROM system_dictionary_items
          WHERE dict_code = $1
@@ -779,44 +771,6 @@ fn idempotency_lock_id(owner_id: Uuid, idempotency_key: &str) -> i64 {
 
 fn map_db_error(error: sqlx::Error) -> SystemDictionaryError {
     SystemDictionaryError::Database(error.to_string())
-}
-
-impl From<SystemDictionaryCategoryRow> for SystemDictionaryCategory {
-    fn from(row: SystemDictionaryCategoryRow) -> Self {
-        Self {
-            dict_code: row.dict_code,
-            dict_name: row.dict_name,
-            enabled: row.enabled,
-            control_level: row.control_level,
-            param_schema: row.param_schema,
-            scope_mode: row.scope_mode,
-            override_policy: row.override_policy,
-            sort_order: row.sort_order,
-            remark: row.remark,
-            created_at: row.created_at,
-            updated_at: row.updated_at,
-        }
-    }
-}
-
-impl From<SystemDictionaryItemRow> for SystemDictionaryItem {
-    fn from(row: SystemDictionaryItemRow) -> Self {
-        Self {
-            id: row.id,
-            dict_code: row.dict_code,
-            item_code: row.item_code,
-            item_name: row.item_name,
-            enabled: row.enabled,
-            owner_id: row.owner_id,
-            params: row.params,
-            effective_from: row.effective_from,
-            effective_to: row.effective_to,
-            source: row.source,
-            disabled_reason: row.disabled_reason,
-            created_at: row.created_at,
-            updated_at: row.updated_at,
-        }
-    }
 }
 
 #[cfg(test)]

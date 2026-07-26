@@ -9,6 +9,11 @@ use wms_api::{
         PrintTemplatePreviewRequest, PrintTemplatePrintRequest, PrintTemplateScope,
         PublishPrintFieldLibraryRequest, SavePrintTemplateRequest,
     },
+    system_dictionary::PgSystemDictionaryRepository,
+};
+use wms_domain::{
+    DisableSystemDictionaryItemRequest, PRINT_TEMPLATE_TYPE_ASN,
+    SYSTEM_DICTIONARY_PRINT_TEMPLATE_TYPE,
 };
 
 fn ctx(owner_id: Uuid) -> AuthContext {
@@ -53,7 +58,7 @@ fn template_request(field_library_version_id: Uuid) -> SavePrintTemplateRequest 
     SavePrintTemplateRequest {
         template_code: "m2_asn_default".to_string(),
         template_name: "M2 ASN 默认模板".to_string(),
-        template_type_code: "m2_asn".to_string(),
+        template_type_code: PRINT_TEMPLATE_TYPE_ASN.to_string(),
         scope: PrintTemplateScope::Global,
         enabled: true,
         is_default: true,
@@ -88,6 +93,60 @@ fn template_request(field_library_version_id: Uuid) -> SavePrintTemplateRequest 
         designer_version: "hiprint@0.4.0".to_string(),
         publish: true,
     }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn disabled_print_template_type_rejects_new_template(pool: PgPool) {
+    let print_templates = PgPrintTemplateRepository::new();
+    let dictionaries = PgSystemDictionaryRepository::new(pool.clone());
+    let owner_id = Uuid::new_v4();
+    let auth = ctx(owner_id);
+    let now = Utc
+        .with_ymd_and_hms(2026, 7, 7, 8, 0, 0)
+        .single()
+        .expect("valid time");
+    let field_library = print_templates
+        .publish_field_library(
+            &pool,
+            &auth,
+            publish_request("ASN 号"),
+            now,
+            "h9-disabled-type-field-library",
+        )
+        .await
+        .expect("field library should publish");
+    dictionaries
+        .disable_item(
+            &auth,
+            SYSTEM_DICTIONARY_PRINT_TEMPLATE_TYPE,
+            PRINT_TEMPLATE_TYPE_ASN,
+            DisableSystemDictionaryItemRequest {
+                owner_id: None,
+                disabled_reason: Some("test disabled".to_string()),
+            },
+            now + chrono::Duration::minutes(1),
+            "h9-disable-template-type",
+        )
+        .await
+        .expect("template type should disable");
+
+    let mut request = template_request(field_library.value.id);
+    request.template_type_code = PRINT_TEMPLATE_TYPE_ASN.to_string();
+    let error = print_templates
+        .save_template(
+            &pool,
+            &auth,
+            request,
+            now + chrono::Duration::minutes(2),
+            "h9-disabled-type-template-save",
+        )
+        .await
+        .expect_err("disabled template type must reject new template");
+
+    assert_eq!(
+        error,
+        wms_api::print_template::PrintTemplateError::TemplateDisabled
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -289,7 +348,7 @@ async fn hiprint_template_publish_preview_and_print_are_versioned_idempotent_and
             &auth,
             PrintTemplatePreviewRequest {
                 template_code: Some("m2_asn_default".to_string()),
-                template_type_code: "m2_asn".to_string(),
+                template_type_code: PRINT_TEMPLATE_TYPE_ASN.to_string(),
                 business_document_id: "ASN-202607070001".to_string(),
                 data: json!({ "asn": { "code": "ASN-202607070001" } }),
             },
@@ -305,7 +364,7 @@ async fn hiprint_template_publish_preview_and_print_are_versioned_idempotent_and
             &auth,
             PrintTemplatePreviewRequest {
                 template_code: Some("m2_asn_default".to_string()),
-                template_type_code: "m2_asn".to_string(),
+                template_type_code: PRINT_TEMPLATE_TYPE_ASN.to_string(),
                 business_document_id: "ASN-202607070002".to_string(),
                 data: json!({}),
             },
@@ -325,7 +384,7 @@ async fn hiprint_template_publish_preview_and_print_are_versioned_idempotent_and
             &auth,
             PrintTemplatePrintRequest {
                 template_code: Some("m2_asn_default".to_string()),
-                template_type_code: "m2_asn".to_string(),
+                template_type_code: PRINT_TEMPLATE_TYPE_ASN.to_string(),
                 business_module: "M2".to_string(),
                 business_document_type: "m2_asn".to_string(),
                 business_document_id: "ASN-202607070001".to_string(),
@@ -348,7 +407,7 @@ async fn hiprint_template_publish_preview_and_print_are_versioned_idempotent_and
             &other_owner,
             PrintTemplatePreviewRequest {
                 template_code: Some("m2_asn_default".to_string()),
-                template_type_code: "m2_asn".to_string(),
+                template_type_code: PRINT_TEMPLATE_TYPE_ASN.to_string(),
                 business_document_id: "ASN-202607070003".to_string(),
                 data: json!({ "asn": { "code": "ASN-202607070003" } }),
             },

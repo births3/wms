@@ -92,6 +92,12 @@ export const SystemDictionaryTwoPane = React.forwardRef<
           render: (item) => systemDictionarySourceText(item.source),
         },
         {
+          key: "sortOrder",
+          label: "排序号",
+          className: "flex-[0.6_1_4rem]",
+          render: (item) => item.sortOrder,
+        },
+        {
           key: "params",
           label: "参数",
           className: "sm:col-span-2 xl:col-span-3",
@@ -150,7 +156,7 @@ function SystemDictionaryParams({ params }: { params?: Record<string, unknown> }
       <span className="font-medium text-muted-foreground">参数</span>
       {items.map((param) => (
         <span key={param.key} className="inline-flex min-w-0 items-center gap-1 rounded-full bg-background/80 px-2 py-0.5">
-          <span className="font-mono text-muted-foreground">{param.key}</span>
+          <span className="text-muted-foreground">{param.label}</span>
           <span className="break-all text-foreground">{param.value}</span>
         </span>
       ))}

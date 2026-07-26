@@ -7,7 +7,7 @@ use sha2::{Digest, Sha256};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use utoipa::ToSchema;
 use uuid::Uuid;
-use wms_domain::PageMeta;
+use wms_domain::{PageMeta, SYSTEM_DICTIONARY_PRINT_TEMPLATE_TYPE};
 
 use crate::{
     audit::{append_event_in_tx, AuditWriteRequest},
@@ -567,6 +567,18 @@ impl PgPrintTemplateRepository {
                 value,
                 replayed: true,
             });
+        }
+        if !crate::system_dictionary::effective_item_enabled_in_tx(
+            &mut tx,
+            ctx.owner_id,
+            SYSTEM_DICTIONARY_PRINT_TEMPLATE_TYPE,
+            &req.template_type_code,
+            now,
+        )
+        .await
+        .map_err(map_db_error)?
+        {
+            return Err(PrintTemplateError::TemplateDisabled);
         }
 
         let template_id = upsert_template_for_update(&mut tx, ctx, &req, now).await?;

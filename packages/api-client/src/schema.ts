@@ -8432,6 +8432,8 @@ export interface components {
             params: {
                 [key: string]: unknown;
             };
+            /** Format: int32 */
+            sort_order: number;
             source: string;
             /** Format: date-time */
             updated_at: string;
@@ -9056,6 +9058,8 @@ export interface components {
             params: {
                 [key: string]: unknown;
             };
+            /** Format: int32 */
+            sort_order: number;
         };
         UpsertTaskGroupRequest: {
             enabled: boolean;

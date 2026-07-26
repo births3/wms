@@ -247,6 +247,7 @@ export function systemDictionaryPaneItem(item: SystemDictionaryItem): SystemDict
     name: item.item_name,
     source: item.source,
     enabled: item.enabled,
+    sortOrder: item.sort_order,
     ownerId: item.owner_id,
     params: item.params,
     effectiveFrom: item.effective_from,

@@ -135,7 +135,7 @@ interface M1MasterDataPageProps {
 
 export function M1MasterDataPage({ viewId, currentUser }: M1MasterDataPageProps) {
   if (viewId === "m1-system-dictionary") {
-    return <M1SystemDictionaryPage meta={masterDataViewMeta[viewId]} />;
+    return <M1SystemDictionaryPage currentUser={currentUser} meta={masterDataViewMeta[viewId]} />;
   }
 
   return <M1MasterDataGridPage currentUser={currentUser} viewId={viewId} />;

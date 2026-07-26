@@ -643,6 +643,7 @@ pub struct SystemDictionaryItem {
     pub item_name: String,
     pub enabled: bool,
     pub owner_id: Option<Uuid>,
+    pub sort_order: i32,
     #[schema(schema_with = free_form_json_schema)]
     pub params: serde_json::Value,
     pub effective_from: Option<DateTime<Utc>>,
@@ -681,6 +682,7 @@ pub struct UpsertSystemDictionaryItemRequest {
     pub owner_id: Option<Uuid>,
     pub item_name: String,
     pub enabled: bool,
+    pub sort_order: i32,
     #[schema(schema_with = free_form_json_schema)]
     pub params: serde_json::Value,
     pub effective_from: Option<DateTime<Utc>>,

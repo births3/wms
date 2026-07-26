@@ -121,6 +121,7 @@ export async function handleSystemDictionaryUpsert(
     params: asRecord(body.params),
     source: ownerId ? "owner" : "global",
     enabled: asBoolean(body.enabled, true),
+    sort_order: asNumber(body.sort_order, existingIndex >= 0 ? items[existingIndex].sort_order : 0),
     effective_from: asNullableString(body.effective_from),
     effective_to: asNullableString(body.effective_to),
     disabled_reason: existingIndex >= 0 ? items[existingIndex].disabled_reason : null,

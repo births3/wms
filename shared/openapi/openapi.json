@@ -2630,8 +2630,8 @@
           }
         },
         "security": [],
-        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。",
-        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。"
+        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。",
+        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。"
       }
     },
     "/api/v1/auth/logout": {
@@ -35899,6 +35899,7 @@
           "item_code",
           "item_name",
           "enabled",
+          "sort_order",
           "params",
           "source",
           "created_at",
@@ -35948,6 +35949,10 @@
             "type": "object",
             "description": "自由结构 JSON 对象。",
             "additionalProperties": true
+          },
+          "sort_order": {
+            "type": "integer",
+            "format": "int32"
           },
           "source": {
             "type": "string"
@@ -37992,6 +37997,7 @@
         "required": [
           "item_name",
           "enabled",
+          "sort_order",
           "params"
         ],
         "properties": {
@@ -38020,6 +38026,10 @@
             "type": "object",
             "description": "自由结构 JSON 对象。",
             "additionalProperties": true
+          },
+          "sort_order": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },

@@ -176,6 +176,7 @@ async fn mutations_reject_cross_owner_before_database() {
                 owner_id: Some(other_owner_id),
                 item_name: "跨货主采购入库".to_string(),
                 enabled: true,
+                sort_order: 10,
                 params: json!({}),
                 effective_from: None,
                 effective_to: None,
