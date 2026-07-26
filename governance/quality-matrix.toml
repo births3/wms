@@ -1718,17 +1718,39 @@ covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
 
 [[stories]]
 id = "US-H9-002"
-title = "字段库生成与字段元数据维护第一切片"
+title = "字段库生成与字段元数据维护"
 module = "H9"
 story_file = "docs/domain/user-stories-h9-print-template.md"
-types = ["read_only", "api_change", "frontend_interaction"]
+types = ["write", "config_rule", "frontend_interaction", "api_change"]
 frontend_pages = ["h9-print-templates"]
 api_paths = [
   "GET /api/v1/print-templates/field-libraries",
+  "POST /api/v1/print-templates/field-libraries/drafts",
+  "GET /api/v1/print-templates/field-libraries/{version_id}/fields",
+  "PATCH /api/v1/print-templates/field-libraries/{version_id}/fields/{field_id}",
+  "POST /api/v1/print-templates/field-libraries/{version_id}/publish",
 ]
 e2e_checks = [
   "node apps/web-admin/self-checks/h9-print-template-tree-self-check.mjs",
   "pnpm --dir apps/web-admin run test:e2e:h9-dev",
+  "just web-admin-m1-real-e2e",
+]
+e2e_screenshots = [
+  { page = "h9-print-templates", spec = "prototypes/e2e/web-admin-h9-field-library-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h9-print-templates/field-library-draft-metadata.png" },
+  { page = "h9-print-templates", spec = "prototypes/e2e/web-admin-h9-field-library-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h9-print-templates/field-library-published.png" },
+]
+test_checks = [
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test print_field_library_postgres --test print_template_postgres -- --test-threads=1",
+  "pnpm --dir apps/web-admin run build",
+  "just openapi-check",
+]
+evidence_refs = [
+  "backend/crates/api/tests/print_field_library_postgres.rs",
+  "backend/crates/api/tests/print_template_postgres.rs",
+  "prototypes/e2e/web-admin-h9-field-library-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/h9-print-templates/field-library-draft-metadata.png",
+  "artifacts/screenshot-portal/real-web/h9-print-templates/field-library-published.png",
+  "docs/reviews/us-h9-002-acceptance-2026-07-26.md",
 ]
 
 [stories.dimensions]
@@ -1739,18 +1761,15 @@ api = "verified"
 backend = "verified"
 database = "verified"
 security = "verified"
-audit = "not_applicable"
+audit = "verified"
 tests = "verified"
 evidence = "verified"
 docs = "verified"
 governance = "verified"
 
-[stories.not_applicable_reasons]
-audit = "本矩阵项登记 H9 字段库列表读取切片；字段库发布审计由后续写入切片单独登记。"
-
 [stories.tests]
-required_layers = ["L1", "L2", "L3", "L7", "L8", "L9"]
-covered_layers = ["L1", "L2", "L3", "L7", "L8", "L9"]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
 
 [[stories]]
 id = "US-H9-003"
