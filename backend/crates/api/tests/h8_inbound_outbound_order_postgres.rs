@@ -13,6 +13,10 @@ use wms_api::{
     h8_inbound::{h8_inbound_router, H8InboundAppState},
 };
 
+#[path = "support/h9.rs"]
+mod h9_support;
+use h9_support::seed_outbound_route_binding;
+
 async fn seed_context(pool: &PgPool, owner_id: Uuid, api_key_id: Uuid, warehouse_id: Uuid) {
     sqlx::query(
         "INSERT INTO auth_owners (id, owner_code, owner_name) VALUES ($1, $2, 'H8 outbound REST test owner')",
@@ -83,6 +87,9 @@ async fn outbound_order_rest_maps_persists_and_replays_one_business_resource(poo
     let app = h8_inbound_router(state.clone()).layer(Extension(ctx));
     let external_ref = format!("ERP-OUT-{}", &Uuid::new_v4().to_string()[..8]);
     let idempotency_key = format!("h8-out-{}", Uuid::new_v4());
+    let customer_id = Uuid::new_v4();
+    let delivery_address_id =
+        seed_outbound_route_binding(&pool, owner_id, warehouse_id, customer_id, Utc::now()).await;
     let body = json!({
         "schema_version": "1",
         "external_ref": external_ref,
@@ -92,7 +99,8 @@ async fn outbound_order_rest_maps_persists_and_replays_one_business_resource(poo
         "wms_order_no": format!("H8-O-{}", &Uuid::new_v4().to_string()[..8]),
         "document_type": "销售出库",
         "erp_order_no": format!("ERP-O-{}", &Uuid::new_v4().to_string()[..8]),
-        "customer_id": Uuid::new_v4(),
+        "customer_id": customer_id,
+        "delivery_address_id": delivery_address_id,
         "product_code": "H8-OUT-P-001",
         "batch_no": "H8-OUT-B-001",
         "planned_qty": 2,
@@ -254,6 +262,7 @@ async fn outbound_order_rest_rejects_unmapped_document_type_before_business_writ
         "document_type": format!("未知出库类型-{}", Uuid::new_v4()),
         "erp_order_no": null,
         "customer_id": Uuid::new_v4(),
+        "delivery_address_id": Uuid::new_v4(),
         "product_code": "H8-OUT-P-INVALID",
         "batch_no": "H8-OUT-B-INVALID",
         "planned_qty": 1,
@@ -303,6 +312,9 @@ async fn concurrent_same_outbound_order_returns_one_message_and_business_resourc
     ));
     let external_ref = format!("ERP-OUT-{}", Uuid::new_v4());
     let idempotency_key = format!("h8-out-{}", Uuid::new_v4());
+    let customer_id = Uuid::new_v4();
+    let delivery_address_id =
+        seed_outbound_route_binding(&pool, owner_id, warehouse_id, customer_id, Utc::now()).await;
     let body = json!({
         "schema_version": "1",
         "external_ref": external_ref,
@@ -312,7 +324,8 @@ async fn concurrent_same_outbound_order_returns_one_message_and_business_resourc
         "wms_order_no": null,
         "document_type": "销售出库",
         "erp_order_no": null,
-        "customer_id": Uuid::new_v4(),
+        "customer_id": customer_id,
+        "delivery_address_id": delivery_address_id,
         "product_code": "H8-OUT-P-CONCURRENT",
         "batch_no": "H8-OUT-B-CONCURRENT",
         "planned_qty": 1,

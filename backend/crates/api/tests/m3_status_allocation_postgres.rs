@@ -17,6 +17,10 @@ use wms_domain::{
     CreateOutboundWaveRequest,
 };
 
+#[path = "support/h9.rs"]
+mod h9_support;
+use h9_support::seed_outbound_route_binding;
+
 fn ctx(owner_id: Uuid) -> AuthContext {
     AuthContext {
         user_id: Uuid::new_v4(),
@@ -309,6 +313,11 @@ async fn quarantined_inventory_is_not_allocated_to_outbound_wave(pool: PgPool) {
         .expect("quality status should change to quarantined");
 
     let outbound = PgWave4Repository::new(pool.clone());
+    let customer_id = Uuid::new_v4();
+    let warehouse_id = Uuid::new_v4();
+    let route_now = Utc::now();
+    let delivery_address_id =
+        seed_outbound_route_binding(&pool, owner_id, warehouse_id, customer_id, route_now).await;
     let order = outbound
         .create_outbound_order(
             &context,
@@ -316,8 +325,9 @@ async fn quarantined_inventory_is_not_allocated_to_outbound_wave(pool: PgPool) {
                 document_type: "sales_outbound".to_string(),
                 wms_order_no: "M3-STATUS-OUT-002".to_string(),
                 erp_order_no: None,
-                customer_id: Uuid::new_v4(),
-                warehouse_id: Uuid::new_v4(),
+                customer_id,
+                warehouse_id,
+                delivery_address_id,
                 required_ship_at: None,
                 lines: vec![CreateOutboundOrderLineRequest {
                     line_no: 1,
@@ -326,7 +336,7 @@ async fn quarantined_inventory_is_not_allocated_to_outbound_wave(pool: PgPool) {
                     planned_qty: 1,
                 }],
             },
-            Utc::now(),
+            route_now,
             "m3-status-outbound-order-002",
             None,
         )

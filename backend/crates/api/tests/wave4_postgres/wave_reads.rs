@@ -10,6 +10,7 @@ async fn outbound_wave_reads_are_owner_scoped_filterable_and_include_orders(pool
         .single()
         .expect("valid time");
     let owner_order = create_read_order(
+        &pool,
         &repo,
         &owner_ctx,
         "WMS-WAVE-READ-001",
@@ -41,6 +42,7 @@ async fn outbound_wave_reads_are_owner_scoped_filterable_and_include_orders(pool
         .expect("owner wave should be created")
         .value;
     let other_order = create_read_order(
+        &pool,
         &repo,
         &other_ctx,
         "WMS-WAVE-READ-002",
@@ -100,7 +102,15 @@ async fn outbound_wave_can_cancel_before_picking_and_release_inventory(pool: PgP
         .with_ymd_and_hms(2026, 6, 5, 10, 0, 0)
         .single()
         .expect("valid time");
-    let order = create_read_order(&repo, &ctx, "WMS-WAVE-CANCEL-001", "ERP-CANCEL-001", now).await;
+    let order = create_read_order(
+        &pool,
+        &repo,
+        &ctx,
+        "WMS-WAVE-CANCEL-001",
+        "ERP-CANCEL-001",
+        now,
+    )
+    .await;
     seed_outbound_inventory(
         &pool,
         owner_id,
@@ -126,26 +136,14 @@ async fn outbound_wave_can_cancel_before_picking_and_release_inventory(pool: PgP
         .value;
 
     let cancelled = repo
-        .cancel_outbound_wave(
-            &ctx,
-            wave.id,
-            now,
-            "outbound-wave-cancel-002",
-            None,
-        )
+        .cancel_outbound_wave(&ctx, wave.id, now, "outbound-wave-cancel-002", None)
         .await
         .expect("wave should be cancellable before picking")
         .value;
     assert_eq!(cancelled.status, "cancelled");
 
     let replayed = repo
-        .cancel_outbound_wave(
-            &ctx,
-            wave.id,
-            now,
-            "outbound-wave-cancel-002",
-            None,
-        )
+        .cancel_outbound_wave(&ctx, wave.id, now, "outbound-wave-cancel-002", None)
         .await
         .expect("cancellation should replay")
         .value;
@@ -173,7 +171,15 @@ async fn outbound_draft_wave_can_cancel_before_picking(pool: PgPool) {
         .with_ymd_and_hms(2026, 6, 5, 11, 0, 0)
         .single()
         .expect("valid time");
-    let order = create_read_order(&repo, &ctx, "WMS-WAVE-CANCEL-DRAFT-001", "ERP-CANCEL-DRAFT-001", now).await;
+    let order = create_read_order(
+        &pool,
+        &repo,
+        &ctx,
+        "WMS-WAVE-CANCEL-DRAFT-001",
+        "ERP-CANCEL-DRAFT-001",
+        now,
+    )
+    .await;
     seed_outbound_inventory(
         &pool,
         owner_id,

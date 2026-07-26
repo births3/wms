@@ -51,6 +51,10 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
     .execute(&pool)
     .await
     .expect("assign custodian role to second reviewer");
+    let customer_id = Uuid::new_v4();
+    let warehouse_id = Uuid::new_v4();
+    let delivery_address_id =
+        seed_outbound_route_binding(&pool, owner_id, warehouse_id, customer_id, now).await;
 
     let order = repo
         .create_outbound_order(
@@ -59,8 +63,9 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
                 document_type: "sales_outbound".to_string(),
                 wms_order_no: "WMS-R-20260605-001".to_string(),
                 erp_order_no: Some("ERP-SO-001".to_string()),
-                customer_id: Uuid::new_v4(),
-                warehouse_id: Uuid::new_v4(),
+                customer_id,
+                warehouse_id,
+                delivery_address_id,
                 required_ship_at: None,
                 lines: vec![CreateOutboundOrderLineRequest {
                     line_no: 1,
@@ -477,7 +482,10 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
     .await
     .expect("shipment confirmation outbox");
     assert_eq!(shipment_outbox.0, 1);
-    assert_eq!(shipment_outbox.1["warehouse_id"], order.warehouse_id.to_string());
+    assert_eq!(
+        shipment_outbox.1["warehouse_id"],
+        order.warehouse_id.to_string()
+    );
     assert_eq!(shipment_outbox.1["outbound_order_id"], order.id.to_string());
     assert_eq!(shipment_outbox.1["wms_order_no"], order.wms_order_no);
     assert_eq!(shipment_outbox.1["package_count"], 1);

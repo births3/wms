@@ -28,6 +28,10 @@ async fn outbound_order_generates_number_when_request_omits_wms_number(pool: PgP
     .execute(&pool)
     .await
     .expect("outbound numbering rule should be seeded");
+    let customer_id = Uuid::new_v4();
+    let warehouse_id = Uuid::new_v4();
+    let delivery_address_id =
+        seed_outbound_route_binding(&pool, owner_id, warehouse_id, customer_id, now).await;
 
     let order = PgWave4Repository::new(pool.clone())
         .create_outbound_order(
@@ -36,8 +40,9 @@ async fn outbound_order_generates_number_when_request_omits_wms_number(pool: PgP
                 document_type: "sales_outbound".to_string(),
                 wms_order_no: String::new(),
                 erp_order_no: Some("ERP-OUT-001".to_string()),
-                customer_id: Uuid::new_v4(),
-                warehouse_id: Uuid::new_v4(),
+                customer_id,
+                warehouse_id,
+                delivery_address_id,
                 required_ship_at: Some(now),
                 lines: vec![CreateOutboundOrderLineRequest {
                     line_no: 1,
@@ -77,28 +82,30 @@ async fn outbound_order_rejects_non_outbound_document_type(pool: PgPool) {
     .await
     .expect("owner should be seeded");
 
-    let result = PgWave4Repository::new(pool).create_outbound_order(
-        &ctx(owner_id),
-        CreateOutboundOrderRequest {
-            document_type: "purchase_inbound".to_string(),
-            wms_order_no: "OUT-INVALID-TYPE".to_string(),
-            erp_order_no: None,
-            customer_id: Uuid::new_v4(),
-            warehouse_id: Uuid::new_v4(),
-            required_ship_at: None,
-            lines: vec![CreateOutboundOrderLineRequest {
-                line_no: 1,
-                product_code: "P-OUT-INVALID".to_string(),
-                batch_no: "B-OUT-INVALID".to_string(),
-                planned_qty: 1,
-            }],
-        },
-        Utc::now(),
-        "outbound-invalid-type-1",
-        None,
-    )
-    .await
-    .expect_err("inbound document type must be rejected");
+    let result = PgWave4Repository::new(pool)
+        .create_outbound_order(
+            &ctx(owner_id),
+            CreateOutboundOrderRequest {
+                document_type: "purchase_inbound".to_string(),
+                wms_order_no: "OUT-INVALID-TYPE".to_string(),
+                erp_order_no: None,
+                customer_id: Uuid::new_v4(),
+                warehouse_id: Uuid::new_v4(),
+                delivery_address_id: Uuid::new_v4(),
+                required_ship_at: None,
+                lines: vec![CreateOutboundOrderLineRequest {
+                    line_no: 1,
+                    product_code: "P-OUT-INVALID".to_string(),
+                    batch_no: "B-OUT-INVALID".to_string(),
+                    planned_qty: 1,
+                }],
+            },
+            Utc::now(),
+            "outbound-invalid-type-1",
+            None,
+        )
+        .await
+        .expect_err("inbound document type must be rejected");
 
     assert_eq!(result, Wave4RepositoryError::InvalidDocumentType);
 }
