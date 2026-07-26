@@ -90,7 +90,11 @@
 ## 实施记录
 
 - 2026-07-07：PC H9 首个真实切片引入 `hiprint@0.4.0` 和 `jquery`，以动态导入方式接入设计器、预览和浏览器打印；模板主数据、模板版本、字段绑定和打印记录仍由 WMS 表和 OpenAPI 治理。
-- 依赖治理记录：`hiprint@0.4.0` npm 声明 MIT，包来源为 CcSimple/vue-plugin-hiprint；构建时 Rollup 会提示 hiprint 包内部存在 `eval` 和较大动态 chunk。该风险必须在正式发布前复核，不得把 hiprint JSON 当作唯一业务事实源。
+- 2026-07-26 依赖工程复核：
+  - 本地安装包与 npm 元数据声明 MIT，来源为 `CcSimple/vue-plugin-hiprint`；上游说明其派生自 LGPL 的 hiprint 2.5.4，因此正式发布前仍须由项目负责人完成人工许可证来源复核。
+  - npm `0.4.0` 发布于 2026-02-25，上游仓库仍可访问；OSV 对 npm `hiprint@0.4.0` 的直接查询未返回已知漏洞。完整传递依赖审计因当前 npm audit 注册表响应异常未完成，保留为正式发布门禁。
+  - 安装包声明 `> 1%`、最近两个版本且排除 IE 8；当前真实 Playwright 只证明 Chromium。正式支持其他浏览器时必须补对应真实 E2E。
+  - 安装包会通过 `eval` 执行模板 JSON 中 9 个格式化、样式、合并和表尾函数字段；WMS 后端保存边界按安装包实际执行点统一拒绝这些选项并返回 `H9_TEMPLATE_JSON_INVALID`，不能依赖前端隐藏。
 
 ## 参考
 

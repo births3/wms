@@ -1781,11 +1781,36 @@ frontend_pages = ["h9-print-templates"]
 api_paths = [
   "GET /api/v1/print-templates/templates",
   "POST /api/v1/print-templates/templates",
+  "GET /api/v1/print-templates/templates/{template_id}/versions",
+  "POST /api/v1/print-templates/templates/{template_id}/versions/{version_id}/publish",
+  "PATCH /api/v1/print-templates/templates/{template_id}/enabled",
   "GET /api/v1/print-templates/field-libraries/{version_id}/fields",
 ]
 e2e_checks = [
   "node apps/web-admin/self-checks/h9-print-template-tree-self-check.mjs",
   "pnpm --dir apps/web-admin run test:e2e:h9-dev",
+  "just web-admin-m1-real-e2e",
+]
+e2e_screenshots = [
+  { page = "h9-print-templates", spec = "prototypes/e2e/web-admin-h9-template-version-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h9-print-templates/template-version-draft.png" },
+  { page = "h9-print-templates", spec = "prototypes/e2e/web-admin-h9-template-version-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h9-print-templates/template-version-published.png" },
+  { page = "h9-print-templates", spec = "prototypes/e2e/web-admin-h9-template-version-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h9-print-templates/template-disabled.png" },
+]
+test_checks = [
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test print_field_library_postgres --test print_template_postgres -- --test-threads=1",
+  "pnpm --dir apps/web-admin run build",
+  "just openapi-check",
+]
+evidence_refs = [
+  "backend/crates/api/tests/print_template_postgres.rs",
+  "backend/crates/api/tests/print_template_postgres/version_lifecycle.rs",
+  "backend/crates/api/src/print_template_lifecycle.rs",
+  "prototypes/e2e/web-admin-h9-template-version-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/h9-print-templates/template-version-draft.png",
+  "artifacts/screenshot-portal/real-web/h9-print-templates/template-version-published.png",
+  "artifacts/screenshot-portal/real-web/h9-print-templates/template-disabled.png",
+  "docs/adr/0036-print-template-engine.md",
+  "docs/reviews/us-h9-003-acceptance-2026-07-26.md",
 ]
 
 [stories.dimensions]
