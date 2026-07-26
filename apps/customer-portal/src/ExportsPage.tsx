@@ -67,6 +67,10 @@ export function ExportsPage(props: { session: LoginResponse }) {
           <div className="portal-empty-state">
             正在读取导出任务…
           </div>
+        ) : exportsQuery.error ? (
+          <div role="alert" className="portal-alert portal-alert-error m-4">
+            {exportsQuery.error.message}
+          </div>
         ) : exportsQuery.data?.length ? (
           <div className="overflow-x-auto">
             <table className="portal-table portal-responsive-table">

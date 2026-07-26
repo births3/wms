@@ -267,6 +267,25 @@ test.describe.serial("独立客户药检单平台真实链路", () => {
     await expect(page.getByRole("alert")).toContainText("不超过 2GB");
     await capture(page, "export-2gb-rejected.png");
   });
+
+  test("导出任务查询失败时明确显示错误", async ({ page }) => {
+    await login(page, "portal-none");
+    await page.evaluate(() => {
+      const key = "wms-customer-portal-session";
+      const session = JSON.parse(sessionStorage.getItem(key) ?? "null") as {
+        access_token: string;
+      } | null;
+      if (session) {
+        session.access_token = "invalid";
+        sessionStorage.setItem(key, JSON.stringify(session));
+      }
+    });
+    await page.reload();
+    await page.getByRole("button", { name: "导出中心" }).first().click();
+    await expect(
+      page.getByTestId("portal-exports-page").getByRole("alert"),
+    ).toContainText("认证失败");
+  });
 });
 
 async function login(page: Page, username: string, screenshotName?: string) {

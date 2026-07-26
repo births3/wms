@@ -552,7 +552,6 @@ select {
   display: flex;
   width: 100%;
   max-width: 48rem;
-  min-height: min(34rem, calc(100vh - 2rem));
   max-height: calc(100vh - 2rem);
   flex-direction: column;
   overflow: hidden;
