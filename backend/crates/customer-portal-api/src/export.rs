@@ -2,7 +2,7 @@ use crate::{
     audit,
     auth::PortalAuth,
     models::{CreateExportRequest, ExportJob},
-    resolve_storage_key, PortalError, PortalState,
+    report_download_file_name, resolve_storage_key, PortalError, PortalState,
 };
 use axum::{extract::State, Json};
 use chrono::{Duration, Utc};
@@ -382,15 +382,31 @@ async fn fetch_manifest_rows(
     .await?;
     rows.into_iter()
         .map(|row| {
+            let product_code: String = row.try_get("product_code")?;
+            let product_name: String = row.try_get("product_name")?;
+            let batch_no: String = row.try_get("batch_no")?;
+            let version_number: Option<i32> = row.try_get("version_number")?;
+            let file_name = match (
+                row.try_get::<Option<String>, _>("file_name")?,
+                version_number,
+            ) {
+                (Some(_), Some(version_number)) => Some(report_download_file_name(
+                    &product_name,
+                    &product_code,
+                    &batch_no,
+                    version_number,
+                )),
+                _ => None,
+            };
             Ok(ManifestRow {
                 order_no: row.try_get("order_no")?,
                 address_name: row.try_get("address_name")?,
-                product_code: row.try_get("product_code")?,
-                product_name: row.try_get("product_name")?,
-                batch_no: row.try_get("batch_no")?,
+                product_code,
+                product_name,
+                batch_no,
                 report_version_id: row.try_get("report_version_id")?,
-                version_number: row.try_get("version_number")?,
-                file_name: row.try_get("file_name")?,
+                version_number,
+                file_name,
                 storage_key: row.try_get("storage_key")?,
                 status: row.try_get("status")?,
             })
@@ -407,8 +423,17 @@ fn write_zip(
     let file = File::create(target).map_err(|error| PortalError::Internal(error.to_string()))?;
     let mut zip = ZipWriter::new(BufWriter::new(file));
     let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
-    for (report_id, (path, file_name, _)) in unique_files {
-        zip.start_file(format!("reports/{report_id}-{file_name}"), options)
+    let mut files = unique_files.into_iter().collect::<Vec<_>>();
+    files.sort_by(|left, right| {
+        left.1
+             .1
+            .cmp(&right.1 .1)
+            .then_with(|| left.0.cmp(&right.0))
+    });
+    let mut used_file_names = HashSet::new();
+    for (_, (path, file_name, _)) in files {
+        let file_name = unique_zip_file_name(&file_name, &mut used_file_names);
+        zip.start_file(format!("reports/{file_name}"), options)
             .map_err(|error| PortalError::Internal(error.to_string()))?;
         let mut source =
             File::open(path).map_err(|error| PortalError::Internal(error.to_string()))?;
@@ -457,6 +482,43 @@ fn safe_zip_name(value: &str) -> String {
         .collect()
 }
 
+fn unique_zip_file_name(file_name: &str, used: &mut HashSet<String>) -> String {
+    if used.insert(file_name.to_string()) {
+        return file_name.to_string();
+    }
+    let (stem, extension) = match file_name.rsplit_once('.') {
+        Some((stem, extension)) => (stem, format!(".{extension}")),
+        None => (file_name, String::new()),
+    };
+    let mut sequence = 2_u64;
+    loop {
+        let candidate = format!("{stem}_{sequence}{extension}");
+        if used.insert(candidate.clone()) {
+            return candidate;
+        }
+        sequence += 1;
+    }
+}
+
 fn csv_escape(value: &str) -> String {
     format!("\"{}\"", value.replace('"', "\"\""))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::unique_zip_file_name;
+    use std::collections::HashSet;
+
+    #[test]
+    fn duplicate_zip_file_names_receive_a_stable_suffix() {
+        let mut used = HashSet::new();
+        assert_eq!(
+            unique_zip_file_name("阿莫西林_P-001_B-01_药检单_V1.pdf", &mut used),
+            "阿莫西林_P-001_B-01_药检单_V1.pdf"
+        );
+        assert_eq!(
+            unique_zip_file_name("阿莫西林_P-001_B-01_药检单_V1.pdf", &mut used),
+            "阿莫西林_P-001_B-01_药检单_V1_2.pdf"
+        );
+    }
 }

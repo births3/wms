@@ -4,7 +4,7 @@ use crate::{
     models::{
         AddressSummary, OrderDetail, OrderLineDetail, OrderQuery, OrderSummary, ReportSummary,
     },
-    PortalError, PortalState,
+    report_download_file_name, PortalError, PortalState,
 };
 use axum::{
     extract::{Path, Query, State},
@@ -217,7 +217,8 @@ pub async fn authorize_report(
     report_version_id: Uuid,
 ) -> Result<(String, String), PortalError> {
     let row = sqlx::query(
-        "SELECT DISTINCT r.customer_copy_storage_key, r.customer_copy_file_name
+        "SELECT DISTINCT r.customer_copy_storage_key, l.product_code, l.product_name,
+                         r.batch_no, r.version_number
          FROM portal_report_versions r
          JOIN portal_order_lines l
            ON l.product_id = r.product_id AND l.batch_no = r.batch_no
@@ -247,7 +248,12 @@ pub async fn authorize_report(
     .ok_or(PortalError::NotFound)?;
     Ok((
         row.try_get("customer_copy_storage_key")?,
-        row.try_get("customer_copy_file_name")?,
+        report_download_file_name(
+            row.try_get("product_name")?,
+            row.try_get("product_code")?,
+            row.try_get("batch_no")?,
+            row.try_get("version_number")?,
+        ),
     ))
 }
 

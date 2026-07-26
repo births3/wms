@@ -104,6 +104,7 @@ fn order_payload(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 fn report_payload(
     id: Uuid,
     report_id: Uuid,
@@ -533,6 +534,8 @@ async fn real_download_and_zip_are_scoped_deduplicated_and_expiring(pool: PgPool
         .expect("report download authorization should respond");
     assert_eq!(authorized.status(), StatusCode::OK);
     let authorized = response_json(authorized).await;
+    let expected_report_file_name = "真实药品_P-001_BATCH-001_药检单_V1.pdf";
+    assert_eq!(authorized["file_name"], expected_report_file_name);
     let expires_at = authorized["expires_at"]
         .as_str()
         .expect("download expiry should exist")
@@ -554,14 +557,7 @@ async fn real_download_and_zip_are_scoped_deduplicated_and_expiring(pool: PgPool
         )
         .await
         .expect("file should respond");
-    assert_eq!(file_response.status(), StatusCode::OK);
-    assert_eq!(
-        to_bytes(file_response.into_body(), usize::MAX)
-            .await
-            .expect("file should read")
-            .as_ref(),
-        original
-    );
+    assert_report_download(file_response, original).await;
 
     let export_response = app
         .clone()
@@ -643,8 +639,12 @@ async fn real_download_and_zip_are_scoped_deduplicated_and_expiring(pool: PgPool
     let report_entries = archive
         .file_names()
         .filter(|name| name.starts_with("reports/"))
-        .count();
-    assert_eq!(report_entries, 1);
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        report_entries,
+        vec![format!("reports/{expected_report_file_name}")]
+    );
     let mut manifest = String::new();
     archive
         .by_name("药检单清单.csv")

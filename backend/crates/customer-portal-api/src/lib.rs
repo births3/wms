@@ -198,10 +198,49 @@ pub fn resolve_storage_key(root: &Path, storage_key: &str) -> Result<PathBuf, Po
     Ok(root.join(key_path))
 }
 
+pub(crate) fn report_download_file_name(
+    product_name: &str,
+    product_code: &str,
+    batch_no: &str,
+    version_number: i32,
+) -> String {
+    let safe = |value: &str| {
+        value
+            .chars()
+            .map(|character| {
+                if character.is_control()
+                    || matches!(
+                        character,
+                        '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|'
+                    )
+                {
+                    '_'
+                } else {
+                    character
+                }
+            })
+            .collect::<String>()
+    };
+    format!(
+        "{}_{}_{}_药检单_V{version_number}.pdf",
+        safe(product_name),
+        safe(product_code),
+        safe(batch_no)
+    )
+}
+
 #[cfg(test)]
 mod tests {
-    use super::resolve_storage_key;
+    use super::{report_download_file_name, resolve_storage_key};
     use std::path::Path;
+
+    #[test]
+    fn report_download_name_contains_drug_product_batch_and_version() {
+        assert_eq!(
+            report_download_file_name("阿莫/西林", "AM:001", "B\\2026", 2),
+            "阿莫_西林_AM_001_B_2026_药检单_V2.pdf"
+        );
+    }
 
     #[test]
     fn storage_key_must_stay_below_root() {

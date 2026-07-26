@@ -29,6 +29,27 @@ async fn response_json(response: axum::response::Response) -> Value {
     .expect("portal response should be JSON")
 }
 
+async fn assert_report_download(response: axum::response::Response, expected: &[u8]) {
+    assert_eq!(response.status(), StatusCode::OK);
+    let content_disposition = response
+        .headers()
+        .get(axum::http::header::CONTENT_DISPOSITION)
+        .expect("content disposition should exist")
+        .to_str()
+        .expect("content disposition should be ASCII");
+    assert!(
+        content_disposition.starts_with("attachment; filename=\"report.pdf\"; filename*=UTF-8''")
+    );
+    assert!(content_disposition.ends_with("_P-001_BATCH-001_%E8%8D%AF%E6%A3%80%E5%8D%95_V1.pdf"));
+    assert_eq!(
+        to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("file should read")
+            .as_ref(),
+        expected
+    );
+}
+
 async fn project(app: &axum::Router, event_type: &str, payload: Value) -> Value {
     let (status, body) = project_event(app, Uuid::new_v4(), event_type, payload).await;
     assert_eq!(status, StatusCode::OK);

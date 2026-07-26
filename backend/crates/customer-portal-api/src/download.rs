@@ -144,10 +144,6 @@ pub async fn serve_download(
         .await
         .map_err(|error| PortalError::Internal(format!("下载文件读取失败：{error}")))?;
     let file_name: String = row.try_get("file_name")?;
-    let safe_file_name = file_name
-        .chars()
-        .filter(|character| !matches!(character, '\r' | '\n' | '"'))
-        .collect::<String>();
     let resource_type: String = row.try_get("resource_type")?;
     let resource_id: Uuid = row.try_get("resource_id")?;
     let user_id: Uuid = row.try_get("user_id")?;
@@ -177,10 +173,38 @@ pub async fn serve_download(
     );
     response.headers_mut().insert(
         header::CONTENT_DISPOSITION,
-        HeaderValue::from_str(&format!("attachment; filename=\"{}\"", safe_file_name))
-            .map_err(|error| PortalError::Internal(error.to_string()))?,
+        HeaderValue::from_str(&format!(
+            "attachment; filename=\"{}\"; filename*=UTF-8''{}",
+            if resource_type == "export" {
+                "export.zip"
+            } else {
+                "report.pdf"
+            },
+            encode_header_file_name(&file_name)
+        ))
+        .map_err(|error| PortalError::Internal(error.to_string()))?,
     );
     Ok(response)
+}
+
+fn encode_header_file_name(file_name: &str) -> String {
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+    let mut encoded = String::with_capacity(file_name.len());
+    for byte in file_name.bytes() {
+        if byte.is_ascii_alphanumeric()
+            || matches!(
+                byte,
+                b'!' | b'#' | b'$' | b'&' | b'+' | b'-' | b'.' | b'^' | b'_' | b'`' | b'|' | b'~'
+            )
+        {
+            encoded.push(byte as char);
+        } else {
+            encoded.push('%');
+            encoded.push(HEX[(byte >> 4) as usize] as char);
+            encoded.push(HEX[(byte & 0x0f) as usize] as char);
+        }
+    }
+    encoded
 }
 
 fn hash_token(token: &str) -> String {
