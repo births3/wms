@@ -14,6 +14,10 @@
 
 H9 作为横向打印模板引擎，统一管理模板类型、字段库、字段元数据、模板版本、业务接入和打印记录。第一阶段使用 hiprint WebComponent 承载可视化设计器，PC Web 先支持浏览器预览和浏览器打印；静默客户端、后端 PDF/Word 渲染、电子签章深度能力作为后续接入边界。
 
+H9 第二阶段的随货同行单归集、打印组套、服务端分类 PDF、打印任务、打印机/纸盒和
+Print Agent 由 [US-H9-006～015](user-stories-h9-print-orchestration.md) 与
+[ADR-0039](../adr/0039-print-suite-and-agent.md) 单独定义，不回写本文件第一阶段完成口径。
+
 ---
 
 ## 首批范围

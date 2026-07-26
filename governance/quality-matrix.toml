@@ -1892,14 +1892,56 @@ id = "US-H9-005"
 title = "业务模块接入规则"
 module = "H9"
 story_file = "docs/domain/user-stories-h9-print-template.md"
-types = ["read_only", "frontend_interaction", "api_change"]
-frontend_pages = ["h9-print-templates"]
+types = ["write", "frontend_interaction", "api_change"]
+frontend_pages = [
+  "m2-receiving",
+  "m2-inspecting",
+  "m4-orders",
+  "m1-locations",
+  "m3-batches",
+  "m1-products",
+]
 api_paths = [
   "POST /api/v1/print-templates/resolve",
+  "POST /api/v1/print-templates/preview",
+  "POST /api/v1/print-templates/print",
 ]
 e2e_checks = [
   "node apps/web-admin/self-checks/h9-print-template-tree-self-check.mjs",
-  "pnpm --dir apps/web-admin run test:e2e:h9-dev",
+  "just web-admin-m1-real-e2e",
+  "just web-admin-m2-real-e2e",
+  "pnpm --dir apps/web-admin run test:e2e:m3-real",
+  "pnpm --dir apps/web-admin run test:e2e:m4-real",
+]
+e2e_screenshots = [
+  { page = "m2-receiving", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/receiving-print-preview.png" },
+  { page = "m2-inspecting", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/inspection-print-preview.png" },
+  { page = "m4-orders", spec = "prototypes/e2e/web-admin-m4-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m4-outbound/delivery-note-preview.png" },
+  { page = "m1-locations", spec = "prototypes/e2e/web-admin-m1-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m1-locations/location-label-preview.png" },
+  { page = "m3-batches", spec = "prototypes/e2e/web-admin-m3-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m3-batches/lpn-label-preview.png" },
+  { page = "m1-products", spec = "prototypes/e2e/web-admin-m1-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m1-products/product-label-preview.png" },
+]
+test_checks = [
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test print_template_postgres -- --test-threads=1",
+  "pnpm --dir apps/web-admin run build",
+  "just openapi-check",
+]
+evidence_refs = [
+  "backend/crates/api/tests/print_template_postgres/business_integration.rs",
+  "backend/crates/api/tests/print_template_postgres/browser_print.rs",
+  "apps/web-admin/src/pages/print-template/H9BusinessPrintDialog.tsx",
+  "prototypes/e2e/h9-business-print.ts",
+  "prototypes/e2e/web-admin-m1-real.spec.ts",
+  "prototypes/e2e/web-admin-m2-real.spec.ts",
+  "prototypes/e2e/web-admin-m3-real.spec.ts",
+  "prototypes/e2e/web-admin-m4-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/m2-inbound/receiving-print-preview.png",
+  "artifacts/screenshot-portal/real-web/m2-inbound/inspection-print-preview.png",
+  "artifacts/screenshot-portal/real-web/m4-outbound/delivery-note-preview.png",
+  "artifacts/screenshot-portal/real-web/m1-locations/location-label-preview.png",
+  "artifacts/screenshot-portal/real-web/m3-batches/lpn-label-preview.png",
+  "artifacts/screenshot-portal/real-web/m1-products/product-label-preview.png",
+  "docs/reviews/us-h9-005-acceptance-2026-07-26.md",
 ]
 
 [stories.dimensions]
@@ -1910,28 +1952,93 @@ api = "verified"
 backend = "verified"
 database = "verified"
 security = "verified"
-audit = "not_applicable"
+audit = "verified"
 tests = "verified"
 evidence = "verified"
 docs = "verified"
 governance = "verified"
 
-[stories.not_applicable_reasons]
-audit = "模板解析为只读行为，不单独写审计；模板保存和打印动作分别在 US-H9-003、US-H9-004 写入 H2 审计。"
-
 [stories.tests]
-required_layers = ["L1", "L2", "L3", "L7", "L8", "L9"]
-covered_layers = ["L1", "L2", "L3", "L7", "L8", "L9"]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
 
-[[deferred_stories]]
+[[stories]]
 id = "US-H9-006"
 title = "随货同行单归集与截单"
 module = "H9"
 story_file = "docs/domain/user-stories-h9-print-orchestration.md"
 types = ["write", "config_rule", "api_change", "frontend_interaction", "critical_path", "audit_compliance"]
-reason = "货主+仓库+地址硬边界、M1 print_document_category 限定编号主题与 M-CG 同事务 no-gap 发号已确认；尚未实现规则、截单、随货同行单号、页面、API、PostgreSQL 并发与真实数据 E2E。"
-owner = "H9 打印能力负责人"
-resume_when = "完成原型走查和 OpenAPI 草案后，以并发截单、地址隔离、幂等和 H2 审计为第一批 outside-in TDD 切片。"
+frontend_pages = ["h9-delivery-note-aggregation"]
+navigation_checks = ["node apps/web-admin/self-checks/h9-delivery-note-aggregation-self-check.mjs"]
+api_paths = [
+  "GET /api/v1/print-orchestration/delivery-note-candidates",
+  "GET /api/v1/print-orchestration/delivery-note-groups",
+  "POST /api/v1/print-orchestration/delivery-note-groups/manual-cutoff",
+  "GET /api/v1/print-orchestration/route-bindings",
+  "POST /api/v1/print-orchestration/route-bindings",
+  "GET /api/v1/print-orchestration/cutoff-plans",
+  "POST /api/v1/print-orchestration/cutoff-plans",
+  "POST /api/v1/print-orchestration/cutoff-plans/{plan_id}/publish",
+]
+database_objects = [
+  "h9_route_bindings",
+  "h9_cutoff_plans",
+  "h9_outbound_route_snapshots",
+  "h9_delivery_note_groups",
+  "h9_delivery_note_group_orders",
+  "outbound_orders",
+  "customer_addresses",
+  "system_dictionary_items",
+  "document_number_rules",
+  "document_number_counters",
+  "audit_event",
+  "idempotency_request",
+]
+e2e_checks = [
+  "node apps/web-admin/self-checks/h9-delivery-note-aggregation-self-check.mjs",
+  "pnpm --dir prototypes exec playwright test --config=playwright-web-admin-m1-real-config.ts e2e/web-admin-h9-delivery-note-aggregation-real.spec.ts",
+  "just web-admin-m1-real-e2e",
+]
+e2e_screenshots = [
+  { page = "h9-delivery-note-aggregation", spec = "prototypes/e2e/web-admin-h9-delivery-note-aggregation-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h9-delivery-note-aggregation/pending-orders.png" },
+  { page = "h9-delivery-note-aggregation", spec = "prototypes/e2e/web-admin-h9-delivery-note-aggregation-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h9-delivery-note-aggregation/cutoff-result.png" },
+  { page = "h9-delivery-note-aggregation", spec = "prototypes/e2e/web-admin-h9-delivery-note-aggregation-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h9-delivery-note-aggregation/cutoff-plans.png" },
+  { page = "h9-delivery-note-aggregation", spec = "prototypes/e2e/web-admin-h9-delivery-note-aggregation-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h9-delivery-note-aggregation/plans-and-routes.png" },
+]
+test_checks = [
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test h9_print_orchestration_postgres -- --test-threads=1",
+  "pnpm --dir apps/web-admin run build",
+  "just openapi-check",
+]
+evidence_refs = [
+  "backend/crates/api/src/print_orchestration_job.rs",
+  "backend/crates/api/tests/h9_print_orchestration_postgres.rs",
+  "backend/crates/api/tests/support/h9.rs",
+  "prototypes/e2e/web-admin-h9-delivery-note-aggregation-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/h9-delivery-note-aggregation/pending-orders.png",
+  "artifacts/screenshot-portal/real-web/h9-delivery-note-aggregation/cutoff-result.png",
+  "artifacts/screenshot-portal/real-web/h9-delivery-note-aggregation/cutoff-plans.png",
+  "artifacts/screenshot-portal/real-web/h9-delivery-note-aggregation/plans-and-routes.png",
+  "docs/reviews/us-h9-006-acceptance-2026-07-26.md",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"]
 
 [[deferred_stories]]
 id = "US-H9-007"
