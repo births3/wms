@@ -17583,6 +17583,107 @@
         }
       }
     },
+    "/api/v1/print-templates/templates/{template_id}/enabled": {
+      "patch": {
+        "tags": [
+          "print-template"
+        ],
+        "operationId": "set_print_template_enabled",
+        "parameters": [
+          {
+            "name": "template_id",
+            "in": "path",
+            "description": "打印模板 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPrintTemplateEnabledRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "停用或启用打印模板主数据",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintTemplateSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "模板不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/print-templates/templates/{template_id}/versions": {
       "get": {
         "tags": [
@@ -17624,6 +17725,107 @@
           },
           "403": {
             "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/print-templates/templates/{template_id}/versions/{version_id}/publish": {
+      "post": {
+        "tags": [
+          "print-template"
+        ],
+        "operationId": "publish_print_template",
+        "parameters": [
+          {
+            "name": "template_id",
+            "in": "path",
+            "description": "打印模板 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "version_id",
+            "in": "path",
+            "description": "草稿版本 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "发布打印模板草稿版本",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintTemplateVersion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "模板或版本不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本不是最新草稿、已发布、模板类型停用或幂等冲突",
             "content": {
               "application/json": {
                 "schema": {
@@ -35314,21 +35516,16 @@
           "template_name",
           "template_type_code",
           "scope",
-          "enabled",
           "is_default",
           "field_library_version_id",
           "hiprint_json",
           "field_bindings",
           "paper",
-          "designer_version",
-          "publish"
+          "designer_version"
         ],
         "properties": {
           "designer_version": {
             "type": "string"
-          },
-          "enabled": {
-            "type": "boolean"
           },
           "field_bindings": {
             "type": "array",
@@ -35345,9 +35542,6 @@
             "type": "boolean"
           },
           "paper": {},
-          "publish": {
-            "type": "boolean"
-          },
           "remark": {
             "type": "string",
             "nullable": true
@@ -35357,6 +35551,11 @@
           },
           "template_code": {
             "type": "string"
+          },
+          "template_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
           },
           "template_name": {
             "type": "string"
@@ -35454,6 +35653,17 @@
               "type": "string",
               "format": "uuid"
             }
+          }
+        }
+      },
+      "SetPrintTemplateEnabledRequest": {
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
           }
         }
       },

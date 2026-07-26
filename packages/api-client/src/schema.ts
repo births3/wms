@@ -3284,6 +3284,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/print-templates/templates/{template_id}/enabled": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["set_print_template_enabled"];
+        trace?: never;
+    };
     "/api/v1/print-templates/templates/{template_id}/versions": {
         parameters: {
             query?: never;
@@ -3294,6 +3310,22 @@ export interface paths {
         get: operations["list_print_template_versions"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-templates/templates/{template_id}/versions/{version_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["publish_print_template"];
         delete?: never;
         options?: never;
         head?: never;
@@ -8215,17 +8247,17 @@ export interface components {
         };
         SavePrintTemplateRequest: {
             designer_version: string;
-            enabled: boolean;
             field_bindings: components["schemas"]["PrintTemplateBinding"][];
             /** Format: uuid */
             field_library_version_id: string;
             hiprint_json: unknown;
             is_default: boolean;
             paper: unknown;
-            publish: boolean;
             remark?: string | null;
             scope: components["schemas"]["PrintTemplateScope"];
             template_code: string;
+            /** Format: uuid */
+            template_id?: string | null;
             template_name: string;
             template_type_code: string;
         };
@@ -8254,6 +8286,9 @@ export interface components {
         SetIsolationRequest: {
             isolate: boolean;
             item_ids: string[];
+        };
+        SetPrintTemplateEnabledRequest: {
+            enabled: boolean;
         };
         SetTaskTypeEnabledRequest: {
             enabled: boolean;
@@ -22137,6 +22172,81 @@ export interface operations {
             };
         };
     };
+    set_print_template_enabled: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 打印模板 ID */
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetPrintTemplateEnabledRequest"];
+            };
+        };
+        responses: {
+            /** @description 停用或启用打印模板主数据 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintTemplateSummary"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 模板不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     list_print_template_versions: {
         parameters: {
             query?: never;
@@ -22169,6 +22279,79 @@ export interface operations {
             };
             /** @description 权限不足 */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    publish_print_template: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 打印模板 ID */
+                template_id: string;
+                /** @description 草稿版本 ID */
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 发布打印模板草稿版本 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintTemplateVersion"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 模板或版本不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 版本不是最新草稿、已发布、模板类型停用或幂等冲突 */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
