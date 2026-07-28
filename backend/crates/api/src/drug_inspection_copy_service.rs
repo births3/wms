@@ -628,8 +628,15 @@ async fn claim_source(
            AND stamp_attachment.owner_id = stamp.owner_id
          WHERE job.id = $1
            AND ($2::UUID IS NULL OR job.owner_id = $2)
-           AND job.status IN ('queued', 'failed')
            AND job.attempt_count < 3
+           AND (
+               job.status IN ('queued', 'failed')
+               -- 与 claim_next 一致：超时 processing 可回收，否则租约查询选中后此处会 NotFound。
+               OR (
+                   job.status = 'processing'
+                   AND job.started_at < now() - interval '10 minutes'
+               )
+           )
          FOR UPDATE OF job
         "#,
     )

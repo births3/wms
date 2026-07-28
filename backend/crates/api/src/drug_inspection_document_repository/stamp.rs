@@ -223,11 +223,13 @@ impl PgDrugInspectionStampRepository {
             .execute(&mut *tx)
             .await
             .map_err(map_db_error)?;
-            // 此前因缺已发布图章而失败（含重试耗尽）的副本任务，图章就绪后重新入队。
+            // 仅重排队因缺已发布图章失败的任务；其它失败原因（坏图、超限等）保持 failed，避免误重跑。
             sqlx::query(
                 "UPDATE drug_inspection_customer_copy_jobs
                     SET status = 'queued', attempt_count = 0, last_error = NULL, updated_at = $2
-                  WHERE owner_id = $1 AND status = 'failed'",
+                  WHERE owner_id = $1
+                    AND status = 'failed'
+                    AND last_error LIKE '%published_stamp_missing%'",
             )
             .bind(ctx.owner_id)
             .bind(now)
