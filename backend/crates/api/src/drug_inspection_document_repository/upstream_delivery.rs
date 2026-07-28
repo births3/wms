@@ -45,12 +45,13 @@ impl PgDrugInspectionDocumentRepository {
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect::<Vec<_>>();
+        // 多页扫描件的页序由客户端提交顺序决定，去重必须保序，不能经 BTreeSet 重排。
+        let mut seen_attachments = BTreeSet::new();
         let attachment_ids = request
             .attachment_ids
             .iter()
             .copied()
-            .collect::<BTreeSet<_>>()
-            .into_iter()
+            .filter(|id| seen_attachments.insert(*id))
             .collect::<Vec<_>>();
         validate_asns(&mut tx, ctx.owner_id, request.supplier_id, &asn_ids).await?;
         validate_files(&mut tx, ctx.owner_id, &attachment_ids).await?;
@@ -230,19 +231,18 @@ impl PgDrugInspectionDocumentRepository {
             r#"
             SELECT version.id, version.document_id, version.owner_id, version.version_number,
                    version.modification_reason, version.uploaded_by, version.created_at,
-                   COALESCE(array_agg(DISTINCT file.attachment_id)
-                       FILTER (WHERE file.attachment_id IS NOT NULL), ARRAY[]::UUID[])
-                       AS attachment_ids,
-                   COALESCE(array_agg(DISTINCT link.asn_id)
-                       FILTER (WHERE link.asn_id IS NOT NULL), ARRAY[]::UUID[])
-                       AS asn_ids
+                   COALESCE((
+                       SELECT array_agg(file.attachment_id ORDER BY file.position)
+                         FROM upstream_delivery_document_files AS file
+                        WHERE file.version_id = version.id
+                   ), ARRAY[]::UUID[]) AS attachment_ids,
+                   COALESCE((
+                       SELECT array_agg(DISTINCT link.asn_id)
+                         FROM upstream_delivery_document_asn_links AS link
+                        WHERE link.version_id = version.id
+                   ), ARRAY[]::UUID[]) AS asn_ids
               FROM upstream_delivery_document_versions AS version
-         LEFT JOIN upstream_delivery_document_files AS file
-                ON file.version_id = version.id
-         LEFT JOIN upstream_delivery_document_asn_links AS link
-                ON link.version_id = version.id
              WHERE version.owner_id = $1 AND version.document_id = $2
-          GROUP BY version.id
           ORDER BY version.version_number DESC
             "#,
         )

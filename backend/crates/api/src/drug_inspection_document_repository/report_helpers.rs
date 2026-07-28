@@ -81,10 +81,11 @@ pub(super) async fn validate_asn_batch(
     product_id: Uuid,
     batch_no: &str,
 ) -> Result<(), DrugInspectionDocumentRepositoryError> {
-    let value: Option<(i64, bool)> = sqlx::query_as(
+    let value: Option<(i64, Option<bool>, Option<bool>)> = sqlx::query_as(
         r#"
         SELECT COUNT(DISTINCT product_id),
-               BOOL_OR(product_id = $3 AND batch_no = $4)
+               BOOL_OR(product_id = $3 AND batch_no = $4),
+               BOOL_OR(product_id = $3 AND batch_no IS NULL)
           FROM receiving_order_lines
          WHERE owner_id = $1 AND receiving_order_id = $2
         "#,
@@ -96,7 +97,11 @@ pub(super) async fn validate_asn_batch(
     .fetch_optional(&mut **tx)
     .await
     .map_err(map_db_error)?;
-    if value != Some((1, true)) {
+    // 批号在验收时才写入行；验收前（行批号仍为 NULL，即"待收货/待批号"状态）
+    // 允许按商品级匹配先登记药检单，否则 missing_behavior=block 的类别会与
+    // 验收前置校验互为死锁。
+    let matched = matches!(value, Some((1, Some(true), _)) | Some((1, _, Some(true))));
+    if !matched {
         return Err(DrugInspectionDocumentRepositoryError::Conflict(
             "asn_product_batch_mismatch",
         ));

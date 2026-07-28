@@ -270,8 +270,12 @@ impl DrugInspectionCopyService {
             r#"
             SELECT id
               FROM drug_inspection_customer_copy_jobs
-             WHERE status IN ('queued', 'failed')
-               AND attempt_count < 3
+             WHERE attempt_count < 3
+               AND (
+                   status IN ('queued', 'failed')
+                   -- 进程崩溃遗留的 processing 任务按 10 分钟租约回收，避免永久卡死。
+                   OR (status = 'processing' AND started_at < now() - interval '10 minutes')
+               )
              ORDER BY created_at
              FOR UPDATE SKIP LOCKED
              LIMIT 1

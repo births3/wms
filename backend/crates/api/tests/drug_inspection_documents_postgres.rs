@@ -230,13 +230,18 @@ async fn seed_fixture(pool: &PgPool) -> Fixture {
         ),
         (stamp_attachment_id, "owner-stamp.png", "image/png"),
     ] {
+        let entity_type = if attachment_id == stamp_attachment_id {
+            "drug_inspection_stamp"
+        } else {
+            "drug_inspection_test"
+        };
         sqlx::query(
             r#"
             INSERT INTO attachments (
                 id, owner_id, module, entity_type, entity_id, file_name, content_type,
                 size_bytes, storage_key, sha256, uploaded_by, created_at
             )
-            VALUES ($1, $2, 'M-DI', 'drug_inspection_test', $3, $4, $5, 20, $6, $7, $8, $9)
+            VALUES ($1, $2, 'M-DI', $10, $3, $4, $5, 20, $6, $7, $8, $9)
             "#,
         )
         .bind(attachment_id)
@@ -248,6 +253,7 @@ async fn seed_fixture(pool: &PgPool) -> Fixture {
         .bind(format!("sha256-{attachment_id}"))
         .bind(uploader_id)
         .bind(now)
+        .bind(entity_type)
         .execute(pool)
         .await
         .expect("attachment should seed");

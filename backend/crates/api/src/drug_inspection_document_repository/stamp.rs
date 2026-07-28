@@ -46,18 +46,28 @@ impl PgDrugInspectionStampRepository {
             tx.commit().await.map_err(map_db_error)?;
             return Ok(value);
         }
-        let is_png: Option<bool> = sqlx::query_scalar(
-            "SELECT content_type = 'image/png' FROM attachments WHERE owner_id = $1 AND id = $2",
+        let attachment: Option<(bool, bool)> = sqlx::query_as(
+            "SELECT content_type = 'image/png', entity_type = 'drug_inspection_stamp'
+             FROM attachments WHERE owner_id = $1 AND id = $2",
         )
         .bind(ctx.owner_id)
         .bind(request.png_attachment_id)
         .fetch_optional(&mut *tx)
         .await
         .map_err(map_db_error)?;
-        if is_png != Some(true) {
-            return Err(DrugInspectionDocumentRepositoryError::Conflict(
-                "stamp_must_be_png",
-            ));
+        match attachment {
+            Some((true, true)) => {}
+            Some((false, _)) | None => {
+                return Err(DrugInspectionDocumentRepositoryError::Conflict(
+                    "stamp_must_be_png",
+                ));
+            }
+            // 非图章上传通道的 PNG 未经透明度校验，配置成图章会让副本任务批量失败。
+            Some((true, false)) => {
+                return Err(DrugInspectionDocumentRepositoryError::Conflict(
+                    "stamp_attachment_entity_mismatch",
+                ));
+            }
         }
         sqlx::query("SELECT pg_advisory_xact_lock(hashtext($1), 4212)")
             .bind(ctx.owner_id.to_string())
@@ -207,6 +217,17 @@ impl PgDrugInspectionStampRepository {
         if published {
             sqlx::query(
                 "UPDATE drug_inspection_stamp_versions SET status = 'superseded', updated_at = $2 WHERE owner_id = $1 AND status = 'published'",
+            )
+            .bind(ctx.owner_id)
+            .bind(now)
+            .execute(&mut *tx)
+            .await
+            .map_err(map_db_error)?;
+            // 此前因缺已发布图章而失败（含重试耗尽）的副本任务，图章就绪后重新入队。
+            sqlx::query(
+                "UPDATE drug_inspection_customer_copy_jobs
+                    SET status = 'queued', attempt_count = 0, last_error = NULL, updated_at = $2
+                  WHERE owner_id = $1 AND status = 'failed'",
             )
             .bind(ctx.owner_id)
             .bind(now)

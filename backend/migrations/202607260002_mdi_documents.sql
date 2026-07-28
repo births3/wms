@@ -143,7 +143,8 @@ SET permission_name = EXCLUDED.permission_name;
 
 GRANT SELECT, INSERT, UPDATE ON drug_inspection_reports TO wms_app;
 GRANT SELECT, INSERT, UPDATE ON drug_inspection_report_versions TO wms_app;
-GRANT SELECT, INSERT ON drug_inspection_asn_links TO wms_app;
+-- reuse_report 换绑走 ON CONFLICT DO UPDATE，必须授 UPDATE。
+GRANT SELECT, INSERT, UPDATE ON drug_inspection_asn_links TO wms_app;
 GRANT SELECT, INSERT ON upstream_delivery_documents TO wms_app;
 GRANT SELECT, INSERT ON upstream_delivery_document_versions TO wms_app;
 GRANT SELECT, INSERT ON upstream_delivery_document_files TO wms_app;
