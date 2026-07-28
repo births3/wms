@@ -2630,8 +2630,8 @@
           }
         },
         "security": [],
-        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。",
-        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。"
+        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。",
+        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。"
       }
     },
     "/api/v1/auth/logout": {
@@ -20698,6 +20698,323 @@
         ]
       }
     },
+    "/api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs": {
+      "get": {
+        "tags": [
+          "print-orchestration"
+        ],
+        "operationId": "list_category_pdfs",
+        "parameters": [
+          {
+            "name": "instance_id",
+            "in": "path",
+            "description": "组套实例 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "分类 PDF 稳定元数据列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryPdfOutputListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无分类 PDF 查看权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "组套实例不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs/download": {
+      "post": {
+        "tags": [
+          "print-orchestration"
+        ],
+        "operationId": "download_category_pdfs",
+        "parameters": [
+          {
+            "name": "instance_id",
+            "in": "path",
+            "description": "组套实例 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SelectCategoryPdfsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "所选分类 PDF；多分类仅临时合并",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无分类 PDF 下载权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "所选分类尚未就绪",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs/emergency-print": {
+      "post": {
+        "tags": [
+          "print-orchestration"
+        ],
+        "operationId": "emergency_print_category_pdfs",
+        "parameters": [
+          {
+            "name": "instance_id",
+            "in": "path",
+            "description": "组套实例 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SelectCategoryPdfsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "供浏览器应急打印的所选分类 PDF",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无 PDF 应急打印专用权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "所选分类尚未就绪",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs/prepare": {
+      "post": {
+        "tags": [
+          "print-orchestration"
+        ],
+        "operationId": "prepare_category_pdfs",
+        "parameters": [
+          {
+            "name": "instance_id",
+            "in": "path",
+            "description": "组套实例 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "首次生成和失败重试必须复用的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "分类 PDF 准备完成或受控失败结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryPdfPreparation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无分类 PDF 生成权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "源单据未就绪或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "H-FILE 存储失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
     "/api/v1/print-templates/field-libraries": {
       "get": {
         "tags": [
@@ -29317,6 +29634,150 @@
             "nullable": true
           },
           "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "CategoryPdfOutput": {
+        "type": "object",
+        "description": "H9 分类 PDF 产物；稳定事实只保存 H-FILE ID、版本与哈希，不保存临时访问 URL。",
+        "required": [
+          "id",
+          "instance_id",
+          "instance_item_id",
+          "sort_order",
+          "category_code",
+          "source_mode",
+          "source_file_bindings",
+          "processing_status",
+          "retention_policy",
+          "attempt_count",
+          "created_at"
+        ],
+        "properties": {
+          "attachment_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "attempt_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cache_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "category_code": {
+            "type": "string"
+          },
+          "content_hash": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "failure_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "instance_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "instance_item_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "processed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "processing_status": {
+            "type": "string"
+          },
+          "retention_policy": {
+            "type": "string"
+          },
+          "sort_order": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "source_data_version": {
+            "type": "string",
+            "nullable": true
+          },
+          "source_file_bindings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrintSuiteFileBinding"
+            }
+          },
+          "source_mode": {
+            "$ref": "#/components/schemas/PrintSuiteSourceMode"
+          },
+          "template_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        }
+      },
+      "CategoryPdfOutputListResponse": {
+        "type": "object",
+        "description": "H9 分类 PDF 产物列表。",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategoryPdfOutput"
+            }
+          },
+          "preparation_status": {
+            "type": "string",
+            "nullable": true
+          },
+          "retry_idempotency_key": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "CategoryPdfPreparation": {
+        "type": "object",
+        "description": "一次分类 PDF 准备结果；同一实例只能复用最初的幂等键重试。",
+        "required": [
+          "instance_id",
+          "idempotency_key",
+          "status",
+          "outputs"
+        ],
+        "properties": {
+          "idempotency_key": {
+            "type": "string"
+          },
+          "instance_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "outputs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategoryPdfOutput"
+            }
+          },
+          "status": {
             "type": "string"
           }
         }
@@ -41605,6 +42066,22 @@
           },
           "template_type_code": {
             "type": "string"
+          }
+        }
+      },
+      "SelectCategoryPdfsRequest": {
+        "type": "object",
+        "description": "临时合并或下载的分类 PDF 选择；空数组表示全部已就绪分类。",
+        "required": [
+          "category_pdf_ids"
+        ],
+        "properties": {
+          "category_pdf_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         }
       },

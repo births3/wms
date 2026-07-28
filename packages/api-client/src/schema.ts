@@ -3732,6 +3732,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_category_pdfs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["download_category_pdfs"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs/emergency-print": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["emergency_print_category_pdfs"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs/prepare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["prepare_category_pdfs"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/print-templates/field-libraries": {
         parameters: {
             query?: never;
@@ -5626,6 +5690,51 @@ export interface components {
             /** @description H4/企业微信审批单号或审批记录 ID；待收货状态必填。 */
             approval_id?: string | null;
             reason: string;
+        };
+        /** @description H9 分类 PDF 产物；稳定事实只保存 H-FILE ID、版本与哈希，不保存临时访问 URL。 */
+        CategoryPdfOutput: {
+            /** Format: uuid */
+            attachment_id?: string | null;
+            /** Format: int32 */
+            attempt_count: number;
+            /** Format: date-time */
+            cache_expires_at?: string | null;
+            category_code: string;
+            content_hash?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            failure_reason?: string | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            instance_id: string;
+            /** Format: uuid */
+            instance_item_id: string;
+            /** Format: date-time */
+            processed_at?: string | null;
+            processing_status: string;
+            retention_policy: string;
+            /** Format: int32 */
+            sort_order: number;
+            source_data_version?: string | null;
+            source_file_bindings: components["schemas"]["PrintSuiteFileBinding"][];
+            source_mode: components["schemas"]["PrintSuiteSourceMode"];
+            /** Format: uuid */
+            template_version_id?: string | null;
+        };
+        /** @description H9 分类 PDF 产物列表。 */
+        CategoryPdfOutputListResponse: {
+            data: components["schemas"]["CategoryPdfOutput"][];
+            preparation_status?: string | null;
+            retry_idempotency_key?: string | null;
+        };
+        /** @description 一次分类 PDF 准备结果；同一实例只能复用最初的幂等键重试。 */
+        CategoryPdfPreparation: {
+            idempotency_key: string;
+            /** Format: uuid */
+            instance_id: string;
+            outputs: components["schemas"]["CategoryPdfOutput"][];
+            status: string;
         };
         ChangeDrugInspectionPlatformStatusRequest: {
             status: string;
@@ -9552,6 +9661,10 @@ export interface components {
             template_id?: string | null;
             template_name: string;
             template_type_code: string;
+        };
+        /** @description 临时合并或下载的分类 PDF 选择；空数组表示全部已就绪分类。 */
+        SelectCategoryPdfsRequest: {
+            category_pdf_ids: string[];
         };
         SendH4NotificationRequest: {
             dedupe_key: string;
@@ -25786,6 +25899,235 @@ export interface operations {
             };
             /** @description 无打印编排读取权限 */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_category_pdfs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 组套实例 ID */
+                instance_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 分类 PDF 稳定元数据列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryPdfOutputListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无分类 PDF 查看权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 组套实例不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    download_category_pdfs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 组套实例 ID */
+                instance_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SelectCategoryPdfsRequest"];
+            };
+        };
+        responses: {
+            /** @description 所选分类 PDF；多分类仅临时合并 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无分类 PDF 下载权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 所选分类尚未就绪 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    emergency_print_category_pdfs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 组套实例 ID */
+                instance_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SelectCategoryPdfsRequest"];
+            };
+        };
+        responses: {
+            /** @description 供浏览器应急打印的所选分类 PDF */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无 PDF 应急打印专用权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 所选分类尚未就绪 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    prepare_category_pdfs: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 首次生成和失败重试必须复用的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 组套实例 ID */
+                instance_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 分类 PDF 准备完成或受控失败结果 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryPdfPreparation"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无分类 PDF 生成权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 源单据未就绪或幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description H-FILE 存储失败 */
+            502: {
                 headers: {
                     [name: string]: unknown;
                 };

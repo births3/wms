@@ -1,13 +1,14 @@
 #[allow(unused_imports)]
 use super::{
     AggregationFieldCatalogResponse, AggregationRuleTestResult, AggregationRuleVersion,
-    AggregationRuleVersionListResponse, CreateAggregationRuleDraftRequest, CreateCutoffPlanRequest,
-    CreatePrintSuiteDraftRequest, CutoffPlan, CutoffPlanListResponse,
-    DeliveryNoteCandidateListResponse, DeliveryNoteGroup, DeliveryNoteGroupListResponse,
-    ErrorResponse, ManualDeliveryNoteCutoffRequest, PrintDocumentCategoryListResponse,
-    PrintSuiteInstanceListResponse, PrintSuiteTestResult, PrintSuiteVersion,
-    PrintSuiteVersionListResponse, PublishRouteBindingRequest, RouteBinding,
-    RouteBindingListResponse, TestAggregationRuleRequest, TestPrintSuiteRequest,
+    AggregationRuleVersionListResponse, CategoryPdfOutputListResponse, CategoryPdfPreparation,
+    CreateAggregationRuleDraftRequest, CreateCutoffPlanRequest, CreatePrintSuiteDraftRequest,
+    CutoffPlan, CutoffPlanListResponse, DeliveryNoteCandidateListResponse, DeliveryNoteGroup,
+    DeliveryNoteGroupListResponse, ErrorResponse, ManualDeliveryNoteCutoffRequest,
+    PrintDocumentCategoryListResponse, PrintSuiteInstanceListResponse, PrintSuiteTestResult,
+    PrintSuiteVersion, PrintSuiteVersionListResponse, PublishRouteBindingRequest, RouteBinding,
+    RouteBindingListResponse, SelectCategoryPdfsRequest, TestAggregationRuleRequest,
+    TestPrintSuiteRequest,
 };
 
 #[utoipa::path(
@@ -382,3 +383,74 @@ pub(crate) fn disable_print_suite() {}
 )]
 #[allow(dead_code)]
 pub(crate) fn list_print_suite_instances() {}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs",
+    params(("instance_id" = uuid::Uuid, Path, description = "组套实例 ID")),
+    responses(
+        (status = 200, description = "分类 PDF 稳定元数据列表", body = CategoryPdfOutputListResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "无分类 PDF 查看权限", body = ErrorResponse),
+        (status = 404, description = "组套实例不存在", body = ErrorResponse)
+    ),
+    security(("bearer_auth" = [])),
+    tag = "print-orchestration"
+)]
+#[allow(dead_code)]
+pub(crate) fn list_category_pdfs() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs/prepare",
+    params(
+        ("instance_id" = uuid::Uuid, Path, description = "组套实例 ID"),
+        ("Idempotency-Key" = String, Header, description = "首次生成和失败重试必须复用的幂等键")
+    ),
+    responses(
+        (status = 200, description = "分类 PDF 准备完成或受控失败结果", body = CategoryPdfPreparation),
+        (status = 400, description = "缺少幂等键", body = ErrorResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "无分类 PDF 生成权限", body = ErrorResponse),
+        (status = 409, description = "源单据未就绪或幂等冲突", body = ErrorResponse),
+        (status = 502, description = "H-FILE 存储失败", body = ErrorResponse)
+    ),
+    security(("bearer_auth" = [])),
+    tag = "print-orchestration"
+)]
+#[allow(dead_code)]
+pub(crate) fn prepare_category_pdfs() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs/download",
+    params(("instance_id" = uuid::Uuid, Path, description = "组套实例 ID")),
+    request_body = SelectCategoryPdfsRequest,
+    responses(
+        (status = 200, description = "所选分类 PDF；多分类仅临时合并", body = String, content_type = "application/pdf"),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "无分类 PDF 下载权限", body = ErrorResponse),
+        (status = 409, description = "所选分类尚未就绪", body = ErrorResponse)
+    ),
+    security(("bearer_auth" = [])),
+    tag = "print-orchestration"
+)]
+#[allow(dead_code)]
+pub(crate) fn download_category_pdfs() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs/emergency-print",
+    params(("instance_id" = uuid::Uuid, Path, description = "组套实例 ID")),
+    request_body = SelectCategoryPdfsRequest,
+    responses(
+        (status = 200, description = "供浏览器应急打印的所选分类 PDF", body = String, content_type = "application/pdf"),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "无 PDF 应急打印专用权限", body = ErrorResponse),
+        (status = 409, description = "所选分类尚未就绪", body = ErrorResponse)
+    ),
+    security(("bearer_auth" = [])),
+    tag = "print-orchestration"
+)]
+#[allow(dead_code)]
+pub(crate) fn emergency_print_category_pdfs() {}

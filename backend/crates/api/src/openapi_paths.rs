@@ -136,6 +136,12 @@ pub use wms_domain::{
     UpdateDockAppointmentRequest, UpdateDockRequest,
 };
 pub use wms_domain::{
+    CategoryPdfOutputListResponse, CategoryPdfPreparation, CreatePrintSuiteDraftRequest,
+    PrintDocumentCategoryListResponse, PrintSuiteInstanceListResponse, PrintSuiteTestResult,
+    PrintSuiteVersion, PrintSuiteVersionListResponse, SelectCategoryPdfsRequest,
+    TestPrintSuiteRequest,
+};
+pub use wms_domain::{
     CompleteArchiveRevisionRequest, CreateQualityLiaisonRequest,
     QualityLiaisonApprovalCallbackRequest, QualityLiaisonOrder, QualityLiaisonTypeConfig,
     UpsertQualityLiaisonTypeRequest,
@@ -146,11 +152,6 @@ pub use wms_domain::{
     PrintSiteListResponse, PrintSiteOwnerMapping, PrintSiteOwnerMappingListResponse, Printer,
     PrinterListResponse, PrinterTestPrint, PrinterTray, PrinterTrayListResponse,
     ReleaseDeviceLeaseRequest, TestPrintRequest, UpdatePrinterRequest, UpdatePrinterTrayRequest,
-};
-pub use wms_domain::{
-    CreatePrintSuiteDraftRequest, PrintDocumentCategoryListResponse,
-    PrintSuiteInstanceListResponse, PrintSuiteTestResult, PrintSuiteVersion,
-    PrintSuiteVersionListResponse, TestPrintSuiteRequest,
 };
 pub use wms_domain::{
     CreateStockLossOrderRequest, CreateStockSurplusOrderRequest, ExecuteStockLossOrderRequest,
