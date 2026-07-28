@@ -14,9 +14,9 @@
 | 指标 | 数量 |
 |---|---:|
 | 故事总数 | 188 |
-| 已完成（已验证） | 55 |
-| 未完成 / 延期 | 133 |
-| 完成率 | 29.3% |
+| 已完成（已验证） | 57 |
+| 未完成 / 延期 | 131 |
+| 完成率 | 30.3% |
 
 > “已完成”表示故事已进入 `stories` 并通过矩阵维度门禁；延期故事中的局部代码、页面或测试切片不计入完成。
 
@@ -37,7 +37,7 @@
 | H5 | 5 | 0 | 5 |
 | H6 | 1 | 0 | 1 |
 | H8 | 1 | 3 | 4 |
-| H9 | 6 | 9 | 15 |
+| H9 | 8 | 7 | 15 |
 | M1 | 2 | 9 | 11 |
 | M10 | 0 | 4 | 4 |
 | M2 | 1 | 8 | 9 |
@@ -104,6 +104,8 @@
 | US-H9-004 预览与浏览器打印 | H9 | S2 |
 | US-H9-005 业务模块接入规则 | H9 | S2 |
 | US-H9-006 随货同行单归集与截单 | H9 | S3 |
+| US-H9-007 归集维度规则配置 | H9 | S3 |
+| US-H9-008 打印组套配置与就绪策略 | H9 | S3 |
 | US-M2-008 收货进度看板 | M2 | S1 |
 | US-M4-001 出库订单管理 | M4 | S2 |
 | US-AL-001 告警定义注册 | AL | S3 |
@@ -124,11 +126,9 @@
 |---|---|---|---|---|
 | US-H4-002 企业微信消息发送 | H4 | S4 | L1、L2、L3、L4、L5、L6、L7、L8、L9、L10、L11 | 已完成可注入企业微信 provider 边界、模板渲染、批量收件人记录、幂等最终结果更新、成功/可重试失败/永久失败状态、发送审计和参数完整性测试；未接外部 provider 时明确记录失败，禁止伪报发送成功。企业微信真实 HTTP API 调用、Secret alias 解析、access_token 获取与刷新、自动重试调度和外部联调证据尚未完成。 |
 | US-H4-003 企业微信审批流对接 | H4 | - | - | 当前仅完成受 JWT 权限保护的内部审批记录和指定审批人回写模型；企业微信审批推送、外部回调签名校验、轮询兜底、业务单据原子回写和外部联调证据尚未完成。 |
-| US-H9-007 归集维度规则配置 | H9 | S3 | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | 需求和受控字段边界已确认；尚未实现规则版本、样本测试、发布页面、API、数据库和治理检查。 |
-| US-H9-008 打印组套配置与就绪策略 | H9 | S3 | L1、L2、L3、L4、L5、L6、L7、L8、L9、L10、L11 | 组套、地址优先级、M1 print_document_category 来源模式、单据完整性和版本语义已确认；尚未实现页面、API、模型、文件引用和真实数据 E2E。 |
 | US-H9-009 分类 PDF 渲染与留存 | H9 | S3 | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | 分类 PDF 与 H-FILE 边界已确认；尚未实现 Render Worker、分类 PDF、哈希、保留策略、API 和测试。 |
 | US-H9-010 打印任务队列、顺序与重打 | H9 | S4 | L1、L2、L3、L4、L5、L6、L7、L8、L9、L10、L11 | 组套/打印项/尝试/租约状态和合法迁移、严格串行、普通暂停/紧急停止分流、失败推进、重打、改派与结果不明边界已确认；H6 定义、队列、页面、API、并发和真实打印机证据未实现。 |
-| US-H9-011 打印机、纸盒与设备租约 | H9 | S4 | L1、L2、L3、L4、L5、L6、L7、L8、L9、L10、L11 | 物理打印站点、货主仓映射、纸盒和租约语义已确认；维护页、模型、测试打印、租约并发和真实设备证据未实现。 |
+| US-H9-011 打印机、纸盒与设备租约 | H9 | S4 | L1、L2、L3、L4、L5、L6、L7、L8、L9、L10、L11 | 站点、货主仓映射、打印机/纸盒、测试打印记录、设备租约、owner 并集授权和真实数据页面证据已完成；但输出槽主备映射、真实 Agent 租约签发/续租、USB 单机约束和物理打印回执仍未完成。 |
 | US-H9-012 Print Agent 注册、状态与设备映射 | H9 | S4 | L1、L2、L3、L4、L5、L6、L7、L8、L9、L10、L11 | ADR-0040 已确认首次激活、专用 listener 白名单、H1 owner-scoped Key 分离、跨 owner 权限/H2 归属、H9 机器幂等、秘密不重显和 pilot 授权；MachineAuthContext、页面、协议、客户端和硬件证据均未实现。 |
 | US-H9-013 多 Agent 分配与故障降级 | H9 | S4 | L1、L2、L3、L4、L5、L6、L7、L8、L9、L10、L11 | 地址/客户/线路优先级、同站点主备及 ADR-0041 在线交接、租约策略、assignment_epoch/lease_token fencing 已确认；分配规则、租约、故障转移、页面和多 Agent S4 证据未实现。 |
 | US-H9-014 Agent 断网对账与本地空间 | H9 | S4 | L1、L2、L3、L4、L5、L6、L7、L8、L9、L10、L11 | 断网、重启、对账、本地缓存和空间阈值已确认；客户端日志、清理、冲突处置、页面和 S4 证据未实现。 |
@@ -302,6 +302,8 @@
 | US-H9-004 预览与浏览器打印 | H9 | S2 | write、frontend_interaction、api_change | L1、L2、L3、L4、L5、L7、L8、L9、L11 | m2-receiving、m2-inspecting | POST /api/v1/print-templates/preview<br>POST /api/v1/print-templates/print | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-H9-005 业务模块接入规则 | H9 | S2 | write、frontend_interaction、api_change | L1、L2、L3、L4、L5、L7、L8、L9、L11 | m2-receiving、m2-inspecting、m4-orders、m1-locations、m3-batches、m1-products | POST /api/v1/print-templates/resolve<br>POST /api/v1/print-templates/preview<br>POST /api/v1/print-templates/print | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-H9-006 随货同行单归集与截单 | H9 | S3 | write、config_rule、api_change、frontend_interaction、critical_path、audit_compliance | L1、L2、L3、L4、L5、L6、L7、L8、L9、L10、L11 | h9-delivery-note-aggregation | GET /api/v1/print-orchestration/delivery-note-candidates<br>GET /api/v1/print-orchestration/delivery-note-groups<br>POST /api/v1/print-orchestration/delivery-note-groups/manual-cutoff<br>GET /api/v1/print-orchestration/route-bindings<br>POST /api/v1/print-orchestration/route-bindings<br>GET /api/v1/print-orchestration/cutoff-plans<br>POST /api/v1/print-orchestration/cutoff-plans<br>POST /api/v1/print-orchestration/cutoff-plans/{plan_id}/publish | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
+| US-H9-007 归集维度规则配置 | H9 | S3 | write、config_rule、api_change、frontend_interaction、audit_compliance | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | h9-delivery-note-aggregation | GET /api/v1/print-orchestration/aggregation-fields<br>GET /api/v1/print-orchestration/aggregation-rules/versions<br>POST /api/v1/print-orchestration/aggregation-rules/versions<br>POST /api/v1/print-orchestration/aggregation-rules/versions/{version_id}/test<br>POST /api/v1/print-orchestration/aggregation-rules/versions/{version_id}/publish<br>POST /api/v1/print-orchestration/aggregation-rules/versions/{version_id}/disable | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
+| US-H9-008 打印组套配置与就绪策略 | H9 | S3 | write、config_rule、api_change、frontend_interaction、critical_path、audit_compliance | L1、L2、L3、L4、L5、L6、L7、L8、L9、L10、L11 | h9-delivery-note-aggregation | GET /api/v1/print-orchestration/print-document-categories<br>GET /api/v1/print-orchestration/print-suites/versions<br>POST /api/v1/print-orchestration/print-suites/versions<br>POST /api/v1/print-orchestration/print-suites/versions/{version_id}/test<br>POST /api/v1/print-orchestration/print-suites/versions/{version_id}/publish<br>POST /api/v1/print-orchestration/print-suites/versions/{version_id}/disable<br>GET /api/v1/print-orchestration/suite-instances | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-M2-008 收货进度看板 | M2 | S1 | read_only、frontend_interaction | L1、L2、L3、L7、L8 | m2-receiving | GET /api/v1/inbound/receiving-dashboard | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:not_applicable<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-M4-001 出库订单管理 | M4 | S2 | write、frontend_interaction、api_change | L1、L2、L3、L4、L5、L7、L8、L9、L11 | m4-orders | GET /api/v1/outbound/orders<br>POST /api/v1/outbound/orders<br>GET /api/v1/outbound/orders/{id} | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-AL-001 告警定义注册 | AL | S3 | read_only、write、api_change、frontend_interaction、config_rule、integration、audit_compliance | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | hal-alert-definitions | GET /api/v1/alert-definitions<br>GET /api/v1/alert-definitions/{id}<br>POST /api/v1/alert-definitions/change-requests<br>PUT /api/v1/quality-liaisons/types/{type_code}<br>POST /api/v1/quality-liaisons/{id}/approval-callback | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |

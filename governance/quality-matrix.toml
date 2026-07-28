@@ -2040,25 +2040,147 @@ governance = "verified"
 required_layers = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"]
 covered_layers = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"]
 
-[[deferred_stories]]
+[[stories]]
 id = "US-H9-007"
 title = "归集维度规则配置"
 module = "H9"
 story_file = "docs/domain/user-stories-h9-print-orchestration.md"
 types = ["write", "config_rule", "api_change", "frontend_interaction", "audit_compliance"]
-reason = "需求和受控字段边界已确认；尚未实现规则版本、样本测试、发布页面、API、数据库和治理检查。"
-owner = "H9 打印能力负责人"
-resume_when = "登记可归集字段白名单并完成配置型页面原型后，实现规则发布、版本快照和地址隔离测试。"
+frontend_pages = ["h9-delivery-note-aggregation"]
+navigation_checks = ["node apps/web-admin/self-checks/h9-delivery-note-aggregation-self-check.mjs"]
+api_paths = [
+  "GET /api/v1/print-orchestration/aggregation-fields",
+  "GET /api/v1/print-orchestration/aggregation-rules/versions",
+  "POST /api/v1/print-orchestration/aggregation-rules/versions",
+  "POST /api/v1/print-orchestration/aggregation-rules/versions/{version_id}/test",
+  "POST /api/v1/print-orchestration/aggregation-rules/versions/{version_id}/publish",
+  "POST /api/v1/print-orchestration/aggregation-rules/versions/{version_id}/disable",
+]
+database_objects = [
+  "h9_aggregation_field_catalog",
+  "h9_aggregation_rule_versions",
+  "h9_delivery_note_groups",
+  "outbound_orders",
+  "audit_event",
+  "idempotency_request",
+]
+e2e_checks = [
+  "node apps/web-admin/self-checks/h9-delivery-note-aggregation-self-check.mjs",
+  "pnpm --dir prototypes exec playwright test --config=playwright-web-admin-m1-real-config.ts e2e/web-admin-h9-delivery-note-aggregation-real.spec.ts",
+  "just web-admin-m1-real-e2e",
+]
+e2e_screenshots = [
+  { page = "h9-delivery-note-aggregation", spec = "prototypes/e2e/web-admin-h9-delivery-note-aggregation-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h9-aggregation-rules/rule-test-preview.png" },
+  { page = "h9-delivery-note-aggregation", spec = "prototypes/e2e/web-admin-h9-delivery-note-aggregation-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h9-aggregation-rules/rule-published.png" },
+]
+test_checks = [
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test h9_aggregation_rule_postgres -- --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test h9_print_orchestration_postgres -- --test-threads=1",
+  "pnpm --dir apps/web-admin run build",
+  "just openapi-check",
+]
+evidence_refs = [
+  "backend/crates/api/src/print_orchestration/aggregation_rule.rs",
+  "backend/crates/api/tests/h9_aggregation_rule_postgres.rs",
+  "prototypes/e2e/web-admin-h9-delivery-note-aggregation-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/h9-aggregation-rules/rule-test-preview.png",
+  "artifacts/screenshot-portal/real-web/h9-aggregation-rules/rule-published.png",
+  "docs/reviews/us-h9-007-acceptance-2026-07-27.md",
+]
 
-[[deferred_stories]]
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+
+[[stories]]
 id = "US-H9-008"
 title = "打印组套配置与就绪策略"
 module = "H9"
 story_file = "docs/domain/user-stories-h9-print-orchestration.md"
 types = ["write", "config_rule", "api_change", "frontend_interaction", "critical_path", "audit_compliance"]
-reason = "组套、地址优先级、M1 print_document_category 来源模式、单据完整性和版本语义已确认；尚未实现页面、API、模型、文件引用和真实数据 E2E。"
-owner = "H9 打印能力负责人"
-resume_when = "完成组套配置原型与字段草案后，实现不可变发布版本、唯一匹配和单据就绪状态机。"
+frontend_pages = ["h9-delivery-note-aggregation"]
+navigation_checks = ["node apps/web-admin/self-checks/h9-delivery-note-aggregation-self-check.mjs"]
+api_paths = [
+  "GET /api/v1/print-orchestration/print-document-categories",
+  "GET /api/v1/print-orchestration/print-suites/versions",
+  "POST /api/v1/print-orchestration/print-suites/versions",
+  "POST /api/v1/print-orchestration/print-suites/versions/{version_id}/test",
+  "POST /api/v1/print-orchestration/print-suites/versions/{version_id}/publish",
+  "POST /api/v1/print-orchestration/print-suites/versions/{version_id}/disable",
+  "GET /api/v1/print-orchestration/suite-instances",
+]
+database_objects = [
+  "h9_print_suite_versions",
+  "h9_print_suite_items",
+  "h9_ingested_document_files",
+  "h9_print_suite_instances",
+  "h9_print_suite_instance_items",
+  "h9_delivery_note_groups",
+  "h9_delivery_note_group_orders",
+  "outbound_orders",
+  "outbound_order_lines",
+  "system_dictionary_items",
+  "audit_event",
+  "idempotency_request",
+]
+e2e_checks = [
+  "node apps/web-admin/self-checks/h9-delivery-note-aggregation-self-check.mjs",
+  "pnpm --dir prototypes exec playwright test --config=playwright-web-admin-m1-real-config.ts e2e/web-admin-h9-delivery-note-aggregation-real.spec.ts",
+  "just web-admin-m1-real-e2e",
+]
+e2e_screenshots = [
+  { page = "h9-delivery-note-aggregation", spec = "prototypes/e2e/web-admin-h9-delivery-note-aggregation-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h9-print-suites/suite-test-readiness.png" },
+  { page = "h9-delivery-note-aggregation", spec = "prototypes/e2e/web-admin-h9-delivery-note-aggregation-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h9-print-suites/suite-published.png" },
+  { page = "h9-delivery-note-aggregation", spec = "prototypes/e2e/web-admin-h9-delivery-note-aggregation-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h9-print-suites/suite-instance.png" },
+]
+test_checks = [
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test h9_print_suite_postgres -- --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test h9_print_orchestration_postgres -- --test-threads=1",
+  "pnpm --dir apps/web-admin run build",
+  "just openapi-check",
+]
+evidence_refs = [
+  "backend/crates/api/src/print_orchestration/print_suite.rs",
+  "backend/crates/api/src/print_orchestration/print_suite_support.rs",
+  "backend/crates/api/tests/h9_print_suite_postgres.rs",
+  "prototypes/e2e/web-admin-h9-delivery-note-aggregation-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/h9-print-suites/suite-test-readiness.png",
+  "artifacts/screenshot-portal/real-web/h9-print-suites/suite-published.png",
+  "artifacts/screenshot-portal/real-web/h9-print-suites/suite-instance.png",
+  "docs/reviews/us-h9-008-acceptance-2026-07-27.md",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"]
 
 [[deferred_stories]]
 id = "US-H9-009"
@@ -2086,9 +2208,68 @@ title = "打印机、纸盒与设备租约"
 module = "H9"
 story_file = "docs/domain/user-stories-h9-print-orchestration.md"
 types = ["write", "config_rule", "api_change", "frontend_interaction", "concurrent_resource", "hardware_runtime", "audit_compliance"]
-reason = "物理打印站点、货主仓映射、纸盒和租约语义已确认；维护页、模型、测试打印、租约并发和真实设备证据未实现。"
+frontend_pages = ["h9-print-devices"]
+navigation_checks = ["node apps/web-admin/self-checks/h9-print-device-slice-self-check.mjs"]
+api_paths = [
+  "GET /api/v1/print-devices/sites",
+  "POST /api/v1/print-devices/sites",
+  "GET /api/v1/print-devices/sites/{site_id}/owner-mappings",
+  "POST /api/v1/print-devices/sites/{site_id}/owner-mappings",
+  "POST /api/v1/print-devices/sites/{site_id}/owner-mappings/{mapping_id}/disable",
+  "GET /api/v1/print-devices/printers",
+  "POST /api/v1/print-devices/printers",
+  "PATCH /api/v1/print-devices/printers/{printer_id}",
+  "GET /api/v1/print-devices/printers/{printer_id}/trays",
+  "POST /api/v1/print-devices/printers/{printer_id}/trays",
+  "PATCH /api/v1/print-devices/printers/{printer_id}/trays/{tray_id}",
+  "POST /api/v1/print-devices/printers/{printer_id}/test-print",
+  "GET /api/v1/print-devices/leases",
+  "POST /api/v1/print-devices/leases/{lease_id}/release",
+]
+database_objects = [
+  "h9_print_sites",
+  "h9_print_site_owner_mappings",
+  "h9_printers",
+  "h9_printer_trays",
+  "h9_device_leases",
+  "h9_printer_test_prints",
+  "system_dictionary_items",
+  "audit_event",
+  "idempotency_request",
+]
+e2e_checks = [
+  "node apps/web-admin/self-checks/h9-print-device-slice-self-check.mjs",
+  "pnpm --dir prototypes exec playwright test --config=playwright-web-admin-m1-real-config.ts e2e/web-admin-h9-print-device-real.spec.ts",
+  "just web-admin-m1-real-e2e",
+]
+e2e_screenshots = [
+  { page = "h9-print-devices", spec = "prototypes/e2e/web-admin-h9-print-device-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h9-print-devices/sites-and-mappings.png" },
+  { page = "h9-print-devices", spec = "prototypes/e2e/web-admin-h9-print-device-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h9-print-devices/printers.png" },
+  { page = "h9-print-devices", spec = "prototypes/e2e/web-admin-h9-print-device-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h9-print-devices/trays.png" },
+  { page = "h9-print-devices", spec = "prototypes/e2e/web-admin-h9-print-device-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h9-print-devices/test-print.png" },
+  { page = "h9-print-devices", spec = "prototypes/e2e/web-admin-h9-print-device-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h9-print-devices/leases-released.png" },
+]
+test_checks = [
+  "cargo test --manifest-path backend/Cargo.toml -p wms-domain print_device",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test h9_print_device_postgres -- --test-threads=1",
+  "pnpm --dir apps/web-admin run build",
+  "just openapi-check",
+]
+evidence_refs = [
+  "backend/crates/api/src/print_device.rs",
+  "backend/crates/api/src/print_device_handlers.rs",
+  "backend/crates/api/tests/h9_print_device_postgres.rs",
+  "prototypes/e2e/web-admin-h9-print-device-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/h9-print-devices/sites-and-mappings.png",
+  "artifacts/screenshot-portal/real-web/h9-print-devices/printers.png",
+  "artifacts/screenshot-portal/real-web/h9-print-devices/trays.png",
+  "artifacts/screenshot-portal/real-web/h9-print-devices/test-print.png",
+  "artifacts/screenshot-portal/real-web/h9-print-devices/leases-released.png",
+  "docs/reviews/us-h9-011-acceptance-2026-07-27.md",
+]
+reason = "站点、货主仓映射、打印机/纸盒、测试打印记录、设备租约、owner 并集授权和真实数据页面证据已完成；但输出槽主备映射、真实 Agent 租约签发/续租、USB 单机约束和物理打印回执仍未完成。"
 owner = "H9 打印能力负责人"
-resume_when = "按 ADR-0040 的站点机器边界设计接口；取得 Windows 打印机和多纸盒测试环境后，实现设备维护、租约和指定纸盒测试打印闭环。"
+resume_when = "完成 US-H9-010/012 的输出槽映射、Agent 租约与设备回执后，在 Windows 打印机和多纸盒环境执行 S4 验收。"
 
 [[deferred_stories]]
 id = "US-H9-012"
