@@ -2,10 +2,9 @@
 
 use axum::{
     extract::{Path, Query, State},
-    http::{HeaderMap, StatusCode},
+    http::{header, HeaderMap, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
-    routing::{get, post},
-    Json, Router,
+    Json,
 };
 use chrono::Utc;
 use serde::Deserialize;
@@ -13,24 +12,37 @@ use sqlx::PgPool;
 use uuid::Uuid;
 use wms_domain::{
     AggregationFieldCatalogResponse, AggregationRuleTestResult, AggregationRuleVersion,
-    AggregationRuleVersionListResponse, CreateAggregationRuleDraftRequest, CreateCutoffPlanRequest,
-    CreatePrintSuiteDraftRequest, CutoffPlan, CutoffPlanListResponse,
-    DeliveryNoteCandidateListResponse, DeliveryNoteGroup, DeliveryNoteGroupListResponse,
-    ErrorResponse, ManualDeliveryNoteCutoffRequest, PrintDocumentCategoryListResponse,
-    PrintSuiteInstanceListResponse, PrintSuiteTestResult, PrintSuiteVersion,
-    PrintSuiteVersionListResponse, PublishRouteBindingRequest, RouteBinding,
-    RouteBindingListResponse, TestAggregationRuleRequest, TestPrintSuiteRequest,
+    AggregationRuleVersionListResponse, CategoryPdfOutputListResponse, CategoryPdfPreparation,
+    CreateAggregationRuleDraftRequest, CreateCutoffPlanRequest, CreatePrintSuiteDraftRequest,
+    CutoffPlan, CutoffPlanListResponse, DeliveryNoteCandidateListResponse, DeliveryNoteGroup,
+    DeliveryNoteGroupListResponse, ErrorResponse, ManualDeliveryNoteCutoffRequest,
+    PrintDocumentCategoryListResponse, PrintSuiteInstanceListResponse, PrintSuiteTestResult,
+    PrintSuiteVersion, PrintSuiteVersionListResponse, PublishRouteBindingRequest, RouteBinding,
+    RouteBindingListResponse, SelectCategoryPdfsRequest, TestAggregationRuleRequest,
+    TestPrintSuiteRequest,
 };
+
+mod category_pdf;
+mod routes;
+use category_pdf::*;
+pub use routes::print_orchestration_router;
 
 use crate::{
     auth::{AuthContext, AuthError},
     document_numbering::DocumentNumberingError,
-    print_orchestration::{PrintOrchestrationError, PrintOrchestrationService},
+    file_attachment::FileAttachmentService,
+    print_orchestration::{
+        CategoryPdfRenderer, PrintOrchestrationError, PrintOrchestrationService,
+    },
 };
 
 const IDEMPOTENCY_KEY_HEADER: &str = "idempotency-key";
 const READ_PERMISSION: &str = "h9.print_orchestration.read";
 const WRITE_PERMISSION: &str = "h9.print_orchestration.write";
+const PDF_READ_PERMISSION: &str = "h9.print_pdf.read";
+const PDF_PREPARE_PERMISSION: &str = "h9.print_pdf.prepare";
+const PDF_DOWNLOAD_PERMISSION: &str = "h9.print_pdf.download";
+const PDF_EMERGENCY_PERMISSION: &str = "h9.print_pdf.emergency_print";
 
 /// H9 print orchestration HTTP state.
 #[derive(Clone, Debug)]
@@ -58,8 +70,32 @@ struct SuiteInstanceFilter {
 impl PrintOrchestrationAppState {
     /// Builds the H9 print orchestration HTTP state.
     pub fn with_postgres(pool: PgPool) -> Self {
+        let h_file = if std::env::var("WMS_E2E_SEED").as_deref() == Ok("1") {
+            FileAttachmentService::with_memory(pool.clone())
+        } else {
+            FileAttachmentService::from_env(pool.clone())
+                .unwrap_or_else(|_| FileAttachmentService::disabled(pool.clone()))
+        };
+        Self::with_pdf_dependencies(pool, h_file, CategoryPdfRenderer::from_env())
+    }
+
+    /// Builds H9 handler tests with memory H-FILE and a deterministic renderer.
+    pub fn with_file_attachment_for_tests(pool: PgPool, h_file: FileAttachmentService) -> Self {
+        Self::with_pdf_dependencies(pool, h_file, CategoryPdfRenderer::deterministic_for_tests())
+    }
+
+    /// Builds H9 handlers with explicit file and browser-renderer dependencies.
+    pub fn with_pdf_dependencies(
+        pool: PgPool,
+        h_file: FileAttachmentService,
+        category_pdf_renderer: CategoryPdfRenderer,
+    ) -> Self {
         Self {
-            service: PrintOrchestrationService::with_postgres(pool),
+            service: PrintOrchestrationService::with_pdf_dependencies(
+                pool,
+                h_file,
+                category_pdf_renderer,
+            ),
         }
     }
 }
@@ -160,6 +196,16 @@ impl IntoResponse for PrintOrchestrationHandlerError {
                 "H9_PRINT_SUITE_BINDING_INVALID",
                 "打印项绑定非法：rendered 需已发布模板版本，external_file 需稳定文件引用",
             ),
+            Self::Orchestration(PrintOrchestrationError::CategoryPdfNotFound) => (
+                StatusCode::NOT_FOUND,
+                "H9_CATEGORY_PDF_NOT_FOUND",
+                "分类 PDF 或准备记录不存在",
+            ),
+            Self::Orchestration(PrintOrchestrationError::CategoryPdfDocumentsNotReady) => (
+                StatusCode::CONFLICT,
+                "H9_CATEGORY_PDF_DOCUMENTS_NOT_READY",
+                "源单据尚未全部就绪，不能生成分类 PDF",
+            ),
             Self::Orchestration(PrintOrchestrationError::DeliveryNoteGroupNotFound) => (
                 StatusCode::NOT_FOUND,
                 "H9_DELIVERY_NOTE_GROUP_NOT_FOUND",
@@ -189,6 +235,16 @@ impl IntoResponse for PrintOrchestrationHandlerError {
                 "H9_DELIVERY_NOTE_CATEGORY_INVALID",
                 "随货同行单分类未启用",
             ),
+            Self::Orchestration(PrintOrchestrationError::FileAttachment(_)) => (
+                StatusCode::BAD_GATEWAY,
+                "H9_CATEGORY_PDF_STORAGE_FAILED",
+                "分类 PDF 存储或校验失败",
+            ),
+            Self::Orchestration(PrintOrchestrationError::RenderWorker(_)) => (
+                StatusCode::BAD_GATEWAY,
+                "H9_CATEGORY_PDF_RENDER_FAILED",
+                "分类 PDF 浏览器渲染失败",
+            ),
             Self::Orchestration(PrintOrchestrationError::DocumentNumbering(_))
             | Self::Orchestration(PrintOrchestrationError::Audit(_))
             | Self::Orchestration(PrintOrchestrationError::Database(_))
@@ -211,80 +267,6 @@ impl IntoResponse for PrintOrchestrationHandlerError {
         )
             .into_response()
     }
-}
-
-/// Builds the H9 print orchestration routes.
-pub fn print_orchestration_router(state: PrintOrchestrationAppState) -> Router {
-    Router::new()
-        .route(
-            "/api/v1/print-orchestration/delivery-note-candidates",
-            get(list_delivery_note_candidates_handler),
-        )
-        .route(
-            "/api/v1/print-orchestration/delivery-note-groups",
-            get(list_delivery_note_groups_handler),
-        )
-        .route(
-            "/api/v1/print-orchestration/delivery-note-groups/manual-cutoff",
-            post(manual_delivery_note_cutoff_handler),
-        )
-        .route(
-            "/api/v1/print-orchestration/route-bindings",
-            get(list_route_bindings_handler).post(publish_route_binding_handler),
-        )
-        .route(
-            "/api/v1/print-orchestration/cutoff-plans",
-            get(list_cutoff_plans_handler).post(create_cutoff_plan_handler),
-        )
-        .route(
-            "/api/v1/print-orchestration/cutoff-plans/:plan_id/publish",
-            post(publish_cutoff_plan_handler),
-        )
-        .route(
-            "/api/v1/print-orchestration/aggregation-fields",
-            get(list_aggregation_fields_handler),
-        )
-        .route(
-            "/api/v1/print-orchestration/aggregation-rules/versions",
-            get(list_aggregation_rules_handler).post(create_aggregation_rule_draft_handler),
-        )
-        .route(
-            "/api/v1/print-orchestration/aggregation-rules/versions/:version_id/test",
-            post(test_aggregation_rule_handler),
-        )
-        .route(
-            "/api/v1/print-orchestration/aggregation-rules/versions/:version_id/publish",
-            post(publish_aggregation_rule_handler),
-        )
-        .route(
-            "/api/v1/print-orchestration/aggregation-rules/versions/:version_id/disable",
-            post(disable_aggregation_rule_handler),
-        )
-        .route(
-            "/api/v1/print-orchestration/print-document-categories",
-            get(list_print_document_categories_handler),
-        )
-        .route(
-            "/api/v1/print-orchestration/print-suites/versions",
-            get(list_print_suites_handler).post(create_print_suite_draft_handler),
-        )
-        .route(
-            "/api/v1/print-orchestration/print-suites/versions/:version_id/test",
-            post(test_print_suite_handler),
-        )
-        .route(
-            "/api/v1/print-orchestration/print-suites/versions/:version_id/publish",
-            post(publish_print_suite_handler),
-        )
-        .route(
-            "/api/v1/print-orchestration/print-suites/versions/:version_id/disable",
-            post(disable_print_suite_handler),
-        )
-        .route(
-            "/api/v1/print-orchestration/suite-instances",
-            get(list_print_suite_instances_handler),
-        )
-        .with_state(state)
 }
 
 async fn list_delivery_note_candidates_handler(
@@ -617,3 +599,6 @@ fn idempotency_key_from_headers(
         .filter(|value| !value.is_empty())
         .ok_or(PrintOrchestrationHandlerError::MissingIdempotencyKey)
 }
+
+#[cfg(test)]
+mod tests;
