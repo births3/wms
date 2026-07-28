@@ -39,29 +39,29 @@ pub use wms_domain::{
     CreateH4ApprovalRequest, CreateH8ErpConnectorRequest, CreateLocationRequest,
     CreateMaintenanceRecordRequest, CreateOutboundOrderLineRequest, CreateOutboundOrderRequest,
     CreateOutboundWaveRequest, CreatePackJobRequest, CreatePackingStationRequest,
-    CreateProductRequest, CreateReceivingOrderRequest, CreateRetailReplenishmentSuggestionRequest,
-    CreateSpecialDrugCategoryRequest, CreateSupplierRequest, CreateWarehouseRequest,
-    CreateWarehouseZoneRequest, CrossdockPlan, CurrentUser, Customer, CustomerAddress,
-    CustomerAddressListResponse, CustomerListResponse, CustomerProfile, CustomerQualification,
-    DisableSystemDictionaryItemRequest, DisposeTemperatureExcursionRequest,
-    DocumentNumberAllocation, DocumentNumberAllocationListResponse, DriverTask,
-    DriverTaskListResponse, DualPersonPolicy, DualPersonPolicyResponse, DualPersonPolicyRule,
-    DualPersonPolicyRuleListQuery, DualPersonPolicyRuleListResponse, DualPersonPolicyScope,
-    ErrorResponse, EventDelivery, EventDeliveryListResponse, EventDeliveryNackRequest,
-    ExpireInventoryBatchesRequest, ExpressCarrier, ExpressCarrierListResponse, ExpressRoutingRule,
-    ExpressRoutingRuleListResponse, ExpressTrackingEvent, ExpressTrackingResponse, ExpressWaybill,
-    FeatureFlagArchiveRequest, FeatureFlagArchiveResult, FeatureFlagBatchImportRequest,
-    FeatureFlagBatchImportResult, FeatureFlagConfig, FeatureFlagExportResponse,
-    FeatureFlagMigrationResult, FeatureFlagReconcileReport, FeatureFlagSourceSwitchRequest,
-    FeatureFlagSourceSwitchResponse, ForceCloseShortageRequest, GenerateBillingStatementRequest,
-    GspLedgerReport, GspLedgerRow, H4ApprovalCallbackRequest, H4ApprovalRecord,
-    H4NotificationConfig, H4NotificationConfigListResponse, H4NotificationRecord,
-    H4NotificationRecordListResponse, H4WechatSettings, H4WechatSettingsResponse,
-    H4WechatSettingsTestResponse, H8ErpConnector, H8ErpConnectorListResponse,
-    H8ErpConnectorTestResult, H8ErpInterfaceTableDetail, H8ErpInterfaceTableField,
-    H8ErpInterfaceTableListResponse, H8ErpInterfaceTableQuery, H8ErpInterfaceTableRow,
-    H8ErpMessage, H8ErpMessageAttempt, H8ErpMessageDetail, H8ErpMessageListResponse,
-    H8ErpMessageStats, HandleInventoryAlertRequest, HealthzResponse,
+    CreateProductRequest, CreatePurchaseReturnRequest, CreateReceivingOrderRequest,
+    CreateRetailReplenishmentSuggestionRequest, CreateSpecialDrugCategoryRequest,
+    CreateSupplierRequest, CreateWarehouseRequest, CreateWarehouseZoneRequest, CrossdockPlan,
+    CurrentUser, Customer, CustomerAddress, CustomerAddressListResponse, CustomerListResponse,
+    CustomerProfile, CustomerQualification, DisableSystemDictionaryItemRequest,
+    DisposeTemperatureExcursionRequest, DocumentNumberAllocation,
+    DocumentNumberAllocationListResponse, DriverTask, DriverTaskListResponse, DualPersonPolicy,
+    DualPersonPolicyResponse, DualPersonPolicyRule, DualPersonPolicyRuleListQuery,
+    DualPersonPolicyRuleListResponse, DualPersonPolicyScope, ErrorResponse, EventDelivery,
+    EventDeliveryListResponse, EventDeliveryNackRequest, ExpireInventoryBatchesRequest,
+    ExpressCarrier, ExpressCarrierListResponse, ExpressRoutingRule, ExpressRoutingRuleListResponse,
+    ExpressTrackingEvent, ExpressTrackingResponse, ExpressWaybill, FeatureFlagArchiveRequest,
+    FeatureFlagArchiveResult, FeatureFlagBatchImportRequest, FeatureFlagBatchImportResult,
+    FeatureFlagConfig, FeatureFlagExportResponse, FeatureFlagMigrationResult,
+    FeatureFlagReconcileReport, FeatureFlagSourceSwitchRequest, FeatureFlagSourceSwitchResponse,
+    ForceCloseShortageRequest, GenerateBillingStatementRequest, GspLedgerReport, GspLedgerRow,
+    H4ApprovalCallbackRequest, H4ApprovalRecord, H4NotificationConfig,
+    H4NotificationConfigListResponse, H4NotificationRecord, H4NotificationRecordListResponse,
+    H4WechatSettings, H4WechatSettingsResponse, H4WechatSettingsTestResponse, H8ErpConnector,
+    H8ErpConnectorListResponse, H8ErpConnectorTestResult, H8ErpInterfaceTableDetail,
+    H8ErpInterfaceTableField, H8ErpInterfaceTableListResponse, H8ErpInterfaceTableQuery,
+    H8ErpInterfaceTableRow, H8ErpMessage, H8ErpMessageAttempt, H8ErpMessageDetail,
+    H8ErpMessageListResponse, H8ErpMessageStats, HandleInventoryAlertRequest, HealthzResponse,
     IngestTemperatureExcursionRequest, IngestTemperatureReadingRequest,
     IngestTransitTemperatureRequest, InspectReceivingOrderRequest, InspectionSignatureRecord,
     InventoryAbcClassification, InventoryAbcListResponse, InventoryAbcQuery, InventoryAlertEvent,
@@ -76,14 +76,15 @@ pub use wms_domain::{
     OverrideInventoryAbcRequest, PackJob, PackingStation, PageMeta, ParameterMappingStatus,
     PasswordChangeRequest, PlanBusinessArchiveJobRequest, PrintWaybillRequest, Product,
     ProductListResponse, ProductMappingTrace, ProductMappingTraceInput, ProductPackagingLevel,
-    ProductPackagingLevelInput, PublishAdminMenuRequest, PurgeH8ErpMessagesRequest,
-    PurgeH8ErpMessagesResponse, PutawayInventoryRequest, PutawayLocationRecommendation,
-    PutawayRecommendationQuery, PutawayRecommendationResponse, PutawayRecord, PutawayRequest,
-    PutawayStrategyProfile, PutawayStrategyProfileListResponse, ReceiveReceivingOrderRequest,
-    ReceiveTmsDispatchRequest, ReceivingDashboardQuery, ReceivingDashboardResponse,
-    ReceivingDashboardRow, ReceivingInspectionRecord, ReceivingOrder, ReceivingOrderLine,
-    ReceivingOrderListResponse, ReceivingOrderPrintData, ReceivingOrderReceipt,
-    ReceivingReceiptDetails, RecomputeInventoryAbcRequest, RejectReceivingOrderRequest,
+    ProductPackagingLevelInput, PublishAdminMenuRequest, PurchaseReturnOrder,
+    PurchaseReturnOrderListResponse, PurgeH8ErpMessagesRequest, PurgeH8ErpMessagesResponse,
+    PutawayInventoryRequest, PutawayLocationRecommendation, PutawayRecommendationQuery,
+    PutawayRecommendationResponse, PutawayRecord, PutawayRequest, PutawayStrategyProfile,
+    PutawayStrategyProfileListResponse, ReceiveReceivingOrderRequest, ReceiveTmsDispatchRequest,
+    ReceivingDashboardQuery, ReceivingDashboardResponse, ReceivingDashboardRow,
+    ReceivingInspectionRecord, ReceivingOrder, ReceivingOrderLine, ReceivingOrderListResponse,
+    ReceivingOrderPrintData, ReceivingOrderReceipt, ReceivingReceiptDetails,
+    RecomputeInventoryAbcRequest, RejectPurchaseReturnRequest, RejectReceivingOrderRequest,
     RelocateInventoryRequest, ReplayH8ErpMessageRequest, ReportQueryRequest, ReportQueryResponse,
     ReportRow, ResilienceStatus, ResolveDualPersonPolicyQuery, RetailReplenishmentSuggestion,
     ReviewOutboundOrderLineRequest, ReviewOutboundOrderRequest, RollbackAdminMenuRequest,
@@ -108,6 +109,17 @@ pub use wms_domain::{
     WarehouseListResponse, WarehouseZone, WarehouseZoneListResponse, WeighPackJobRequest,
 };
 pub use wms_domain::{
+    AggregationDimension, AggregationFieldCatalogResponse, AggregationFieldCode,
+    AggregationFieldDefinition, AggregationGroupKeyItem, AggregationMethod,
+    AggregationRuleTestGroup, AggregationRuleTestResult, AggregationRuleVersion,
+    AggregationRuleVersionListResponse, CreateAggregationRuleDraftRequest, CreateCutoffPlanRequest,
+    CutoffDateException, CutoffPlan, CutoffPlanListResponse, CutoffPlanScope,
+    DeliveryNoteCandidate, DeliveryNoteCandidateListResponse, DeliveryNoteGroup,
+    DeliveryNoteGroupListItem, DeliveryNoteGroupListResponse, ManualDeliveryNoteCutoffRequest,
+    PublishRouteBindingRequest, RouteBinding, RouteBindingListResponse, TestAggregationRuleRequest,
+    WeeklyCutoffSlot,
+};
+pub use wms_domain::{
     AlertActionRequest, AlertChangeEvent, AlertChangeListResponse, AlertEscalationLevelDraft,
     AlertEscalationRule, AlertEscalationRuleListResponse, AlertExportJob, AlertInstance,
     AlertInstanceListQuery, AlertInstanceListResponse, AlertMonthlyMetric, AlertRankingItem,
@@ -129,10 +141,16 @@ pub use wms_domain::{
     UpsertQualityLiaisonTypeRequest,
 };
 pub use wms_domain::{
-    CreateCutoffPlanRequest, CutoffDateException, CutoffPlan, CutoffPlanListResponse,
-    CutoffPlanScope, DeliveryNoteCandidate, DeliveryNoteCandidateListResponse, DeliveryNoteGroup,
-    DeliveryNoteGroupListItem, DeliveryNoteGroupListResponse, ManualDeliveryNoteCutoffRequest,
-    PublishRouteBindingRequest, RouteBinding, RouteBindingListResponse, WeeklyCutoffSlot,
+    CreatePrintSiteRequest, CreatePrinterRequest, CreatePrinterTrayRequest,
+    CreateSiteOwnerMappingRequest, DeviceLease, DeviceLeaseListResponse, PrintSite,
+    PrintSiteListResponse, PrintSiteOwnerMapping, PrintSiteOwnerMappingListResponse, Printer,
+    PrinterListResponse, PrinterTestPrint, PrinterTray, PrinterTrayListResponse,
+    ReleaseDeviceLeaseRequest, TestPrintRequest, UpdatePrinterRequest, UpdatePrinterTrayRequest,
+};
+pub use wms_domain::{
+    CreatePrintSuiteDraftRequest, PrintDocumentCategoryListResponse,
+    PrintSuiteInstanceListResponse, PrintSuiteTestResult, PrintSuiteVersion,
+    PrintSuiteVersionListResponse, TestPrintSuiteRequest,
 };
 pub use wms_domain::{
     CreateStockLossOrderRequest, CreateStockSurplusOrderRequest, ExecuteStockLossOrderRequest,
@@ -191,6 +209,8 @@ mod extensions;
 mod h8_erp;
 mod inventory_count;
 mod maintenance;
+mod outbound;
+mod print_device;
 mod print_orchestration;
 mod quality_liaison;
 mod reconciliation;
@@ -211,6 +231,8 @@ pub(crate) use extensions::*;
 pub(crate) use h8_erp::*;
 pub(crate) use inventory_count::*;
 pub(crate) use maintenance::*;
+pub(crate) use outbound::*;
+pub(crate) use print_device::*;
 pub(crate) use print_orchestration::*;
 pub(crate) use quality_liaison::*;
 pub(crate) use reconciliation::*;
