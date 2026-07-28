@@ -81,6 +81,33 @@ pub fn process_image(
     }
 }
 
+/// 启发式检测 PDF 是否含数字签名字典标记。
+/// 用于客户平台提示“分发副本可能使原签名失效”，**不**验证证书链或签名有效性。
+pub fn pdf_has_digital_signature_markers(bytes: &[u8]) -> bool {
+    if bytes.len() < 8 || !bytes.starts_with(b"%PDF") {
+        return false;
+    }
+    // 常见签名字典 / SubFilter 标记；允许空格变体。
+    const MARKERS: &[&[u8]] = &[
+        b"/Type/Sig",
+        b"/Type /Sig",
+        b"/Type\n/Sig",
+        b"/SubFilter/adbe.pkcs7",
+        b"/SubFilter /adbe.pkcs7",
+        b"/SubFilter/ETSI.CAdES",
+        b"/SubFilter /ETSI.CAdES",
+        b"/ByteRange[",
+        b"/ByteRange [",
+    ];
+    MARKERS.iter().any(|marker| find_bytes(bytes, marker))
+}
+
+fn find_bytes(haystack: &[u8], needle: &[u8]) -> bool {
+    haystack
+        .windows(needle.len())
+        .any(|window| window == needle)
+}
+
 pub fn generate_customer_pdf(
     original_bytes: &[u8],
     original_content_type: &str,
@@ -277,6 +304,16 @@ mod tests {
     fn png(width: u32, height: u32, alpha: u8) -> Vec<u8> {
         let image = ImageBuffer::from_pixel(width, height, Rgba([220, 20, 60, alpha]));
         encode_preview_png(&DynamicImage::ImageRgba8(image)).expect("PNG should encode")
+    }
+
+    #[test]
+    fn detects_pdf_digital_signature_dictionary_markers() {
+        assert!(!pdf_has_digital_signature_markers(b"not-a-pdf"));
+        assert!(!pdf_has_digital_signature_markers(b"%PDF-1.4\n1 0 obj<<>>"));
+        let signed = b"%PDF-1.7\n1 0 obj<</Type /Sig /Filter /Adobe.PPKLite /SubFilter /adbe.pkcs7.detached /ByteRange [0 100 200 50]>>";
+        assert!(pdf_has_digital_signature_markers(signed));
+        let compact = b"%PDF-1.4\n/Type/Sig/ByteRange[0 1 2 3]";
+        assert!(pdf_has_digital_signature_markers(compact));
     }
 
     #[test]

@@ -48,6 +48,8 @@ CREATE TABLE IF NOT EXISTS drug_inspection_report_versions (
     ),
     customer_copy_file_id UUID REFERENCES attachments(id),
     customer_copy_hash    TEXT,
+    -- 权威原件为 PDF 且含数字签名字典标记时为 true；供客户平台提示，不验证证书。
+    digitally_signed_original BOOLEAN NOT NULL DEFAULT FALSE,
     stamp_version_id      UUID,
     created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at            TIMESTAMPTZ NOT NULL DEFAULT now(),

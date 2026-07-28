@@ -322,6 +322,26 @@ impl DrugInspectionCopyService {
             .await
             .map_err(|error| DrugInspectionCopyServiceError::Storage(error.to_string()))?;
         let content_type = source.original_content_type.clone();
+        let digitally_signed_original = content_type == "application/pdf"
+            && crate::drug_inspection_copy_processor::pdf_has_digital_signature_markers(&original);
+        // 在副本生成前写入签名标记，失败任务也能投影出客户提示。
+        {
+            let now = Utc::now();
+            sqlx::query(
+                r#"
+                UPDATE drug_inspection_report_versions
+                   SET digitally_signed_original = $3, updated_at = $4
+                 WHERE owner_id = $1 AND id = $2
+                "#,
+            )
+            .bind(source.owner_id)
+            .bind(source.report_version_id)
+            .bind(digitally_signed_original)
+            .bind(now)
+            .execute(&self.pool)
+            .await
+            .map_err(map_db_error)?;
+        }
         let processing_mode = source.processing_mode.clone();
         let placement = StampPlacement {
             relative_x: source.relative_x.unwrap_or(0.7),

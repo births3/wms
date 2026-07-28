@@ -27,6 +27,7 @@ pub(crate) async fn publish_report_projection_from_db(
         Option<String>,
         Option<i64>,
         Option<String>,
+        bool,
         DateTime<Utc>,
     );
     let row: Option<ProjectionRow> = sqlx::query_as(
@@ -37,6 +38,7 @@ pub(crate) async fn publish_report_projection_from_db(
                version.modification_reason, version.customer_copy_status,
                attachment.storage_key, attachment.file_name, attachment.size_bytes,
                version.customer_copy_hash,
+               version.digitally_signed_original,
                COALESCE(version.reviewed_at, version.updated_at)
           FROM drug_inspection_report_versions version
           JOIN drug_inspection_reports report
@@ -66,14 +68,16 @@ pub(crate) async fn publish_report_projection_from_db(
         file_name,
         size_bytes,
         copy_hash,
+        digitally_signed_original,
         confirmed_at,
     )) = row
     else {
         return Ok(());
     };
     let event_key = format!(
-        "portal-report:{version_id}:{copy_status}:{}",
-        copy_hash.as_deref().unwrap_or("none")
+        "portal-report:{version_id}:{copy_status}:{}:sig={}",
+        copy_hash.as_deref().unwrap_or("none"),
+        digitally_signed_original
     );
     let portal_copy_status = match copy_status.as_str() {
         "not_requested" | "queued" => "queued",
@@ -98,7 +102,7 @@ pub(crate) async fn publish_report_projection_from_db(
         "customer_copy_file_name": file_name,
         "customer_copy_size": size_bytes,
         "customer_copy_hash": copy_hash,
-        "digitally_signed_original": false,
+        "digitally_signed_original": digitally_signed_original,
         "confirmed_at": confirmed_at,
         "updated_at": now
     });
