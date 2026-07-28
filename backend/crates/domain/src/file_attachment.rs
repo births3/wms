@@ -74,6 +74,7 @@ pub struct DrugInspectionImagePreviewResponse {
 pub enum FileAttachmentValidationError {
     FieldRequired(&'static str),
     FieldTooLong(&'static str),
+    FieldInvalidCharacters(&'static str),
     UnsupportedContentType,
     InvalidSize,
     MdiImageTooLarge,
@@ -82,8 +83,8 @@ pub enum FileAttachmentValidationError {
 
 impl CreateFileUploadRequest {
     pub fn validate(&self) -> Result<(), FileAttachmentValidationError> {
-        validate_text(&self.module, "module", 32)?;
-        validate_text(&self.entity_type, "entity_type", 64)?;
+        validate_identifier(&self.module, "module", 32)?;
+        validate_identifier(&self.entity_type, "entity_type", 64)?;
         validate_text(&self.file_name, "file_name", 255)?;
         if !H_FILE_CONTENT_TYPES.contains(&self.content_type.trim()) {
             return Err(FileAttachmentValidationError::UnsupportedContentType);
@@ -105,6 +106,24 @@ impl CreateFileUploadRequest {
         }
         Ok(())
     }
+}
+
+/// module / entity_type 会参与存储路径拼接，只允许字母数字、连字符与下划线，
+/// 从源头排除 `..`、分隔符等路径穿越字符。
+fn validate_identifier(
+    value: &str,
+    field: &'static str,
+    max_chars: usize,
+) -> Result<(), FileAttachmentValidationError> {
+    validate_text(value, field, max_chars)?;
+    if !value
+        .trim()
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    {
+        return Err(FileAttachmentValidationError::FieldInvalidCharacters(field));
+    }
+    Ok(())
 }
 
 fn validate_text(
@@ -164,6 +183,35 @@ mod tests {
             request("application/pdf", 0).validate(),
             Err(FileAttachmentValidationError::InvalidSize)
         );
+    }
+
+    #[test]
+    fn rejects_path_traversal_characters_in_module_and_entity_type() {
+        let mut value = request("application/pdf", 1);
+        value.module = "../../../../etc/cron.d".to_string();
+        assert_eq!(
+            value.validate(),
+            Err(FileAttachmentValidationError::FieldInvalidCharacters(
+                "module"
+            ))
+        );
+        let mut value = request("application/pdf", 1);
+        value.module = "M2/..".to_string();
+        assert_eq!(
+            value.validate(),
+            Err(FileAttachmentValidationError::FieldInvalidCharacters(
+                "module"
+            ))
+        );
+        let mut value = request("application/pdf", 1);
+        value.entity_type = "a b".to_string();
+        assert_eq!(
+            value.validate(),
+            Err(FileAttachmentValidationError::FieldInvalidCharacters(
+                "entity_type"
+            ))
+        );
+        assert!(request("application/pdf", 1).validate().is_ok());
     }
 
     #[test]

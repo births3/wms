@@ -140,9 +140,15 @@ pub async fn serve_download(
     .ok_or(PortalError::NotFound)?;
     let storage_key: String = row.try_get("storage_key")?;
     let path = resolve_storage_key(&state.storage_root, &storage_key)?;
-    let bytes = tokio::fs::read(path)
+    // 导出 ZIP 最大 2GB，必须流式回传，禁止整读进内存。
+    let file = tokio::fs::File::open(path)
         .await
         .map_err(|error| PortalError::Internal(format!("下载文件读取失败：{error}")))?;
+    let content_length = file
+        .metadata()
+        .await
+        .map_err(|error| PortalError::Internal(format!("下载文件读取失败：{error}")))?
+        .len();
     let file_name: String = row.try_get("file_name")?;
     let resource_type: String = row.try_get("resource_type")?;
     let resource_id: Uuid = row.try_get("resource_id")?;
@@ -162,7 +168,17 @@ pub async fn serve_download(
         serde_json::json!({}),
     )
     .await?;
-    let mut response = Response::new(Body::from(bytes));
+    let mut response = Response::new(Body::from_stream(tokio_util::io::ReaderStream::new(file)));
+    response
+        .headers_mut()
+        .insert(header::CONTENT_LENGTH, HeaderValue::from(content_length));
+    response.headers_mut().insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
+    response
+        .headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     response.headers_mut().insert(
         header::CONTENT_TYPE,
         HeaderValue::from_static(if resource_type == "export" {

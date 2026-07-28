@@ -120,7 +120,7 @@ async fn upload_content(
             _ => {}
         }
     }
-    let path = state.storage_root.join(&target.storage_key);
+    let path = resolve_storage_path(&state.storage_root, &target.storage_key)?;
     let parent = path
         .parent()
         .ok_or(FileAttachmentHandlerError::StorageFailed)?;
@@ -191,9 +191,12 @@ async fn create_drug_inspection_image_preview(
         .repository
         .drug_inspection_image_target(ctx.owner_id, request.attachment_id)
         .await?;
-    let bytes = tokio::fs::read(state.storage_root.join(target.storage_key))
-        .await
-        .map_err(|_| FileAttachmentHandlerError::StorageFailed)?;
+    let bytes = tokio::fs::read(resolve_storage_path(
+        &state.storage_root,
+        &target.storage_key,
+    )?)
+    .await
+    .map_err(|_| FileAttachmentHandlerError::StorageFailed)?;
     let content_type = target.content_type;
     let processing_mode = request.processing_mode;
     let (bytes, width, height) = tokio::task::spawn_blocking(move || {
@@ -225,9 +228,17 @@ async fn download_content(
         .repository
         .authorize_download(attachment_id, query.download_id, &query.token)
         .await?;
-    let bytes = tokio::fs::read(state.storage_root.join(target.storage_key))
+    let file = tokio::fs::File::open(resolve_storage_path(
+        &state.storage_root,
+        &target.storage_key,
+    )?)
+    .await
+    .map_err(|_| FileAttachmentHandlerError::StorageFailed)?;
+    let content_length = file
+        .metadata()
         .await
-        .map_err(|_| FileAttachmentHandlerError::StorageFailed)?;
+        .map_err(|_| FileAttachmentHandlerError::StorageFailed)?
+        .len();
     let content_type = HeaderValue::from_str(&target.content_type)
         .map_err(|_| FileAttachmentHandlerError::StorageFailed)?;
     let file_name = target
@@ -248,8 +259,14 @@ async fn download_content(
         [
             (header::CONTENT_TYPE, content_type),
             (header::CONTENT_DISPOSITION, disposition),
+            (header::CONTENT_LENGTH, HeaderValue::from(content_length)),
+            (
+                header::X_CONTENT_TYPE_OPTIONS,
+                HeaderValue::from_static("nosniff"),
+            ),
+            (header::CACHE_CONTROL, HeaderValue::from_static("no-store")),
         ],
-        bytes,
+        axum::body::Body::from_stream(tokio_util::io::ReaderStream::new(file)),
     )
         .into_response())
 }
@@ -262,6 +279,22 @@ fn idempotency_key(headers: &HeaderMap) -> Result<String, FileAttachmentHandlerE
         .filter(|value| !value.is_empty() && value.len() <= 200)
         .map(str::to_string)
         .ok_or(FileAttachmentHandlerError::IdempotencyRequired)
+}
+
+/// 拒绝绝对路径与任何非普通分量（`..`、`.`、盘符等），storage_key 只能落在存储根内。
+fn resolve_storage_path(
+    root: &std::path::Path,
+    storage_key: &str,
+) -> Result<std::path::PathBuf, FileAttachmentHandlerError> {
+    let relative = std::path::Path::new(storage_key);
+    if relative.as_os_str().is_empty()
+        || relative
+            .components()
+            .any(|component| !matches!(component, std::path::Component::Normal(_)))
+    {
+        return Err(FileAttachmentHandlerError::StorageFailed);
+    }
+    Ok(root.join(relative))
 }
 
 fn header_value(
@@ -403,6 +436,11 @@ fn validation_error(
             StatusCode::UNPROCESSABLE_ENTITY,
             "H_FILE_FIELD_TOO_LONG",
             "附件元数据字段超长",
+        ),
+        FileAttachmentValidationError::FieldInvalidCharacters(_) => (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "H_FILE_FIELD_INVALID_CHARACTERS",
+            "附件模块与实体类型只允许字母数字、连字符与下划线",
         ),
         FileAttachmentValidationError::UnsupportedContentType => (
             StatusCode::UNPROCESSABLE_ENTITY,

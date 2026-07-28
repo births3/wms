@@ -32,6 +32,7 @@ struct ManifestRow {
     file_name: Option<String>,
     storage_key: Option<String>,
     status: String,
+    copy_available: bool,
 }
 
 pub async fn create_export(
@@ -290,7 +291,9 @@ async fn build_export(
             row.storage_key.as_deref(),
             row.file_name.as_deref(),
         ) {
-            (Some(report_id), Some(storage_key), Some(file_name)) => {
+            // 与单份下载同口径：只有 customer_copy_status = 'available' 的副本才允许进包，
+            // 防止"生成失败/处理中"版本残留的旧附件被批量导出带出。
+            (Some(report_id), Some(storage_key), Some(file_name)) if row.copy_available => {
                 let path = resolve_storage_key(&state.storage_root, storage_key)?;
                 if path.is_file() {
                     let size = std::fs::metadata(&path)
@@ -325,10 +328,15 @@ async fn build_export(
             .map_err(|error| PortalError::Internal(error.to_string()))?;
     }
     let file_name = format!("药检单导出-{job_id}.zip");
-    let target_for_task = target.clone();
-    tokio::task::spawn_blocking(move || write_zip(&target_for_task, &rows, unique_files))
+    // 先写 .part 再原子改名，任务中途失败不会留下半截 ZIP。
+    let part_path = target.with_extension("zip.part");
+    let part_for_task = part_path.clone();
+    tokio::task::spawn_blocking(move || write_zip(&part_for_task, &rows, unique_files))
         .await
         .map_err(|error| PortalError::Internal(error.to_string()))??;
+    tokio::fs::rename(&part_path, &target)
+        .await
+        .map_err(|error| PortalError::Internal(error.to_string()))?;
     Ok((
         storage_key,
         file_name,
@@ -358,6 +366,7 @@ async fn fetch_manifest_rows(
                 r.id AS report_version_id, r.version_number,
                 r.customer_copy_file_name AS file_name,
                 r.customer_copy_storage_key AS storage_key,
+                COALESCE(r.customer_copy_status = 'available', FALSE) AS copy_available,
                 CASE
                     WHEN r.id IS NULL THEN '资料暂缺'
                     WHEN r.customer_copy_status = 'available' THEN '可下载'
@@ -409,6 +418,7 @@ async fn fetch_manifest_rows(
                 file_name,
                 storage_key: row.try_get("storage_key")?,
                 status: row.try_get("status")?,
+                copy_available: row.try_get("copy_available")?,
             })
         })
         .collect::<Result<Vec<_>, sqlx::Error>>()
