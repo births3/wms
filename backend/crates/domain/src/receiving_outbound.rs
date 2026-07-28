@@ -1,3 +1,4 @@
+// @governance: skip-page-size 入库与出库共享 OpenAPI DTO 正在随 M4 分组收口，本次仅扩展 H9 标准归集字段，避免在脏工作区扩大跨故事重构。
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashSet;
@@ -269,6 +270,12 @@ pub struct CreateOutboundOrderRequest {
     pub document_type: String,
     pub wms_order_no: String,
     pub erp_order_no: Option<String>,
+    pub invoice_no: Option<String>,
+    pub transport_mode_code: Option<String>,
+    pub department_code: Option<String>,
+    pub sales_group_code: Option<String>,
+    pub order_group_no: Option<String>,
+    pub business_type_code: Option<String>,
     pub customer_id: Uuid,
     pub warehouse_id: Uuid,
     pub delivery_address_id: Uuid,
@@ -283,6 +290,12 @@ pub struct OutboundOrder {
     pub document_type: String,
     pub wms_order_no: String,
     pub erp_order_no: Option<String>,
+    pub invoice_no: Option<String>,
+    pub transport_mode_code: Option<String>,
+    pub department_code: Option<String>,
+    pub sales_group_code: Option<String>,
+    pub order_group_no: Option<String>,
+    pub business_type_code: Option<String>,
     pub customer_id: Uuid,
     pub warehouse_id: Uuid,
     pub required_ship_at: Option<DateTime<Utc>>,

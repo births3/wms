@@ -125,6 +125,12 @@ struct OutboundOrderRow {
     document_type: String,
     wms_order_no: String,
     erp_order_no: Option<String>,
+    invoice_no: Option<String>,
+    transport_mode_code: Option<String>,
+    department_code: Option<String>,
+    sales_group_code: Option<String>,
+    order_group_no: Option<String>,
+    business_type_code: Option<String>,
     customer_id: Uuid,
     warehouse_id: Uuid,
     required_ship_at: Option<DateTime<Utc>>,
@@ -197,8 +203,10 @@ async fn lock_outbound_order(
 ) -> Result<OutboundOrderRow, Wave4RepositoryError> {
     sqlx::query_as::<_, OutboundOrderRow>(
         r#"
-        SELECT id, owner_id, document_type, wms_order_no, erp_order_no, customer_id,
-               warehouse_id, required_ship_at, status, short_pick,
+        SELECT id, owner_id, document_type, wms_order_no, erp_order_no,
+               invoice_no, transport_mode_code, department_code, sales_group_code,
+               order_group_no, business_type_code, customer_id, warehouse_id,
+               required_ship_at, status, short_pick,
                created_at, updated_at
           FROM outbound_orders
          WHERE owner_id = $1 AND id = $2
@@ -250,8 +258,10 @@ async fn load_outbound_order(
 ) -> Result<OutboundOrder, Wave4RepositoryError> {
     let row = sqlx::query_as::<_, OutboundOrderRow>(
         r#"
-        SELECT id, owner_id, document_type, wms_order_no, erp_order_no, customer_id,
-               warehouse_id, required_ship_at, status, short_pick,
+        SELECT id, owner_id, document_type, wms_order_no, erp_order_no,
+               invoice_no, transport_mode_code, department_code, sales_group_code,
+               order_group_no, business_type_code, customer_id, warehouse_id,
+               required_ship_at, status, short_pick,
                created_at, updated_at
           FROM outbound_orders
          WHERE owner_id = $1 AND id = $2
@@ -701,6 +711,12 @@ fn map_outbound_order(row: OutboundOrderRow, lines: Vec<OutboundOrderLine>) -> O
         document_type: row.document_type,
         wms_order_no: row.wms_order_no,
         erp_order_no: row.erp_order_no,
+        invoice_no: row.invoice_no,
+        transport_mode_code: row.transport_mode_code,
+        department_code: row.department_code,
+        sales_group_code: row.sales_group_code,
+        order_group_no: row.order_group_no,
+        business_type_code: row.business_type_code,
         customer_id: row.customer_id,
         warehouse_id: row.warehouse_id,
         required_ship_at: row.required_ship_at,

@@ -646,10 +646,25 @@ fn outbound_order_request(
             .map(str::to_string)
             .ok_or_else(|| H8InboundError::Unprocessable(format!("{field} is invalid")))
     };
+    let optional_string = |field: &'static str| {
+        command
+            .fields
+            .get(field)
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string)
+    };
     Ok(CreateOutboundOrderRequest {
         document_type: string("document_type")?,
         wms_order_no: string("wms_order_no")?,
         erp_order_no: Some(string("erp_order_no")?),
+        invoice_no: optional_string("invoice_no"),
+        transport_mode_code: optional_string("transport_mode_code"),
+        department_code: optional_string("department_code"),
+        sales_group_code: optional_string("sales_group_code"),
+        order_group_no: optional_string("order_group_no"),
+        business_type_code: optional_string("business_type_code"),
         customer_id: string("customer_id")?
             .parse()
             .map_err(|_| H8InboundError::Unprocessable("customer_id is invalid".to_string()))?,
