@@ -74,8 +74,8 @@ async fn required_not_ready_applies_frozen_policy_and_completeness(pool: PgPool)
     seed_order_line(&pool, &scope, order, "PROD-H9-008", "BATCH-H9-008").await;
     let group = cutoff(&service, &scope, order, "h9-suite-pol-g2").await;
     let instance = single_instance(&service, &scope, group).await;
-    assert_eq!(instance.status, "queued");
-    assert_eq!(instance.hold_scope, None);
+    assert_eq!(instance.status, "waiting_documents");
+    assert_eq!(instance.hold_scope.as_deref(), Some("instance"));
     let invoice_item = instance
         .items
         .iter()
@@ -83,15 +83,22 @@ async fn required_not_ready_applies_frozen_policy_and_completeness(pool: PgPool)
         .expect("invoice item should exist");
     assert!(invoice_item.ready);
     assert_eq!(invoice_item.file_bindings.len(), 1);
-    assert_eq!(invoice_item.file_bindings[0].file_ref, "HFILE-INV-P02");
-    assert_eq!(invoice_item.file_bindings[0].content_hash, "hash-inv-p02");
+    assert!(invoice_item.file_bindings[0]
+        .file_ref
+        .starts_with("h-file:"));
+    assert_eq!(
+        invoice_item.file_bindings[0].content_hash,
+        test_hash("hash-inv-p02")
+    );
     let drug_item = instance
         .items
         .iter()
         .find(|item| item.category_code == "drug_inspection_report")
         .expect("drug item should exist");
     assert!(drug_item.ready);
-    assert_eq!(drug_item.file_bindings[0].file_ref, "HFILE-DIR-P02");
+    assert!(drug_item.file_bindings[0]
+        .file_ref
+        .starts_with("h-file:"));
 
     // Suite 2: pause_agent_queue freezes the queue-level policy instead.
     service
@@ -461,17 +468,40 @@ async fn seed_invoice_file(
     file_ref: &str,
     content_hash: &str,
 ) {
+    let attachment_id = Uuid::new_v4();
+    let content_hash = test_hash(content_hash);
     sqlx::query(
-        "INSERT INTO h9_ingested_document_files (id, owner_id, category_code, file_ref, file_version, content_hash, status, invoice_no) VALUES ($1, $2, 'invoice', $3, 1, $4, 'valid', $5)",
+        r#"
+        INSERT INTO attachments (
+            id, owner_id, module, entity_type, entity_id, bucket, storage_key,
+            file_name, content_type, size_bytes, content_hash, file_version,
+            status, retention_policy, retain_until, created_by, confirmed_at
+        )
+        VALUES (
+            $1, $2, 'H9', 'authoritative_invoice', $1, 'wms-attachments', $3,
+            'invoice.pdf', 'application/pdf', 100, $4, 1, 'ready',
+            'gsp_5_year', now() + interval '5 years', $5, now()
+        )
+        "#,
+    )
+    .bind(attachment_id)
+    .bind(scope.owner_id)
+    .bind(file_ref)
+    .bind(&content_hash)
+    .bind(scope.actor.user_id)
+    .execute(pool)
+    .await
+    .expect("invoice attachment should insert");
+    sqlx::query(
+        "INSERT INTO h9_document_file_bindings (id, owner_id, category_code, attachment_id, invoice_no) VALUES ($1, $2, 'invoice', $3, $4)",
     )
     .bind(Uuid::new_v4())
     .bind(scope.owner_id)
-    .bind(file_ref)
-    .bind(content_hash)
+    .bind(attachment_id)
     .bind(invoice_no)
     .execute(pool)
     .await
-    .expect("invoice file should insert");
+    .expect("invoice binding should insert");
 }
 
 async fn seed_drug_file(
@@ -482,16 +512,43 @@ async fn seed_drug_file(
     file_ref: &str,
     content_hash: &str,
 ) {
+    let attachment_id = Uuid::new_v4();
+    let content_hash = test_hash(content_hash);
     sqlx::query(
-        "INSERT INTO h9_ingested_document_files (id, owner_id, category_code, file_ref, file_version, content_hash, status, product_code, batch_no) VALUES ($1, $2, 'drug_inspection_report', $3, 1, $4, 'valid', $5, $6)",
+        r#"
+        INSERT INTO attachments (
+            id, owner_id, module, entity_type, entity_id, bucket, storage_key,
+            file_name, content_type, size_bytes, content_hash, file_version,
+            status, retention_policy, retain_until, created_by, confirmed_at
+        )
+        VALUES (
+            $1, $2, 'H9', 'authoritative_drug_report', $1, 'wms-attachments', $3,
+            'drug-report.pdf', 'application/pdf', 100, $4, 1, 'ready',
+            'gsp_5_year', now() + interval '5 years', $5, now()
+        )
+        "#,
+    )
+    .bind(attachment_id)
+    .bind(scope.owner_id)
+    .bind(file_ref)
+    .bind(&content_hash)
+    .bind(scope.actor.user_id)
+    .execute(pool)
+    .await
+    .expect("drug-report attachment should insert");
+    sqlx::query(
+        "INSERT INTO h9_document_file_bindings (id, owner_id, category_code, attachment_id, product_code, batch_no) VALUES ($1, $2, 'drug_inspection_report', $3, $4, $5)",
     )
     .bind(Uuid::new_v4())
     .bind(scope.owner_id)
-    .bind(file_ref)
-    .bind(content_hash)
+    .bind(attachment_id)
     .bind(product_code)
     .bind(batch_no)
     .execute(pool)
     .await
-    .expect("drug file should insert");
+    .expect("drug-report binding should insert");
+}
+
+fn test_hash(value: &str) -> String {
+    hex::encode(Sha256::digest(value.as_bytes()))
 }

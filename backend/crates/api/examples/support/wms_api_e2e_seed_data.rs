@@ -156,6 +156,26 @@ pub async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
             "H9 打印编排维护",
         ),
         (
+            "00000000-0000-0000-0000-000000000130",
+            "h9.print_pdf.read",
+            "H9 分类 PDF 查看",
+        ),
+        (
+            "00000000-0000-0000-0000-000000000131",
+            "h9.print_pdf.prepare",
+            "H9 分类 PDF 生成与重试",
+        ),
+        (
+            "00000000-0000-0000-0000-000000000132",
+            "h9.print_pdf.download",
+            "H9 分类 PDF 下载",
+        ),
+        (
+            "00000000-0000-0000-0000-000000000133",
+            "h9.print_pdf.emergency_print",
+            "H9 分类 PDF 应急打印",
+        ),
+        (
             "00000000-0000-0000-0000-000000000122",
             "mcg.document_numbering.read",
             "M-CG 单据号规则读取",

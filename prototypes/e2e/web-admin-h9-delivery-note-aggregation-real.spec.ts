@@ -177,9 +177,11 @@ test("US-H9-007 归集维度规则配置：草稿、样本测试、发布与停�
   await expect(ruleRow).toContainText("已停用");
 });
 
-test("US-H9-008 打印组套配置与就绪策略：草稿、样本预检、发布与实例冻结", async ({ page }) => {
+test("US-H9-008/009 打印组套冻结、分类 PDF 渲染留存与选择打印", async ({ page }) => {
   const suiteEvidenceDir = path.resolve("../artifacts/screenshot-portal/real-web/h9-print-suites");
+  const pdfEvidenceDir = path.resolve("../artifacts/screenshot-portal/real-web/h9-category-pdfs");
   fs.mkdirSync(suiteEvidenceDir, { recursive: true });
+  fs.mkdirSync(pdfEvidenceDir, { recursive: true });
   await login(page);
   await openDeliveryNoteAggregation(page);
   await page.getByRole("tab", { name: "打印组套" }).click();
@@ -267,9 +269,98 @@ test("US-H9-008 打印组套配置与就绪策略：草稿、样本预检、发�
   await page.getByRole("tab", { name: "打印组套" }).click();
   const instanceRow = page.getByRole("row").filter({ hasText: group.delivery_note_no });
   await expect(instanceRow).toContainText(`V${suite.version_no}`);
-  await expect(instanceRow).toContainText("待打印");
+  await expect(instanceRow).toContainText("等待分类 PDF");
   await expect(instanceRow).toContainText("1.delivery_note✓ → 2.invoice✓");
   await page.screenshot({ path: path.join(suiteEvidenceDir, "suite-instance.png"), fullPage: false });
+
+  // US-H9-009 AC1/AC2/AC4/AC5：源单据已就绪仍先等待分类 PDF；服务端准备成功才进入待打印。
+  const pdfPanel = page.getByRole("region", { name: "分类 PDF 生成与留存" });
+  const instanceOption = pdfPanel
+    .getByLabel("组套实例")
+    .locator("option")
+    .filter({ hasText: group.delivery_note_no });
+  const instanceId = await instanceOption.getAttribute("value");
+  expect(instanceId).toBeTruthy();
+  await pdfPanel.getByLabel("组套实例").selectOption(instanceId as string);
+  const actualPrepareResponse = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/v1/print-orchestration/suite-instances/")
+      && response.url().endsWith("/category-pdfs/prepare")
+      && response.request().method() === "POST",
+  );
+  await pdfPanel.getByRole("button", { name: "生成分类 PDF", exact: true }).click();
+  const prepared = await actualPrepareResponse;
+  expect(prepared.ok(), await prepared.text()).toBeTruthy();
+  await expect(instanceRow).toContainText("待打印");
+  const deliveryPdfRow = pdfPanel.getByRole("row").filter({ hasText: "随货同行单" });
+  const invoicePdfRow = pdfPanel.getByRole("row").filter({ hasText: "发票" });
+  await expect(deliveryPdfRow).toContainText("服务端渲染");
+  await expect(deliveryPdfRow).toContainText("GSP 五年归档");
+  await expect(deliveryPdfRow).toContainText("已就绪");
+  await expect(invoicePdfRow).toContainText("权威外部 PDF");
+  await expect(invoicePdfRow).toContainText("短期缓存");
+  await expect(invoicePdfRow).toContainText("已就绪");
+  await expect(invoicePdfRow).toContainText("不适用（权威外部 PDF）");
+  await pdfPanel.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: path.join(pdfEvidenceDir, "category-pdfs-ready.png"), fullPage: false });
+
+  // AC3/AC6：只选发票下载；响应为真实 PDF，文件读取由独立权限控制并写审计。
+  await invoicePdfRow.getByRole("checkbox", { name: "选择此行" }).check();
+  await expect(pdfPanel.getByRole("button", { name: "下载所选分类" })).toBeEnabled();
+  await page.screenshot({ path: path.join(pdfEvidenceDir, "category-pdfs-selection.png"), fullPage: false });
+  const selectedPdfResponse = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/category-pdfs/download")
+      && response.request().method() === "POST",
+  );
+  const browserDownload = page.waitForEvent("download");
+  await pdfPanel.getByRole("button", { name: "下载所选分类" }).click();
+  const selectedPdf = await selectedPdfResponse;
+  expect(selectedPdf.ok()).toBeTruthy();
+  expect(selectedPdf.headers()["content-type"]).toContain("application/pdf");
+  const downloaded = await browserDownload;
+  const downloadedPath = await downloaded.path();
+  expect(downloadedPath).toBeTruthy();
+  expect(fs.readFileSync(downloadedPath as string).subarray(0, 5).toString()).toBe("%PDF-");
+
+  // BUSINESS-CONTENT：浏览器下载的 rendered 分类必须携带同一真实出库单业务键，
+  // 不能只证明接口返回了一个 PDF 文件头。
+  await invoicePdfRow.getByRole("checkbox", { name: "选择此行" }).uncheck();
+  await deliveryPdfRow.getByRole("checkbox", { name: "选择此行" }).check();
+  const renderedDownload = page.waitForEvent("download");
+  await pdfPanel.getByRole("button", { name: "下载所选分类" }).click();
+  const renderedPath = await (await renderedDownload).path();
+  expect(renderedPath).toBeTruthy();
+  const renderedBytes = fs.readFileSync(renderedPath as string);
+  expect(renderedBytes.subarray(0, 5).toString()).toBe("%PDF-");
+  expect(renderedBytes.length).toBeGreaterThan(5_000);
+  expect(renderedBytes.toString("latin1")).toContain("/Subtype /Image");
+  const jpegStart = renderedBytes.indexOf(Buffer.from([0xff, 0xd8]));
+  const jpegEnd = renderedBytes.indexOf(Buffer.from([0xff, 0xd9]), jpegStart);
+  expect(jpegStart).toBeGreaterThanOrEqual(0);
+  expect(jpegEnd).toBeGreaterThan(jpegStart);
+  const renderedPage = await page.context().newPage();
+  await renderedPage.setContent(
+    `<img alt="真实分类 PDF 页面" src="data:image/jpeg;base64,${
+      renderedBytes.subarray(jpegStart, jpegEnd + 2).toString("base64")
+    }">`,
+  );
+  const renderedImage = renderedPage.getByRole("img", { name: "真实分类 PDF 页面" });
+  await expect(renderedImage).toBeVisible();
+  await renderedImage.screenshot({
+    path: path.join(pdfEvidenceDir, "category-pdf-rendered-document.png"),
+  });
+  await renderedPage.close();
+
+  const emergencyPdfResponse = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/category-pdfs/emergency-print")
+      && response.request().method() === "POST",
+  );
+  const emergencyPopup = page.waitForEvent("popup");
+  await pdfPanel.getByRole("button", { name: "应急打印所选" }).click();
+  expect((await emergencyPdfResponse).ok()).toBeTruthy();
+  await (await emergencyPopup).close();
 
   // 停用组套，保证套件可重复执行；既有实例快照不受影响
   const publishedRow = page.getByRole("row").filter({ hasText: suiteName });

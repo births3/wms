@@ -2,9 +2,15 @@
 
 use std::error::Error;
 
+use chrono::Utc;
 use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
+use wms_api::{
+    auth::AuthContext,
+    file_attachment::{FileAttachmentService, FileRetentionPolicy, StorePdfRequest},
+    pdf_document::render_text_pdf,
+};
 
 struct BusinessPrintSeed {
     library_code: &'static str,
@@ -305,8 +311,8 @@ pub async fn seed_h9_delivery_note_aggregation(pool: &PgPool) -> Result<(), Box<
     Ok(())
 }
 
-/// US-H9-008：打印组套样本数据——一个已截单的样本归集组（含发票号与商品批号）、
-/// 一张待截单候选订单，以及发票/药检单的已摄取稳定文件引用（H-FILE 占位登记表）。
+/// US-H9-008：打印组套样本数据——一个已截单的样本归集组（含发票号与商品批号）
+/// 和一张待截单候选订单。权威 PDF 通过下方 H-FILE 种子单独写入。
 async fn seed_h9_print_suite_samples(
     pool: &PgPool,
     owner_id: Uuid,
@@ -448,31 +454,40 @@ async fn seed_h9_print_suite_samples(
     .bind(address_id)
     .execute(pool)
     .await?;
-    // 已摄取的权威文件引用：发票覆盖两张订单，药检报告覆盖样本商品批号。
-    for (file_id, category, file_ref, hash, invoice_no, product, batch) in [
+    Ok(())
+}
+
+/// US-H9-009：通过真实 H-FILE 端口写入 E2E 权威 PDF，再建立发票/药检覆盖关系。
+pub async fn seed_h9_file_attachments(
+    pool: &PgPool,
+    h_file: &FileAttachmentService,
+) -> Result<(), Box<dyn Error>> {
+    let ctx = AuthContext {
+        user_id: Uuid::parse_str("00000000-0000-0000-0000-000000000101")?,
+        owner_id: Uuid::from_u128(1),
+        actor_name: "系统管理员".to_string(),
+        permissions: Vec::new(),
+        jti: "wms-e2e-h-file-seed".to_string(),
+        warehouse_scope: None,
+    };
+    for (category, business_key, invoice_no, product_code, batch_no) in [
         (
-            "00000000-0000-0000-0000-000000009613",
             "invoice",
-            "HFILE-INV-E2E-009",
-            "hash-inv-e2e-009",
+            "INV-H9-E2E-009",
             Some("INV-H9-E2E-009"),
             None,
             None,
         ),
         (
-            "00000000-0000-0000-0000-000000009614",
             "invoice",
-            "HFILE-INV-E2E-010",
-            "hash-inv-e2e-010",
+            "INV-H9-E2E-010",
             Some("INV-H9-E2E-010"),
             None,
             None,
         ),
         (
-            "00000000-0000-0000-0000-000000009615",
             "drug_inspection_report",
-            "HFILE-DIR-E2E-009",
-            "hash-dir-e2e-009",
+            "PROD-H9-E2E/BATCH-H9-E2E",
             None,
             Some("PROD-H9-E2E"),
             Some("BATCH-H9-E2E"),
@@ -480,22 +495,56 @@ async fn seed_h9_print_suite_samples(
     ] {
         sqlx::query(
             r#"
-            INSERT INTO h9_ingested_document_files (
-                id, owner_id, category_code, file_ref, file_version,
-                content_hash, status, invoice_no, product_code, batch_no
-            )
-            VALUES ($1, $2, $3, $4, 1, $5, 'valid', $6, $7, $8)
-            ON CONFLICT (id) DO NOTHING
+            DELETE FROM h9_document_file_bindings
+             WHERE owner_id = $1 AND category_code = $2
+               AND invoice_no IS NOT DISTINCT FROM $3
+               AND product_code IS NOT DISTINCT FROM $4
+               AND batch_no IS NOT DISTINCT FROM $5
             "#,
         )
-        .bind(Uuid::parse_str(file_id)?)
-        .bind(owner_id)
+        .bind(ctx.owner_id)
         .bind(category)
-        .bind(file_ref)
-        .bind(hash)
         .bind(invoice_no)
-        .bind(product)
-        .bind(batch)
+        .bind(product_code)
+        .bind(batch_no)
+        .execute(pool)
+        .await?;
+        let content = render_text_pdf(&format!(
+            "H9 E2E AUTHORITY PDF | category={category} | key={business_key}"
+        ));
+        let attachment = h_file
+            .store_pdf(
+                &ctx,
+                StorePdfRequest {
+                    module: "H9".to_string(),
+                    entity_type: "e2e_authority_document".to_string(),
+                    entity_id: Uuid::new_v4(),
+                    file_name: format!("{category}-{business_key}.pdf"),
+                    retention_policy: FileRetentionPolicy::ShortCache,
+                },
+                &content,
+                Utc::now(),
+            )
+            .await
+            .map_err(|error| {
+                std::io::Error::other(format!("seed H-FILE {business_key}: {error:?}"))
+            })?;
+        sqlx::query(
+            r#"
+            INSERT INTO h9_document_file_bindings (
+                id, owner_id, category_code, attachment_id,
+                invoice_no, product_code, batch_no
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(ctx.owner_id)
+        .bind(category)
+        .bind(attachment.id)
+        .bind(invoice_no)
+        .bind(product_code)
+        .bind(batch_no)
         .execute(pool)
         .await?;
     }

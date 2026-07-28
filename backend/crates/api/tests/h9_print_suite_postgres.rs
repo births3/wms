@@ -1,5 +1,6 @@
 use chrono::{DateTime, TimeZone, Utc};
 use serde_json::json;
+use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 use uuid::Uuid;
 use wms_api::{
@@ -702,3 +703,4 @@ async fn binding_and_category_validation_is_mode_specific(pool: PgPool) {
 }
 
 include!("h9_print_suite_postgres/part2.rs");
+include!("h9_print_suite_postgres/category_pdf.rs");
