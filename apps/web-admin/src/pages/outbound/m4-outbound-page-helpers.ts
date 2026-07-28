@@ -1,3 +1,4 @@
+import type { ShipOutboundOrderRequest } from "@/features/outbound/outbound-queries";
 import type { DualPersonPolicy } from "@/features/validation-rules/dual-person-policy-queries";
 import type {
   OutboundOrder,
@@ -112,6 +113,46 @@ export function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value,
   );
+}
+
+export interface OutboundShipForm {
+  carrierType: string;
+  handoverTo: string;
+  packageCount: string;
+}
+
+/** 承运方式选项与后端 wave4 交接契约保持一致（own_fleet / third_party_express）。 */
+export const outboundCarrierTypeOptions: Array<{
+  value: string;
+  label: string;
+}> = [
+  { value: "third_party_express", label: "第三方快递" },
+  { value: "own_fleet", label: "自有车队" },
+];
+
+export function defaultOutboundShipForm(): OutboundShipForm {
+  return { carrierType: "", handoverTo: "", packageCount: "1" };
+}
+
+export function buildShipOutboundRequest(
+  form: OutboundShipForm,
+): ShipOutboundOrderRequest {
+  const carrierValid = outboundCarrierTypeOptions.some(
+    (option) => option.value === form.carrierType,
+  );
+  if (!carrierValid) throw new Error("请选择承运方式");
+  const handoverTo = form.handoverTo.trim();
+  if (!handoverTo) throw new Error("请填写交接对象");
+  const packageCount = Number(form.packageCount);
+  if (!Number.isInteger(packageCount) || packageCount <= 0) {
+    throw new Error("件数必须为正整数");
+  }
+  return {
+    carrier_type: form.carrierType,
+    handover_to: handoverTo,
+    package_count: packageCount,
+    shipped_at: new Date().toISOString(),
+  };
 }
 
 export function strictestDualPersonPolicy(

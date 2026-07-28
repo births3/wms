@@ -76,9 +76,12 @@ import {
   type M4OutboundMode,
 } from "./m4-outbound-page-model";
 import {
+  buildShipOutboundRequest,
+  defaultOutboundShipForm,
   formatDate,
   isUuid,
   makeOrder,
+  type OutboundShipForm,
   makeReturn,
   outboundCustomerId as customerId,
   outboundOwnerId as ownerId,
@@ -184,6 +187,7 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
     plannedQty: "12",
     requiredShipDate: "",
   });
+  const [shipForm, setShipForm] = React.useState<OutboundShipForm>(defaultOutboundShipForm);
   const ordersQuery = useOutboundOrdersQuery(mode === "orders" || mode === "waves" || mode === "review");
   const wavesQuery = useOutboundWavesQuery(mode === "waves");
   const createOutboundOrderMutation = useCreateOutboundOrderMutation();
@@ -420,6 +424,7 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
     if (kind === "create-wave") createOutboundWaveMutation.reset();
     if (kind === "cancel-wave") cancelOutboundWaveMutation.reset();
     if (kind === "review") reviewOutboundOrderMutation.reset();
+    if (kind === "ship") { shipOutboundOrderMutation.reset(); setShipForm(defaultOutboundShipForm()); }
     setActiveAction({ kind, targetId });
     setNote("");
     setSecondReviewerId("");
@@ -568,15 +573,7 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
     }
     if (action.kind === "print") setLastEvent("打印任务已提交");
     if (action.kind === "ship") {
-      const shipped = await shipOutboundOrderMutation.mutateAsync({
-        orderId: action.targetId,
-        request: {
-          carrier_type: "third_party_express",
-          handover_to: "页面发货交接",
-          package_count: 1,
-          shipped_at: new Date().toISOString(),
-        },
-      });
+      const shipped = await shipOutboundOrderMutation.mutateAsync({ orderId: action.targetId, request: buildShipOutboundRequest(shipForm) });
       setOrders((value) => value.map((item) => item.id === shipped.id ? shipped : item));
       setSelectedId(shipped.id);
       setLastEvent(`${shipped.wms_order_no} 发货交接已完成`);
@@ -766,6 +763,7 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
         action={activeAction}
         target={resolveActionTarget(activeAction)}
         createForm={createForm}
+        shipForm={shipForm}
         documentTypeOptions={documentTypeOptions}
         deliveryAddressOptions={deliveryAddressOptions}
         reviewOrder={activeAction?.kind === "review" ? reviewDetailQuery.data ?? null : null}
@@ -796,6 +794,7 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
           || (reviewPolicyLoading && activeAction?.kind === "review")
         }
         setCreateForm={setCreateForm}
+        setShipForm={setShipForm}
         setNote={(value) => {
           setNote(value);
           if (actionError) setActionError(null);

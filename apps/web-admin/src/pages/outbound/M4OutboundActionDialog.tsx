@@ -14,6 +14,10 @@ import { CheckCircle2, ClipboardCheck, Truck, XCircle } from "lucide-react";
 
 import type { OutboundOrder, OutboundWave, PurchaseReturnOrder } from "./M4OutboundDetailDialog";
 import { ActionExtraFields, TextField } from "./M4OutboundPageParts";
+import {
+  outboundCarrierTypeOptions,
+  type OutboundShipForm,
+} from "./m4-outbound-page-helpers";
 import type { M4OutboundMode } from "./m4-outbound-page-model";
 
 export type ActionKind =
@@ -164,10 +168,11 @@ function toolbarAction(
   };
 }
 
-export function M4OutboundActionDialog({ action, target, createForm, documentTypeOptions, deliveryAddressOptions, reviewOrder, reviewLoading, reviewError, reviewPolicy, reviewPolicyLoading, secondReviewerId, note, actionError, pending, setCreateForm, setSecondReviewerId, setNote, onClose, onSubmit }: {
+export function M4OutboundActionDialog({ action, target, createForm, shipForm, documentTypeOptions, deliveryAddressOptions, reviewOrder, reviewLoading, reviewError, reviewPolicy, reviewPolicyLoading, secondReviewerId, note, actionError, pending, setCreateForm, setShipForm, setSecondReviewerId, setNote, onClose, onSubmit }: {
   action: ActionState | null;
   target: ActionTargetContext | null;
   createForm: OutboundCreateForm;
+  shipForm: OutboundShipForm;
   documentTypeOptions: Array<{ value: string; label: string }>;
   deliveryAddressOptions: Array<{ value: string; label: string }>;
   reviewOrder: OutboundOrder | null;
@@ -180,6 +185,7 @@ export function M4OutboundActionDialog({ action, target, createForm, documentTyp
   actionError: string | null;
   pending: boolean;
   setCreateForm: React.Dispatch<React.SetStateAction<OutboundCreateForm>>;
+  setShipForm: React.Dispatch<React.SetStateAction<OutboundShipForm>>;
   setSecondReviewerId: (value: string) => void;
   setNote: (value: string) => void;
   onClose: () => void;
@@ -263,6 +269,29 @@ export function M4OutboundActionDialog({ action, target, createForm, documentTyp
               <TextField label="批号" value={createForm.batchNo} onChange={(batchNo) => setCreateForm((value) => ({ ...value, batchNo }))} />
               <TextField label="计划数量" type="number" value={createForm.plannedQty} onChange={(plannedQty) => setCreateForm((value) => ({ ...value, plannedQty }))} />
               <TextField label="要求发货" type="date" value={createForm.requiredShipDate} onChange={(requiredShipDate) => setCreateForm((value) => ({ ...value, requiredShipDate }))} />
+            </>
+          ) : action.kind === "ship" ? (
+            <>
+              <label className="grid gap-1 text-sm">承运方式（必选）
+                <select
+                  className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                  required
+                  value={shipForm.carrierType}
+                  onChange={(event) => setShipForm((value) => ({ ...value, carrierType: event.target.value }))}
+                >
+                  <option value="">请选择承运方式</option>
+                  {outboundCarrierTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              </label>
+              <TextField label="交接对象（必填）" required value={shipForm.handoverTo} onChange={(handoverTo) => setShipForm((value) => ({ ...value, handoverTo }))} placeholder="承运商 / 快递员 / 司机姓名" />
+              <TextField label="件数（必填正整数）" type="number" required value={shipForm.packageCount} onChange={(packageCount) => setShipForm((value) => ({ ...value, packageCount }))} />
+              <ActionExtraFields kind={action.kind} />
+              <TextField
+                className="md:col-span-2"
+                label="备注"
+                value={note}
+                onChange={setNote}
+              />
             </>
           ) : (
             <>

@@ -141,7 +141,15 @@ export function ActionExtraFields({ kind }: { kind: string }) {
 function extraActionFields(kind: string): Array<[string, string, string?]> {
   if (kind === "release-wave" || kind === "create-wave") return [["路径策略", "S 型最短路径"], ["温区", "常温"], ["容量上限", "100 单 / 10000 件"]];
   if (kind === "review") return [["工位码", "PK-STATION-01"], ["实际复核数量", "按扫码累计"], ["短拣标识", "否"], ["复核人", "当前用户"]];
-  if (kind === "ship" || kind === "ship-return") {
+  if (kind === "ship") {
+    // 承运方式 / 交接对象 / 件数改为发货表单真实字段，这里只保留静态补充信息
+    return [
+      ["车牌号", "沪A-12345"],
+      ["装车温度", "", "冷链时必填"],
+      ["签字", "交接双方签字"],
+    ];
+  }
+  if (kind === "ship-return") {
     return [
       ["配送方类型", "第三方快递"],
       ["包裹数量", "1"],
