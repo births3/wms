@@ -1,10 +1,15 @@
 use chrono::{DateTime, Datelike, FixedOffset, NaiveTime, TimeZone, Utc};
 use sqlx::PgPool;
 use wms_domain::{
-    validate_cutoff_plan, validate_manual_delivery_note_cutoff, validate_route_binding,
-    CreateCutoffPlanRequest, CutoffPlan, CutoffPlanListResponse, DeliveryNoteCandidateListResponse,
-    DeliveryNoteGroupListResponse, ManualDeliveryNoteCutoffRequest, PublishRouteBindingRequest,
-    RouteBinding, RouteBindingListResponse,
+    validate_aggregation_rule, validate_cutoff_plan, validate_manual_delivery_note_cutoff,
+    validate_print_suite, validate_route_binding, AggregationFieldCatalogResponse,
+    AggregationRuleTestResult, AggregationRuleVersion, AggregationRuleVersionListResponse,
+    CreateAggregationRuleDraftRequest, CreateCutoffPlanRequest, CreatePrintSuiteDraftRequest,
+    CutoffPlan, CutoffPlanListResponse, DeliveryNoteCandidateListResponse,
+    DeliveryNoteGroupListResponse, ManualDeliveryNoteCutoffRequest,
+    PrintDocumentCategoryListResponse, PrintSuiteInstanceListResponse, PrintSuiteTestResult,
+    PrintSuiteVersion, PrintSuiteVersionListResponse, PublishRouteBindingRequest, RouteBinding,
+    RouteBindingListResponse, TestAggregationRuleRequest, TestPrintSuiteRequest,
 };
 
 use crate::auth::AuthContext;
@@ -136,6 +141,201 @@ impl PrintOrchestrationService {
             .await
     }
 
+    /// Lists the controlled standard-order fields available to equality grouping.
+    pub async fn list_aggregation_fields(
+        &self,
+        _ctx: &AuthContext,
+    ) -> Result<AggregationFieldCatalogResponse, PrintOrchestrationError> {
+        self.repository.list_aggregation_fields().await
+    }
+
+    /// Lists all owner-scoped immutable aggregation-rule versions.
+    pub async fn list_aggregation_rules(
+        &self,
+        ctx: &AuthContext,
+    ) -> Result<AggregationRuleVersionListResponse, PrintOrchestrationError> {
+        self.repository.list_aggregation_rules(ctx).await
+    }
+
+    /// Creates the next aggregation-rule draft from controlled dimensions.
+    pub async fn create_aggregation_rule_draft(
+        &self,
+        ctx: &AuthContext,
+        request: CreateAggregationRuleDraftRequest,
+        now: DateTime<Utc>,
+        idempotency_key: &str,
+    ) -> Result<IdempotentMutation<AggregationRuleVersion>, PrintOrchestrationError> {
+        validate_aggregation_rule(&request).map_err(|_| PrintOrchestrationError::InvalidRequest)?;
+        if idempotency_key.trim().is_empty() {
+            return Err(PrintOrchestrationError::InvalidRequest);
+        }
+        self.repository
+            .create_aggregation_rule_draft(ctx, request, now, idempotency_key)
+            .await
+    }
+
+    /// Tests a draft against real owner-scoped sample orders.
+    pub async fn test_aggregation_rule(
+        &self,
+        ctx: &AuthContext,
+        version_id: uuid::Uuid,
+        request: TestAggregationRuleRequest,
+        now: DateTime<Utc>,
+        idempotency_key: &str,
+    ) -> Result<IdempotentMutation<AggregationRuleTestResult>, PrintOrchestrationError> {
+        if version_id.is_nil()
+            || request.order_ids.is_empty()
+            || request.order_ids.iter().any(uuid::Uuid::is_nil)
+            || request
+                .order_ids
+                .iter()
+                .collect::<std::collections::HashSet<_>>()
+                .len()
+                != request.order_ids.len()
+            || idempotency_key.trim().is_empty()
+        {
+            return Err(PrintOrchestrationError::InvalidRequest);
+        }
+        self.repository
+            .test_aggregation_rule(ctx, version_id, request, now, idempotency_key)
+            .await
+    }
+
+    /// Publishes a tested aggregation-rule version.
+    pub async fn publish_aggregation_rule(
+        &self,
+        ctx: &AuthContext,
+        version_id: uuid::Uuid,
+        now: DateTime<Utc>,
+        idempotency_key: &str,
+    ) -> Result<IdempotentMutation<AggregationRuleVersion>, PrintOrchestrationError> {
+        if version_id.is_nil() || idempotency_key.trim().is_empty() {
+            return Err(PrintOrchestrationError::InvalidRequest);
+        }
+        self.repository
+            .publish_aggregation_rule(ctx, version_id, now, idempotency_key)
+            .await
+    }
+
+    /// Disables one published aggregation-rule version.
+    pub async fn disable_aggregation_rule(
+        &self,
+        ctx: &AuthContext,
+        version_id: uuid::Uuid,
+        now: DateTime<Utc>,
+        idempotency_key: &str,
+    ) -> Result<IdempotentMutation<AggregationRuleVersion>, PrintOrchestrationError> {
+        if version_id.is_nil() || idempotency_key.trim().is_empty() {
+            return Err(PrintOrchestrationError::InvalidRequest);
+        }
+        self.repository
+            .disable_aggregation_rule(ctx, version_id, now, idempotency_key)
+            .await
+    }
+
+    /// Lists the controlled M1 print-document categories with source modes.
+    pub async fn list_print_document_categories(
+        &self,
+        ctx: &AuthContext,
+    ) -> Result<PrintDocumentCategoryListResponse, PrintOrchestrationError> {
+        self.repository.list_print_document_categories(ctx).await
+    }
+
+    /// Lists all owner-scoped immutable print-suite versions with items.
+    pub async fn list_print_suites(
+        &self,
+        ctx: &AuthContext,
+    ) -> Result<PrintSuiteVersionListResponse, PrintOrchestrationError> {
+        self.repository.list_print_suites(ctx).await
+    }
+
+    /// Creates the next print-suite draft with ordered, policy-frozen items.
+    pub async fn create_print_suite_draft(
+        &self,
+        ctx: &AuthContext,
+        request: CreatePrintSuiteDraftRequest,
+        now: DateTime<Utc>,
+        idempotency_key: &str,
+    ) -> Result<IdempotentMutation<PrintSuiteVersion>, PrintOrchestrationError> {
+        validate_print_suite(&request).map_err(|_| PrintOrchestrationError::InvalidRequest)?;
+        if idempotency_key.trim().is_empty() {
+            return Err(PrintOrchestrationError::InvalidRequest);
+        }
+        self.repository
+            .create_print_suite_draft(ctx, request, now, idempotency_key)
+            .await
+    }
+
+    /// Runs the readiness/completeness precheck against real sample groups.
+    pub async fn test_print_suite(
+        &self,
+        ctx: &AuthContext,
+        version_id: uuid::Uuid,
+        request: TestPrintSuiteRequest,
+        now: DateTime<Utc>,
+        idempotency_key: &str,
+    ) -> Result<IdempotentMutation<PrintSuiteTestResult>, PrintOrchestrationError> {
+        if version_id.is_nil()
+            || request.group_ids.is_empty()
+            || request.group_ids.iter().any(uuid::Uuid::is_nil)
+            || request
+                .group_ids
+                .iter()
+                .collect::<std::collections::HashSet<_>>()
+                .len()
+                != request.group_ids.len()
+            || idempotency_key.trim().is_empty()
+        {
+            return Err(PrintOrchestrationError::InvalidRequest);
+        }
+        self.repository
+            .test_print_suite(ctx, version_id, request, now, idempotency_key)
+            .await
+    }
+
+    /// Publishes a tested print-suite version after same-level overlap checks.
+    pub async fn publish_print_suite(
+        &self,
+        ctx: &AuthContext,
+        version_id: uuid::Uuid,
+        now: DateTime<Utc>,
+        idempotency_key: &str,
+    ) -> Result<IdempotentMutation<PrintSuiteVersion>, PrintOrchestrationError> {
+        if version_id.is_nil() || idempotency_key.trim().is_empty() {
+            return Err(PrintOrchestrationError::InvalidRequest);
+        }
+        self.repository
+            .publish_print_suite(ctx, version_id, now, idempotency_key)
+            .await
+    }
+
+    /// Disables one published print-suite version.
+    pub async fn disable_print_suite(
+        &self,
+        ctx: &AuthContext,
+        version_id: uuid::Uuid,
+        now: DateTime<Utc>,
+        idempotency_key: &str,
+    ) -> Result<IdempotentMutation<PrintSuiteVersion>, PrintOrchestrationError> {
+        if version_id.is_nil() || idempotency_key.trim().is_empty() {
+            return Err(PrintOrchestrationError::InvalidRequest);
+        }
+        self.repository
+            .disable_print_suite(ctx, version_id, now, idempotency_key)
+            .await
+    }
+
+    /// Lists frozen suite instances, optionally for one delivery-note group.
+    pub async fn list_print_suite_instances(
+        &self,
+        ctx: &AuthContext,
+        group_id: Option<uuid::Uuid>,
+    ) -> Result<PrintSuiteInstanceListResponse, PrintOrchestrationError> {
+        self.repository
+            .list_print_suite_instances(ctx, group_id)
+            .await
+    }
+
     /// Resolves the effective plan using customer > route > owner+warehouse.
     pub async fn resolve_cutoff_plan(
         &self,
@@ -183,13 +383,11 @@ impl PrintOrchestrationService {
             let Some(scheduled_at) = scheduled_cutoff_at(&plan, now)? else {
                 continue;
             };
-            if let Some(group) = self
-                .repository
-                .scheduled_cutoff(ctx, &plan, &boundary, scheduled_at, now)
-                .await?
-            {
-                groups.push(group);
-            }
+            groups.extend(
+                self.repository
+                    .scheduled_cutoff(ctx, &plan, &boundary, scheduled_at, now)
+                    .await?,
+            );
         }
         Ok(groups)
     }

@@ -1,7 +1,9 @@
 //! H9 delivery-note aggregation application facade.
 
+mod aggregation_rule;
 mod configuration;
 mod cutoff_plan;
+mod print_suite;
 mod repository;
 mod service;
 mod workbench;
@@ -32,7 +34,15 @@ pub enum PrintOrchestrationError {
     OrderNotFound,
     OrderNotEligibleForCutoff,
     AggregationBoundaryMismatch,
+    AggregationRuleMismatch,
+    AggregationRuleNotFound,
+    AggregationRuleInvalidState,
     OrderAlreadyCutoff,
+    PrintSuiteNotFound,
+    PrintSuiteInvalidState,
+    PrintSuiteCategoryInvalid,
+    PrintSuiteBindingInvalid,
+    DeliveryNoteGroupNotFound,
     IdempotencyConflict,
     DocumentNumbering(DocumentNumberingError),
     Audit(String),

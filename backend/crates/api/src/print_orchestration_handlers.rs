@@ -12,10 +12,14 @@ use serde::Deserialize;
 use sqlx::PgPool;
 use uuid::Uuid;
 use wms_domain::{
-    CreateCutoffPlanRequest, CutoffPlan, CutoffPlanListResponse, DeliveryNoteCandidateListResponse,
-    DeliveryNoteGroup, DeliveryNoteGroupListResponse, ErrorResponse,
-    ManualDeliveryNoteCutoffRequest, PublishRouteBindingRequest, RouteBinding,
-    RouteBindingListResponse,
+    AggregationFieldCatalogResponse, AggregationRuleTestResult, AggregationRuleVersion,
+    AggregationRuleVersionListResponse, CreateAggregationRuleDraftRequest, CreateCutoffPlanRequest,
+    CreatePrintSuiteDraftRequest, CutoffPlan, CutoffPlanListResponse,
+    DeliveryNoteCandidateListResponse, DeliveryNoteGroup, DeliveryNoteGroupListResponse,
+    ErrorResponse, ManualDeliveryNoteCutoffRequest, PrintDocumentCategoryListResponse,
+    PrintSuiteInstanceListResponse, PrintSuiteTestResult, PrintSuiteVersion,
+    PrintSuiteVersionListResponse, PublishRouteBindingRequest, RouteBinding,
+    RouteBindingListResponse, TestAggregationRuleRequest, TestPrintSuiteRequest,
 };
 
 use crate::{
@@ -44,6 +48,11 @@ enum PrintOrchestrationHandlerError {
 #[derive(Debug, Deserialize)]
 struct WarehouseFilter {
     warehouse_id: Option<Uuid>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SuiteInstanceFilter {
+    group_id: Option<Uuid>,
 }
 
 impl PrintOrchestrationAppState {
@@ -115,6 +124,46 @@ impl IntoResponse for PrintOrchestrationHandlerError {
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "H9_DELIVERY_NOTE_BOUNDARY_MISMATCH",
                 "订单不属于同一货主、仓库和送货地址",
+            ),
+            Self::Orchestration(PrintOrchestrationError::AggregationRuleMismatch) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "H9_AGGREGATION_RULE_MISMATCH",
+                "所选订单不属于同一个归集规则分组",
+            ),
+            Self::Orchestration(PrintOrchestrationError::AggregationRuleNotFound) => (
+                StatusCode::NOT_FOUND,
+                "H9_AGGREGATION_RULE_NOT_FOUND",
+                "归集规则版本不存在",
+            ),
+            Self::Orchestration(PrintOrchestrationError::AggregationRuleInvalidState) => (
+                StatusCode::CONFLICT,
+                "H9_AGGREGATION_RULE_STATE_INVALID",
+                "归集规则版本状态不允许当前操作",
+            ),
+            Self::Orchestration(PrintOrchestrationError::PrintSuiteNotFound) => (
+                StatusCode::NOT_FOUND,
+                "H9_PRINT_SUITE_NOT_FOUND",
+                "打印组套版本不存在",
+            ),
+            Self::Orchestration(PrintOrchestrationError::PrintSuiteInvalidState) => (
+                StatusCode::CONFLICT,
+                "H9_PRINT_SUITE_STATE_INVALID",
+                "打印组套版本状态不允许当前操作",
+            ),
+            Self::Orchestration(PrintOrchestrationError::PrintSuiteCategoryInvalid) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "H9_PRINT_SUITE_CATEGORY_INVALID",
+                "单据分类未在 M1 字典登记或来源模式不匹配",
+            ),
+            Self::Orchestration(PrintOrchestrationError::PrintSuiteBindingInvalid) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "H9_PRINT_SUITE_BINDING_INVALID",
+                "打印项绑定非法：rendered 需已发布模板版本，external_file 需稳定文件引用",
+            ),
+            Self::Orchestration(PrintOrchestrationError::DeliveryNoteGroupNotFound) => (
+                StatusCode::NOT_FOUND,
+                "H9_DELIVERY_NOTE_GROUP_NOT_FOUND",
+                "随货同行单归集组不存在",
             ),
             Self::Orchestration(PrintOrchestrationError::OrderAlreadyCutoff) => (
                 StatusCode::CONFLICT,
@@ -190,6 +239,50 @@ pub fn print_orchestration_router(state: PrintOrchestrationAppState) -> Router {
         .route(
             "/api/v1/print-orchestration/cutoff-plans/:plan_id/publish",
             post(publish_cutoff_plan_handler),
+        )
+        .route(
+            "/api/v1/print-orchestration/aggregation-fields",
+            get(list_aggregation_fields_handler),
+        )
+        .route(
+            "/api/v1/print-orchestration/aggregation-rules/versions",
+            get(list_aggregation_rules_handler).post(create_aggregation_rule_draft_handler),
+        )
+        .route(
+            "/api/v1/print-orchestration/aggregation-rules/versions/:version_id/test",
+            post(test_aggregation_rule_handler),
+        )
+        .route(
+            "/api/v1/print-orchestration/aggregation-rules/versions/:version_id/publish",
+            post(publish_aggregation_rule_handler),
+        )
+        .route(
+            "/api/v1/print-orchestration/aggregation-rules/versions/:version_id/disable",
+            post(disable_aggregation_rule_handler),
+        )
+        .route(
+            "/api/v1/print-orchestration/print-document-categories",
+            get(list_print_document_categories_handler),
+        )
+        .route(
+            "/api/v1/print-orchestration/print-suites/versions",
+            get(list_print_suites_handler).post(create_print_suite_draft_handler),
+        )
+        .route(
+            "/api/v1/print-orchestration/print-suites/versions/:version_id/test",
+            post(test_print_suite_handler),
+        )
+        .route(
+            "/api/v1/print-orchestration/print-suites/versions/:version_id/publish",
+            post(publish_print_suite_handler),
+        )
+        .route(
+            "/api/v1/print-orchestration/print-suites/versions/:version_id/disable",
+            post(disable_print_suite_handler),
+        )
+        .route(
+            "/api/v1/print-orchestration/suite-instances",
+            get(list_print_suite_instances_handler),
         )
         .with_state(state)
 }
@@ -308,6 +401,210 @@ async fn publish_cutoff_plan_handler(
         .publish_cutoff_plan(&ctx, plan_id, Utc::now(), idempotency_key)
         .await?;
     Ok(Json(result.value))
+}
+
+async fn list_aggregation_fields_handler(
+    ctx: AuthContext,
+    State(state): State<PrintOrchestrationAppState>,
+) -> Result<Json<AggregationFieldCatalogResponse>, PrintOrchestrationHandlerError> {
+    ctx.require_permission(READ_PERMISSION)?;
+    Ok(Json(state.service.list_aggregation_fields(&ctx).await?))
+}
+
+async fn list_aggregation_rules_handler(
+    ctx: AuthContext,
+    State(state): State<PrintOrchestrationAppState>,
+) -> Result<Json<AggregationRuleVersionListResponse>, PrintOrchestrationHandlerError> {
+    ctx.require_permission(READ_PERMISSION)?;
+    Ok(Json(state.service.list_aggregation_rules(&ctx).await?))
+}
+
+async fn create_aggregation_rule_draft_handler(
+    ctx: AuthContext,
+    State(state): State<PrintOrchestrationAppState>,
+    headers: HeaderMap,
+    Json(request): Json<CreateAggregationRuleDraftRequest>,
+) -> Result<Json<AggregationRuleVersion>, PrintOrchestrationHandlerError> {
+    ctx.require_permission(WRITE_PERMISSION)?;
+    let result = state
+        .service
+        .create_aggregation_rule_draft(
+            &ctx,
+            request,
+            Utc::now(),
+            idempotency_key_from_headers(&headers)?,
+        )
+        .await?;
+    Ok(Json(result.value))
+}
+
+async fn test_aggregation_rule_handler(
+    ctx: AuthContext,
+    State(state): State<PrintOrchestrationAppState>,
+    Path(version_id): Path<Uuid>,
+    headers: HeaderMap,
+    Json(request): Json<TestAggregationRuleRequest>,
+) -> Result<Json<AggregationRuleTestResult>, PrintOrchestrationHandlerError> {
+    ctx.require_permission(WRITE_PERMISSION)?;
+    let result = state
+        .service
+        .test_aggregation_rule(
+            &ctx,
+            version_id,
+            request,
+            Utc::now(),
+            idempotency_key_from_headers(&headers)?,
+        )
+        .await?;
+    Ok(Json(result.value))
+}
+
+async fn publish_aggregation_rule_handler(
+    ctx: AuthContext,
+    State(state): State<PrintOrchestrationAppState>,
+    Path(version_id): Path<Uuid>,
+    headers: HeaderMap,
+) -> Result<Json<AggregationRuleVersion>, PrintOrchestrationHandlerError> {
+    ctx.require_permission(WRITE_PERMISSION)?;
+    let result = state
+        .service
+        .publish_aggregation_rule(
+            &ctx,
+            version_id,
+            Utc::now(),
+            idempotency_key_from_headers(&headers)?,
+        )
+        .await?;
+    Ok(Json(result.value))
+}
+
+async fn disable_aggregation_rule_handler(
+    ctx: AuthContext,
+    State(state): State<PrintOrchestrationAppState>,
+    Path(version_id): Path<Uuid>,
+    headers: HeaderMap,
+) -> Result<Json<AggregationRuleVersion>, PrintOrchestrationHandlerError> {
+    ctx.require_permission(WRITE_PERMISSION)?;
+    let result = state
+        .service
+        .disable_aggregation_rule(
+            &ctx,
+            version_id,
+            Utc::now(),
+            idempotency_key_from_headers(&headers)?,
+        )
+        .await?;
+    Ok(Json(result.value))
+}
+
+async fn list_print_document_categories_handler(
+    ctx: AuthContext,
+    State(state): State<PrintOrchestrationAppState>,
+) -> Result<Json<PrintDocumentCategoryListResponse>, PrintOrchestrationHandlerError> {
+    ctx.require_permission(READ_PERMISSION)?;
+    Ok(Json(
+        state.service.list_print_document_categories(&ctx).await?,
+    ))
+}
+
+async fn list_print_suites_handler(
+    ctx: AuthContext,
+    State(state): State<PrintOrchestrationAppState>,
+) -> Result<Json<PrintSuiteVersionListResponse>, PrintOrchestrationHandlerError> {
+    ctx.require_permission(READ_PERMISSION)?;
+    Ok(Json(state.service.list_print_suites(&ctx).await?))
+}
+
+async fn create_print_suite_draft_handler(
+    ctx: AuthContext,
+    State(state): State<PrintOrchestrationAppState>,
+    headers: HeaderMap,
+    Json(request): Json<CreatePrintSuiteDraftRequest>,
+) -> Result<Json<PrintSuiteVersion>, PrintOrchestrationHandlerError> {
+    ctx.require_permission(WRITE_PERMISSION)?;
+    let result = state
+        .service
+        .create_print_suite_draft(
+            &ctx,
+            request,
+            Utc::now(),
+            idempotency_key_from_headers(&headers)?,
+        )
+        .await?;
+    Ok(Json(result.value))
+}
+
+async fn test_print_suite_handler(
+    ctx: AuthContext,
+    State(state): State<PrintOrchestrationAppState>,
+    Path(version_id): Path<Uuid>,
+    headers: HeaderMap,
+    Json(request): Json<TestPrintSuiteRequest>,
+) -> Result<Json<PrintSuiteTestResult>, PrintOrchestrationHandlerError> {
+    ctx.require_permission(WRITE_PERMISSION)?;
+    let result = state
+        .service
+        .test_print_suite(
+            &ctx,
+            version_id,
+            request,
+            Utc::now(),
+            idempotency_key_from_headers(&headers)?,
+        )
+        .await?;
+    Ok(Json(result.value))
+}
+
+async fn publish_print_suite_handler(
+    ctx: AuthContext,
+    State(state): State<PrintOrchestrationAppState>,
+    Path(version_id): Path<Uuid>,
+    headers: HeaderMap,
+) -> Result<Json<PrintSuiteVersion>, PrintOrchestrationHandlerError> {
+    ctx.require_permission(WRITE_PERMISSION)?;
+    let result = state
+        .service
+        .publish_print_suite(
+            &ctx,
+            version_id,
+            Utc::now(),
+            idempotency_key_from_headers(&headers)?,
+        )
+        .await?;
+    Ok(Json(result.value))
+}
+
+async fn disable_print_suite_handler(
+    ctx: AuthContext,
+    State(state): State<PrintOrchestrationAppState>,
+    Path(version_id): Path<Uuid>,
+    headers: HeaderMap,
+) -> Result<Json<PrintSuiteVersion>, PrintOrchestrationHandlerError> {
+    ctx.require_permission(WRITE_PERMISSION)?;
+    let result = state
+        .service
+        .disable_print_suite(
+            &ctx,
+            version_id,
+            Utc::now(),
+            idempotency_key_from_headers(&headers)?,
+        )
+        .await?;
+    Ok(Json(result.value))
+}
+
+async fn list_print_suite_instances_handler(
+    ctx: AuthContext,
+    State(state): State<PrintOrchestrationAppState>,
+    Query(query): Query<SuiteInstanceFilter>,
+) -> Result<Json<PrintSuiteInstanceListResponse>, PrintOrchestrationHandlerError> {
+    ctx.require_permission(READ_PERMISSION)?;
+    Ok(Json(
+        state
+            .service
+            .list_print_suite_instances(&ctx, query.group_id)
+            .await?,
+    ))
 }
 
 fn idempotency_key_from_headers(
