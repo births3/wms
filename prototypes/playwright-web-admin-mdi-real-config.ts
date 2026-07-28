@@ -38,10 +38,12 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: "CARGO_INCREMENTAL=0 cargo run --manifest-path ../backend/Cargo.toml -p wms-api --example wms_api_e2e",
+      // 优先跑已编译二进制，避免 CARGO_INCREMENTAL=0 冷编译撑爆 180s 超时。
+      command:
+        "test -x ../backend/target/debug/examples/wms_api_e2e && ../backend/target/debug/examples/wms_api_e2e || cargo run --manifest-path ../backend/Cargo.toml -p wms-api --example wms_api_e2e",
       url: `${apiURL}/api/v1/healthz`,
       reuseExistingServer: false,
-      timeout: 180_000,
+      timeout: 300_000,
       env: {
         ...process.env,
         DATABASE_URL: databaseURL,

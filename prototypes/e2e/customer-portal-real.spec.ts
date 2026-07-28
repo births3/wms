@@ -268,7 +268,7 @@ test.describe.serial("独立客户药检单平台真实链路", () => {
     await capture(page, "export-2gb-rejected.png");
   });
 
-  test("导出任务查询失败时明确显示错误", async ({ page }) => {
+  test("授权接口 401 时会话过期并回到登录", async ({ page }) => {
     await login(page, "portal-none");
     await page.evaluate(() => {
       const key = "wms-customer-portal-session";
@@ -281,10 +281,10 @@ test.describe.serial("独立客户药检单平台真实链路", () => {
       }
     });
     await page.reload();
-    await page.getByRole("button", { name: "导出中心" }).first().click();
-    await expect(
-      page.getByTestId("portal-exports-page").getByRole("alert"),
-    ).toContainText("认证失败");
+    // 带 token 的查询返回 401 后统一登出，不再停留在业务页展示局部错误。
+    await expect(page.getByRole("alert")).toContainText("登录已过期");
+    await expect(page.getByLabel("用户名")).toBeVisible();
+    await expect(page.getByRole("button", { name: "导出中心" })).toHaveCount(0);
   });
 });
 
