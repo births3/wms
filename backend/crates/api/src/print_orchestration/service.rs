@@ -13,23 +13,43 @@ use wms_domain::{
 };
 
 use crate::auth::AuthContext;
+use crate::file_attachment::FileAttachmentService;
 
 use super::{
-    repository::PgPrintOrchestrationRepository, DeliveryNoteGroup, IdempotentMutation,
-    PrintOrchestrationError,
+    render_worker::CategoryPdfRenderer, repository::PgPrintOrchestrationRepository,
+    DeliveryNoteGroup, IdempotentMutation, PrintOrchestrationError,
 };
 
 /// H9 delivery-note cutoff use cases.
 #[derive(Clone, Debug)]
 pub struct PrintOrchestrationService {
-    repository: PgPrintOrchestrationRepository,
+    pub(super) repository: PgPrintOrchestrationRepository,
+    pub(super) h_file: FileAttachmentService,
+    pub(super) category_pdf_renderer: CategoryPdfRenderer,
 }
 
 impl PrintOrchestrationService {
     /// Builds the H9 orchestration service with PostgreSQL persistence.
     pub fn with_postgres(pool: PgPool) -> Self {
+        let h_file = FileAttachmentService::disabled(pool.clone());
+        Self::with_pdf_dependencies(pool, h_file, CategoryPdfRenderer::Disabled)
+    }
+
+    /// Builds H9 tests with memory H-FILE and a deterministic PDF renderer.
+    pub fn with_file_attachment_for_tests(pool: PgPool, h_file: FileAttachmentService) -> Self {
+        Self::with_pdf_dependencies(pool, h_file, CategoryPdfRenderer::deterministic_for_tests())
+    }
+
+    /// Builds H9 with explicit H-FILE and browser-renderer dependencies.
+    pub fn with_pdf_dependencies(
+        pool: PgPool,
+        h_file: FileAttachmentService,
+        category_pdf_renderer: CategoryPdfRenderer,
+    ) -> Self {
         Self {
             repository: PgPrintOrchestrationRepository::new(pool),
+            h_file,
+            category_pdf_renderer,
         }
     }
 

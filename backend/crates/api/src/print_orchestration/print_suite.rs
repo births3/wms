@@ -612,19 +612,16 @@ impl PgPrintOrchestrationRepository {
             let readiness = compute_item_readiness(tx, ctx.owner_id, item, &orders).await?;
             instance_items.push((item.clone(), readiness));
         }
-        let any_required_not_ready = instance_items
-            .iter()
-            .any(|(item, readiness)| item.required && !readiness.ready);
         let pause_queue_policy = instance_items.iter().any(|(item, readiness)| {
             item.required
                 && !readiness.ready
                 && item.ready_policy == PrintSuiteReadyPolicy::PauseAgentQueue
         });
-        let (status, hold_scope) = if !any_required_not_ready {
-            ("queued", None)
-        } else if pause_queue_policy {
+        let (status, hold_scope) = if pause_queue_policy {
             ("waiting_documents", Some("agent_queue"))
         } else {
+            // US-H9-009: source readiness is necessary but not sufficient.
+            // The instance queues only after every category PDF is prepared.
             ("waiting_documents", Some("instance"))
         };
         let instance_id = Uuid::new_v4();

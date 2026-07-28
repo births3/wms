@@ -458,15 +458,22 @@ async fn compute_item_readiness(
                 let invoice_list = invoice_nos.iter().cloned().collect::<Vec<_>>();
                 let files = sqlx::query_as::<_, IngestedFileRow>(
                     r#"
-                    SELECT DISTINCT ON (invoice_no)
-                           id, file_ref, file_version, content_hash,
-                           invoice_no, product_code, batch_no
-                      FROM h9_ingested_document_files
-                     WHERE owner_id = $1
-                       AND category_code = 'invoice'
-                       AND status = 'valid'
-                       AND invoice_no = ANY($2)
-                     ORDER BY invoice_no, file_version DESC
+                    SELECT DISTINCT ON (binding.invoice_no)
+                           attachment.id,
+                           'h-file:' || attachment.id::text AS file_ref,
+                           attachment.file_version,
+                           attachment.content_hash,
+                           binding.invoice_no, binding.product_code, binding.batch_no
+                      FROM h9_document_file_bindings binding
+                      JOIN attachments attachment
+                        ON attachment.owner_id = binding.owner_id
+                       AND attachment.id = binding.attachment_id
+                     WHERE binding.owner_id = $1
+                       AND binding.category_code = 'invoice'
+                       AND attachment.status = 'ready'
+                       AND binding.invoice_no = ANY($2)
+                     ORDER BY binding.invoice_no, attachment.file_version DESC,
+                              attachment.created_at DESC, attachment.id DESC
                     "#,
                 )
                 .bind(owner_id)
@@ -505,15 +512,23 @@ async fn compute_item_readiness(
                     .collect::<Vec<_>>();
                 let files = sqlx::query_as::<_, IngestedFileRow>(
                     r#"
-                    SELECT DISTINCT ON (product_code, batch_no)
-                           id, file_ref, file_version, content_hash,
-                           invoice_no, product_code, batch_no
-                      FROM h9_ingested_document_files
-                     WHERE owner_id = $1
-                       AND category_code = 'drug_inspection_report'
-                       AND status = 'valid'
-                       AND product_code || '||' || batch_no = ANY($2)
-                     ORDER BY product_code, batch_no, file_version DESC
+                    SELECT DISTINCT ON (binding.product_code, binding.batch_no)
+                           attachment.id,
+                           'h-file:' || attachment.id::text AS file_ref,
+                           attachment.file_version,
+                           attachment.content_hash,
+                           binding.invoice_no, binding.product_code, binding.batch_no
+                      FROM h9_document_file_bindings binding
+                      JOIN attachments attachment
+                        ON attachment.owner_id = binding.owner_id
+                       AND attachment.id = binding.attachment_id
+                     WHERE binding.owner_id = $1
+                       AND binding.category_code = 'drug_inspection_report'
+                       AND attachment.status = 'ready'
+                       AND binding.product_code || '||' || binding.batch_no = ANY($2)
+                     ORDER BY binding.product_code, binding.batch_no,
+                              attachment.file_version DESC,
+                              attachment.created_at DESC, attachment.id DESC
                     "#,
                 )
                 .bind(owner_id)

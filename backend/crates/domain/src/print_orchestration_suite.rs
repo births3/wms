@@ -194,6 +194,52 @@ pub struct PrintSuiteInstanceListResponse {
     pub data: Vec<PrintSuiteInstance>,
 }
 
+/// H9 分类 PDF 产物；稳定事实只保存 H-FILE ID、版本与哈希，不保存临时访问 URL。
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+pub struct CategoryPdfOutput {
+    pub id: Uuid,
+    pub instance_id: Uuid,
+    pub instance_item_id: Uuid,
+    pub sort_order: i32,
+    pub category_code: String,
+    pub source_mode: PrintSuiteSourceMode,
+    pub source_data_version: Option<String>,
+    pub source_file_bindings: Vec<PrintSuiteFileBinding>,
+    pub template_version_id: Option<Uuid>,
+    pub attachment_id: Option<Uuid>,
+    pub content_hash: Option<String>,
+    pub processing_status: String,
+    pub failure_reason: Option<String>,
+    pub retention_policy: String,
+    pub cache_expires_at: Option<DateTime<Utc>>,
+    pub attempt_count: i32,
+    pub created_at: DateTime<Utc>,
+    pub processed_at: Option<DateTime<Utc>>,
+}
+
+/// 一次分类 PDF 准备结果；同一实例只能复用最初的幂等键重试。
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+pub struct CategoryPdfPreparation {
+    pub instance_id: Uuid,
+    pub idempotency_key: String,
+    pub status: String,
+    pub outputs: Vec<CategoryPdfOutput>,
+}
+
+/// H9 分类 PDF 产物列表。
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+pub struct CategoryPdfOutputListResponse {
+    pub data: Vec<CategoryPdfOutput>,
+    pub preparation_status: Option<String>,
+    pub retry_idempotency_key: Option<String>,
+}
+
+/// 临时合并或下载的分类 PDF 选择；空数组表示全部已就绪分类。
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+pub struct SelectCategoryPdfsRequest {
+    pub category_pdf_ids: Vec<Uuid>,
+}
+
 /// M1 系统字典 print_document_category 的一条受控分类。
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 pub struct PrintDocumentCategory {
