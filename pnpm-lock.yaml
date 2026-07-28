@@ -6,6 +6,15 @@ settings:
 
 importers:
 
+  apps/h9-render-worker:
+    dependencies:
+      hiprint:
+        specifier: 0.4.0
+        version: 0.4.0(supports-color@10.2.2)
+      playwright-core:
+        specifier: 1.60.0
+        version: 1.60.0
+
   apps/web-admin:
     dependencies:
       '@tanstack/react-query':
