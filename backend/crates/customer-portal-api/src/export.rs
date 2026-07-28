@@ -331,12 +331,19 @@ async fn build_export(
     // 先写 .part 再原子改名，任务中途失败不会留下半截 ZIP。
     let part_path = target.with_extension("zip.part");
     let part_for_task = part_path.clone();
-    tokio::task::spawn_blocking(move || write_zip(&part_for_task, &rows, unique_files))
-        .await
-        .map_err(|error| PortalError::Internal(error.to_string()))??;
-    tokio::fs::rename(&part_path, &target)
-        .await
-        .map_err(|error| PortalError::Internal(error.to_string()))?;
+    let write_result =
+        tokio::task::spawn_blocking(move || write_zip(&part_for_task, &rows, unique_files))
+            .await
+            .map_err(|error| PortalError::Internal(error.to_string()))
+            .and_then(|inner| inner);
+    if let Err(error) = write_result {
+        let _ = tokio::fs::remove_file(&part_path).await;
+        return Err(error);
+    }
+    if let Err(error) = tokio::fs::rename(&part_path, &target).await {
+        let _ = tokio::fs::remove_file(&part_path).await;
+        return Err(PortalError::Internal(error.to_string()));
+    }
     Ok((
         storage_key,
         file_name,

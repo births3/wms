@@ -297,6 +297,30 @@ fn resolve_storage_path(
     Ok(root.join(relative))
 }
 
+#[cfg(test)]
+mod resolve_storage_path_tests {
+    use super::resolve_storage_path;
+    use std::path::Path;
+
+    #[test]
+    fn accepts_nested_normal_components() {
+        let path = resolve_storage_path(Path::new("/var/wms"), "M-DI/entity/file.pdf")
+            .unwrap_or_else(|_| panic!("nested key should resolve"));
+        assert_eq!(path, Path::new("/var/wms/M-DI/entity/file.pdf"));
+    }
+
+    #[test]
+    fn rejects_empty_absolute_and_parent_components() {
+        let root = Path::new("/var/wms");
+        assert!(resolve_storage_path(root, "").is_err());
+        assert!(resolve_storage_path(root, "/etc/passwd").is_err());
+        assert!(resolve_storage_path(root, "../secret").is_err());
+        assert!(resolve_storage_path(root, "a/../b").is_err());
+        // Path 会折叠 `./`，故 `a/./b` 等价于安全相对路径，不单独拒绝。
+        assert!(resolve_storage_path(root, "a/./b").is_ok());
+    }
+}
+
 fn header_value(
     headers: &HeaderMap,
     name: header::HeaderName,
