@@ -30,6 +30,9 @@ pub struct DeliveryNoteGroup {
     pub scheduled_cutoff_at: Option<DateTime<Utc>>,
     pub cutoff_at: DateTime<Utc>,
     pub order_ids: Vec<Uuid>,
+    pub aggregation_rule_version_id: Option<Uuid>,
+    pub aggregation_rule_version_no: Option<i32>,
+    pub aggregation_group_key: serde_json::Value,
 }
 
 /// H9 待截单出库订单。
@@ -187,6 +190,144 @@ pub struct CutoffPlanListResponse {
     pub data: Vec<CutoffPlan>,
 }
 
+/// H9 可用于等值归组的受控出库订单字段。
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AggregationFieldCode {
+    DocumentType,
+    ErpOrderNo,
+    InvoiceNo,
+    TransportModeCode,
+    DepartmentCode,
+    SalesGroupCode,
+    OrderGroupNo,
+    BusinessTypeCode,
+}
+
+impl AggregationFieldCode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::DocumentType => "document_type",
+            Self::ErpOrderNo => "erp_order_no",
+            Self::InvoiceNo => "invoice_no",
+            Self::TransportModeCode => "transport_mode_code",
+            Self::DepartmentCode => "department_code",
+            Self::SalesGroupCode => "sales_group_code",
+            Self::OrderGroupNo => "order_group_no",
+            Self::BusinessTypeCode => "business_type_code",
+        }
+    }
+}
+
+impl TryFrom<&str> for AggregationFieldCode {
+    type Error = ();
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "document_type" => Ok(Self::DocumentType),
+            "erp_order_no" => Ok(Self::ErpOrderNo),
+            "invoice_no" => Ok(Self::InvoiceNo),
+            "transport_mode_code" => Ok(Self::TransportModeCode),
+            "department_code" => Ok(Self::DepartmentCode),
+            "sales_group_code" => Ok(Self::SalesGroupCode),
+            "order_group_no" => Ok(Self::OrderGroupNo),
+            "business_type_code" => Ok(Self::BusinessTypeCode),
+            _ => Err(()),
+        }
+    }
+}
+
+/// H9 归组方法；首个正式版本前只允许受控等值归组。
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AggregationMethod {
+    Equals,
+}
+
+/// H9 一条有序归集维度。
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+pub struct AggregationDimension {
+    pub field_code: AggregationFieldCode,
+    pub method: AggregationMethod,
+    pub order: u16,
+}
+
+/// H9 归集字段目录项。
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+pub struct AggregationFieldDefinition {
+    pub field_code: AggregationFieldCode,
+    pub display_name: String,
+    pub value_type: String,
+    pub method: AggregationMethod,
+}
+
+/// H9 归集字段目录。
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+pub struct AggregationFieldCatalogResponse {
+    pub data: Vec<AggregationFieldDefinition>,
+}
+
+/// 创建下一版 H9 归集规则草稿。
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+pub struct CreateAggregationRuleDraftRequest {
+    pub name: String,
+    pub dimensions: Vec<AggregationDimension>,
+}
+
+/// H9 归集规则不可变版本。
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+pub struct AggregationRuleVersion {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub version_no: i32,
+    pub name: String,
+    pub status: String,
+    pub dimensions: Vec<AggregationDimension>,
+    pub tested_at: Option<DateTime<Utc>>,
+    pub published_at: Option<DateTime<Utc>>,
+    pub disabled_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+}
+
+/// H9 归集规则版本列表。
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+pub struct AggregationRuleVersionListResponse {
+    pub data: Vec<AggregationRuleVersion>,
+}
+
+/// 使用真实出库订单测试一版归集规则。
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+pub struct TestAggregationRuleRequest {
+    pub order_ids: Vec<Uuid>,
+}
+
+/// 样本测试中一项可解释的分组键。
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+pub struct AggregationGroupKeyItem {
+    pub field_code: String,
+    pub display_name: String,
+    pub value: String,
+}
+
+/// 样本测试的一组预计归集结果。
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+pub struct AggregationRuleTestGroup {
+    pub warehouse_id: Uuid,
+    pub delivery_address_id: Uuid,
+    pub group_key: Vec<AggregationGroupKeyItem>,
+    pub order_ids: Vec<Uuid>,
+    pub order_nos: Vec<String>,
+}
+
+/// H9 归集规则样本测试结果。
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+pub struct AggregationRuleTestResult {
+    pub rule: AggregationRuleVersion,
+    pub groups: Vec<AggregationRuleTestGroup>,
+}
+
+include!("print_orchestration_suite.rs");
+
 /// 人工截单的纯业务校验失败。
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ManualDeliveryNoteCutoffValidationError {
@@ -219,6 +360,17 @@ pub enum CutoffPlanValidationError {
     InvalidCutoffTime,
     DuplicateExceptionDate,
     InvalidEffectivePeriod,
+}
+
+/// 归集规则草稿的纯业务校验失败。
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum AggregationRuleValidationError {
+    NameRequired,
+    NameTooLong,
+    DimensionsRequired,
+    DuplicateField,
+    DuplicateOrder,
+    InvalidOrderSequence,
 }
 
 /// 校验人工截单命令中不依赖数据库的业务约束。
@@ -329,6 +481,42 @@ pub fn validate_cutoff_plan(
         .is_some_and(|effective_to| effective_to <= request.effective_from)
     {
         return Err(CutoffPlanValidationError::InvalidEffectivePeriod);
+    }
+    Ok(())
+}
+
+/// 校验归集规则仅包含有序、受控、等值维度。
+pub fn validate_aggregation_rule(
+    request: &CreateAggregationRuleDraftRequest,
+) -> Result<(), AggregationRuleValidationError> {
+    let name = request.name.trim();
+    if name.is_empty() {
+        return Err(AggregationRuleValidationError::NameRequired);
+    }
+    if name.chars().count() > 100 {
+        return Err(AggregationRuleValidationError::NameTooLong);
+    }
+    if request.dimensions.is_empty() {
+        return Err(AggregationRuleValidationError::DimensionsRequired);
+    }
+    let mut fields = HashSet::new();
+    let mut orders = HashSet::new();
+    for dimension in &request.dimensions {
+        if !fields.insert(dimension.field_code) {
+            return Err(AggregationRuleValidationError::DuplicateField);
+        }
+        if dimension.order == 0 || !orders.insert(dimension.order) {
+            return Err(AggregationRuleValidationError::DuplicateOrder);
+        }
+    }
+    let mut sorted_orders = orders.into_iter().collect::<Vec<_>>();
+    sorted_orders.sort_unstable();
+    if sorted_orders
+        .iter()
+        .enumerate()
+        .any(|(index, order)| usize::from(*order) != index + 1)
+    {
+        return Err(AggregationRuleValidationError::InvalidOrderSequence);
     }
     Ok(())
 }
