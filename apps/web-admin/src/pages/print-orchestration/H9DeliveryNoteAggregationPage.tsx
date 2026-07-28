@@ -17,7 +17,7 @@ import {
   type QueryPanelField,
   type QueryPanelValue,
 } from "@wms/ui";
-import { CalendarClock, Route } from "lucide-react";
+import { CalendarClock, FlaskConical, Power, Route, Upload } from "lucide-react";
 
 import type { CurrentUser } from "@/features/auth/auth-queries";
 import {
@@ -25,14 +25,21 @@ import {
   useMasterDataRowsQuery,
 } from "@/features/master-data/master-data-queries/queries";
 import {
+  useAggregationFieldsQuery,
+  useAggregationRulesQuery,
+  useCreateAggregationRuleDraftMutation,
   useCreateCutoffPlanMutation,
   useCutoffPlansQuery,
   useDeliveryNoteCandidatesQuery,
   useDeliveryNoteGroupsQuery,
+  useDisableAggregationRuleMutation,
   useManualDeliveryNoteCutoffMutation,
+  usePublishAggregationRuleMutation,
   usePublishCutoffPlanMutation,
   usePublishRouteBindingMutation,
   useRouteBindingsQuery,
+  useTestAggregationRuleMutation,
+  type AggregationRuleVersion,
   type CutoffPlan,
   type DeliveryNoteCandidate,
   type DeliveryNoteGroupListItem,
@@ -42,10 +49,17 @@ import { formatDateTime } from "@/lib/format";
 import { queryString, queryValueFromUnknown } from "@/lib/query-value";
 import { usePageQueryState } from "@/lib/use-page-query-state";
 import {
+  AggregationRuleDialog,
+  AggregationRuleTestDialog,
   CutoffPlanDialog,
   ManualCutoffDialog,
   RouteBindingDialog,
 } from "./H9DeliveryNoteAggregationDialogs";
+import {
+  H9LifecycleConfirmDialog,
+  type H9LifecycleConfirmation,
+} from "./H9LifecycleConfirmDialog";
+import { H9PrintSuitePanel } from "./H9PrintSuitePanel";
 
 /**
  * 页面设计契约：列表/配置工作台；主信息为 QueryPanel + Tabs + DataGrid；
@@ -53,6 +67,10 @@ import {
  */
 
 export const h9DeliveryNoteCoreQueryFieldKeys = ["warehouseId", "keyword"];
+
+type AggregationLifecycleAction =
+  | { kind: "publish-plan"; plan: CutoffPlan }
+  | { kind: "publish-rule" | "disable-rule"; rule: AggregationRuleVersion };
 
 export function H9DeliveryNoteAggregationPage({ currentUser }: { currentUser: CurrentUser }) {
   const warehousesQuery = useMasterDataRowsQuery("m1-warehouses");
@@ -72,11 +90,21 @@ export function H9DeliveryNoteAggregationPage({ currentUser }: { currentUser: Cu
   const publishRoute = usePublishRouteBindingMutation();
   const createPlan = useCreateCutoffPlanMutation();
   const publishPlan = usePublishCutoffPlanMutation();
+  const aggregationFieldsQuery = useAggregationFieldsQuery();
+  const rulesQuery = useAggregationRulesQuery();
+  const createRule = useCreateAggregationRuleDraftMutation();
+  const testRule = useTestAggregationRuleMutation();
+  const publishRule = usePublishAggregationRuleMutation();
+  const disableRule = useDisableAggregationRuleMutation();
   const [candidateIds, setCandidateIds] = React.useState<string[]>([]);
   const [planIds, setPlanIds] = React.useState<string[]>([]);
+  const [ruleIds, setRuleIds] = React.useState<string[]>([]);
   const [manualOpen, setManualOpen] = React.useState(false);
   const [routeOpen, setRouteOpen] = React.useState(false);
   const [planOpen, setPlanOpen] = React.useState(false);
+  const [ruleOpen, setRuleOpen] = React.useState(false);
+  const [ruleTestOpen, setRuleTestOpen] = React.useState(false);
+  const [lifecycleAction, setLifecycleAction] = React.useState<AggregationLifecycleAction | null>(null);
   const [notice, setNotice] = React.useState<string | null>(null);
   const canWrite = currentUser.permissions.includes("h9.print_orchestration.write");
 
@@ -124,6 +152,8 @@ export function H9DeliveryNoteAggregationPage({ currentUser }: { currentUser: Cu
   );
   const selectedCandidates = candidates.filter((item) => candidateIds.includes(item.outbound_order_id));
   const selectedPlan = plans.find((item) => planIds.includes(item.id)) ?? null;
+  const rules = rulesQuery.data ?? [];
+  const selectedRule = rules.find((item) => ruleIds.includes(item.id)) ?? null;
   const selectionValid = oneBoundary(selectedCandidates);
   const querySummaryItems = React.useMemo(
     () => buildQueryPanelSummaryItems(h9DeliveryNoteQueryFields, appliedQuery),
@@ -174,13 +204,91 @@ export function H9DeliveryNoteAggregationPage({ currentUser }: { currentUser: Cu
     icon: <Route className="size-4" aria-hidden />,
     disabled: !canWrite || !selectedPlan || selectedPlan.status !== "draft" || publishPlan.isPending,
     onClick: () => {
-      if (!selectedPlan || !window.confirm(`确认发布截单计划“${selectedPlan.name}”？`)) return;
-      void publishPlan.mutateAsync(selectedPlan.id).then(() => {
-        setPlanIds([]);
-        setNotice(`截单计划“${selectedPlan.name}”已发布`);
-      }).catch(() => undefined);
+      if (!selectedPlan) return;
+      publishPlan.reset();
+      setLifecycleAction({ kind: "publish-plan", plan: selectedPlan });
     },
   };
+
+  const ruleCreateAction: DataGridCreateAction = {
+    label: "新建规则版本",
+    description: "从已登记字段目录创建下一版归集规则草稿",
+    disabled: !canWrite || createRule.isPending,
+    onClick: () => {
+      createRule.reset();
+      setRuleOpen(true);
+    },
+  };
+  const ruleTestAction: DataGridToolbarAction = {
+    key: "test-rule",
+    label: "测试规则",
+    description: "用真实样本订单展示分组键与预计归集结果",
+    icon: <FlaskConical className="size-4" aria-hidden />,
+    disabled: !canWrite || !selectedRule || !["draft", "tested"].includes(selectedRule.status) || testRule.isPending,
+    onClick: () => {
+      testRule.reset();
+      setRuleTestOpen(true);
+    },
+  };
+  const rulePublishAction: DataGridToolbarAction = {
+    key: "publish-rule",
+    label: "发布规则",
+    description: "发布已测试版本；同货主旧发布版本自动停用",
+    icon: <Upload className="size-4" aria-hidden />,
+    disabled: !canWrite || !selectedRule || selectedRule.status !== "tested" || publishRule.isPending,
+    onClick: () => {
+      if (!selectedRule) return;
+      publishRule.reset();
+      setLifecycleAction({ kind: "publish-rule", rule: selectedRule });
+    },
+  };
+  const ruleDisableAction: DataGridToolbarAction = {
+    key: "disable-rule",
+    label: "停用规则",
+    description: "停用当前发布版本，恢复仅按硬边界归集",
+    icon: <Power className="size-4" aria-hidden />,
+    disabled: !canWrite || !selectedRule || selectedRule.status !== "published" || disableRule.isPending,
+    onClick: () => {
+      if (!selectedRule) return;
+      disableRule.reset();
+      setLifecycleAction({ kind: "disable-rule", rule: selectedRule });
+    },
+  };
+
+  const lifecycleConfirmation: H9LifecycleConfirmation | null = lifecycleAction
+    ? lifecycleAction.kind === "publish-plan"
+      ? {
+          title: "发布截单计划",
+          description: `确认发布截单计划“${lifecycleAction.plan.name}”？发布后将参与自动截单。`,
+          confirmLabel: "确认发布",
+        }
+      : {
+          title: lifecycleAction.kind === "publish-rule" ? "发布归集规则" : "停用归集规则",
+          description: lifecycleAction.kind === "publish-rule"
+            ? `确认发布归集规则 V${lifecycleAction.rule.version_no}「${lifecycleAction.rule.name}」？同货主旧发布版本将自动停用。`
+            : `确认停用归集规则 V${lifecycleAction.rule.version_no}「${lifecycleAction.rule.name}」？新订单将恢复按硬边界归集。`,
+          confirmLabel: lifecycleAction.kind === "publish-rule" ? "确认发布" : "确认停用",
+          destructive: lifecycleAction.kind === "disable-rule",
+        }
+    : null;
+
+  async function confirmLifecycleAction() {
+    if (!lifecycleAction) return;
+    if (lifecycleAction.kind === "publish-plan") {
+      const plan = lifecycleAction.plan;
+      await publishPlan.mutateAsync(plan.id);
+      setPlanIds([]);
+      setLifecycleAction(null);
+      setNotice(`截单计划“${plan.name}”已发布`);
+      return;
+    }
+    const rule = lifecycleAction.kind === "publish-rule"
+      ? await publishRule.mutateAsync(lifecycleAction.rule.id)
+      : await disableRule.mutateAsync(lifecycleAction.rule.id);
+    setRuleIds([]);
+    setLifecycleAction(null);
+    setNotice(`归集规则 V${rule.version_no} 已${lifecycleAction.kind === "publish-rule" ? "发布" : "停用"}`);
+  }
 
   async function submitManual(reason: string) {
     const first = selectedCandidates[0];
@@ -239,6 +347,8 @@ export function H9DeliveryNoteAggregationPage({ currentUser }: { currentUser: Cu
           <TabsTrigger value="groups">截单结果（{groups.length}）</TabsTrigger>
           <TabsTrigger value="plans">截单计划（{plans.length}）</TabsTrigger>
           <TabsTrigger value="routes">线路绑定（{routes.length}）</TabsTrigger>
+          <TabsTrigger value="rules">归集规则（{rules.length}）</TabsTrigger>
+          <TabsTrigger value="print-suites">打印组套</TabsTrigger>
         </TabsList>
         <TabsContent value="candidates">
           <DataGrid
@@ -309,6 +419,36 @@ export function H9DeliveryNoteAggregationPage({ currentUser }: { currentUser: Cu
             tableClassName="min-w-[1200px]"
           />
         </TabsContent>
+        <TabsContent value="rules">
+          <p className="mb-3 text-sm text-muted-foreground">
+            维度只能从已登记订单标准字段中等值归组；货主 + 仓库 + 送货地址是不可覆盖的硬边界，规则不能跨地址归集。
+          </p>
+          <DataGrid
+            columns={ruleColumns}
+            data={rules}
+            rowKey={(row) => row.id}
+            storageKey="h9-aggregation-rules"
+            emptyTitle="暂无归集规则版本"
+            emptyDescription="未发布规则时按仓库 + 送货地址硬边界整体归集"
+            caption={rulesQuery.isPending ? "加载归集规则..." : undefined}
+            refreshAction={refreshAction(rulesQuery, "归集规则")}
+            createAction={ruleCreateAction}
+            toolbarActions={[ruleTestAction, rulePublishAction, ruleDisableAction]}
+            selectedRowKeys={ruleIds}
+            onSelectedRowKeysChange={(keys) => setRuleIds(keys.length ? [keys.at(-1) as string] : [])}
+            selectable
+            tableClassName="min-w-[1180px]"
+          />
+        </TabsContent>
+        <TabsContent value="print-suites">
+          <H9PrintSuitePanel
+            canWrite={canWrite}
+            warehouses={warehouseOptions}
+            customers={customerOptions}
+            groups={groupsQuery.data ?? []}
+            onNotice={setNotice}
+          />
+        </TabsContent>
       </Tabs>
       <ManualCutoffDialog
         open={manualOpen}
@@ -344,8 +484,84 @@ export function H9DeliveryNoteAggregationPage({ currentUser }: { currentUser: Cu
           setNotice(`截单计划“${request.name}”草稿已保存`);
         }}
       />
+      <AggregationRuleDialog
+        open={ruleOpen}
+        pending={createRule.isPending}
+        errorMessage={createRule.error?.message ?? aggregationFieldsQuery.error?.message}
+        fields={aggregationFieldsQuery.data ?? []}
+        onOpenChange={setRuleOpen}
+        onSubmit={async (request) => {
+          const rule = await createRule.mutateAsync(request);
+          setRuleOpen(false);
+          setNotice(`归集规则草稿 V${rule.version_no}「${rule.name}」已保存`);
+        }}
+      />
+      <AggregationRuleTestDialog
+        open={ruleTestOpen}
+        pending={testRule.isPending}
+        errorMessage={testRule.error?.message}
+        rule={selectedRule}
+        candidates={candidates}
+        result={testRule.data ?? null}
+        onOpenChange={(next) => {
+          setRuleTestOpen(next);
+          if (!next) testRule.reset();
+        }}
+        onSubmit={async (orderIds) => {
+          if (!selectedRule) return;
+          const result = await testRule.mutateAsync({ versionId: selectedRule.id, orderIds });
+          setNotice(`规则 V${result.rule.version_no} 测试完成：${result.groups.length} 组`);
+        }}
+      />
+      <H9LifecycleConfirmDialog
+        confirmation={lifecycleConfirmation}
+        pending={publishPlan.isPending || publishRule.isPending || disableRule.isPending}
+        errorMessage={
+          lifecycleAction?.kind === "publish-plan"
+            ? publishPlan.error?.message
+            : lifecycleAction?.kind === "publish-rule"
+              ? publishRule.error?.message
+              : disableRule.error?.message
+        }
+        onOpenChange={(open) => {
+          if (!open) setLifecycleAction(null);
+        }}
+        onConfirm={() => void confirmLifecycleAction().catch(() => undefined)}
+      />
     </section>
   );
+}
+
+const ruleColumns: DataGridColumn<AggregationRuleVersion>[] = [
+  { key: "version_no", header: "版本", width: 80, mono: true, render: (row) => `V${row.version_no}` },
+  { key: "name", header: "规则名称", width: 220, render: (row) => row.name },
+  { key: "status", header: "状态", width: 110, render: (row) => <StatusBadge status={ruleStatusKey(row.status)} label={ruleStatusLabel(row.status)} size="sm" /> },
+  { key: "dimensions", header: "维度顺序（等值归组）", width: 340, render: (row) => row.dimensions.map((item) => aggregationFieldLabel(item.field_code)).join(" → ") },
+  { key: "tested_at", header: "测试时间", width: 170, render: (row) => row.tested_at ? formatDateTime(row.tested_at) : "-" },
+  { key: "published_at", header: "发布时间", width: 170, render: (row) => row.published_at ? formatDateTime(row.published_at) : "-" },
+  { key: "created_at", header: "创建时间", width: 170, defaultHidden: true, render: (row) => formatDateTime(row.created_at) },
+];
+
+function ruleStatusKey(status: string) {
+  return status === "published" ? "completed" : status === "disabled" ? "expired" : status === "tested" ? "in_progress" : "pending";
+}
+
+function ruleStatusLabel(status: string) {
+  return status === "published" ? "已发布" : status === "disabled" ? "已停用" : status === "tested" ? "已测试" : "草稿";
+}
+
+export function aggregationFieldLabel(code: string) {
+  const labels: Record<string, string> = {
+    document_type: "单据类型",
+    erp_order_no: "ERP 订单号",
+    invoice_no: "发票号",
+    transport_mode_code: "运输方式",
+    department_code: "业务部门",
+    sales_group_code: "销售组",
+    order_group_no: "订单组号",
+    business_type_code: "业务类型",
+  };
+  return labels[code] ?? code;
 }
 
 const candidateColumns: DataGridColumn<DeliveryNoteCandidate>[] = [
