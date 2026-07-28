@@ -359,6 +359,58 @@ pub struct ShipOutboundOrderRequest {
     pub shipped_at: Option<DateTime<Utc>>,
 }
 
+/// M4 采购退货出库固定单据类型。
+pub const PURCHASE_RETURN_DOCUMENT_TYPE: &str = "purchase_return_outbound";
+/// M4 采购退货出库固定审批来源。
+pub const PURCHASE_RETURN_APPROVAL_SOURCE: &str = "purchase_return_approval";
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CreatePurchaseReturnRequest {
+    pub return_no: String,
+    pub source_purchase_order_no: String,
+    pub supplier_id: Option<Uuid>,
+    pub supplier_name: String,
+    pub reason: String,
+    pub warehouse_id: Uuid,
+    pub product_code: String,
+    pub qty: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct RejectPurchaseReturnRequest {
+    /// 驳回原因（必填，不允许空白）。
+    pub reason: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct PurchaseReturnOrder {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub warehouse_id: Uuid,
+    pub return_no: String,
+    pub document_type: String,
+    pub source_purchase_order_no: String,
+    pub supplier_id: Option<Uuid>,
+    pub supplier_name: String,
+    pub reason: String,
+    pub approval_source: String,
+    pub status: String,
+    pub product_code: String,
+    pub qty: i64,
+    pub reject_reason: Option<String>,
+    pub shipped_at: Option<DateTime<Utc>>,
+    pub shipped_by: Option<Uuid>,
+    pub shipped_by_name: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct PurchaseReturnOrderListResponse {
+    pub data: Vec<PurchaseReturnOrder>,
+    pub page: PageMeta,
+}
+
 #[cfg(test)]
 mod tests {
     use chrono::TimeZone;
