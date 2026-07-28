@@ -61,6 +61,8 @@ mod openapi_contract;
 pub mod outbound;
 pub mod packing_station;
 pub mod parameter_mapping;
+pub mod print_device;
+pub mod print_device_handlers;
 pub mod print_orchestration;
 pub mod print_orchestration_handlers;
 pub mod print_orchestration_job;

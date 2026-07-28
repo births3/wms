@@ -40,6 +40,7 @@ use wms_api::{
     },
     master_data_handlers::{master_data_router, MasterDataAppState},
     parameter_mapping::{parameter_mapping_router, ParameterMappingAppState},
+    print_device_handlers::{print_device_router, PrintDeviceAppState},
     print_orchestration_handlers::{print_orchestration_router, PrintOrchestrationAppState},
     print_template_handlers::{print_template_router, PrintTemplateAppState},
     quality_liaison_handlers::{quality_liaison_router, QualityLiaisonAppState},
@@ -352,6 +353,9 @@ fn app(
         .merge(print_orchestration_router(
             PrintOrchestrationAppState::with_postgres(shared_pool.clone()),
         ))
+        .merge(print_device_router(PrintDeviceAppState::with_postgres(
+            shared_pool.clone(),
+        )))
         .merge(wechat_notify_router(wechat_notify_state))
         .merge(express_router(express_state))
         .merge(wave3_router(wave3_state))
