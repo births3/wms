@@ -659,6 +659,7 @@ pub async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
 
     crate::wms_api_e2e_seed_h9::seed_h9_business_print_templates(pool).await?;
     crate::wms_api_e2e_seed_h9::seed_h9_delivery_note_aggregation(pool).await?;
+    crate::wms_api_e2e_seed_h9::seed_h9_print_devices(pool).await?;
     sqlx::query(
         r#"
         INSERT INTO document_number_rules (

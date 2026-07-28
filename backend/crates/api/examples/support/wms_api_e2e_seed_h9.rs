@@ -230,6 +230,365 @@ pub async fn seed_h9_delivery_note_aggregation(pool: &PgPool) -> Result<(), Box<
     .bind(address_id)
     .execute(pool)
     .await?;
+    // US-H9-007：同边界（仓库/客户/地址/线路）但发票号不同的两张候选订单，
+    // 供归集维度规则的样本测试展示按发票号拆分的分组结果。
+    for (order_uuid, order_no, erp_no, invoice_no) in [
+        (
+            "00000000-0000-0000-0000-000000009607",
+            "OUT-H9-E2E-007",
+            "ERP-H9-E2E-007",
+            "INV-H9-E2E-007",
+        ),
+        (
+            "00000000-0000-0000-0000-000000009608",
+            "OUT-H9-E2E-008",
+            "ERP-H9-E2E-008",
+            "INV-H9-E2E-008",
+        ),
+    ] {
+        let rule_sample_order_id = Uuid::parse_str(order_uuid).expect("valid rule sample order id");
+        sqlx::query(
+            r#"
+            INSERT INTO outbound_orders (
+                id, owner_id, document_type, wms_order_no, erp_order_no,
+                customer_id, warehouse_id, invoice_no, status, created_at
+            )
+            VALUES ($1, $2, 'sales_outbound', $3, $4,
+                    $5, $6, $7, 'confirmed', '2026-07-26T08:05:00Z')
+            ON CONFLICT (id) DO UPDATE
+            SET invoice_no = EXCLUDED.invoice_no,
+                status = CASE
+                WHEN EXISTS (
+                    SELECT 1 FROM h9_delivery_note_group_orders
+                     WHERE owner_id = EXCLUDED.owner_id AND outbound_order_id = EXCLUDED.id
+                ) THEN outbound_orders.status
+                ELSE 'confirmed'
+            END
+            "#,
+        )
+        .bind(rule_sample_order_id)
+        .bind(owner_id)
+        .bind(order_no)
+        .bind(erp_no)
+        .bind(customer_id)
+        .bind(warehouse_id)
+        .bind(invoice_no)
+        .execute(pool)
+        .await?;
+        sqlx::query(
+            r#"
+            INSERT INTO h9_outbound_route_snapshots (
+                outbound_order_id, owner_id, warehouse_id, customer_id,
+                delivery_address_id, route_code, frozen_at
+            )
+            VALUES ($1, $2, $3, $4, $5, 'LINE-H9-E2E-006', '2026-07-26T08:05:00Z')
+            ON CONFLICT (outbound_order_id) DO NOTHING
+            "#,
+        )
+        .bind(rule_sample_order_id)
+        .bind(owner_id)
+        .bind(warehouse_id)
+        .bind(customer_id)
+        .bind(address_id)
+        .execute(pool)
+        .await?;
+    }
+    seed_h9_print_suite_samples(
+        pool,
+        owner_id,
+        warehouse_id,
+        customer_id,
+        address_id,
+        actor_id,
+    )
+    .await?;
+    Ok(())
+}
+
+/// US-H9-008：打印组套样本数据——一个已截单的样本归集组（含发票号与商品批号）、
+/// 一张待截单候选订单，以及发票/药检单的已摄取稳定文件引用（H-FILE 占位登记表）。
+async fn seed_h9_print_suite_samples(
+    pool: &PgPool,
+    owner_id: Uuid,
+    warehouse_id: Uuid,
+    customer_id: Uuid,
+    address_id: Uuid,
+    actor_id: Uuid,
+) -> Result<(), Box<dyn Error>> {
+    let sample_order_id = Uuid::parse_str("00000000-0000-0000-0000-000000009609")?;
+    let sample_group_id = Uuid::parse_str("00000000-0000-0000-0000-000000009610")?;
+    let candidate_order_id = Uuid::parse_str("00000000-0000-0000-0000-000000009611")?;
+    // 样本归集组的源订单：已归集，不再出现在待截单列表。
+    sqlx::query(
+        r#"
+        INSERT INTO outbound_orders (
+            id, owner_id, document_type, wms_order_no, erp_order_no,
+            customer_id, warehouse_id, invoice_no, status, created_at
+        )
+        VALUES ($1, $2, 'sales_outbound', 'OUT-H9-E2E-009', 'ERP-H9-E2E-009',
+                $3, $4, 'INV-H9-E2E-009', 'confirmed', '2026-07-26T08:10:00Z')
+        ON CONFLICT (id) DO NOTHING
+        "#,
+    )
+    .bind(sample_order_id)
+    .bind(owner_id)
+    .bind(customer_id)
+    .bind(warehouse_id)
+    .execute(pool)
+    .await?;
+    sqlx::query(
+        r#"
+        INSERT INTO outbound_order_lines (
+            id, outbound_order_id, owner_id, line_no, product_code, batch_no, planned_qty
+        )
+        VALUES ('00000000-0000-0000-0000-000000009612', $1, $2, 1,
+                'PROD-H9-E2E', 'BATCH-H9-E2E', 10)
+        ON CONFLICT (id) DO NOTHING
+        "#,
+    )
+    .bind(sample_order_id)
+    .bind(owner_id)
+    .execute(pool)
+    .await?;
+    sqlx::query(
+        r#"
+        INSERT INTO h9_outbound_route_snapshots (
+            outbound_order_id, owner_id, warehouse_id, customer_id,
+            delivery_address_id, route_code, frozen_at
+        )
+        VALUES ($1, $2, $3, $4, $5, 'LINE-H9-E2E-006', '2026-07-26T08:10:00Z')
+        ON CONFLICT (outbound_order_id) DO NOTHING
+        "#,
+    )
+    .bind(sample_order_id)
+    .bind(owner_id)
+    .bind(warehouse_id)
+    .bind(customer_id)
+    .bind(address_id)
+    .execute(pool)
+    .await?;
+    sqlx::query(
+        r#"
+        INSERT INTO h9_delivery_note_groups (
+            id, owner_id, warehouse_id, customer_id, delivery_address_id,
+            route_code, delivery_note_no, cutoff_mode, cutoff_reason,
+            cutoff_at, created_by
+        )
+        VALUES ($1, $2, $3, $4, $5, 'LINE-H9-E2E-006', 'SHTX-E2E-H9-008-0001',
+                'manual', 'US-H9-008 组套样本种子', '2026-07-26T09:00:00Z', $6)
+        ON CONFLICT (id) DO NOTHING
+        "#,
+    )
+    .bind(sample_group_id)
+    .bind(owner_id)
+    .bind(warehouse_id)
+    .bind(customer_id)
+    .bind(address_id)
+    .bind(actor_id)
+    .execute(pool)
+    .await?;
+    sqlx::query(
+        r#"
+        INSERT INTO h9_delivery_note_group_orders (
+            group_id, owner_id, outbound_order_id, warehouse_id,
+            customer_id, delivery_address_id, route_code
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, 'LINE-H9-E2E-006')
+        ON CONFLICT DO NOTHING
+        "#,
+    )
+    .bind(sample_group_id)
+    .bind(owner_id)
+    .bind(sample_order_id)
+    .bind(warehouse_id)
+    .bind(customer_id)
+    .bind(address_id)
+    .execute(pool)
+    .await?;
+    // 组套发布后由页面人工截单生成组套实例的候选订单。
+    sqlx::query(
+        r#"
+        INSERT INTO outbound_orders (
+            id, owner_id, document_type, wms_order_no, erp_order_no,
+            customer_id, warehouse_id, invoice_no, status, created_at
+        )
+        VALUES ($1, $2, 'sales_outbound', 'OUT-H9-E2E-010', 'ERP-H9-E2E-010',
+                $3, $4, 'INV-H9-E2E-010', 'confirmed', '2026-07-26T08:15:00Z')
+        ON CONFLICT (id) DO UPDATE
+        SET invoice_no = EXCLUDED.invoice_no,
+            status = CASE
+            WHEN EXISTS (
+                SELECT 1 FROM h9_delivery_note_group_orders
+                 WHERE owner_id = EXCLUDED.owner_id AND outbound_order_id = EXCLUDED.id
+            ) THEN outbound_orders.status
+            ELSE 'confirmed'
+        END
+        "#,
+    )
+    .bind(candidate_order_id)
+    .bind(owner_id)
+    .bind(customer_id)
+    .bind(warehouse_id)
+    .execute(pool)
+    .await?;
+    sqlx::query(
+        r#"
+        INSERT INTO h9_outbound_route_snapshots (
+            outbound_order_id, owner_id, warehouse_id, customer_id,
+            delivery_address_id, route_code, frozen_at
+        )
+        VALUES ($1, $2, $3, $4, $5, 'LINE-H9-E2E-006', '2026-07-26T08:15:00Z')
+        ON CONFLICT (outbound_order_id) DO NOTHING
+        "#,
+    )
+    .bind(candidate_order_id)
+    .bind(owner_id)
+    .bind(warehouse_id)
+    .bind(customer_id)
+    .bind(address_id)
+    .execute(pool)
+    .await?;
+    // 已摄取的权威文件引用：发票覆盖两张订单，药检报告覆盖样本商品批号。
+    for (file_id, category, file_ref, hash, invoice_no, product, batch) in [
+        (
+            "00000000-0000-0000-0000-000000009613",
+            "invoice",
+            "HFILE-INV-E2E-009",
+            "hash-inv-e2e-009",
+            Some("INV-H9-E2E-009"),
+            None,
+            None,
+        ),
+        (
+            "00000000-0000-0000-0000-000000009614",
+            "invoice",
+            "HFILE-INV-E2E-010",
+            "hash-inv-e2e-010",
+            Some("INV-H9-E2E-010"),
+            None,
+            None,
+        ),
+        (
+            "00000000-0000-0000-0000-000000009615",
+            "drug_inspection_report",
+            "HFILE-DIR-E2E-009",
+            "hash-dir-e2e-009",
+            None,
+            Some("PROD-H9-E2E"),
+            Some("BATCH-H9-E2E"),
+        ),
+    ] {
+        sqlx::query(
+            r#"
+            INSERT INTO h9_ingested_document_files (
+                id, owner_id, category_code, file_ref, file_version,
+                content_hash, status, invoice_no, product_code, batch_no
+            )
+            VALUES ($1, $2, $3, $4, 1, $5, 'valid', $6, $7, $8)
+            ON CONFLICT (id) DO NOTHING
+            "#,
+        )
+        .bind(Uuid::parse_str(file_id)?)
+        .bind(owner_id)
+        .bind(category)
+        .bind(file_ref)
+        .bind(hash)
+        .bind(invoice_no)
+        .bind(product)
+        .bind(batch)
+        .execute(pool)
+        .await?;
+    }
+    Ok(())
+}
+
+/// US-H9-011：物理打印站点、货主仓映射、打印机、纸盒与一条活动租约。
+/// 租约由测试直接落表（真实签发在 US-H9-012 Print Agent），供租约页签查看与
+/// 人工释放（专用权限 + 原因 + 二次确认）真实链路验证。
+pub async fn seed_h9_print_devices(pool: &PgPool) -> Result<(), Box<dyn Error>> {
+    let owner_id = Uuid::from_u128(1);
+    let actor_id = Uuid::parse_str("00000000-0000-0000-0000-000000000101")?;
+    let warehouse_id = Uuid::parse_str("00000000-0000-0000-0000-000000001301")?;
+    let site_id = Uuid::parse_str("00000000-0000-0000-0000-00000000a601")?;
+    let mapping_id = Uuid::parse_str("00000000-0000-0000-0000-00000000a602")?;
+    let printer_id = Uuid::parse_str("00000000-0000-0000-0000-00000000a603")?;
+    let tray_id = Uuid::parse_str("00000000-0000-0000-0000-00000000a604")?;
+    let lease_id = Uuid::parse_str("00000000-0000-0000-0000-00000000a605")?;
+
+    sqlx::query(
+        r#"
+        INSERT INTO h9_print_sites (id, site_code, site_name, status, created_by)
+        VALUES ($1, 'SITE-H9-E2E', 'E2E 一号打印站', 'active', $2)
+        ON CONFLICT (id) DO NOTHING
+        "#,
+    )
+    .bind(site_id)
+    .bind(actor_id)
+    .execute(pool)
+    .await?;
+    sqlx::query(
+        r#"
+        INSERT INTO h9_print_site_owner_mappings (
+            id, site_id, owner_id, warehouse_id, status, created_by
+        )
+        VALUES ($1, $2, $3, $4, 'active', $5)
+        ON CONFLICT (id) DO NOTHING
+        "#,
+    )
+    .bind(mapping_id)
+    .bind(site_id)
+    .bind(owner_id)
+    .bind(warehouse_id)
+    .bind(actor_id)
+    .execute(pool)
+    .await?;
+    sqlx::query(
+        r#"
+        INSERT INTO h9_printers (
+            id, site_id, printer_name, printer_model, connection_type,
+            status, release_mode_override, created_by
+        )
+        VALUES ($1, $2, 'E2E 东区网络打印机', 'HP LaserJet 5200', 'network',
+                'active', NULL, $3)
+        ON CONFLICT (id) DO NOTHING
+        "#,
+    )
+    .bind(printer_id)
+    .bind(site_id)
+    .bind(actor_id)
+    .execute(pool)
+    .await?;
+    sqlx::query(
+        r#"
+        INSERT INTO h9_printer_trays (
+            id, site_id, printer_id, tray_code, paper_size, paper_type, enabled, created_by
+        )
+        VALUES ($1, $2, $3, 'TRAY-1', 'A4', '普通纸', TRUE, $4)
+        ON CONFLICT (id) DO NOTHING
+        "#,
+    )
+    .bind(tray_id)
+    .bind(site_id)
+    .bind(printer_id)
+    .bind(actor_id)
+    .execute(pool)
+    .await?;
+    sqlx::query(
+        r#"
+        INSERT INTO h9_device_leases (
+            id, site_id, printer_id, holder_agent_id, lease_token, release_mode,
+            busy_state, status, assigned_at, acquired_at
+        )
+        VALUES ($1, $2, $3, NULL, 'LEASE-H9-E2E-001', 'manual_only',
+                'idle', 'active', '2026-07-27T08:00:00Z', '2026-07-27T08:00:01Z')
+        ON CONFLICT (id) DO NOTHING
+        "#,
+    )
+    .bind(lease_id)
+    .bind(site_id)
+    .bind(printer_id)
+    .execute(pool)
+    .await?;
     Ok(())
 }
 
