@@ -59,8 +59,14 @@ export interface OrderLine {
   reports: ReportSummary[];
 }
 
-export interface OrderDetail extends OrderSummary {
+export interface OrderDetail {
+  id: string;
+  order_no: string;
+  status: "shipped" | "signed";
+  delivery_address_id: string;
   address_snapshot: Record<string, unknown>;
+  shipped_at: string;
+  signed_at: string | null;
   lines: OrderLine[];
 }
 

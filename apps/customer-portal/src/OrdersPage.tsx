@@ -33,6 +33,7 @@ export function OrdersPage(props: {
   onOpenExports: () => void;
 }) {
   const token = props.session.access_token;
+  const userId = props.session.user.id;
   const queryClient = useQueryClient();
   const [keywordInput, setKeywordInput] = useState("");
   const [keyword, setKeyword] = useState("");
@@ -44,11 +45,11 @@ export function OrdersPage(props: {
   const [message, setMessage] = useState("");
 
   const addresses = useQuery({
-    queryKey: ["portal-addresses"],
+    queryKey: ["portal-addresses", userId],
     queryFn: () => listAddresses(token),
   });
   const orders = useQuery({
-    queryKey: ["portal-orders", addressId, status, keyword],
+    queryKey: ["portal-orders", userId, addressId, status, keyword],
     queryFn: () =>
       listOrders(token, {
         addressId: addressId || undefined,
@@ -61,7 +62,7 @@ export function OrdersPage(props: {
     onSuccess: async () => {
       setMessage("批量任务已创建，可在导出中心查看进度");
       setSelected([]);
-      await queryClient.invalidateQueries({ queryKey: ["portal-exports"] });
+      await queryClient.invalidateQueries({ queryKey: ["portal-exports", userId] });
     },
   });
 
@@ -274,6 +275,7 @@ export function OrdersPage(props: {
       {detailId ? (
         <OrderDetailPanel
           token={token}
+          userId={userId}
           orderId={detailId}
           onClose={() => setDetailId(null)}
         />
@@ -358,13 +360,14 @@ function OrderRow(props: {
 
 function OrderDetailPanel(props: {
   token: string;
+  userId: string;
   orderId: string;
   onClose: () => void;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const detail = useQuery({
-    queryKey: ["portal-order", props.orderId],
+    queryKey: ["portal-order", props.userId, props.orderId],
     queryFn: () => getOrder(props.token, props.orderId),
   });
   const [downloadError, setDownloadError] = useState("");

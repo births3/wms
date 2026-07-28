@@ -68,10 +68,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ProjectionResponse"
+        "400":
+          description: 请求校验失败（VALIDATION_ERROR）或事件数据格式错误（INVALID_PROJECTION_PAYLOAD）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "401":
           $ref: "#/components/responses/Unauthorized"
-        "422":
-          $ref: "#/components/responses/ValidationError"
+        "409":
+          description: 投影事件已进入死信队列，需人工重放
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/v1/addresses:
     get:
       tags: [orders]
@@ -178,9 +188,11 @@ paths:
                 type: string
                 format: binary
         "404":
-          $ref: "#/components/responses/NotFound"
-        "410":
-          description: 下载地址已过期
+          description: 下载地址不存在、越权或已过期
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/v1/exports:
     get:
       tags: [exports]
@@ -234,9 +246,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/DownloadUrl"
         "404":
-          $ref: "#/components/responses/NotFound"
-        "410":
-          description: 导出记录已过 7 天保留期
+          description: 导出任务不存在、越权、未完成或已过 7 天保留期
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/v1/users:
     get:
       tags: [users]
@@ -392,7 +406,6 @@ components:
       properties:
         access_token:
           type: string
-          writeOnly: true
         expires_at:
           type: string
           format: date-time
@@ -440,8 +453,6 @@ components:
         - display_name
         - password
         - role
-        - can_view_report_history
-        - address_ids
       properties:
         username:
           type: string
@@ -460,9 +471,12 @@ components:
         can_view_report_history:
           type: boolean
           default: false
+          description: 缺省时默认为 false
         address_ids:
           type: array
           uniqueItems: true
+          default: []
+          description: 缺省时默认为空数组
           items:
             type: string
             format: uuid
@@ -579,18 +593,41 @@ components:
           type: integer
           format: int64
     OrderDetail:
-      allOf:
-        - $ref: "#/components/schemas/OrderSummary"
-        - type: object
-          required: [address_snapshot, lines]
-          properties:
-            address_snapshot:
-              type: object
-              additionalProperties: true
-            lines:
-              type: array
-              items:
-                $ref: "#/components/schemas/OrderLine"
+      type: object
+      required:
+        - id
+        - order_no
+        - status
+        - delivery_address_id
+        - address_snapshot
+        - shipped_at
+        - lines
+      properties:
+        id:
+          type: string
+          format: uuid
+        order_no:
+          type: string
+        status:
+          type: string
+          enum: [shipped, signed]
+        delivery_address_id:
+          type: string
+          format: uuid
+        address_snapshot:
+          type: object
+          additionalProperties: true
+        shipped_at:
+          type: string
+          format: date-time
+        signed_at:
+          type: string
+          format: date-time
+          nullable: true
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderLine"
     OrderLine:
       type: object
       required: [id, product_id, product_code, product_name, batch_no, quantity, reports]

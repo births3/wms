@@ -14,8 +14,9 @@ import type { ExportJob, LoginResponse } from "./types";
 
 export function ExportsPage(props: { session: LoginResponse }) {
   const token = props.session.access_token;
+  const userId = props.session.user.id;
   const exportsQuery = useQuery({
-    queryKey: ["portal-exports"],
+    queryKey: ["portal-exports", userId],
     queryFn: () => listExports(token),
     refetchInterval: (query) =>
       query.state.data?.some((job) => ["queued", "processing"].includes(job.status))

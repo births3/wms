@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Archive,
   Building2,
@@ -10,6 +11,7 @@ import {
 } from "lucide-react";
 import { Button } from "@wms/ui";
 
+import { setSessionExpiredHandler } from "./api";
 import { LoginPage } from "./LoginPage";
 import { OrdersPage } from "./OrdersPage";
 import { ExportsPage } from "./ExportsPage";
@@ -32,23 +34,50 @@ function readSession(): LoginResponse | null {
 }
 
 export function App() {
+  const queryClient = useQueryClient();
   const [session, setSession] = useState<LoginResponse | null>(readSession);
   const [page, setPage] = useState<PageKey>("orders");
+  const [sessionNotice, setSessionNotice] = useState("");
+
+  useEffect(() => {
+    setSessionExpiredHandler(() => {
+      sessionStorage.removeItem(SESSION_KEY);
+      queryClient.clear();
+      setSession(null);
+      setPage("orders");
+      setSessionNotice("登录已过期，请重新登录");
+    });
+    return () => setSessionExpiredHandler(null);
+  }, [queryClient]);
 
   if (!session) {
     return (
-      <LoginPage
-        onLogin={(next) => {
-          sessionStorage.setItem(SESSION_KEY, JSON.stringify(next));
-          setSession(next);
-        }}
-      />
+      <>
+        {sessionNotice ? (
+          <div
+            role="alert"
+            className="fixed inset-x-0 top-0 z-50 bg-amber-100 px-4 py-2 text-center text-sm font-medium text-amber-900"
+          >
+            {sessionNotice}
+          </div>
+        ) : null}
+        <LoginPage
+          onLogin={(next) => {
+            queryClient.clear();
+            sessionStorage.setItem(SESSION_KEY, JSON.stringify(next));
+            setSessionNotice("");
+            setSession(next);
+          }}
+        />
+      </>
     );
   }
 
   const logout = () => {
     sessionStorage.removeItem(SESSION_KEY);
+    queryClient.clear();
     setSession(null);
+    setPage("orders");
   };
   const isAdmin = session.user.role === "customer_admin";
 

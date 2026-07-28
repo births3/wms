@@ -8,21 +8,22 @@ import type { LoginResponse, PortalUser } from "./types";
 
 export function UsersPage(props: { session: LoginResponse }) {
   const token = props.session.access_token;
+  const userId = props.session.user.id;
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const users = useQuery({
-    queryKey: ["portal-users"],
+    queryKey: ["portal-users", userId],
     queryFn: () => listUsers(token),
   });
   const addresses = useQuery({
-    queryKey: ["portal-addresses"],
+    queryKey: ["portal-addresses", userId],
     queryFn: () => listAddresses(token),
   });
   const create = useMutation({
     mutationFn: createUser.bind(null, token),
     onSuccess: async () => {
       setOpen(false);
-      await queryClient.invalidateQueries({ queryKey: ["portal-users"] });
+      await queryClient.invalidateQueries({ queryKey: ["portal-users", userId] });
     },
   });
   const update = useMutation({
@@ -39,7 +40,7 @@ export function UsersPage(props: { session: LoginResponse }) {
       address_ids: input.user.address_ids,
     }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["portal-users"] });
+      await queryClient.invalidateQueries({ queryKey: ["portal-users", userId] });
     },
   });
 
