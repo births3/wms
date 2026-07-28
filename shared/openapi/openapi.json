@@ -15822,6 +15822,107 @@
         }
       }
     },
+    "/api/v1/outbound/orders/{id}/revalidate": {
+      "post": {
+        "tags": [
+          "outbound"
+        ],
+        "operationId": "revalidate_outbound_order",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "出库订单 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "重新校验出库订单；通过置 confirmed，失败置 validation_exception",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutboundOrder"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无出库写权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "出库订单不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "幂等键已用于不同请求",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "订单状态不允许重新校验",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/outbound/orders/{id}/review": {
       "get": {
         "tags": [
@@ -16034,6 +16135,107 @@
         }
       }
     },
+    "/api/v1/outbound/orders/{id}/void-request": {
+      "post": {
+        "tags": [
+          "outbound"
+        ],
+        "operationId": "void_request_outbound_order",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "出库订单 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "提交作废申请，订单置 void_requested",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutboundOrder"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无出库写权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "出库订单不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "幂等键已用于不同请求",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "订单已进入波次或后续状态，不允许作废申请",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/outbound/pick-tasks/{id}/complete": {
       "post": {
         "tags": [
@@ -16104,6 +16306,726 @@
           },
           "422": {
             "description": "数量或状态非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/outbound/purchase-returns": {
+      "get": {
+        "tags": [
+          "outbound"
+        ],
+        "operationId": "list_purchase_returns",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "description": "按退货单状态过滤",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "按退货单号/来源采购单号/供应商模糊查询",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "返回条数，默认 50，最大 200",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "采购退货出库单列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseReturnOrderListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "outbound"
+        ],
+        "operationId": "create_purchase_return",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePurchaseReturnRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "创建采购退货出库单，初始状态 pending_approval",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseReturnOrder"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无出库写权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "退货单号重复或幂等键已用于不同请求",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "数量非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/outbound/purchase-returns/{id}": {
+      "get": {
+        "tags": [
+          "outbound"
+        ],
+        "operationId": "get_purchase_return",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "采购退货出库单 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "采购退货出库单详情",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseReturnOrder"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "采购退货出库单不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/outbound/purchase-returns/{id}/approve": {
+      "post": {
+        "tags": [
+          "outbound"
+        ],
+        "operationId": "approve_purchase_return",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "采购退货出库单 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "审批通过：pending_approval → approved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseReturnOrder"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无出库写权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "采购退货出库单不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "幂等键已用于不同请求",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "当前状态不允许审批",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/outbound/purchase-returns/{id}/pick": {
+      "post": {
+        "tags": [
+          "outbound"
+        ],
+        "operationId": "pick_purchase_return",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "采购退货出库单 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "退货拣货：approved → picking",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseReturnOrder"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无出库写权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "采购退货出库单不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "幂等键已用于不同请求",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "当前状态不允许拣货",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/outbound/purchase-returns/{id}/reject": {
+      "post": {
+        "tags": [
+          "outbound"
+        ],
+        "operationId": "reject_purchase_return",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "采购退货出库单 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectPurchaseReturnRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "审批驳回：pending_approval → cancelled，驳回原因必填",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseReturnOrder"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无出库写权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "采购退货出库单不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "幂等键已用于不同请求",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "当前状态不允许驳回或驳回原因缺失",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/outbound/purchase-returns/{id}/review": {
+      "post": {
+        "tags": [
+          "outbound"
+        ],
+        "operationId": "review_purchase_return",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "采购退货出库单 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "退货复核：picking → reviewed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseReturnOrder"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无出库写权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "采购退货出库单不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "幂等键已用于不同请求",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "当前状态不允许复核",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/outbound/purchase-returns/{id}/ship": {
+      "post": {
+        "tags": [
+          "outbound"
+        ],
+        "operationId": "ship_purchase_return",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "采购退货出库单 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "出库交接：reviewed → shipped，记录交接时间与操作人",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseReturnOrder"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无出库写权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "采购退货出库单不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "幂等键已用于不同请求",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "当前状态不允许出库交接",
             "content": {
               "application/json": {
                 "schema": {
@@ -16380,6 +17302,107 @@
           },
           "422": {
             "description": "波次状态不允许取消",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/outbound/waves/{wave_id}/release": {
+      "post": {
+        "tags": [
+          "outbound"
+        ],
+        "operationId": "release_outbound_wave",
+        "parameters": [
+          {
+            "name": "wave_id",
+            "in": "path",
+            "description": "出库波次 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "下发草稿波次：锁定订单库存并生成拣选任务",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutboundWave"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少或非法幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无出库写权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "出库波次不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "幂等键已用于不同请求",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "波次或订单状态不允许下发",
             "content": {
               "application/json": {
                 "schema": {
@@ -16814,6 +17837,1723 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/print-devices/leases": {
+      "get": {
+        "tags": [
+          "print-devices"
+        ],
+        "operationId": "list_device_leases",
+        "responses": {
+          "200": {
+            "description": "设备租约列表（含释放模式快照与安全状态）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceLeaseListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印设备读取权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/print-devices/leases/{lease_id}/release": {
+      "post": {
+        "tags": [
+          "print-devices"
+        ],
+        "operationId": "release_device_lease",
+        "parameters": [
+          {
+            "name": "lease_id",
+            "in": "path",
+            "description": "设备租约 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReleaseDeviceLeaseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "人工释放成功或幂等重放；需专用权限+原因+二次确认",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceLease"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "缺少 h9.device_lease.release 专用权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "租约不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "租约已释放，或处于 printing/result_unknown/reconciling 硬安全状态",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "缺少原因或二次确认",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/print-devices/printers": {
+      "get": {
+        "tags": [
+          "print-devices"
+        ],
+        "operationId": "list_printers",
+        "responses": {
+          "200": {
+            "description": "打印机列表（含生效释放模式）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrinterListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印设备读取权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "print-devices"
+        ],
+        "operationId": "create_printer",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePrinterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "打印机创建成功或幂等重放；打印机归属唯一站点",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Printer"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印设备维护权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "站点不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "同站点打印机名称已存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "打印机参数非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/print-devices/printers/{printer_id}": {
+      "patch": {
+        "tags": [
+          "print-devices"
+        ],
+        "operationId": "update_printer",
+        "parameters": [
+          {
+            "name": "printer_id",
+            "in": "path",
+            "description": "打印机 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePrinterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "打印机状态或释放模式覆盖更新成功；运行中的租约保持快照",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Printer"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印设备维护权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "打印机不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "参数非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/print-devices/printers/{printer_id}/test-print": {
+      "post": {
+        "tags": [
+          "print-devices"
+        ],
+        "operationId": "test_print_printer",
+        "parameters": [
+          {
+            "name": "printer_id",
+            "in": "path",
+            "description": "打印机 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestPrintRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "测试指令受控下发并落表；真实硬件回执由 Print Agent/S4 验收登记",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrinterTestPrint"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印设备维护权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "打印机或纸盒不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "打印机或纸盒已停用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/print-devices/printers/{printer_id}/trays": {
+      "get": {
+        "tags": [
+          "print-devices"
+        ],
+        "operationId": "list_printer_trays",
+        "parameters": [
+          {
+            "name": "printer_id",
+            "in": "path",
+            "description": "打印机 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "纸盒列表（纸张能力/启用状态/设备标识）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrinterTrayListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印设备读取权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "打印机不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "print-devices"
+        ],
+        "operationId": "create_printer_tray",
+        "parameters": [
+          {
+            "name": "printer_id",
+            "in": "path",
+            "description": "打印机 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePrinterTrayRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "纸盒创建成功或幂等重放",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrinterTray"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印设备维护权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "打印机不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "同打印机纸盒设备标识已存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "纸盒参数非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/print-devices/printers/{printer_id}/trays/{tray_id}": {
+      "patch": {
+        "tags": [
+          "print-devices"
+        ],
+        "operationId": "update_printer_tray",
+        "parameters": [
+          {
+            "name": "printer_id",
+            "in": "path",
+            "description": "打印机 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "tray_id",
+            "in": "path",
+            "description": "纸盒 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePrinterTrayRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "纸盒能力或启用状态更新成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrinterTray"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印设备维护权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "纸盒不存在或不属于该打印机",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "参数非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/print-devices/sites": {
+      "get": {
+        "tags": [
+          "print-devices"
+        ],
+        "operationId": "list_print_sites",
+        "responses": {
+          "200": {
+            "description": "物理打印站点列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintSiteListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印设备读取权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "print-devices"
+        ],
+        "operationId": "create_print_site",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePrintSiteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "站点创建成功或幂等重放",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintSite"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印设备维护权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "站点编码已存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "站点参数非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/print-devices/sites/{site_id}/owner-mappings": {
+      "get": {
+        "tags": [
+          "print-devices"
+        ],
+        "operationId": "list_print_site_owner_mappings",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "description": "物理打印站点 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "站点货主仓映射列表（含软删行）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintSiteOwnerMappingListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印设备读取权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "站点不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "print-devices"
+        ],
+        "operationId": "create_print_site_owner_mapping",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "description": "物理打印站点 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSiteOwnerMappingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "映射创建成功或幂等重放",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintSiteOwnerMapping"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印设备维护权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "站点不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "同货主+仓库映射已存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "映射参数非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/print-devices/sites/{site_id}/owner-mappings/{mapping_id}/disable": {
+      "post": {
+        "tags": [
+          "print-devices"
+        ],
+        "operationId": "disable_print_site_owner_mapping",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "description": "物理打印站点 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "mapping_id",
+            "in": "path",
+            "description": "映射 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "映射软删成功或幂等重放",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintSiteOwnerMapping"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印设备维护权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "映射不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "映射已停用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/print-orchestration/aggregation-fields": {
+      "get": {
+        "tags": [
+          "print-orchestration"
+        ],
+        "operationId": "list_aggregation_fields",
+        "responses": {
+          "200": {
+            "description": "已登记的归集维度字段目录（仅等值归组）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AggregationFieldCatalogResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印编排读取权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/print-orchestration/aggregation-rules/versions": {
+      "get": {
+        "tags": [
+          "print-orchestration"
+        ],
+        "operationId": "list_aggregation_rules",
+        "responses": {
+          "200": {
+            "description": "归集规则版本列表（按版本号倒序）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AggregationRuleVersionListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印编排读取权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "print-orchestration"
+        ],
+        "operationId": "create_aggregation_rule_draft",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAggregationRuleDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "规则草稿创建成功或幂等重放",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AggregationRuleVersion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印编排维护权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "维度未登记或参数非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/print-orchestration/aggregation-rules/versions/{version_id}/disable": {
+      "post": {
+        "tags": [
+          "print-orchestration"
+        ],
+        "operationId": "disable_aggregation_rule",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "description": "规则版本 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "规则停用成功或幂等重放",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AggregationRuleVersion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印编排维护权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "规则版本不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "仅已发布版本可停用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/print-orchestration/aggregation-rules/versions/{version_id}/publish": {
+      "post": {
+        "tags": [
+          "print-orchestration"
+        ],
+        "operationId": "publish_aggregation_rule",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "description": "规则版本 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "规则发布成功或幂等重放；同货主旧发布版本自动停用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AggregationRuleVersion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印编排维护权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "规则版本不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "仅已测试版本可发布",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/print-orchestration/aggregation-rules/versions/{version_id}/test": {
+      "post": {
+        "tags": [
+          "print-orchestration"
+        ],
+        "operationId": "test_aggregation_rule",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "description": "规则版本 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestAggregationRuleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "样本订单测试成功或幂等重放，返回分组键与预计归集结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AggregationRuleTestResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印编排维护权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "规则版本或样本订单不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "规则状态不允许测试",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
       }
     },
     "/api/v1/print-orchestration/cutoff-plans": {
@@ -17276,6 +20016,478 @@
         ]
       }
     },
+    "/api/v1/print-orchestration/print-document-categories": {
+      "get": {
+        "tags": [
+          "print-orchestration"
+        ],
+        "operationId": "list_print_document_categories",
+        "responses": {
+          "200": {
+            "description": "M1 系统字典 print_document_category 受控分类（含 source_mode）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintDocumentCategoryListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印编排读取权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/print-orchestration/print-suites/versions": {
+      "get": {
+        "tags": [
+          "print-orchestration"
+        ],
+        "operationId": "list_print_suites",
+        "responses": {
+          "200": {
+            "description": "打印组套版本列表（含有序打印项，按版本号倒序）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintSuiteVersionListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印编排读取权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "print-orchestration"
+        ],
+        "operationId": "create_print_suite_draft",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePrintSuiteDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "组套草稿创建成功或幂等重放",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintSuiteVersion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印编排维护权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "分类未登记、绑定非法或参数非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/print-orchestration/print-suites/versions/{version_id}/disable": {
+      "post": {
+        "tags": [
+          "print-orchestration"
+        ],
+        "operationId": "disable_print_suite",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "description": "组套版本 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "组套停用成功或幂等重放",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintSuiteVersion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印编排维护权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "组套版本不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "仅已发布版本可停用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/print-orchestration/print-suites/versions/{version_id}/publish": {
+      "post": {
+        "tags": [
+          "print-orchestration"
+        ],
+        "operationId": "publish_print_suite",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "description": "组套版本 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "组套发布成功或幂等重放",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintSuiteVersion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印编排维护权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "组套版本不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "仅已测试版本可发布，或同级同对象有效期重叠",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/print-orchestration/print-suites/versions/{version_id}/test": {
+      "post": {
+        "tags": [
+          "print-orchestration"
+        ],
+        "operationId": "test_print_suite",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "description": "组套版本 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestPrintSuiteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "样本归集组测试成功或幂等重放，返回解析层级与逐项就绪预检",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintSuiteTestResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "缺少幂等键",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印编排维护权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "组套版本或样本归集组不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "组套状态不允许测试",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
     "/api/v1/print-orchestration/route-bindings": {
       "get": {
         "tags": [
@@ -17412,6 +20624,64 @@
           },
           "422": {
             "description": "线路绑定参数或主数据非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/print-orchestration/suite-instances": {
+      "get": {
+        "tags": [
+          "print-orchestration"
+        ],
+        "operationId": "list_print_suite_instances",
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "query",
+            "description": "可选随货同行单归集组筛选",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "冻结组套实例列表（含组套版本、规则版本、源单据快照与逐项策略）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintSuiteInstanceListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无打印编排读取权限",
             "content": {
               "application/json": {
                 "schema": {
@@ -24079,6 +27349,240 @@
           }
         }
       },
+      "AggregationDimension": {
+        "type": "object",
+        "description": "H9 一条有序归集维度。",
+        "required": [
+          "field_code",
+          "method",
+          "order"
+        ],
+        "properties": {
+          "field_code": {
+            "$ref": "#/components/schemas/AggregationFieldCode"
+          },
+          "method": {
+            "$ref": "#/components/schemas/AggregationMethod"
+          },
+          "order": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "AggregationFieldCatalogResponse": {
+        "type": "object",
+        "description": "H9 归集字段目录。",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AggregationFieldDefinition"
+            }
+          }
+        }
+      },
+      "AggregationFieldCode": {
+        "type": "string",
+        "description": "H9 可用于等值归组的受控出库订单字段。",
+        "enum": [
+          "document_type",
+          "erp_order_no",
+          "invoice_no",
+          "transport_mode_code",
+          "department_code",
+          "sales_group_code",
+          "order_group_no",
+          "business_type_code"
+        ]
+      },
+      "AggregationFieldDefinition": {
+        "type": "object",
+        "description": "H9 归集字段目录项。",
+        "required": [
+          "field_code",
+          "display_name",
+          "value_type",
+          "method"
+        ],
+        "properties": {
+          "display_name": {
+            "type": "string"
+          },
+          "field_code": {
+            "$ref": "#/components/schemas/AggregationFieldCode"
+          },
+          "method": {
+            "$ref": "#/components/schemas/AggregationMethod"
+          },
+          "value_type": {
+            "type": "string"
+          }
+        }
+      },
+      "AggregationGroupKeyItem": {
+        "type": "object",
+        "description": "样本测试中一项可解释的分组键。",
+        "required": [
+          "field_code",
+          "display_name",
+          "value"
+        ],
+        "properties": {
+          "display_name": {
+            "type": "string"
+          },
+          "field_code": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        }
+      },
+      "AggregationMethod": {
+        "type": "string",
+        "description": "H9 归组方法；首个正式版本前只允许受控等值归组。",
+        "enum": [
+          "equals"
+        ]
+      },
+      "AggregationRuleTestGroup": {
+        "type": "object",
+        "description": "样本测试的一组预计归集结果。",
+        "required": [
+          "warehouse_id",
+          "delivery_address_id",
+          "group_key",
+          "order_ids",
+          "order_nos"
+        ],
+        "properties": {
+          "delivery_address_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "group_key": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AggregationGroupKeyItem"
+            }
+          },
+          "order_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "order_nos": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "AggregationRuleTestResult": {
+        "type": "object",
+        "description": "H9 归集规则样本测试结果。",
+        "required": [
+          "rule",
+          "groups"
+        ],
+        "properties": {
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AggregationRuleTestGroup"
+            }
+          },
+          "rule": {
+            "$ref": "#/components/schemas/AggregationRuleVersion"
+          }
+        }
+      },
+      "AggregationRuleVersion": {
+        "type": "object",
+        "description": "H9 归集规则不可变版本。",
+        "required": [
+          "id",
+          "owner_id",
+          "version_no",
+          "name",
+          "status",
+          "dimensions",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "dimensions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AggregationDimension"
+            }
+          },
+          "disabled_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "tested_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "version_no": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "AggregationRuleVersionListResponse": {
+        "type": "object",
+        "description": "H9 归集规则版本列表。",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AggregationRuleVersion"
+            }
+          }
+        }
+      },
       "AlertActionRequest": {
         "type": "object",
         "required": [
@@ -26172,6 +29676,25 @@
           }
         }
       },
+      "CreateAggregationRuleDraftRequest": {
+        "type": "object",
+        "description": "创建下一版 H9 归集规则草稿。",
+        "required": [
+          "name",
+          "dimensions"
+        ],
+        "properties": {
+          "dimensions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AggregationDimension"
+            }
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
       "CreateAlertExportRequest": {
         "type": "object",
         "required": [
@@ -26933,6 +30456,10 @@
           "lines"
         ],
         "properties": {
+          "business_type_code": {
+            "type": "string",
+            "nullable": true
+          },
           "customer_id": {
             "type": "string",
             "format": "uuid"
@@ -26941,10 +30468,18 @@
             "type": "string",
             "format": "uuid"
           },
+          "department_code": {
+            "type": "string",
+            "nullable": true
+          },
           "document_type": {
             "type": "string"
           },
           "erp_order_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "invoice_no": {
             "type": "string",
             "nullable": true
           },
@@ -26954,9 +30489,21 @@
               "$ref": "#/components/schemas/CreateOutboundOrderLineRequest"
             }
           },
+          "order_group_no": {
+            "type": "string",
+            "nullable": true
+          },
           "required_ship_at": {
             "type": "string",
             "format": "date-time",
+            "nullable": true
+          },
+          "sales_group_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "transport_mode_code": {
+            "type": "string",
             "nullable": true
           },
           "warehouse_id": {
@@ -27062,6 +30609,123 @@
           }
         }
       },
+      "CreatePrintSiteRequest": {
+        "type": "object",
+        "description": "创建 H9 物理打印站点。",
+        "required": [
+          "site_code",
+          "site_name"
+        ],
+        "properties": {
+          "site_code": {
+            "type": "string"
+          },
+          "site_name": {
+            "type": "string"
+          }
+        }
+      },
+      "CreatePrintSuiteDraftRequest": {
+        "type": "object",
+        "description": "创建 H9 打印组套草稿版本。",
+        "required": [
+          "name",
+          "warehouse_id",
+          "scope",
+          "effective_from",
+          "items"
+        ],
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "delivery_address_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "effective_from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "effective_to": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrintSuiteItemInput"
+            }
+          },
+          "name": {
+            "type": "string"
+          },
+          "route_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "scope": {
+            "$ref": "#/components/schemas/PrintSuiteScope"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "CreatePrinterRequest": {
+        "type": "object",
+        "description": "创建 H9 打印机。",
+        "required": [
+          "site_id",
+          "printer_name",
+          "connection_type"
+        ],
+        "properties": {
+          "connection_type": {
+            "type": "string"
+          },
+          "printer_model": {
+            "type": "string",
+            "nullable": true
+          },
+          "printer_name": {
+            "type": "string"
+          },
+          "release_mode_override": {
+            "type": "string",
+            "nullable": true
+          },
+          "site_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "CreatePrinterTrayRequest": {
+        "type": "object",
+        "description": "创建 H9 纸盒。",
+        "required": [
+          "tray_code",
+          "paper_size",
+          "paper_type"
+        ],
+        "properties": {
+          "paper_size": {
+            "type": "string"
+          },
+          "paper_type": {
+            "type": "string"
+          },
+          "tray_code": {
+            "type": "string"
+          }
+        }
+      },
       "CreateProductRequest": {
         "type": "object",
         "description": "创建商品请求。",
@@ -27141,6 +30805,48 @@
             "type": "number",
             "format": "double",
             "nullable": true
+          }
+        }
+      },
+      "CreatePurchaseReturnRequest": {
+        "type": "object",
+        "required": [
+          "return_no",
+          "source_purchase_order_no",
+          "supplier_name",
+          "reason",
+          "warehouse_id",
+          "product_code",
+          "qty"
+        ],
+        "properties": {
+          "product_code": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "return_no": {
+            "type": "string"
+          },
+          "source_purchase_order_no": {
+            "type": "string"
+          },
+          "supplier_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "supplier_name": {
+            "type": "string"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },
@@ -27295,6 +31001,24 @@
           },
           "role_name": {
             "type": "string"
+          }
+        }
+      },
+      "CreateSiteOwnerMappingRequest": {
+        "type": "object",
+        "description": "新增 H9 站点货主仓映射。",
+        "required": [
+          "owner_id",
+          "warehouse_id"
+        ],
+        "properties": {
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },
@@ -28147,9 +31871,21 @@
           "delivery_note_no",
           "cutoff_mode",
           "cutoff_at",
-          "order_ids"
+          "order_ids",
+          "aggregation_group_key"
         ],
         "properties": {
+          "aggregation_group_key": {},
+          "aggregation_rule_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "aggregation_rule_version_no": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
           "customer_id": {
             "type": "string",
             "format": "uuid"
@@ -28311,6 +32047,92 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/DeliveryNoteGroupListItem"
+            }
+          }
+        }
+      },
+      "DeviceLease": {
+        "type": "object",
+        "description": "H9 设备租约；`release_mode` 是租约创建时的策略快照；\n`busy_state` 真实来源在 US-H9-010/012，printing/result_unknown/reconciling 禁止释放。",
+        "required": [
+          "id",
+          "site_id",
+          "printer_id",
+          "printer_name",
+          "connection_type",
+          "lease_token",
+          "release_mode",
+          "busy_state",
+          "status",
+          "assigned_at"
+        ],
+        "properties": {
+          "acquired_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "assigned_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "busy_state": {
+            "type": "string"
+          },
+          "connection_type": {
+            "type": "string"
+          },
+          "holder_agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lease_token": {
+            "type": "string"
+          },
+          "printer_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "printer_name": {
+            "type": "string"
+          },
+          "release_mode": {
+            "type": "string"
+          },
+          "release_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "released_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "site_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "DeviceLeaseListResponse": {
+        "type": "object",
+        "description": "H9 设备租约列表。",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeviceLease"
             }
           }
         }
@@ -33335,6 +37157,10 @@
           "updated_at"
         ],
         "properties": {
+          "business_type_code": {
+            "type": "string",
+            "nullable": true
+          },
           "created_at": {
             "type": "string",
             "format": "date-time"
@@ -33342,6 +37168,10 @@
           "customer_id": {
             "type": "string",
             "format": "uuid"
+          },
+          "department_code": {
+            "type": "string",
+            "nullable": true
           },
           "document_type": {
             "type": "string"
@@ -33354,11 +37184,19 @@
             "type": "string",
             "format": "uuid"
           },
+          "invoice_no": {
+            "type": "string",
+            "nullable": true
+          },
           "lines": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/OutboundOrderLine"
             }
+          },
+          "order_group_no": {
+            "type": "string",
+            "nullable": true
           },
           "owner_id": {
             "type": "string",
@@ -33369,11 +37207,19 @@
             "format": "date-time",
             "nullable": true
           },
+          "sales_group_code": {
+            "type": "string",
+            "nullable": true
+          },
           "short_pick": {
             "type": "boolean"
           },
           "status": {
             "type": "string"
+          },
+          "transport_mode_code": {
+            "type": "string",
+            "nullable": true
           },
           "updated_at": {
             "type": "string",
@@ -33762,6 +37608,41 @@
           }
         }
       },
+      "PrintDocumentCategory": {
+        "type": "object",
+        "description": "M1 系统字典 print_document_category 的一条受控分类。",
+        "required": [
+          "item_code",
+          "item_name",
+          "source_mode"
+        ],
+        "properties": {
+          "item_code": {
+            "type": "string"
+          },
+          "item_name": {
+            "type": "string"
+          },
+          "source_mode": {
+            "$ref": "#/components/schemas/PrintSuiteSourceMode"
+          }
+        }
+      },
+      "PrintDocumentCategoryListResponse": {
+        "type": "object",
+        "description": "M1 系统字典 print_document_category 列表。",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrintDocumentCategory"
+            }
+          }
+        }
+      },
       "PrintFieldDefinition": {
         "type": "object",
         "required": [
@@ -34077,6 +37958,642 @@
           "template_version_id": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "PrintSite": {
+        "type": "object",
+        "description": "H9 物理打印站点：打印机、纸盒、设备租约与 Print Agent（US-H9-012）的资源边界。",
+        "required": [
+          "id",
+          "site_code",
+          "site_name",
+          "status",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "site_code": {
+            "type": "string"
+          },
+          "site_name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "PrintSiteListResponse": {
+        "type": "object",
+        "description": "H9 物理打印站点列表。",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrintSite"
+            }
+          }
+        }
+      },
+      "PrintSiteOwnerMapping": {
+        "type": "object",
+        "description": "H9 站点 ↔ 货主+仓库显式映射；停用为软删。",
+        "required": [
+          "id",
+          "site_id",
+          "owner_id",
+          "warehouse_id",
+          "status",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "disabled_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "site_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "PrintSiteOwnerMappingListResponse": {
+        "type": "object",
+        "description": "H9 站点货主仓映射列表。",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrintSiteOwnerMapping"
+            }
+          }
+        }
+      },
+      "PrintSuiteFailurePolicy": {
+        "type": "string",
+        "description": "H9 打印项失败策略；必需项永远不能跳过（ADR-0041）。",
+        "enum": [
+          "pause_suite",
+          "skip_and_continue"
+        ]
+      },
+      "PrintSuiteFileBinding": {
+        "type": "object",
+        "description": "H9 权威文件绑定（AC6/AC8：文件 ID + 版本 + 内容哈希，不落临时 URL）。",
+        "required": [
+          "file_id",
+          "file_ref",
+          "file_version",
+          "content_hash"
+        ],
+        "properties": {
+          "content_hash": {
+            "type": "string"
+          },
+          "file_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "file_ref": {
+            "type": "string"
+          },
+          "file_version": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PrintSuiteInstance": {
+        "type": "object",
+        "description": "H9 组套实例：冻结组套版本、规则版本、源单据和策略快照。",
+        "required": [
+          "id",
+          "owner_id",
+          "group_id",
+          "delivery_note_no",
+          "suite_version_id",
+          "suite_version_no",
+          "suite_snapshot",
+          "source_documents",
+          "status",
+          "items",
+          "created_at"
+        ],
+        "properties": {
+          "aggregation_rule_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "aggregation_rule_version_no": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "delivery_note_no": {
+            "type": "string"
+          },
+          "group_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "hold_scope": {
+            "type": "string",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrintSuiteInstanceItem"
+            }
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source_documents": {},
+          "status": {
+            "type": "string"
+          },
+          "suite_snapshot": {},
+          "suite_version_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "suite_version_no": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PrintSuiteInstanceItem": {
+        "type": "object",
+        "description": "H9 组套实例中的一条冻结打印项。",
+        "required": [
+          "id",
+          "category_code",
+          "copies",
+          "sort_order",
+          "output_slot",
+          "required",
+          "ready_policy",
+          "failure_policy",
+          "source_mode",
+          "file_bindings",
+          "ready",
+          "missing"
+        ],
+        "properties": {
+          "category_code": {
+            "type": "string"
+          },
+          "copies": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "external_file_ref": {
+            "type": "string",
+            "nullable": true
+          },
+          "failure_policy": {
+            "$ref": "#/components/schemas/PrintSuiteFailurePolicy"
+          },
+          "file_bindings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrintSuiteFileBinding"
+            }
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "output_slot": {
+            "type": "string"
+          },
+          "ready": {
+            "type": "boolean"
+          },
+          "ready_policy": {
+            "$ref": "#/components/schemas/PrintSuiteReadyPolicy"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "sort_order": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "source_mode": {
+            "$ref": "#/components/schemas/PrintSuiteSourceMode"
+          },
+          "template_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        }
+      },
+      "PrintSuiteInstanceListResponse": {
+        "type": "object",
+        "description": "H9 组套实例列表。",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrintSuiteInstance"
+            }
+          }
+        }
+      },
+      "PrintSuiteItem": {
+        "type": "object",
+        "description": "H9 打印组套版本中的一条打印项。",
+        "required": [
+          "id",
+          "category_code",
+          "category_name",
+          "copies",
+          "sort_order",
+          "output_slot",
+          "required",
+          "ready_policy",
+          "failure_policy",
+          "source_mode"
+        ],
+        "properties": {
+          "category_code": {
+            "type": "string"
+          },
+          "category_name": {
+            "type": "string"
+          },
+          "copies": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "external_file_ref": {
+            "type": "string",
+            "nullable": true
+          },
+          "failure_policy": {
+            "$ref": "#/components/schemas/PrintSuiteFailurePolicy"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "output_slot": {
+            "type": "string"
+          },
+          "ready_policy": {
+            "$ref": "#/components/schemas/PrintSuiteReadyPolicy"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "sort_order": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "source_mode": {
+            "$ref": "#/components/schemas/PrintSuiteSourceMode"
+          },
+          "template_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        }
+      },
+      "PrintSuiteItemInput": {
+        "type": "object",
+        "description": "创建 H9 打印组套草稿的一条有序打印项。",
+        "required": [
+          "category_code",
+          "copies",
+          "sort_order",
+          "output_slot",
+          "required",
+          "ready_policy",
+          "failure_policy",
+          "source_mode"
+        ],
+        "properties": {
+          "category_code": {
+            "type": "string"
+          },
+          "copies": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "external_file_ref": {
+            "type": "string",
+            "nullable": true
+          },
+          "failure_policy": {
+            "$ref": "#/components/schemas/PrintSuiteFailurePolicy"
+          },
+          "output_slot": {
+            "type": "string"
+          },
+          "ready_policy": {
+            "$ref": "#/components/schemas/PrintSuiteReadyPolicy"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "sort_order": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "source_mode": {
+            "$ref": "#/components/schemas/PrintSuiteSourceMode"
+          },
+          "template_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        }
+      },
+      "PrintSuiteItemReadiness": {
+        "type": "object",
+        "description": "一条打印项对一个样本归集组的就绪判定（AC5）。",
+        "required": [
+          "category_code",
+          "category_name",
+          "source_mode",
+          "required",
+          "ready",
+          "missing",
+          "file_bindings"
+        ],
+        "properties": {
+          "category_code": {
+            "type": "string"
+          },
+          "category_name": {
+            "type": "string"
+          },
+          "file_bindings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrintSuiteFileBinding"
+            }
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ready": {
+            "type": "boolean"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "source_mode": {
+            "$ref": "#/components/schemas/PrintSuiteSourceMode"
+          }
+        }
+      },
+      "PrintSuiteReadyPolicy": {
+        "type": "string",
+        "description": "H9 必需单据未就绪时的受控就绪策略（AC7）。",
+        "enum": [
+          "wait_hold_instance",
+          "pause_agent_queue"
+        ]
+      },
+      "PrintSuiteScope": {
+        "type": "string",
+        "description": "H9 打印组套匹配层级；解析优先级固定为送货地址、客户、线路、货主+仓库默认。",
+        "enum": [
+          "delivery_address",
+          "customer",
+          "route",
+          "warehouse_default"
+        ]
+      },
+      "PrintSuiteSourceMode": {
+        "type": "string",
+        "description": "H9 打印项来源模式（ADR-0041）。",
+        "enum": [
+          "rendered",
+          "external_file"
+        ]
+      },
+      "PrintSuiteTestResult": {
+        "type": "object",
+        "description": "H9 打印组套样本测试结果。",
+        "required": [
+          "suite",
+          "samples"
+        ],
+        "properties": {
+          "samples": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrintSuiteTestSample"
+            }
+          },
+          "suite": {
+            "$ref": "#/components/schemas/PrintSuiteVersion"
+          }
+        }
+      },
+      "PrintSuiteTestSample": {
+        "type": "object",
+        "description": "一个样本归集组的组套解析与就绪预检结果。",
+        "required": [
+          "group_id",
+          "delivery_note_no",
+          "matches_this_version",
+          "item_readiness"
+        ],
+        "properties": {
+          "delivery_note_no": {
+            "type": "string"
+          },
+          "group_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "item_readiness": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrintSuiteItemReadiness"
+            }
+          },
+          "matches_this_version": {
+            "type": "boolean"
+          },
+          "resolved_scope": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PrintSuiteScope"
+              }
+            ],
+            "nullable": true
+          }
+        }
+      },
+      "PrintSuiteVersion": {
+        "type": "object",
+        "description": "H9 打印组套不可变版本。",
+        "required": [
+          "id",
+          "owner_id",
+          "version_no",
+          "name",
+          "status",
+          "warehouse_id",
+          "scope",
+          "effective_from",
+          "items",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "customer_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "delivery_address_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "disabled_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "effective_from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "effective_to": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrintSuiteItem"
+            }
+          },
+          "name": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "route_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "scope": {
+            "$ref": "#/components/schemas/PrintSuiteScope"
+          },
+          "status": {
+            "type": "string"
+          },
+          "tested_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "version_no": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "PrintSuiteVersionListResponse": {
+        "type": "object",
+        "description": "H9 打印组套版本列表。",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrintSuiteVersion"
+            }
           }
         }
       },
@@ -34440,6 +38957,173 @@
           }
         }
       },
+      "Printer": {
+        "type": "object",
+        "description": "H9 打印机；`connection_type = usb` 的租约语义为单机（仅实际连接它的本机 Agent）。",
+        "required": [
+          "id",
+          "site_id",
+          "site_code",
+          "site_name",
+          "printer_name",
+          "connection_type",
+          "status",
+          "effective_release_mode",
+          "created_at"
+        ],
+        "properties": {
+          "connection_type": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "effective_release_mode": {
+            "type": "string",
+            "description": "覆盖优先、否则全局默认的当前生效释放模式。"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "printer_model": {
+            "type": "string",
+            "nullable": true
+          },
+          "printer_name": {
+            "type": "string"
+          },
+          "release_mode_override": {
+            "type": "string",
+            "description": "打印机级释放模式覆盖；空表示继承全局默认。",
+            "nullable": true
+          },
+          "site_code": {
+            "type": "string"
+          },
+          "site_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "site_name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "PrinterListResponse": {
+        "type": "object",
+        "description": "H9 打印机列表。",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Printer"
+            }
+          }
+        }
+      },
+      "PrinterTestPrint": {
+        "type": "object",
+        "description": "H9 测试打印记录；本机无真实硬件时 result 停留在 `dispatched`，\n`result/result_at/result_note` 为 Print Agent（US-H9-012）或人工回执字段。",
+        "required": [
+          "id",
+          "printer_id",
+          "tray_id",
+          "result",
+          "requested_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "printer_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requested_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "result": {
+            "type": "string"
+          },
+          "result_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "result_note": {
+            "type": "string",
+            "nullable": true
+          },
+          "tray_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "PrinterTray": {
+        "type": "object",
+        "description": "H9 纸盒：纸张能力、启用状态与设备标识。",
+        "required": [
+          "id",
+          "printer_id",
+          "tray_code",
+          "paper_size",
+          "paper_type",
+          "enabled",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "paper_size": {
+            "type": "string"
+          },
+          "paper_type": {
+            "type": "string"
+          },
+          "printer_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tray_code": {
+            "type": "string"
+          }
+        }
+      },
+      "PrinterTrayListResponse": {
+        "type": "object",
+        "description": "H9 纸盒列表。",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrinterTray"
+            }
+          }
+        }
+      },
       "Product": {
         "type": "object",
         "description": "商品基础档案。",
@@ -34777,6 +39461,116 @@
           "warehouse_id": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "PurchaseReturnOrder": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "warehouse_id",
+          "return_no",
+          "document_type",
+          "source_purchase_order_no",
+          "supplier_name",
+          "reason",
+          "approval_source",
+          "status",
+          "product_code",
+          "qty",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "approval_source": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "document_type": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "reject_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "return_no": {
+            "type": "string"
+          },
+          "shipped_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "shipped_by": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "shipped_by_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "source_purchase_order_no": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "supplier_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "supplier_name": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "PurchaseReturnOrderListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PurchaseReturnOrder"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
           }
         }
       },
@@ -36135,12 +40929,41 @@
           }
         }
       },
+      "RejectPurchaseReturnRequest": {
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "驳回原因（必填，不允许空白）。"
+          }
+        }
+      },
       "RejectReceivingOrderRequest": {
         "type": "object",
         "required": [
           "reason"
         ],
         "properties": {
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "ReleaseDeviceLeaseRequest": {
+        "type": "object",
+        "description": "人工释放设备租约：专用权限 + 原因必填 + 二次确认。",
+        "required": [
+          "reason",
+          "confirm"
+        ],
+        "properties": {
+          "confirm": {
+            "type": "boolean",
+            "description": "必须为 true 表示已完成二次确认。"
+          },
           "reason": {
             "type": "string"
           }
@@ -38357,6 +43180,51 @@
           }
         }
       },
+      "TestAggregationRuleRequest": {
+        "type": "object",
+        "description": "使用真实出库订单测试一版归集规则。",
+        "required": [
+          "order_ids"
+        ],
+        "properties": {
+          "order_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
+      "TestPrintRequest": {
+        "type": "object",
+        "description": "对指定打印机和纸盒发起测试打印。",
+        "required": [
+          "tray_id"
+        ],
+        "properties": {
+          "tray_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "TestPrintSuiteRequest": {
+        "type": "object",
+        "description": "用真实归集组样本测试一版打印组套。",
+        "required": [
+          "group_ids"
+        ],
+        "properties": {
+          "group_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
       "TmsDispatch": {
         "type": "object",
         "required": [
@@ -39130,6 +43998,38 @@
           },
           "supports_qrcode": {
             "type": "boolean"
+          }
+        }
+      },
+      "UpdatePrinterRequest": {
+        "type": "object",
+        "description": "维护 H9 打印机状态与释放模式覆盖；`release_mode_override = \"inherit\"` 表示清除覆盖。",
+        "properties": {
+          "release_mode_override": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "UpdatePrinterTrayRequest": {
+        "type": "object",
+        "description": "维护 H9 纸盒能力与启用状态。",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "paper_size": {
+            "type": "string",
+            "nullable": true
+          },
+          "paper_type": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
