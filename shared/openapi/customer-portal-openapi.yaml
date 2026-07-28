@@ -158,7 +158,9 @@ paths:
         - $ref: "#/components/parameters/ReportVersionId"
       responses:
         "200":
-          description: 15 分钟有效下载地址
+          description: |
+            15 分钟有效下载会话。`url` 为客户平台相对路径（如 `/api/v1/files/{token}`），
+            不是对象存储预签名 URL；客户端须再请求该路径由本服务流式回传文件。
           content:
             application/json:
               schema:
@@ -169,6 +171,10 @@ paths:
     get:
       tags: [downloads]
       operationId: downloadPortalFile
+      summary: 凭下载会话 token 流式获取文件
+      description: |
+        校验 token 未过期后从 H-FILE 只读存储根流式读取；不访问 WMS。
+        不经过对象存储预签名直出（首期基线）。
       parameters:
         - in: path
           name: token
@@ -240,7 +246,9 @@ paths:
         - $ref: "#/components/parameters/ExportId"
       responses:
         "200":
-          description: 15 分钟有效 ZIP 下载地址
+          description: |
+            15 分钟有效 ZIP 下载会话；`url` 为客户平台 `/api/v1/files/{token}`，
+            由本服务流式回传，非对象存储预签名。
           content:
             application/json:
               schema:
@@ -765,7 +773,9 @@ components:
       properties:
         url:
           type: string
-          description: 15 分钟临时地址，不得持久化
+          description: |
+            客户平台相对下载路径（`/api/v1/files/{token}`），约 15 分钟有效，
+            不得持久化或当作对象存储预签名 URL 使用。
         file_name:
           type: string
         expires_at:
