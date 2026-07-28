@@ -123,6 +123,7 @@ async fn seed_order(
     warehouse_id: Uuid,
     customer_id: Uuid,
     address_id: Uuid,
+    created_at: DateTime<Utc>,
     order_no: &str,
 ) -> Uuid {
     let order_id = Uuid::new_v4();
@@ -130,9 +131,12 @@ async fn seed_order(
         r#"
         INSERT INTO outbound_orders (
             id, owner_id, document_type, wms_order_no, customer_id,
-            warehouse_id, status
+            warehouse_id, status, created_at
         )
-        VALUES ($1, $2, 'sales_outbound', $3, $4, $5, 'confirmed')
+        VALUES (
+            $1, $2, 'sales_outbound', $3, $4, $5, 'confirmed',
+            $6
+        )
         "#,
     )
     .bind(order_id)
@@ -140,6 +144,7 @@ async fn seed_order(
     .bind(order_no)
     .bind(customer_id)
     .bind(warehouse_id)
+    .bind(created_at)
     .execute(pool)
     .await
     .expect("outbound order seed should insert");
@@ -172,6 +177,7 @@ async fn manual_cutoff_freezes_one_boundary_numbers_audits_and_replays(pool: PgP
         warehouse_id,
         customer_id,
         address_id,
+        at(7, 26, 8, 0),
         "SO-H9-006-01",
     )
     .await;
@@ -181,6 +187,7 @@ async fn manual_cutoff_freezes_one_boundary_numbers_audits_and_replays(pool: PgP
         warehouse_id,
         customer_id,
         address_id,
+        at(7, 26, 8, 1),
         "SO-H9-006-02",
     )
     .await;
@@ -247,6 +254,7 @@ async fn delivery_note_workbench_lists_real_pending_orders_and_cutoff_results(po
         warehouse_id,
         customer_id,
         address_id,
+        at(7, 26, 8, 0),
         "SO-H9-WORKBENCH-01",
     )
     .await;
@@ -256,6 +264,7 @@ async fn delivery_note_workbench_lists_real_pending_orders_and_cutoff_results(po
         warehouse_id,
         customer_id,
         address_id,
+        at(7, 26, 8, 1),
         "SO-H9-WORKBENCH-02",
     )
     .await;
@@ -339,6 +348,7 @@ async fn manual_cutoff_rejects_mixed_address_before_allocating_a_number(pool: Pg
         warehouse_id,
         customer_id,
         address_id,
+        at(7, 26, 8, 0),
         "SO-H9-006-11",
     )
     .await;
@@ -348,6 +358,7 @@ async fn manual_cutoff_rejects_mixed_address_before_allocating_a_number(pool: Pg
         warehouse_id,
         customer_id,
         other_address_id,
+        at(7, 26, 8, 1),
         "SO-H9-006-12",
     )
     .await;
@@ -638,6 +649,7 @@ async fn scheduled_cutoff_uses_exception_time_and_concurrent_runs_create_one_gro
         warehouse_id,
         customer_id,
         address_id,
+        at(7, 26, 8, 0),
         "SO-H9-SCHEDULED-01",
     )
     .await;
@@ -657,6 +669,7 @@ async fn scheduled_cutoff_uses_exception_time_and_concurrent_runs_create_one_gro
         warehouse_id,
         customer_id,
         unplanned_address_id,
+        at(7, 26, 8, 1),
         "SO-H9-UNPLANNED-01",
     )
     .await;
@@ -673,6 +686,7 @@ async fn scheduled_cutoff_uses_exception_time_and_concurrent_runs_create_one_gro
         warehouse_id,
         customer_id,
         address_id,
+        at(7, 26, 8, 2),
         "SO-H9-SCHEDULED-02",
     )
     .await;
@@ -765,64 +779,4 @@ async fn scheduled_cutoff_uses_exception_time_and_concurrent_runs_create_one_gro
     assert_eq!(evidence, (1, 2, 1, 1));
 }
 
-#[sqlx::test(migrations = "../../migrations")]
-async fn outbound_order_creation_freezes_the_effective_address_route(pool: PgPool) {
-    let (owner_id, warehouse_id, customer_id, address_id) = seed_scope(&pool).await;
-    let auth = ctx(owner_id);
-    let now = Utc
-        .with_ymd_and_hms(2026, 7, 26, 8, 0, 0)
-        .single()
-        .expect("valid order time");
-    PrintOrchestrationService::with_postgres(pool.clone())
-        .publish_route_binding(
-            &auth,
-            PublishRouteBindingRequest {
-                warehouse_id,
-                customer_id,
-                delivery_address_id: address_id,
-                route_code: "LINE-FROZEN".to_string(),
-                effective_from: now,
-                effective_to: None,
-            },
-            now,
-            "h9-route-freeze-binding",
-        )
-        .await
-        .expect("route binding should publish");
-
-    let order = PgWave4Repository::new(pool.clone())
-        .create_outbound_order(
-            &auth,
-            CreateOutboundOrderRequest {
-                document_type: "sales_outbound".to_string(),
-                wms_order_no: "SO-H9-ROUTE-FREEZE".to_string(),
-                erp_order_no: Some("ERP-H9-ROUTE-FREEZE".to_string()),
-                customer_id,
-                warehouse_id,
-                delivery_address_id: address_id,
-                required_ship_at: None,
-                lines: vec![CreateOutboundOrderLineRequest {
-                    line_no: 1,
-                    product_code: "P-H9-ROUTE".to_string(),
-                    batch_no: "B-H9-ROUTE".to_string(),
-                    planned_qty: 1,
-                }],
-            },
-            now,
-            "h9-route-freeze-order",
-            None,
-        )
-        .await
-        .expect("outbound order should freeze route")
-        .value;
-
-    let frozen: (Uuid, String) = sqlx::query_as(
-        "SELECT delivery_address_id, route_code FROM h9_outbound_route_snapshots WHERE owner_id = $1 AND outbound_order_id = $2",
-    )
-    .bind(owner_id)
-    .bind(order.id)
-    .fetch_one(&pool)
-    .await
-    .expect("route snapshot should load");
-    assert_eq!(frozen, (address_id, "LINE-FROZEN".to_string()));
-}
+include!("h9_print_orchestration_postgres/part2.rs");
