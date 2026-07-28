@@ -13,6 +13,10 @@ import {
 
 import { useCustomerAddressesQuery } from "@/features/master-data/master-data-queries/queries";
 import type {
+  AggregationFieldDefinition,
+  AggregationRuleTestResult,
+  AggregationRuleVersion,
+  CreateAggregationRuleDraftRequest,
   CreateCutoffPlanRequest,
   DeliveryNoteCandidate,
   PublishRouteBindingRequest,
@@ -325,6 +329,220 @@ export function CutoffPlanDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+interface AggregationRuleDialogProps extends CommonDialogProps {
+  fields: AggregationFieldDefinition[];
+  onSubmit: (request: CreateAggregationRuleDraftRequest) => Promise<void>;
+}
+
+/**
+ * US-H9-007 AC1/AC2：维度只能从已登记字段目录中按顺序挑选，归组方式固定等值；
+ * 不提供任何自由 SQL / 脚本 / 正则 / 字段路径输入。
+ */
+export function AggregationRuleDialog({
+  open,
+  pending,
+  errorMessage,
+  fields,
+  onOpenChange,
+  onSubmit,
+}: AggregationRuleDialogProps) {
+  const [name, setName] = React.useState("");
+  const [chosen, setChosen] = React.useState<string[]>([]);
+
+  React.useEffect(() => {
+    if (open) {
+      setName("");
+      setChosen([]);
+    }
+  }, [open]);
+
+  const available = fields.filter((field) => !chosen.includes(field.field_code));
+  const labelOf = (code: string) => fields.find((field) => field.field_code === code)?.display_name ?? code;
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => !pending && onOpenChange(next)}>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>新建归集规则版本</DialogTitle>
+          <DialogDescription>
+            仅可从已登记订单标准字段中按顺序选择等值归组维度；货主 + 仓库 + 送货地址是系统硬边界，规则不能跨地址归集。
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <Field label="规则名称">
+            <Input
+              value={name}
+              maxLength={100}
+              placeholder="例如：按发票号与运输方式归集"
+              onChange={(event) => setName(event.target.value)}
+            />
+          </Field>
+          <Field label="添加维度（等值归组）">
+            <NativeSelect
+              value=""
+              options={available.map((field) => ({ value: field.field_code, label: field.display_name }))}
+              onChange={(code) => code && setChosen((current) => [...current, code])}
+            />
+          </Field>
+          {chosen.length > 0 && (
+            <ol className="space-y-2" aria-label="已选维度顺序">
+              {chosen.map((code, index) => (
+                <li key={code} className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm">
+                  <span className="w-6 text-muted-foreground">{index + 1}.</span>
+                  <span className="flex-1">{labelOf(code)} · 等值</span>
+                  <Button type="button" variant="ghost" size="sm" disabled={index === 0} onClick={() => setChosen((current) => move(current, index, -1))}>上移</Button>
+                  <Button type="button" variant="ghost" size="sm" disabled={index === chosen.length - 1} onClick={() => setChosen((current) => move(current, index, 1))}>下移</Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setChosen((current) => current.filter((item) => item !== code))}>移除</Button>
+                </li>
+              ))}
+            </ol>
+          )}
+          <ErrorText message={errorMessage} />
+        </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button type="button" variant="outline" disabled={pending}>取消</Button>
+          </DialogClose>
+          <Button
+            type="button"
+            disabled={pending || !name.trim() || chosen.length === 0}
+            onClick={() =>
+              void onSubmit({
+                name: name.trim(),
+                dimensions: chosen.map((code, index) => ({
+                  field_code: code as CreateAggregationRuleDraftRequest["dimensions"][number]["field_code"],
+                  method: "equals",
+                  order: index + 1,
+                })),
+              }).catch(() => undefined)
+            }
+          >
+            {pending ? "保存中..." : "保存草稿"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface AggregationRuleTestDialogProps extends CommonDialogProps {
+  rule: AggregationRuleVersion | null;
+  candidates: DeliveryNoteCandidate[];
+  result: AggregationRuleTestResult | null;
+  onSubmit: (orderIds: string[]) => Promise<void>;
+}
+
+/** US-H9-007 AC4：发布前用真实样本订单展示命中规则、分组键和预计归集结果。 */
+export function AggregationRuleTestDialog({
+  open,
+  pending,
+  errorMessage,
+  rule,
+  candidates,
+  result,
+  onOpenChange,
+  onSubmit,
+}: AggregationRuleTestDialogProps) {
+  const [orderIds, setOrderIds] = React.useState<string[]>([]);
+
+  React.useEffect(() => {
+    if (open) setOrderIds([]);
+  }, [open]);
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => !pending && onOpenChange(next)}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>样本订单测试</DialogTitle>
+          <DialogDescription>
+            规则 {rule ? `V${rule.version_no}「${rule.name}」` : "-"} · 维度顺序：
+            {rule?.dimensions.map((item) => dimensionLabel(item.field_code)).join(" → ") ?? "-"}
+            。仓库与送货地址为不可覆盖硬边界，测试结果按边界先分组。
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <p className="text-sm font-medium">选择样本订单（当前仓库待截单订单）</p>
+          <ul className="max-h-48 space-y-1 overflow-y-auto rounded-md border p-2" aria-label="样本订单">
+            {candidates.map((row) => (
+              <li key={row.outbound_order_id}>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={orderIds.includes(row.outbound_order_id)}
+                    onChange={(event) =>
+                      setOrderIds((current) =>
+                        event.target.checked
+                          ? [...current, row.outbound_order_id]
+                          : current.filter((id) => id !== row.outbound_order_id),
+                      )
+                    }
+                  />
+                  <span className="font-mono">{row.wms_order_no}</span>
+                  <span className="text-muted-foreground">{row.customer_name} · {row.delivery_address}</span>
+                </label>
+              </li>
+            ))}
+            {candidates.length === 0 && <li className="p-2 text-sm text-muted-foreground">当前仓库暂无待截单订单可作样本</li>}
+          </ul>
+          {result && (
+            <div className="space-y-2" aria-label="预计归集结果">
+              <p className="text-sm font-medium">预计归集结果（{result.groups.length} 组）</p>
+              {result.groups.map((group, index) => (
+                <div key={index} className="rounded-md border bg-muted/40 p-3 text-sm">
+                  <p className="font-medium">
+                    第 {index + 1} 组 · {group.order_nos.join("、")}
+                  </p>
+                  <p className="text-muted-foreground">
+                    分组键：
+                    {group.group_key.length
+                      ? group.group_key.map((item) => `${item.display_name}=${item.value || "（空）"}`).join("；")
+                      : "仅按硬边界"}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+          <ErrorText message={errorMessage} />
+        </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button type="button" variant="outline" disabled={pending}>关闭</Button>
+          </DialogClose>
+          <Button
+            type="button"
+            disabled={pending || !rule || orderIds.length === 0}
+            onClick={() => void onSubmit(orderIds).catch(() => undefined)}
+          >
+            {pending ? "测试中..." : "执行测试"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function move(list: string[], index: number, delta: number) {
+  const next = [...list];
+  const target = index + delta;
+  if (target < 0 || target >= next.length) return next;
+  [next[index], next[target]] = [next[target], next[index]];
+  return next;
+}
+
+function dimensionLabel(code: string) {
+  const labels: Record<string, string> = {
+    document_type: "单据类型",
+    erp_order_no: "ERP 订单号",
+    invoice_no: "发票号",
+    transport_mode_code: "运输方式",
+    department_code: "业务部门",
+    sales_group_code: "销售组",
+    order_group_no: "订单组号",
+    business_type_code: "业务类型",
+  };
+  return labels[code] ?? code;
 }
 
 function Field({ label, wide, children }: { label: string; wide?: boolean; children: React.ReactNode }) {
