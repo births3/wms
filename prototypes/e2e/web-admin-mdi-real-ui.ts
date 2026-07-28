@@ -227,7 +227,8 @@ export async function uploadReport(
 }
 
 export async function openDocuments(page: Page, keyword: string) {
-  await openMenu(page, "入库业务", "入库作业", /入库资料录入/);
+  // 菜单已归并：入库业务 → 入库资料 → 入库资料录入
+  await openMenu(page, "入库业务", "入库资料", /入库资料录入/);
   await expect(
     page.getByRole("heading", { name: "入库资料录入" }),
   ).toBeVisible();
@@ -236,7 +237,7 @@ export async function openDocuments(page: Page, keyword: string) {
 }
 
 export async function openReview(page: Page, reportNo: string) {
-  await openMenu(page, "入库业务", "入库作业", /药检单审核/);
+  await openMenu(page, "入库业务", "入库资料", /药检单审核/);
   await expect(
     page.getByRole("heading", { name: "药检单审核" }),
   ).toBeVisible();
@@ -246,7 +247,7 @@ export async function openReview(page: Page, reportNo: string) {
 }
 
 export async function openStampPage(page: Page) {
-  await openMenu(page, "基础档案", "系统配置", /药检图章配置/);
+  await openMenu(page, "入库业务", "入库资料", /药检图章配置/);
   await expect(
     page.getByRole("heading", { name: "药检图章配置" }),
   ).toBeVisible();
@@ -377,10 +378,23 @@ async function openMenu(
   group: string,
   item: RegExp,
 ) {
-  await page.getByRole("button", { name: section }).click();
-  const groupButton = page.getByRole("button", { name: group });
-  if ((await groupButton.getAttribute("aria-expanded")) === "false") {
-    await groupButton.click();
+  const navigation = page.getByRole("navigation");
+  const target = navigation.getByRole("button", { name: item });
+  if (!(await target.isVisible().catch(() => false))) {
+    const sectionButton = navigation.getByRole("button", {
+      name: section,
+      exact: true,
+    });
+    if ((await sectionButton.getAttribute("aria-expanded")) !== "true") {
+      await sectionButton.click();
+    }
+    const groupButton = navigation.getByRole("button", {
+      name: group,
+      exact: true,
+    });
+    if ((await groupButton.getAttribute("aria-expanded")) !== "true") {
+      await groupButton.click();
+    }
   }
-  await page.getByRole("button", { name: item }).click();
+  await target.click();
 }

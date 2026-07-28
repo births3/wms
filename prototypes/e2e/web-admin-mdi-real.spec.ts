@@ -297,7 +297,7 @@ test("M-DI 透明图章可拖动缩放并由另一账号发布", async ({ page }
 
 test("M-DI 受控规则真实处理缺失和不合格药检单并允许副本失败发货", async ({ page }) => {
   await login(page, "admin");
-  await openMenu(page, "入库业务", "入库作业", /药检单审核/);
+  await openMenu(page, "入库业务", "入库资料", /药检单审核/);
   await expect(page.getByRole("heading", { name: "药检单审核" })).toBeVisible();
   await page.getByLabel("药检要求商品类别").selectOption("*");
   await page.getByLabel("药检单缺失处理").selectOption("warning");
@@ -335,7 +335,7 @@ test("M-DI 受控规则真实处理缺失和不合格药检单并允许副本失
   });
 
   await switchUser(page, "admin");
-  await openMenu(page, "入库业务", "入库作业", /药检单审核/);
+  await openMenu(page, "入库业务", "入库资料", /药检单审核/);
   await page.getByLabel("药检单缺失处理").selectOption("block");
   await page.getByRole("button", { name: "保存规则" }).click();
   await expect(page.getByRole("status")).toContainText("规则已保存为 v");
@@ -464,6 +464,10 @@ test("M-DI 受控规则真实处理缺失和不合格药检单并允许副本失
   await page.getByRole("button", { name: "交接", exact: true }).click();
   const shipDialog = page.getByRole("dialog", { name: new RegExp(`发货交接.*${m4ReviewOrderNo}`) });
   await expect(shipDialog).toContainText("生成失败时不阻塞发货");
+  // 与 wave4 发货契约对齐：承运方式 / 交接对象 / 件数必填。
+  await shipDialog.getByLabel("承运方式（必选）").selectOption("third_party_express");
+  await shipDialog.getByLabel("交接对象（必填）").fill("E2E 快递员");
+  await shipDialog.getByLabel("件数（必填正整数）").fill("1");
   const shipResponse = page.waitForResponse(
     (candidate) =>
       candidate.url().endsWith(`/api/v1/outbound/orders/${m4ReviewOrderId}/ship`)
