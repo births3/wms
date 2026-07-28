@@ -275,6 +275,7 @@ function devAdminMenuSeed(): DevAdminMenuNode[] {
       ]),
       group(parent, "h9-print", "H9 打印能力", "Printer", 90, [
         ["h9-delivery-note-aggregation", "作业·随货同行单归集", "Printer"],
+        ["h9-print-devices", "设备·Print Agent 管理", "Printer"],
         ["h9-print-templates", "H9 打印模板", "Printer"],
       ]),
       group(parent, "mcg-numbering", "M-CG 编码能力", "KeyRound", 100, [["mcg-numbering", "M-CG 单据号规则", "KeyRound"]]),
@@ -380,6 +381,7 @@ function devViewPermissionKey(viewId: string) {
     "h8-erp-messages": "h8.erp_connector.read",
     "h8-erp-interface-tables": "h8.erp_interface_table.read",
     "h9-delivery-note-aggregation": "h9.print_orchestration.read",
+    "h9-print-devices": "h9.print_device.read",
     "h9-print-templates": "h9.print_template.read",
     "mcg-numbering": "mcg.document_numbering.read",
   };
