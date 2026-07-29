@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { completeH9BusinessPrint } from "./h9-business-print";
 
 const artifactsDir = path.resolve("../artifacts/screenshot-portal/real-web/m4-outbound");
 
@@ -43,6 +44,15 @@ test("M4 PC 新建出库单使用真实 API 返回单据类型和自动单号", 
 
   const createdRow = page.getByRole("row").filter({ hasText: created.wms_order_no }).first();
   await createdRow.getByRole("checkbox", { name: "选择此行" }).check();
+  await completeH9BusinessPrint(page, {
+    actionName: "打印",
+    dialogName: "M4 随货同行单 E2E 模板",
+    businessModule: "M4",
+    templateType: "delivery_note",
+    expectedField: "wms_order_no",
+    expectedValue: created.wms_order_no,
+    screenshotPath: path.join(artifactsDir, "delivery-note-preview.png"),
+  });
   const detailResponsePromise = page.waitForResponse(
     (response) => response.url().endsWith(`/api/v1/outbound/orders/${created.id}`) && response.request().method() === "GET",
   );
@@ -158,6 +168,101 @@ test("M4 PC 复核使用真实详情和提交 API", async ({ page }) => {
   await page.screenshot({ path: path.join(artifactsDir, "outbound-review-submitted.png"), fullPage: false });
 });
 
+// 【注意】M4 采购退货已从纯前端演示流程切换为真实接口（/api/v1/outbound/purchase-returns），
+// 本文件（m4-real e2e）需要连真实后端重跑验证。
+// 数据库可能没有采购退货种子数据，因此本用例先通过 UI 创建退货单，再走审批 → 拣货 → 复核 → 出库链路。
+test("M4 PC 采购退货使用真实 API 走创建到出库全链路", async ({ page }) => {
+  fs.mkdirSync(artifactsDir, { recursive: true });
+  await login(page);
+  await openOutboundReturns(page);
+
+  await page.getByRole("button", { name: "新增", exact: true }).click();
+  const createDialog = page.getByRole("dialog", { name: "新建采购退货单" });
+  await expect(createDialog).toBeVisible();
+  const returnNo = `RTN-M4-E2E-${Date.now()}`;
+  await fillPurchaseReturnForm(createDialog, returnNo);
+  const createResponsePromise = page.waitForResponse(
+    (response) => response.url().endsWith("/api/v1/outbound/purchase-returns") && response.request().method() === "POST",
+  );
+  await createDialog.getByRole("button", { name: "创建采购退货单" }).click();
+  const createResponse = await createResponsePromise;
+  const createBody = await createResponse.text();
+  expect(createResponse.ok(), `M4 return create returned ${createResponse.status()}: ${createBody}`).toBeTruthy();
+  const createdReturn = JSON.parse(createBody) as { id: string; return_no: string; status: string };
+  expect(createdReturn.return_no).toBe(returnNo);
+  expect(createdReturn.status).toBe("pending_approval");
+  await expect(page.getByRole("status")).toContainText(`${createdReturn.return_no} 已创建`);
+  await expect(page.getByText(createdReturn.return_no, { exact: true })).toBeVisible();
+  await page.screenshot({ path: path.join(artifactsDir, "purchase-return-created.png"), fullPage: false });
+
+  const returnRow = page.getByRole("row").filter({ hasText: createdReturn.return_no }).first();
+  await returnRow.getByRole("checkbox", { name: "选择此行" }).check();
+
+  const chain = [
+    { button: "审批", dialogName: /采购退货审批/, submit: "审批通过", endpoint: "approve", expectedStatus: "approved", toast: "采购退货审批已通过" },
+    { button: "拣货", dialogName: /采购退货拣货/, submit: "确认拣货", endpoint: "pick", expectedStatus: "picking", toast: "采购退货拣货已完成" },
+    { button: "复核", dialogName: /采购退货复核/, submit: "提交复核", endpoint: "review", expectedStatus: "reviewed", toast: "采购退货复核已完成" },
+    { button: "出库", dialogName: /采购退货出库交接/, submit: "确认出库", endpoint: "ship", expectedStatus: "shipped", toast: "采购退货出库交接已完成" },
+  ] as const;
+  for (const step of chain) {
+    await page.getByRole("button", { name: step.button, exact: true }).click();
+    const actionDialog = page.getByRole("dialog", { name: step.dialogName });
+    await expect(actionDialog).toBeVisible();
+    const actionResponsePromise = page.waitForResponse(
+      (response) =>
+        response.url().endsWith(`/api/v1/outbound/purchase-returns/${createdReturn.id}/${step.endpoint}`)
+        && response.request().method() === "POST",
+    );
+    await actionDialog.getByRole("button", { name: step.submit, exact: true }).click();
+    const actionResponse = await actionResponsePromise;
+    const actionBody = await actionResponse.text();
+    expect(actionResponse.ok(), `M4 return ${step.endpoint} returned ${actionResponse.status()}: ${actionBody}`).toBeTruthy();
+    const updatedReturn = JSON.parse(actionBody) as { id: string; status: string };
+    expect(updatedReturn.id).toBe(createdReturn.id);
+    expect(updatedReturn.status).toBe(step.expectedStatus);
+    await expect(page.getByRole("status")).toContainText(step.toast);
+  }
+  await page.screenshot({ path: path.join(artifactsDir, "purchase-return-shipped.png"), fullPage: false });
+});
+
+// 驳回走真实接口且 reason 必填：新建一张退货单验证驳回分支。
+test("M4 PC 采购退货驳回使用真实 API 提交必填原因", async ({ page }) => {
+  fs.mkdirSync(artifactsDir, { recursive: true });
+  await login(page);
+  await openOutboundReturns(page);
+
+  await page.getByRole("button", { name: "新增", exact: true }).click();
+  const createDialog = page.getByRole("dialog", { name: "新建采购退货单" });
+  await fillPurchaseReturnForm(createDialog, `RTN-M4-REJECT-${Date.now()}`);
+  const createResponsePromise = page.waitForResponse(
+    (response) => response.url().endsWith("/api/v1/outbound/purchase-returns") && response.request().method() === "POST",
+  );
+  await createDialog.getByRole("button", { name: "创建采购退货单" }).click();
+  const createResponse = await createResponsePromise;
+  expect(createResponse.ok()).toBeTruthy();
+  const createdReturn = JSON.parse(await createResponse.text()) as { id: string; return_no: string };
+
+  const returnRow = page.getByRole("row").filter({ hasText: createdReturn.return_no }).first();
+  await returnRow.getByRole("checkbox", { name: "选择此行" }).check();
+  await page.getByRole("button", { name: "驳回", exact: true }).click();
+  const rejectDialog = page.getByRole("dialog", { name: /采购退货驳回/ });
+  await expect(rejectDialog).toBeVisible();
+  await rejectDialog.getByLabel("驳回备注（必填）").fill("E2E 驳回原因");
+  const rejectResponsePromise = page.waitForResponse(
+    (response) =>
+      response.url().endsWith(`/api/v1/outbound/purchase-returns/${createdReturn.id}/reject`)
+      && response.request().method() === "POST",
+  );
+  await rejectDialog.getByRole("button", { name: "确认驳回", exact: true }).click();
+  const rejectResponse = await rejectResponsePromise;
+  const rejectBody = await rejectResponse.text();
+  expect(rejectResponse.ok(), `M4 return reject returned ${rejectResponse.status()}: ${rejectBody}`).toBeTruthy();
+  const rejectedReturn = JSON.parse(rejectBody) as { id: string; status: string; reject_reason?: string | null };
+  expect(rejectedReturn.status).toBe("cancelled");
+  await expect(page.getByRole("status")).toContainText("采购退货审批已驳回");
+  await page.screenshot({ path: path.join(artifactsDir, "purchase-return-rejected.png"), fullPage: false });
+});
+
 async function login(page: import("@playwright/test").Page) {
   await page.goto("/");
   await page.getByLabel("货主编码").fill("PY_OWNER");
@@ -165,6 +270,19 @@ async function login(page: import("@playwright/test").Page) {
   await page.getByRole("textbox", { name: "密码", exact: true }).fill("CorrectHorse1!");
   await page.getByRole("button", { name: "登录" }).click();
   await expect(page.getByRole("heading", { name: "运营总览" })).toBeVisible();
+}
+
+async function fillPurchaseReturnForm(
+  dialog: import("@playwright/test").Locator,
+  returnNo: string,
+) {
+  await dialog.getByLabel("采购退货单号").fill(returnNo);
+  await dialog.getByLabel("原采购入库单").fill("ASN-M2-E2E-001");
+  await dialog.getByLabel("供应商").fill("E2E 医药供应商");
+  await expect(dialog.getByLabel("仓库")).not.toHaveValue("");
+  await dialog.getByLabel("退货原因").fill("E2E 供应商召回");
+  await dialog.getByLabel("商品编码").fill("P-M1-E2E-001");
+  await dialog.getByLabel("数量").fill("3");
 }
 
 async function openOutboundOrders(page: import("@playwright/test").Page) {
@@ -191,6 +309,19 @@ async function openOutboundWaves(page: import("@playwright/test").Page) {
   }
   await target.click();
   await expect(page.getByRole("heading", { name: "M4 波次规划" })).toBeVisible();
+}
+
+async function openOutboundReturns(page: import("@playwright/test").Page) {
+  const navigation = page.getByRole("navigation");
+  const target = navigation.getByRole("button", { name: /M4 采购退货出库/ });
+  if (!(await target.isVisible())) {
+    const section = navigation.getByRole("button", { name: "出库业务", exact: true });
+    if ((await section.getAttribute("aria-expanded")) !== "true") await section.click();
+    const group = navigation.getByRole("button", { name: "出库作业", exact: true });
+    if ((await group.getAttribute("aria-expanded")) !== "true") await group.click();
+  }
+  await target.click();
+  await expect(page.getByRole("heading", { name: "M4 采购退货出库" })).toBeVisible();
 }
 
 async function openOutboundReview(page: import("@playwright/test").Page) {

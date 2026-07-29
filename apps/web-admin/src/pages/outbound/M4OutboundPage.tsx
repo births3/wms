@@ -3,9 +3,7 @@ import {
   DataGrid,
   PageHeader,
   QueryPanel,
-  StatusBadge,
   buildQueryPanelSummaryItems,
-  type DataGridColumn,
   type DataGridCreateAction,
   type DataGridDetailAction,
   type DataGridExportAction,
@@ -29,35 +27,40 @@ import {
   type ActionState,
   type ActionTargetContext,
   type OutboundCreateForm,
+  type OutboundShipForm,
+  type PurchaseReturnCreateForm,
 } from "./M4OutboundActionDialog";
 import {
+  useApprovePurchaseReturnMutation,
   useCancelOutboundWaveMutation,
   useCreateOutboundOrderMutation,
   useCreateOutboundWaveMutation,
+  useCreatePurchaseReturnMutation,
   useOutboundOrderQuery,
   useOutboundOrdersQuery,
   useOutboundReviewQuery,
   useOutboundWaveQuery,
   useOutboundWavesQuery,
+  usePickPurchaseReturnMutation,
+  usePurchaseReturnsQuery,
+  useRejectPurchaseReturnMutation,
+  useReleaseOutboundWaveMutation,
+  useRevalidateOutboundOrderMutation,
   useReviewOutboundOrderMutation,
-  type CreateOutboundOrderRequest,
+  useReviewPurchaseReturnMutation,
+  useShipOutboundOrderMutation,
+  useShipPurchaseReturnMutation,
+  useVoidRequestOutboundOrderMutation,
   type CreateOutboundWaveRequest,
 } from "@/features/outbound/outbound-queries";
 import { useCurrentUserQuery } from "@/features/auth/auth-queries";
-import { useMasterDataRowsQuery, useSystemDictionaryItemOptionsQuery } from "@/features/master-data/master-data-queries";
+import { useCustomerAddressesQuery, useMasterDataRowsQuery, useSystemDictionaryItemOptionsQuery } from "@/features/master-data/master-data-queries";
 import {
   useDualPersonPolicyQueries,
   type DualPersonPolicy,
 } from "@/features/validation-rules/dual-person-policy-queries";
 import {
-  BatchNoCell,
-  CustomerCell,
-  OrderNoSummary,
-  ProductSummary,
-  ReviewSummary,
-  TwoLine,
-  ValidationBadge,
-  purchaseReturnDocumentTypeLabel,
+  OutboundPageErrors,
 } from "./M4OutboundPageParts";
 import {
   defaultM4OutboundQueryValue,
@@ -65,12 +68,32 @@ import {
   filterReturns,
   filterWaves,
   normalizeM4OutboundQueryValue,
+  outboundStatusLabels,
   queryValueFromUnknown,
   pageMeta,
-  statusKey,
-  statusOptions,
   type M4OutboundMode,
 } from "./m4-outbound-page-model";
+import {
+  outboundOrderColumns,
+  outboundWaveColumns,
+  purchaseReturnColumns,
+} from "./M4OutboundGridColumns";
+import {
+  H9BusinessPrintDialog,
+  type H9BusinessPrintTarget,
+} from "../print-template/H9BusinessPrintDialog";
+import {
+  emptyPurchaseReturnForm,
+  emptyShipForm,
+  outboundOrderRequest,
+  outboundShipRequest,
+  purchaseReturnRequest,
+} from "./m4-outbound-action-requests";
+import { outboundPrintTarget } from "./m4-outbound-print";
+import { useDialogState } from "@/lib/use-dialog-state";
+import { usePageQueryState } from "@/lib/use-page-query-state";
+import { useTransientEvent } from "@/lib/use-transient-event";
+import { isUuid } from "@/lib/uuid";
 
 export type { M4OutboundMode } from "./m4-outbound-page-model";
 
@@ -79,29 +102,7 @@ interface M4OutboundPageProps {
   onBack: () => void;
 }
 
-const ownerId = "00000000-0000-0000-0000-000000000001";
-const warehouseId = "00000000-0000-0000-0000-000000003001";
-const customerId = "00000000-0000-0000-0000-000000004001";
-
-const m4OutboundStatusOptions = [
-  { value: "draft", label: "草稿" },
-  { value: "pending_validation", label: "待校验" },
-  { value: "validation_exception", label: "校验异常" },
-  { value: "confirmed", label: "已确认" },
-  { value: "void_requested", label: "作废申请中" },
-  { value: "in_wave", label: "已进波次" },
-  { value: "inventory_locked", label: "库存锁定" },
-  { value: "picked", label: "已拣选" },
-  { value: "picked_short", label: "短拣待补齐" },
-  { value: "released", label: "已下发" },
-  { value: "reviewed", label: "已复核" },
-  { value: "reviewed_short", label: "短拣已复核" },
-  { value: "shipped", label: "已发货" },
-  { value: "pending_approval", label: "待审批" },
-  { value: "approved", label: "已审批" },
-  { value: "picking", label: "拣货中" },
-  { value: "cancelled", label: "已取消" },
-];
+const m4OutboundStatusOptions = Object.entries(outboundStatusLabels).map(([value, label]) => ({ value, label }));
 
 const m4OutboundQueryFields: QueryPanelField[] = [
   { key: "keyword", label: "关键字", type: "text", placeholder: "单号 / 商品 / 批号 / 客商" },
@@ -110,77 +111,99 @@ const m4OutboundQueryFields: QueryPanelField[] = [
 ];
 const m4OutboundCoreQueryFieldKeys = ["keyword", "statusFilter"];
 
-// ponytail: local state mirrors successful API responses so the grid updates without inventing a success result.
-const seedOrders: OutboundOrder[] = [
-  makeOrder("00000000-0000-0000-0000-000000006001", "SO-M4-PC-0001", "ERP-SO-0001", "confirmed", 36, false),
-  makeOrder("00000000-0000-0000-0000-000000006002", "SO-M4-PC-0002", "ERP-SO-0002", "inventory_locked", 18, true),
-  makeOrder("00000000-0000-0000-0000-000000006003", "SO-M4-PC-0003", "ERP-SO-0003", "reviewed", 24, false),
-];
-
-const seedWaves: OutboundWave[] = [
-  {
-    id: "00000000-0000-0000-0000-000000007001",
-    owner_id: ownerId,
-    wave_no: "WAVE-M4-PC-0001",
-    status: "released",
-    order_ids: [seedOrders[1].id],
-    created_at: "2026-06-27T08:30:00.000Z",
-    updated_at: "2026-06-27T08:45:00.000Z",
-  },
-];
-
-const seedReturns: PurchaseReturnOrder[] = [
-  {
-    id: "00000000-0000-0000-0000-000000008001",
-    return_no: "PRTN-M4-PC-0001",
-    document_type: "purchase_return_outbound",
-    source_purchase_order_no: "ASN-M2-PC-0001",
-    supplier_name: "华东医药供应商",
-    reason: "供应商召回",
-    approval_source: "purchase_return_approval",
-    status: "pending_approval",
-    product_code: "P-M4-001",
-    qty: 6,
-    created_at: "2026-06-27T10:00:00.000Z",
-    updated_at: "2026-06-27T10:00:00.000Z",
-  },
-];
-
 export function M4OutboundPage({ mode }: M4OutboundPageProps) {
-  const [orders, setOrders] = React.useState<OutboundOrder[]>(seedOrders);
-  const [waves, setWaves] = React.useState<OutboundWave[]>(seedWaves);
-  const [returns, setReturns] = React.useState<PurchaseReturnOrder[]>(seedReturns);
-  const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(() => defaultM4OutboundQueryValue());
-  const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(() => defaultM4OutboundQueryValue());
+  // 订单 / 波次 / 采购退货均以空列表起步、由真实查询填充：接口加载中或失败时不得把演示单据当真数据展示。
+  const [orders, setOrders] = React.useState<OutboundOrder[]>([]);
+  const [waves, setWaves] = React.useState<OutboundWave[]>([]);
+  const [returns, setReturns] = React.useState<PurchaseReturnOrder[]>([]);
+  const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
+    usePageQueryState<QueryPanelValue>(defaultM4OutboundQueryValue, normalizeM4OutboundQueryValue);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
-  const [detailOpen, setDetailOpen] = React.useState(false);
-  const [detailTarget, setDetailTarget] = React.useState<DetailTarget | null>(null);
+  const {
+    open: detailOpen,
+    target: detailTarget,
+    openWith: openDetailWith,
+    setOpen: setDetailOpen,
+  } = useDialogState<DetailTarget>();
   const [activeAction, setActiveAction] = React.useState<ActionState | null>(null);
-  const [lastEvent, setLastEvent] = React.useState<string | null>(null);
+  const [printTarget, setPrintTarget] = React.useState<H9BusinessPrintTarget | null>(null);
+  const { lastEvent, setLastEvent } = useTransientEvent();
   const [note, setNote] = React.useState("");
   const [actionError, setActionError] = React.useState<string | null>(null);
   const [secondReviewerId, setSecondReviewerId] = React.useState("");
   const [createForm, setCreateForm] = React.useState<OutboundCreateForm>({
     wmsOrderNo: "",
-    erpOrderNo: "ERP-SO-NEW",
+    erpOrderNo: "",
     documentType: "sales_outbound",
-    customerName: "连锁门店 A",
-    productCode: "P-M4-NEW",
-    batchNo: "BATCH-OUT-202607",
-    plannedQty: "12",
+    warehouseId: "",
+    customerId: "",
+    deliveryAddressId: "",
+    productCode: "",
+    batchNo: "",
+    plannedQty: "",
     requiredShipDate: "",
   });
+  const [purchaseReturnForm, setPurchaseReturnForm] =
+    React.useState<PurchaseReturnCreateForm>(emptyPurchaseReturnForm);
+  const [shipForm, setShipForm] = React.useState<OutboundShipForm>(emptyShipForm);
   const ordersQuery = useOutboundOrdersQuery(mode === "orders" || mode === "waves" || mode === "review");
   const wavesQuery = useOutboundWavesQuery(mode === "waves");
+  const returnsQuery = usePurchaseReturnsQuery(mode === "returns");
   const createOutboundOrderMutation = useCreateOutboundOrderMutation();
   const createOutboundWaveMutation = useCreateOutboundWaveMutation();
+  const releaseOutboundWaveMutation = useReleaseOutboundWaveMutation();
   const cancelOutboundWaveMutation = useCancelOutboundWaveMutation();
   const reviewOutboundOrderMutation = useReviewOutboundOrderMutation();
+  const revalidateOutboundOrderMutation = useRevalidateOutboundOrderMutation();
+  const voidRequestOutboundOrderMutation = useVoidRequestOutboundOrderMutation();
+  const shipOutboundOrderMutation = useShipOutboundOrderMutation();
+  const createPurchaseReturnMutation = useCreatePurchaseReturnMutation();
+  const approvePurchaseReturnMutation = useApprovePurchaseReturnMutation();
+  const rejectPurchaseReturnMutation = useRejectPurchaseReturnMutation();
+  const pickPurchaseReturnMutation = usePickPurchaseReturnMutation();
+  const reviewPurchaseReturnMutation = useReviewPurchaseReturnMutation();
+  const shipPurchaseReturnMutation = useShipPurchaseReturnMutation();
   const currentUserQuery = useCurrentUserQuery(true);
+  const canPrint = currentUserQuery.data?.permissions.includes("h9.print_template.print") ?? false;
   const orderDetailQuery = useOutboundOrderQuery(detailTarget?.kind === "order" ? detailTarget.value.id : null);
   const waveDetailQuery = useOutboundWaveQuery(detailTarget?.kind === "wave" ? detailTarget.value.id : null);
   const reviewDetailQuery = useOutboundReviewQuery(activeAction?.kind === "review" ? activeAction.targetId ?? null : null);
   const reviewProductsQuery = useMasterDataRowsQuery("m1-products", activeAction?.kind === "review");
+  const createWarehousesQuery = useMasterDataRowsQuery(
+    "m1-warehouses",
+    mode === "orders" || mode === "returns",
+  );
+  const createPartnersQuery = useMasterDataRowsQuery("m1-business-partners", mode === "orders");
+  const createAddressesQuery = useCustomerAddressesQuery(createForm.customerId || null);
+  const createWarehouses = React.useMemo(() => createWarehousesQuery.data ?? [], [createWarehousesQuery.data]);
+  const createCustomers = React.useMemo(
+    () => (createPartnersQuery.data ?? []).filter((item) => item.partnerKind === "customer"),
+    [createPartnersQuery.data],
+  );
+  const createAddresses = React.useMemo(() => createAddressesQuery.data ?? [], [createAddressesQuery.data]);
+  React.useEffect(() => {
+    if (mode !== "orders") return;
+    setCreateForm((current) => ({
+      ...current,
+      warehouseId: createWarehouses.some((item) => item.id === current.warehouseId) ? current.warehouseId : createWarehouses[0]?.id ?? "",
+      customerId: createCustomers.some((item) => item.id === current.customerId) ? current.customerId : createCustomers[0]?.id ?? "",
+    }));
+  }, [createCustomers, createWarehouses, mode]);
+  React.useEffect(() => {
+    if (mode !== "returns") return;
+    setPurchaseReturnForm((current) => ({
+      ...current,
+      warehouseId: createWarehouses.some((item) => item.id === current.warehouseId)
+        ? current.warehouseId
+        : createWarehouses[0]?.id ?? "",
+    }));
+  }, [createWarehouses, mode]);
+  React.useEffect(() => {
+    setCreateForm((current) => ({
+      ...current,
+      deliveryAddressId: createAddresses.some((item) => item.id === current.deliveryAddressId) ? current.deliveryAddressId : createAddresses[0]?.id ?? "",
+    }));
+  }, [createAddresses]);
   const reviewPolicyInputs = React.useMemo(() => {
     if (activeAction?.kind !== "review" || !reviewDetailQuery.data || !reviewProductsQuery.data) return [];
     const productsByCode = new Map(reviewProductsQuery.data.map((item) => [item.code, item]));
@@ -229,11 +252,9 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
 
   React.useEffect(() => {
     setSelectedId(null);
-    const next = defaultM4OutboundQueryValue();
-    setDraftQuery(next);
-    setAppliedQuery(next);
+    resetQuery();
     setLastEvent(null);
-  }, [mode]);
+  }, [mode, resetQuery, setLastEvent]);
 
   React.useEffect(() => {
     if (!ordersQuery.isPending && !ordersQuery.error && ordersQuery.data) setOrders(ordersQuery.data);
@@ -244,17 +265,12 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
   }, [wavesQuery.data, wavesQuery.error, wavesQuery.isPending]);
 
   React.useEffect(() => {
-    if (!lastEvent) return;
-    const timer = window.setTimeout(() => setLastEvent(null), 3000);
-    return () => window.clearTimeout(timer);
-  }, [lastEvent]);
+    if (!returnsQuery.isPending && !returnsQuery.error && returnsQuery.data) setReturns(returnsQuery.data);
+  }, [returnsQuery.data, returnsQuery.error, returnsQuery.isPending]);
 
   const meta = pageMeta(mode);
   const normalizedQuery = normalizeM4OutboundQueryValue(appliedQuery);
-  const filteredOrders = (mode === "review"
-    ? filterOrders(orders, normalizedQuery, "orders")
-    : filterOrders(orders, normalizedQuery, mode)
-  ).filter((order) => mode !== "review" || order.status === "picked" || order.status === "picked_short");
+  const filteredOrders = filterOrders(orders, normalizedQuery, mode);
   const filteredWaves = filterWaves(waves, normalizedQuery);
   const filteredReturns = filterReturns(returns, normalizedQuery);
   const selectedOrder = filteredOrders.find((item) => item.id === selectedId) ?? null;
@@ -268,7 +284,7 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
   const gridRefreshAction: DataGridRefreshAction = {
     label: "刷新",
     description: `刷新${meta.title}列表`,
-    disabled: ordersQuery.isFetching || wavesQuery.isFetching,
+    disabled: ordersQuery.isFetching || wavesQuery.isFetching || returnsQuery.isFetching,
     onClick: () => {
       void refreshOutbound();
     },
@@ -286,67 +302,42 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
     disabled: ({ selectedRowKeys }) => selectedRowKeys.length !== 1,
     onClick: ({ selectedRowKeys }) => openSelectedDetail(selectedRowKeys[0]),
   };
-  const gridPrintAction: DataGridPrintAction = {
-    label: "打印",
-    description: `打印${meta.title}`,
-    disabled: ({ selectedRowKeys }) => selectedRowKeys.length !== 1,
-    onClick: ({ selectedRowKeys }) => {
-      const targetId = selectedRowKeys[0];
-      if (targetId) openAction("print", targetId);
-    },
-  };
+  const gridPrintAction: DataGridPrintAction | undefined =
+    canPrint && (mode === "orders" || mode === "review")
+      ? {
+          label: "打印",
+          description: "打印随货同行单",
+          disabled: ({ selectedRowKeys }) => selectedRowKeys.length !== 1,
+          onClick: ({ selectedRowKeys }) => {
+            const order = orders.find((item) => item.id === selectedRowKeys[0]);
+            if (order) setPrintTarget(outboundPrintTarget(order));
+          },
+        }
+      : undefined;
   const gridExportAction: DataGridExportAction = {
     label: "导出",
     description: `导出${meta.title}`,
   };
   const gridToolbarActions = outboundPrivateActions(mode, selectedOrder, selectedWave, selectedReturn, openAction);
 
-  const orderColumns: DataGridColumn<OutboundOrder>[] = mode === "review"
-    ? [
-        { key: "wms_order_no", header: "单号 / 类型", mono: true, minWidth: 220, width: 240, onDoubleClick: (row) => openOrderDetail(row.id), render: (row) => <OrderNoSummary order={row} /> },
-        { key: "product", header: "计划件数", minWidth: 120, render: (row) => <ReviewSummary order={row} /> },
-        { key: "customer_id", header: "客户 / 配送", minWidth: 160, render: (row) => (
-          <div className="text-sm">
-            <CustomerCell customerId={row.customer_id} />
-            <div className="mt-0.5 text-xs text-muted-foreground">配送 第三方快递</div>
-          </div>
-        ) },
-        { key: "required_ship_at", header: "包裹 / 车牌", minWidth: 150, render: () => <TwoLine top="包裹数量 1" bottom="车牌号 沪A-12345" /> },
-        { key: "created_at", header: "创建时间", minWidth: 150, filter: { type: "dateRange" }, render: (row) => formatDate(row.created_at) },
-        { key: "status", header: "状态", minWidth: 130, filter: { type: "multiSelect", options: statusOptions(mode).map(([value, label]) => ({ value, label })) }, render: (row) => <StatusBadge status={statusKey(row.status)} label={statusLabel(row.status)} size="sm" /> },
-      ]
-    : [
-        { key: "wms_order_no", header: "单号 / 类型", mono: true, minWidth: 220, width: 240, onDoubleClick: (row) => openOrderDetail(row.id), render: (row) => <OrderNoSummary order={row} /> },
-        { key: "product", header: "商品 / 数量", minWidth: 140, render: (row) => <ProductSummary order={row} /> },
-        { key: "batch_no", header: "批号", mono: true, minWidth: 150, render: (row) => <BatchNoCell order={row} /> },
-        { key: "validation", header: "校验", minWidth: 100, render: (row) => <ValidationBadge order={row} /> },
-        { key: "customer_id", header: "客户 / 门店", minWidth: 150, render: (row) => <CustomerCell customerId={row.customer_id} /> },
-        { key: "required_ship_at", header: "要求发货", minWidth: 150, render: (row) => formatDate(row.required_ship_at) },
-        { key: "created_at", header: "创建时间", minWidth: 150, filter: { type: "dateRange" }, render: (row) => formatDate(row.created_at) },
-        { key: "status", header: "状态", minWidth: 130, filter: { type: "multiSelect", options: statusOptions(mode).map(([value, label]) => ({ value, label })) }, render: (row) => <StatusBadge status={statusKey(row.status)} label={statusLabel(row.status)} size="sm" /> },
-      ];
+  const orderColumns = outboundOrderColumns(mode, openOrderDetail);
+  const waveColumns = outboundWaveColumns(mode, orders, openWaveDetail);
+  const returnColumns = purchaseReturnColumns(mode, openReturnDetail);
 
-  const waveColumns: DataGridColumn<OutboundWave>[] = [
-    { key: "wave_no", header: "波次号", mono: true, minWidth: 180, onDoubleClick: (row) => openWaveDetail(row.id), render: (row) => <span className="text-primary">{row.wave_no}</span> },
-    { key: "orders", header: "订单 / 明细", minWidth: 140, render: (row) => `${(row.order_ids ?? []).length} 单 / ${waveLineCount(row, orders)} 行` },
-    { key: "qty", header: "件数 / 温区", align: "right", minWidth: 130, render: (row) => `${waveQty(row, orders)} 件 / 常温` },
-    { key: "route", header: "路径策略 / 容量", minWidth: 180, render: () => <TwoLine top="S 型最短路径" bottom="容量上限 100 单 / 10000 件" /> },
-    { key: "created_at", header: "创建时间", minWidth: 150, filter: { type: "dateRange" }, render: (row) => formatDate(row.created_at) },
-    { key: "status", header: "状态", minWidth: 130, filter: { type: "multiSelect", options: statusOptions(mode).map(([value, label]) => ({ value, label })) }, render: (row) => <StatusBadge status={statusKey(row.status)} label={statusLabel(row.status)} size="sm" /> },
-  ];
+  function applyGridQueryState(queryState: unknown) {
+    applyQuery(queryValueFromUnknown(queryState));
+    setSelectedId(null);
+  }
 
-  const returnColumns: DataGridColumn<PurchaseReturnOrder>[] = [
-    { key: "return_no", header: "采购退货单 / 类型", mono: true, minWidth: 240, width: 260, onDoubleClick: (row) => openReturnDetail(row.id), render: (row) => <TwoLine top={row.return_no} bottom={purchaseReturnDocumentTypeLabel(row.document_type)} /> },
-    { key: "source_purchase_order_no", header: "原采购入库单", mono: true, minWidth: 180 },
-    { key: "supplier_name", header: "供应商 / 原因", minWidth: 200, render: (row) => <TwoLine top={row.supplier_name} bottom={row.reason} /> },
-    { key: "product", header: "商品 / 数量", minWidth: 160, render: (row) => <TwoLine top={row.product_code} bottom={`${row.qty} 件`} /> },
-    { key: "created_at", header: "创建时间", minWidth: 150, filter: { type: "dateRange" }, render: (row) => formatDate(row.created_at) },
-    { key: "status", header: "状态", minWidth: 130, filter: { type: "multiSelect", options: statusOptions(mode).map(([value, label]) => ({ value, label })) }, render: (row) => <StatusBadge status={statusKey(row.status)} label={statusLabel(row.status)} size="sm" /> },
-  ];
+  function clearGridQueryState() {
+    resetQuery();
+    setSelectedId(null);
+  }
 
   async function refreshOutbound() {
     if (mode === "orders" || mode === "review") await ordersQuery.refetch();
     if (mode === "waves") await Promise.all([ordersQuery.refetch(), wavesQuery.refetch()]);
+    if (mode === "returns") await returnsQuery.refetch();
     setLastEvent(`${meta.title}已刷新`);
   }
 
@@ -367,35 +358,49 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
     const order = orders.find((item) => item.id === id);
     if (!order) return;
     setSelectedId(id);
-    setDetailTarget({ kind: "order", value: order });
-    setDetailOpen(true);
+    openDetailWith({ kind: "order", value: order });
   }
 
   function openWaveDetail(id: string) {
     const wave = waves.find((item) => item.id === id);
     if (!wave) return;
     setSelectedId(id);
-    setDetailTarget({ kind: "wave", value: wave, orders: orders.filter((order) => (wave.order_ids ?? []).includes(order.id)) });
-    setDetailOpen(true);
+    openDetailWith({ kind: "wave", value: wave, orders: orders.filter((order) => (wave.order_ids ?? []).includes(order.id)) });
   }
 
   function openReturnDetail(id: string) {
     const returnOrder = returns.find((item) => item.id === id);
     if (!returnOrder) return;
     setSelectedId(id);
-    setDetailTarget({ kind: "return", value: returnOrder });
-    setDetailOpen(true);
+    openDetailWith({ kind: "return", value: returnOrder });
   }
 
   function openAction(kind: ActionKind, targetId?: string) {
     if (kind === "create-order") createOutboundOrderMutation.reset();
     if (kind === "create-wave") createOutboundWaveMutation.reset();
+    if (kind === "release-wave") releaseOutboundWaveMutation.reset();
     if (kind === "cancel-wave") cancelOutboundWaveMutation.reset();
     if (kind === "review") reviewOutboundOrderMutation.reset();
+    if (kind === "validate") revalidateOutboundOrderMutation.reset();
+    if (kind === "void") voidRequestOutboundOrderMutation.reset();
+    if (kind === "ship") shipOutboundOrderMutation.reset();
+    if (kind === "create-return") createPurchaseReturnMutation.reset();
+    if (kind === "approve-return") approvePurchaseReturnMutation.reset();
+    if (kind === "reject-return") rejectPurchaseReturnMutation.reset();
+    if (kind === "pick-return") pickPurchaseReturnMutation.reset();
+    if (kind === "review-return") reviewPurchaseReturnMutation.reset();
+    if (kind === "ship-return") shipPurchaseReturnMutation.reset();
     setActiveAction({ kind, targetId });
     setNote("");
     setSecondReviewerId("");
     setActionError(null);
+    if (kind === "create-return") {
+      setPurchaseReturnForm((current) => ({
+        ...emptyPurchaseReturnForm,
+        warehouseId: current.warehouseId,
+      }));
+    }
+    if (kind === "ship") setShipForm(emptyShipForm);
   }
 
   function resolveActionTarget(action: ActionState | null): ActionTargetContext | null {
@@ -451,20 +456,7 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
 
   async function applyAction(action: ActionState) {
     if (action.kind === "create-order") {
-      const request: CreateOutboundOrderRequest = {
-        document_type: createForm.documentType,
-        wms_order_no: createForm.wmsOrderNo.trim(),
-        erp_order_no: createForm.erpOrderNo.trim() || null,
-        customer_id: customerId,
-        warehouse_id: warehouseId,
-        required_ship_at: createForm.requiredShipDate ? `${createForm.requiredShipDate}T09:00:00.000Z` : null,
-        lines: [{
-          line_no: 1,
-          product_code: createForm.productCode.trim(),
-          batch_no: createForm.batchNo.trim(),
-          planned_qty: toInteger(createForm.plannedQty),
-        }],
-      };
+      const request = outboundOrderRequest(createForm);
       const created = await createOutboundOrderMutation.mutateAsync(request);
       setOrders((value) => [created, ...value]);
       setSelectedId(created.id);
@@ -497,14 +489,25 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
       return;
     }
     if (action.kind === "create-return") {
-      const item = makeReturn(`RTN-M4-PC-${Date.now()}`);
+      const request = purchaseReturnRequest(purchaseReturnForm);
+      const item = await createPurchaseReturnMutation.mutateAsync(request);
       setReturns((value) => [item, ...value]);
       setLastEvent(`${item.return_no} 已创建`);
       return;
     }
     if (!action.targetId) return;
-    if (action.kind === "validate") updateOrder(action.targetId, "confirmed", "重新校验已完成");
-    if (action.kind === "void") updateOrder(action.targetId, "void_requested", "作废申请已提交");
+    if (action.kind === "validate") {
+      const revalidated = await revalidateOutboundOrderMutation.mutateAsync(action.targetId);
+      setOrders((value) => value.map((item) => item.id === revalidated.id ? revalidated : item));
+      setLastEvent(revalidated.status === "validation_exception" ? "校验未通过" : "重新校验已完成");
+      return;
+    }
+    if (action.kind === "void") {
+      const voided = await voidRequestOutboundOrderMutation.mutateAsync(action.targetId);
+      setOrders((value) => value.map((item) => item.id === voided.id ? voided : item));
+      setLastEvent("作废申请已提交");
+      return;
+    }
     if (action.kind === "review") {
       const order = reviewDetailQuery.data;
       const reviewerId = currentUserQuery.data?.user_id;
@@ -537,28 +540,49 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
       setLastEvent(`${reviewed.wms_order_no} 已复核`);
       return;
     }
-    if (action.kind === "print") setLastEvent("打印任务已提交");
-    if (action.kind === "ship") updateOrder(action.targetId, "shipped", "发货交接已完成");
-    if (action.kind === "release-wave") updateWave(action.targetId, "inventory_locked", "波次已下发");
-    if (action.kind === "approve-return") updateReturn(action.targetId, "approved", "采购退货审批已通过");
-    if (action.kind === "reject-return") updateReturn(action.targetId, "cancelled", "采购退货审批已驳回");
-    if (action.kind === "pick-return") updateReturn(action.targetId, "picking", "采购退货拣货已完成");
-    if (action.kind === "review-return") updateReturn(action.targetId, "reviewed", "采购退货复核已完成");
-    if (action.kind === "ship-return") updateReturn(action.targetId, "shipped", "采购退货出库交接已完成");
+    if (action.kind === "ship") {
+      const shipped = await shipOutboundOrderMutation.mutateAsync({
+        orderId: action.targetId,
+        request: outboundShipRequest(shipForm),
+      });
+      setOrders((value) => value.map((item) => item.id === shipped.id ? shipped : item));
+      setLastEvent("发货交接已完成");
+      return;
+    }
+    if (action.kind === "release-wave") {
+      const released = await releaseOutboundWaveMutation.mutateAsync(action.targetId);
+      setWaves((value) => value.map((wave) => wave.id === released.id ? released : wave));
+      const releasedOrderIds = released.order_ids ?? [];
+      setOrders((value) => value.map((order) => releasedOrderIds.includes(order.id) ? { ...order, status: "in_wave" } : order));
+      setLastEvent("波次已下发");
+      return;
+    }
+    if (action.kind === "approve-return") {
+      applyReturnResult(await approvePurchaseReturnMutation.mutateAsync(action.targetId), "采购退货审批已通过");
+      return;
+    }
+    if (action.kind === "reject-return") {
+      applyReturnResult(
+        await rejectPurchaseReturnMutation.mutateAsync({ returnId: action.targetId, request: { reason: note.trim() } }),
+        "采购退货审批已驳回",
+      );
+      return;
+    }
+    if (action.kind === "pick-return") {
+      applyReturnResult(await pickPurchaseReturnMutation.mutateAsync(action.targetId), "采购退货拣货已完成");
+      return;
+    }
+    if (action.kind === "review-return") {
+      applyReturnResult(await reviewPurchaseReturnMutation.mutateAsync(action.targetId), "采购退货复核已完成");
+      return;
+    }
+    if (action.kind === "ship-return") {
+      applyReturnResult(await shipPurchaseReturnMutation.mutateAsync(action.targetId), "采购退货出库交接已完成");
+    }
   }
 
-  function updateOrder(id: string, status: string, message: string) {
-    setOrders((value) => value.map((order) => order.id === id ? { ...order, status, updated_at: new Date().toISOString() } : order));
-    setLastEvent(message);
-  }
-
-  function updateWave(id: string, status: string, message: string) {
-    setWaves((value) => value.map((wave) => wave.id === id ? { ...wave, status, updated_at: new Date().toISOString() } : wave));
-    setLastEvent(message);
-  }
-
-  function updateReturn(id: string, status: string, message: string) {
-    setReturns((value) => value.map((item) => item.id === id ? { ...item, status } : item));
+  function applyReturnResult(item: PurchaseReturnOrder, message: string) {
+    setReturns((value) => value.map((current) => current.id === item.id ? item : current));
     setLastEvent(message);
   }
 
@@ -577,26 +601,13 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
         </div>
       )}
 
-      {ordersQuery.error && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
-          {ordersQuery.error.message}
-        </div>
-      )}
-      {wavesQuery.error && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
-          {wavesQuery.error.message}
-        </div>
-      )}
-      {detailOpen && orderDetailQuery.error && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
-          {orderDetailQuery.error.message}
-        </div>
-      )}
-      {detailOpen && waveDetailQuery.error && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
-          {waveDetailQuery.error.message}
-        </div>
-      )}
+      <OutboundPageErrors messages={[
+        ordersQuery.error?.message,
+        wavesQuery.error?.message,
+        returnsQuery.error?.message,
+        detailOpen ? orderDetailQuery.error?.message : null,
+        detailOpen ? waveDetailQuery.error?.message : null,
+      ]} />
 
       <QueryPanel
         fields={m4OutboundQueryFields}
@@ -604,13 +615,11 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
         value={draftQuery}
         onValueChange={(next) => setDraftQuery(normalizeM4OutboundQueryValue(next))}
         onQuery={() => {
-          setAppliedQuery(normalizeM4OutboundQueryValue(draftQuery));
+          applyQuery(draftQuery);
           setLastEvent(`${meta.title}已查询`);
         }}
         onReset={() => {
-          const next = defaultM4OutboundQueryValue();
-          setDraftQuery(next);
-          setAppliedQuery(next);
+          resetQuery();
           setSelectedId(null);
         }}
       />
@@ -625,7 +634,8 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
           selectedRowKeys={selectedId ? [selectedId] : []}
           onSelectedRowKeysChange={(keys) => setSelectedId(keys.at(-1) ?? null)}
           onRowClick={(row) => setSelectedId(row.id)}
-          emptyTitle="暂无波次"
+          caption={wavesQuery.isPending ? "加载波次..." : undefined}
+          emptyTitle={wavesQuery.isError ? "读取波次失败" : "暂无波次"}
           exportFileBaseName={meta.title}
           refreshAction={gridRefreshAction}
           createAction={gridCreateAction}
@@ -635,18 +645,8 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
           toolbarActions={gridToolbarActions}
           queryState={appliedQuery}
           querySummaryItems={querySummaryItems}
-          onApplyQueryState={(queryState) => {
-            const next = normalizeM4OutboundQueryValue(queryValueFromUnknown(queryState));
-            setDraftQuery(next);
-            setAppliedQuery(next);
-            setSelectedId(null);
-          }}
-          onClearQueryState={() => {
-            const next = defaultM4OutboundQueryValue();
-            setDraftQuery(next);
-            setAppliedQuery(next);
-            setSelectedId(null);
-          }}
+          onApplyQueryState={applyGridQueryState}
+          onClearQueryState={clearGridQueryState}
           selectable
         />
       ) : mode === "returns" ? (
@@ -659,7 +659,8 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
           selectedRowKeys={selectedId ? [selectedId] : []}
           onSelectedRowKeysChange={(keys) => setSelectedId(keys.at(-1) ?? null)}
           onRowClick={(row) => setSelectedId(row.id)}
-          emptyTitle="暂无采购退货单"
+          caption={returnsQuery.isPending ? "加载采购退货单..." : undefined}
+          emptyTitle={returnsQuery.isError ? "读取采购退货单失败" : "暂无采购退货单"}
           exportFileBaseName={meta.title}
           refreshAction={gridRefreshAction}
           createAction={gridCreateAction}
@@ -669,18 +670,8 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
           toolbarActions={gridToolbarActions}
           queryState={appliedQuery}
           querySummaryItems={querySummaryItems}
-          onApplyQueryState={(queryState) => {
-            const next = normalizeM4OutboundQueryValue(queryValueFromUnknown(queryState));
-            setDraftQuery(next);
-            setAppliedQuery(next);
-            setSelectedId(null);
-          }}
-          onClearQueryState={() => {
-            const next = defaultM4OutboundQueryValue();
-            setDraftQuery(next);
-            setAppliedQuery(next);
-            setSelectedId(null);
-          }}
+          onApplyQueryState={applyGridQueryState}
+          onClearQueryState={clearGridQueryState}
           selectable
         />
       ) : (
@@ -693,7 +684,8 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
           selectedRowKeys={selectedId ? [selectedId] : []}
           onSelectedRowKeysChange={(keys) => setSelectedId(keys.at(-1) ?? null)}
           onRowClick={(row) => setSelectedId(row.id)}
-          emptyTitle="暂无出库单"
+          caption={ordersQuery.isPending ? "加载出库单..." : undefined}
+          emptyTitle={ordersQuery.isError ? "读取出库单失败" : "暂无出库单"}
           exportFileBaseName={meta.title}
           refreshAction={gridRefreshAction}
           createAction={gridCreateAction}
@@ -703,18 +695,8 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
           toolbarActions={gridToolbarActions}
           queryState={appliedQuery}
           querySummaryItems={querySummaryItems}
-          onApplyQueryState={(queryState) => {
-            const next = normalizeM4OutboundQueryValue(queryValueFromUnknown(queryState));
-            setDraftQuery(next);
-            setAppliedQuery(next);
-            setSelectedId(null);
-          }}
-          onClearQueryState={() => {
-            const next = defaultM4OutboundQueryValue();
-            setDraftQuery(next);
-            setAppliedQuery(next);
-            setSelectedId(null);
-          }}
+          onApplyQueryState={applyGridQueryState}
+          onClearQueryState={clearGridQueryState}
           selectable
         />
       )}
@@ -723,7 +705,15 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
         action={activeAction}
         target={resolveActionTarget(activeAction)}
         createForm={createForm}
+        purchaseReturnForm={purchaseReturnForm}
+        shipForm={shipForm}
         documentTypeOptions={documentTypeOptions}
+        warehouseOptions={createWarehouses.map((item) => ({ value: item.id, label: `${item.code} ${item.name}` }))}
+        customerOptions={createCustomers.map((item) => ({ value: item.id, label: `${item.code} ${item.name}` }))}
+        addressOptions={createAddresses.map((item) => ({
+          value: item.id,
+          label: `${item.province}${item.city}${item.district}${item.detail_address}`,
+        }))}
         reviewOrder={activeAction?.kind === "review" ? reviewDetailQuery.data ?? null : null}
         reviewLoading={activeAction?.kind === "review" && reviewDetailQuery.isPending}
         reviewError={activeAction?.kind === "review" ? reviewDetailQuery.error?.message ?? null : null}
@@ -735,18 +725,40 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
           activeAction?.kind === "create-order"
             ? createOutboundOrderMutation.error?.message ?? documentTypeOptionsQuery.error?.message ?? null
             : activeAction?.kind === "create-wave" ? createOutboundWaveMutation.error?.message ?? null
-              : activeAction?.kind === "cancel-wave" ? cancelOutboundWaveMutation.error?.message ?? null
-                : activeAction?.kind === "review" ? reviewOutboundOrderMutation.error?.message ?? null : null
+              : activeAction?.kind === "release-wave" ? releaseOutboundWaveMutation.error?.message ?? null
+                : activeAction?.kind === "cancel-wave" ? cancelOutboundWaveMutation.error?.message ?? null
+                  : activeAction?.kind === "review" ? reviewOutboundOrderMutation.error?.message ?? null
+                    : activeAction?.kind === "validate" ? revalidateOutboundOrderMutation.error?.message ?? null
+                      : activeAction?.kind === "void" ? voidRequestOutboundOrderMutation.error?.message ?? null
+                        : activeAction?.kind === "ship" ? shipOutboundOrderMutation.error?.message ?? null
+                          : activeAction?.kind === "create-return" ? createPurchaseReturnMutation.error?.message ?? null
+                            : activeAction?.kind === "approve-return" ? approvePurchaseReturnMutation.error?.message ?? null
+                              : activeAction?.kind === "reject-return" ? rejectPurchaseReturnMutation.error?.message ?? null
+                                : activeAction?.kind === "pick-return" ? pickPurchaseReturnMutation.error?.message ?? null
+                                  : activeAction?.kind === "review-return" ? reviewPurchaseReturnMutation.error?.message ?? null
+                                    : activeAction?.kind === "ship-return" ? shipPurchaseReturnMutation.error?.message ?? null : null
         )}
         pending={
           (createOutboundOrderMutation.isPending && activeAction?.kind === "create-order")
           || (createOutboundWaveMutation.isPending && activeAction?.kind === "create-wave")
+          || (releaseOutboundWaveMutation.isPending && activeAction?.kind === "release-wave")
           || (cancelOutboundWaveMutation.isPending && activeAction?.kind === "cancel-wave")
           || (reviewOutboundOrderMutation.isPending && activeAction?.kind === "review")
+          || (revalidateOutboundOrderMutation.isPending && activeAction?.kind === "validate")
+          || (voidRequestOutboundOrderMutation.isPending && activeAction?.kind === "void")
+          || (shipOutboundOrderMutation.isPending && activeAction?.kind === "ship")
+          || (createPurchaseReturnMutation.isPending && activeAction?.kind === "create-return")
+          || (approvePurchaseReturnMutation.isPending && activeAction?.kind === "approve-return")
+          || (rejectPurchaseReturnMutation.isPending && activeAction?.kind === "reject-return")
+          || (pickPurchaseReturnMutation.isPending && activeAction?.kind === "pick-return")
+          || (reviewPurchaseReturnMutation.isPending && activeAction?.kind === "review-return")
+          || (shipPurchaseReturnMutation.isPending && activeAction?.kind === "ship-return")
           || (reviewDetailQuery.isPending && activeAction?.kind === "review")
           || (reviewPolicyLoading && activeAction?.kind === "review")
         }
         setCreateForm={setCreateForm}
+        setPurchaseReturnForm={setPurchaseReturnForm}
+        setShipForm={setShipForm}
         setNote={(value) => {
           setNote(value);
           if (actionError) setActionError(null);
@@ -762,72 +774,16 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
         onSubmit={submitAction}
       />
       <M4OutboundDetailDialog target={renderedDetailTarget} open={detailOpen} onOpenChange={setDetailOpen} />
+      <H9BusinessPrintDialog
+        open={Boolean(printTarget)}
+        target={printTarget}
+        onOpenChange={(next) => {
+          if (!next) setPrintTarget(null);
+        }}
+        onPrinted={(target) => setLastEvent(`${target.description}已登记打印结果`)}
+      />
     </section>
   );
-}
-
-function makeOrder(id: string, wmsNo: string, erpNo: string, status: string, qty: number, shortPick: boolean, now = "2026-06-27T09:00:00.000Z"): OutboundOrder {
-  return {
-    id,
-    owner_id: ownerId,
-    document_type: "sales_outbound",
-    customer_id: customerId,
-    warehouse_id: warehouseId,
-    wms_order_no: wmsNo,
-    erp_order_no: erpNo,
-    required_ship_at: "2026-06-28T09:00:00.000Z",
-    status,
-    short_pick: shortPick,
-    created_at: now,
-    updated_at: now,
-    lines: [{ line_no: 1, product_code: "P-M4-001", batch_no: "BATCH-OUT-202606", planned_qty: qty, picked_qty: shortPick ? qty - 2 : qty, reviewed_qty: status === "reviewed" || status === "shipped" ? qty : 0, shipped_qty: status === "shipped" ? qty : 0, short_pick_qty: shortPick ? 2 : 0 }],
-  };
-}
-
-function makeReturn(returnNo: string): PurchaseReturnOrder {
-  const now = new Date().toISOString();
-  return {
-    id: crypto.randomUUID(),
-    return_no: returnNo,
-    document_type: "purchase_return_outbound",
-    source_purchase_order_no: "ASN-M2-PC-0001",
-    supplier_name: "华东医药供应商",
-    reason: "供应商召回",
-    approval_source: "purchase_return_approval",
-    status: "pending_approval",
-    product_code: "P-M4-001",
-    qty: 3,
-    created_at: now,
-    updated_at: now,
-  };
-}
-
-function totalPlannedQty(order: OutboundOrder) {
-  return (order.lines ?? []).reduce((sum, line) => sum + line.planned_qty, 0);
-}
-
-function waveQty(wave: OutboundWave, orders: OutboundOrder[]) {
-  const orderIds = wave.order_ids ?? [];
-  return orders.filter((order) => orderIds.includes(order.id)).reduce((sum, order) => sum + totalPlannedQty(order), 0);
-}
-
-function waveLineCount(wave: OutboundWave, orders: OutboundOrder[]) {
-  const orderIds = wave.order_ids ?? [];
-  return orders.filter((order) => orderIds.includes(order.id)).reduce((sum, order) => sum + (order.lines ?? []).length, 0);
-}
-
-function formatDate(value: string | null | undefined) {
-  if (!value) return "-";
-  return value.slice(0, 10);
-}
-
-function toInteger(value: string) {
-  const parsed = Number.parseInt(value, 10);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function isUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 function strictestDualPersonPolicy(policies: DualPersonPolicy[]): DualPersonPolicy {
