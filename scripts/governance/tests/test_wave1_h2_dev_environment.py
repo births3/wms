@@ -1,6 +1,11 @@
 """Wave 1 H2 dev runtime evidence environment scaffolding tests."""
 from pathlib import Path
 
+RENDER_WORKER_SELF_HEALTHCHECK = (
+    "fetch('http://127.0.0.1:18090/healthz')"
+    ".then(r=>{if(!r.ok)process.exit(1)})"
+)
+
 
 def test_wave1_h2_dev_compose_declares_real_dev_postgres_only():
     """W6.A H2 evidence needs a dev PostgreSQL boundary, not staging/local/mock."""
@@ -23,7 +28,8 @@ def test_wave1_h2_dev_compose_declares_real_dev_postgres_only():
     assert "postgres_dev_h2_data:" in compose
     assert "wms_dev_h2_db_password:" in compose
     assert "localhost" not in compose
-    assert "127.0.0.1" not in compose
+    assert RENDER_WORKER_SELF_HEALTHCHECK in compose
+    assert "127.0.0.1" not in compose.replace(RENDER_WORKER_SELF_HEALTHCHECK, "")
     assert "staging" not in compose
     assert "mock" not in compose.lower()
     assert "fake" not in compose.lower()
@@ -39,6 +45,11 @@ def test_wave1_h2_dev_env_example_declares_only_dev_values():
     assert "WMS_STAGING" not in env_example
     assert "localhost" not in env_example
     assert "127.0.0.1" not in env_example
+    assert "WMS_HFILE_ENDPOINT=http://dev-h2.wms.internal:19000" in env_example
+    assert (
+        "WMS_H9_RENDER_WORKER_URL=http://dev-h2.wms.internal:18090/render"
+        in env_example
+    )
     assert "deploy/env/*.env" in Path(".gitignore").read_text(encoding="utf-8")
     assert "deploy/secrets/" in secrets_doc
     assert "wms_dev_h2_db_password.txt" in secrets_doc

@@ -1,6 +1,11 @@
 """Wave 2 staging deployment scaffolding governance tests."""
 from pathlib import Path
 
+RENDER_WORKER_SELF_HEALTHCHECK = (
+    "fetch('http://127.0.0.1:18090/healthz')"
+    ".then(r=>{if(!r.ok)process.exit(1)})"
+)
+
 
 def test_wave2_staging_compose_declares_real_staging_services():
     """W6.C runtime evidence needs a real staging service chain, not local/mock/test."""
@@ -25,7 +30,8 @@ def test_wave2_staging_compose_declares_real_staging_services():
     assert "/docker-entrypoint-initdb.d" not in compose
     assert "env_file:" not in compose
     assert "localhost" not in compose
-    assert "127.0.0.1" not in compose
+    assert RENDER_WORKER_SELF_HEALTHCHECK in compose
+    assert "127.0.0.1" not in compose.replace(RENDER_WORKER_SELF_HEALTHCHECK, "")
     assert "mock" not in compose.lower()
     assert "fake" not in compose.lower()
 
