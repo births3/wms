@@ -130,8 +130,11 @@ test("US-H9-002 字段库真实数据生成、维护与发布", async ({ page })
 
 async function login(page: Page, username: string) {
   await page.goto("/");
+  if (await page.getByRole("button", { name: "退出" }).isVisible()) {
+    await page.getByRole("button", { name: "退出" }).click();
+  }
   await page.evaluate(() => localStorage.clear());
-  await page.reload();
+  await page.goto("/");
   await page.getByLabel("货主编码").fill("PY_OWNER");
   await page.getByLabel("登录账号").fill(username);
   await page.getByRole("textbox", { name: "密码", exact: true }).fill("CorrectHorse1!");

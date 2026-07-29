@@ -45,6 +45,9 @@ import {
 import { H9TemplateDesignerDialog, type H9TemplateDesignerMode } from "./H9TemplateDesignerDialog";
 import { H9FieldLibraryDialog } from "./H9FieldLibraryDialog";
 import { H9TemplatePreviewDialog } from "./H9TemplatePreviewDialog";
+import { useDialogState } from "@/lib/use-dialog-state";
+import { usePageQueryState } from "@/lib/use-page-query-state";
+import { queryString, queryValueFromUnknown } from "@/lib/query-value";
 
 const h9PrintTemplateQueryFields: QueryPanelField[] = [
   {
@@ -226,18 +229,15 @@ export function H9PrintTemplatePage({ currentUser }: { currentUser: CurrentUser 
   const enabledMutation = useSetPrintTemplateEnabledMutation();
   const versionsMutation = usePrintTemplateVersionsMutation();
   const previewMutation = usePreviewPrintTemplateMutation();
-  const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(() => defaultH9QueryValue());
-  const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(() => defaultH9QueryValue());
+  const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
+    usePageQueryState<QueryPanelValue>(defaultH9QueryValue, normalizeH9QueryValue);
   const [selectedRowKeys, setSelectedRowKeys] = React.useState<string[]>([]);
   const [selectedTreeNodeId, setSelectedTreeNodeId] = React.useState("");
-  const [designerOpen, setDesignerOpen] = React.useState(false);
   const [designerMode, setDesignerMode] = React.useState<H9TemplateDesignerMode>("create");
-  const [designerTemplate, setDesignerTemplate] = React.useState<PrintTemplateVersion | null>(null);
-  const [previewOpen, setPreviewOpen] = React.useState(false);
-  const [preview, setPreview] = React.useState<PrintTemplatePreviewResponse | null>(null);
-  const [historyOpen, setHistoryOpen] = React.useState(false);
+  const designerDialog = useDialogState<PrintTemplateVersion>();
+  const previewDialog = useDialogState<PrintTemplatePreviewResponse>();
+  const historyDialog = useDialogState<PrintTemplateVersion[]>();
   const [fieldLibraryOpen, setFieldLibraryOpen] = React.useState(false);
-  const [historyVersions, setHistoryVersions] = React.useState<PrintTemplateVersion[]>([]);
   const [notice, setNotice] = React.useState<Notice>(null);
   const canWriteTemplate = currentUser.permissions.includes("h9.print_template.write");
   const canPublishTemplate = currentUser.permissions.includes("h9.print_template.publish");
@@ -346,10 +346,12 @@ export function H9PrintTemplatePage({ currentUser }: { currentUser: CurrentUser 
     );
   }
 
-  function resetQuery() {
-    const defaults = defaultH9QueryValue();
-    setDraftQuery(defaults);
-    setAppliedQuery(defaults);
+  function applyGridQueryState(queryState: unknown) {
+    applyQuery(queryValueFromUnknown(queryState));
+  }
+
+  function clearGridQueryState() {
+    resetQuery();
   }
 
   async function saveTemplate(request: SavePrintTemplateRequest) {
@@ -363,16 +365,15 @@ export function H9PrintTemplatePage({ currentUser }: { currentUser: CurrentUser 
 
   function openCreateDesigner() {
     setDesignerMode("create");
-    setDesignerTemplate(null);
-    setDesignerOpen(true);
+    designerDialog.setTarget(null);
+    designerDialog.setOpen(true);
   }
 
   async function openDesignerFromRow(rowId: string, mode: H9TemplateDesignerMode) {
     try {
       const latest = await latestTemplateVersion(rowId);
       setDesignerMode(mode);
-      setDesignerTemplate(latest);
-      setDesignerOpen(true);
+      designerDialog.openWith(latest);
     } catch (errorValue) {
       setNotice({ type: "error", text: errorValue instanceof Error ? errorValue.message : "读取模板版本失败" });
     }
@@ -413,8 +414,7 @@ export function H9PrintTemplatePage({ currentUser }: { currentUser: CurrentUser 
       const row = templateById.get(rowId);
       if (!row) return;
       const versions = await versionsMutation.mutateAsync(row.id);
-      setHistoryVersions(versions);
-      setHistoryOpen(true);
+      historyDialog.openWith(versions);
     } catch (errorValue) {
       setNotice({ type: "error", text: errorValue instanceof Error ? errorValue.message : "读取版本历史失败" });
     }
@@ -440,8 +440,7 @@ export function H9PrintTemplatePage({ currentUser }: { currentUser: CurrentUser 
         business_document_id: "H9-SAMPLE",
         data: samplePrintData(),
       });
-      setPreview(next);
-      setPreviewOpen(true);
+      previewDialog.openWith(next);
     } catch (errorValue) {
       setNotice({ type: "error", text: errorValue instanceof Error ? errorValue.message : "预览失败" });
     }
@@ -466,7 +465,7 @@ export function H9PrintTemplatePage({ currentUser }: { currentUser: CurrentUser 
         defaultVisibleFieldKeys={h9PrintTemplateCoreQueryFieldKeys}
         value={draftQuery}
         onValueChange={(next) => setDraftQuery(normalizeH9QueryValue(next))}
-        onQuery={() => setAppliedQuery(normalizeH9QueryValue(draftQuery))}
+        onQuery={() => applyQuery(draftQuery)}
         onReset={resetQuery}
         resetLabel="重置"
       />
@@ -516,24 +515,20 @@ export function H9PrintTemplatePage({ currentUser }: { currentUser: CurrentUser 
             toolbarActions={toolbarActions}
             queryState={appliedQuery}
             querySummaryItems={querySummaryItems}
-            onApplyQueryState={(queryState) => {
-              const next = normalizeH9QueryValue(queryValueFromUnknown(queryState));
-              setDraftQuery(next);
-              setAppliedQuery(next);
-            }}
-            onClearQueryState={resetQuery}
+            onApplyQueryState={applyGridQueryState}
+            onClearQueryState={clearGridQueryState}
           />
         </div>
       </div>
       <H9TemplateDesignerDialog
-        open={designerOpen}
+        open={designerDialog.open}
         mode={designerMode}
-        initialTemplate={designerTemplate}
+        initialTemplate={designerDialog.target}
         templateTypes={templateTypesQuery.data ?? []}
         libraries={librariesQuery.data ?? []}
         onOpenChange={(open) => {
-          setDesignerOpen(open);
-          if (!open) setDesignerTemplate(null);
+          designerDialog.setOpen(open);
+          if (!open) designerDialog.setTarget(null);
         }}
         onSave={saveTemplate}
       />
@@ -544,11 +539,11 @@ export function H9PrintTemplatePage({ currentUser }: { currentUser: CurrentUser 
         canPublish={canPublishFieldLibrary}
         onOpenChange={setFieldLibraryOpen}
       />
-      <VersionHistoryDialog open={historyOpen} versions={historyVersions} onOpenChange={setHistoryOpen} />
+      <VersionHistoryDialog open={historyDialog.open} versions={historyDialog.target ?? []} onOpenChange={historyDialog.setOpen} />
       <H9TemplatePreviewDialog
-        open={previewOpen}
-        preview={preview}
-        onOpenChange={setPreviewOpen}
+        open={previewDialog.open}
+        preview={previewDialog.target}
+        onOpenChange={previewDialog.setOpen}
       />
     </section>
   );
@@ -655,14 +650,6 @@ function h9VersionNodeId(id: string) {
   return `version:${id}`;
 }
 
-function queryString(value: QueryPanelValue[string]) {
-  return typeof value === "string" ? value : "";
-}
-
-function queryValueFromUnknown(value: unknown): QueryPanelValue {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as QueryPanelValue) : {};
-}
-
 function formatDateTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
@@ -750,11 +737,13 @@ function NoticePanel({ notice }: { notice: Notice }) {
 
 function samplePrintData() {
   return {
-    asn: { code: "ASN-202607070001" },
-    inspection: { code: "INS-202607070001" },
-    outbound: { delivery_no: "DN-202607070001" },
-    location: { code: "A01-01-02-03" },
-    lpn: { code: "LPN-202607070001" },
-    product: { code: "P-M1-001", name: "冷藏胰岛素注射液" },
+    order: {
+      receipt_no: "ASN-202607070001",
+      lines: [{ product_code: "P-M1-001" }],
+    },
+    wms_order_no: "OUT-202607070001",
+    location_code: "A01-01-02-03",
+    container_lpn: "LPN-202607070001",
+    product_code: "P-M1-001",
   };
 }

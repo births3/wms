@@ -2,6 +2,8 @@ import * as React from "react";
 import { Button, cn } from "@wms/ui";
 import { Maximize2, Minimize2, RefreshCw, Save, X } from "lucide-react";
 
+import { initHiprintOnce } from "./hiprint-init";
+
 import "hiprint/dist/print-lock.css";
 
 type DesignerReadyState = "initializing" | "ready" | "error";
@@ -96,10 +98,10 @@ export const H9HiprintDesigner = React.forwardRef<H9HiprintDesignerHandle, H9Hip
           const win = window as unknown as { jQuery?: unknown; $?: unknown };
           win.jQuery = jqueryModule.default;
           win.$ = jqueryModule.default;
-          const { disAutoConnect, hiprint, defaultElementTypeProvider } = await import("hiprint");
+          const hiprintModule = await import("hiprint");
+          const { hiprint } = hiprintModule;
           if (disposed) return;
-          disAutoConnect();
-          hiprint.init({ providers: [new defaultElementTypeProvider()] });
+          initHiprintOnce(hiprintModule);
           const palette = document.getElementById(paletteId);
           if (palette && hiprint.PrintElementTypeManager) {
             hiprint.PrintElementTypeManager.buildByHtml(jqueryModule.default(palette).find(".ep-draggable-item"));

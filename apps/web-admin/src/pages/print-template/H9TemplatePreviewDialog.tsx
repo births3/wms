@@ -12,6 +12,8 @@ import { Printer } from "lucide-react";
 
 import type { PrintTemplatePreviewResponse } from "@/features/print-template/print-template-queries";
 
+import { initHiprintOnce } from "./hiprint-init";
+
 import "hiprint/dist/print-lock.css";
 
 interface H9TemplatePreviewDialogProps {
@@ -53,10 +55,10 @@ export function H9TemplatePreviewDialog({
         const win = window as unknown as { jQuery?: unknown; $?: unknown };
         win.jQuery = jqueryModule.default;
         win.$ = jqueryModule.default;
-        const { disAutoConnect, hiprint, defaultElementTypeProvider } = await import("hiprint");
+        const hiprintModule = await import("hiprint");
+        const { hiprint } = hiprintModule;
         if (disposed) return;
-        disAutoConnect();
-        hiprint.init({ providers: [new defaultElementTypeProvider()] });
+        initHiprintOnce(hiprintModule);
         const template = new hiprint.PrintTemplate({
           template: applyPreviewPaperDirection(currentPreview.hiprint_json, paperDirection),
         });

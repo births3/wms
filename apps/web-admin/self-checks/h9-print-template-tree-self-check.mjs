@@ -9,6 +9,14 @@ const querySource = read("src/features/print-template/print-template-queries.ts"
 const designerSource = read("src/pages/print-template/H9TemplateDesignerDialog.tsx");
 const hiprintSource = read("src/pages/print-template/H9HiprintDesigner.tsx");
 const previewSource = read("src/pages/print-template/H9TemplatePreviewDialog.tsx");
+const businessPrintSource = read("src/pages/print-template/H9BusinessPrintDialog.tsx");
+const businessPrintConsumers = [
+  read("src/pages/inbound/M2InboundPrintDialog.tsx"),
+  read("src/pages/outbound/M4OutboundPage.tsx"),
+  read("src/pages/outbound/m4-outbound-print.ts"),
+  read("src/pages/master-data/M1MasterDataPage.tsx"),
+  read("src/pages/inventory/M3BatchManagementPage.tsx"),
+].join("\n");
 const fieldLibrarySource = read("src/pages/print-template/H9FieldLibraryDialog.tsx");
 const dictionaryPageSource = read("src/pages/master-data/SystemDictionaryPage.tsx");
 const dictionaryPrintTypeFieldsSource = read(
@@ -110,6 +118,26 @@ assert.match(previewSource, /template\.getHtml/);
 assert.match(previewSource, /纸张方向/);
 assert.match(previewSource, /applyPreviewPaperDirection/);
 assert.match(previewSource, /templateRef\.current\?\.print/);
+assert.match(businessPrintSource, /usePreviewPrintTemplateMutation/);
+assert.match(businessPrintSource, /useRecordPrintTemplateMutation/);
+for (const errorCode of [
+  "H9_TEMPLATE_NOT_FOUND",
+  "H9_TEMPLATE_DISABLED",
+  "H9_FIELD_LIBRARY_NOT_PUBLISHED",
+  "H9_TEMPLATE_FIELD_MISMATCH",
+]) {
+  assert.match(businessPrintSource, new RegExp(errorCode), `H9 业务打印必须处理 ${errorCode}`);
+}
+for (const templateType of [
+  "asn",
+  "acceptance_record",
+  "delivery_note",
+  "location_label",
+  "lpn_label",
+  "product_label",
+]) {
+  assert.match(businessPrintConsumers, new RegExp(`"${templateType}"`), `业务页面必须接入 ${templateType}`);
+}
 for (const label of [
   "字段库编码",
   "字段库名称",

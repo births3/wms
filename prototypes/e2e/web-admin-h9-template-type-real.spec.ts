@@ -5,6 +5,7 @@ import path from "node:path";
 const evidenceDir = path.resolve("../artifacts/screenshot-portal/real-web/m1-system-dictionary");
 const consumerEvidenceDir = path.resolve("../artifacts/screenshot-portal/real-web/h9-print-templates");
 const ownerId = "00000000-0000-0000-0000-000000000001";
+const ownerOverrideCode = "product_label";
 
 test("US-H9-001 打印模板类型字典真实数据验收", async ({ page }) => {
   await login(page, "admin");
@@ -38,20 +39,19 @@ test("US-H9-001 打印模板类型字典真实数据验收", async ({ page }) =>
   await expect(page.getByText("A4", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("全局", { exact: true }).first()).toBeVisible();
 
-  const consumerPage = await page.context().newPage();
-  await consumerPage.goto("/");
-  await consumerPage.getByRole("button", { name: "基础能力", exact: true }).click();
-  await consumerPage.getByRole("button", { name: "H9 打印能力", exact: true }).click();
-  await consumerPage.getByRole("button", { name: /H9 打印模板/ }).click();
-  await expect(consumerPage.getByRole("heading", { name: "H9 打印模板" })).toBeVisible();
-  await expect(consumerPage.getByText("ASN 单", { exact: true })).toBeVisible();
-  await expect(consumerPage.getByText("商品标签", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "基础能力", exact: true }).click();
+  await page.getByRole("button", { name: "H9 打印能力", exact: true }).click();
+  await page.getByRole("button", { name: /H9 打印模板/ }).click();
+  await expect(page.getByRole("heading", { name: "H9 打印模板" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "ASN 单 asn M2", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "商品标签 product_label M1", exact: true })).toBeVisible();
   fs.mkdirSync(consumerEvidenceDir, { recursive: true });
-  await consumerPage.screenshot({
+  await page.screenshot({
     path: path.join(consumerEvidenceDir, "template-type-tree.png"),
     fullPage: false,
   });
-  await consumerPage.close();
+  await openSystemDictionary(page);
+  await page.getByRole("button", { name: /打印模板类型 print_template_type/ }).click();
 
   const invalidFieldLibrary = await page.evaluate(async ({ ownerId: currentOwnerId }) => {
     const session = JSON.parse(localStorage.getItem("wms.web-admin.auth-session") ?? "null");
@@ -85,7 +85,7 @@ test("US-H9-001 打印模板类型字典真实数据验收", async ({ page }) =>
 
   await page.getByRole("button", { name: "新增", exact: true }).click();
   const createDialog = page.getByRole("dialog");
-  await createDialog.getByLabel("编码", { exact: true }).fill("product_label");
+  await createDialog.getByLabel("编码", { exact: true }).fill(ownerOverrideCode);
   await createDialog.getByLabel("名称", { exact: true }).fill("商品标签·货主覆盖");
   await createDialog.getByLabel("货主 ID（可选）", { exact: true }).fill(ownerId);
   await createDialog.getByLabel("排序号", { exact: true }).fill("5");
@@ -96,14 +96,14 @@ test("US-H9-001 打印模板类型字典真实数据验收", async ({ page }) =>
   await createDialog.getByLabel("默认作用域", { exact: true }).selectOption("owner");
   const createResponse = page.waitForResponse(
     (response) =>
-      response.url().includes("/api/v1/system-dictionaries/print_template_type/items/product_label") &&
+      response.url().includes(`/api/v1/system-dictionaries/print_template_type/items/${ownerOverrideCode}`) &&
       response.request().method() === "PUT",
   );
   await createDialog.getByRole("button", { name: "保存", exact: true }).click();
   expect((await createResponse).status()).toBe(200);
   await expect(createDialog).toBeHidden();
 
-  await page.getByRole("button", { name: "product_label", exact: true }).click();
+  await page.getByRole("button", { name: ownerOverrideCode, exact: true }).click();
   await expect(page.getByText("商品标签·货主覆盖", { exact: true })).toBeVisible();
   await expect(page.getByText("m1_product_label_owner", { exact: true })).toBeVisible();
   fs.mkdirSync(evidenceDir, { recursive: true });
@@ -118,7 +118,7 @@ test("US-H9-001 打印模板类型字典真实数据验收", async ({ page }) =>
   await updateDialog.getByLabel("名称", { exact: true }).fill("商品标签·货主覆盖已更新");
   const updateResponse = page.waitForResponse(
     (response) =>
-      response.url().includes("/api/v1/system-dictionaries/print_template_type/items/product_label") &&
+      response.url().includes(`/api/v1/system-dictionaries/print_template_type/items/${ownerOverrideCode}`) &&
       response.request().method() === "PUT",
   );
   await updateDialog.getByRole("button", { name: "保存", exact: true }).click();
@@ -130,12 +130,40 @@ test("US-H9-001 打印模板类型字典真实数据验收", async ({ page }) =>
   await disableDialog.getByLabel("停用原因", { exact: true }).fill("US-H9-001 E2E 清理");
   const disableResponse = page.waitForResponse(
     (response) =>
-      response.url().includes("/api/v1/system-dictionaries/print_template_type/items/product_label/disable") &&
+      response.url().includes(`/api/v1/system-dictionaries/print_template_type/items/${ownerOverrideCode}/disable`) &&
       response.request().method() === "PATCH",
   );
   await disableDialog.getByRole("button", { name: "确认停用", exact: true }).click();
   expect((await disableResponse).status()).toBe(200);
-  await expect(page.getByRole("button", { name: "product_label", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: ownerOverrideCode, exact: true })).toHaveCount(0);
+
+  const cleanupStatus = await page.evaluate(async ({ code, ownerId: currentOwnerId }) => {
+    const session = JSON.parse(localStorage.getItem("wms.web-admin.auth-session") ?? "null");
+    return fetch(`/api/v1/system-dictionaries/print_template_type/items/${code}`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${session.accessToken}`,
+        "Content-Type": "application/json",
+        "Idempotency-Key": `h9-type-cleanup-${Date.now()}`,
+      },
+      body: JSON.stringify({
+        item_name: "商品标签",
+        owner_id: currentOwnerId,
+        enabled: true,
+        sort_order: 60,
+        params: {
+          field_library_code: "m1_product_label",
+          business_module: "M1",
+          business_direction: "label",
+          paper_type: "label",
+          default_scope: "global",
+        },
+        effective_from: null,
+        effective_to: null,
+      }),
+    }).then((response) => response.status);
+  }, { code: ownerOverrideCode, ownerId });
+  expect(cleanupStatus).toBe(200);
 
   await login(page, "wh-manager");
   await openSystemDictionary(page);
@@ -176,8 +204,11 @@ test("US-H9-001 打印模板类型字典真实数据验收", async ({ page }) =>
 
 async function login(page: Page, username: string) {
   await page.goto("/");
+  if (await page.getByRole("button", { name: "退出" }).isVisible()) {
+    await page.getByRole("button", { name: "退出" }).click();
+  }
   await page.evaluate(() => localStorage.clear());
-  await page.reload();
+  await page.goto("/");
   await page.getByLabel("货主编码").fill("PY_OWNER");
   await page.getByLabel("登录账号").fill(username);
   await page.getByRole("textbox", { name: "密码", exact: true }).fill("CorrectHorse1!");
