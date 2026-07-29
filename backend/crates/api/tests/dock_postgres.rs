@@ -153,19 +153,35 @@ async fn dock_import_is_transactional_and_delete_respects_active_appointments(po
     let warehouse_id = warehouse(&pool, owner_id, "WH-IMPORT").await;
     let repo = PgDockRepository::new(pool.clone());
     let actor = ctx(owner_id);
+    let import_request = CreateDockImportRequest {
+        warehouse_id,
+        docks: vec![request(warehouse_id, "D-01"), request(warehouse_id, "D-02")],
+    };
     let imported = repo
-        .import_docks(
-            &actor,
-            CreateDockImportRequest {
-                warehouse_id,
-                docks: vec![request(warehouse_id, "D-01"), request(warehouse_id, "D-02")],
-            },
-            at(9),
-            "dock-import-1",
-        )
+        .import_docks(&actor, import_request.clone(), at(9), "dock-import-1")
         .await
         .expect("bulk import should create all rows");
     assert_eq!(imported.len(), 2);
+    let replay = repo
+        .import_docks(&actor, import_request, at(9), "dock-import-1")
+        .await
+        .expect("same bulk import should replay");
+    assert_eq!(
+        replay.iter().map(|dock| dock.id).collect::<Vec<_>>(),
+        imported.iter().map(|dock| dock.id).collect::<Vec<_>>()
+    );
+    let import_evidence: (i64, i64) = sqlx::query_as(
+        "SELECT
+           (SELECT COUNT(*) FROM audit_event
+             WHERE owner_id = $1 AND action = 'import_dock'),
+           (SELECT COUNT(*) FROM idempotency_request
+             WHERE owner_id = $1 AND idempotency_key = 'dock-import-1')",
+    )
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("dock import audit and idempotency evidence should query");
+    assert_eq!(import_evidence, (2, 1));
 
     sqlx::query(
         "INSERT INTO dock_appointments

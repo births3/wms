@@ -144,27 +144,56 @@ async fn force_close_shortage_from_receiving_with_shortage_qty(pool: PgPool) {
         .await
         .expect("receive with shortage");
 
+    let close_request = ForceCloseShortageRequest {
+        reason: "缺货部分由 ERP 重推".to_string(),
+    };
+    let close_audit = AuditWriteRequest::from_auth_context(
+        &ctx,
+        "force_close_shortage",
+        "M2",
+        "receiving_order",
+        order.id.to_string(),
+        None,
+    );
     let closed = repository
         .force_close_shortage_with_audit(
             &ctx,
             order.id,
-            ForceCloseShortageRequest {
-                reason: "缺货部分由 ERP 重推".to_string(),
-            },
+            close_request.clone(),
             chrono::Utc::now(),
             "m2-force-close-shortage",
-            Some(AuditWriteRequest::from_auth_context(
-                &ctx,
-                "force_close_shortage",
-                "M2",
-                "receiving_order",
-                order.id.to_string(),
-                None,
-            )),
+            Some(close_audit.clone()),
         )
         .await
         .expect("force close shortage");
+    assert!(!closed.replayed);
     assert_eq!(closed.value.status, "closed_shortage");
+    let replay = repository
+        .force_close_shortage_with_audit(
+            &ctx,
+            order.id,
+            close_request,
+            chrono::Utc::now(),
+            "m2-force-close-shortage",
+            Some(close_audit),
+        )
+        .await
+        .expect("same force close should replay");
+    assert!(replay.replayed);
+    assert_eq!(replay.value.id, closed.value.id);
+    let evidence: (i64, i64) = sqlx::query_as(
+        "SELECT
+           (SELECT COUNT(*) FROM audit_event
+             WHERE owner_id = $1 AND action = 'force_close_shortage'),
+           (SELECT COUNT(*) FROM idempotency_request
+             WHERE owner_id = $1
+               AND idempotency_key = 'm2-force-close-shortage')",
+    )
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("force-close audit and idempotency evidence should query");
+    assert_eq!(evidence, (1, 1));
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -251,6 +280,19 @@ async fn putaway_strategy_profile_drives_default_top_n(pool: PgPool) {
         listed.data[0].rule_priority[3].as_str(),
         Some("empty_location_first")
     );
+    let evidence: (i64, i64) = sqlx::query_as(
+        "SELECT
+           (SELECT COUNT(*) FROM audit_event
+             WHERE owner_id = $1 AND resource_type = 'putaway_strategy_profile'),
+           (SELECT COUNT(*) FROM idempotency_request
+             WHERE owner_id = $1
+               AND idempotency_key = 'm2-upsert-putaway-strategy')",
+    )
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("putaway strategy audit and idempotency evidence should query");
+    assert_eq!(evidence, (1, 1));
 }
 
 #[sqlx::test(migrations = "../../migrations")]
