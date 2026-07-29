@@ -201,13 +201,13 @@ async fn logout_is_idempotent_blacklists_token_and_writes_one_audit(pool: PgPool
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn session_list_and_single_device_revoke_are_tenant_scoped(pool: PgPool) {
+async fn session_list_single_device_revoke_and_revoke_others_are_tenant_scoped(pool: PgPool) {
     std::env::set_var(JWT_SECRET_ENV, "session-test-secret");
     let owner_id = Uuid::new_v4();
     let user_id = Uuid::new_v4();
     seed_user(&pool, owner_id, user_id, "session-user").await;
     let store = Arc::new(MemoryRevocations::default());
-    let app = app(pool, store);
+    let app = app(pool.clone(), store);
     let first = login(&app, owner_id, "session-user").await;
     let second = login(&app, owner_id, "session-user").await;
 
@@ -255,12 +255,47 @@ async fn session_list_and_single_device_revoke_are_tenant_scoped(pool: PgPool) {
         StatusCode::UNAUTHORIZED
     );
     assert_eq!(
-        app.oneshot(bearer(&first.access_token, "/api/v1/auth/me"))
+        app.clone()
+            .oneshot(bearer(&first.access_token, "/api/v1/auth/me"))
             .await
             .expect("current device request should respond")
             .status(),
         StatusCode::OK
     );
+
+    let third = login(&app, owner_id, "session-user").await;
+    let revoke_others = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/sessions/revoke-others")
+                .header("authorization", format!("Bearer {}", first.access_token))
+                .body(Body::empty())
+                .expect("revoke other sessions request should build"),
+        )
+        .await
+        .expect("revoke other sessions should respond");
+    assert_eq!(revoke_others.status(), StatusCode::OK);
+    assert_eq!(
+        app.oneshot(bearer(&third.access_token, "/api/v1/auth/me"))
+            .await
+            .expect("other revoked device request should respond")
+            .status(),
+        StatusCode::UNAUTHORIZED
+    );
+
+    let audit_count: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM audit_event
+         WHERE owner_id = $1
+           AND action = ANY($2::text[])",
+    )
+    .bind(owner_id)
+    .bind(vec!["auth.session.revoke", "auth.sessions.revoke_others"])
+    .fetch_one(&pool)
+    .await
+    .expect("session revocation audit count should query");
+    assert_eq!(audit_count, 2);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
