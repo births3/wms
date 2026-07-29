@@ -133,19 +133,21 @@ async fn upload_content(
             .and_then(|value| value.to_str())
             .unwrap_or("upload")
     ));
-    tokio::fs::write(&temporary_path, &bytes)
-        .await
-        .map_err(|_| FileAttachmentHandlerError::StorageFailed)?;
-    tokio::fs::rename(&temporary_path, &path)
-        .await
-        .map_err(|_| FileAttachmentHandlerError::StorageFailed)?;
+    if tokio::fs::write(&temporary_path, &bytes).await.is_err() {
+        remove_partial_file(&temporary_path).await;
+        return Err(FileAttachmentHandlerError::StorageFailed);
+    }
+    if tokio::fs::rename(&temporary_path, &path).await.is_err() {
+        remove_partial_file(&temporary_path).await;
+        return Err(FileAttachmentHandlerError::StorageFailed);
+    }
     let sha256 = hex::encode(Sha256::digest(&bytes));
     if let Err(error) = state
         .repository
         .mark_uploaded(upload_id, &query.token, size_bytes, &sha256)
         .await
     {
-        let _ = tokio::fs::remove_file(path).await;
+        remove_partial_file(&path).await;
         return Err(error.into());
     }
     Ok(StatusCode::NO_CONTENT)
@@ -297,27 +299,11 @@ fn resolve_storage_path(
     Ok(root.join(relative))
 }
 
-#[cfg(test)]
-mod resolve_storage_path_tests {
-    use super::resolve_storage_path;
-    use std::path::Path;
-
-    #[test]
-    fn accepts_nested_normal_components() {
-        let path = resolve_storage_path(Path::new("/var/wms"), "M-DI/entity/file.pdf")
-            .unwrap_or_else(|_| panic!("nested key should resolve"));
-        assert_eq!(path, Path::new("/var/wms/M-DI/entity/file.pdf"));
-    }
-
-    #[test]
-    fn rejects_empty_absolute_and_parent_components() {
-        let root = Path::new("/var/wms");
-        assert!(resolve_storage_path(root, "").is_err());
-        assert!(resolve_storage_path(root, "/etc/passwd").is_err());
-        assert!(resolve_storage_path(root, "../secret").is_err());
-        assert!(resolve_storage_path(root, "a/../b").is_err());
-        // Path 会折叠 `./`，故 `a/./b` 等价于安全相对路径，不单独拒绝。
-        assert!(resolve_storage_path(root, "a/./b").is_ok());
+async fn remove_partial_file(path: &std::path::Path) {
+    if let Err(error) = tokio::fs::remove_file(path).await {
+        if error.kind() != std::io::ErrorKind::NotFound {
+            tracing::warn!(path = %path.display(), %error, "failed to remove partial attachment");
+        }
     }
 }
 
@@ -486,5 +472,29 @@ fn validation_error(
             "H_FILE_M_DI_UPSTREAM_FILE_TOO_LARGE",
             "上游随货同行单每个文件不得超过 5MB",
         ),
+    }
+}
+
+#[cfg(test)]
+mod resolve_storage_path_tests {
+    use super::resolve_storage_path;
+    use std::path::Path;
+
+    #[test]
+    fn accepts_nested_normal_components() {
+        let path = resolve_storage_path(Path::new("/var/wms"), "M-DI/entity/file.pdf")
+            .unwrap_or_else(|_| panic!("nested key should resolve"));
+        assert_eq!(path, Path::new("/var/wms/M-DI/entity/file.pdf"));
+    }
+
+    #[test]
+    fn rejects_empty_absolute_and_parent_components() {
+        let root = Path::new("/var/wms");
+        assert!(resolve_storage_path(root, "").is_err());
+        assert!(resolve_storage_path(root, "/etc/passwd").is_err());
+        assert!(resolve_storage_path(root, "../secret").is_err());
+        assert!(resolve_storage_path(root, "a/../b").is_err());
+        // Path 会折叠 `./`，故 `a/./b` 等价于安全相对路径，不单独拒绝。
+        assert!(resolve_storage_path(root, "a/./b").is_ok());
     }
 }

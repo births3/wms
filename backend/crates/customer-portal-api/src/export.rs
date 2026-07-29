@@ -337,11 +337,11 @@ async fn build_export(
             .map_err(|error| PortalError::Internal(error.to_string()))
             .and_then(|inner| inner);
     if let Err(error) = write_result {
-        let _ = tokio::fs::remove_file(&part_path).await;
+        remove_partial_export(&part_path).await;
         return Err(error);
     }
     if let Err(error) = tokio::fs::rename(&part_path, &target).await {
-        let _ = tokio::fs::remove_file(&part_path).await;
+        remove_partial_export(&part_path).await;
         return Err(PortalError::Internal(error.to_string()));
     }
     Ok((
@@ -351,6 +351,14 @@ async fn build_export(
         missing_count,
         total_size,
     ))
+}
+
+async fn remove_partial_export(path: &std::path::Path) {
+    if let Err(error) = tokio::fs::remove_file(path).await {
+        if error.kind() != std::io::ErrorKind::NotFound {
+            tracing::warn!(path = %path.display(), %error, "failed to remove partial export");
+        }
+    }
 }
 
 fn unique_files_len(path: &std::path::Path) -> Result<i32, PortalError> {
