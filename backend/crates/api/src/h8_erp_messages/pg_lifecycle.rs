@@ -5,10 +5,10 @@ use sqlx::PgPool;
 use uuid::Uuid;
 use wms_domain::{
     can_transition_message_status, sanitize_error_summary, standard_retry_delay_millis,
-    H8ErpMessage, H8MessageError,
+    H8MessageError,
 };
 
-use super::{error::H8ErpMessageRepoError, pg_rows::MessageRow};
+use super::{error::H8ErpMessageRepoError, pg_rows::MessageRow, repository::H8LifecycleTransition};
 use crate::audit::{append_event_in_tx, AuditWriteRequest};
 
 pub(super) async fn transition_lifecycle_status(
@@ -21,7 +21,7 @@ pub(super) async fn transition_lifecycle_status(
     actor: &str,
     now: DateTime<Utc>,
     audit_requests: &[AuditWriteRequest],
-) -> Result<H8ErpMessage, H8ErpMessageRepoError> {
+) -> Result<H8LifecycleTransition, H8ErpMessageRepoError> {
     let mut tx = pool
         .begin()
         .await
@@ -40,6 +40,19 @@ pub(super) async fn transition_lifecycle_status(
     .await
     .map_err(|error| H8ErpMessageRepoError::Db(error.to_string()))?
     .ok_or(H8ErpMessageRepoError::NotFound)?;
+    let concurrent_replay = (current.sync_status == "processing" && target == "processing")
+        || (current.sync_status == "succeeded"
+            && target == "succeeded"
+            && current.wms_resource_id.as_deref() == wms_resource_id);
+    if concurrent_replay {
+        tx.commit()
+            .await
+            .map_err(|error| H8ErpMessageRepoError::Db(error.to_string()))?;
+        return Ok(H8LifecycleTransition {
+            message: current.into(),
+            applied: false,
+        });
+    }
     can_transition_message_status(&current.sync_status, target)
         .map_err(H8ErpMessageRepoError::Domain)?;
     let summary = error_summary.map(sanitize_error_summary);
@@ -144,5 +157,8 @@ pub(super) async fn transition_lifecycle_status(
     tx.commit()
         .await
         .map_err(|error| H8ErpMessageRepoError::Db(error.to_string()))?;
-    Ok(next.into())
+    Ok(H8LifecycleTransition {
+        message: next.into(),
+        applied: true,
+    })
 }

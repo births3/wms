@@ -317,7 +317,7 @@ async fn apply_lifecycle_status_with_failure_class(
     if target == "dead" {
         requests.push(dead_entry_audit_request(ctx, &projected, now));
     }
-    let updated = state
+    let transition = state
         .repository
         .transition_lifecycle_status(
             ctx.owner_id,
@@ -331,8 +331,10 @@ async fn apply_lifecycle_status_with_failure_class(
         )
         .await
         .map_err(H8ErpMessageHandlerError::from)?;
-    append_memory_audit_requests(state, &requests);
-    Ok(updated)
+    if transition.applied {
+        append_memory_audit_requests(state, &requests);
+    }
+    Ok(transition.message)
 }
 
 pub(super) async fn mark_dead_with_audit(

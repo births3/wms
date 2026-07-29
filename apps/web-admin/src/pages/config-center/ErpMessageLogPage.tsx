@@ -22,7 +22,6 @@ import {
   type DataGridColumn,
   type DataGridToolbarAction,
   type QueryPanelField,
-  type QueryPanelRangeValue,
   type QueryPanelValue,
 } from "@wms/ui";
 import { Eye, FileJson, RefreshCw, RotateCcw } from "lucide-react";
@@ -37,8 +36,10 @@ import {
 } from "@/features/config-center/erp-message-queries";
 import { useCurrentUserQuery } from "@/features/auth/auth-queries";
 import { H8WorkerRuntimePanel } from "./H8WorkerRuntimePanel";
+import { formatDateTime } from "@/lib/format";
+import { queryRange } from "@/lib/query-value";
+import { usePageQueryState } from "@/lib/use-page-query-state";
 
-export const H8_ERP_CONNECTOR_READ = "h8.erp_connector.read";
 export const H8_ERP_CONNECTOR_WRITE = "h8.erp_connector.write";
 
 const messageTypeOptions = [
@@ -204,10 +205,6 @@ function defaultQuery(): QueryPanelValue {
   };
 }
 
-function queryRange(value: QueryPanelValue[string]): QueryPanelRangeValue {
-  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
-}
-
 function toIsoDay(value: string | undefined, end = false): string | undefined {
   if (!value) return undefined;
   const [year, month, day] = value.split("-").map(Number);
@@ -223,16 +220,11 @@ function toIsoDay(value: string | undefined, end = false): string | undefined {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
 
-function formatDateTime(value: string): string {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { hour12: false });
-}
-
 export function ErpMessageLogPage() {
   const { data: currentUser } = useCurrentUserQuery(true);
   const canWrite = Boolean(currentUser?.permissions.includes(H8_ERP_CONNECTOR_WRITE));
-  const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(() => defaultQuery());
-  const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(() => defaultQuery());
+  const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
+    usePageQueryState<QueryPanelValue>(defaultQuery);
   const [selectedKeys, setSelectedKeys] = React.useState<string[]>([]);
   const [detailId, setDetailId] = React.useState<string | null>(null);
   const [replayOpen, setReplayOpen] = React.useState(false);
@@ -312,6 +304,7 @@ export function ErpMessageLogPage() {
             },
             onClick: () => {
               setReplayReason("");
+              setNotice(null);
               setReplayOpen(true);
             },
           } satisfies DataGridToolbarAction,
@@ -364,12 +357,8 @@ export function ErpMessageLogPage() {
             defaultVisibleFieldKeys={h8ErpMessageCoreQueryFieldKeys}
             value={draftQuery}
             onValueChange={setDraftQuery}
-            onQuery={() => setAppliedQuery(draftQuery)}
-            onReset={() => {
-              const q = defaultQuery();
-              setDraftQuery(q);
-              setAppliedQuery(q);
-            }}
+            onQuery={() => applyQuery(draftQuery)}
+            onReset={resetQuery}
           />
 
           <DataGrid
@@ -558,6 +547,15 @@ export function ErpMessageLogPage() {
                 仅 failed/dead 可重放；复用原 Idempotency-Key，不复制新业务消息。
               </DialogDescription>
             </DialogHeader>
+            {/* 重放失败提示必须渲染在弹窗内部，避免被模态遮挡（页面层保留成功提示）。 */}
+            {replayOpen && notice?.isError ? (
+              <div
+                role="alert"
+                className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+              >
+                {notice.message}
+              </div>
+            ) : null}
             <label className="grid gap-1 text-sm">
               原因（必填）
               <Input

@@ -51,6 +51,9 @@ export default defineConfig({
         WMS_SECRETS_REQUIRE_RESOLVE: "1",
         WMS_ENCRYPTION_MASTER_KEY: jwtSigningKey,
         WMS_ENCRYPTION_KEY_VERSION: "e2e-v1",
+        // REST 连通性探查（AC7）：允许探查本地 e2e 后端 /healthz，生产默认拒绝本地 http
+        WMS_H8_REST_PROBE_ALLOW_LOCAL_HTTP: "1",
+        WMS_H8_REST_PROBE_ALLOWED_ENDPOINTS: bindAddr(apiURL),
       },
     },
     {

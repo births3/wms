@@ -4,6 +4,7 @@ use axum::{
     body::Body,
     http::{Method, Request, StatusCode},
 };
+use chrono::Utc;
 use tower::ServiceExt;
 use uuid::Uuid;
 
@@ -53,6 +54,56 @@ async fn post_lifecycle(
         .await
         .unwrap()
         .status()
+}
+
+#[tokio::test]
+async fn repository_marks_same_terminal_transition_as_concurrent_replay() {
+    let state = H8ErpMessageAppState::with_memory();
+    let owner = Uuid::new_v4();
+    let message = sample_message(owner, "processing");
+    state.repository.upsert_for_test(&message).await.unwrap();
+
+    let first = state
+        .repository
+        .transition_lifecycle_status(
+            owner,
+            message.id,
+            "succeeded",
+            None,
+            Some("receiving-order-1"),
+            "worker:test",
+            Utc::now(),
+            &[],
+        )
+        .await
+        .unwrap();
+    let replay = state
+        .repository
+        .transition_lifecycle_status(
+            owner,
+            message.id,
+            "succeeded",
+            None,
+            Some("receiving-order-1"),
+            "worker:test",
+            Utc::now(),
+            &[],
+        )
+        .await
+        .unwrap();
+
+    assert!(first.applied);
+    assert!(!replay.applied);
+    assert_eq!(replay.message.sync_status, "succeeded");
+    assert_eq!(
+        state
+            .repository
+            .list_attempts(owner, message.id)
+            .await
+            .unwrap()
+            .len(),
+        1
+    );
 }
 
 #[tokio::test]

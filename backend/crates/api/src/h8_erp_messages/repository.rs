@@ -23,6 +23,11 @@ pub struct H8ErpMessageCursor {
     pub id: Uuid,
 }
 
+pub struct H8LifecycleTransition {
+    pub message: H8ErpMessage,
+    pub applied: bool,
+}
+
 #[axum::async_trait]
 pub trait H8ErpMessageRepository: Send + Sync {
     async fn list(
@@ -92,7 +97,7 @@ pub trait H8ErpMessageRepository: Send + Sync {
         actor: &str,
         now: DateTime<Utc>,
         audit_requests: &[AuditWriteRequest],
-    ) -> Result<H8ErpMessage, H8ErpMessageRepoError>;
+    ) -> Result<H8LifecycleTransition, H8ErpMessageRepoError>;
 
     /// 进入 dead（AC6）；调用方须写 H2 审计。
     async fn mark_dead(
@@ -495,7 +500,7 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
         actor: &str,
         now: DateTime<Utc>,
         _audit_requests: &[AuditWriteRequest],
-    ) -> Result<H8ErpMessage, H8ErpMessageRepoError> {
+    ) -> Result<H8LifecycleTransition, H8ErpMessageRepoError> {
         let mut guard = lock_recover(&self.inner);
         let (next, started_at, receipt_retry) = {
             let message = guard
@@ -503,6 +508,16 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
                 .get_mut(&id)
                 .filter(|message| message.owner_id == owner_id)
                 .ok_or(H8ErpMessageRepoError::NotFound)?;
+            let concurrent_replay = (message.sync_status == "processing" && target == "processing")
+                || (message.sync_status == "succeeded"
+                    && target == "succeeded"
+                    && message.wms_resource_id.as_deref() == wms_resource_id);
+            if concurrent_replay {
+                return Ok(H8LifecycleTransition {
+                    message: message.clone(),
+                    applied: false,
+                });
+            }
             can_transition_message_status(&message.sync_status, target)
                 .map_err(H8ErpMessageRepoError::Domain)?;
             let started_at = message.updated_at;
@@ -552,7 +567,10 @@ impl H8ErpMessageRepository for MemoryH8ErpMessageRepository {
                 actor: actor.into(),
             });
         }
-        Ok(next)
+        Ok(H8LifecycleTransition {
+            message: next,
+            applied: true,
+        })
     }
 
     async fn mark_archived(

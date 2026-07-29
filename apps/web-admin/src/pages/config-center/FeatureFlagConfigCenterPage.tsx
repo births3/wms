@@ -34,6 +34,9 @@ import {
   useSwitchFeatureFlagSourceMutation,
   type FeatureFlagConfig,
 } from "@/features/config-center/feature-flag-queries";
+import { errorText } from "@/lib/error-text";
+import { queryValueFromUnknown } from "@/lib/query-value";
+import { usePageQueryState } from "@/lib/use-page-query-state";
 
 interface FeatureFlagConfigCenterPageProps {
   onBack: () => void;
@@ -107,8 +110,8 @@ export function FeatureFlagConfigCenterPage({ onBack }: FeatureFlagConfigCenterP
   const [archiveRef, setArchiveRef] = React.useState("deploy/feature_flags.toml");
   const [importOpen, setImportOpen] = React.useState(false);
   const [importText, setImportText] = React.useState("");
-  const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(() => defaultFeatureFlagQuery());
-  const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(() => defaultFeatureFlagQuery());
+  const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
+    usePageQueryState<QueryPanelValue>(defaultFeatureFlagQuery, normalizeFeatureFlagQuery);
   const flags = flagsQuery.data?.flags ?? [];
   const filteredFlags = React.useMemo(() => filterFeatureFlags(flags, appliedQuery), [flags, appliedQuery]);
   const querySummaryItems = React.useMemo(
@@ -153,7 +156,7 @@ export function FeatureFlagConfigCenterPage({ onBack }: FeatureFlagConfigCenterP
     try {
       setNotice({ type: "success", text: success(await task) });
     } catch (error) {
-      setNotice({ type: "error", text: errorMessage(error, fallback) });
+      setNotice({ type: "error", text: errorText(error, fallback) });
     }
   }
 
@@ -162,9 +165,17 @@ export function FeatureFlagConfigCenterPage({ onBack }: FeatureFlagConfigCenterP
     const result = await flagsQuery.refetch();
     setNotice(
       result.error
-        ? { type: "error", text: errorMessage(result.error, "刷新功能开关失败") }
+        ? { type: "error", text: errorText(result.error, "刷新功能开关失败") }
         : { type: "success", text: "功能开关列表已刷新" },
     );
+  }
+
+  function applyGridQueryState(queryState: unknown) {
+    applyQuery(queryValueFromUnknown(queryState));
+  }
+
+  function clearGridQueryState() {
+    resetQuery();
   }
 
   async function submitImport(event: React.FormEvent<HTMLFormElement>) {
@@ -173,7 +184,7 @@ export function FeatureFlagConfigCenterPage({ onBack }: FeatureFlagConfigCenterP
     try {
       nextFlags = parseFeatureFlagImportJson(importText);
     } catch (error) {
-      setNotice({ type: "error", text: errorMessage(error, "导入功能开关失败") });
+      setNotice({ type: "error", text: errorText(error, "导入功能开关失败") });
       return;
     }
     await act(
@@ -205,12 +216,8 @@ export function FeatureFlagConfigCenterPage({ onBack }: FeatureFlagConfigCenterP
         defaultVisibleFieldKeys={featureFlagCoreQueryFieldKeys}
         value={draftQuery}
         onValueChange={(next) => setDraftQuery(normalizeFeatureFlagQuery(next))}
-        onQuery={() => setAppliedQuery(normalizeFeatureFlagQuery(draftQuery))}
-        onReset={() => {
-          const next = defaultFeatureFlagQuery();
-          setDraftQuery(next);
-          setAppliedQuery(next);
-        }}
+        onQuery={() => applyQuery(draftQuery)}
+        onReset={resetQuery}
       />
 
       <div className="grid gap-4 lg:grid-cols-[1fr_22rem]">
@@ -223,22 +230,14 @@ export function FeatureFlagConfigCenterPage({ onBack }: FeatureFlagConfigCenterP
               rowKey={(row) => row.key}
               caption={flagsQuery.isPending ? "加载功能开关..." : undefined}
               emptyTitle={flagsQuery.isError ? "读取功能开关失败" : "暂无功能开关"}
-              emptyDescription={flagsQuery.isError ? errorMessage(flagsQuery.error, "请检查后端接口") : "当前导出结果为空，或没有匹配查询条件"}
+              emptyDescription={flagsQuery.isError ? errorText(flagsQuery.error, "请检查后端接口") : "当前导出结果为空，或没有匹配查询条件"}
               exportFileBaseName="功能开关配置中心"
               refreshAction={gridRefreshAction}
               toolbarActions={gridToolbarActions}
               queryState={appliedQuery}
               querySummaryItems={querySummaryItems}
-              onApplyQueryState={(queryState) => {
-                const next = normalizeFeatureFlagQuery(queryValueFromUnknown(queryState));
-                setDraftQuery(next);
-                setAppliedQuery(next);
-              }}
-              onClearQueryState={() => {
-                const next = defaultFeatureFlagQuery();
-                setDraftQuery(next);
-                setAppliedQuery(next);
-              }}
+              onApplyQueryState={applyGridQueryState}
+              onClearQueryState={clearGridQueryState}
             />
           </CardContent>
         </Card>
@@ -305,10 +304,6 @@ function sourceLabel(value: string) {
   return sourceOptions.find(([source]) => source === value)?.[1] ?? value;
 }
 
-function errorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback;
-}
-
 function downloadJson(payload: unknown) {
   if (!payload || typeof document === "undefined") return;
   const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
@@ -340,10 +335,6 @@ function filterFeatureFlags(flags: FeatureFlagConfig[], query: QueryPanelValue):
     const haystack = [flag.key, flag.owner, flag.source, sourceLabel(flag.source)].join(" ").toLowerCase();
     return (!keyword || haystack.includes(keyword)) && (!statuses.size || statuses.has(statusValue));
   });
-}
-
-function queryValueFromUnknown(value: unknown): QueryPanelValue {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as QueryPanelValue) : {};
 }
 
 const importPlaceholder = JSON.stringify({ flags: [{ key: "m4_outbound_v2_picker_stage1", owner: "platform", created_at: "2026-07-03", cleanup_by: "2026-10-01", enabled: false, source: "config_center" }] }, null, 2);

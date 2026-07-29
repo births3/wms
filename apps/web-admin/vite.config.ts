@@ -9,10 +9,12 @@ const devApiProxyUrl = e2eApiUrl || process.env.VITE_API_BASE_URL?.trim();
 
 export default defineConfig(({ command }) => {
   const devLoginEnabled = command === "serve" && process.env.WMS_WEB_ADMIN_DEV_LOGIN !== "0";
+  const devPrefillEnabled = command === "serve" && process.env.WMS_WEB_ADMIN_DEV_PREFILL !== "0";
 
   return {
     define: {
       __WMS_WEB_ADMIN_DEV_LOGIN__: JSON.stringify(devLoginDefaults(devLoginEnabled)),
+      __WMS_WEB_ADMIN_DEV_PREFILL__: JSON.stringify(devPrefillEnabled),
     },
     plugins: [react(), webAdminDevMock()],
     resolve: {

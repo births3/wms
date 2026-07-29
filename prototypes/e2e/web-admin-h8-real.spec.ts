@@ -5,6 +5,9 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const screenshotDir = path.join(repoRoot, "artifacts/screenshot-portal/real-web/h8-erp-connectors");
+// REST 连通性探查会真实 GET `<REST 地址>/healthz` 且受端点白名单约束（见 h8-real 配置），
+// e2e 统一指向本地后端的 /api/v1（其 /api/v1/healthz 恒 200）。
+const probeApiBase = `${process.env.WMS_WEB_ADMIN_E2E_API_URL ?? "http://127.0.0.1:19199"}/api/v1`;
 
 test("H8 ERP 连接：新建 → 测试 → 启用 → 停用（真实 API）", async ({ page }) => {
   fs.mkdirSync(screenshotDir, { recursive: true });
@@ -163,6 +166,7 @@ test("H8 ERP 连接：编辑端点后回 testing 并需复测", async ({ page })
   await createDialog.locator("label", { hasText: "连接编码" }).locator("input").fill(code);
   await createDialog.locator("label", { hasText: "连接名称" }).locator("input").fill("待编辑连接");
   await createDialog.locator("label", { hasText: "方向" }).locator("select").selectOption("outbound");
+  await createDialog.locator("label", { hasText: "REST 地址" }).locator("input").fill(probeApiBase);
   await createDialog
     .locator("label", { hasText: "Bearer secret alias" })
     .locator("input")
@@ -259,6 +263,11 @@ test("H8 ERP 连接：Vault alias 可解析后测试通过", async ({ page }) =>
   await dialog.locator("label", { hasText: "连接名称" }).locator("input").fill("Vault 出站连接");
   await dialog.locator("label", { hasText: "方向" }).locator("select").selectOption("outbound");
   await dialog
+    .locator("label", { hasText: "API Key（入站鉴权）" })
+    .locator("select")
+    .selectOption("00000000-0000-0000-0000-000000000099");
+  await dialog.locator("label", { hasText: "REST 地址" }).locator("input").fill(probeApiBase);
+  await dialog
     .locator("label", { hasText: "Bearer secret alias" })
     .locator("input")
     .fill("vault://wms/e2e/h8/bearer");
@@ -323,6 +332,12 @@ async function createConnector(
   const dialog = page.getByRole("dialog", { name: "新建 ERP 连接" });
   await dialog.locator("label", { hasText: "连接编码" }).locator("input").fill(code);
   await dialog.locator("label", { hasText: "连接名称" }).locator("input").fill(name);
+  // API Key 为必填下拉（选项异步加载），显式选中 e2e 种子 Key
+  await dialog
+    .locator("label", { hasText: "API Key（入站鉴权）" })
+    .locator("select")
+    .selectOption("00000000-0000-0000-0000-000000000099");
+  await dialog.locator("label", { hasText: "REST 地址" }).locator("input").fill(probeApiBase);
   const createResponsePromise = page.waitForResponse(
     (response) =>
       response.url().includes("/api/v1/config/erp-connectors") &&

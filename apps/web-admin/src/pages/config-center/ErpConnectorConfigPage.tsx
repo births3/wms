@@ -38,12 +38,15 @@ import {
   type H8ErpConnector,
 } from "@/features/config-center/erp-connector-queries";
 import type { CurrentUser } from "@/features/auth/auth-queries";
+import { useApiKeysQuery } from "@/features/api-key/api-key-queries";
+import { useDialogState } from "@/lib/use-dialog-state";
+import { usePageQueryState } from "@/lib/use-page-query-state";
+import { queryValueFromUnknown } from "@/lib/query-value";
 
-export const H8_ERP_CONNECTOR_READ = "h8.erp_connector.read";
 export const H8_ERP_CONNECTOR_WRITE = "h8.erp_connector.write";
 
 type Notice = { type: "success" | "error"; text: string } | null;
-type ConfirmAction = "test" | "activate" | "disable" | "delete" | null;
+type ConfirmAction = "test" | "activate" | "disable" | "delete";
 
 export const h8ErpConnectorQueryFields: QueryPanelField[] = [
   {
@@ -131,8 +134,8 @@ function emptyForm(): CreateH8ErpConnectorRequest {
     message_types: ["asn"],
     channel_mode: "rest",
     api_base_url: "https://erp.example.com",
-    // HTTP 局域网访问时 crypto.randomUUID 可能不可用
-    api_key_id: globalThis.crypto?.randomUUID?.() ?? `00000000-0000-4000-8000-${Date.now().toString(16).padStart(12, "0").slice(-12)}`,
+    // 必须引用真实存在的 API Key（后端会校验 key 存在且 scopes 覆盖消息类型），由弹窗下拉选择
+    api_key_id: "",
     bearer_secret_alias: null,
     interface_db_password_alias: null,
     interface_probe_db_username: null,
@@ -185,8 +188,19 @@ export function ErpConnectorConfigPage({
   const [selectedRowKeys, setSelectedRowKeys] = React.useState<string[]>([]);
   const [createOpen, setCreateOpen] = React.useState(false);
   const [editOpen, setEditOpen] = React.useState(false);
-  const [confirmAction, setConfirmAction] = React.useState<ConfirmAction>(null);
+  const confirmDialog = useDialogState<ConfirmAction>();
   const [form, setForm] = React.useState<CreateH8ErpConnectorRequest>(() => emptyForm());
+  const apiKeysQuery = useApiKeysQuery({ status: "active" });
+  const apiKeyOptions = React.useMemo(
+    () => (apiKeysQuery.data?.data ?? []).filter((key) => !key.revoked_at),
+    [apiKeysQuery.data],
+  );
+  const defaultApiKeyId = apiKeyOptions[0]?.key_id ?? "";
+  React.useEffect(() => {
+    // 新建弹窗默认选中第一个可用 Key，避免空引用被后端 422 拒绝
+    if (!createOpen || !defaultApiKeyId) return;
+    setForm((current) => (current.api_key_id ? current : { ...current, api_key_id: defaultApiKeyId }));
+  }, [createOpen, defaultApiKeyId]);
   const [editForm, setEditForm] = React.useState({
     connector_name: "",
     channel_mode: "rest",
@@ -198,8 +212,8 @@ export function ErpConnectorConfigPage({
     expected_probe_config_version: 1,
   });
   const [notice, setNotice] = React.useState<Notice>(null);
-  const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(() => defaultQuery());
-  const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(() => defaultQuery());
+  const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
+    usePageQueryState<QueryPanelValue>(defaultQuery, normalizeQuery);
 
   // 无 currentUser 时默认不可写，避免权限未就绪时露出写操作
   const canWrite = Boolean(currentUser?.permissions.includes(H8_ERP_CONNECTOR_WRITE));
@@ -232,6 +246,7 @@ export function ErpConnectorConfigPage({
         description: "创建 testing 状态的 ERP 连接",
         disabled: busy,
         onClick: () => {
+          setNotice(null);
           setForm(emptyForm());
           setCreateOpen(true);
         },
@@ -247,6 +262,7 @@ export function ErpConnectorConfigPage({
           disabled: (ctx) => ctx.selectedRowKeys.length !== 1 || busy,
           onClick: () => {
             if (!selected) return;
+            setNotice(null);
             setEditForm({
               connector_name: selected.connector_name,
               channel_mode: selected.channel_mode,
@@ -267,7 +283,7 @@ export function ErpConnectorConfigPage({
           description: "测试当前版本（不写业务单据）",
           icon: <Play className="size-4" aria-hidden />,
           disabled: (ctx) => ctx.selectedRowKeys.length !== 1 || busy,
-          onClick: () => setConfirmAction("test"),
+          onClick: () => confirmDialog.openWith("test"),
         },
         {
           key: "activate",
@@ -275,7 +291,7 @@ export function ErpConnectorConfigPage({
           description: "当前版本测试通过后启用",
           icon: <Power className="size-4" aria-hidden />,
           disabled: (ctx) => ctx.selectedRowKeys.length !== 1 || busy,
-          onClick: () => setConfirmAction("activate"),
+          onClick: () => confirmDialog.openWith("activate"),
         },
         {
           key: "disable",
@@ -284,7 +300,7 @@ export function ErpConnectorConfigPage({
           icon: <PowerOff className="size-4" aria-hidden />,
           disabled: (ctx) =>
             ctx.selectedRowKeys.length !== 1 || selected?.status !== "active" || busy,
-          onClick: () => setConfirmAction("disable"),
+          onClick: () => confirmDialog.openWith("disable"),
         },
         {
           key: "delete",
@@ -292,7 +308,7 @@ export function ErpConnectorConfigPage({
           description: "仅从未启用且无引用可删",
           icon: <Trash2 className="size-4" aria-hidden />,
           disabled: (ctx) => ctx.selectedRowKeys.length !== 1 || busy,
-          onClick: () => setConfirmAction("delete"),
+          onClick: () => confirmDialog.openWith("delete"),
         },
       ]
     : [];
@@ -303,9 +319,9 @@ export function ErpConnectorConfigPage({
       await action();
       setNotice({ type: "success", text: ok });
       setSelectedRowKeys([]);
-      setConfirmAction(null);
+      confirmDialog.close();
     } catch (error) {
-      setConfirmAction(null);
+      confirmDialog.close();
       setNotice({
         type: "error",
         text: error instanceof Error ? error.message : "操作失败",
@@ -313,7 +329,7 @@ export function ErpConnectorConfigPage({
     }
   }
 
-  function confirmTitle(action: ConfirmAction): string {
+  function confirmTitle(action: ConfirmAction | null): string {
     switch (action) {
       case "test":
         return "确认测试连接？";
@@ -328,8 +344,17 @@ export function ErpConnectorConfigPage({
     }
   }
 
+  function applyGridQueryState(queryState: unknown) {
+    applyQuery(queryValueFromUnknown(queryState));
+  }
+
+  function clearGridQueryState() {
+    resetQuery();
+  }
+
   function executeConfirm() {
-    if (!selected || !confirmAction) return;
+    const confirmAction = confirmDialog.target;
+    if (!selected || !confirmDialog.open || !confirmAction) return;
     const id = selected.id;
     if (confirmAction === "test") {
       void run(() => testMutation.mutateAsync(id), "测试已完成");
@@ -375,12 +400,8 @@ export function ErpConnectorConfigPage({
         defaultVisibleFieldKeys={h8ErpConnectorCoreQueryFieldKeys}
         value={draftQuery}
         onValueChange={(next) => setDraftQuery(normalizeQuery(next))}
-        onQuery={() => setAppliedQuery(normalizeQuery(draftQuery))}
-        onReset={() => {
-          const next = defaultQuery();
-          setDraftQuery(next);
-          setAppliedQuery(next);
-        }}
+        onQuery={() => applyQuery(draftQuery)}
+        onReset={resetQuery}
       />
       <Card className="rounded-lg shadow-sm">
         <CardContent className="p-5">
@@ -400,22 +421,15 @@ export function ErpConnectorConfigPage({
             toolbarActions={toolbarActions}
             queryState={appliedQuery}
             querySummaryItems={querySummaryItems}
-            onApplyQueryState={(queryState) => {
-              const next = normalizeQuery(queryState as QueryPanelValue);
-              setDraftQuery(next);
-              setAppliedQuery(next);
-            }}
-            onClearQueryState={() => {
-              const next = defaultQuery();
-              setDraftQuery(next);
-              setAppliedQuery(next);
-            }}
+            onApplyQueryState={applyGridQueryState}
+            onClearQueryState={clearGridQueryState}
           />
         </CardContent>
       </Card>
 
       <Dialog open={createOpen} onOpenChange={(open) => !busy && setCreateOpen(open)}>
-        <DialogContent className="sm:max-w-lg">
+        {/* 表单较长（含 API Key 下拉），限制高度并允许滚动，避免“保存”按钮溢出视口不可点 */}
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <form
             className="grid gap-4"
             onSubmit={(event) => {
@@ -432,6 +446,8 @@ export function ErpConnectorConfigPage({
                 密钥只使用 alias / API Key 引用。新建进入 testing，须测试通过后人工启用。
               </DialogDescription>
             </DialogHeader>
+            {/* 提交失败提示必须渲染在弹窗内部，避免被模态遮挡（页面层保留成功提示）。 */}
+            <ErrorNotice notice={createOpen ? notice : null} />
             <label className="grid gap-1 text-sm">
               连接编码
               <Input
@@ -457,12 +473,31 @@ export function ErpConnectorConfigPage({
                   setForm((f) => ({
                     ...f,
                     directions: [e.target.value],
-                    message_types: e.target.value === "outbound" ? ["outbound_order"] : ["asn"],
+                    // outbound_order 属入站目录（ERP 下发出库单到 WMS）；出站默认用发运确认
+                    message_types: e.target.value === "outbound" ? ["shipment_confirm"] : ["asn"],
                   }))
                 }
               >
                 <option value="inbound">inbound</option>
                 <option value="outbound">outbound</option>
+              </select>
+            </label>
+            <label className="grid gap-1 text-sm">
+              API Key（入站鉴权）
+              <select
+                required
+                className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                value={form.api_key_id ?? ""}
+                onChange={(e) => setForm((f) => ({ ...f, api_key_id: e.target.value }))}
+              >
+                <option value="" disabled>
+                  {apiKeysQuery.isPending ? "API Key 加载中..." : apiKeyOptions.length === 0 ? "无可用 API Key（请先在 H1 创建）" : "请选择 API Key"}
+                </option>
+                {apiKeyOptions.map((key) => (
+                  <option key={key.key_id} value={key.key_id}>
+                    {key.caller_name} · {key.purpose}
+                  </option>
+                ))}
               </select>
             </label>
             <label className="grid gap-1 text-sm">
@@ -540,7 +575,7 @@ export function ErpConnectorConfigPage({
       </Dialog>
 
       <Dialog open={editOpen} onOpenChange={(open) => !busy && setEditOpen(open)}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <form
             className="grid gap-4"
             onSubmit={(event) => {
@@ -576,6 +611,8 @@ export function ErpConnectorConfigPage({
                 编码不可改。探查凭据使用独立版本，不会使传输测试失效；传输版本 {editForm.expected_config_version}，探查版本 {editForm.expected_probe_config_version}。
               </DialogDescription>
             </DialogHeader>
+            {/* 提交失败提示必须渲染在弹窗内部，避免被模态遮挡（页面层保留成功提示）。 */}
+            <ErrorNotice notice={editOpen ? notice : null} />
             <label className="grid gap-1 text-sm">
               连接名称
               <Input
@@ -640,12 +677,12 @@ export function ErpConnectorConfigPage({
       </Dialog>
 
       <Dialog
-        open={confirmAction != null}
-        onOpenChange={(open) => !busy && !open && setConfirmAction(null)}
+        open={confirmDialog.open}
+        onOpenChange={(open) => !busy && !open && confirmDialog.close()}
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{confirmTitle(confirmAction)}</DialogTitle>
+            <DialogTitle>{confirmTitle(confirmDialog.target)}</DialogTitle>
             <DialogDescription>
               {selected
                 ? `${selected.connector_code} · ${selected.connector_name}`
@@ -665,6 +702,18 @@ export function ErpConnectorConfigPage({
         </DialogContent>
       </Dialog>
     </section>
+  );
+}
+
+function ErrorNotice({ notice }: { notice: Notice }) {
+  if (notice?.type !== "error") return null;
+  return (
+    <div
+      className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+      role="alert"
+    >
+      {notice.text}
+    </div>
   );
 }
 

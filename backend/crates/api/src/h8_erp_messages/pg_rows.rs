@@ -17,7 +17,7 @@ pub(super) struct MessageRow {
     schema_version: String,
     pub(super) channel: String,
     external_ref: String,
-    wms_resource_id: Option<String>,
+    pub(super) wms_resource_id: Option<String>,
     pub(super) idempotency_key: String,
     correlation_id: String,
     pub(super) sync_status: String,

@@ -26,6 +26,7 @@ import {
   type H8ErpInterfaceTableDetail,
   type H8ErpInterfaceTableRow,
 } from "@/features/config-center/erp-interface-table-queries";
+import { usePageQueryState } from "@/lib/use-page-query-state";
 
 const TABLES = [
   ["if_in_asn", "入站 ASN"],
@@ -280,9 +281,20 @@ function asRange(value: QueryPanelValue["updated_at"]): QueryPanelRangeValue {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
 
+/** 与 ErpMessageLogPage.toIsoDay 一致：按本地时区解析日界，避免 UTC 边界漏掉当天数据。 */
 function toIsoDay(value: string | undefined, end = false): string | undefined {
   if (!value) return undefined;
-  return new Date(`${value}T${end ? "23:59:59.999" : "00:00:00.000"}Z`).toISOString();
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(
+    year,
+    month - 1,
+    day,
+    end ? 23 : 0,
+    end ? 59 : 0,
+    end ? 59 : 0,
+    end ? 999 : 0,
+  );
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
 
 function defaultQuery(connectorId = ""): QueryPanelValue {
@@ -312,19 +324,19 @@ function isApplicable(tableKey: string, key: string): boolean {
 export function ErpInterfaceTablePage() {
   const connectorsQuery = useH8ErpInterfaceTableConnectorsQuery();
   const connectors = (connectorsQuery.data ?? []) as Connector[];
-  const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(() => defaultQuery());
-  const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(() => defaultQuery());
+  const firstReadyConnectorId = connectors.find((connector) => connector.probe_credentials_configured)?.id ?? "";
+  const { draftQuery, setDraftQuery, appliedQuery, setAppliedQuery, applyQuery, resetQuery } =
+    usePageQueryState<QueryPanelValue>(() => defaultQuery(firstReadyConnectorId));
   const [detailId, setDetailId] = React.useState<string | null>(null);
   const [selectedKeys, setSelectedKeys] = React.useState<string[]>([]);
 
   React.useEffect(() => {
-    const firstReadyConnector = connectors.find((connector) => connector.probe_credentials_configured);
-    if (!String(draftQuery.connector_id) && firstReadyConnector) {
-      const next = defaultQuery(firstReadyConnector.id);
-      setDraftQuery(next);
-      setAppliedQuery(next);
+    // 连接列表返回后只补齐 connector_id，不得整体重置查询：用户已填的其他条件必须保留。
+    if (!String(draftQuery.connector_id) && firstReadyConnectorId) {
+      setDraftQuery((prev) => ({ ...prev, connector_id: firstReadyConnectorId }));
+      setAppliedQuery((prev) => ({ ...prev, connector_id: firstReadyConnectorId }));
     }
-  }, [connectors, draftQuery.connector_id]);
+  }, [draftQuery.connector_id, firstReadyConnectorId, setAppliedQuery, setDraftQuery]);
 
   const tableKey = String(appliedQuery.table_key ?? "if_in_asn");
   const selectedConnector = connectors.find((connector) => connector.id === String(appliedQuery.connector_id ?? ""));
@@ -352,6 +364,9 @@ export function ErpInterfaceTablePage() {
   const selected = rows.find((row) => row.row_id === selectedKeys[0]);
   const draftTableKey = String(draftQuery.table_key ?? "if_in_asn");
   const draftStatusOptions = draftTableKey === "if_out_message" ? OUTBOUND_STATUSES : INBOUND_STATUSES;
+  // 查询闸门必须依据草稿里选中的连接：按 appliedQuery 判断会在“已应用连接不可用”时死锁，永远无法查询。
+  const draftConnector = connectors.find((connector) => connector.id === String(draftQuery.connector_id ?? ""));
+  const draftConnectorReady = draftConnector?.probe_credentials_configured === true;
   const h8ErpInterfaceTableQueryFields = h8ErpInterfaceTableQueryFieldDefinitions
     .filter((field) => h8ErpInterfaceTableCoreQueryFieldKeys.includes(field.key) || isApplicable(draftTableKey, field.key))
     .map((field) =>
@@ -386,8 +401,8 @@ export function ErpInterfaceTablePage() {
               : next,
           )
         }
-        onQuery={() => { if (selectedConnectorReady) setAppliedQuery(draftQuery); }}
-        onReset={() => { const next = defaultQuery(connectors.find((connector) => connector.probe_credentials_configured)?.id ?? ""); setDraftQuery(next); setAppliedQuery(next); }}
+        onQuery={() => { if (draftConnectorReady) applyQuery(draftQuery); }}
+        onReset={resetQuery}
       />
       {selectedConnector && !selectedConnectorReady ? (
         <div role="status" className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">

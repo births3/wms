@@ -27,6 +27,9 @@ import {
   useErpConnectorsQuery,
   type H8ErpConnector,
 } from "@/features/config-center/erp-connector-queries";
+import { errorText } from "@/lib/error-text";
+import { formatDateTime } from "@/lib/format";
+import { useDialogState } from "@/lib/use-dialog-state";
 
 type WorkerRow = {
   id: string;
@@ -44,11 +47,6 @@ type WorkerRow = {
   payloadEnabled: boolean;
   retentionDays: number;
 };
-
-function formatDateTime(value: string): string {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { hour12: false });
-}
 
 const columns: DataGridColumn<WorkerRow>[] = [
   { key: "workerId", header: "Worker 实例", width: 160 },
@@ -192,12 +190,14 @@ export function H8WorkerRuntimePanel({
   const controlMutation = useSetH8WorkerClaimControlMutation();
   const policyMutation = useUpdateH8PayloadRetentionPolicyMutation();
   const [selectedKeys, setSelectedKeys] = React.useState<string[]>([]);
-  const [controlOpen, setControlOpen] = React.useState(false);
+  const controlDialog = useDialogState<WorkerRow>();
   const [controlReason, setControlReason] = React.useState("");
   const [pausedUntil, setPausedUntil] = React.useState("");
-  const [policyOpen, setPolicyOpen] = React.useState(false);
+  const [controlError, setControlError] = React.useState<string | null>(null);
+  const policyDialog = useDialogState<WorkerRow>();
   const [policyEnabled, setPolicyEnabled] = React.useState(false);
   const [retentionDays, setRetentionDays] = React.useState("7");
+  const [policyError, setPolicyError] = React.useState<string | null>(null);
 
   const loadError = runtimeQuery.isError || policyQuery.isError || connectorQuery.isError;
   const loading = runtimeQuery.isLoading || policyQuery.isLoading || connectorQuery.isLoading;
@@ -229,9 +229,11 @@ export function H8WorkerRuntimePanel({
             ),
             disabled: (ctx: { selectedRowKeys: string[] }) => ctx.selectedRowKeys.length !== 1,
             onClick: () => {
+              if (!selected) return;
               setControlReason("");
               setPausedUntil("");
-              setControlOpen(true);
+              setControlError(null);
+              controlDialog.openWith(selected);
             },
           } satisfies DataGridToolbarAction,
           {
@@ -241,9 +243,11 @@ export function H8WorkerRuntimePanel({
             disabled: (ctx: { selectedRowKeys: string[] }) =>
               ctx.selectedRowKeys.length !== 1 || policyQuery.isError || policyQuery.isLoading,
             onClick: () => {
-              setPolicyEnabled(selected?.payloadEnabled ?? false);
-              setRetentionDays(String(selected?.retentionDays ?? 7));
-              setPolicyOpen(true);
+              if (!selected) return;
+              setPolicyEnabled(selected.payloadEnabled);
+              setRetentionDays(String(selected.retentionDays));
+              setPolicyError(null);
+              policyDialog.openWith(selected);
             },
           } satisfies DataGridToolbarAction,
         ]
@@ -267,40 +271,53 @@ export function H8WorkerRuntimePanel({
       />
 
       <Dialog
-        open={controlOpen}
-        onOpenChange={(open) => !controlMutation.isPending && setControlOpen(open)}
+        open={controlDialog.open}
+        onOpenChange={(open) => !controlMutation.isPending && controlDialog.setOpen(open)}
       >
         <DialogContent className="sm:max-w-md">
           <form
             className="grid gap-3"
             onSubmit={(event) => {
               event.preventDefault();
-              if (!selected) return;
+              // 列表刷新后选中行可能已消失：不得静默 no-op，要在弹窗内给出明确提示。
+              const current = rows.find((row) => row.id === controlDialog.target?.id);
+              if (!current) {
+                setControlError("该 Worker 已离线或列表已刷新，请关闭弹窗刷新后重试");
+                return;
+              }
               void (async () => {
                 try {
                   await controlMutation.mutateAsync({
-                    connector_id: selected.connectorId,
-                    direction: selected.direction,
-                    paused: !selected.paused,
+                    connector_id: current.connectorId,
+                    direction: current.direction,
+                    paused: !current.paused,
                     reason: controlReason.trim(),
                     paused_until:
-                      !selected.paused && pausedUntil ? new Date(pausedUntil).toISOString() : null,
+                      !current.paused && pausedUntil ? new Date(pausedUntil).toISOString() : null,
                     confirmed: true,
                   });
-                  setControlOpen(false);
-                  onNotice(selected.paused ? "已恢复认领" : "已暂停认领");
-                } catch {
-                  onNotice("更新认领控制失败，请重试", true);
+                  controlDialog.close();
+                  onNotice(current.paused ? "已恢复认领" : "已暂停认领");
+                } catch (cause: unknown) {
+                  setControlError(errorText(cause, "更新认领控制失败，请重试"));
                 }
               })();
             }}
           >
             <DialogHeader>
-              <DialogTitle>{selected?.paused ? "恢复认领" : "暂停认领"}</DialogTitle>
+              <DialogTitle>{controlDialog.target?.paused ? "恢复认领" : "暂停认领"}</DialogTitle>
               <DialogDescription>
                 按当前连接和方向生效；在途消息继续完成，不改变连接启停状态。
               </DialogDescription>
             </DialogHeader>
+            {controlError ? (
+              <div
+                role="alert"
+                className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+              >
+                {controlError}
+              </div>
+            ) : null}
             <label className="grid gap-1 text-sm">
               原因（必填）
               <Input
@@ -310,7 +327,7 @@ export function H8WorkerRuntimePanel({
                 placeholder="说明操作原因"
               />
             </label>
-            {!selected?.paused ? (
+            {!controlDialog.target?.paused ? (
               <label className="grid gap-1 text-sm">
                 自动恢复时间（可选）
                 <Input
@@ -335,31 +352,36 @@ export function H8WorkerRuntimePanel({
       </Dialog>
 
       <Dialog
-        open={policyOpen}
-        onOpenChange={(open) => !policyMutation.isPending && setPolicyOpen(open)}
+        open={policyDialog.open}
+        onOpenChange={(open) => !policyMutation.isPending && policyDialog.setOpen(open)}
       >
         <DialogContent className="sm:max-w-md">
           <form
             className="grid gap-3"
             onSubmit={(event) => {
               event.preventDefault();
-              if (!selected) return;
+              // 列表刷新后选中行可能已消失：不得静默 no-op，要在弹窗内给出明确提示。
+              const current = rows.find((row) => row.id === policyDialog.target?.id);
+              if (!current) {
+                setPolicyError("该 Worker 已离线或列表已刷新，请关闭弹窗刷新后重试");
+                return;
+              }
               void (async () => {
                 try {
                   await policyMutation.mutateAsync({
-                    connector_id: selected.connectorId,
+                    connector_id: current.connectorId,
                     enabled: policyEnabled,
                     retention_days: policyEnabled ? Number(retentionDays) : undefined,
                     confirmed: true,
                   });
-                  setPolicyOpen(false);
+                  policyDialog.close();
                   onNotice(
                     policyEnabled
                       ? `已启用完整报文保留（${retentionDays} 天）`
                       : "已关闭完整报文保留",
                   );
-                } catch {
-                  onNotice("更新完整报文保留策略失败，请重试", true);
+                } catch (cause: unknown) {
+                  setPolicyError(errorText(cause, "更新完整报文保留策略失败，请重试"));
                 }
               })();
             }}
@@ -367,10 +389,18 @@ export function H8WorkerRuntimePanel({
             <DialogHeader>
               <DialogTitle>完整报文短期保留</DialogTitle>
               <DialogDescription>
-                连接 {selected?.connectorCode ?? "—"} 默认关闭；启用后加密保存，最长 30 天。
+                连接 {policyDialog.target?.connectorCode ?? "—"} 默认关闭；启用后加密保存，最长 30 天。
                 关闭会立即清除该连接已有密文。
               </DialogDescription>
             </DialogHeader>
+            {policyError ? (
+              <div
+                role="alert"
+                className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+              >
+                {policyError}
+              </div>
+            ) : null}
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"

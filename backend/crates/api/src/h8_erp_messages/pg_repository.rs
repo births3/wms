@@ -11,7 +11,7 @@ use wms_domain::{
 use super::error::H8ErpMessageRepoError;
 use super::pg_lifecycle::transition_lifecycle_status;
 use super::pg_rows::{AttemptRow, MessageRow, StatsRow};
-use super::repository::{H8ErpMessageCursor, H8ErpMessageRepository};
+use super::repository::{H8ErpMessageCursor, H8ErpMessageRepository, H8LifecycleTransition};
 use crate::audit::AuditWriteRequest;
 
 pub struct PgH8ErpMessageRepository {
@@ -552,7 +552,7 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
         actor: &str,
         now: DateTime<Utc>,
         audit_requests: &[AuditWriteRequest],
-    ) -> Result<H8ErpMessage, H8ErpMessageRepoError> {
+    ) -> Result<H8LifecycleTransition, H8ErpMessageRepoError> {
         transition_lifecycle_status(
             &self.pool,
             owner_id,
