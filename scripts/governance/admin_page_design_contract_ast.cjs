@@ -127,6 +127,13 @@ function isPropertyCall(call, objectName, methodNames) {
   return ts.isIdentifier(call.expression.expression) && call.expression.expression.text === objectName;
 }
 
+function isDialogStateCall(call, methodNames) {
+  if (!ts.isPropertyAccessExpression(call.expression)) return false;
+  if (!methodNames.includes(call.expression.name.text)) return false;
+  const target = call.expression.expression;
+  return ts.isIdentifier(target) && /Dialog$/.test(target.text);
+}
+
 function scanWriteAndConfirm(node, functionBodies, stack = new Set()) {
   let hasWrite = false;
   let hasConfirm = false;
@@ -143,6 +150,15 @@ function scanWriteAndConfirm(node, functionBodies, stack = new Set()) {
       if (isPropertyCall(current, null, ["mutate", "mutateAsync"])) hasWrite = true;
       if (isPropertyCall(current, "window", ["prompt", "print"])) hasWrite = true;
       if (isPropertyCall(current, "window", ["confirm"])) hasConfirm = true;
+      if (
+        isDialogStateCall(current, ["openWith"])
+        || (
+          isDialogStateCall(current, ["setOpen"])
+          && current.arguments[0]?.kind === ts.SyntaxKind.TrueKeyword
+        )
+      ) {
+        hasDialogOpen = true;
+      }
       if (
         ts.isIdentifier(current.expression)
         && /^set[A-Z].*Open$/.test(current.expression.text)

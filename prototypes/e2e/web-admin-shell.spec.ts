@@ -34,26 +34,18 @@ test("dev mock 保留主数据分页和入库动作状态", async ({ request }) 
     attrs: { ...baseProduct?.attrs, storage_condition: "frozen" },
     status: "inactive",
   };
+  // 商品主数据已改为 ERP 只读（仅 H8 防腐层可写）：任何直写都应被 403 拒绝
   const updateResponse = await request.patch(`/api/v1/master-data/products/${baseProduct?.id}`, {
     data: updatePayload,
   });
-  expect(updateResponse.status()).toBe(200);
-  await expect.poll(async () => {
-    const productsAfterUpdate = await request.get("/api/v1/master-data/products");
-    const updatedRows = (await productsAfterUpdate.json() as { data: typeof productRows }).data;
-    return updatedRows.find((product) => product.product_code === "P-M1-001");
-  }).toMatchObject({
-    special_drug_category_code: "controlled",
-    attrs: { storage_condition: "frozen" },
-    status: "inactive",
-  });
-  await request.patch(`/api/v1/master-data/products/${baseProduct?.id}`, {
-    data: {
-      ...updatePayload,
-      special_drug_category_code: baseProduct?.special_drug_category_code,
-      attrs: baseProduct?.attrs,
-      status: baseProduct?.status,
-    },
+  expect(updateResponse.status()).toBe(403);
+  const updateError = await updateResponse.json() as { code: string };
+  expect(updateError.code).toBe("AUTH-005");
+  const productsAfterUpdate = await request.get("/api/v1/master-data/products");
+  const rowsAfterUpdate = (await productsAfterUpdate.json() as { data: typeof productRows }).data;
+  expect(rowsAfterUpdate.find((product) => product.product_code === "P-M1-001")).toMatchObject({
+    special_drug_category_code: baseProduct?.special_drug_category_code ?? null,
+    status: baseProduct?.status,
   });
 
   const secondProduct = productRows.find((product) => product.product_code === "P-M1-002");
@@ -61,23 +53,13 @@ test("dev mock 保留主数据分页和入库动作状态", async ({ request }) 
   const secondUpdateResponse = await request.patch(`/api/v1/master-data/products/${secondProduct?.id}`, {
     data: { ...secondProduct, status: "inactive" },
   });
-  expect(secondUpdateResponse.status()).toBe(200);
-  await expect.poll(async () => {
-    const response = await request.get("/api/v1/master-data/products");
-    const rows = (await response.json() as { data: typeof productRows }).data;
-    return rows.find((product) => product.product_code === "P-M1-002")?.status;
-  }).toBe("inactive");
-  await request.patch(`/api/v1/master-data/products/${secondProduct?.id}`, {
-    data: secondProduct,
-  });
+  expect(secondUpdateResponse.status()).toBe(403);
 
   const createdProductResponse = await request.post("/api/v1/master-data/products", {
     data: { product_code: "P-M1-E2E", product_name: "默认值商品", attrs: {} },
   });
-  await expect(createdProductResponse.json()).resolves.toMatchObject({
-    attrs: { source: "api_import", storage_condition: "normal" },
-    status: "active",
-  });
+  expect(createdProductResponse.status()).toBe(403);
+  await expect(createdProductResponse.json()).resolves.toMatchObject({ code: "AUTH-005" });
   const createdSupplierResponse = await request.post("/api/v1/master-data/suppliers", {
     data: { supplier_code: "S-M1-E2E", supplier_name: "默认值供应商" },
   });
@@ -420,8 +402,8 @@ test("H2 H3 基础能力能通过三层菜单打开", async ({ page }) => {
   await expect(h2Page.getByText("192.168.124.25")).toBeVisible();
   await expect(h2Page.getByText(/验收中/)).toBeVisible();
   await expect(h2Page.getByText(/已验收/)).toBeVisible();
-  await expect(h2Page.getByText(/P-M1-001/)).toBeVisible();
-  await expect(h2Page.getByText(/BATCH-M3-202606-01/)).toBeVisible();
+  await expect(h2Page.getByText(/P-M1-001/).first()).toBeVisible();
+  await expect(h2Page.getByText(/BATCH-M3-202606-01/).first()).toBeVisible();
   await h2Page.getByRole("button", { name: "导出" }).click();
   const exportDialog = page.getByRole("dialog");
   await expect(exportDialog.getByRole("heading", { name: "导出列表" })).toBeVisible();

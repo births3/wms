@@ -246,6 +246,16 @@
       "more": ["customerId", "routeCode", "deliveryAddressId"]
     },
     {
+      "id": "h9-print-devices",
+      "title": "设备·Print Agent 管理",
+      "required": true,
+      "source": "apps/web-admin/src/pages/print-orchestration/H9PrintDevicePage.tsx",
+      "fieldConstant": "h9PrintDeviceQueryFields",
+      "coreConstant": "h9PrintDeviceCoreQueryFieldKeys",
+      "core": ["keyword", "siteId"],
+      "more": ["connectionType"]
+    },
+    {
       "id": "h9-print-templates",
       "title": "H9 打印模板",
       "required": true,

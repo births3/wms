@@ -34,8 +34,9 @@ assert.match(queryPanelSource, /收起/);
 assert.match(queryPanelSource, /buildQueryPanelSummaryItems/);
 
 assert.match(m1PageSource, /const m1QueryFields: QueryPanelField\[\]/);
-assert.match(m1PageSource, /const \[draftQuery, setDraftQuery\]/);
-assert.match(m1PageSource, /const \[appliedQuery, setAppliedQuery\]/);
+assert.match(m1PageSource, /usePageQueryState[<(]/);
+assert.match(m1PageSource, /\bdraftQuery\b/);
+assert.match(m1PageSource, /\bappliedQuery\b/);
 assert.match(m1PageSource, /fields=\{m1QueryFields\}/);
 assert.match(m1PageSource, /defaultVisibleFieldKeys=\{m1CoreQueryFieldKeys\}/);
 assert.match(m1PageSource, /queryState=\{appliedQuery\}/);
@@ -43,8 +44,9 @@ assert.match(m1PageSource, /querySummaryItems=\{m1QuerySummaryItems\}/);
 assert.doesNotMatch(m1PageSource, /keyword=\{keyword\}/);
 
 assert.match(m2PageSource, /const m2InboundQueryFields: QueryPanelField\[\]/);
-assert.match(m2PageSource, /const \[draftQuery, setDraftQuery\]/);
-assert.match(m2PageSource, /const \[appliedQuery, setAppliedQuery\]/);
+assert.match(m2PageSource, /usePageQueryState[<(]/);
+assert.match(m2PageSource, /\bdraftQuery\b/);
+assert.match(m2PageSource, /\bappliedQuery\b/);
 assert.match(m2PageSource, /fields=\{m2InboundQueryFields\}/);
 assert.match(m2PageSource, /defaultVisibleFieldKeys=\{m2InboundCoreQueryFieldKeys\}/);
 assert.match(m2PageSource, /queryState=\{appliedQuery\}/);

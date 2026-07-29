@@ -127,6 +127,28 @@ def test_design_contract_allows_write_action_that_opens_dialog(tmp_path, monkeyp
     assert check.scan() == []
 
 
+def test_design_contract_allows_write_action_that_opens_shared_dialog_state(tmp_path, monkeypatch):
+    pages = tmp_path / "apps/web-admin/src/pages/print-template"
+    pages.mkdir(parents=True)
+    page = pages / "H9PrintTemplatePage.tsx"
+    page.write_text(
+        """
+        export function H9PrintTemplatePage() {
+          return <Button onClick={openDesigner}>修改</Button>;
+        }
+        async function openDesigner() {
+          const version = await versionsMutation.mutateAsync("tpl-1");
+          designerDialog.openWith(version);
+        }
+        """,
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(check, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(check, "PAGES_DIR", tmp_path / "apps/web-admin/src/pages")
+
+    assert check.scan() == []
+
+
 def test_design_contract_supports_explicit_governance_skip(tmp_path, monkeypatch):
     pages = tmp_path / "apps/web-admin/src/pages/config-center"
     pages.mkdir(parents=True)
