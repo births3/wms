@@ -53,6 +53,9 @@ import {
 } from "@/features/reconciliation/reconciliation-queries";
 import { MrcReconciliationIsolationDialog } from "./MrcReconciliationIsolationDialog";
 import { MrcReconciliationRuleDialog } from "./MrcReconciliationRuleDialog";
+import { errorText } from "@/lib/error-text";
+import { queryString, queryStringArray, queryValueFromUnknown } from "@/lib/query-value";
+import { usePageQueryState } from "@/lib/use-page-query-state";
 const differenceOptions = [
   { label: "WMS 多", value: "wms_more" },
   { label: "ERP 多", value: "erp_more" },
@@ -68,13 +71,13 @@ const resolutionOptions = [
   { label: "一致", value: "matched" },
 ];
 
-export const mRcReconciliationQueryFields: QueryPanelField[] = [
+const mRcReconciliationQueryFields: QueryPanelField[] = [
   { key: "productCode", label: "商品编码", type: "text", placeholder: "按商品编码模糊查询" },
   { key: "differenceType", label: "差异类型", type: "multiSelect", options: differenceOptions },
   { key: "resolutionStatus", label: "处理状态", type: "multiSelect", options: resolutionOptions },
   { key: "batchNo", label: "批号", type: "text", placeholder: "按批号模糊查询" },
 ];
-export const mRcReconciliationCoreQueryFieldKeys = [
+const mRcReconciliationCoreQueryFieldKeys = [
   "productCode",
   "differenceType",
   "resolutionStatus",
@@ -136,8 +139,8 @@ type Notice = { type: "success" | "error"; text: string } | null;
 type ResolveDialog = { item: ReconciliationItem; disposition: ReconciliationDisposition } | null;
 
 export function MrcReconciliationPage({ currentUser }: { currentUser: CurrentUser }) {
-  const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(defaultQuery);
-  const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(defaultQuery);
+  const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
+    usePageQueryState<QueryPanelValue>(defaultQuery, normalizeQuery);
   const [selectedRowKeys, setSelectedRowKeys] = React.useState<string[]>([]);
   const [notice, setNotice] = React.useState<Notice>(null);
   const [ruleOpen, setRuleOpen] = React.useState(false);
@@ -227,6 +230,14 @@ export function MrcReconciliationPage({ currentUser }: { currentUser: CurrentUse
       onClick: () => selected && openResolve(selected, "known_difference"),
     },
   ] : [];
+
+  function applyGridQueryState(value: unknown) {
+    applyQuery(queryValueFromUnknown(value));
+  }
+
+  function clearGridQueryState() {
+    resetQuery();
+  }
 
   async function refresh() {
     const result = await itemsQuery.refetch();
@@ -344,12 +355,8 @@ export function MrcReconciliationPage({ currentUser }: { currentUser: CurrentUse
         defaultVisibleFieldKeys={mRcReconciliationCoreQueryFieldKeys}
         value={draftQuery}
         onValueChange={setDraftQuery}
-        onQuery={() => setAppliedQuery(normalizeQuery(draftQuery))}
-        onReset={() => {
-          const next = defaultQuery();
-          setDraftQuery(next);
-          setAppliedQuery(next);
-        }}
+        onQuery={() => applyQuery(draftQuery)}
+        onReset={resetQuery}
         actions={canExecute ? (
           <Button
             type="button"
@@ -389,16 +396,8 @@ export function MrcReconciliationPage({ currentUser }: { currentUser: CurrentUse
             toolbarActions={toolbarActions}
             queryState={appliedQuery}
             querySummaryItems={buildQueryPanelSummaryItems(mRcReconciliationQueryFields, appliedQuery)}
-            onApplyQueryState={(value) => {
-              const next = normalizeQuery(value);
-              setDraftQuery(next);
-              setAppliedQuery(next);
-            }}
-            onClearQueryState={() => {
-              const next = defaultQuery();
-              setDraftQuery(next);
-              setAppliedQuery(next);
-            }}
+            onApplyQueryState={applyGridQueryState}
+            onClearQueryState={clearGridQueryState}
           />
           {itemsQuery.hasNextPage && (
             <div className="mt-4 flex justify-center">
@@ -532,32 +531,24 @@ function defaultQuery(): QueryPanelValue {
 }
 
 function normalizeQuery(value: unknown): QueryPanelValue {
-  const row = value && typeof value === "object" ? value as QueryPanelValue : {};
+  const row = queryValueFromUnknown(value);
   return {
-    productCode: text(row.productCode),
-    batchNo: text(row.batchNo),
-    differenceType: stringArray(row.differenceType),
-    resolutionStatus: stringArray(row.resolutionStatus),
+    productCode: queryString(row.productCode),
+    batchNo: queryString(row.batchNo),
+    differenceType: queryStringArray(row.differenceType),
+    resolutionStatus: queryStringArray(row.resolutionStatus),
   };
 }
 
 function toFilters(value: QueryPanelValue): ReconciliationFilters {
-  const differenceType = stringArray(value.differenceType);
-  const resolutionStatus = stringArray(value.resolutionStatus);
+  const differenceType = queryStringArray(value.differenceType);
+  const resolutionStatus = queryStringArray(value.resolutionStatus);
   return {
-    product_code: optional(text(value.productCode)),
-    batch_no: optional(text(value.batchNo)),
+    product_code: optional(queryString(value.productCode)),
+    batch_no: optional(queryString(value.batchNo)),
     difference_type: differenceType.length ? differenceType.join(",") : undefined,
     resolution_status: resolutionStatus.length ? resolutionStatus.join(",") : undefined,
   };
-}
-
-function text(value: QueryPanelValue[string]) {
-  return typeof value === "string" ? value : "";
-}
-
-function stringArray(value: QueryPanelValue[string]) {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
 function optional(value: string) {
@@ -614,8 +605,4 @@ function qualityStatusLabel(value: string) {
   if (value === "pending_destruction") return "待销毁";
   if (value === "loss_deducted") return "报损扣减";
   return `未知状态（${value}）`;
-}
-
-function errorText(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback;
 }

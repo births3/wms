@@ -13,13 +13,17 @@ import {
   type TaskGroup, type UpsertTaskGroupRequest,
 } from "@/features/task-engine/task-engine-queries";
 import { useTaskTypesQuery } from "@/features/task-engine/task-type-queries";
+import { errorText } from "@/lib/error-text";
+import { queryString, queryValueFromUnknown } from "@/lib/query-value";
+import { useDialogState } from "@/lib/use-dialog-state";
+import { usePageQueryState } from "@/lib/use-page-query-state";
 
-export const mteTaskGroupQueryFields: QueryPanelField[] = [
+const mteTaskGroupQueryFields: QueryPanelField[] = [
   { key: "keyword", label: "关键字", type: "text", placeholder: "任务组编码 / 名称" },
   { key: "status", label: "状态", type: "select", options: [{ label: "全部", value: "" }, { label: "启用", value: "enabled" }, { label: "停用", value: "disabled" }] },
   { key: "warehouseId", label: "仓库 ID", type: "text", placeholder: "按 warehouse_id 筛选" },
 ];
-export const mteTaskGroupCoreQueryFieldKeys = ["keyword", "status"];
+const mteTaskGroupCoreQueryFieldKeys = ["keyword", "status"];
 
 type FormState = {
   code: string;
@@ -44,18 +48,22 @@ export function TaskGroupConfigPage() {
   const zonesQuery = useTaskEngineWarehouseZonesQuery();
   const usersQuery = useTaskWorkersQuery();
   const save = useUpsertTaskGroupMutation();
-  const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(defaultQuery);
-  const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(defaultQuery);
+  const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
+    usePageQueryState<QueryPanelValue>(defaultQuery, normalizeQuery);
   const [selected, setSelected] = React.useState<string[]>([]);
-  const [editing, setEditing] = React.useState<TaskGroup | null>(null);
-  const [dialogOpen, setDialogOpen] = React.useState(false);
+  const {
+    open: dialogOpen,
+    target: editing,
+    setOpen: setDialogOpen,
+    setTarget: setEditing,
+  } = useDialogState<TaskGroup>();
   const [form, setForm] = React.useState<FormState>(emptyForm);
   const [notice, setNotice] = React.useState<Notice>(null);
   const warehouseNames = new Map((warehousesQuery.data ?? []).map((item) => [item.id, `${item.warehouse_code} · ${item.warehouse_name}`]));
   const rows = (groupsQuery.data?.data ?? []).filter((row) => {
-    const keyword = text(appliedQuery.keyword).trim().toLowerCase();
-    const status = text(appliedQuery.status);
-    const warehouseId = text(appliedQuery.warehouseId).trim();
+    const keyword = queryString(appliedQuery.keyword).trim().toLowerCase();
+    const status = queryString(appliedQuery.status);
+    const warehouseId = queryString(appliedQuery.warehouseId).trim();
     return (!keyword || `${row.task_group_code} ${row.task_group_name}`.toLowerCase().includes(keyword))
       && (!status || (status === "enabled" ? row.enabled : !row.enabled))
       && (!warehouseId || row.warehouse_id === warehouseId);
@@ -79,11 +87,13 @@ export function TaskGroupConfigPage() {
   return <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
     <PageHeader title="M-TE 任务组与人员资格" subtitle="按仓库和任务类型控制可分派人员" />
     {notice && <div className={notice.kind === "error" ? "rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" : "rounded-md border border-wms-success/30 bg-wms-success/10 px-3 py-2 text-sm text-wms-success"} role={notice.kind === "error" ? "alert" : "status"}>{notice.text}</div>}
-    <QueryPanel fields={mteTaskGroupQueryFields} defaultVisibleFieldKeys={mteTaskGroupCoreQueryFieldKeys} value={draftQuery} onValueChange={setDraftQuery} onQuery={() => setAppliedQuery(draftQuery)} onReset={() => { const next = defaultQuery(); setDraftQuery(next); setAppliedQuery(next); }} />
-    <Card><CardContent className="p-5"><DataGrid storageKey="mte.task-groups" columns={columns} data={rows} rowKey={(row) => row.id} selectable selectedRowKeys={selected} onSelectedRowKeysChange={setSelected} caption={groupsQuery.isPending ? "加载任务组..." : undefined} emptyTitle={groupsQuery.isError ? "读取任务组失败" : "暂无任务组"} emptyDescription={groupsQuery.isError ? errorText(groupsQuery.error, "请检查鉴权和 API 服务") : "业务创建首个任务时会生成仓库默认任务组，也可手工新增"} refreshAction={refreshAction} createAction={createAction} editAction={editAction} exportFileBaseName="M-TE-task-groups" queryState={appliedQuery} querySummaryItems={buildQueryPanelSummaryItems(mteTaskGroupQueryFields, appliedQuery)} onApplyQueryState={(value) => { const next = normalizeQuery(value); setDraftQuery(next); setAppliedQuery(next); }} onClearQueryState={() => { const next = defaultQuery(); setDraftQuery(next); setAppliedQuery(next); }} /></CardContent></Card>
+    <QueryPanel fields={mteTaskGroupQueryFields} defaultVisibleFieldKeys={mteTaskGroupCoreQueryFieldKeys} value={draftQuery} onValueChange={setDraftQuery} onQuery={() => applyQuery(draftQuery)} onReset={resetQuery} />
+    <Card><CardContent className="p-5"><DataGrid storageKey="mte.task-groups" columns={columns} data={rows} rowKey={(row) => row.id} selectable selectedRowKeys={selected} onSelectedRowKeysChange={setSelected} caption={groupsQuery.isPending ? "加载任务组..." : undefined} emptyTitle={groupsQuery.isError ? "读取任务组失败" : "暂无任务组"} emptyDescription={groupsQuery.isError ? errorText(groupsQuery.error, "请检查鉴权和 API 服务") : "业务创建首个任务时会生成仓库默认任务组，也可手工新增"} refreshAction={refreshAction} createAction={createAction} editAction={editAction} exportFileBaseName="M-TE-task-groups" queryState={appliedQuery} querySummaryItems={buildQueryPanelSummaryItems(mteTaskGroupQueryFields, appliedQuery)} onApplyQueryState={applyGridQueryState} onClearQueryState={clearGridQueryState} /></CardContent></Card>
     <TaskGroupDialog open={dialogOpen} editing={editing} form={form} pending={save.isPending} errorMessage={save.error?.message} warehouses={warehousesQuery.data ?? []} zones={zonesQuery.data ?? []} taskTypes={taskTypesQuery.data?.data ?? []} users={usersQuery.data?.data ?? []} onOpenChange={setDialogOpen} onFormChange={setForm} onSubmit={submit} />
   </section>;
 
+  function applyGridQueryState(value: unknown) { applyQuery(queryValueFromUnknown(value)); }
+  function clearGridQueryState() { resetQuery(); }
   function openDialog(row: TaskGroup | null) {
     setEditing(row); setForm(row ? formFor(row) : emptyForm()); setDialogOpen(true); setNotice(null);
   }
@@ -150,8 +160,6 @@ function emptyForm(): FormState { return { code: "", name: "", warehouseId: "", 
 function formFor(row: TaskGroup): FormState { return { code: row.task_group_code, name: row.task_group_name, warehouseId: row.warehouse_id, zoneIds: row.zone_ids, taskTypeCodes: row.task_type_codes, memberUserIds: row.member_user_ids, memberQualifications: row.member_qualifications.map((item) => ({ userId: item.user_id, validUntil: toDateTimeLocal(item.valid_until), maxActiveTasks: item.max_active_tasks?.toString() ?? "" })), enabled: row.enabled }; }
 function validate(form: FormState, editing: boolean) { if (!editing && !/^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/.test(form.code.trim())) return "任务组编码非法"; if (!form.name.trim() || !form.warehouseId || form.taskTypeCodes.length === 0) return "请填写名称、仓库并至少选择一个任务类型"; if (form.memberQualifications.some((item) => item.maxActiveTasks && (!Number.isInteger(Number(item.maxActiveTasks)) || Number(item.maxActiveTasks) <= 0))) return "同时在手上限必须为正整数"; return null; }
 function defaultQuery(): QueryPanelValue { return { keyword: "", status: "", warehouseId: "" }; }
-function text(value: unknown) { return typeof value === "string" ? value : ""; }
-function normalizeQuery(value: unknown): QueryPanelValue { const row = value && typeof value === "object" ? value as Record<string, unknown> : {}; return { keyword: text(row.keyword), status: text(row.status), warehouseId: text(row.warehouseId) }; }
-function errorText(error: unknown, fallback: string) { return error instanceof Error ? error.message : fallback; }
+function normalizeQuery(value: unknown): QueryPanelValue { const row = queryValueFromUnknown(value); return { keyword: queryString(row.keyword), status: queryString(row.status), warehouseId: queryString(row.warehouseId) }; }
 function formatDateTime(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { hour12: false }); }
 function toDateTimeLocal(value?: string | null) { if (!value) return ""; const date = new Date(value); const offset = date.getTimezoneOffset() * 60_000; return new Date(date.getTime() - offset).toISOString().slice(0, 16); }

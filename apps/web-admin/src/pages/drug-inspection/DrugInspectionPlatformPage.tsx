@@ -63,7 +63,7 @@ export function DrugInspectionPlatformPage({ currentUser }: { currentUser: Curre
   const toolbarActions: DataGridToolbarAction[] = [{
     key: "status", label: "维护状态", description: "维护选中平台状态", icon: <PlugZap className="size-4" aria-hidden />,
     disabled: (context) => context.selectedRowKeys.length !== 1 || busy,
-    onClick: () => selected && setDialog("status"),
+    onClick: () => selected && openStatus(selected),
   }];
 
   async function refresh() {
@@ -89,6 +89,8 @@ export function DrugInspectionPlatformPage({ currentUser }: { currentUser: Curre
   }
   function update(key: keyof Form, value: string) { setForm((current) => ({ ...current, [key]: value })); }
   function openCreate() { setNotice(null); setForm(defaultForm()); setDialog("create"); }
+  // 状态弹窗必须回填选中平台的当前状态，否则用户未改动直接保存会把平台改成 defaultForm 的 testing
+  function openStatus(row: DrugInspectionPlatform) { setNotice(null); setForm({ ...defaultForm(), status: row.status }); setDialog("status"); }
   function openEdit(row: DrugInspectionPlatform) {
     setNotice(null); setForm({ ...defaultForm(), platform_code: row.platform_code, platform_name: row.platform_name, api_url: row.api_url, auth_method: row.auth_method, username: row.username ?? "", timeout_seconds: String(row.timeout_seconds), status: row.status }); setDialog("edit");
   }
@@ -124,6 +126,6 @@ function credentialLabel(row: DrugInspectionPlatform) { return row.auth_method =
 function statusLabel(value: string) { return value === "connected" ? "已对接" : value === "testing" ? "测试中" : "停用"; }
 function statusVariant(value: string): "completed" | "isolated" | "expired" { return value === "connected" ? "completed" : value === "testing" ? "isolated" : "expired"; }
 function queryString(value: QueryPanelValue[string]) { return typeof value === "string" ? value : ""; }
-function formatDateTime(value: string) { return new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
+function formatDateTime(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? "-" : new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium", timeStyle: "short" }).format(date); }
 function errorMessage(error: unknown, fallback: string) { return error instanceof Error ? error.message : fallback; }
 function Field({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) { return <label className={cn("grid gap-1 text-sm", className)}>{label}{children}</label>; }

@@ -11,6 +11,10 @@ import {
   useUpsertTaskPriorityRuleMutation, useUpsertTaskTypeMutation,
   type TaskType, type UpsertTaskTypeRequest,
 } from "@/features/task-engine/task-type-queries";
+import { errorText } from "@/lib/error-text";
+import { queryString, queryValueFromUnknown } from "@/lib/query-value";
+import { useDialogState } from "@/lib/use-dialog-state";
+import { usePageQueryState } from "@/lib/use-page-query-state";
 
 const queryFields: QueryPanelField[] = [
   { key: "keyword", label: "关键字", type: "text", placeholder: "编码 / 名称" },
@@ -38,18 +42,27 @@ export function TaskTypeConfigPage() {
   const query = useTaskTypesQuery();
   const save = useUpsertTaskTypeMutation();
   const toggle = useSetTaskTypeEnabledMutation();
-  const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(defaultQuery);
-  const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(defaultQuery);
+  const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
+    usePageQueryState<QueryPanelValue>(defaultQuery, normalizeQuery);
   const [selected, setSelected] = React.useState<string[]>([]);
-  const [dialogOpen, setDialogOpen] = React.useState(false);
-  const [editing, setEditing] = React.useState<TaskType | null>(null);
-  const [toggleTarget, setToggleTarget] = React.useState<TaskType | null>(null);
-  const [toggleOpen, setToggleOpen] = React.useState(false);
+  const {
+    open: dialogOpen,
+    target: editing,
+    setOpen: setDialogOpen,
+    setTarget: setEditing,
+  } = useDialogState<TaskType>();
+  const {
+    open: toggleOpen,
+    target: toggleTarget,
+    openWith: openToggleWith,
+    setOpen: setToggleOpen,
+    setTarget: setToggleTarget,
+  } = useDialogState<TaskType>();
   const [form, setForm] = React.useState<Form>(emptyForm);
   const [notice, setNotice] = React.useState<Notice>(null);
   const rows = (query.data?.data ?? []).filter((row) => {
-    const keyword = stringValue(appliedQuery.keyword).trim().toLowerCase();
-    const status = stringValue(appliedQuery.status);
+    const keyword = queryString(appliedQuery.keyword).trim().toLowerCase();
+    const status = queryString(appliedQuery.status);
     return (!keyword || `${row.task_type_code} ${row.task_type_name}`.toLowerCase().includes(keyword)) && (!status || (status === "enabled" ? row.enabled : !row.enabled));
   });
   const busy = save.isPending || toggle.isPending;
@@ -58,18 +71,20 @@ export function TaskTypeConfigPage() {
   const refreshAction: DataGridRefreshAction = { label: "刷新", description: "刷新任务类型列表", disabled: query.isFetching, onClick: () => void query.refetch() };
   const createAction: DataGridCreateAction = { label: "新增类型", description: "新增自定义任务类型", disabled: busy, onClick: () => openDialog(null) };
   const editAction: DataGridEditAction = { label: "编辑", description: "编辑选中任务类型", disabled: (ctx) => ctx.selectedRowKeys.length !== 1 || busy, onClick: (ctx) => openDialog(rows.find((r) => r.task_type_code === ctx.selectedRowKeys[0]) ?? null) };
-  const disableAction: DataGridDisableAction = { label: selectedRow?.enabled ? "停用" : "启用", description: "切换任务类型状态", disabled: (ctx) => ctx.selectedRowKeys.length !== 1 || busy, onClick: () => { if (selectedRow) { setToggleTarget(selectedRow); setToggleOpen(true); } } };
+  const disableAction: DataGridDisableAction = { label: selectedRow?.enabled ? "停用" : "启用", description: "切换任务类型状态", disabled: (ctx) => ctx.selectedRowKeys.length !== 1 || busy, onClick: () => { if (selectedRow) openToggleWith(selectedRow); } };
 
   return <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
     <PageHeader title="M-TE 任务类型配置" subtitle="维护预置与自定义任务类型的调度参数" />
     <PriorityRuleCard />
     {notice && <div className={notice.kind === "error" ? "rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" : "rounded-md border border-wms-success/30 bg-wms-success/10 px-3 py-2 text-sm text-wms-success"} role={notice.kind === "error" ? "alert" : "status"}>{notice.text}</div>}
-    <QueryPanel fields={queryFields} defaultVisibleFieldKeys={mteTaskTypeCoreQueryFieldKeys} value={draftQuery} onValueChange={setDraftQuery} onQuery={() => setAppliedQuery(draftQuery)} onReset={() => { const next = defaultQuery(); setDraftQuery(next); setAppliedQuery(next); }} />
-    <Card><CardContent className="p-5"><DataGrid storageKey="mte.task-types" columns={columns} data={rows} rowKey={(r) => r.task_type_code} selectable selectedRowKeys={selected} onSelectedRowKeysChange={setSelected} caption={query.isPending ? "加载任务类型..." : undefined} emptyTitle={query.isError ? "读取任务类型失败" : "暂无任务类型"} emptyDescription={query.isError ? errorText(query.error, "请检查鉴权和 API 服务") : "暂无可用任务类型"} exportFileBaseName="M-TE-task-types" refreshAction={refreshAction} createAction={createAction} editAction={editAction} disableAction={disableAction} queryState={appliedQuery} querySummaryItems={buildQueryPanelSummaryItems(queryFields, appliedQuery)} onApplyQueryState={(value) => { const next = normalizeQuery(value); setDraftQuery(next); setAppliedQuery(next); }} onClearQueryState={() => { const next = defaultQuery(); setDraftQuery(next); setAppliedQuery(next); }} /></CardContent></Card>
+    <QueryPanel fields={queryFields} defaultVisibleFieldKeys={mteTaskTypeCoreQueryFieldKeys} value={draftQuery} onValueChange={setDraftQuery} onQuery={() => applyQuery(draftQuery)} onReset={resetQuery} />
+    <Card><CardContent className="p-5"><DataGrid storageKey="mte.task-types" columns={columns} data={rows} rowKey={(r) => r.task_type_code} selectable selectedRowKeys={selected} onSelectedRowKeysChange={setSelected} caption={query.isPending ? "加载任务类型..." : undefined} emptyTitle={query.isError ? "读取任务类型失败" : "暂无任务类型"} emptyDescription={query.isError ? errorText(query.error, "请检查鉴权和 API 服务") : "暂无可用任务类型"} exportFileBaseName="M-TE-task-types" refreshAction={refreshAction} createAction={createAction} editAction={editAction} disableAction={disableAction} queryState={appliedQuery} querySummaryItems={buildQueryPanelSummaryItems(queryFields, appliedQuery)} onApplyQueryState={applyGridQueryState} onClearQueryState={clearGridQueryState} /></CardContent></Card>
     {/* TaskTypeDisableDialog: 启停写操作统一经过确认。 */}<Dialog open={toggleOpen} onOpenChange={(open) => !busy && (setToggleOpen(open), !open && setToggleTarget(null))}><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>{toggleTarget?.enabled ? "停用任务类型" : "启用任务类型"}</DialogTitle><DialogDescription>确认{toggleTarget?.enabled ? "停用" : "启用"}任务类型“{toggleTarget?.task_type_name ?? ""}”？</DialogDescription></DialogHeader><DialogFooter><DialogClose asChild><Button type="button" variant="outline" disabled={busy}>取消</Button></DialogClose><Button type="button" disabled={busy || !toggleTarget} onClick={() => void confirmToggle()}>{busy ? "处理中..." : "确认"}</Button></DialogFooter></DialogContent></Dialog>
     <TaskTypeDialog open={dialogOpen} editing={editing} form={form} pending={save.isPending} errorMessage={save.error?.message} onOpenChange={setDialogOpen} onFormChange={setForm} onSubmit={submit} />
   </section>;
 
+  function applyGridQueryState(value: unknown) { applyQuery(queryValueFromUnknown(value)); }
+  function clearGridQueryState() { resetQuery(); }
   function openDialog(row: TaskType | null) { setNotice(null); setEditing(row); setForm(row ? formFor(row) : emptyForm()); setDialogOpen(true); }
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -79,8 +94,9 @@ export function TaskTypeConfigPage() {
     const body: UpsertTaskTypeRequest = { task_type_name: form.name.trim(), default_priority: Number(form.priority), estimated_minutes: Number(form.minutes), mergeable: form.mergeable, insertable: form.insertable, release_strategy: form.releaseStrategy, release_interval_minutes: scheduled ? Number(form.releaseInterval) : null, release_batch_size: scheduled ? Number(form.releaseBatch) : null, enabled: form.enabled };
     try { await save.mutateAsync({ code: form.code.trim().toLowerCase(), body }); setDialogOpen(false); setSelected([]); setNotice({ kind: "success", text: `任务类型 ${form.code.trim().toLowerCase()} 已保存` }); } catch { /* 弹窗保留，允许重试。 */ }
   }
-  async function setEnabled(row: TaskType) { setNotice(null); try { await toggle.mutateAsync({ code: row.task_type_code, enabled: !row.enabled }); setSelected([]); setNotice({ kind: "success", text: `${row.task_type_name} 已${row.enabled ? "停用" : "启用"}` }); } catch (error) { setNotice({ kind: "error", text: errorText(error, "更新任务类型状态失败") }); } }
-  async function confirmToggle() { if (!toggleTarget) return; const row = toggleTarget; try { await setEnabled(row); setToggleOpen(false); setToggleTarget(null); } catch { /* setEnabled 已展示错误，保留确认弹窗允许重试。 */ } }
+  /** 返回是否成功：失败时已写入错误 Notice，由调用方决定是否保留弹窗。 */
+  async function setEnabled(row: TaskType) { setNotice(null); try { await toggle.mutateAsync({ code: row.task_type_code, enabled: !row.enabled }); setSelected([]); setNotice({ kind: "success", text: `${row.task_type_name} 已${row.enabled ? "停用" : "启用"}` }); return true; } catch (error) { setNotice({ kind: "error", text: errorText(error, "更新任务类型状态失败") }); return false; } }
+  async function confirmToggle() { if (!toggleTarget) return; const ok = await setEnabled(toggleTarget); if (!ok) return; /* 失败保留确认弹窗允许重试 */ setToggleOpen(false); setToggleTarget(null); }
 }
 
 function TaskTypeDialog({ open, editing, form, pending, errorMessage, onOpenChange, onFormChange, onSubmit }: { open: boolean; editing: TaskType | null; form: Form; pending: boolean; errorMessage?: string; onOpenChange: (open: boolean) => void; onFormChange: (form: Form) => void; onSubmit: (event: React.FormEvent<HTMLFormElement>) => void }) {
@@ -99,9 +115,7 @@ function emptyForm(): Form { return { code: "", name: "", priority: "100", minut
 function formFor(row: TaskType): Form { return { code: row.task_type_code, name: row.task_type_name, priority: String(row.default_priority), minutes: String(row.estimated_minutes), mergeable: row.mergeable, insertable: row.insertable, releaseStrategy: row.release_strategy, releaseInterval: String(row.release_interval_minutes ?? 10), releaseBatch: String(row.release_batch_size ?? 50), enabled: row.enabled }; }
 function validate(form: Form, editing: boolean) { if (!editing && !/^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/.test(form.code.trim())) return "类型编码必须以字母或数字开头，且只允许字母、数字、下划线、连字符或点号"; if (!form.name.trim()) return "类型名称不能为空"; const priority = Number(form.priority); if (!Number.isInteger(priority) || priority < 0 || priority > 1000) return "默认优先级必须是 0 到 1000 的整数"; const minutes = Number(form.minutes); if (!Number.isInteger(minutes) || minutes < 1 || minutes > 10080) return "预计耗时必须是 1 到 10080 分钟的整数"; if (form.releaseStrategy === "scheduled") { const interval = Number(form.releaseInterval); const batch = Number(form.releaseBatch); if (!Number.isInteger(interval) || interval < 1 || interval > 1440 || !Number.isInteger(batch) || batch < 1 || batch > 1000) return "定时释放间隔必须是 1 到 1440 分钟，每批任务数必须是 1 到 1000"; } return null; }
 function defaultQuery(): QueryPanelValue { return { keyword: "", status: "" }; }
-function stringValue(value: unknown) { return typeof value === "string" ? value : ""; }
-function normalizeQuery(value: unknown): QueryPanelValue { const record = value && typeof value === "object" ? value as Record<string, unknown> : {}; return { keyword: stringValue(record.keyword), status: stringValue(record.status) }; }
-function errorText(error: unknown, fallback: string) { return error instanceof Error ? error.message : fallback; }
+function normalizeQuery(value: unknown): QueryPanelValue { const record = queryValueFromUnknown(value); return { keyword: queryString(record.keyword), status: queryString(record.status) }; }
 function formatDateTime(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { hour12: false }); }
 
 const releaseStrategyLabels: Record<TaskType["release_strategy"], string> = { immediate: "立即释放", scheduled: "定时释放", conditional: "条件释放", capacity: "容量释放" };

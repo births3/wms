@@ -10,7 +10,6 @@ import {
   type DataGridColumn,
   type DataGridRefreshAction,
   type QueryPanelField,
-  type QueryPanelRangeValue,
   type QueryPanelValue,
 } from "@wms/ui";
 import { ExternalLink, FileJson, RefreshCw } from "lucide-react";
@@ -19,6 +18,8 @@ import {
   useAuditEventsQuery,
   type AuditEventRow,
 } from "@/features/audit/audit-queries";
+import { queryRange } from "@/lib/query-value";
+import { usePageQueryState } from "@/lib/use-page-query-state";
 
 const h2AuditQueryFields: QueryPanelField[] = [
   {
@@ -185,8 +186,8 @@ const h3ContractEntries = [
 ] as const;
 
 export function H2AuditTrailPage() {
-  const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(() => defaultH2QueryValue());
-  const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(() => defaultH2QueryValue());
+  const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
+    usePageQueryState<QueryPanelValue>(defaultH2QueryValue, normalizeH2QueryValue);
   const [selectedRowKeys, setSelectedRowKeys] = React.useState<string[]>([]);
 
   const queryParams = React.useMemo(() => normalizeH2Query(appliedQuery), [appliedQuery]);
@@ -219,13 +220,11 @@ export function H2AuditTrailPage() {
         value={draftQuery}
         onValueChange={(next) => setDraftQuery(normalizeH2QueryValue(next))}
         onQuery={() => {
-          setAppliedQuery(normalizeH2QueryValue(draftQuery));
+          applyQuery(draftQuery);
           setSelectedRowKeys([]);
         }}
         onReset={() => {
-          const next = defaultH2QueryValue();
-          setDraftQuery(next);
-          setAppliedQuery(next);
+          resetQuery();
           setSelectedRowKeys([]);
         }}
         resetLabel="重置"
@@ -387,19 +386,9 @@ function normalizeH2Query(value: QueryPanelValue) {
   };
 }
 
+// 本地实现保留 trim 语义（公共 queryString 不做 trim）。
 function queryString(value: QueryPanelValue[string]) {
   return typeof value === "string" ? value.trim() : "";
-}
-
-function queryRange(value: QueryPanelValue[string]): QueryPanelRangeValue {
-  if (value && typeof value === "object" && !Array.isArray(value) && ("from" in value || "to" in value)) {
-    const range = value as QueryPanelRangeValue;
-    return {
-      from: typeof range.from === "string" ? range.from : "",
-      to: typeof range.to === "string" ? range.to : "",
-    };
-  }
-  return { from: "", to: "" };
 }
 
 function toRfc3339Start(value: string) {

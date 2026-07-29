@@ -38,10 +38,15 @@ import {
   type UpsertDocumentNumberRuleRequest,
 } from "@/features/document-numbering/document-numbering-queries";
 import { useSystemDictionaryItemOptionsQuery } from "@/features/master-data/master-data-queries";
+import { errorText } from "@/lib/error-text";
+import { formatDateTime } from "@/lib/format";
+import { queryString, queryValueFromUnknown } from "@/lib/query-value";
+import { useDialogState } from "@/lib/use-dialog-state";
+import { usePageQueryState } from "@/lib/use-page-query-state";
 
 type DocumentTypeOption = { label: string; value: string };
 
-export function buildMcgDocumentNumberQueryFields(
+function buildMcgDocumentNumberQueryFields(
   documentTypeOptions: DocumentTypeOption[],
 ): QueryPanelField[] {
   return [{
@@ -51,7 +56,7 @@ export function buildMcgDocumentNumberQueryFields(
     options: [{ label: "全部", value: "" }, ...documentTypeOptions],
   }];
 }
-export const mcgDocumentNumberCoreQueryFieldKeys = ["documentType"];
+const mcgDocumentNumberCoreQueryFieldKeys = ["documentType"];
 
 function buildRuleColumns(documentTypeOptions: DocumentTypeOption[]): DataGridColumn<DocumentNumberRule>[] {
   return [
@@ -190,15 +195,28 @@ type RuleForm = {
 };
 
 export function MCGDocumentNumberingPage() {
-  const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(defaultQuery);
-  const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(defaultQuery);
+  const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
+    usePageQueryState<QueryPanelValue>(defaultQuery, normalizeQuery);
   const [selectedRowKeys, setSelectedRowKeys] = React.useState<string[]>([]);
-  const [editorOpen, setEditorOpen] = React.useState(false);
-  const [disableDialogOpen, setDisableDialogOpen] = React.useState(false);
-  const [previewOpen, setPreviewOpen] = React.useState(false);
-  const [editingRule, setEditingRule] = React.useState<DocumentNumberRule | null>(null);
-  const [disableRuleTarget, setDisableRuleTarget] = React.useState<DocumentNumberRule | null>(null);
-  const [previewRule, setPreviewRule] = React.useState<DocumentNumberRule | null>(null);
+  const {
+    open: editorOpen,
+    target: editingRule,
+    setOpen: setEditorOpen,
+    setTarget: setEditingRule,
+  } = useDialogState<DocumentNumberRule>();
+  const {
+    open: disableDialogOpen,
+    target: disableRuleTarget,
+    openWith: openDisableDialogWith,
+    setOpen: setDisableDialogOpen,
+    setTarget: setDisableRuleTarget,
+  } = useDialogState<DocumentNumberRule>();
+  const {
+    open: previewOpen,
+    target: previewRule,
+    openWith: openPreviewWith,
+    setOpen: setPreviewOpen,
+  } = useDialogState<DocumentNumberRule>();
   const [form, setForm] = React.useState<RuleForm>(defaultForm);
   const [notice, setNotice] = React.useState<Notice>(null);
   const documentTypeOptionsQuery = useSystemDictionaryItemOptionsQuery("document_type");
@@ -249,10 +267,7 @@ export function MCGDocumentNumberingPage() {
     disabled: (context) => context.selectedRowKeys.length !== 1,
     onClick: (context) => {
       const rule = rules.find((row) => row.rule_code === context.selectedRowKeys[0]);
-      if (rule) {
-        setPreviewRule(rule);
-        setPreviewOpen(true);
-      }
+      if (rule) openPreviewWith(rule);
     },
   };
   const disableAction: DataGridDisableAction = {
@@ -262,8 +277,8 @@ export function MCGDocumentNumberingPage() {
     onClick: (context) => {
       const rule = rules.find((row) => row.rule_code === context.selectedRowKeys[0]);
       if (rule) {
-        setDisableRuleTarget(rule);
-        setDisableDialogOpen(true);
+        setNotice(null);
+        openDisableDialogWith(rule);
       }
     },
   };
@@ -275,8 +290,16 @@ export function MCGDocumentNumberingPage() {
   async function refresh() {
     const [rulesResult, allocationResult] = await Promise.all([rulesQuery.refetch(), allocationsQuery.refetch()]);
     setNotice(rulesResult.error || allocationResult.error
-      ? { type: "error", text: errorMessage(rulesResult.error ?? allocationResult.error, "刷新编码规则失败") }
+      ? { type: "error", text: errorText(rulesResult.error ?? allocationResult.error, "刷新编码规则失败") }
       : { type: "success", text: "编码规则和生成记录已刷新" });
+  }
+
+  function applyGridQueryState(value: unknown) {
+    applyQuery(queryValueFromUnknown(value));
+  }
+
+  function clearGridQueryState() {
+    resetQuery();
   }
 
   function openEditor(rule: DocumentNumberRule | null) {
@@ -286,20 +309,24 @@ export function MCGDocumentNumberingPage() {
     setEditorOpen(true);
   }
 
+  /** 返回是否成功：失败时已写入错误 Notice，由调用方决定是否保留弹窗。 */
   async function toggleRule(rule?: DocumentNumberRule) {
-    if (!rule) return;
+    if (!rule) return false;
     setNotice(null);
     try {
       await enabledMutation.mutateAsync({ ruleCode: rule.rule_code, enabled: !rule.enabled });
       setSelectedRowKeys([]);
       setNotice({ type: "success", text: `${rule.rule_name} 已${rule.enabled ? "停用" : "启用"}` });
+      return true;
     } catch (error) {
-      setNotice({ type: "error", text: errorMessage(error, "更新规则状态失败") });
+      setNotice({ type: "error", text: errorText(error, "更新规则状态失败") });
+      return false;
     }
   }
 
   async function confirmToggleRule() {
-    await toggleRule(disableRuleTarget ?? undefined);
+    const ok = await toggleRule(disableRuleTarget ?? undefined);
+    if (!ok) return; /* 失败保留确认弹窗允许重试 */
     setDisableDialogOpen(false);
     setDisableRuleTarget(null);
   }
@@ -310,6 +337,10 @@ export function MCGDocumentNumberingPage() {
     const sequenceWidth = Number(form.sequenceWidth);
     if (!ruleCode || !form.ruleName.trim() || !form.template.trim() || !Number.isInteger(sequenceWidth) || sequenceWidth < 1 || sequenceWidth > 12) {
       setNotice({ type: "error", text: "请填写规则编码、名称、模板，并将流水位数设置为 1 至 12 的整数" });
+      return;
+    }
+    if (!form.documentType) {
+      setNotice({ type: "error", text: "请选择来自 M1 系统字典的单据类型" });
       return;
     }
     const body: UpsertDocumentNumberRuleRequest = {
@@ -327,7 +358,7 @@ export function MCGDocumentNumberingPage() {
       setEditorOpen(false);
       setNotice({ type: "success", text: `${editingRule ? "规则已更新" : "规则已新增"}，历史单号保持不变` });
     } catch (error) {
-      setNotice({ type: "error", text: errorMessage(error, "保存单据号规则失败") });
+      setNotice({ type: "error", text: errorText(error, "保存单据号规则失败") });
     }
   }
 
@@ -336,7 +367,7 @@ export function MCGDocumentNumberingPage() {
       <PageHeader title="M-CG 单据号规则" subtitle="统一维护单据类型、模板、流水策略和生成记录" />
       <NoticePanel
         notice={notice ?? (documentTypeOptionsQuery.isError
-          ? { type: "error", text: errorMessage(documentTypeOptionsQuery.error, "读取 M1 单据类型字典失败") }
+          ? { type: "error", text: errorText(documentTypeOptionsQuery.error, "读取 M1 单据类型字典失败") }
           : null)}
       />
       <QueryPanel
@@ -344,12 +375,8 @@ export function MCGDocumentNumberingPage() {
         defaultVisibleFieldKeys={mcgDocumentNumberCoreQueryFieldKeys}
         value={draftQuery}
         onValueChange={setDraftQuery}
-        onQuery={() => setAppliedQuery(draftQuery)}
-        onReset={() => {
-          const next = defaultQuery();
-          setDraftQuery(next);
-          setAppliedQuery(next);
-        }}
+        onQuery={() => applyQuery(draftQuery)}
+        onReset={resetQuery}
       />
       <Card className="rounded-lg shadow-sm">
         <CardContent className="p-5">
@@ -363,7 +390,7 @@ export function MCGDocumentNumberingPage() {
             onSelectedRowKeysChange={setSelectedRowKeys}
             caption={rulesQuery.isPending ? "加载编码规则..." : undefined}
             emptyTitle={rulesQuery.isError ? "读取编码规则失败" : "暂无编码规则"}
-            emptyDescription={rulesQuery.isError ? errorMessage(rulesQuery.error, "请检查权限和数据库连接") : "请新增或导入受控的单据号规则"}
+            emptyDescription={rulesQuery.isError ? errorText(rulesQuery.error, "请检查权限和数据库连接") : "请新增或导入受控的单据号规则"}
             exportFileBaseName="M-CG-单据号规则"
             refreshAction={refreshAction}
             createAction={createAction}
@@ -372,16 +399,8 @@ export function MCGDocumentNumberingPage() {
             disableAction={disableAction}
             queryState={appliedQuery}
             querySummaryItems={querySummaryItems}
-            onApplyQueryState={(value) => {
-              const next = normalizeQuery(value);
-              setDraftQuery(next);
-              setAppliedQuery(next);
-            }}
-            onClearQueryState={() => {
-              const next = defaultQuery();
-              setDraftQuery(next);
-              setAppliedQuery(next);
-            }}
+            onApplyQueryState={applyGridQueryState}
+            onClearQueryState={clearGridQueryState}
           />
         </CardContent>
       </Card>
@@ -401,7 +420,7 @@ export function MCGDocumentNumberingPage() {
             rowKey={(row) => row.id}
             caption={allocationsQuery.isPending ? "加载生成记录..." : undefined}
             emptyTitle={allocationsQuery.isError ? "读取生成记录失败" : "暂无生成记录"}
-            emptyDescription={allocationsQuery.isError ? errorMessage(allocationsQuery.error, "请检查权限和数据库连接") : "业务单据生成编号后会出现在这里"}
+            emptyDescription={allocationsQuery.isError ? errorText(allocationsQuery.error, "请检查权限和数据库连接") : "业务单据生成编号后会出现在这里"}
             exportFileBaseName="M-CG-单据号生成记录"
             refreshAction={refreshAction}
           />
@@ -437,6 +456,8 @@ export function MCGDocumentNumberingPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>{disableRuleTarget?.enabled ? "停用编码规则" : "启用编码规则"}</DialogTitle><DialogDescription>停用只影响后续发号，不会修改已经生成的历史单号。</DialogDescription></DialogHeader>
           <p className="text-sm">确认{disableRuleTarget?.enabled ? "停用" : "启用"}规则“{disableRuleTarget?.rule_name ?? ""}”？</p>
+          {/* 启停失败提示优先渲染在确认弹窗内部，避免页面层 notice 被模态遮挡。 */}
+          {notice?.type === "error" && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">{notice.text}</div>}
           <DialogFooter><DialogClose asChild><Button type="button" variant="outline" disabled={busy}>取消</Button></DialogClose><Button type="button" disabled={busy} onClick={() => void confirmToggleRule()}>{busy ? "处理中..." : disableRuleTarget?.enabled ? "确认停用" : "确认启用"}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
@@ -475,19 +496,14 @@ function defaultQuery(): QueryPanelValue {
 }
 
 function normalizeQuery(value: unknown): QueryPanelValue {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return defaultQuery();
-  const documentType = "documentType" in value && typeof value.documentType === "string" ? value.documentType : "";
-  return { documentType };
-}
-
-function queryString(value: QueryPanelValue[string]) {
-  return typeof value === "string" ? value : "";
+  return { documentType: queryString(queryValueFromUnknown(value).documentType) };
 }
 
 function defaultForm(): RuleForm {
   return {
     ruleCode: "",
-    documentType: "purchase_inbound",
+    // 单据类型必须来自 M1 系统字典，不预设可能不存在的取值；提交前校验非空。
+    documentType: "",
     ruleName: "",
     template: "{OWNER}-ASN-{YYYY}{MM}{DD}-{SEQ}",
     resetPolicy: "daily",
@@ -528,19 +544,11 @@ function documentTypeLabel(value: string, options: DocumentTypeOption[]) {
   return options.find((option) => option.value === value)?.label ?? value;
 }
 
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
-}
-
 function toLocalDateTime(value?: string | null) {
   if (!value) return "";
   const date = new Date(value);
   const pad = (part: number) => String(part).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-function errorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback;
 }
 
 function NoticePanel({ notice }: { notice: Notice }) {
