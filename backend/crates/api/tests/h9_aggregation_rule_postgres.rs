@@ -541,7 +541,14 @@ async fn seed_order(
 ) -> Uuid {
     let order_id = Uuid::new_v4();
     sqlx::query(
-        "INSERT INTO outbound_orders (id, owner_id, document_type, wms_order_no, erp_order_no, invoice_no, customer_id, warehouse_id, status, created_at) VALUES ($1, $2, 'sales_outbound', $3, $3, $4, $5, $6, 'confirmed', '2026-07-26T08:00:00Z')",
+        "INSERT INTO outbound_orders (
+            id, owner_id, document_type, wms_order_no, erp_order_no, invoice_no,
+            customer_id, warehouse_id, delivery_address_id,
+            delivery_address_snapshot, status, created_at
+         ) VALUES (
+            $1, $2, 'sales_outbound', $3, $3, $4, $5, $6, $7, $8,
+            'confirmed', '2026-07-26T08:00:00Z'
+         )",
     )
     .bind(order_id)
     .bind(owner_id)
@@ -549,6 +556,13 @@ async fn seed_order(
     .bind(invoice_no)
     .bind(customer_id)
     .bind(warehouse_id)
+    .bind(address_id)
+    .bind(serde_json::json!({
+        "province": "浙江省",
+        "city": "杭州市",
+        "district": "拱墅区",
+        "detail_address": "真实数据路 007 号"
+    }))
     .execute(pool)
     .await
     .expect("order should insert");
