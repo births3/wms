@@ -427,12 +427,27 @@ async fn record_worker_heartbeat(
     Json(body): Json<H8WorkerHeartbeatRequest>,
 ) -> Result<Json<H8WorkerStatus>, H8ErpMessageHandlerError> {
     ctx.require_permission(H8_MSG_WRITE)?;
-    Ok(Json(
-        state
-            .runtime_repository
-            .record_heartbeat(ctx.owner_id, &body, Utc::now())
-            .await?,
-    ))
+    let status = state
+        .runtime_repository
+        .record_heartbeat(ctx.owner_id, &body, Utc::now())
+        .await?;
+    write_owner_audit(
+        &state,
+        &ctx,
+        "h8_worker_heartbeat",
+        serde_json::json!({
+            "worker_id": status.worker_id,
+            "worker_version": status.worker_version,
+            "connector_id": status.connector_id,
+            "directions": status.directions,
+            "current_claims": status.current_claims,
+            "heartbeat_expires_at": status.heartbeat_expires_at,
+            "health": status.health,
+            "payload": null,
+        }),
+    )
+    .await?;
+    Ok(Json(status))
 }
 
 async fn set_worker_claim_control(
