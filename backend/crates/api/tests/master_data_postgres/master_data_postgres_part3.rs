@@ -215,13 +215,20 @@ async fn warehouse_zone_create_replays_idempotency_key_and_rejects_changed_reque
 async fn product_supplier_customer_updates_persist_and_append_audit(pool: PgPool) {
     let owner_id = Uuid::new_v4();
     let writer = writer_token(owner_id);
+    let auth = ctx(owner_id);
+    let repository = PgMasterDataReadRepository::new(pool.clone());
     let app = master_data_router(MasterDataAppState::with_postgres(pool.clone())).layer(
         auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(AllowAllRevocationStore))),
     );
-    let product: Product = json_response(app.clone(), request_json("POST", "/api/v1/master-data/products", &writer, json!({
-        "product_code":"P-LIFE-01", "product_name":"原商品", "approval_no":null, "spec":"1盒", "dosage_form":null,
-        "manufacturer":null, "special_drug_category_code":"none", "attrs":{"storage_condition":"normal","source":"manual"}
-    }))).await;
+    let product = repository
+        .create_product(
+            &auth,
+            controlled_product_request("P-LIFE-01", "原商品", "none", "normal", "erp_rest"),
+            Utc::now(),
+            "product-life-create",
+        )
+        .await
+        .expect("controlled product should create");
     let supplier_body = json!({
         "supplier_code":"S-LIFE-01", "supplier_name":"原供应商", "license_no":"91310110666007217T", "contact_name":null, "source":"manual"
     });
@@ -275,16 +282,16 @@ async fn product_supplier_customer_updates_persist_and_append_audit(pool: PgPool
     .await;
     assert_eq!(customer.id, replayed_customer.id);
 
-    let product: Product = json_response(
-        app.clone(),
-        request_json(
-            "PATCH",
-            &format!("/api/v1/master-data/products/{}", product.id),
-            &writer,
-            json!({"product_name":"新商品","status":"disabled"}),
-        ),
-    )
-    .await;
+    let product = repository
+        .update_product(
+            &auth,
+            product.id,
+            product_update(json!({"product_name":"新商品","status":"disabled"})),
+            Utc::now(),
+            "product-life-update",
+        )
+        .await
+        .expect("controlled product should update");
     let supplier: Supplier = json_response(
         app.clone(),
         request_json(

@@ -18,8 +18,9 @@ use wms_api::{
     master_data_postgres::PgMasterDataReadRepository,
 };
 use wms_domain::{
-    Customer, CustomerListResponse, ErrorResponse, Location, LocationListResponse, Product,
-    ProductListResponse, SpecialDrugCategoryListResponse, Supplier, SupplierListResponse,
+    CreateProductRequest, Customer, CustomerListResponse, ErrorResponse, Location,
+    LocationListResponse, ProductListResponse, ProductPackagingLevelInput,
+    SpecialDrugCategoryListResponse, Supplier, SupplierListResponse, UpdateProductRequest,
     Warehouse, WarehouseZone,
 };
 
@@ -88,6 +89,47 @@ fn bearer_token_with_permissions(owner_id: Uuid, permissions: &[&str]) -> String
 
 fn writer_token(owner_id: Uuid) -> String {
     bearer_token_with_permissions(owner_id, &["m1.master_data.read", "m1.master_data.write"])
+}
+
+fn controlled_product_request(
+    product_code: &str,
+    product_name: &str,
+    special_drug_category_code: &str,
+    storage_condition: &str,
+    source: &str,
+) -> CreateProductRequest {
+    CreateProductRequest {
+        product_code: product_code.to_string(),
+        product_name: product_name.to_string(),
+        approval_no: None,
+        spec: "1盒".to_string(),
+        dosage_form: None,
+        manufacturer: None,
+        special_drug_category_code: Some(special_drug_category_code.to_string()),
+        udi_code: None,
+        electronic_regulatory_code: None,
+        length_mm: None,
+        width_mm: None,
+        height_mm: None,
+        volume_cm3: None,
+        weight_g: None,
+        packaging_levels: vec![ProductPackagingLevelInput {
+            unit_code: "box".to_string(),
+            unit_name: "盒".to_string(),
+            ratio_to_base: 1,
+            is_base: true,
+            is_default: true,
+            sort_order: 1,
+        }],
+        attrs: json!({
+            "storage_condition": storage_condition,
+            "source": source
+        }),
+    }
+}
+
+fn product_update(body: serde_json::Value) -> UpdateProductRequest {
+    serde_json::from_value(body).expect("product update fixture should deserialize")
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -174,65 +216,35 @@ async fn product_list_route_reads_postgres_by_owner(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn product_create_route_writes_source_and_audit(pool: PgPool) {
+async fn controlled_product_create_writes_source_and_audit(pool: PgPool) {
     let owner_id = Uuid::new_v4();
-    let token = writer_token(owner_id);
-    let app = master_data_router(MasterDataAppState::with_postgres(pool.clone())).layer(
-        auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(AllowAllRevocationStore))),
-    );
-
-    let product_body = json!({
-        "product_code": "P-M1-CREATE",
-        "product_name": "新建冷链商品",
-        "approval_no": "国药准字H-CREATE",
-        "spec": "10ml*1支",
-        "dosage_form": "注射剂",
-        "manufacturer": "示例药业",
-        "special_drug_category_code": "none",
-        "attrs": {
-            "storage_condition": "cold",
-            "source": "manual",
-            "middle_package": "10盒/中包"
-        }
-    });
-    let response = app
-        .clone()
-        .oneshot(request_json_with_key(
-            "POST",
-            "/api/v1/master-data/products",
-            &token,
-            product_body.clone(),
+    let repository = PgMasterDataReadRepository::new(pool.clone());
+    let auth = ctx(owner_id);
+    let mut request =
+        controlled_product_request("P-M1-CREATE", "新建冷链商品", "none", "cold", "manual");
+    request.approval_no = Some("国药准字H-CREATE".to_string());
+    request.spec = "10ml*1支".to_string();
+    request.dosage_form = Some("注射剂".to_string());
+    request.manufacturer = Some("示例药业".to_string());
+    request.attrs["middle_package"] = json!("10盒/中包");
+    let product = repository
+        .create_product(
+            &auth,
+            request.clone(),
+            Utc::now(),
             "m1-product-create-source",
-        ))
+        )
         .await
-        .expect("router should respond");
-
-    assert_eq!(response.status(), StatusCode::OK);
-    let product: Product =
-        serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap())
-            .expect("product response");
+        .expect("controlled product create should succeed");
     assert_eq!(product.product_code, "P-M1-CREATE");
     assert_eq!(product.attrs["source"], "manual");
     assert_eq!(product.attrs["storage_condition"], "cold");
     assert_eq!(product.attrs["middle_package"], "10盒/中包");
 
-    let replayed_response = app
-        .oneshot(request_json_with_key(
-            "POST",
-            "/api/v1/master-data/products",
-            &token,
-            product_body,
-            "m1-product-create-source",
-        ))
+    let replayed = repository
+        .create_product(&auth, request, Utc::now(), "m1-product-create-source")
         .await
-        .expect("replay should respond");
-    assert_eq!(replayed_response.status(), StatusCode::OK);
-    let replayed: Product = serde_json::from_slice(
-        &to_bytes(replayed_response.into_body(), usize::MAX)
-            .await
-            .unwrap(),
-    )
-    .expect("replayed product response");
+        .expect("controlled product create should replay");
     assert_eq!(replayed.id, product.id);
 
     let audit_count: i64 = sqlx::query_scalar(
@@ -246,7 +258,7 @@ async fn product_create_route_writes_source_and_audit(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn product_routes_accept_custom_enabled_special_drug_category(pool: PgPool) {
+async fn controlled_product_writes_accept_custom_enabled_special_drug_category(pool: PgPool) {
     let owner_id = Uuid::new_v4();
     let custom_code = "custom_antineoplastic";
     let now = Utc
@@ -264,58 +276,42 @@ async fn product_routes_accept_custom_enabled_special_drug_category(pool: PgPool
     .await
     .expect("custom special drug category should be seeded");
 
-    let token = writer_token(owner_id);
-    let app = master_data_router(MasterDataAppState::with_postgres(pool)).layer(
-        auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(AllowAllRevocationStore))),
-    );
-    let create_response = app
-        .clone()
-        .oneshot(request_json_with_key(
-            "POST",
-            "/api/v1/master-data/products",
-            &token,
-            json!({
-                "product_code": "P-M1-CUSTOM-001",
-                "product_name": "自定义特殊药品",
-                "spec": "1盒",
-                "special_drug_category_code": custom_code,
-                "packaging_levels": [{
-                    "unit_code": "box",
-                    "unit_name": "盒",
-                    "ratio_to_base": 1,
-                    "is_base": true,
-                    "is_default": true,
-                    "sort_order": 1
-                }],
-                "attrs": { "storage_condition": "normal" }
-            }),
+    let repository = PgMasterDataReadRepository::new(pool);
+    let auth = ctx(owner_id);
+    let created = repository
+        .create_product(
+            &auth,
+            controlled_product_request(
+                "P-M1-CUSTOM-001",
+                "自定义特殊药品",
+                custom_code,
+                "normal",
+                "erp_rest",
+            ),
+            Utc::now(),
             "m1-product-custom-category-create",
-        ))
+        )
         .await
-        .expect("custom category create should respond");
-    assert_eq!(create_response.status(), StatusCode::OK);
-    let created: Product = serde_json::from_slice(
-        &to_bytes(create_response.into_body(), usize::MAX)
-            .await
-            .expect("create response body"),
-    )
-    .expect("custom category product response");
+        .expect("custom category product should create");
     assert_eq!(
         created.special_drug_category_code.as_deref(),
         Some(custom_code)
     );
 
-    let update_response = app
-        .oneshot(request_json_with_key(
-            "PATCH",
-            &format!("/api/v1/master-data/products/{}", created.id),
-            &token,
-            json!({ "special_drug_category_code": custom_code }),
+    let updated = repository
+        .update_product(
+            &auth,
+            created.id,
+            product_update(json!({ "special_drug_category_code": custom_code })),
+            Utc::now(),
             "m1-product-custom-category-update",
-        ))
+        )
         .await
-        .expect("custom category update should respond");
-    assert_eq!(update_response.status(), StatusCode::OK);
+        .expect("custom category product should update");
+    assert_eq!(
+        updated.special_drug_category_code.as_deref(),
+        Some(custom_code)
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]

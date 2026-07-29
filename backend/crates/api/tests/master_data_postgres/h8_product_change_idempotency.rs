@@ -21,23 +21,28 @@ async fn h8_product_change_replays_without_duplicate_update_or_audit(pool: PgPoo
     .fetch_one(&pool)
     .await
     .expect("seeded product should exist");
-    let token = writer_token(owner_id);
-    let app = master_data_router(MasterDataAppState::with_postgres(pool.clone())).layer(
-        auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(AllowAllRevocationStore))),
-    );
-    let uri = format!("/api/v1/master-data/products/{product_id}");
-    let body = json!({"spec": "10mg*30片"});
-
-    let first: Product = json_response(
-        app.clone(),
-        request_json_with_key("PATCH", &uri, &token, body.clone(), "h8-product-change-1"),
-    )
-    .await;
-    let replayed: Product = json_response(
-        app,
-        request_json_with_key("PATCH", &uri, &token, body, "h8-product-change-1"),
-    )
-    .await;
+    let repository = PgMasterDataReadRepository::new(pool.clone());
+    let auth = ctx(owner_id);
+    let first = repository
+        .update_product(
+            &auth,
+            product_id,
+            product_update(json!({"spec": "10mg*30片"})),
+            now,
+            "h8-product-change-1",
+        )
+        .await
+        .expect("controlled H8 product change should succeed");
+    let replayed = repository
+        .update_product(
+            &auth,
+            product_id,
+            product_update(json!({"spec": "10mg*30片"})),
+            now,
+            "h8-product-change-1",
+        )
+        .await
+        .expect("controlled H8 product change should replay");
 
     assert_eq!(replayed.id, first.id);
     assert_eq!(replayed.updated_at, first.updated_at);
