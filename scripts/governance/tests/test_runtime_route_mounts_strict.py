@@ -40,6 +40,20 @@ def test_runtime_operation_parser_tracks_method_and_normalizes_path_parameter():
     }
 
 
+def test_runtime_operation_parser_resolves_module_string_path_constants():
+    source = '''
+        const MAP_PATH: &str = "/api/v1/parameter-mapping/map";
+
+        pub fn parameter_mapping_router() -> Router {
+            Router::new().route(MAP_PATH, post(map_parameter))
+        }
+    '''
+
+    assert check.operations_from_sources([source]) == {
+        "POST /api/v1/parameter-mapping/map",
+    }
+
+
 def test_axum_07_runtime_parser_rejects_openapi_brace_parameter_syntax():
     source = '''
         Router::new()

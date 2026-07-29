@@ -26,6 +26,10 @@ WMS_API_RS = REPO_ROOT / "backend" / "crates" / "api" / "src" / "bin" / "wms_api
 API_LIB_RS = REPO_ROOT / "backend" / "crates" / "api" / "src" / "lib.rs"
 API_SRC = REPO_ROOT / "backend" / "crates" / "api" / "src"
 HTTP_METHODS = {"get", "post", "put", "patch", "delete"}
+STRING_CONST_RE = re.compile(
+    r"\b(?:pub(?:\([^)]*\))?\s+)?const\s+"
+    r"([A-Z][A-Z0-9_]*)\s*:\s*&str\s*=\s*\"([^\"]+)\"\s*;"
+)
 
 
 @dataclass(frozen=True)
@@ -132,12 +136,19 @@ def _route_calls(source: str) -> list[str]:
 def operations_from_sources(sources: list[str]) -> set[str]:
     operations: set[str] = set()
     for source in sources:
+        string_constants = dict(STRING_CONST_RE.findall(source))
         for call in _route_calls(source):
             path_match = re.match(r'\s*"([^"]+)"\s*,', call)
-            if not path_match:
-                continue
-            path = re.sub(r":([A-Za-z_][A-Za-z0-9_]*)", r"{\1}", path_match.group(1))
-            handler_expression = call[path_match.end():]
+            if path_match:
+                path = path_match.group(1)
+                handler_expression = call[path_match.end():]
+            else:
+                const_match = re.match(r"\s*([A-Z][A-Z0-9_]*)\s*,", call)
+                if not const_match or const_match.group(1) not in string_constants:
+                    continue
+                path = string_constants[const_match.group(1)]
+                handler_expression = call[const_match.end():]
+            path = re.sub(r":([A-Za-z_][A-Za-z0-9_]*)", r"{\1}", path)
             for method in HTTP_METHODS:
                 if re.search(rf"\b{method}\s*\(", handler_expression):
                     operations.add(f"{method.upper()} {path}")
