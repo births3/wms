@@ -25,7 +25,8 @@
 
 - V0：`just openapi-check`；质量矩阵检查；页面 self-check；`just gov-t1`。
 - V1：Worker 真实 Chromium 渲染 2/2；Rust HTTP 端口 2/2；`pdf_document`
-  临时合并；handler 权限 2/2；H9 PostgreSQL 9/9。
+  临时合并；handler 权限 2/2；H9 PostgreSQL 9/9；实际 Docker 镜像构建通过，并在
+  非 root、只读根文件系统、`cap_drop=ALL` 条件下通过健康检查和真实 PDF 渲染。
 - V2：隔离 PostgreSQL 覆盖真实源数据、外部权威 PDF、
   顺序、哈希、留存、失败、不入队、同键重试和临时合并不落库。
 - V3：一次性真实 PostgreSQL + API + 独立 Render Worker + Web 管理端 E2E 通过；
@@ -71,6 +72,10 @@
     生成浏览器截图，避免用黑色插件外壳冒充业务证据。
 11. 首轮独立 Worker 容器文件沿用 `Dockerfile`，触发前端路径 kebab-case 门禁；已改为
     小写 `dockerfile` 并同步两套 compose，`just gov-t1` 恢复 56/56。
+12. 首次实际构建镜像时，Corepack 自动选择的 pnpm 版本与锁文件生成版本不一致，加上
+    Docker 构建只复制 Worker 清单，导致 hiprint 的 peer 依赖链接指向不存在目录；已固定
+    pnpm 11.5.2、显式固定锁文件已有的 `supports-color` 解析上下文，并加入构建期模块导入
+    检查。修复后的容器 `/healthz` 返回 `ok`，`/render` 返回 41,338 字节真实 PDF。
 
 ## 范围声明
 
