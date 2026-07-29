@@ -8,8 +8,6 @@ pub async fn ship_outbound_order(
         idempotency_key: &str,
         audit: Option<AuditWriteRequest>,
     ) -> Result<IdempotentMutation<OutboundOrder>, Wave4RepositoryError> {
-        validate_ship_outbound_request(&req)
-            .map_err(Wave4RepositoryError::ShipmentValidation)?;
         let request_hash = request_hash(&serde_json::json!({
             "outbound_order_id": order_id,
             "request": req,
@@ -39,6 +37,21 @@ pub async fn ship_outbound_order(
         let order = load_outbound_order(&mut tx, ctx.owner_id, order_id).await?;
         all_lines_reviewed_for_ship(&order.lines)
             .map_err(|_| Wave4RepositoryError::ShortPickNotReplenished)?;
+        let cold_chain =
+            outbound_order_requires_cold_chain(&mut tx, ctx.owner_id, order_id).await?;
+        validate_ship_outbound_request(&req, cold_chain)
+            .map_err(Wave4RepositoryError::ShipmentValidation)?;
+        let driver_name =
+            outbound_driver_name(&mut tx, ctx.owner_id, &req).await?;
+        ensure_handover_signature_attachment(
+            &mut tx,
+            ctx.owner_id,
+            order_id,
+            req.signature_attachment_id,
+        )
+        .await?;
+        let cold_chain_packages = serde_json::to_value(&req.cold_chain_packages)
+            .map_err(|error| Wave4RepositoryError::Serialize(error.to_string()))?;
 
         for line in &order.lines {
             if !consume_inventory_allocation_for_outbound(
@@ -68,19 +81,35 @@ pub async fn ship_outbound_order(
         sqlx::query(
             r#"
             INSERT INTO outbound_shipments (
-                id, owner_id, outbound_order_id, carrier_type, handover_to,
-                package_count, shipped_at
+                id, owner_id, outbound_order_id, delivery_provider_type,
+                vehicle_no, plate_no, driver_user_id, driver_name,
+                courier_name, courier_phone, signature_attachment_id,
+                cold_chain, loading_temperature_celsius, cold_chain_packages,
+                package_count, handover_by, shipped_at, created_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9,
+                $10, $11, $12, $13, $14, $15, $16, $17, $17
+            )
             "#,
         )
         .bind(Uuid::new_v4())
         .bind(ctx.owner_id)
         .bind(order_id)
-        .bind(&req.carrier_type)
-        .bind(&req.handover_to)
+        .bind(&req.delivery_provider_type)
+        .bind(req.vehicle_no.as_deref().map(str::trim))
+        .bind(req.plate_no.trim())
+        .bind(req.driver_user_id)
+        .bind(driver_name)
+        .bind(req.courier_name.as_deref().map(str::trim))
+        .bind(req.courier_phone.as_deref().map(str::trim))
+        .bind(req.signature_attachment_id)
+        .bind(cold_chain)
+        .bind(req.loading_temperature_celsius)
+        .bind(cold_chain_packages)
         .bind(i32::try_from(req.package_count).map_err(|_| Wave4RepositoryError::InvalidQuantity)?)
-        .bind(req.shipped_at.unwrap_or(now))
+        .bind(ctx.user_id)
+        .bind(now)
         .execute(&mut *tx)
         .await
         .map_err(map_insert_error)?;
@@ -105,7 +134,7 @@ pub async fn ship_outbound_order(
         publish_customer_portal_order_snapshot(
             &mut tx,
             &shipped,
-            req.shipped_at.unwrap_or(now),
+            now,
         )
         .await?;
 
@@ -122,7 +151,30 @@ pub async fn ship_outbound_order(
             now,
         )
         .await?;
-        append_outbound_audit(&mut tx, ctx, audit, "ship_outbound_order", shipped.id, now).await?;
+        let mut audit = audit.unwrap_or_else(|| {
+            AuditWriteRequest::from_auth_context(
+                ctx,
+                "ship_outbound_order",
+                "M4",
+                "outbound_order",
+                shipped.id.to_string(),
+                None,
+            )
+        });
+        audit.diff = Some(AuditDiff::compute(
+            serde_json::Value::Null,
+            serde_json::to_value(&shipped.shipment)
+                .map_err(|error| Wave4RepositoryError::Serialize(error.to_string()))?,
+        ));
+        append_outbound_audit(
+            &mut tx,
+            ctx,
+            Some(audit),
+            "ship_outbound_order",
+            shipped.id,
+            now,
+        )
+        .await?;
         tx.commit().await.map_err(map_db_error)?;
         Ok(IdempotentMutation {
             value: shipped,

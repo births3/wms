@@ -43,7 +43,9 @@ pub fn new(pool: PgPool) -> Self {
         for row in rows {
             let lines =
                 load_outbound_order_lines_from_pool(&self.pool, ctx.owner_id, row.id).await?;
-            orders.push(map_outbound_order(row, lines));
+            let shipment =
+                load_outbound_shipment_from_pool(&self.pool, ctx.owner_id, row.id).await?;
+            orders.push(map_outbound_order(row, lines, shipment));
         }
         Ok(orders)
     }
@@ -70,7 +72,8 @@ pub fn new(pool: PgPool) -> Self {
         .map_err(map_db_error)?
         .ok_or(Wave4RepositoryError::NotFound)?;
         let lines = load_outbound_order_lines_from_pool(&self.pool, ctx.owner_id, id).await?;
-        Ok(map_outbound_order(row, lines))
+        let shipment = load_outbound_shipment_from_pool(&self.pool, ctx.owner_id, id).await?;
+        Ok(map_outbound_order(row, lines, shipment))
     }
 
     pub async fn create_outbound_order(

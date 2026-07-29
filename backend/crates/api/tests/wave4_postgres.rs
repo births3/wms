@@ -12,9 +12,9 @@ use wms_api::{
 };
 use wms_domain::{
     CompletePickTaskRequest, CreateOutboundOrderLineRequest, CreateOutboundOrderRequest,
-    CreateOutboundWaveRequest, OutboundOrder, ReviewOutboundOrderLineRequest,
-    ReviewOutboundOrderRequest, ShipOutboundOrderRequest, TraceabilityOutboundReportRequest,
-    TraceabilityStatusChangeEvent,
+    CreateOutboundWaveRequest, OutboundColdChainPackage, OutboundOrder,
+    ReviewOutboundOrderLineRequest, ReviewOutboundOrderRequest, ShipOutboundOrderRequest,
+    TraceabilityOutboundReportRequest, TraceabilityStatusChangeEvent,
 };
 
 #[path = "support/wave4.rs"]

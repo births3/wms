@@ -51,11 +51,17 @@ CREATE TABLE IF NOT EXISTS attachments (
     sha256          TEXT NOT NULL,
     uploaded_by     UUID NOT NULL REFERENCES auth_users(id),
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (owner_id, storage_key)
+    UNIQUE (owner_id, storage_key),
+    UNIQUE (owner_id, id)
 );
 
 CREATE INDEX IF NOT EXISTS attachments_owner_entity_idx
     ON attachments (owner_id, entity_type, entity_id, created_at DESC);
+
+ALTER TABLE outbound_shipments
+    ADD CONSTRAINT outbound_shipments_signature_attachment_owner_fk
+    FOREIGN KEY (owner_id, signature_attachment_id)
+    REFERENCES attachments(owner_id, id);
 
 CREATE TABLE IF NOT EXISTS h_file_download_sessions (
     id              UUID PRIMARY KEY,

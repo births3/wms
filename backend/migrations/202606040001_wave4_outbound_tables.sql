@@ -67,15 +67,65 @@ CREATE TABLE IF NOT EXISTS outbound_wave_orders (
 );
 
 CREATE TABLE IF NOT EXISTS outbound_shipments (
-    id                 UUID PRIMARY KEY,
-    owner_id           UUID NOT NULL,
-    outbound_order_id  UUID NOT NULL REFERENCES outbound_orders(id) ON DELETE CASCADE,
-    carrier_type       TEXT NOT NULL,
-    handover_to        TEXT NOT NULL,
-    package_count      INT NOT NULL CHECK (package_count > 0),
-    shipped_at         TIMESTAMPTZ NOT NULL,
-    created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (outbound_order_id)
+    id                            UUID PRIMARY KEY,
+    owner_id                      UUID NOT NULL,
+    outbound_order_id             UUID NOT NULL REFERENCES outbound_orders(id) ON DELETE CASCADE,
+    delivery_provider_type        TEXT NOT NULL
+        CHECK (delivery_provider_type IN ('own_fleet', 'third_party_express')),
+    vehicle_no                    TEXT,
+    plate_no                      TEXT NOT NULL CHECK (length(btrim(plate_no)) BETWEEN 1 AND 32),
+    driver_user_id                UUID,
+    driver_name                   TEXT,
+    courier_name                  TEXT,
+    courier_phone                 TEXT,
+    signature_attachment_id       UUID,
+    cold_chain                    BOOLEAN NOT NULL,
+    loading_temperature_celsius   DOUBLE PRECISION,
+    cold_chain_packages           JSONB NOT NULL DEFAULT '[]'::jsonb
+        CHECK (jsonb_typeof(cold_chain_packages) = 'array'),
+    package_count                 INT NOT NULL CHECK (package_count > 0),
+    handover_by                   UUID NOT NULL,
+    shipped_at                    TIMESTAMPTZ NOT NULL,
+    created_at                    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (outbound_order_id),
+    CHECK (
+        (
+            delivery_provider_type = 'own_fleet'
+            AND vehicle_no IS NOT NULL
+            AND length(btrim(vehicle_no)) BETWEEN 1 AND 64
+            AND driver_user_id IS NOT NULL
+            AND driver_name IS NOT NULL
+            AND length(btrim(driver_name)) BETWEEN 1 AND 128
+            AND courier_name IS NULL
+            AND courier_phone IS NULL
+        )
+        OR
+        (
+            delivery_provider_type = 'third_party_express'
+            AND vehicle_no IS NULL
+            AND driver_user_id IS NULL
+            AND driver_name IS NULL
+            AND courier_name IS NOT NULL
+            AND length(btrim(courier_name)) BETWEEN 1 AND 128
+            AND courier_phone IS NOT NULL
+            AND length(btrim(courier_phone)) BETWEEN 1 AND 32
+            AND signature_attachment_id IS NOT NULL
+        )
+    ),
+    CHECK (
+        (
+            cold_chain
+            AND loading_temperature_celsius IS NOT NULL
+            AND loading_temperature_celsius BETWEEN -100 AND 100
+            AND jsonb_array_length(cold_chain_packages) BETWEEN 1 AND package_count
+        )
+        OR
+        (
+            NOT cold_chain
+            AND loading_temperature_celsius IS NULL
+            AND cold_chain_packages = '[]'::jsonb
+        )
+    )
 );
 
 CREATE INDEX IF NOT EXISTS outbound_shipments_owner_shipped_idx

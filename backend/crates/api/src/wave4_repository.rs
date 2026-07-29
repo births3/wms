@@ -9,10 +9,11 @@ use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{
     validate_review_submission, validate_ship_outbound_request, CompletePickTaskRequest,
-    CreateOutboundOrderRequest, CreateOutboundWaveRequest, InventoryBatch, OutboundOrder,
-    OutboundOrderLine, OutboundWave, ReviewOutboundOrderRequest, ReviewValidationError,
-    ShipOutboundOrderRequest, ShipOutboundValidationError, TemperatureExcursionEvent,
-    TraceabilityOutboundReport, TraceabilityOutboundReportRequest, TraceabilityStatusChangeEvent,
+    CreateOutboundOrderRequest, CreateOutboundWaveRequest, InventoryBatch,
+    OutboundColdChainPackage, OutboundOrder, OutboundOrderLine, OutboundShipment, OutboundWave,
+    ReviewOutboundOrderRequest, ReviewValidationError, ShipOutboundOrderRequest,
+    ShipOutboundValidationError, TemperatureExcursionEvent, TraceabilityOutboundReport,
+    TraceabilityOutboundReportRequest, TraceabilityStatusChangeEvent,
 };
 
 use crate::{
@@ -80,6 +81,8 @@ pub enum Wave4RepositoryError {
     MissingSecondReviewer,
     UnqualifiedSecondReviewer,
     DualPersonApprovalRequired,
+    InvalidDriver,
+    InvalidSignatureAttachment,
     Audit(String),
     Database(String),
     Serialize(String),
@@ -191,6 +194,7 @@ struct TraceabilityOutboundReportEventRow {
 
 include!("wave4_repository_part1.rs");
 include!("wave4_repository_part2.rs");
+include!("wave4_repository_shipment.rs");
 include!("wave4_repository_waves.rs");
 include!("wave4_repository_customer_portal.rs");
 
@@ -287,7 +291,8 @@ async fn load_outbound_order(
         .into_iter()
         .map(map_outbound_order_line)
         .collect::<Result<Vec<_>, _>>()?;
-    Ok(map_outbound_order(row, lines))
+    let shipment = load_outbound_shipment(tx, owner_id, id).await?;
+    Ok(map_outbound_order(row, lines, shipment))
 }
 
 async fn load_outbound_order_lines_from_pool(
@@ -700,7 +705,11 @@ fn non_empty_filter(value: Option<&str>) -> Option<&str> {
     value.map(str::trim).filter(|value| !value.is_empty())
 }
 
-fn map_outbound_order(row: OutboundOrderRow, lines: Vec<OutboundOrderLine>) -> OutboundOrder {
+fn map_outbound_order(
+    row: OutboundOrderRow,
+    lines: Vec<OutboundOrderLine>,
+    shipment: Option<OutboundShipment>,
+) -> OutboundOrder {
     OutboundOrder {
         id: row.id,
         owner_id: row.owner_id,
@@ -715,6 +724,7 @@ fn map_outbound_order(row: OutboundOrderRow, lines: Vec<OutboundOrderLine>) -> O
         status: row.status,
         short_pick: row.short_pick,
         lines,
+        shipment,
         created_at: row.created_at,
         updated_at: row.updated_at,
     }
