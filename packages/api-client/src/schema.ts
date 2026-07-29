@@ -420,6 +420,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/attachments/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["confirm_file_upload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attachments/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create_file_upload_session"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attachments/uploads/{upload_id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["upload_file_content"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attachments/{attachment_id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["download_file_content"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attachments/{attachment_id}/url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["create_file_download_url"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/audit/archive/partitions": {
         parameters: {
             query?: never;
@@ -1396,6 +1476,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/drug-inspection/customer-copy-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_drug_inspection_copy_jobs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/drug-inspection/customer-copy-jobs/{job_id}/oversize-approval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["approve_drug_inspection_copy_oversize"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/drug-inspection/customer-copy-jobs/{job_id}/process": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["process_drug_inspection_copy_job"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/drug-inspection/image-previews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create_drug_inspection_image_preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/drug-inspection/inbound-documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_inbound_documents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/drug-inspection/platforms": {
         parameters: {
             query?: never;
@@ -1426,6 +1586,294 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["change_drug_inspection_platform_status"];
+        trace?: never;
+    };
+    "/api/v1/drug-inspection/processing-rule-versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_drug_inspection_processing_rule_versions"];
+        put?: never;
+        post: operations["publish_drug_inspection_processing_rule_version"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/drug-inspection/report-versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create_drug_inspection_version"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/drug-inspection/report-versions/editable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["find_editable_drug_inspection_version"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/drug-inspection/report-versions/{version_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["update_drug_inspection_draft"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/drug-inspection/report-versions/{version_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["review_drug_inspection_version"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/drug-inspection/report-versions/{version_id}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["submit_drug_inspection_version"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/drug-inspection/reports/reusable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["find_reusable_drug_inspection_report"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/drug-inspection/reports/{report_id}/corrections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create_drug_inspection_correction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/drug-inspection/reports/{report_id}/reuse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reuse_drug_inspection_report"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/drug-inspection/reports/{report_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_drug_inspection_report_versions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/drug-inspection/requirement-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_drug_inspection_requirement_rules"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/drug-inspection/requirement-rules/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["upsert_drug_inspection_requirement_rule"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/drug-inspection/review-queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_drug_inspection_review_queue"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/drug-inspection/stamp-versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_drug_inspection_stamp_versions"];
+        put?: never;
+        post: operations["create_drug_inspection_stamp_version"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/drug-inspection/stamp-versions/{version_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["review_drug_inspection_stamp_version"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/drug-inspection/stamp-versions/{version_id}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["submit_drug_inspection_stamp_version"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/drug-inspection/upstream-delivery-document-versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create_upstream_delivery_document_version"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/drug-inspection/upstream-delivery-documents/{document_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_upstream_delivery_document_versions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/event-bus/deliveries/pending": {
@@ -5362,6 +5810,9 @@ export interface components {
             /** Format: uuid */
             previous_key_id: string;
         };
+        ApproveDrugInspectionCopyOversizeRequest: {
+            reason: string;
+        };
         ApproveInventoryCountRequest: {
             approval_id: string;
             approval_source: string;
@@ -5820,6 +6271,10 @@ export interface components {
             /** Format: date-time */
             shipped_at?: string | null;
         };
+        ConfirmFileUploadRequest: {
+            /** Format: uuid */
+            upload_id: string;
+        };
         ContainerRecovery: {
             container_lpn: string;
             /** Format: date-time */
@@ -5978,6 +6433,42 @@ export interface components {
             /** Format: uuid */
             warehouse_id: string;
         };
+        CreateDrugInspectionCorrectionRequest: {
+            modification_reason: string;
+            /** Format: uuid */
+            original_file_id: string;
+            processing_mode: string;
+            qualified: boolean;
+            report_no: string;
+        };
+        CreateDrugInspectionImagePreviewRequest: {
+            /** Format: uuid */
+            attachment_id: string;
+            processing_mode: string;
+        };
+        CreateDrugInspectionStampVersionRequest: {
+            /** Format: uuid */
+            png_attachment_id: string;
+            /** Format: double */
+            relative_width: number;
+            /** Format: double */
+            relative_x: number;
+            /** Format: double */
+            relative_y: number;
+        };
+        CreateDrugInspectionVersionRequest: {
+            /** Format: uuid */
+            asn_id: string;
+            batch_no: string;
+            /** Format: uuid */
+            original_file_id: string;
+            processing_mode: string;
+            /** Format: uuid */
+            product_id: string;
+            qualified: boolean;
+            report_no: string;
+            source: string;
+        };
         CreateExpressWaybillRequest: {
             carrier_code: string;
             /** Format: uuid */
@@ -5996,6 +6487,16 @@ export interface components {
             volume_cm3: number;
             /** Format: int64 */
             weight_grams: number;
+        };
+        CreateFileUploadRequest: {
+            content_type: string;
+            /** Format: uuid */
+            entity_id: string;
+            entity_type: string;
+            file_name: string;
+            module: string;
+            /** Format: int64 */
+            size_bytes: number;
         };
         CreateH4ApprovalRequest: {
             approver_user: string;
@@ -6302,6 +6803,15 @@ export interface components {
             source?: string | null;
             supplier_code: string;
             supplier_name: string;
+        };
+        CreateUpstreamDeliveryVersionRequest: {
+            asn_ids: string[];
+            attachment_ids: string[];
+            /** Format: uuid */
+            document_id?: string | null;
+            modification_reason?: string | null;
+            /** Format: uuid */
+            supplier_id: string;
         };
         CreateUserRequest: {
             display_name: string;
@@ -6748,6 +7258,34 @@ export interface components {
             data: components["schemas"]["DriverTask"][];
             page: components["schemas"]["PageMeta"];
         };
+        DrugInspectionCustomerCopyJob: {
+            /** Format: int32 */
+            attempt_count: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            finished_at?: string | null;
+            /** Format: uuid */
+            id: string;
+            last_error?: string | null;
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: uuid */
+            report_version_id: string;
+            /** Format: date-time */
+            started_at?: string | null;
+            status: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        DrugInspectionImagePreviewResponse: {
+            content_type: string;
+            data_base64: string;
+            /** Format: int32 */
+            height: number;
+            /** Format: int32 */
+            width: number;
+        };
         DrugInspectionPlatform: {
             api_key_configured: boolean;
             api_url: string;
@@ -6773,6 +7311,117 @@ export interface components {
         DrugInspectionPlatformListResponse: {
             data: components["schemas"]["DrugInspectionPlatform"][];
             page: components["schemas"]["PageMeta"];
+        };
+        DrugInspectionProcessingRuleVersion: {
+            apply_scope: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: date-time */
+            published_at: string;
+            /** Format: uuid */
+            published_by: string;
+            /** Format: int32 */
+            reprocess_job_count: number;
+            rule_code: string;
+            /** Format: int32 */
+            version_number: number;
+        };
+        DrugInspectionReportVersion: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            customer_copy_file_id?: string | null;
+            customer_copy_hash?: string | null;
+            customer_copy_status: string;
+            /** Format: uuid */
+            id: string;
+            modification_reason?: string | null;
+            original_file_hash: string;
+            /** Format: uuid */
+            original_file_id: string;
+            /** Format: uuid */
+            owner_id: string;
+            processing_mode: string;
+            qualified: boolean;
+            /** Format: uuid */
+            replaces_version_id?: string | null;
+            /** Format: uuid */
+            report_id: string;
+            report_no: string;
+            review_comment?: string | null;
+            review_result?: string | null;
+            /** Format: date-time */
+            reviewed_at?: string | null;
+            /** Format: uuid */
+            reviewed_by?: string | null;
+            source: string;
+            /** Format: uuid */
+            stamp_version_id?: string | null;
+            status: string;
+            /** Format: date-time */
+            submitted_at?: string | null;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            uploaded_by: string;
+            /** Format: int32 */
+            version_number: number;
+        };
+        DrugInspectionRequirementRule: {
+            /** Format: date-time */
+            created_at: string;
+            enabled: boolean;
+            /** Format: uuid */
+            id: string;
+            missing_behavior: string;
+            /** Format: uuid */
+            owner_id: string;
+            special_drug_category: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            updated_by: string;
+            /** Format: int64 */
+            version: number;
+        };
+        DrugInspectionReviewQueueEntry: {
+            batch_no: string;
+            product_code: string;
+            product_name: string;
+            uploader_name: string;
+            version: components["schemas"]["DrugInspectionReportVersion"];
+        };
+        DrugInspectionStampVersion: {
+            /** Format: uuid */
+            configured_by: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: uuid */
+            png_attachment_id: string;
+            /** Format: double */
+            relative_width: number;
+            /** Format: double */
+            relative_x: number;
+            /** Format: double */
+            relative_y: number;
+            review_comment?: string | null;
+            /** Format: date-time */
+            reviewed_at?: string | null;
+            /** Format: uuid */
+            reviewed_by?: string | null;
+            status: string;
+            /** Format: date-time */
+            submitted_at?: string | null;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: int32 */
+            version_number: number;
         };
         /** @enum {string} */
         DualPersonPolicy: "single" | "dual_scan" | "dual_scan_with_approval";
@@ -7015,6 +7664,37 @@ export interface components {
         };
         FeatureFlagSourceSwitchResponse: {
             active_source: string;
+        };
+        FileAttachment: {
+            content_type: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            entity_id: string;
+            entity_type: string;
+            file_name: string;
+            /** Format: uuid */
+            id: string;
+            module: string;
+            /** Format: uuid */
+            owner_id: string;
+            sha256: string;
+            /** Format: int64 */
+            size_bytes: number;
+            /** Format: uuid */
+            uploaded_by: string;
+        };
+        FileAttachmentDownloadUrlResponse: {
+            /** Format: date-time */
+            expires_at: string;
+            url: string;
+        };
+        FileUploadSessionResponse: {
+            /** Format: date-time */
+            expires_at: string;
+            /** Format: uuid */
+            upload_id: string;
+            upload_url: string;
         };
         /** @description 验收环节短少强制关闭。 */
         ForceCloseShortageRequest: {
@@ -7651,6 +8331,38 @@ export interface components {
             /** @description 契约版本。 */
             version: string;
         };
+        InboundDocumentEntry: {
+            /** Format: date-time */
+            actual_received_at?: string | null;
+            /** Format: uuid */
+            asn_id: string;
+            batch_nos: string[];
+            /** Format: date-time */
+            created_at: string;
+            drug_inspection_status: string;
+            /** Format: int32 */
+            drug_inspection_version: number;
+            /** Format: uuid */
+            owner_id: string;
+            product_code: string;
+            /** Format: uuid */
+            product_id: string;
+            product_name: string;
+            purchase_order_no: string;
+            receipt_no: string;
+            /** Format: uuid */
+            supplier_id: string;
+            supplier_name: string;
+            upstream_delivery_status: string;
+            /** Format: uuid */
+            upstream_document_id?: string | null;
+            /** Format: int32 */
+            upstream_version: number;
+        };
+        InboundDocumentEntryListResponse: {
+            data: components["schemas"]["InboundDocumentEntry"][];
+            page: components["schemas"]["PageMeta"];
+        };
         IngestTemperatureExcursionRequest: {
             affected_batch_ids: string[];
             device_code: string;
@@ -8182,12 +8894,20 @@ export interface components {
             batch_id: string;
             reason: string;
         };
+        OutboundColdChainPackage: {
+            /** Format: int32 */
+            ice_pack_count: number;
+            insulated_container_no: string;
+        };
         OutboundOrder: {
             business_type_code?: string | null;
             /** Format: date-time */
             created_at: string;
             /** Format: uuid */
             customer_id: string;
+            /** Format: uuid */
+            delivery_address_id: string;
+            delivery_address_snapshot: unknown;
             department_code?: string | null;
             document_type: string;
             erp_order_no?: string | null;
@@ -8201,6 +8921,7 @@ export interface components {
             /** Format: date-time */
             required_ship_at?: string | null;
             sales_group_code?: string | null;
+            shipment?: components["schemas"]["OutboundShipment"] | null;
             short_pick: boolean;
             status: string;
             transport_mode_code?: string | null;
@@ -8229,6 +8950,32 @@ export interface components {
         OutboundOrderListResponse: {
             data: components["schemas"]["OutboundOrder"][];
             page: components["schemas"]["PageMeta"];
+        };
+        OutboundShipment: {
+            cold_chain: boolean;
+            cold_chain_packages: components["schemas"]["OutboundColdChainPackage"][];
+            courier_name?: string | null;
+            courier_phone?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            delivery_provider_type: string;
+            driver_name?: string | null;
+            /** Format: uuid */
+            driver_user_id?: string | null;
+            /** Format: uuid */
+            handover_by: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: double */
+            loading_temperature_celsius?: number | null;
+            /** Format: int32 */
+            package_count: number;
+            plate_no: string;
+            /** Format: date-time */
+            shipped_at: string;
+            /** Format: uuid */
+            signature_attachment_id?: string | null;
+            vehicle_no?: string | null;
         };
         OutboundWave: {
             /** Format: date-time */
@@ -8941,6 +9688,9 @@ export interface components {
         PublishAdminMenuRequest: {
             note?: string | null;
         };
+        PublishDrugInspectionProcessingRuleRequest: {
+            apply_scope: string;
+        };
         /** @description H9 送货地址线路绑定发布命令。 */
         PublishRouteBindingRequest: {
             /** Format: uuid */
@@ -9567,6 +10317,40 @@ export interface components {
             /** Format: int64 */
             suggested_qty: number;
         };
+        ReusableDrugInspectionReportResponse: {
+            /** Format: uuid */
+            current_version_id: string;
+            linked_to_asn: boolean;
+            /** Format: uuid */
+            report_id: string;
+            report_no: string;
+            /** Format: int32 */
+            version_number: number;
+        };
+        ReuseDrugInspectionReportRequest: {
+            /** Format: uuid */
+            asn_id: string;
+            batch_no: string;
+        };
+        ReuseDrugInspectionReportResponse: {
+            /** Format: uuid */
+            asn_id: string;
+            batch_no: string;
+            /** Format: date-time */
+            linked_at: string;
+            /** Format: uuid */
+            report_id: string;
+            /** Format: uuid */
+            source_version_id: string;
+        };
+        ReviewDrugInspectionStampVersionRequest: {
+            comment?: string | null;
+            decision: string;
+        };
+        ReviewDrugInspectionVersionRequest: {
+            comment?: string | null;
+            decision: string;
+        };
         ReviewOutboundOrderLineRequest: {
             /** Format: int32 */
             line_no: number;
@@ -9699,12 +10483,20 @@ export interface components {
             enabled: boolean;
         };
         ShipOutboundOrderRequest: {
-            carrier_type: string;
-            handover_to: string;
+            cold_chain_packages?: components["schemas"]["OutboundColdChainPackage"][];
+            courier_name?: string | null;
+            courier_phone?: string | null;
+            delivery_provider_type: string;
+            /** Format: uuid */
+            driver_user_id?: string | null;
+            /** Format: double */
+            loading_temperature_celsius?: number | null;
             /** Format: int32 */
             package_count: number;
-            /** Format: date-time */
-            shipped_at?: string | null;
+            plate_no: string;
+            /** Format: uuid */
+            signature_attachment_id?: string | null;
+            vehicle_no?: string | null;
         };
         ShippedCustomerHint: {
             /** Format: uuid */
@@ -10323,6 +11115,13 @@ export interface components {
             maintenance_recovery_at?: string | null;
             status: string;
         };
+        UpdateDrugInspectionDraftRequest: {
+            /** Format: uuid */
+            original_file_id: string;
+            processing_mode: string;
+            qualified: boolean;
+            report_no: string;
+        };
         UpdateH8ErpConnectorRequest: {
             api_base_url?: string | null;
             /** Format: uuid */
@@ -10519,6 +11318,11 @@ export interface components {
             timeout_seconds: number;
             username?: string | null;
         };
+        UpsertDrugInspectionRequirementRuleRequest: {
+            enabled: boolean;
+            missing_behavior: string;
+            special_drug_category: string;
+        };
         UpsertDualPersonPolicyRuleRequest: {
             /** Format: uuid */
             confirmed_by_user_id: string;
@@ -10692,6 +11496,23 @@ export interface components {
             release_interval_minutes?: number | null;
             release_strategy?: components["schemas"]["TaskReleaseStrategy"];
             task_type_name: string;
+        };
+        UpstreamDeliveryDocumentVersion: {
+            asn_ids: string[];
+            attachment_ids: string[];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            document_id: string;
+            /** Format: uuid */
+            id: string;
+            modification_reason?: string | null;
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: uuid */
+            uploaded_by: string;
+            /** Format: int32 */
+            version_number: number;
         };
         /** @description 仓库基础档案。 */
         Warehouse: {
@@ -12097,6 +12918,270 @@ export interface operations {
             };
             /** @description 忽略原因为空 */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    confirm_file_upload: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmFileUploadRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileAttachment"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_file_upload_session: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateFileUploadRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileUploadSessionResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    upload_file_content: {
+        parameters: {
+            query: {
+                /** @description 5 分钟上传令牌 */
+                token: string;
+            };
+            header?: never;
+            path: {
+                /** @description 上传会话 ID */
+                upload_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/octet-stream": string;
+            };
+        };
+        responses: {
+            /** @description 附件字节已写入对象存储 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    download_file_content: {
+        parameters: {
+            query: {
+                /** @description 下载授权 ID */
+                download_id: string;
+                /** @description 15 分钟下载令牌 */
+                token: string;
+            };
+            header?: never;
+            path: {
+                /** @description 附件 ID */
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 附件字节 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_file_download_url: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 附件 ID */
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileAttachmentDownloadUrlResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -15890,6 +16975,255 @@ export interface operations {
             };
         };
     };
+    list_drug_inspection_copy_jobs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DrugInspectionCustomerCopyJob"][];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    approve_drug_inspection_copy_oversize: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 客户副本任务 ID */
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApproveDrugInspectionCopyOversizeRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DrugInspectionCustomerCopyJob"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    process_drug_inspection_copy_job: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 客户副本任务 ID */
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DrugInspectionCustomerCopyJob"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_drug_inspection_image_preview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDrugInspectionImagePreviewRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DrugInspectionImagePreviewResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_inbound_documents: {
+        parameters: {
+            query?: {
+                /** @description 实际收货开始日期 */
+                received_from?: string | null;
+                /** @description 实际收货结束日期 */
+                received_to?: string | null;
+                /** @description 仅药检单不齐 */
+                missing_drug_inspection?: boolean | null;
+                /** @description 仅上游随货同行单不齐 */
+                missing_upstream_delivery?: boolean | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboundDocumentEntryListResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     list_drug_inspection_platforms: {
         parameters: {
             query?: {
@@ -16087,6 +17421,1039 @@ export interface operations {
             };
             /** @description 平台状态非法 */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_drug_inspection_processing_rule_versions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DrugInspectionProcessingRuleVersion"][];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    publish_drug_inspection_processing_rule_version: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishDrugInspectionProcessingRuleRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DrugInspectionProcessingRuleVersion"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_drug_inspection_version: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDrugInspectionVersionRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DrugInspectionReportVersion"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    find_editable_drug_inspection_version: {
+        parameters: {
+            query: {
+                /** @description 当前 ASN ID */
+                asn_id: string;
+                /** @description 商品 ID */
+                product_id: string;
+                /** @description 批号 */
+                batch_no: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DrugInspectionReportVersion"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_drug_inspection_draft: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 可编辑的药检单草稿版本 ID */
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateDrugInspectionDraftRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DrugInspectionReportVersion"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    review_drug_inspection_version: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 药检单版本 ID */
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewDrugInspectionVersionRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DrugInspectionReportVersion"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    submit_drug_inspection_version: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 药检单版本 ID */
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DrugInspectionReportVersion"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    find_reusable_drug_inspection_report: {
+        parameters: {
+            query: {
+                /** @description 商品 ID */
+                product_id: string;
+                /** @description 批号 */
+                batch_no: string;
+                /** @description 用于判断是否已关联的 ASN ID */
+                asn_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReusableDrugInspectionReportResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_drug_inspection_correction: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 药检报告根 ID */
+                report_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDrugInspectionCorrectionRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DrugInspectionReportVersion"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    reuse_drug_inspection_report: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 药检报告根 ID */
+                report_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReuseDrugInspectionReportRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReuseDrugInspectionReportResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_drug_inspection_report_versions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 药检报告根 ID */
+                report_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DrugInspectionReportVersion"][];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_drug_inspection_requirement_rules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DrugInspectionRequirementRule"][];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    upsert_drug_inspection_requirement_rule: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertDrugInspectionRequirementRuleRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DrugInspectionRequirementRule"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_drug_inspection_review_queue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DrugInspectionReviewQueueEntry"][];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_drug_inspection_stamp_versions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DrugInspectionStampVersion"][];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_drug_inspection_stamp_version: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDrugInspectionStampVersionRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DrugInspectionStampVersion"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    review_drug_inspection_stamp_version: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 图章版本 ID */
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewDrugInspectionStampVersionRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DrugInspectionStampVersion"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    submit_drug_inspection_stamp_version: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 图章版本 ID */
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DrugInspectionStampVersion"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_upstream_delivery_document_version: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateUpstreamDeliveryVersionRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpstreamDeliveryDocumentVersion"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_upstream_delivery_document_versions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 上游随货同行单 ID */
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpstreamDeliveryDocumentVersion"][];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -5,13 +5,21 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
+const appShell = readFileSync(resolve(root, "src/App.tsx"), "utf8");
 const pageFile = readFileSync(resolve(root, "src/pages/outbound/M4OutboundPage.tsx"), "utf8");
 const actionDialog = readFileSync(resolve(root, "src/pages/outbound/M4OutboundActionDialog.tsx"), "utf8");
 const gridColumns = readFileSync(resolve(root, "src/pages/outbound/M4OutboundGridColumns.tsx"), "utf8");
 const page = `${pageFile}\n${actionDialog}\n${gridColumns}`;
 const parts = readFileSync(resolve(root, "src/pages/outbound/M4OutboundPageParts.tsx"), "utf8");
 const detail = readFileSync(resolve(root, "src/pages/outbound/M4OutboundDetailDialog.tsx"), "utf8");
+const queries = readFileSync(resolve(root, "src/features/outbound/outbound-queries.ts"), "utf8");
+const model = readFileSync(resolve(root, "src/pages/outbound/m4-outbound-page-model.ts"), "utf8");
+const helpers = readFileSync(resolve(root, "src/pages/outbound/m4-outbound-page-helpers.ts"), "utf8");
+const { buildShipOutboundRequest, defaultOutboundShipForm } = await import(
+  "../src/pages/outbound/m4-outbound-page-helpers.ts"
+);
 
+assert.match(appShell, /id:\s*"m4-review"/, "管理端菜单应登记 m4-review 复核发货视图");
 const pageHeaderStart = page.indexOf("<PageHeader");
 const queryPanelStart = page.indexOf("<QueryPanel", pageHeaderStart);
 
@@ -88,6 +96,51 @@ assert.doesNotMatch(canReviewOrderBody(), /inventory_locked|reviewed|shipped/, "
 assert.match(canShipOrderBody(), /reviewed/, "交接应允许 reviewed");
 assert.match(canShipOrderBody(), /reviewed_short/, "交接应允许 reviewed_short（后端前置 reviewed|reviewed_short）");
 assert.doesNotMatch(canShipOrderBody(), /inventory_locked|shipped/, "未复核/已发货不得交接");
+assert.match(
+  model,
+  /mode === "review"[\s\S]*new Set\(\[[^\]]*"picked"[^\]]*"picked_short"[^\]]*"reviewed"[^\]]*"reviewed_short"[^\]]*"shipped"[^\]]*\]\)/,
+  "复核发货列表必须保留已复核与已发货订单，才能闭环真实发货交接并展示结果",
+);
+assert.doesNotMatch(
+  pageFile,
+  /mode !== "review" \|\| order\.status === "picked"/,
+  "M4 页面不得在统一筛选后再次把复核发货列表裁成仅已拣选订单",
+);
+assert.match(queries, /useShipOutboundOrderMutation/, "发货交接必须有真实 POST mutation");
+assert.match(queries, /\/api\/v1\/outbound\/orders\/\{id\}\/ship/, "发货 mutation 必须调用正式 ship API");
+assert.match(pageFile, /shipOutboundOrderMutation\.mutateAsync/, "发货交接不能只改页面内存状态");
+assert.doesNotMatch(pageFile, /action\.kind === "ship"\)\s*updateOrder/, "发货交接不得用本地 updateOrder 冒充成功");
+assert.match(actionDialog, /客户药检副本.*不.*发货|发货.*不.*客户药检副本/, "发货弹窗应明确客户药检副本不参与发货阻断");
+for (const field of ["delivery_provider_type", "vehicle_no", "plate_no", "driver_user_id", "signature_attachment_id", "loading_temperature_celsius", "cold_chain_packages"]) {
+  assert.match(helpers, new RegExp(`\\b${field}\\b`), `发货请求应提交 ${field}`);
+}
+assert.doesNotMatch(helpers, /\bcarrier_type\b|\bhandover_to\b/, "发货请求不得保留已删除的旧交接字段");
+assert.deepEqual(
+  buildShipOutboundRequest({
+    ...defaultOutboundShipForm(),
+    deliveryProviderType: "third_party_express",
+    plateNo: "沪A12345",
+    courierName: "快递员",
+    courierPhone: "13800000000",
+    signatureAttachmentId: "00000000-0000-4000-8000-000000000201",
+    loadingTemperatureCelsius: "4.2",
+    insulatedContainerNo: "BOX-COLD-001",
+    icePackCount: "4",
+  }),
+  {
+    delivery_provider_type: "third_party_express",
+    vehicle_no: null,
+    plate_no: "沪A12345",
+    driver_user_id: null,
+    courier_name: "快递员",
+    courier_phone: "13800000000",
+    signature_attachment_id: "00000000-0000-4000-8000-000000000201",
+    loading_temperature_celsius: 4.2,
+    cold_chain_packages: [{ insulated_container_no: "BOX-COLD-001", ice_pack_count: 4 }],
+    package_count: 1,
+  },
+);
+assert.doesNotMatch(pageFile, /配送 第三方快递|包裹数量 1|车牌号 沪A-12345/, "复核发货列表不得展示未由 API 返回的静态交接数据");
 assert.match(canApproveReturnBody(), /pending_approval/, "审批仅待审批");
 assert.match(canRejectReturnBody(), /pending_approval/, "驳回仅待审批");
 assert.match(canPickReturnBody(), /approved/, "拣货仅已审批");
@@ -111,10 +164,8 @@ assert.match(page, /titleWithDocNo|meta\.title.*docNo|\$\{meta\.title\} · \$\{t
 // --- 详情去原型说明字段 ---
 assert.doesNotMatch(detail, /作废审批入口/, "OrderDetail 不得展示原型说明字段「作废审批入口」");
 assert.doesNotMatch(detail, /未进波次订单可申请/, "OrderDetail 不得展示「未进波次订单可申请」说明文案");
-assert.match(detail, /装车温度/, "交接字段应保留装车温度");
-assert.match(detail, /\["装车温度",\s*"—"\]/, "装车温度空值应显示「—」");
-assert.doesNotMatch(detail, /\["装车温度",\s*"冷链时必填"\]/, "装车温度不得把 placeholder 当值");
-assert.match(parts, /\["装车温度",\s*"",\s*"冷链时必填"\]/, "发货表单装车温度应空值 + placeholder");
+assert.match(detail, /order\.shipment/, "订单详情应读取 API 返回的持久化交接记录");
+assert.doesNotMatch(detail, /沪A-12345|已签字/, "订单详情不得展示静态交接数据");
 
 function canValidateOrderBody() {
   return functionBody(page, "canValidateOrder");

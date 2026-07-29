@@ -28,6 +28,22 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
     .await
     .expect("seed outbound review owner");
     sqlx::query(
+        "INSERT INTO auth_users (id, username, display_name, password_hash, status) VALUES ($1, $2, '第一复核员', 'test-hash', 'active')",
+    )
+    .bind(reviewer_ctx.user_id)
+    .bind(format!("m4-reviewer-{}", &reviewer_ctx.user_id.to_string()[..8]))
+    .execute(&pool)
+    .await
+    .expect("seed first reviewer");
+    sqlx::query(
+        "INSERT INTO auth_user_owner_bindings (user_id, owner_id, is_active, is_primary) VALUES ($1, $2, TRUE, TRUE)",
+    )
+    .bind(reviewer_ctx.user_id)
+    .bind(owner_id)
+    .execute(&pool)
+    .await
+    .expect("bind first reviewer");
+    sqlx::query(
         "INSERT INTO auth_users (id, username, display_name, password_hash, status) VALUES ($1, $2, '第二复核员', 'test-hash', 'active')",
     )
     .bind(second_reviewer_id)
@@ -291,10 +307,16 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
             &ctx,
             order.id,
             ShipOutboundOrderRequest {
-                carrier_type: "own_fleet".to_string(),
-                handover_to: "driver-001".to_string(),
+                delivery_provider_type: "own_fleet".to_string(),
+                vehicle_no: Some("VEHICLE-001".to_string()),
+                plate_no: "沪A12345".to_string(),
+                driver_user_id: Some(second_reviewer_id),
+                courier_name: None,
+                courier_phone: None,
+                signature_attachment_id: None,
+                loading_temperature_celsius: None,
+                cold_chain_packages: Vec::new(),
                 package_count: 1,
-                shipped_at: Some(now),
             },
             now,
             "outbound-ship-blocked-1",
@@ -339,7 +361,7 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
     assert_eq!(pick_replay.value.id, replenished.value.id);
 
     sqlx::query(
-        "UPDATE products SET special_drug_category = 'narcotic' WHERE owner_id = $1 AND product_code = 'P-OUT-001'",
+        "UPDATE products SET special_drug_category = 'narcotic', storage_condition = 'cold' WHERE owner_id = $1 AND product_code = 'P-OUT-001'",
     )
     .bind(owner_id)
     .execute(&pool)
@@ -448,12 +470,75 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
         )
     );
 
+    let signature_attachment_id = Uuid::new_v4();
+    sqlx::query(
+        r#"
+        INSERT INTO attachments (
+            id, owner_id, module, entity_type, entity_id, file_name, content_type,
+            size_bytes, storage_key, sha256, uploaded_by
+        )
+        VALUES ($1, $2, 'M4', 'outbound_handover_signature', $3,
+                'driver-signature.png', 'image/png', 128, $4, $5, $6)
+        "#,
+    )
+    .bind(signature_attachment_id)
+    .bind(owner_id)
+    .bind(order.id)
+    .bind(format!("m4/{owner_id}/{signature_attachment_id}.png"))
+    .bind("a".repeat(64))
+    .bind(second_reviewer_id)
+    .execute(&pool)
+    .await
+    .expect("handover signature attachment should seed");
+
     let ship_request = ShipOutboundOrderRequest {
-        carrier_type: "own_fleet".to_string(),
-        handover_to: "driver-001".to_string(),
+        delivery_provider_type: "own_fleet".to_string(),
+        vehicle_no: Some("VEHICLE-001".to_string()),
+        plate_no: "沪A12345".to_string(),
+        driver_user_id: Some(second_reviewer_id),
+        courier_name: None,
+        courier_phone: None,
+        signature_attachment_id: Some(signature_attachment_id),
+        loading_temperature_celsius: Some(4.2),
+        cold_chain_packages: vec![OutboundColdChainPackage {
+            insulated_container_no: "BOX-COLD-001".to_string(),
+            ice_pack_count: 4,
+        }],
         package_count: 1,
-        shipped_at: Some(now),
     };
+    let mut invalid_driver_request = ship_request.clone();
+    invalid_driver_request.driver_user_id = Some(Uuid::new_v4());
+    let invalid_driver = repo
+        .ship_outbound_order(
+            &reviewer_ctx,
+            order.id,
+            invalid_driver_request,
+            now,
+            "outbound-ship-invalid-driver-1",
+            None,
+        )
+        .await
+        .expect_err("driver must be an active user bound to the owner");
+    assert!(matches!(invalid_driver, Wave4RepositoryError::InvalidDriver));
+
+    let mut invalid_signature_request = ship_request.clone();
+    invalid_signature_request.signature_attachment_id = Some(Uuid::new_v4());
+    let invalid_signature = repo
+        .ship_outbound_order(
+            &reviewer_ctx,
+            order.id,
+            invalid_signature_request,
+            now,
+            "outbound-ship-invalid-signature-1",
+            None,
+        )
+        .await
+        .expect_err("signature attachment must belong to this handover");
+    assert!(matches!(
+        invalid_signature,
+        Wave4RepositoryError::InvalidSignatureAttachment
+    ));
+
     let shipped = repo
         .ship_outbound_order(
             &reviewer_ctx,
@@ -468,12 +553,65 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
         .value;
     assert_eq!(shipped.status, "shipped");
     assert_eq!(shipped.lines[0].shipped_qty, 10);
+    let shipment = shipped
+        .shipment
+        .as_ref()
+        .expect("shipping response should include persisted handover");
+    assert_eq!(shipment.delivery_provider_type, "own_fleet");
+    assert_eq!(shipment.driver_user_id, Some(second_reviewer_id));
+    assert_eq!(shipment.driver_name.as_deref(), Some("第二复核员"));
+    assert_eq!(shipment.signature_attachment_id, Some(signature_attachment_id));
+    assert!(shipment.cold_chain);
+    assert_eq!(shipment.loading_temperature_celsius, Some(4.2));
+    assert_eq!(shipment.handover_by, reviewer_ctx.user_id);
     let ship_replay = repo
         .ship_outbound_order(&ctx, order.id, ship_request, now, "outbound-ship-1", None)
         .await
         .expect("same-key outbound ship should replay");
     assert!(ship_replay.replayed);
     assert_eq!(ship_replay.value.id, shipped.id);
+
+    let persisted_shipment: (
+        String,
+        Option<String>,
+        String,
+        Option<Uuid>,
+        Option<String>,
+        Option<Uuid>,
+        bool,
+        Option<f64>,
+        serde_json::Value,
+        Uuid,
+    ) = sqlx::query_as(
+        r#"
+        SELECT delivery_provider_type, vehicle_no, plate_no, driver_user_id,
+               driver_name, signature_attachment_id, cold_chain,
+               loading_temperature_celsius, cold_chain_packages, handover_by
+          FROM outbound_shipments
+         WHERE owner_id = $1 AND outbound_order_id = $2
+        "#,
+    )
+    .bind(owner_id)
+    .bind(order.id)
+    .fetch_one(&pool)
+    .await
+    .expect("shipment handover fields should persist");
+    assert_eq!(persisted_shipment.0, "own_fleet");
+    assert_eq!(persisted_shipment.1.as_deref(), Some("VEHICLE-001"));
+    assert_eq!(persisted_shipment.2, "沪A12345");
+    assert_eq!(persisted_shipment.3, Some(second_reviewer_id));
+    assert_eq!(persisted_shipment.4.as_deref(), Some("第二复核员"));
+    assert_eq!(persisted_shipment.5, Some(signature_attachment_id));
+    assert!(persisted_shipment.6);
+    assert_eq!(persisted_shipment.7, Some(4.2));
+    assert_eq!(
+        persisted_shipment.8,
+        serde_json::json!([{
+            "insulated_container_no": "BOX-COLD-001",
+            "ice_pack_count": 4
+        }])
+    );
+    assert_eq!(persisted_shipment.9, reviewer_ctx.user_id);
 
     let shipment_outbox: (i64, serde_json::Value) = sqlx::query_as(
         r#"
@@ -541,6 +679,24 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
         review_diff["after"]["approval_record_id"],
         serde_json::json!(approval_id)
     );
+    let ship_diff: serde_json::Value = sqlx::query_scalar(
+        r#"
+        SELECT diff
+          FROM audit_event
+         WHERE owner_id = $1 AND action = 'ship_outbound_order'
+         ORDER BY id DESC
+         LIMIT 1
+        "#,
+    )
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("shipment audit diff should be persisted");
+    assert_eq!(
+        ship_diff["after"]["driver_user_id"],
+        serde_json::json!(second_reviewer_id)
+    );
+    assert_eq!(ship_diff["after"]["cold_chain"], serde_json::json!(true));
 
     let persisted_review: (Uuid, Uuid, Uuid) = sqlx::query_as(
         r#"

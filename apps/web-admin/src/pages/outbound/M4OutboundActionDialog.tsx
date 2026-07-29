@@ -14,6 +14,10 @@ import { CheckCircle2, ClipboardCheck, Truck, XCircle } from "lucide-react";
 
 import type { OutboundOrder, OutboundWave, PurchaseReturnOrder } from "./M4OutboundDetailDialog";
 import { ActionExtraFields, TextField } from "./M4OutboundPageParts";
+import {
+  outboundCarrierTypeOptions,
+  type OutboundShipForm,
+} from "./m4-outbound-page-helpers";
 import type { M4OutboundMode } from "./m4-outbound-page-model";
 
 export type ActionKind =
@@ -66,12 +70,6 @@ export interface PurchaseReturnCreateForm {
   warehouseId: string;
   productCode: string;
   qty: string;
-}
-
-export interface OutboundShipForm {
-  carrierType: string;
-  handoverTo: string;
-  packageCount: string;
 }
 
 export function outboundPrivateActions(
@@ -232,6 +230,11 @@ export function M4OutboundActionDialog({ action, target, createForm, purchaseRet
               <div className="text-xs text-muted-foreground">当前状态：{target.statusText}</div>
             </div>
           )}
+          {action.kind === "ship" && (
+            <div className="md:col-span-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm" role="note">
+              客户药检副本暂缺、处理中或生成失败时不阻塞发货；副本可用后由客户平台异步补齐。
+            </div>
+          )}
           {action.kind === "review" ? (
             <>
               <ReviewDetails order={reviewOrder} loading={reviewLoading} error={reviewError} />
@@ -288,15 +291,32 @@ export function M4OutboundActionDialog({ action, target, createForm, purchaseRet
               <SelectField
                 required
                 label="配送方类型"
-                value={shipForm.carrierType}
-                options={[
-                  { value: "own_fleet", label: "自有配送" },
-                  { value: "third_party_express", label: "第三方快递" },
-                ]}
-                onChange={(carrierType) => setShipForm((value) => ({ ...value, carrierType }))}
+                value={shipForm.deliveryProviderType}
+                options={outboundCarrierTypeOptions}
+                onChange={(deliveryProviderType) => setShipForm((value) => ({ ...value, deliveryProviderType }))}
               />
-              <TextField required label="交接对象" value={shipForm.handoverTo} onChange={(handoverTo) => setShipForm((value) => ({ ...value, handoverTo }))} />
+              <TextField required label="车牌号" value={shipForm.plateNo} onChange={(plateNo) => setShipForm((value) => ({ ...value, plateNo }))} />
+              {shipForm.deliveryProviderType === "own_fleet" ? (
+                <>
+                  <TextField required label="车辆编号" value={shipForm.vehicleNo} onChange={(vehicleNo) => setShipForm((value) => ({ ...value, vehicleNo }))} />
+                  <TextField required label="司机用户 ID" value={shipForm.driverUserId} onChange={(driverUserId) => setShipForm((value) => ({ ...value, driverUserId }))} />
+                </>
+              ) : shipForm.deliveryProviderType === "third_party_express" ? (
+                <>
+                  <TextField required label="快递员姓名" value={shipForm.courierName} onChange={(courierName) => setShipForm((value) => ({ ...value, courierName }))} />
+                  <TextField required label="快递员电话" value={shipForm.courierPhone} onChange={(courierPhone) => setShipForm((value) => ({ ...value, courierPhone }))} />
+                </>
+              ) : null}
+              <TextField
+                required={shipForm.deliveryProviderType === "third_party_express"}
+                label="签字附件 ID"
+                value={shipForm.signatureAttachmentId}
+                onChange={(signatureAttachmentId) => setShipForm((value) => ({ ...value, signatureAttachmentId }))}
+              />
               <TextField required label="包裹数量" type="number" value={shipForm.packageCount} onChange={(packageCount) => setShipForm((value) => ({ ...value, packageCount }))} />
+              <TextField label="装车温度（冷链必填）" type="number" value={shipForm.loadingTemperatureCelsius} onChange={(loadingTemperatureCelsius) => setShipForm((value) => ({ ...value, loadingTemperatureCelsius }))} />
+              <TextField label="保温箱编号（冷链必填）" value={shipForm.insulatedContainerNo} onChange={(insulatedContainerNo) => setShipForm((value) => ({ ...value, insulatedContainerNo }))} />
+              <TextField label="冰袋数量（冷链必填）" type="number" value={shipForm.icePackCount} onChange={(icePackCount) => setShipForm((value) => ({ ...value, icePackCount }))} />
             </>
           ) : (
             <>

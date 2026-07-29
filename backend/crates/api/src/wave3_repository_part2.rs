@@ -111,6 +111,75 @@ impl PgWave3Repository {
         .await
         .map_err(map_db_error)?
         .ok_or(Wave3RepositoryError::NotFound)?;
+        let product_id = line.product_id.ok_or(Wave3RepositoryError::MissingProduct)?;
+        match validate_drug_inspection_for_acceptance(
+            &mut tx,
+            ctx,
+            id,
+            &order.receipt_no,
+            product_id,
+            &req.batch_no,
+            idempotency_key,
+            now,
+        )
+        .await?
+        {
+            DrugInspectionAcceptanceDecision::Continue => {}
+            DrugInspectionAcceptanceDecision::MissingBlocked => {
+                let validation_audit = AuditWriteRequest::from_auth_context(
+                    ctx,
+                    "di.acceptance.missing_blocked",
+                    "M-DI",
+                    "receiving_order",
+                    id.to_string(),
+                    Some(AuditDiff::compute(
+                        serde_json::json!({}),
+                        serde_json::json!({
+                            "batch_no": req.batch_no,
+                            "result": "missing_blocked"
+                        }),
+                    )),
+                );
+                append_event_in_tx(&mut tx, &validation_audit)
+                    .await
+                    .map_err(|error| Wave3RepositoryError::Audit(format!("{error:?}")))?;
+                tx.commit().await.map_err(map_db_error)?;
+                return Err(Wave3RepositoryError::DrugInspectionMissingBlocked);
+            }
+            DrugInspectionAcceptanceDecision::UnqualifiedBlocked(report_version_id) => {
+                enqueue_drug_inspection_unqualified_liaison(
+                    &mut tx,
+                    ctx,
+                    id,
+                    &order.receipt_no,
+                    product_id,
+                    &req.batch_no,
+                    report_version_id,
+                    now,
+                )
+                .await?;
+                let validation_audit = AuditWriteRequest::from_auth_context(
+                    ctx,
+                    "di.acceptance.unqualified_blocked",
+                    "M-DI",
+                    "receiving_order",
+                    id.to_string(),
+                    Some(AuditDiff::compute(
+                        serde_json::json!({}),
+                        serde_json::json!({
+                            "batch_no": req.batch_no,
+                            "report_version_id": report_version_id,
+                            "result": "unqualified_blocked"
+                        }),
+                    )),
+                );
+                append_event_in_tx(&mut tx, &validation_audit)
+                    .await
+                    .map_err(|error| Wave3RepositoryError::Audit(format!("{error:?}")))?;
+                tx.commit().await.map_err(map_db_error)?;
+                return Err(Wave3RepositoryError::DrugInspectionUnqualifiedBlocked);
+            }
+        }
         let previous_inspected_qty: i64 = sqlx::query_scalar(
             "SELECT COALESCE(SUM(accepted_qty + rejected_qty), 0)::BIGINT FROM receiving_inspections WHERE receiving_order_id = $1 AND owner_id = $2 AND batch_no = $3",
         )

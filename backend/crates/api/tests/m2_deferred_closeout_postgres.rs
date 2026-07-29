@@ -1,14 +1,17 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 use wms_api::{
+    audit::AuditWriteRequest,
     auth::AuthContext,
     inventory::STATUS_QUALIFIED,
     wave3_repository::{PgWave3Repository, Wave3RepositoryError},
 };
 use wms_domain::{
-    CreateReceivingOrderRequest, InspectReceivingOrderRequest, ReceiveReceivingOrderRequest,
-    ReceivingOrderLine, ReceivingReceiptDetails, SignInspectionRequest,
-    RECEIVING_DOCUMENT_TYPE_PURCHASE_INBOUND, RECEIVING_DOCUMENT_TYPE_SALES_RETURN,
+    CancelReceivingOrderRequest, CreateReceivingOrderRequest, ForceCloseShortageRequest,
+    InspectReceivingOrderRequest, PutawayRequest, ReceiveReceivingOrderRequest,
+    ReceivingDashboardQuery, ReceivingOrderLine, ReceivingReceiptDetails, SignInspectionRequest,
+    UpsertPutawayStrategyProfileRequest, RECEIVING_DOCUMENT_TYPE_PURCHASE_INBOUND,
+    RECEIVING_DOCUMENT_TYPE_SALES_RETURN,
 };
 
 #[path = "support/auth.rs"]
@@ -99,6 +102,64 @@ async fn seed_asn_references(
     for line in &mut request.lines {
         line.product_id = Some(product_id);
     }
+}
+
+async fn seed_putaway_location(pool: &PgPool, owner_id: Uuid) -> (Uuid, Uuid) {
+    let warehouse_id = Uuid::new_v4();
+    let zone_id = Uuid::new_v4();
+    let location_id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO warehouses (id, owner_id, warehouse_code, warehouse_name, warehouse_type, status) VALUES ($1, $2, $3, 'M2 test warehouse', 'normal', 'active')",
+    )
+    .bind(warehouse_id)
+    .bind(owner_id)
+    .bind(format!("M2-WH-{}", &warehouse_id.to_string()[..8]))
+    .execute(pool)
+    .await
+    .expect("seed warehouse");
+    sqlx::query(
+        "INSERT INTO warehouse_zones (id, owner_id, warehouse_id, zone_code, zone_name, temperature_zone, quality_color, status) VALUES ($1, $2, $3, $4, 'M2 test zone', 'normal', 'qualified_green', 'active')",
+    )
+    .bind(zone_id)
+    .bind(owner_id)
+    .bind(warehouse_id)
+    .bind(format!("M2-ZONE-{}", &zone_id.to_string()[..8]))
+    .execute(pool)
+    .await
+    .expect("seed zone");
+    sqlx::query(
+        "INSERT INTO warehouse_locations (id, owner_id, warehouse_id, zone_id, location_code, row_no, column_no, layer_no, max_volume_cm3, used_volume_cm3, max_sku_count, location_type, status) VALUES ($1, $2, $3, $4, $5, 1, 1, 1, 100000, 0, 3, 'storage', 'available')",
+    )
+    .bind(location_id)
+    .bind(owner_id)
+    .bind(warehouse_id)
+    .bind(zone_id)
+    .bind(format!("M2-LOC-{}", &location_id.to_string()[..8]))
+    .execute(pool)
+    .await
+    .expect("seed location");
+    (warehouse_id, location_id)
+}
+
+async fn seed_numbering_rule(pool: &PgPool, owner_id: Uuid) {
+    let now = chrono::Utc::now();
+    sqlx::query(
+        "INSERT INTO auth_owners (id, owner_code, owner_name) VALUES ($1, $2, 'M2 test owner')",
+    )
+    .bind(owner_id)
+    .bind(format!("M2OWNER-{}", &owner_id.to_string()[..8]))
+    .execute(pool)
+    .await
+    .expect("seed numbering owner");
+    sqlx::query(
+        "INSERT INTO document_number_rules (id, owner_id, document_type, rule_code, rule_name, template, reset_policy, sequence_width, enabled, created_at, updated_at) VALUES ($1, NULL, 'purchase_inbound', $2, 'M2 test ASN rule', 'ASN-{OWNER}-{YYYY}{MM}{DD}-{SEQ}', 'daily', 4, TRUE, $3, $3)",
+    )
+    .bind(Uuid::new_v4())
+    .bind(format!("m2-test-asn-{}", &owner_id.to_string()[..8]))
+    .bind(now)
+    .execute(pool)
+    .await
+    .expect("seed numbering rule");
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -465,3 +526,5 @@ async fn sales_return_requires_the_original_batch(pool: PgPool) {
         Err(Wave3RepositoryError::InvalidBatchPolicy)
     ));
 }
+
+include!("m2_deferred_closeout_postgres_included/part2.rs");

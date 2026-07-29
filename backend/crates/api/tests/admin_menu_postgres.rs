@@ -10,7 +10,7 @@ use wms_api::{
 };
 use wms_domain::{
     BatchEnableAdminMenuRequest, CreateAdminMenuNodeRequest, PublishAdminMenuRequest,
-    RollbackAdminMenuRequest, UpsertAdminMenuButtonPermissionRequest,
+    RollbackAdminMenuRequest, UpdateAdminMenuNodeRequest, UpsertAdminMenuButtonPermissionRequest,
 };
 
 fn ctx(owner_id: Uuid) -> AuthContext {
@@ -49,6 +49,104 @@ async fn seed_owner(pool: &PgPool, owner_id: Uuid) {
     .execute(pool)
     .await
     .expect("owner should insert");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn seeded_drug_inspection_menu_nodes_can_be_saved(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    seed_owner(&pool, owner_id).await;
+    let service = PgAdminMenuService::new();
+    let auth = ctx(owner_id);
+    let now = Utc
+        .with_ymd_and_hms(2026, 7, 26, 10, 0, 0)
+        .single()
+        .expect("valid time");
+
+    let (published, _) = service
+        .list_published_tree(&pool, &auth)
+        .await
+        .expect("published drug inspection menu should list");
+    for view_id in [
+        "m2-inbound-documents",
+        "m-di-review",
+        "m-di-platforms",
+        "m-di-stamp",
+    ] {
+        assert!(has_page_in_group(
+            &published,
+            "入库业务",
+            "入库资料",
+            view_id
+        ));
+    }
+    assert!(!has_page_in_group(
+        &published,
+        "基础档案",
+        "系统配置",
+        "m-di-stamp"
+    ));
+
+    for (node_id, view_id, icon_key, permission_key, actions) in [
+        (
+            "00000000-0000-0000-0000-000000130090",
+            "m2-inbound-documents",
+            "ClipboardList",
+            "m-di.document.read",
+            vec![
+                ("query", "查询"),
+                ("refresh", "刷新"),
+                ("upload", "上传"),
+                ("reuse", "复用"),
+                ("review", "审核"),
+                ("detail", "详情"),
+            ],
+        ),
+        (
+            "00000000-0000-0000-0000-000000130092",
+            "m-di-stamp",
+            "Stamp",
+            "m-di.stamp.manage",
+            vec![
+                ("query", "查询"),
+                ("upload", "上传图章"),
+                ("submit", "提交审核"),
+                ("review", "审核发布"),
+                ("history", "版本记录"),
+            ],
+        ),
+    ] {
+        service
+            .update_node(
+                &pool,
+                &auth,
+                Uuid::parse_str(node_id).expect("static menu node uuid"),
+                UpdateAdminMenuNodeRequest {
+                    view_id: Some(view_id.to_string()),
+                    icon_key: Some(icon_key.to_string()),
+                    permission_key: Some(permission_key.to_string()),
+                    button_permissions: Some(
+                        actions
+                            .into_iter()
+                            .enumerate()
+                            .map(
+                                |(index, (key, label))| UpsertAdminMenuButtonPermissionRequest {
+                                    action_key: key.to_string(),
+                                    action_label: label.to_string(),
+                                    action_kind: "standard".to_string(),
+                                    enabled: true,
+                                    sort_order: (index as i32 + 1) * 10,
+                                },
+                            )
+                            .collect(),
+                    ),
+                    ..Default::default()
+                },
+                now,
+                &format!("save-{view_id}"),
+            )
+            .await
+            .expect("seeded drug inspection menu should remain editable");
+    }
 }
 
 fn platform_extra_request() -> CreateAdminMenuNodeRequest {

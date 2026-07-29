@@ -1,4 +1,5 @@
 //! Wave 4 repository helpers for cross-module business closures.
+// @governance: skip-page-size shared row types and transaction helpers serve five include! slices.
 
 use std::collections::HashSet;
 
@@ -8,10 +9,11 @@ use sha2::{Digest, Sha256};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{
-    validate_review_submission, CompletePickTaskRequest, CreateOutboundOrderRequest,
-    CreateOutboundWaveRequest, CreatePurchaseReturnRequest, InventoryBatch, OutboundOrder,
-    OutboundOrderLine, OutboundWave, PurchaseReturnOrder, RejectPurchaseReturnRequest,
-    ReviewOutboundOrderRequest, ReviewValidationError, ShipOutboundOrderRequest,
+    validate_review_submission, validate_ship_outbound_request, CompletePickTaskRequest,
+    CreateOutboundOrderRequest, CreateOutboundWaveRequest, CreatePurchaseReturnRequest,
+    InventoryBatch, OutboundColdChainPackage, OutboundOrder, OutboundOrderLine, OutboundShipment,
+    OutboundWave, PurchaseReturnOrder, RejectPurchaseReturnRequest, ReviewOutboundOrderRequest,
+    ReviewValidationError, ShipOutboundOrderRequest, ShipOutboundValidationError,
     TemperatureExcursionEvent, TraceabilityOutboundReport, TraceabilityOutboundReportRequest,
     TraceabilityStatusChangeEvent,
 };
@@ -20,6 +22,7 @@ use crate::{
     audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
     auth::AuthContext,
     document_numbering::{GenerateDocumentNumberRequest, PgDocumentNumberingService},
+    h2_lifecycle::publish_event_in_tx,
     inventory::{STATUS_QUALIFIED, STATUS_QUARANTINED},
     outbound::{
         all_lines_reviewed_for_ship, short_pick_qty, status_after_pick, status_after_review,
@@ -60,6 +63,7 @@ pub enum Wave4RepositoryError {
     DuplicateCode,
     EmptySelection,
     InvalidDocumentType,
+    InvalidDeliveryAddress,
     RouteBindingUnavailable,
     BatchNotAffected(Uuid),
     InvalidStatus {
@@ -72,6 +76,7 @@ pub enum Wave4RepositoryError {
         approval_source: String,
     },
     ReviewValidation(ReviewValidationError),
+    ShipmentValidation(ShipOutboundValidationError),
     InvalidQuantity,
     DocumentNumbering(String),
     InvalidTraceabilityEvent,
@@ -83,6 +88,8 @@ pub enum Wave4RepositoryError {
     DualPersonApprovalRequired,
     MissingRejectReason,
     MissingRequiredField(&'static str),
+    InvalidDriver,
+    InvalidSignatureAttachment,
     Audit(String),
     Database(String),
     Serialize(String),
@@ -136,6 +143,8 @@ struct OutboundOrderRow {
     order_group_no: Option<String>,
     business_type_code: Option<String>,
     customer_id: Uuid,
+    delivery_address_id: Uuid,
+    delivery_address_snapshot: serde_json::Value,
     warehouse_id: Uuid,
     required_ship_at: Option<DateTime<Utc>>,
     status: String,
@@ -198,9 +207,11 @@ struct TraceabilityOutboundReportEventRow {
 
 include!("wave4_repository_part1.rs");
 include!("wave4_repository_part2.rs");
+include!("wave4_repository_shipment.rs");
 include!("wave4_repository_waves.rs");
 include!("wave4_repository_actions.rs");
 include!("wave4_repository_returns.rs");
+include!("wave4_repository_customer_portal.rs");
 
 async fn lock_outbound_order(
     tx: &mut Transaction<'_, Postgres>,
@@ -211,7 +222,8 @@ async fn lock_outbound_order(
         r#"
         SELECT id, owner_id, document_type, wms_order_no, erp_order_no,
                invoice_no, transport_mode_code, department_code, sales_group_code,
-               order_group_no, business_type_code, customer_id, warehouse_id,
+               order_group_no, business_type_code, customer_id,
+               delivery_address_id, delivery_address_snapshot, warehouse_id,
                required_ship_at, status, short_pick,
                created_at, updated_at
           FROM outbound_orders
@@ -266,7 +278,8 @@ async fn load_outbound_order(
         r#"
         SELECT id, owner_id, document_type, wms_order_no, erp_order_no,
                invoice_no, transport_mode_code, department_code, sales_group_code,
-               order_group_no, business_type_code, customer_id, warehouse_id,
+               order_group_no, business_type_code, customer_id,
+               delivery_address_id, delivery_address_snapshot, warehouse_id,
                required_ship_at, status, short_pick,
                created_at, updated_at
           FROM outbound_orders
@@ -297,7 +310,8 @@ async fn load_outbound_order(
         .into_iter()
         .map(map_outbound_order_line)
         .collect::<Result<Vec<_>, _>>()?;
-    Ok(map_outbound_order(row, lines))
+    let shipment = load_outbound_shipment(tx, owner_id, id).await?;
+    Ok(map_outbound_order(row, lines, shipment))
 }
 
 async fn load_outbound_order_lines_from_pool(
@@ -710,7 +724,11 @@ fn non_empty_filter(value: Option<&str>) -> Option<&str> {
     value.map(str::trim).filter(|value| !value.is_empty())
 }
 
-fn map_outbound_order(row: OutboundOrderRow, lines: Vec<OutboundOrderLine>) -> OutboundOrder {
+fn map_outbound_order(
+    row: OutboundOrderRow,
+    lines: Vec<OutboundOrderLine>,
+    shipment: Option<OutboundShipment>,
+) -> OutboundOrder {
     OutboundOrder {
         id: row.id,
         owner_id: row.owner_id,
@@ -724,11 +742,14 @@ fn map_outbound_order(row: OutboundOrderRow, lines: Vec<OutboundOrderLine>) -> O
         order_group_no: row.order_group_no,
         business_type_code: row.business_type_code,
         customer_id: row.customer_id,
+        delivery_address_id: row.delivery_address_id,
+        delivery_address_snapshot: row.delivery_address_snapshot,
         warehouse_id: row.warehouse_id,
         required_ship_at: row.required_ship_at,
         status: row.status,
         short_pick: row.short_pick,
         lines,
+        shipment,
         created_at: row.created_at,
         updated_at: row.updated_at,
     }

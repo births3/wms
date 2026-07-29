@@ -1872,6 +1872,384 @@
         "x-idempotency-exempt-reason": "告警动作由资源 ID 和生命周期状态机约束，重复状态迁移被拒绝，不产生第二次业务迁移。"
       }
     },
+    "/api/v1/attachments/confirm": {
+      "post": {
+        "tags": [
+          "file-attachment"
+        ],
+        "operationId": "confirm_file_upload",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmFileUploadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileAttachment"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/attachments/uploads": {
+      "post": {
+        "tags": [
+          "file-attachment"
+        ],
+        "operationId": "create_file_upload_session",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFileUploadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUploadSessionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/attachments/uploads/{upload_id}/content": {
+      "put": {
+        "tags": [
+          "file-attachment"
+        ],
+        "operationId": "upload_file_content",
+        "parameters": [
+          {
+            "name": "upload_id",
+            "in": "path",
+            "description": "上传会话 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "description": "5 分钟上传令牌",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "附件字节已写入对象存储"
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "x-auth-exempt-reason": "附件上传使用 5 分钟上传会话令牌鉴权，不依赖 Bearer token。",
+        "x-idempotency-exempt-reason": "上传会话 ID 与令牌共同限定单一对象键，PUT 全量替换内容；重复同一请求得到相同字节与哈希。"
+      }
+    },
+    "/api/v1/attachments/{attachment_id}/content": {
+      "get": {
+        "tags": [
+          "file-attachment"
+        ],
+        "operationId": "download_file_content",
+        "parameters": [
+          {
+            "name": "attachment_id",
+            "in": "path",
+            "description": "附件 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "download_id",
+            "in": "query",
+            "description": "下载授权 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "description": "15 分钟下载令牌",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "附件字节"
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "x-auth-exempt-reason": "附件下载使用 15 分钟下载会话令牌鉴权，不依赖 Bearer token。"
+      }
+    },
+    "/api/v1/attachments/{attachment_id}/url": {
+      "get": {
+        "tags": [
+          "file-attachment"
+        ],
+        "operationId": "create_file_download_url",
+        "parameters": [
+          {
+            "name": "attachment_id",
+            "in": "path",
+            "description": "附件 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileAttachmentDownloadUrlResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/audit/archive/partitions": {
       "get": {
         "tags": [
@@ -6955,6 +7333,368 @@
         }
       }
     },
+    "/api/v1/drug-inspection/customer-copy-jobs": {
+      "get": {
+        "tags": [
+          "drug-inspection"
+        ],
+        "operationId": "list_drug_inspection_copy_jobs",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DrugInspectionCustomerCopyJob"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/drug-inspection/customer-copy-jobs/{job_id}/oversize-approval": {
+      "post": {
+        "tags": [
+          "drug-inspection"
+        ],
+        "operationId": "approve_drug_inspection_copy_oversize",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "description": "客户副本任务 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveDrugInspectionCopyOversizeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DrugInspectionCustomerCopyJob"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/drug-inspection/customer-copy-jobs/{job_id}/process": {
+      "post": {
+        "tags": [
+          "drug-inspection"
+        ],
+        "operationId": "process_drug_inspection_copy_job",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "description": "客户副本任务 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DrugInspectionCustomerCopyJob"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-idempotency-exempt-reason": "客户副本任务由 job_id、状态机与最大尝试次数受控认领；成功任务不能再次认领，失败任务重复调用表示显式重试。"
+      }
+    },
+    "/api/v1/drug-inspection/image-previews": {
+      "post": {
+        "tags": [
+          "drug-inspection"
+        ],
+        "operationId": "create_drug_inspection_image_preview",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDrugInspectionImagePreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DrugInspectionImagePreviewResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-idempotency-exempt-reason": "图像预览只读取不可变附件并返回派生图片，不写入业务数据；使用 POST 承载处理参数。"
+      }
+    },
+    "/api/v1/drug-inspection/inbound-documents": {
+      "get": {
+        "tags": [
+          "drug-inspection"
+        ],
+        "operationId": "list_inbound_documents",
+        "parameters": [
+          {
+            "name": "received_from",
+            "in": "query",
+            "description": "实际收货开始日期",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "nullable": true
+            }
+          },
+          {
+            "name": "received_to",
+            "in": "query",
+            "description": "实际收货结束日期",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "nullable": true
+            }
+          },
+          {
+            "name": "missing_drug_inspection",
+            "in": "query",
+            "description": "仅药检单不齐",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "nullable": true
+            }
+          },
+          {
+            "name": "missing_upstream_delivery",
+            "in": "query",
+            "description": "仅上游随货同行单不齐",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboundDocumentEntryListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/drug-inspection/platforms": {
       "get": {
         "tags": [
@@ -7206,6 +7946,1479 @@
           },
           "422": {
             "description": "平台状态非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/drug-inspection/processing-rule-versions": {
+      "get": {
+        "tags": [
+          "drug-inspection"
+        ],
+        "operationId": "list_drug_inspection_processing_rule_versions",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DrugInspectionProcessingRuleVersion"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "drug-inspection"
+        ],
+        "operationId": "publish_drug_inspection_processing_rule_version",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishDrugInspectionProcessingRuleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DrugInspectionProcessingRuleVersion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/drug-inspection/report-versions": {
+      "post": {
+        "tags": [
+          "drug-inspection"
+        ],
+        "operationId": "create_drug_inspection_version",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDrugInspectionVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DrugInspectionReportVersion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/drug-inspection/report-versions/editable": {
+      "get": {
+        "tags": [
+          "drug-inspection"
+        ],
+        "operationId": "find_editable_drug_inspection_version",
+        "parameters": [
+          {
+            "name": "asn_id",
+            "in": "query",
+            "description": "当前 ASN ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "product_id",
+            "in": "query",
+            "description": "商品 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "batch_no",
+            "in": "query",
+            "description": "批号",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DrugInspectionReportVersion"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/drug-inspection/report-versions/{version_id}": {
+      "put": {
+        "tags": [
+          "drug-inspection"
+        ],
+        "operationId": "update_drug_inspection_draft",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "description": "可编辑的药检单草稿版本 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDrugInspectionDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DrugInspectionReportVersion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/drug-inspection/report-versions/{version_id}/review": {
+      "post": {
+        "tags": [
+          "drug-inspection"
+        ],
+        "operationId": "review_drug_inspection_version",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "description": "药检单版本 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewDrugInspectionVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DrugInspectionReportVersion"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/drug-inspection/report-versions/{version_id}/submit": {
+      "post": {
+        "tags": [
+          "drug-inspection"
+        ],
+        "operationId": "submit_drug_inspection_version",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "description": "药检单版本 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DrugInspectionReportVersion"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/drug-inspection/reports/reusable": {
+      "get": {
+        "tags": [
+          "drug-inspection"
+        ],
+        "operationId": "find_reusable_drug_inspection_report",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "query",
+            "description": "商品 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "batch_no",
+            "in": "query",
+            "description": "批号",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "asn_id",
+            "in": "query",
+            "description": "用于判断是否已关联的 ASN ID",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReusableDrugInspectionReportResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/drug-inspection/reports/{report_id}/corrections": {
+      "post": {
+        "tags": [
+          "drug-inspection"
+        ],
+        "operationId": "create_drug_inspection_correction",
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "description": "药检报告根 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDrugInspectionCorrectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DrugInspectionReportVersion"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/drug-inspection/reports/{report_id}/reuse": {
+      "post": {
+        "tags": [
+          "drug-inspection"
+        ],
+        "operationId": "reuse_drug_inspection_report",
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "description": "药检报告根 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReuseDrugInspectionReportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReuseDrugInspectionReportResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/drug-inspection/reports/{report_id}/versions": {
+      "get": {
+        "tags": [
+          "drug-inspection"
+        ],
+        "operationId": "list_drug_inspection_report_versions",
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "description": "药检报告根 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DrugInspectionReportVersion"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/drug-inspection/requirement-rules": {
+      "get": {
+        "tags": [
+          "drug-inspection"
+        ],
+        "operationId": "list_drug_inspection_requirement_rules",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DrugInspectionRequirementRule"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/drug-inspection/requirement-rules/current": {
+      "put": {
+        "tags": [
+          "drug-inspection"
+        ],
+        "operationId": "upsert_drug_inspection_requirement_rule",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertDrugInspectionRequirementRuleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DrugInspectionRequirementRule"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/drug-inspection/review-queue": {
+      "get": {
+        "tags": [
+          "drug-inspection"
+        ],
+        "operationId": "list_drug_inspection_review_queue",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DrugInspectionReviewQueueEntry"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/drug-inspection/stamp-versions": {
+      "get": {
+        "tags": [
+          "drug-inspection"
+        ],
+        "operationId": "list_drug_inspection_stamp_versions",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DrugInspectionStampVersion"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "drug-inspection"
+        ],
+        "operationId": "create_drug_inspection_stamp_version",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDrugInspectionStampVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DrugInspectionStampVersion"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/drug-inspection/stamp-versions/{version_id}/review": {
+      "post": {
+        "tags": [
+          "drug-inspection"
+        ],
+        "operationId": "review_drug_inspection_stamp_version",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "description": "图章版本 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewDrugInspectionStampVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DrugInspectionStampVersion"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/drug-inspection/stamp-versions/{version_id}/submit": {
+      "post": {
+        "tags": [
+          "drug-inspection"
+        ],
+        "operationId": "submit_drug_inspection_stamp_version",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "description": "图章版本 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DrugInspectionStampVersion"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/drug-inspection/upstream-delivery-document-versions": {
+      "post": {
+        "tags": [
+          "drug-inspection"
+        ],
+        "operationId": "create_upstream_delivery_document_version",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "客户端生成的幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUpstreamDeliveryVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpstreamDeliveryDocumentVersion"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/drug-inspection/upstream-delivery-documents/{document_id}/versions": {
+      "get": {
+        "tags": [
+          "drug-inspection"
+        ],
+        "operationId": "list_upstream_delivery_document_versions",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "description": "上游随货同行单 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UpstreamDeliveryDocumentVersion"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -28695,6 +30908,17 @@
           }
         }
       },
+      "ApproveDrugInspectionCopyOversizeRequest": {
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
       "ApproveInventoryCountRequest": {
         "type": "object",
         "required": [
@@ -30029,6 +32253,18 @@
           }
         }
       },
+      "ConfirmFileUploadRequest": {
+        "type": "object",
+        "required": [
+          "upload_id"
+        ],
+        "properties": {
+          "upload_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "ContainerRecovery": {
         "type": "object",
         "required": [
@@ -30565,6 +32801,119 @@
           }
         }
       },
+      "CreateDrugInspectionCorrectionRequest": {
+        "type": "object",
+        "required": [
+          "report_no",
+          "original_file_id",
+          "processing_mode",
+          "qualified",
+          "modification_reason"
+        ],
+        "properties": {
+          "modification_reason": {
+            "type": "string"
+          },
+          "original_file_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "processing_mode": {
+            "type": "string"
+          },
+          "qualified": {
+            "type": "boolean"
+          },
+          "report_no": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateDrugInspectionImagePreviewRequest": {
+        "type": "object",
+        "required": [
+          "attachment_id",
+          "processing_mode"
+        ],
+        "properties": {
+          "attachment_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "processing_mode": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateDrugInspectionStampVersionRequest": {
+        "type": "object",
+        "required": [
+          "png_attachment_id",
+          "relative_x",
+          "relative_y",
+          "relative_width"
+        ],
+        "properties": {
+          "png_attachment_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "relative_width": {
+            "type": "number",
+            "format": "double"
+          },
+          "relative_x": {
+            "type": "number",
+            "format": "double"
+          },
+          "relative_y": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "CreateDrugInspectionVersionRequest": {
+        "type": "object",
+        "required": [
+          "asn_id",
+          "product_id",
+          "batch_no",
+          "report_no",
+          "original_file_id",
+          "source",
+          "processing_mode",
+          "qualified"
+        ],
+        "properties": {
+          "asn_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "batch_no": {
+            "type": "string"
+          },
+          "original_file_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "processing_mode": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "qualified": {
+            "type": "boolean"
+          },
+          "report_no": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          }
+        }
+      },
       "CreateExpressWaybillRequest": {
         "type": "object",
         "required": [
@@ -30623,6 +32972,39 @@
             "format": "int64"
           },
           "weight_grams": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "CreateFileUploadRequest": {
+        "type": "object",
+        "required": [
+          "module",
+          "entity_type",
+          "entity_id",
+          "file_name",
+          "content_type",
+          "size_bytes"
+        ],
+        "properties": {
+          "content_type": {
+            "type": "string"
+          },
+          "entity_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "entity_type": {
+            "type": "string"
+          },
+          "file_name": {
+            "type": "string"
+          },
+          "module": {
+            "type": "string"
+          },
+          "size_bytes": {
             "type": "integer",
             "format": "int64"
           }
@@ -30912,8 +33294,8 @@
           "document_type",
           "wms_order_no",
           "customer_id",
-          "warehouse_id",
           "delivery_address_id",
+          "warehouse_id",
           "lines"
         ],
         "properties": {
@@ -31606,6 +33988,43 @@
           },
           "supplier_name": {
             "type": "string"
+          }
+        }
+      },
+      "CreateUpstreamDeliveryVersionRequest": {
+        "type": "object",
+        "required": [
+          "supplier_id",
+          "asn_ids",
+          "attachment_ids"
+        ],
+        "properties": {
+          "asn_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "attachment_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "modification_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "supplier_id": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },
@@ -32997,6 +35416,88 @@
           }
         }
       },
+      "DrugInspectionCustomerCopyJob": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "report_version_id",
+          "status",
+          "attempt_count",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "attempt_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finished_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "last_error": {
+            "type": "string",
+            "nullable": true
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "report_version_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DrugInspectionImagePreviewResponse": {
+        "type": "object",
+        "required": [
+          "content_type",
+          "data_base64",
+          "width",
+          "height"
+        ],
+        "properties": {
+          "content_type": {
+            "type": "string"
+          },
+          "data_base64": {
+            "type": "string"
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "width": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
       "DrugInspectionPlatform": {
         "type": "object",
         "required": [
@@ -33081,6 +35582,328 @@
           },
           "page": {
             "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "DrugInspectionProcessingRuleVersion": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "version_number",
+          "rule_code",
+          "apply_scope",
+          "reprocess_job_count",
+          "published_by",
+          "published_at"
+        ],
+        "properties": {
+          "apply_scope": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "published_by": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reprocess_job_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rule_code": {
+            "type": "string"
+          },
+          "version_number": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "DrugInspectionReportVersion": {
+        "type": "object",
+        "required": [
+          "id",
+          "report_id",
+          "owner_id",
+          "version_number",
+          "report_no",
+          "original_file_id",
+          "original_file_hash",
+          "source",
+          "processing_mode",
+          "qualified",
+          "status",
+          "uploaded_by",
+          "customer_copy_status",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "customer_copy_file_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "customer_copy_hash": {
+            "type": "string",
+            "nullable": true
+          },
+          "customer_copy_status": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "modification_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "original_file_hash": {
+            "type": "string"
+          },
+          "original_file_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "processing_mode": {
+            "type": "string"
+          },
+          "qualified": {
+            "type": "boolean"
+          },
+          "replaces_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "report_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "report_no": {
+            "type": "string"
+          },
+          "review_comment": {
+            "type": "string",
+            "nullable": true
+          },
+          "review_result": {
+            "type": "string",
+            "nullable": true
+          },
+          "reviewed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "reviewed_by": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "source": {
+            "type": "string"
+          },
+          "stamp_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "submitted_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "uploaded_by": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version_number": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "DrugInspectionRequirementRule": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "special_drug_category",
+          "missing_behavior",
+          "enabled",
+          "version",
+          "updated_by",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "missing_behavior": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "special_drug_category": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_by": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "DrugInspectionReviewQueueEntry": {
+        "type": "object",
+        "required": [
+          "version",
+          "product_code",
+          "product_name",
+          "batch_no",
+          "uploader_name"
+        ],
+        "properties": {
+          "batch_no": {
+            "type": "string"
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "product_name": {
+            "type": "string"
+          },
+          "uploader_name": {
+            "type": "string"
+          },
+          "version": {
+            "$ref": "#/components/schemas/DrugInspectionReportVersion"
+          }
+        }
+      },
+      "DrugInspectionStampVersion": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "version_number",
+          "png_attachment_id",
+          "relative_x",
+          "relative_y",
+          "relative_width",
+          "status",
+          "configured_by",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "configured_by": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "png_attachment_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "relative_width": {
+            "type": "number",
+            "format": "double"
+          },
+          "relative_x": {
+            "type": "number",
+            "format": "double"
+          },
+          "relative_y": {
+            "type": "number",
+            "format": "double"
+          },
+          "review_comment": {
+            "type": "string",
+            "nullable": true
+          },
+          "reviewed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "reviewed_by": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "submitted_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version_number": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -33873,6 +36696,100 @@
         ],
         "properties": {
           "active_source": {
+            "type": "string"
+          }
+        }
+      },
+      "FileAttachment": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "module",
+          "entity_type",
+          "entity_id",
+          "file_name",
+          "content_type",
+          "size_bytes",
+          "sha256",
+          "uploaded_by",
+          "created_at"
+        ],
+        "properties": {
+          "content_type": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "entity_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "entity_type": {
+            "type": "string"
+          },
+          "file_name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "module": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "uploaded_by": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "FileAttachmentDownloadUrlResponse": {
+        "type": "object",
+        "required": [
+          "url",
+          "expires_at"
+        ],
+        "properties": {
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      },
+      "FileUploadSessionResponse": {
+        "type": "object",
+        "required": [
+          "upload_id",
+          "upload_url",
+          "expires_at"
+        ],
+        "properties": {
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "upload_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "upload_url": {
             "type": "string"
           }
         }
@@ -35932,6 +38849,111 @@
           }
         }
       },
+      "InboundDocumentEntry": {
+        "type": "object",
+        "required": [
+          "asn_id",
+          "receipt_no",
+          "purchase_order_no",
+          "owner_id",
+          "supplier_id",
+          "supplier_name",
+          "product_id",
+          "product_code",
+          "product_name",
+          "batch_nos",
+          "drug_inspection_status",
+          "drug_inspection_version",
+          "upstream_delivery_status",
+          "upstream_version",
+          "created_at"
+        ],
+        "properties": {
+          "actual_received_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "asn_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "batch_nos": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "drug_inspection_status": {
+            "type": "string"
+          },
+          "drug_inspection_version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product_name": {
+            "type": "string"
+          },
+          "purchase_order_no": {
+            "type": "string"
+          },
+          "receipt_no": {
+            "type": "string"
+          },
+          "supplier_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "supplier_name": {
+            "type": "string"
+          },
+          "upstream_delivery_status": {
+            "type": "string"
+          },
+          "upstream_document_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "upstream_version": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "InboundDocumentEntryListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InboundDocumentEntry"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
       "IngestTemperatureExcursionRequest": {
         "type": "object",
         "required": [
@@ -37602,6 +40624,23 @@
           }
         }
       },
+      "OutboundColdChainPackage": {
+        "type": "object",
+        "required": [
+          "insulated_container_no",
+          "ice_pack_count"
+        ],
+        "properties": {
+          "ice_pack_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "insulated_container_no": {
+            "type": "string"
+          }
+        }
+      },
       "OutboundOrder": {
         "type": "object",
         "required": [
@@ -37610,6 +40649,8 @@
           "document_type",
           "wms_order_no",
           "customer_id",
+          "delivery_address_id",
+          "delivery_address_snapshot",
           "warehouse_id",
           "status",
           "short_pick",
@@ -37630,6 +40671,11 @@
             "type": "string",
             "format": "uuid"
           },
+          "delivery_address_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "delivery_address_snapshot": {},
           "department_code": {
             "type": "string",
             "nullable": true
@@ -37670,6 +40716,14 @@
           },
           "sales_group_code": {
             "type": "string",
+            "nullable": true
+          },
+          "shipment": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OutboundShipment"
+              }
+            ],
             "nullable": true
           },
           "short_pick": {
@@ -37756,6 +40810,89 @@
           },
           "page": {
             "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "OutboundShipment": {
+        "type": "object",
+        "required": [
+          "id",
+          "delivery_provider_type",
+          "plate_no",
+          "cold_chain",
+          "cold_chain_packages",
+          "package_count",
+          "handover_by",
+          "shipped_at",
+          "created_at"
+        ],
+        "properties": {
+          "cold_chain": {
+            "type": "boolean"
+          },
+          "cold_chain_packages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OutboundColdChainPackage"
+            }
+          },
+          "courier_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "courier_phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "delivery_provider_type": {
+            "type": "string"
+          },
+          "driver_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "driver_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "handover_by": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "loading_temperature_celsius": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "package_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "plate_no": {
+            "type": "string"
+          },
+          "shipped_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "signature_attachment_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "vehicle_no": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -39888,6 +43025,17 @@
           }
         }
       },
+      "PublishDrugInspectionProcessingRuleRequest": {
+        "type": "object",
+        "required": [
+          "apply_scope"
+        ],
+        "properties": {
+          "apply_scope": {
+            "type": "string"
+          }
+        }
+      },
       "PublishRouteBindingRequest": {
         "type": "object",
         "description": "H9 送货地址线路绑定发布命令。",
@@ -41754,6 +44902,113 @@
           }
         }
       },
+      "ReusableDrugInspectionReportResponse": {
+        "type": "object",
+        "required": [
+          "report_id",
+          "current_version_id",
+          "version_number",
+          "report_no",
+          "linked_to_asn"
+        ],
+        "properties": {
+          "current_version_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "linked_to_asn": {
+            "type": "boolean"
+          },
+          "report_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "report_no": {
+            "type": "string"
+          },
+          "version_number": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ReuseDrugInspectionReportRequest": {
+        "type": "object",
+        "required": [
+          "asn_id",
+          "batch_no"
+        ],
+        "properties": {
+          "asn_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "batch_no": {
+            "type": "string"
+          }
+        }
+      },
+      "ReuseDrugInspectionReportResponse": {
+        "type": "object",
+        "required": [
+          "report_id",
+          "asn_id",
+          "batch_no",
+          "source_version_id",
+          "linked_at"
+        ],
+        "properties": {
+          "asn_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "batch_no": {
+            "type": "string"
+          },
+          "linked_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "report_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source_version_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "ReviewDrugInspectionStampVersionRequest": {
+        "type": "object",
+        "required": [
+          "decision"
+        ],
+        "properties": {
+          "comment": {
+            "type": "string",
+            "nullable": true
+          },
+          "decision": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewDrugInspectionVersionRequest": {
+        "type": "object",
+        "required": [
+          "decision"
+        ],
+        "properties": {
+          "comment": {
+            "type": "string",
+            "nullable": true
+          },
+          "decision": {
+            "type": "string"
+          }
+        }
+      },
       "ReviewOutboundOrderLineRequest": {
         "type": "object",
         "required": [
@@ -42201,25 +45456,53 @@
       "ShipOutboundOrderRequest": {
         "type": "object",
         "required": [
-          "carrier_type",
-          "handover_to",
+          "delivery_provider_type",
+          "plate_no",
           "package_count"
         ],
         "properties": {
-          "carrier_type": {
+          "cold_chain_packages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OutboundColdChainPackage"
+            }
+          },
+          "courier_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "courier_phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "delivery_provider_type": {
             "type": "string"
           },
-          "handover_to": {
-            "type": "string"
+          "driver_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "loading_temperature_celsius": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
           },
           "package_count": {
             "type": "integer",
             "format": "int32",
             "minimum": 0
           },
-          "shipped_at": {
+          "plate_no": {
+            "type": "string"
+          },
+          "signature_attachment_id": {
             "type": "string",
-            "format": "date-time",
+            "format": "uuid",
+            "nullable": true
+          },
+          "vehicle_no": {
+            "type": "string",
             "nullable": true
           }
         }
@@ -44248,6 +47531,30 @@
           }
         }
       },
+      "UpdateDrugInspectionDraftRequest": {
+        "type": "object",
+        "required": [
+          "report_no",
+          "original_file_id",
+          "processing_mode",
+          "qualified"
+        ],
+        "properties": {
+          "original_file_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "processing_mode": {
+            "type": "string"
+          },
+          "qualified": {
+            "type": "boolean"
+          },
+          "report_no": {
+            "type": "string"
+          }
+        }
+      },
       "UpdateH8ErpConnectorRequest": {
         "type": "object",
         "required": [
@@ -44919,6 +48226,25 @@
           }
         }
       },
+      "UpsertDrugInspectionRequirementRuleRequest": {
+        "type": "object",
+        "required": [
+          "special_drug_category",
+          "missing_behavior",
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "missing_behavior": {
+            "type": "string"
+          },
+          "special_drug_category": {
+            "type": "string"
+          }
+        }
+      },
       "UpsertDualPersonPolicyRuleRequest": {
         "type": "object",
         "required": [
@@ -45487,6 +48813,63 @@
           }
         }
       },
+      "UpstreamDeliveryDocumentVersion": {
+        "type": "object",
+        "required": [
+          "id",
+          "document_id",
+          "owner_id",
+          "version_number",
+          "attachment_ids",
+          "asn_ids",
+          "uploaded_by",
+          "created_at"
+        ],
+        "properties": {
+          "asn_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "attachment_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "document_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "modification_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "uploaded_by": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version_number": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "Warehouse": {
         "type": "object",
         "description": "仓库基础档案。",
@@ -45911,6 +49294,10 @@
     {
       "name": "drug-inspection",
       "description": "M-DI 药检平台配置"
+    },
+    {
+      "name": "file-attachment",
+      "description": "H-FILE 附件上传与下载"
     },
     {
       "name": "admin-menu",

@@ -27,7 +27,6 @@ import {
   type ActionState,
   type ActionTargetContext,
   type OutboundCreateForm,
-  type OutboundShipForm,
   type PurchaseReturnCreateForm,
 } from "./M4OutboundActionDialog";
 import {
@@ -84,11 +83,14 @@ import {
 } from "../print-template/H9BusinessPrintDialog";
 import {
   emptyPurchaseReturnForm,
-  emptyShipForm,
   outboundOrderRequest,
-  outboundShipRequest,
   purchaseReturnRequest,
 } from "./m4-outbound-action-requests";
+import {
+  buildShipOutboundRequest,
+  defaultOutboundShipForm,
+  type OutboundShipForm,
+} from "./m4-outbound-page-helpers";
 import { outboundPrintTarget } from "./m4-outbound-print";
 import { useDialogState } from "@/lib/use-dialog-state";
 import { usePageQueryState } from "@/lib/use-page-query-state";
@@ -145,7 +147,7 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
   });
   const [purchaseReturnForm, setPurchaseReturnForm] =
     React.useState<PurchaseReturnCreateForm>(emptyPurchaseReturnForm);
-  const [shipForm, setShipForm] = React.useState<OutboundShipForm>(emptyShipForm);
+  const [shipForm, setShipForm] = React.useState<OutboundShipForm>(defaultOutboundShipForm);
   const ordersQuery = useOutboundOrdersQuery(mode === "orders" || mode === "waves" || mode === "review");
   const wavesQuery = useOutboundWavesQuery(mode === "waves");
   const returnsQuery = usePurchaseReturnsQuery(mode === "returns");
@@ -400,7 +402,7 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
         warehouseId: current.warehouseId,
       }));
     }
-    if (kind === "ship") setShipForm(emptyShipForm);
+    if (kind === "ship") setShipForm(defaultOutboundShipForm());
   }
 
   function resolveActionTarget(action: ActionState | null): ActionTargetContext | null {
@@ -543,7 +545,7 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
     if (action.kind === "ship") {
       const shipped = await shipOutboundOrderMutation.mutateAsync({
         orderId: action.targetId,
-        request: outboundShipRequest(shipForm),
+        request: buildShipOutboundRequest(shipForm),
       });
       setOrders((value) => value.map((item) => item.id === shipped.id ? shipped : item));
       setLastEvent("发货交接已完成");

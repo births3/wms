@@ -1,56 +1,48 @@
 -- US-H9-009 / ADR-0031：统一 H-FILE 元数据、H9 文件业务绑定与分类 PDF。
 
-CREATE TABLE attachments (
-    id                UUID PRIMARY KEY,
-    owner_id          UUID NOT NULL,
-    module            TEXT NOT NULL,
-    entity_type       TEXT NOT NULL,
-    entity_id         UUID NOT NULL,
-    bucket            TEXT NOT NULL,
-    storage_key       TEXT NOT NULL,
-    file_name         TEXT NOT NULL,
-    content_type      TEXT NOT NULL,
-    size_bytes        BIGINT NOT NULL,
-    content_hash      TEXT NOT NULL,
-    file_version      INT NOT NULL DEFAULT 1,
-    status            TEXT NOT NULL,
-    retention_policy  TEXT NOT NULL,
-    retain_until      TIMESTAMPTZ,
-    cache_expires_at  TIMESTAMPTZ,
-    created_by        UUID NOT NULL,
-    created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
-    confirmed_at      TIMESTAMPTZ,
-    UNIQUE (owner_id, id),
-    UNIQUE (bucket, storage_key),
-    CHECK (length(btrim(module)) BETWEEN 1 AND 32),
-    CHECK (length(btrim(entity_type)) BETWEEN 1 AND 64),
-    CHECK (length(btrim(bucket)) BETWEEN 1 AND 100),
-    CHECK (length(btrim(storage_key)) BETWEEN 1 AND 500),
-    CHECK (length(btrim(file_name)) BETWEEN 1 AND 255),
-    CHECK (content_type = 'application/pdf'),
-    CHECK (size_bytes BETWEEN 1 AND 52428800),
-    CHECK (content_hash ~ '^[0-9a-f]{64}$'),
-    CHECK (file_version > 0),
-    CHECK (status IN ('pending', 'ready', 'failed')),
-    CHECK (retention_policy IN ('gsp_5_year', 'short_cache')),
-    CHECK (
-        (retention_policy = 'gsp_5_year'
-            AND retain_until IS NOT NULL
-            AND cache_expires_at IS NULL)
-        OR (retention_policy = 'short_cache'
-            AND retain_until IS NULL
-            AND cache_expires_at IS NOT NULL)
+ALTER TABLE attachments
+    ADD COLUMN bucket TEXT,
+    ADD COLUMN content_hash TEXT,
+    ADD COLUMN file_version INT,
+    ADD COLUMN status TEXT,
+    ADD COLUMN retention_policy TEXT,
+    ADD COLUMN retain_until TIMESTAMPTZ,
+    ADD COLUMN cache_expires_at TIMESTAMPTZ,
+    ADD COLUMN created_by UUID,
+    ADD COLUMN confirmed_at TIMESTAMPTZ,
+    ADD CONSTRAINT attachments_h9_pdf_metadata_check CHECK (
+        bucket IS NULL
+        OR (
+            length(btrim(bucket)) BETWEEN 1 AND 100
+            AND length(btrim(storage_key)) BETWEEN 1 AND 500
+            AND length(btrim(file_name)) BETWEEN 1 AND 255
+            AND content_type = 'application/pdf'
+            AND size_bytes BETWEEN 1 AND 52428800
+            AND content_hash ~ '^[0-9a-f]{64}$'
+            AND file_version > 0
+            AND status IN ('pending', 'ready', 'failed')
+            AND retention_policy IN ('gsp_5_year', 'short_cache')
+            AND created_by IS NOT NULL
+            AND (
+                (retention_policy = 'gsp_5_year'
+                    AND retain_until IS NOT NULL
+                    AND cache_expires_at IS NULL)
+                OR (retention_policy = 'short_cache'
+                    AND retain_until IS NULL
+                    AND cache_expires_at IS NOT NULL)
+            )
+            AND (
+                (status = 'ready' AND confirmed_at IS NOT NULL)
+                OR (status <> 'ready' AND confirmed_at IS NULL)
+            )
+        )
     ),
-    CHECK (
-        (status = 'ready' AND confirmed_at IS NOT NULL)
-        OR (status <> 'ready' AND confirmed_at IS NULL)
-    )
-);
+    ADD CONSTRAINT attachments_bucket_storage_key_key UNIQUE (bucket, storage_key);
 
-CREATE INDEX attachments_entity_idx
+CREATE INDEX IF NOT EXISTS attachments_entity_idx
     ON attachments (owner_id, module, entity_type, entity_id);
 
-CREATE INDEX attachments_retention_idx
+CREATE INDEX IF NOT EXISTS attachments_retention_idx
     ON attachments (status, retention_policy, retain_until, cache_expires_at);
 
 -- H9 只保留发票/药检单覆盖关系；文件事实统一由 attachments 承载。

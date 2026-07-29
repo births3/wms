@@ -52,6 +52,11 @@
 11. 模块严格范围检查通过。
 12. 不存在 mock 替代生产实现、无效按钮或只登记未实现。
 
+有页面故事的“真实数据 E2E”必须连接真实 HTTP 服务和 PostgreSQL 测试库；写入附件或后台
+任务时还要连接对应测试实现。dev mock、静态 JSON、Playwright 业务路由拦截和浏览器内存状态
+只能用于走查，不能作为完成证据。截图 spec 使用 `*-real.spec.ts`，并在业务断言和刷新回读
+通过后生成。
+
 ### 模块级
 
 模块验收必须同时满足：模块内无延期故事；菜单、页面、API、后端和数据库形成完整业务链；正常、拒绝、撤销、重复提交、越权和跨货主路径按适用范围通过；字段矩阵、状态机和审计一致；真实 E2E 覆盖主要流程；质量矩阵、OpenAPI、范围和治理检查通过。
@@ -110,7 +115,7 @@ PDA 必须有真机扫码、离线重放、幂等和易用性证据；外部系�
 - 明确不在本轮范围的故事写入 `governance/quality-matrix.toml` 的 `[[deferred_stories]]`，必须有原因；这只关闭范围缺口，不表示功能已完成。
 - issue、review 或验收反馈发现“页面已有但按钮/弹窗/流程没做”时，先定位对应用户故事是否已进入矩阵；没有进入矩阵则先补矩阵或登记待办，再补实现。
 - 管理端页面进入 `frontend_pages` 后，必须同时检查 `menuSections`、`defaultMenuTree`、`renderAdminView` 路由可达和 `apps/web-admin/dev-mocks/admin-menu-dev-mock.ts` 已发布菜单种子，避免只登记菜单标题但默认三层菜单、运行时已发布菜单或页面渲染漏接。
-- 带 `frontend_interaction` 且声明管理端页面的故事，必须登记 `e2e_checks`。页面级 self-check 可证明菜单、路由和公共组件接线，但不能替代真实浏览器验收。
+- 带 `frontend_interaction` 且声明管理端页面的故事，必须登记真实数据 `e2e_checks`。页面级 self-check 和 dev mock Playwright 只能证明接线或走查，不能替代真实浏览器验收。
 - `governance/menu-e2e-screenshot-policy.toml` 生效后新增的菜单页，必须登记真实 Playwright `e2e_checks`，并在所属故事写 `e2e_screenshots = [{ page, spec, screenshot }]`；`spec` 与 `screenshot` 还必须进入 `evidence_refs`。截图路径固定使用 `artifacts/screenshot-portal/real-web/<页面证据目录>/*.png`，由 E2E 运行时生成，不把临时 PNG 入库。
 - `legacy_pages` 只冻结规则启用前的页面，不得用于豁免新页面；检查器冻结初始债务上限，清单只允许减少。历史页面补齐证据后应从列表删除。`check_scope_gap_discovery.py` 默认对基线外缺证据页面硬失败，避免“菜单可见但流程未验收”。
 - 页面级 self-check 至少覆盖菜单入口、默认菜单树、已发布菜单 dev mock、路由渲染、公共 `QueryPanel` / `DataGrid` 使用、真实后端或 dev mock 数据入口。

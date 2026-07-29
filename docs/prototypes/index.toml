@@ -1354,19 +1354,15 @@ prototype_slug = "pc-di-001"
 end = "pc"
 priority = "P3"
 status = "ready_for_walkthrough"
-reason = "对接配置+测试连接"
+reason = "ASN资料清单+药检单复用上传+上游随货同行单录入"
 
 [[required]]
 story_id = "US-DI-002"
-prototype_slug = "pda-di-002"
-end = "pda"
+prototype_slug = "pc-di-002"
+end = "pc"
 priority = "P3"
 status = "ready_for_walkthrough"
-reason = "PDA 扫码查询"
-
-[required.viewport]
-touch_target_min_pt = 48
-font_size_min_pt = 16
+reason = "PC 审核走查+副本对比"
 
 [[required]]
 story_id = "US-DI-003"
@@ -1374,7 +1370,7 @@ prototype_slug = "pc-di-003"
 end = "pc"
 priority = "P3"
 status = "ready_for_walkthrough"
-reason = "药检单详情+PDF 预览"
+reason = "地址订单查询+批量下载"
 
 [[required]]
 story_id = "US-BA-001"

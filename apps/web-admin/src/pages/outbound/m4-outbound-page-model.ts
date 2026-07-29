@@ -87,7 +87,9 @@ export function normalizeM4OutboundQueryValue(value: QueryPanelValue): QueryPane
 }
 
 export function filterOrders(orders: OutboundOrder[], query: QueryPanelValue, mode: M4OutboundMode) {
-  const allowed = mode === "review" ? new Set(["picked", "picked_short"]) : null;
+  const allowed = mode === "review"
+    ? new Set(["picked", "picked_short", "reviewed", "reviewed_short", "shipped"])
+    : null;
   const keyword = queryString(query.keyword);
   const statuses = new Set(queryStringArray(query.statusFilter));
   const businessDate = queryRange(query.businessDate);

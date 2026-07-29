@@ -1,6 +1,6 @@
 # ADR-0021：高保真原型策略
 
-- 状态：Accepted
+- 状态：Superseded by ADR-0043
 - 决策日期：2026-05-22
 - 决策人：项目主人
 - 关联：ADR-0001 / ADR-0006 / ADR-0015 / docs/infra/usability-baseline.md

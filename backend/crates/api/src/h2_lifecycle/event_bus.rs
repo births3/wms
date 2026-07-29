@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde_json::Value;
-use sqlx::PgPool;
+use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use super::support::{append_system_audit_in_tx, db_error, matches_event_pattern};
@@ -79,16 +79,69 @@ pub async fn publish_event(
     payload: Value,
     now: DateTime<Utc>,
 ) -> Result<EventEnvelope, H2LifecycleError> {
-    if idempotency_key.trim().is_empty() || event_type.trim().is_empty() {
-        return Err(H2LifecycleError::InvalidInput(
-            "idempotency_key and event_type are required".to_string(),
-        ));
-    }
     if let Some(existing) = load_event_by_idempotency(pool, owner_id, idempotency_key).await? {
         return Ok(existing);
     }
 
     let mut tx = pool.begin().await.map_err(db_error)?;
+    let envelope = publish_event_in_tx(
+        &mut tx,
+        owner_id,
+        idempotency_key,
+        event_type,
+        source_module,
+        resource_type,
+        resource_id,
+        payload,
+        now,
+    )
+    .await?;
+    tx.commit().await.map_err(db_error)?;
+    Ok(envelope)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn publish_event_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    idempotency_key: &str,
+    event_type: &str,
+    source_module: &str,
+    resource_type: &str,
+    resource_id: &str,
+    payload: Value,
+    now: DateTime<Utc>,
+) -> Result<EventEnvelope, H2LifecycleError> {
+    if idempotency_key.trim().is_empty() || event_type.trim().is_empty() {
+        return Err(H2LifecycleError::InvalidInput(
+            "idempotency_key and event_type are required".to_string(),
+        ));
+    }
+    let existing: Option<Uuid> = sqlx::query_scalar(
+        "SELECT id
+         FROM event_bus_event
+         WHERE owner_id = $1 AND idempotency_key = $2",
+    )
+    .bind(owner_id)
+    .bind(idempotency_key)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(db_error)?;
+    if let Some(event_id) = existing {
+        let delivery_count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*)::BIGINT FROM event_bus_delivery WHERE event_id = $1",
+        )
+        .bind(event_id)
+        .fetch_one(&mut **tx)
+        .await
+        .map_err(db_error)?;
+        return Ok(EventEnvelope {
+            id: event_id,
+            owner_id,
+            event_type: event_type.to_string(),
+            delivery_count,
+        });
+    }
     let event_id = Uuid::new_v4();
     sqlx::query(
         r#"
@@ -108,7 +161,7 @@ pub async fn publish_event(
     .bind(resource_id)
     .bind(payload)
     .bind(now)
-    .execute(&mut *tx)
+    .execute(&mut **tx)
     .await
     .map_err(db_error)?;
 
@@ -120,7 +173,7 @@ pub async fn publish_event(
         "#,
     )
     .bind(owner_id)
-    .fetch_all(&mut *tx)
+    .fetch_all(&mut **tx)
     .await
     .map_err(db_error)?;
 
@@ -143,13 +196,11 @@ pub async fn publish_event(
         .bind(event_id)
         .bind(subscription.id)
         .bind(now)
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await
         .map_err(db_error)?;
         delivery_count += 1;
     }
-
-    tx.commit().await.map_err(db_error)?;
 
     Ok(EventEnvelope {
         id: event_id,
@@ -243,7 +294,10 @@ pub async fn record_delivery_failure(
                END,
                last_error = $4,
                updated_at = $5,
-               next_attempt_at = $5
+               next_attempt_at = CASE
+                   WHEN attempt_count + 1 >= $3 THEN NULL
+                   ELSE $5 + make_interval(secs => LEAST(30, (2 ^ attempt_count)::INT))
+               END
          WHERE owner_id = $1 AND id = $2
         RETURNING id, event_id, status, attempt_count
         "#,

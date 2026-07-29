@@ -13,6 +13,7 @@ import { handlePrintInventoryDevMock } from "./web-admin-dev-mock-print-inventor
 import { handleDocumentNumberingDevMock } from "./document-numbering-dev-mock";
 import { handleOutboundDevMock } from "./outbound-dev-mock";
 import { handleDockDevMock } from "./dock-dev-mock";
+import { handleDrugInspectionDocumentDevMock } from "./drug-inspection-document-dev-mock";
 import { handleReconciliationDevMock } from "./reconciliation-dev-mock";
 
 import {
@@ -199,6 +200,12 @@ async function tryHandleDevMockRoute(
   }
   if (pathname.startsWith("/api/v1/outbound")) {
     if (await handleOutboundDevMock(req, res, pathname)) return true;
+  }
+  if (
+    pathname.startsWith("/api/v1/drug-inspection")
+    || pathname.startsWith("/api/v1/attachments")
+  ) {
+    if (await handleDrugInspectionDocumentDevMock(req, res, pathname)) return true;
   }
 
   if (req.method === "POST" && pathname === "/api/v1/auth/login") {

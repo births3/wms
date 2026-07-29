@@ -62,6 +62,7 @@ export function M4OutboundDetailDialog({ target, open, onOpenChange }: M4Outboun
 }
 
 function OrderDetail({ order }: { order: OutboundOrder }) {
+  const shipment = order.shipment;
   return (
     <section className="grid gap-4">
       <div className="grid gap-4 md:grid-cols-2">
@@ -88,21 +89,20 @@ function OrderDetail({ order }: { order: OutboundOrder }) {
         <DetailBlock
           title="校验与配送"
           rows={[
-            // 复核模式 / 配送方 / 包裹数量尚无真实字段：展示「-」，不得虚构
             ["校验结果", order.status === "validation_exception" ? "校验异常" : "通过"],
             ["复核模式", "-"],
-            ["配送方", "-"],
-            ["包裹数量", "-"],
+            ["配送方", shipment ? deliveryProviderLabel(shipment.delivery_provider_type) : "-"],
+            ["包裹数量", shipment ? `${shipment.package_count} 件` : "-"],
           ]}
         />
         <DetailBlock
           title="交接字段"
           rows={[
-            // 车牌 / 装车温度 / 签字尚未随订单返回：展示「—」，不得按状态虚构
-            ["交接时间", order.status === "shipped" ? formatDateTime(order.updated_at) : "—"],
-            ["车牌号", "—"],
-            ["装车温度", "—"],
-            ["签字", "—"],
+            ["交接时间", shipment ? formatDateTime(shipment.shipped_at) : "—"],
+            ["车辆 / 车牌", shipment ? `${shipment.vehicle_no ?? "第三方车辆"} / ${shipment.plate_no}` : "—"],
+            ["司机 / 快递员", shipment?.driver_name ?? shipment?.courier_name ?? "—"],
+            ["装车温度", shipment?.cold_chain ? `${shipment.loading_temperature_celsius ?? "-"}℃` : "非冷链"],
+            ["签字", shipment?.signature_attachment_id ? "已关联附件" : shipment?.driver_user_id ? "已关联司机用户" : "—"],
           ]}
         />
       </div>
@@ -112,6 +112,10 @@ function OrderDetail({ order }: { order: OutboundOrder }) {
       }))} />
     </section>
   );
+}
+
+function deliveryProviderLabel(value: string) {
+  return value === "own_fleet" ? "自有车队" : "第三方快递";
 }
 
 function documentTypeLabel(value: string) {

@@ -532,7 +532,7 @@ def run() -> tuple[list[str], list[str]]:
     for f in sorted(source_files):
         if f in page_file_set:
             continue
-        if any(part in f.parts for part in ("node_modules", "target", "dist", ".vite-temp")):
+        if any(part in f.parts for part in ("node_modules", "target", "dist", ".vite", ".vite-temp")):
             continue
         rel = f.relative_to(REPO_ROOT).as_posix()
         if rel in GENERATED_FILES:

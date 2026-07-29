@@ -40,6 +40,7 @@ prototypes/.visual-snapshots/
 prototypes/.visual-diffs/
 prototypes/.e2e-artifacts/
 apps/web-admin/.e2e-artifacts/
+apps/customer-portal/.e2e-artifacts/
 prototypes/test-results/
 test-results/
 

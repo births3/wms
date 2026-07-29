@@ -1,0 +1,269 @@
+@media (max-width: 1023px) {
+  .portal-workspace {
+    display: block;
+    padding: 1.25rem;
+  }
+
+  .portal-sidebar {
+    position: static;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+  }
+
+  .portal-space-label,
+  .portal-scope-card {
+    display: none;
+  }
+
+  .portal-navigation {
+    display: flex;
+    width: 100%;
+    gap: 0.375rem;
+  }
+
+  .portal-nav-button {
+    justify-content: center;
+    white-space: nowrap;
+  }
+
+  .portal-nav-icon {
+    width: auto;
+    height: auto;
+    background: transparent;
+  }
+
+  .portal-main {
+    margin-top: 1.25rem;
+  }
+}
+
+@media (max-width: 860px) {
+  .login-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .login-brand {
+    min-height: 30rem;
+  }
+
+  .portal-filter-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(180px, 0.8fr);
+  }
+
+  .portal-filter-action {
+    min-height: 2.5rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .portal-header-inner {
+    min-height: 4.25rem;
+    padding-inline: 1rem;
+  }
+
+  .portal-brand-caption,
+  .portal-account-avatar,
+  .portal-account-copy {
+    display: none;
+  }
+
+  .portal-brand-title {
+    max-width: 8rem;
+    font-size: 0.875rem;
+    line-height: 1.25;
+  }
+
+  .portal-logout-button {
+    width: 2.5rem;
+    padding: 0;
+    font-size: 0;
+  }
+
+  .portal-logout-button svg {
+    margin: 0;
+  }
+
+  .portal-workspace {
+    padding: 0.75rem;
+  }
+
+  .portal-navigation {
+    overflow-x: auto;
+  }
+
+  .portal-nav-button {
+    min-width: max-content;
+    flex: 1;
+    padding-inline: 0.625rem;
+    font-size: 0.8125rem;
+  }
+
+  .portal-page-header {
+    align-items: flex-start;
+  }
+
+  .portal-page-header > button {
+    flex: 0 0 auto;
+  }
+
+  .portal-page-description {
+    max-width: 28rem;
+  }
+
+  .portal-summary-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .portal-summary-card {
+    min-height: 4.75rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.75rem;
+  }
+
+  .portal-summary-icon {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  .portal-summary-value {
+    font-size: 1.125rem;
+  }
+
+  .portal-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .portal-table-toolbar {
+    align-items: flex-start;
+  }
+
+  .portal-responsive-table {
+    min-width: 0;
+  }
+
+  .portal-responsive-table thead {
+    display: none;
+  }
+
+  .portal-responsive-table tbody {
+    display: grid;
+    gap: 0.75rem;
+    padding: 0.75rem;
+  }
+
+  .portal-responsive-table tbody tr {
+    position: relative;
+    display: grid;
+    padding: 0.625rem 0.875rem 0.75rem;
+    border: 1px solid hsl(var(--portal-line));
+    border-radius: 0.875rem;
+    background: hsl(var(--portal-surface));
+    box-shadow: 0 5px 16px hsl(var(--portal-shadow) / 4%);
+  }
+
+  .portal-responsive-table td {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid hsl(var(--portal-line));
+    font-size: 0.8125rem;
+    text-align: right;
+  }
+
+  .portal-responsive-table td::before {
+    flex: 0 0 auto;
+    color: hsl(var(--portal-muted));
+    content: attr(data-label);
+    font-size: 0.6875rem;
+    font-weight: 650;
+  }
+
+  .portal-responsive-table td[data-mobile="select"] {
+    justify-content: flex-start;
+    padding-top: 0.25rem;
+  }
+
+  .portal-responsive-table td[data-mobile="select"]::before,
+  .portal-responsive-table td[data-mobile="action"]::before {
+    display: none;
+  }
+
+  .portal-responsive-table td[data-mobile="action"] {
+    padding: 0.75rem 0 0;
+    border-bottom: 0;
+  }
+
+  .portal-responsive-table td[data-mobile="action"] > button,
+  .portal-responsive-table td[data-mobile="action"] > div {
+    width: 100%;
+  }
+
+  .portal-responsive-table td[data-mobile="action"] > div > button {
+    flex: 1;
+  }
+
+  .portal-dialog-backdrop {
+    padding: 0;
+  }
+
+  .portal-dialog-panel {
+    max-width: none;
+    height: 100%;
+    min-height: 100%;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .portal-dialog-header,
+  .portal-dialog-body {
+    padding: 1rem;
+  }
+
+  .login-brand {
+    min-height: 33rem;
+    padding: 1.5rem;
+  }
+
+  .login-brand-caption {
+    font-size: 0.6875rem;
+  }
+
+  .login-hero-copy h1 {
+    font-size: 2.4rem;
+  }
+
+  .login-hero-copy p {
+    margin-top: 1rem;
+    line-height: 1.7;
+  }
+
+  .login-points {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .login-point:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .login-form-pane {
+    padding: 1.25rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portal-dialog-panel,
+  .portal-nav-button,
+  .portal-table tbody tr {
+    animation: none;
+    transition: none;
+  }
+}

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from collections import Counter
 from dataclasses import asdict, dataclass
@@ -29,6 +30,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 MATRIX = REPO_ROOT / "governance" / "quality-matrix.toml"
 DOC = REPO_ROOT / "docs" / "governance" / "quality-matrix.md"
 OPENAPI_JSON = REPO_ROOT / "shared" / "openapi" / "openapi.json"
+OPENAPI_YAML_FILES = [
+    REPO_ROOT / "shared" / "openapi" / "customer-portal-openapi.yaml",
+]
 STORY_GLOB = "docs/domain/user-stories-*.md"
 NAVIGATION_CHECK_SOURCES = {
     "pnpm --dir apps/web-admin run test:e2e:shell-dev": REPO_ROOT
@@ -67,6 +71,14 @@ NAVIGATION_CHECK_SOURCES = {
     / "apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs",
     "node apps/web-admin/self-checks/m2-putaway-strategy-self-check.mjs": REPO_ROOT
     / "apps/web-admin/self-checks/m2-putaway-strategy-self-check.mjs",
+    "node apps/web-admin/self-checks/m2-inbound-documents-page-self-check.mjs": REPO_ROOT
+    / "apps/web-admin/self-checks/m2-inbound-documents-page-self-check.mjs",
+    "node apps/web-admin/self-checks/di-drug-inspection-slice-self-check.mjs": REPO_ROOT
+    / "apps/web-admin/self-checks/di-drug-inspection-slice-self-check.mjs",
+    "node apps/web-admin/self-checks/mdi-document-workflow-self-check.mjs": REPO_ROOT
+    / "apps/web-admin/self-checks/mdi-document-workflow-self-check.mjs",
+    "node apps/web-admin/self-checks/m4-outbound-datagrid-actions-self-check.mjs": REPO_ROOT
+    / "apps/web-admin/self-checks/m4-outbound-datagrid-actions-self-check.mjs",
 }
 
 DIMENSIONS = (
@@ -102,6 +114,7 @@ ALLOWED_MODULES = {
     "H10",
     "TE",
     "AL",
+    "DI",
     "RC",
 }
 STORY_TYPE_LAYERS = {
@@ -150,14 +163,43 @@ def story_files() -> set[str]:
 def openapi_paths() -> set[str]:
     payload = json.loads(OPENAPI_JSON.read_text(encoding="utf-8"))
     paths = payload.get("paths")
-    if not isinstance(paths, dict):
-        return set()
-    return {
+    operations = {
         f"{method.upper()} {path}"
         for path, operations in paths.items()
         if isinstance(operations, dict)
         for method in operations
-    }
+    } if isinstance(paths, dict) else set()
+    for contract in OPENAPI_YAML_FILES:
+        if contract.exists():
+            operations.update(yaml_openapi_paths(contract))
+    return operations
+
+
+def yaml_openapi_paths(contract: Path) -> set[str]:
+    """读取仓库内简单 OpenAPI YAML 的 paths/method，避免治理脚本新增运行时依赖。"""
+    operations: set[str] = set()
+    in_paths = False
+    current_path: str | None = None
+    for line in contract.read_text(encoding="utf-8").splitlines():
+        if line == "paths:":
+            in_paths = True
+            continue
+        if not in_paths:
+            continue
+        if line and not line.startswith(" "):
+            break
+        path_match = re.fullmatch(r"  (/\S+):\s*", line)
+        if path_match:
+            current_path = path_match.group(1)
+            continue
+        method_match = re.fullmatch(
+            r"    (get|put|post|delete|patch|options|head|trace):\s*",
+            line,
+            flags=re.IGNORECASE,
+        )
+        if current_path and method_match:
+            operations.add(f"{method_match.group(1).upper()} {current_path}")
+    return operations
 
 
 def layer_sort_key(layer: str) -> int:

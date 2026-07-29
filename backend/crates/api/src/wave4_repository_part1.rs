@@ -1,3 +1,4 @@
+// @governance: skip-page-size outbound create, wave, pick, and review transactions stay auditable together.
 impl PgWave4Repository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
@@ -17,7 +18,8 @@ impl PgWave4Repository {
             r#"
             SELECT id, owner_id, document_type, wms_order_no, erp_order_no,
                    invoice_no, transport_mode_code, department_code, sales_group_code,
-                   order_group_no, business_type_code, customer_id, warehouse_id,
+                   order_group_no, business_type_code, customer_id,
+                   delivery_address_id, delivery_address_snapshot, warehouse_id,
                    required_ship_at, status, short_pick,
                    created_at, updated_at
               FROM outbound_orders
@@ -44,7 +46,9 @@ impl PgWave4Repository {
         for row in rows {
             let lines =
                 load_outbound_order_lines_from_pool(&self.pool, ctx.owner_id, row.id).await?;
-            orders.push(map_outbound_order(row, lines));
+            let shipment =
+                load_outbound_shipment_from_pool(&self.pool, ctx.owner_id, row.id).await?;
+            orders.push(map_outbound_order(row, lines, shipment));
         }
         Ok(orders)
     }
@@ -58,7 +62,8 @@ impl PgWave4Repository {
             r#"
             SELECT id, owner_id, document_type, wms_order_no, erp_order_no,
                    invoice_no, transport_mode_code, department_code, sales_group_code,
-                   order_group_no, business_type_code, customer_id, warehouse_id,
+                   order_group_no, business_type_code, customer_id,
+                   delivery_address_id, delivery_address_snapshot, warehouse_id,
                    required_ship_at, status, short_pick,
                    created_at, updated_at
               FROM outbound_orders
@@ -72,7 +77,8 @@ impl PgWave4Repository {
         .map_err(map_db_error)?
         .ok_or(Wave4RepositoryError::NotFound)?;
         let lines = load_outbound_order_lines_from_pool(&self.pool, ctx.owner_id, id).await?;
-        Ok(map_outbound_order(row, lines))
+        let shipment = load_outbound_shipment_from_pool(&self.pool, ctx.owner_id, id).await?;
+        Ok(map_outbound_order(row, lines, shipment))
     }
 
     pub async fn create_outbound_order(
@@ -101,6 +107,27 @@ impl PgWave4Repository {
 
         let order_id = Uuid::new_v4();
         ensure_outbound_document_type(&mut tx, ctx.owner_id, &req.document_type).await?;
+        let delivery_address_snapshot: serde_json::Value = sqlx::query_scalar(
+            r#"
+            SELECT jsonb_build_object(
+                'province', province,
+                'city', city,
+                'district', district,
+                'detail_address', detail_address,
+                'contact_name', contact_name,
+                'contact_phone', contact_phone
+            )
+              FROM customer_addresses
+             WHERE owner_id = $1 AND customer_id = $2 AND id = $3
+            "#,
+        )
+        .bind(ctx.owner_id)
+        .bind(req.customer_id)
+        .bind(req.delivery_address_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(map_db_error)?
+        .ok_or(Wave4RepositoryError::InvalidDeliveryAddress)?;
         let wms_order_no = if req.wms_order_no.trim().is_empty() {
             PgDocumentNumberingService::new()
                 .generate_in_tx(
@@ -126,12 +153,13 @@ impl PgWave4Repository {
             INSERT INTO outbound_orders (
                 id, owner_id, document_type, wms_order_no, erp_order_no,
                 invoice_no, transport_mode_code, department_code, sales_group_code,
-                order_group_no, business_type_code, customer_id, warehouse_id,
+                order_group_no, business_type_code, customer_id,
+                delivery_address_id, delivery_address_snapshot, warehouse_id,
                 required_ship_at, status, short_pick, created_at, updated_at
             )
             VALUES (
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
-                $12, $13, $14, $15, FALSE, $16, $16
+                $12, $13, $14, $15, $16, $17, FALSE, $18, $18
             )
             "#,
         )
@@ -147,6 +175,8 @@ impl PgWave4Repository {
         .bind(&req.order_group_no)
         .bind(&req.business_type_code)
         .bind(req.customer_id)
+        .bind(req.delivery_address_id)
+        .bind(delivery_address_snapshot)
         .bind(req.warehouse_id)
         .bind(req.required_ship_at)
         .bind(OUTBOUND_STATUS_CONFIRMED)

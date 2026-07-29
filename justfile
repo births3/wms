@@ -84,6 +84,8 @@ _t2-unit-tests:
     @pnpm --dir apps/web-admin run test:self-checks
     @node packages/ui/tests/dialog-dismiss.test.ts
     @node packages/ui/tests/data-grid-views.test.ts
+    @node packages/ui/tests/query-panel-quick-filters.test.ts
+    @node apps/web-admin/src/pages/inbound/inbound-document-entry-model.test.ts
 
 _t2-contract-static:
     @echo "  · L2 API contract static"

@@ -130,9 +130,13 @@ impl IntoResponse for Wave4HandlerError {
             | Wave4HandlerError::Repository(Wave4RepositoryError::BatchNotAffected(_))
             | Wave4HandlerError::Repository(Wave4RepositoryError::InvalidQuantity)
             | Wave4HandlerError::Repository(Wave4RepositoryError::InvalidDocumentType)
+            | Wave4HandlerError::Repository(Wave4RepositoryError::InvalidDeliveryAddress)
             | Wave4HandlerError::Repository(Wave4RepositoryError::InvalidTraceabilityEvent)
             | Wave4HandlerError::Repository(Wave4RepositoryError::ShortPickNotReplenished)
+            | Wave4HandlerError::Repository(Wave4RepositoryError::InvalidDriver)
+            | Wave4HandlerError::Repository(Wave4RepositoryError::InvalidSignatureAttachment)
             | Wave4HandlerError::Repository(Wave4RepositoryError::ReviewValidation(_))
+            | Wave4HandlerError::Repository(Wave4RepositoryError::ShipmentValidation(_))
             | Wave4HandlerError::Repository(Wave4RepositoryError::InvalidStatus { .. })
             | Wave4HandlerError::Repository(Wave4RepositoryError::InvalidStateTransition {
                 ..
@@ -541,8 +545,8 @@ mod tests {
                 order_group_no: None,
                 business_type_code: None,
                 customer_id: Uuid::new_v4(),
-                warehouse_id: Uuid::new_v4(),
                 delivery_address_id: Uuid::new_v4(),
+                warehouse_id: Uuid::new_v4(),
                 required_ship_at: None,
                 lines: vec![],
             }),
@@ -579,8 +583,8 @@ mod tests {
                 order_group_no: None,
                 business_type_code: None,
                 customer_id: Uuid::new_v4(),
-                warehouse_id: Uuid::new_v4(),
                 delivery_address_id: Uuid::new_v4(),
+                warehouse_id: Uuid::new_v4(),
                 required_ship_at: None,
                 lines: vec![],
             }),

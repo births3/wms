@@ -1924,14 +1924,14 @@ expected_keywords = ["US-DI-001", "DI", "GSP"]
 related_story = "US-DI-001 药检单平台对接配置（PC）"
 
 [[snapshots]]
-tab = "pda-di-002"
-url_hash = "#pda-di-002"
-viewport = "1500x1700"
-file = "pda-di-002.png"
-reviewed_by = "项目主人"
-reviewed_at = "2026-05-27"
+tab = "pc-di-002"
+url_hash = "#pc-di-002"
+viewport = "1700x1500"
+file = "pc-di-002.png"
+reviewed_by = "Codex 自动回归"
+reviewed_at = "2026-07-26"
 expected_keywords = ["US-DI-002", "DI", "GSP"]
-related_story = "US-DI-002 扫码批量查询药检单（PDA）"
+related_story = "US-DI-002 药检单上传、审核与版本管理（PC）"
 
 [[snapshots]]
 tab = "pc-di-003"

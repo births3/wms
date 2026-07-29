@@ -50,10 +50,11 @@ async fn seed_outbound_order(pool: &PgPool, owner_id: Uuid, now: chrono::DateTim
     sqlx::query(
         r#"
         INSERT INTO outbound_orders (
-            id, owner_id, wms_order_no, customer_id, warehouse_id,
+            id, owner_id, wms_order_no, customer_id,
+            delivery_address_id, delivery_address_snapshot, warehouse_id,
             status, short_pick, created_at, updated_at
         )
-        VALUES ($1, $2, $3, $4, $5, 'reviewed', FALSE, $6, $6)
+        VALUES ($1, $2, $3, $4, gen_random_uuid(), '{}'::jsonb, $5, 'reviewed', FALSE, $6, $6)
         "#,
     )
     .bind(order_id)

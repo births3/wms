@@ -131,11 +131,12 @@ async fn seed_order(
         r#"
         INSERT INTO outbound_orders (
             id, owner_id, document_type, wms_order_no, customer_id,
-            warehouse_id, status, created_at
+            warehouse_id, delivery_address_id, delivery_address_snapshot,
+            status, created_at
         )
         VALUES (
-            $1, $2, 'sales_outbound', $3, $4, $5, 'confirmed',
-            $6
+            $1, $2, 'sales_outbound', $3, $4, $5, $6, $7, 'confirmed',
+            $8
         )
         "#,
     )
@@ -144,6 +145,15 @@ async fn seed_order(
     .bind(order_no)
     .bind(customer_id)
     .bind(warehouse_id)
+    .bind(address_id)
+    .bind(serde_json::json!({
+        "province": "浙江省",
+        "city": "杭州市",
+        "district": "拱墅区",
+        "detail_address": "真实数据路 006 号",
+        "contact_name": "测试收货人",
+        "contact_phone": "13800000006"
+    }))
     .bind(created_at)
     .execute(pool)
     .await

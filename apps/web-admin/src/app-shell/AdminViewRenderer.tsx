@@ -1,6 +1,9 @@
 import * as React from "react";
 import type { ReactNode } from "react";
 
+import { M2InboundDocumentsPage } from "@/pages/inbound/M2InboundDocumentsPage";
+import { DrugInspectionReviewPage } from "@/pages/drug-inspection/DrugInspectionReviewPage";
+import { DrugInspectionStampPage } from "@/pages/drug-inspection/DrugInspectionStampPage";
 import type { H4WechatNotifyMode } from "@/pages/wechat-notify/H4WechatNotifyPage";
 import type { M2InboundMode } from "@/pages/inbound/M2InboundPage";
 import type { MasterDataViewId } from "@/pages/master-data/M1MasterDataPage";
@@ -79,6 +82,9 @@ export function renderAdminView(
   }
   if (view === "dock-management") return <DockManagementPage />;
   if (view === "m-di-platforms") return <DrugInspectionPlatformPage currentUser={currentUser} />;
+  if (view === "m2-inbound-documents") return <M2InboundDocumentsPage />;
+  if (view === "m-di-review") return <DrugInspectionReviewPage />;
+  if (view === "m-di-stamp") return <DrugInspectionStampPage />;
   if (inboundMode) {
     return (
       <M2InboundPage

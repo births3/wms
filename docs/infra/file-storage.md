@@ -81,6 +81,11 @@ H9 分类 PDF 读取：
   API → H2 下载/应急打印审计 → 流式返回 PDF
 ```
 
+M-DI 独立客户平台不得为下载回查 WMS。平台先按客户账号、地址、订单、商品和批号完成本地授权，再签发 15 分钟有效的只读下载 URL。批量下载由异步任务生成 ZIP 和缺失清单；任务凭证只能写自身导出前缀，ZIP 保留 7 天。
+
+临时上传/下载 URL 使用自身会话令牌鉴权，不继承 WMS Bearer 登录态；令牌非法返回
+`401 ErrorResponse`，上传授权过期返回 `410 ErrorResponse`。URL 及令牌不得写入审计 diff。
+
 H9 不向浏览器暴露 MinIO object key、长期 URL 或通用预签名端点。其他业务如需大文件
 直传，必须另立故事定义确认、扫描和权限边界。
 Worker 的进程边界、令牌、网络阻断和部署方式见
@@ -90,11 +95,11 @@ Worker 的进程边界、令牌、网络阻断和部署方式见
 
 | 规则 | 说明 |
 |------|------|
-| 大小限制 | 单文件 ≤ 50 MB；超过走分片上传 |
+| 大小限制 | 通用附件单文件 ≤ 50 MB；M-DI 的 JPG/PNG 单文件 ≤ 5 MB、解码后 ≤ 50 MP、任一边 ≤ 12000 px，输入 PDF ≤ 50 MB；客户副本 PDF 软上限 50 MB（审核人说明理由可放行）、绝对上限 100 MB |
 | 类型白名单 | `image/jpeg`, `image/png`, `application/pdf`, `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`, `text/csv` |
 | 病毒扫描 | Wave 3+ 可选 ClamAV 扫描（当前不强制） |
 | 加密 | `WMS_HFILE_SSE_MODE` 必须显式为 `none` 或 `aes256`；`aes256` 只在已配置 KMS 的对象存储启用 |
-| 审计 | 上传/下载/删除均写 H2 审计追踪 |
+| 审计 | WMS 上传/下载/删除写 H2 审计；独立客户平台的查看、下载、批量导出和授权变更写平台只追加审计 |
 | 清理 | `wms-exports` / `wms-imports` 由定时任务清理（coding-standards §3.6） |
 | 多货主隔离 | storage key 前缀含 `owner_id`：`{owner_id}/{module}/{entity_type}/{entity_id}/{uuid}.pdf` |
 
@@ -128,5 +133,6 @@ Worker 的进程边界、令牌、网络阻断和部署方式见
 
 | 日期 | 版本 | 变更 |
 |------|------|------|
+| 2026-07-25 | v2 | 增加 M-DI 客户平台本地授权、批量导出隔离和药检单专用文件限制 |
 | 2026-05-18 | v1 | 初版：MinIO（S3 兼容）+ 4 Bucket + 附件关联模型 + presigned URL 流程 |
 | 2026-07-28 | v2 | US-H9-009：落地 H-FILE PDF 切片、统一附件元数据、SSE-S3、后端代理读取、分层验证与开发/staging MinIO |

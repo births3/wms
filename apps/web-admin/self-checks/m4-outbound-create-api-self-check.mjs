@@ -96,8 +96,6 @@ assert.match(page, /await createPurchaseReturnMutation\.mutateAsync/, "M4 新建
 assert.match(actionRequests, /return_no:\s*form\.returnNo\.trim\(\)/, "M4 新建采购退货必须提交用户录入的退货单号");
 assert.match(actionRequests, /source_purchase_order_no:\s*form\.sourcePurchaseOrderNo\.trim\(\)/, "M4 新建采购退货必须提交用户录入的原采购入库单");
 assert.match(actionRequests, /warehouse_id:\s*form\.warehouseId/, "M4 新建采购退货必须提交用户选择的仓库");
-assert.match(actionRequests, /carrier_type:\s*form\.carrierType/, "M4 发货交接必须提交用户选择的配送方类型");
-assert.match(actionRequests, /handover_to:\s*form\.handoverTo\.trim\(\)/, "M4 发货交接必须提交用户录入的交接对象");
 assert.doesNotMatch(page, /RTN-M4-PC-|ASN-M2-PC-0001|华东医药供应商|承运交接人/, "M4 真实写接口不得提交固定演示业务数据");
 assert.match(page, /reason: note\.trim\(\)/, "M4 采购退货驳回必须提交弹窗备注作为驳回原因");
 assert.match(page, /returnsQuery\.error/, "M4 采购退货列表读取失败必须回显错误");

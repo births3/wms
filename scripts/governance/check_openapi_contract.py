@@ -153,6 +153,14 @@ AUTH_EXEMPT_OPERATIONS = {
     ("/redoc", "get"): "生产只读 API 文档浏览页；访问边界由网关或内网 ACL 控制。",
     ("/api/v1/resilience/status", "get"): "H3 韧性状态供运行时探测；生产访问边界由网关或内网 ACL 控制。",
     ("/metrics", "get"): "Prometheus 指标由内网抓取；生产访问边界由网关或内网 ACL 控制。",
+    (
+        "/api/v1/attachments/uploads/{upload_id}/content",
+        "put",
+    ): "附件上传使用 5 分钟上传会话令牌鉴权，不依赖 Bearer token。",
+    (
+        "/api/v1/attachments/{attachment_id}/content",
+        "get",
+    ): "附件下载使用 15 分钟下载会话令牌鉴权，不依赖 Bearer token。",
 }
 COLD_CHAIN_API_KEY_OPERATIONS = {
     ("/api/v1/cold-chain/readings", "post"),

@@ -49,10 +49,11 @@ async fn seed_outbound_order(
     sqlx::query(
         r#"
         INSERT INTO outbound_orders (
-            id, owner_id, wms_order_no, erp_order_no, customer_id, warehouse_id,
+            id, owner_id, wms_order_no, erp_order_no, customer_id,
+            delivery_address_id, delivery_address_snapshot, warehouse_id,
             required_ship_at, status, short_pick, created_at, updated_at
         )
-        VALUES ($1, $2, $3, NULL, $4, $5, NULL, 'confirmed', FALSE, $6, $6)
+        VALUES ($1, $2, $3, NULL, $4, gen_random_uuid(), '{}'::jsonb, $5, NULL, 'confirmed', FALSE, $6, $6)
         "#,
     )
     .bind(id)

@@ -6,6 +6,14 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 
+def test_read_admin_navigation_recognizes_single_letter_module_routes():
+    from check_scope_gap_discovery import read_admin_navigation
+
+    navigation = read_admin_navigation()
+
+    assert {"m-di-platforms", "m-di-review", "m-di-stamp"} <= navigation.routed_views
+
+
 def test_scope_gap_reports_unregistered_stories_in_active_module_without_default_blocking():
     from check_scope_gap_discovery import scan_scope_gaps
 
@@ -241,6 +249,46 @@ def test_scope_gap_accepts_new_menu_page_with_real_e2e_screenshot_evidence():
     assert result.ok
     assert result.strict_ok
     assert result.gaps == []
+
+
+def test_scope_gap_rejects_dev_mock_screenshot_even_when_story_has_another_real_e2e():
+    from check_scope_gap_discovery import AdminNavigation, scan_scope_gaps
+
+    page = "m2-inbound-documents"
+    navigation = AdminNavigation(
+        menu_sections={page: "入库资料录入"},
+        default_menu_tree={page},
+        routed_views={page},
+    )
+    spec = "prototypes/e2e/web-admin-shell.spec.ts"
+    screenshot = "artifacts/screenshot-portal/real-web/m2-inbound-documents/uploaded.png"
+    result = scan_scope_gaps(
+        story_docs={"docs/domain/user-stories-mdi.md": "## US-DI-001：入库资料录入"},
+        matrix_stories=[],
+        deferred_stories=[
+            {
+                "id": "US-DI-001",
+                "module": "DI",
+                "reason": "正式资料接口未完成",
+                "owner": "DI 模块负责人",
+                "resume_when": "真实 PostgreSQL E2E 通过",
+                "types": ["frontend_interaction"],
+                "frontend_pages": [page],
+                "e2e_checks": [
+                    "pnpm --dir prototypes exec playwright test --config=playwright-web-admin-dev-config.ts",
+                    "pnpm --dir apps/web-admin run test:e2e:di-real",
+                ],
+                "e2e_screenshots": [{"page": page, "spec": spec, "screenshot": screenshot}],
+                "evidence_refs": [spec, screenshot],
+            }
+        ],
+        admin_pages=navigation.menu_sections,
+        admin_navigation=navigation,
+        screenshot_legacy_pages=set(),
+    )
+
+    assert not result.ok
+    assert [gap.kind for gap in result.gaps] == ["menu_page_missing_e2e_screenshot_evidence"]
 
 
 def test_scope_gap_blocks_when_any_declared_screenshot_is_missing_from_evidence_refs():

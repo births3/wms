@@ -269,13 +269,13 @@ impl FileAttachmentService {
             r#"
             INSERT INTO attachments (
                 id, owner_id, module, entity_type, entity_id, bucket, storage_key,
-                file_name, content_type, size_bytes, content_hash, file_version,
+                file_name, content_type, size_bytes, content_hash, sha256, file_version,
                 status, retention_policy, retain_until, cache_expires_at,
-                created_by, created_at
+                created_by, uploaded_by, created_at
             )
             VALUES (
-                $1, $2, $3, $4, $5, $6, $7, $8, 'application/pdf', $9, $10,
-                1, 'pending', $11, $12, $13, $14, $15
+                $1, $2, $3, $4, $5, $6, $7, $8, 'application/pdf', $9, $10, $10,
+                1, 'pending', $11, $12, $13, $14, $14, $15
             )
             "#,
         )

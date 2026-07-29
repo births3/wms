@@ -5,7 +5,9 @@ import { dirname, resolve } from "node:path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const appShell = readFileSync(resolve(__dirname, "../src/App.tsx"), "utf8");
+const adminView = readFileSync(resolve(__dirname, "../src/app-shell/admin-view.ts"), "utf8");
 const adminSidebarMenu = readFileSync(resolve(__dirname, "../src/app-shell/AdminSidebarMenu.tsx"), "utf8");
+const adminMenuPage = readFileSync(resolve(__dirname, "../src/pages/admin-menu/H1AdminMenuPage.tsx"), "utf8");
 const workspaceTabsPath = resolve(__dirname, "../../../packages/ui/src/business/WorkspaceTabs/WorkspaceTabs.tsx");
 const componentRegistry = readFileSync(resolve(__dirname, "../../../docs/prototypes/component-registry.md"), "utf8");
 const menuPages = [
@@ -38,6 +40,14 @@ for (const hGroup of ["H1 权限租户", "H2 审计能力", "H3 契约能力", "
   assert.match(appShell, new RegExp(`label:\\s*"${hGroup}"`), `基础能力应按 ${hGroup} 独立成二级菜单`);
 }
 assert.doesNotMatch(adminSidebarMenu, /\|\|\s*hasActive/, "当前页面所在菜单不能用 hasActive 强制展开，否则用户无法折叠");
+const iconMap = appShell.match(/const adminMenuIconByKey:[^{]+\{([\s\S]*?)\n\};/)?.[1] ?? "";
+for (const iconKey of ["ArrowUpCircle", "BellRing", "Database", "Inbox", "Settings", "Stamp"]) {
+  assert.match(iconMap, new RegExp(`\\b${iconKey}\\b`), `AppShell 必须渲染已发布菜单图标 ${iconKey}`);
+  assert.match(adminMenuPage, new RegExp(`"${iconKey}"`), `菜单管理必须允许选择图标 ${iconKey}`);
+}
+for (const [, viewId] of adminView.matchAll(/\|\s*"([^"]+)"/g)) {
+  assert.match(adminMenuPage, new RegExp(`"${viewId}"`), `菜单管理必须允许选择页面 ${viewId}`);
+}
 
 assert.ok(existsSync(workspaceTabsPath), "必须新增公共 WorkspaceTabs 组件");
 const workspaceTabs = readFileSync(workspaceTabsPath, "utf8");

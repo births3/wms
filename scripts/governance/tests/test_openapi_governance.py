@@ -202,6 +202,37 @@ def test_check_openapi_contract_allows_documentation_and_metrics_public_operatio
     assert not any(issue.kind == "unexpected_auth_exempt_security" for issue in issues)
 
 
+def test_check_openapi_contract_allows_signed_attachment_transfer_operations():
+    """短期签名 URL 使用自身令牌鉴权，不应继承 Bearer。"""
+    from check_openapi_contract import (
+        AUTH_EXEMPT_REASON,
+        IDEMPOTENCY_EXEMPT_REASON,
+        check_openapi_contract,
+    )
+
+    issues, _ = check_openapi_contract(_secured_contract(
+        **{
+            "/api/v1/attachments/uploads/{upload_id}/content": {
+                "put": {
+                    "responses": _responses_with_401(),
+                    "security": [],
+                    AUTH_EXEMPT_REASON: "上传会话令牌鉴权。",
+                    IDEMPOTENCY_EXEMPT_REASON: "资源替换 PUT 天然幂等。",
+                }
+            },
+            "/api/v1/attachments/{attachment_id}/content": {
+                "get": {
+                    "responses": _responses_with_401(),
+                    "security": [],
+                    AUTH_EXEMPT_REASON: "下载会话令牌鉴权。",
+                }
+            },
+        }
+    ))
+
+    assert not any(issue.kind == "unexpected_auth_exempt_security" for issue in issues)
+
+
 def test_check_openapi_contract_requires_cold_chain_api_key_security():
     """外部冷链写入接口必须使用 API Key security scheme。"""
     from check_openapi_contract import check_openapi_contract

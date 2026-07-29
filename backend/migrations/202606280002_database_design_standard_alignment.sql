@@ -250,6 +250,16 @@ ALTER TABLE outbound_shipments
     ADD CONSTRAINT outbound_shipments_owner_order_fk
     FOREIGN KEY (owner_id, outbound_order_id) REFERENCES outbound_orders(owner_id, id) ON DELETE CASCADE;
 
+ALTER TABLE outbound_shipments
+    ADD CONSTRAINT outbound_shipments_driver_owner_fk
+    FOREIGN KEY (driver_user_id, owner_id)
+    REFERENCES auth_user_owner_bindings(user_id, owner_id);
+
+ALTER TABLE outbound_shipments
+    ADD CONSTRAINT outbound_shipments_handover_owner_fk
+    FOREIGN KEY (handover_by, owner_id)
+    REFERENCES auth_user_owner_bindings(user_id, owner_id);
+
 ALTER TABLE traceability_outbound_report_events
     ADD CONSTRAINT traceability_outbound_report_events_owner_report_fk
     FOREIGN KEY (owner_id, report_id) REFERENCES traceability_outbound_reports(owner_id, id) ON DELETE CASCADE;

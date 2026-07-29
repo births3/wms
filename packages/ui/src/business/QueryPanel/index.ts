@@ -8,6 +8,7 @@ export type {
   QueryPanelFieldValue,
   QueryPanelOption,
   QueryPanelProps,
+  QueryPanelQuickFilter,
   QueryPanelRangeValue,
   QueryPanelSummaryItem,
   QueryPanelValue,

@@ -166,6 +166,21 @@ test("M4 PC 复核使用真实详情和提交 API", async ({ page }) => {
   expect(reviewed.status).toBe("reviewed");
   await expect(page.getByRole("status")).toContainText(`${reviewOrderNo} 已复核`);
   await page.screenshot({ path: path.join(artifactsDir, "outbound-review-submitted.png"), fullPage: false });
+
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await row.getByRole("checkbox", { name: "选择此行" }).check();
+  await page.getByRole("button", { name: "交接", exact: true }).click();
+  const handoverDialog = page.getByRole("dialog", { name: /发货交接/ });
+  await expect(handoverDialog).toBeVisible();
+  await handoverDialog.getByLabel("配送方类型（必选）").selectOption("own_fleet");
+  await handoverDialog.getByLabel("车牌号（必填）").fill("沪A12345");
+  await handoverDialog.getByLabel("车辆编号（必填）").fill("VEHICLE-E2E-001");
+  await handoverDialog.getByLabel("司机用户 ID（必填）").fill("00000000-0000-4000-8000-000000000104");
+  await expect(handoverDialog.getByLabel("签字附件 ID（可选）")).toBeVisible();
+  await expect(handoverDialog.getByLabel("装车温度（冷链订单必填）")).toBeVisible();
+  await expect(handoverDialog.getByLabel("保温箱编号（冷链订单必填）")).toBeVisible();
+  await expect(handoverDialog.getByLabel("冰袋数量（冷链订单必填）")).toBeVisible();
+  await page.screenshot({ path: path.join(artifactsDir, "outbound-handover-fields.png"), fullPage: false });
 });
 
 // 【注意】M4 采购退货已从纯前端演示流程切换为真实接口（/api/v1/outbound/purchase-returns），

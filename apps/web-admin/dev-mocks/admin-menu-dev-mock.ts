@@ -219,6 +219,12 @@ function devAdminMenuSeed(): DevAdminMenuNode[] {
         ["m2-putaway", "M2 上架管理", "PackageCheck"],
         ["m2-putaway-strategy", "M2 上架策略", "ClipboardList"],
       ]),
+      group(parent, "inbound-documents", "入库资料", "ClipboardList", 20, [
+        ["m2-inbound-documents", "入库资料录入", "ClipboardList"],
+        ["m-di-review", "药检单审核", "ShieldCheck"],
+        ["m-di-platforms", "M-DI 药检平台", "KeyRound"],
+        ["m-di-stamp", "药检图章配置", "Stamp"],
+      ]),
     ]),
     section("outbound", "出库业务", "ClipboardList", 40, (parent) => [
       group(parent, "outbound-work", "出库作业", "ClipboardList", 10, [

@@ -2,7 +2,9 @@ import * as React from "react";
 import { Button, Card, CardContent, Input, PageHeader, WorkspaceTabs, cn } from "@wms/ui";
 import {
   Activity,
+  ArrowUpCircle,
   Bell,
+  BellRing,
   BookOpen,
   CheckCircle2,
   ClipboardList,
@@ -19,7 +21,9 @@ import {
   Printer,
   RefreshCw,
   Search,
+  Settings,
   ShieldCheck,
+  Stamp,
   Truck,
   Users,
   Warehouse,
@@ -96,10 +100,13 @@ const menuSections: Array<{ label: string; items: SidebarMenuItem<AdminView>[] }
     label: "入库业务",
     items: [
       { id: "m2-receiving", title: "M2 收货管理", subtitle: "ASN / 到货确认", icon: CheckCircle2 },
+      { id: "m2-inbound-documents", title: "入库资料录入", subtitle: "药检单 / 上游随货同行单", icon: ClipboardList },
+      { id: "m-di-review", title: "药检单审核", subtitle: "逐份确认 / 版本记录", icon: ShieldCheck },
       { id: "m2-inspecting", title: "M2 验收管理", subtitle: "批号 / 效期 / 签字", icon: ClipboardList },
       { id: "m2-putaway", title: "M2 上架管理", subtitle: "库位 / 数量确认", icon: PackageCheck },
       { id: "m2-putaway-strategy", title: "M2 上架策略", subtitle: "规则优先级 / 方案绑定", icon: ClipboardList },
       { id: "m-di-platforms", title: "M-DI 药检平台", subtitle: "平台 / 认证 / 状态", icon: KeyRound },
+      { id: "m-di-stamp", title: "药检图章配置", subtitle: "拖动设计 / 双人发布", icon: Stamp },
     ],
   },
   {
@@ -178,7 +185,10 @@ const defaultMenuTree: SidebarMenuTreeSection<AdminView>[] = [
   },
   {
     label: "入库业务",
-    groups: [{ label: "入库作业", items: [menuItem("m2-receiving"), menuItem("m2-inspecting"), menuItem("m2-putaway"), menuItem("m2-putaway-strategy"), menuItem("m-di-platforms")] }],
+    groups: [
+      { label: "入库作业", items: [menuItem("m2-receiving"), menuItem("m2-inspecting"), menuItem("m2-putaway"), menuItem("m2-putaway-strategy")] },
+      { label: "入库资料", items: [menuItem("m2-inbound-documents"), menuItem("m-di-review"), menuItem("m-di-platforms"), menuItem("m-di-stamp")] },
+    ],
   },
   {
     label: "出库业务",
@@ -204,19 +214,24 @@ const defaultMenuTree: SidebarMenuTreeSection<AdminView>[] = [
 
 const adminMenuIconByKey: Record<string, LucideIcon> = {
   Activity,
+  ArrowUpCircle,
   Bell,
+  BellRing,
   BookOpen,
   CheckCircle2,
   ClipboardList,
   Database,
   History,
+  Inbox,
   KeyRound,
   Layers,
   MapPinned,
   PackageCheck,
   PanelLeftOpen,
   Printer,
+  Settings,
   ShieldCheck,
+  Stamp,
   Truck,
   Users,
   Warehouse,

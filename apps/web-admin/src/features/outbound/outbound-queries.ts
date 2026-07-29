@@ -131,8 +131,9 @@ export function useShipOutboundOrderMutation() {
       if (!result.data) throw new ApiError(result.error, "出库发货交接失败", result.response.status);
       return result.data;
     },
-    onSuccess: () => {
+    onSuccess: (order) => {
       void queryClient.invalidateQueries({ queryKey: outboundOrdersQueryKey });
+      void queryClient.invalidateQueries({ queryKey: [...outboundOrdersQueryKey, "detail", order.id] });
     },
   });
 }

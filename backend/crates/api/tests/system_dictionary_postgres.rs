@@ -645,9 +645,11 @@ async fn document_type_impact_preview_counts_owner_scoped_m2_and_m4_references(p
         sqlx::query(
             r#"
             INSERT INTO outbound_orders (
-                id, owner_id, wms_order_no, customer_id, warehouse_id, status, created_at, updated_at
+                id, owner_id, wms_order_no, customer_id,
+                delivery_address_id, delivery_address_snapshot,
+                warehouse_id, status, created_at, updated_at
             )
-            VALUES ($1, $2, $3, $4, $5, 'confirmed', $6, $6)
+            VALUES ($1, $2, $3, $4, gen_random_uuid(), '{}'::jsonb, $5, 'confirmed', $6, $6)
             "#,
         )
         .bind(Uuid::new_v4())

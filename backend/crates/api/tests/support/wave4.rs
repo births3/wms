@@ -3,6 +3,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 use wms_api::inventory::STATUS_QUALIFIED;
 
+#[allow(dead_code)]
 pub async fn seed_inventory_batch(
     pool: &PgPool,
     owner_id: Uuid,

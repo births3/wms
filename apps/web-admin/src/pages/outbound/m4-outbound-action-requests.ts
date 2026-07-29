@@ -1,12 +1,10 @@
 import type {
   CreateOutboundOrderRequest,
   CreatePurchaseReturnRequest,
-  ShipOutboundOrderRequest,
 } from "@/features/outbound/outbound-queries";
 
 import type {
   OutboundCreateForm,
-  OutboundShipForm,
   PurchaseReturnCreateForm,
 } from "./M4OutboundActionDialog";
 
@@ -18,12 +16,6 @@ export const emptyPurchaseReturnForm: PurchaseReturnCreateForm = {
   warehouseId: "",
   productCode: "",
   qty: "",
-};
-
-export const emptyShipForm: OutboundShipForm = {
-  carrierType: "",
-  handoverTo: "",
-  packageCount: "",
 };
 
 export function outboundOrderRequest(form: OutboundCreateForm): CreateOutboundOrderRequest {
@@ -61,18 +53,6 @@ export function purchaseReturnRequest(
   };
   if (Object.values(request).some((value) => value === "")) {
     throw new Error("采购退货必填字段不能为空");
-  }
-  return request;
-}
-
-export function outboundShipRequest(form: OutboundShipForm): ShipOutboundOrderRequest {
-  const request = {
-    carrier_type: form.carrierType,
-    handover_to: form.handoverTo.trim(),
-    package_count: positiveInteger(form.packageCount, "包裹数量"),
-  };
-  if (!request.carrier_type || !request.handover_to) {
-    throw new Error("配送方类型和交接对象必填");
   }
   return request;
 }

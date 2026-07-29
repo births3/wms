@@ -28,6 +28,8 @@
 
 - 回复语言：中文。
 - 开发模式：外向内 TDD，先写失败测试再写代码。
+- 前端直接开发：新页面直接进入 `apps/*`，使用开发 Mock 进行业务走查；不再新增原型页、
+  原型矩阵或原型 baseline。既有 `prototypes/` 只作为历史资产保留。
 - 版本兼容：首个正式版本发布前按 [ADR-0038](docs/adr/0038-pre-v1-compatibility-policy.md) 不做兼容设计；数据库、API、前后端模型直接同步到当前基线，禁止为未发布版本保留旧字段、旧接口、双读双写、兼容分支或过渡适配层。
 - 脚本优先：能被治理脚本检查的问题，先修脚本可验证的问题，再处理人工语义判断。
 - 复用优先：前后端改动先查现有模块、组件、类型、接口、工具函数和测试夹具；再查 GitHub、成熟开源方案或已安装依赖，能复用就不造轮子；确实没有合适方案，或需要在现有轮子基础上形成更适合 WMS 的能力时，再按分层边界补标准可复用单元，并沉淀为后续可复用的组件、工具函数、服务或治理脚本。
@@ -55,7 +57,7 @@
 - 新增或修改用户故事 / 页面 / API / 字段时，必须同步检查 `governance/quality-matrix.toml` 和生成页 `docs/governance/quality-matrix.md`。
 - 提交前按变更范围补充最小相关测试；非平凡逻辑必须留下可运行检查。
 - 首个正式版本发布前，破坏性变更直接同步当前建表脚本、OpenAPI / API 契约、前后端模型、测试和文档，不做兼容迁移、数据回填、灰度双写或过渡适配；首个正式版本发布后按 [docs/adr/0016-deployment.md](docs/adr/0016-deployment.md) 补兼容迁移、数据回填、灰度和回滚证据。
-- 前端/原型变更还要遵守截图、视觉基线、页面行数等门禁，详见 [apps/AGENTS.override.md](apps/AGENTS.override.md) 与 [prototypes/AGENTS.override.md](prototypes/AGENTS.override.md)。
+- 前端变更还要遵守真实页面截图、页面行数和菜单证据门禁，详见 [apps/AGENTS.override.md](apps/AGENTS.override.md)。
 - 完成后确认 `git status --short`；最终汇报只覆盖本轮实际修改和验证结果。
 
 ## 协作约定
@@ -104,15 +106,13 @@
 5. [docs/layered-design.md](docs/layered-design.md) — 前后端分层设计规范
 6. [docs/governance.md](docs/governance.md) — 治理体系
 7. [docs/adr/0006-tdd-and-test-layers.md](docs/adr/0006-tdd-and-test-layers.md) — TDD + 11 层测试
-8. [docs/adr/0029-frontend-as-prototype-workflow.md](docs/adr/0029-frontend-as-prototype-workflow.md) — 前端原型先行工作流
-9. [docs/prototypes/prototype-to-production.md](docs/prototypes/prototype-to-production.md) — 原型转生产清单
-10. [docs/prototypes/matrix-e2e-screenshot-gate.md](docs/prototypes/matrix-e2e-screenshot-gate.md) — Matrix E2E 截图门禁
-11. [docs/architecture-dependencies.md](docs/architecture-dependencies.md) — 模块依赖图
-12. [docs/adr/README.md](docs/adr/README.md) — ADR 索引
-13. [docs/infra/technical-specs.md](docs/infra/technical-specs.md) — 基础设施技术规格
-14. [docs/concept-audit.md](docs/concept-audit.md) — 概念审计报告
-15. [docs/domain/clarifications.md](docs/domain/clarifications.md) — 业务澄清记录
-16. [docs/glossary.md](docs/glossary.md) — 术语表
+8. [docs/adr/0043-direct-production-frontend-workflow.md](docs/adr/0043-direct-production-frontend-workflow.md) — 直接生产前端与开发 Mock 走查
+9. [docs/architecture-dependencies.md](docs/architecture-dependencies.md) — 模块依赖图
+10. [docs/adr/README.md](docs/adr/README.md) — ADR 索引
+11. [docs/infra/technical-specs.md](docs/infra/technical-specs.md) — 基础设施技术规格
+12. [docs/concept-audit.md](docs/concept-audit.md) — 概念审计报告
+13. [docs/domain/clarifications.md](docs/domain/clarifications.md) — 业务澄清记录
+14. [docs/glossary.md](docs/glossary.md) — 术语表
 
 ## 模块规则
 
@@ -120,7 +120,7 @@
 |---|---|
 | 后端 | [backend/AGENTS.override.md](backend/AGENTS.override.md) |
 | 前端 / PDA 应用 | [apps/AGENTS.override.md](apps/AGENTS.override.md) |
-| 原型 | [prototypes/AGENTS.override.md](prototypes/AGENTS.override.md) |
+| 历史原型资产 | [prototypes/AGENTS.override.md](prototypes/AGENTS.override.md) |
 | 部署 | [deploy/AGENTS.override.md](deploy/AGENTS.override.md) |
 | 治理脚本 | [scripts/AGENTS.override.md](scripts/AGENTS.override.md) |
 

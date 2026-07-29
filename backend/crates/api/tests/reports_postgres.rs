@@ -127,8 +127,10 @@ async fn report_query_counts_owner_scoped_outbound_orders(pool: PgPool) {
         sqlx::query(
             r#"
             INSERT INTO outbound_orders (
-                id, owner_id, wms_order_no, customer_id, warehouse_id, status, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, 'confirmed', $6, $6)
+                id, owner_id, wms_order_no, customer_id,
+                delivery_address_id, delivery_address_snapshot,
+                warehouse_id, status, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, gen_random_uuid(), '{}'::jsonb, $5, 'confirmed', $6, $6)
             "#,
         )
         .bind(Uuid::new_v4())

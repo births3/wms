@@ -272,6 +272,20 @@ impl IntoResponse for Wave3HandlerError {
                 "M2_DUAL_PERSON_APPROVAL_REQUIRED",
                 "M-VR 策略要求先完成主管审批",
             ),
+            Wave3HandlerError::Repository(
+                Wave3RepositoryError::DrugInspectionMissingBlocked,
+            ) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M_DI_REPORT_REQUIRED",
+                "当前批号缺少已确认药检单，货主规则已阻塞验收",
+            ),
+            Wave3HandlerError::Repository(
+                Wave3RepositoryError::DrugInspectionUnqualifiedBlocked,
+            ) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M_DI_REPORT_UNQUALIFIED",
+                "当前批号药检结论不合格，已创建质量联系单并阻塞验收",
+            ),
             Wave3HandlerError::Receiving(ReceivingOrderError::EmptyLines)
             | Wave3HandlerError::Receiving(ReceivingOrderError::InvalidStatus { .. })
             | Wave3HandlerError::Receiving(ReceivingOrderError::QuantityClosureMismatch)

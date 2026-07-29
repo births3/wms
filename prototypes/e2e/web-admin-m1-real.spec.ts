@@ -147,7 +147,7 @@ test("M1 管理端读取真实后端数据", async ({ page }) => {
         path: path.join(artifactsDir, "business-partners-supplier-invalid-qualification.png"),
         fullPage: false,
       });
-      await supplierDialog.getByLabel("统一社会信用代码").fill("91350211M000100Y46");
+      await supplierDialog.getByLabel("统一社会信用代码").fill("91350100M000100Y43");
       await supplierDialog.getByLabel("联系人").fill("E2E 供应商联系人");
       const supplierUpdate = page.waitForResponse(
         (response) => response.url().includes("/api/v1/master-data/suppliers/") && response.request().method() === "PATCH",
@@ -359,7 +359,7 @@ test("M1 供应商资质 PC 真实维护", async ({ page }) => {
   await expect(supplierDialog.getByRole("button", { name: "保存", exact: true })).toBeDisabled();
   await page.screenshot({ path: path.join(artifactsDir, "supplier-qualification-invalid.png"), fullPage: false });
 
-  await supplierDialog.getByLabel("统一社会信用代码").fill("91350211M000100Y46");
+  await supplierDialog.getByLabel("统一社会信用代码").fill("91350100M000100Y43");
   await supplierDialog.getByLabel("联系人").fill("E2E 供应商联系人");
   const updateResponse = page.waitForResponse(
     (response) => response.url().includes("/api/v1/master-data/suppliers/") && response.request().method() === "PATCH",
@@ -391,7 +391,7 @@ test("M1 供应商批量导入调用原子批量接口", async ({ page }) => {
   await page.getByRole("button", { name: "供入", exact: true }).click();
   await page.getByRole("textbox", { name: "批量导入供应商" }).fill([
     "supplier_code,supplier_name,license_no,contact_name",
-    `${firstCode},E2E 批量供应商一,91310000MA1FL3L806,联系人一`,
+    `${firstCode},E2E 批量供应商一,91310110666007217T,联系人一`,
     `${secondCode},E2E 批量供应商二,91110108MA01ABCD1E,联系人二`,
   ].join("\n"));
   const batchResponse = page.waitForResponse(

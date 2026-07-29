@@ -37,12 +37,11 @@ async function login(page: import("@playwright/test").Page) {
 
 async function openPage(page: import("@playwright/test").Page) {
   const navigation = page.getByRole("navigation");
-  // 菜单为三级结构：入库业务（板块）→ 入库作业（分组）→ M-DI 药检平台（叶子）
+  const target = navigation.getByRole("button", { name: /药检平台/ });
   const section = navigation.getByRole("button", { name: "入库业务", exact: true });
   if ((await section.getAttribute("aria-expanded")) !== "true") await section.click();
   const group = navigation.getByRole("button", { name: "入库作业", exact: true });
   if ((await group.getAttribute("aria-expanded")) !== "true") await group.click();
-  const target = navigation.getByRole("button", { name: /药检平台/ });
   await expect(target).toBeVisible();
   await target.click();
 }

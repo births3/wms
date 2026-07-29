@@ -205,8 +205,10 @@ mod customer_profile;
 mod dock;
 mod dock_appointment;
 mod drug_inspection;
+mod drug_inspection_document;
 mod dual_person_policy;
 mod extensions;
+mod file_attachment;
 mod h8_erp;
 mod inventory_count;
 mod maintenance;
@@ -227,8 +229,10 @@ pub(crate) use customer_profile::*;
 pub(crate) use dock::*;
 pub(crate) use dock_appointment::*;
 pub(crate) use drug_inspection::*;
+pub(crate) use drug_inspection_document::*;
 pub(crate) use dual_person_policy::*;
 pub(crate) use extensions::*;
+pub(crate) use file_attachment::*;
 pub(crate) use h8_erp::*;
 pub(crate) use inventory_count::*;
 pub(crate) use maintenance::*;
@@ -241,6 +245,18 @@ pub(crate) use stock_adjustment::*;
 pub(crate) use task_engine::*;
 pub(crate) use task_type::*;
 
+pub use wms_domain::{
+    ApproveDrugInspectionCopyOversizeRequest, ConfirmFileUploadRequest,
+    CreateDrugInspectionCorrectionRequest, CreateDrugInspectionStampVersionRequest,
+    CreateDrugInspectionVersionRequest, CreateFileUploadRequest,
+    CreateUpstreamDeliveryVersionRequest, DrugInspectionCustomerCopyJob,
+    DrugInspectionReportVersion, DrugInspectionReviewQueueEntry, DrugInspectionStampVersion,
+    FileAttachment, FileAttachmentDownloadUrlResponse, FileUploadSessionResponse,
+    InboundDocumentEntry, InboundDocumentEntryListResponse, ReusableDrugInspectionReportResponse,
+    ReuseDrugInspectionReportRequest, ReuseDrugInspectionReportResponse,
+    ReviewDrugInspectionStampVersionRequest, ReviewDrugInspectionVersionRequest,
+    UpdateDrugInspectionDraftRequest, UpstreamDeliveryDocumentVersion,
+};
 pub use wms_domain::{
     ApproveInventoryCountRequest, CreateInventoryCountRequest, InventoryCount, InventoryCountLine,
     SubmitInventoryCountLineRequest, UpdateColdChainDeviceRequest,

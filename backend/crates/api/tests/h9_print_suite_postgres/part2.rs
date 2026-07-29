@@ -251,6 +251,28 @@ async fn seed_scope(pool: &PgPool) -> Scope {
     .await
     .expect("owner should insert");
     sqlx::query(
+        "INSERT INTO auth_users (
+            id, username, display_name, password_hash, status
+         )
+         VALUES ($1, $2, 'H9 组套测试用户', 'not-used-in-test', 'active')",
+    )
+    .bind(actor.user_id)
+    .bind(format!("h9-suite-{}", &actor.user_id.to_string()[..8]))
+    .execute(pool)
+    .await
+    .expect("actor should insert");
+    sqlx::query(
+        "INSERT INTO auth_user_owner_bindings (
+            user_id, owner_id, is_active, is_primary
+         )
+         VALUES ($1, $2, TRUE, TRUE)",
+    )
+    .bind(actor.user_id)
+    .bind(owner_id)
+    .execute(pool)
+    .await
+    .expect("actor owner binding should insert");
+    sqlx::query(
         "INSERT INTO warehouses (id, owner_id, warehouse_code, warehouse_name, warehouse_type) VALUES ($1, $2, 'WH-H9-008', 'H9 组套测试仓', 'distribution')",
     )
     .bind(warehouse_id)
@@ -416,7 +438,15 @@ async fn seed_order(
 ) -> Uuid {
     let order_id = Uuid::new_v4();
     sqlx::query(
-        "INSERT INTO outbound_orders (id, owner_id, document_type, wms_order_no, erp_order_no, invoice_no, customer_id, warehouse_id, status, created_at) VALUES ($1, $2, 'sales_outbound', $3, $3, $4, $5, $6, 'confirmed', '2026-07-27T08:00:00Z')",
+        "INSERT INTO outbound_orders (
+            id, owner_id, document_type, wms_order_no, erp_order_no, invoice_no,
+            customer_id, warehouse_id, delivery_address_id,
+            delivery_address_snapshot, status, created_at
+         )
+         VALUES (
+            $1, $2, 'sales_outbound', $3, $3, $4, $5, $6, $7, $8,
+            'confirmed', '2026-07-27T08:00:00Z'
+         )",
     )
     .bind(order_id)
     .bind(scope.owner_id)
@@ -424,6 +454,15 @@ async fn seed_order(
     .bind(invoice_no)
     .bind(scope.customer_id)
     .bind(scope.warehouse_id)
+    .bind(scope.address_id)
+    .bind(json!({
+        "province": "浙江省",
+        "city": "杭州市",
+        "district": "西湖区",
+        "detail_address": "真实数据路 008 号",
+        "contact_name": "组套测试人",
+        "contact_phone": "13800000008"
+    }))
     .execute(pool)
     .await
     .expect("order should insert");
@@ -474,13 +513,14 @@ async fn seed_invoice_file(
         r#"
         INSERT INTO attachments (
             id, owner_id, module, entity_type, entity_id, bucket, storage_key,
-            file_name, content_type, size_bytes, content_hash, file_version,
-            status, retention_policy, retain_until, created_by, confirmed_at
+            file_name, content_type, size_bytes, content_hash, sha256, file_version,
+            status, retention_policy, retain_until, created_by, uploaded_by,
+            confirmed_at
         )
         VALUES (
             $1, $2, 'H9', 'authoritative_invoice', $1, 'wms-attachments', $3,
-            'invoice.pdf', 'application/pdf', 100, $4, 1, 'ready',
-            'gsp_5_year', now() + interval '5 years', $5, now()
+            'invoice.pdf', 'application/pdf', 100, $4, $4, 1, 'ready',
+            'gsp_5_year', now() + interval '5 years', $5, $5, now()
         )
         "#,
     )
@@ -518,13 +558,14 @@ async fn seed_drug_file(
         r#"
         INSERT INTO attachments (
             id, owner_id, module, entity_type, entity_id, bucket, storage_key,
-            file_name, content_type, size_bytes, content_hash, file_version,
-            status, retention_policy, retain_until, created_by, confirmed_at
+            file_name, content_type, size_bytes, content_hash, sha256, file_version,
+            status, retention_policy, retain_until, created_by, uploaded_by,
+            confirmed_at
         )
         VALUES (
             $1, $2, 'H9', 'authoritative_drug_report', $1, 'wms-attachments', $3,
-            'drug-report.pdf', 'application/pdf', 100, $4, 1, 'ready',
-            'gsp_5_year', now() + interval '5 years', $5, now()
+            'drug-report.pdf', 'application/pdf', 100, $4, $4, 1, 'ready',
+            'gsp_5_year', now() + interval '5 years', $5, $5, now()
         )
         "#,
     )

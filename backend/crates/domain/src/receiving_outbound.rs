@@ -277,8 +277,8 @@ pub struct CreateOutboundOrderRequest {
     pub order_group_no: Option<String>,
     pub business_type_code: Option<String>,
     pub customer_id: Uuid,
-    pub warehouse_id: Uuid,
     pub delivery_address_id: Uuid,
+    pub warehouse_id: Uuid,
     pub required_ship_at: Option<DateTime<Utc>>,
     pub lines: Vec<CreateOutboundOrderLineRequest>,
 }
@@ -297,11 +297,14 @@ pub struct OutboundOrder {
     pub order_group_no: Option<String>,
     pub business_type_code: Option<String>,
     pub customer_id: Uuid,
+    pub delivery_address_id: Uuid,
+    pub delivery_address_snapshot: serde_json::Value,
     pub warehouse_id: Uuid,
     pub required_ship_at: Option<DateTime<Utc>>,
     pub status: String,
     pub short_pick: bool,
     pub lines: Vec<OutboundOrderLine>,
+    pub shipment: Option<OutboundShipment>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -352,11 +355,179 @@ pub struct ReviewOutboundOrderRequest {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
-pub struct ShipOutboundOrderRequest {
-    pub carrier_type: String,
-    pub handover_to: String,
+pub struct OutboundColdChainPackage {
+    pub insulated_container_no: String,
+    pub ice_pack_count: u32,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct OutboundShipment {
+    pub id: Uuid,
+    pub delivery_provider_type: String,
+    pub vehicle_no: Option<String>,
+    pub plate_no: String,
+    pub driver_user_id: Option<Uuid>,
+    pub driver_name: Option<String>,
+    pub courier_name: Option<String>,
+    pub courier_phone: Option<String>,
+    pub signature_attachment_id: Option<Uuid>,
+    pub cold_chain: bool,
+    pub loading_temperature_celsius: Option<f64>,
+    pub cold_chain_packages: Vec<OutboundColdChainPackage>,
     pub package_count: u32,
-    pub shipped_at: Option<DateTime<Utc>>,
+    pub handover_by: Uuid,
+    pub shipped_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ShipOutboundOrderRequest {
+    pub delivery_provider_type: String,
+    pub vehicle_no: Option<String>,
+    pub plate_no: String,
+    pub driver_user_id: Option<Uuid>,
+    pub courier_name: Option<String>,
+    pub courier_phone: Option<String>,
+    pub signature_attachment_id: Option<Uuid>,
+    pub loading_temperature_celsius: Option<f64>,
+    #[serde(default)]
+    pub cold_chain_packages: Vec<OutboundColdChainPackage>,
+    pub package_count: u32,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ShipOutboundValidationError {
+    InvalidCarrierType,
+    InvalidPackageCount,
+    FieldRequired(&'static str),
+    FieldForbidden(&'static str),
+    FieldTooLong(&'static str),
+    InvalidIdentifier(&'static str),
+    InvalidTemperature,
+    InvalidColdChainPackageCount,
+}
+
+pub fn validate_ship_outbound_request(
+    request: &ShipOutboundOrderRequest,
+    requires_cold_chain: bool,
+) -> Result<(), ShipOutboundValidationError> {
+    if !matches!(
+        request.delivery_provider_type.as_str(),
+        "own_fleet" | "third_party_express"
+    ) {
+        return Err(ShipOutboundValidationError::InvalidCarrierType);
+    }
+    if request.package_count == 0 {
+        return Err(ShipOutboundValidationError::InvalidPackageCount);
+    }
+    required_text(&request.plate_no, "plate_no", 32)?;
+    if request
+        .signature_attachment_id
+        .is_some_and(|value| value.is_nil())
+    {
+        return Err(ShipOutboundValidationError::InvalidIdentifier(
+            "signature_attachment_id",
+        ));
+    }
+
+    match request.delivery_provider_type.as_str() {
+        "own_fleet" => {
+            required_option_text(&request.vehicle_no, "vehicle_no", 64)?;
+            if request.driver_user_id.is_none_or(|value| value.is_nil()) {
+                return Err(ShipOutboundValidationError::FieldRequired("driver_user_id"));
+            }
+            forbidden_option(&request.courier_name, "courier_name")?;
+            forbidden_option(&request.courier_phone, "courier_phone")?;
+        }
+        "third_party_express" => {
+            if request.vehicle_no.is_some() {
+                return Err(ShipOutboundValidationError::FieldForbidden("vehicle_no"));
+            }
+            if request.driver_user_id.is_some() {
+                return Err(ShipOutboundValidationError::FieldForbidden(
+                    "driver_user_id",
+                ));
+            }
+            required_option_text(&request.courier_name, "courier_name", 128)?;
+            required_option_text(&request.courier_phone, "courier_phone", 32)?;
+            if request.signature_attachment_id.is_none() {
+                return Err(ShipOutboundValidationError::FieldRequired(
+                    "signature_attachment_id",
+                ));
+            }
+        }
+        _ => return Err(ShipOutboundValidationError::InvalidCarrierType),
+    }
+
+    if requires_cold_chain {
+        let temperature = request.loading_temperature_celsius.ok_or(
+            ShipOutboundValidationError::FieldRequired("loading_temperature_celsius"),
+        )?;
+        if !temperature.is_finite() || !(-100.0..=100.0).contains(&temperature) {
+            return Err(ShipOutboundValidationError::InvalidTemperature);
+        }
+        if request.cold_chain_packages.is_empty() {
+            return Err(ShipOutboundValidationError::FieldRequired(
+                "cold_chain_packages",
+            ));
+        }
+        let package_count = usize::try_from(request.package_count)
+            .map_err(|_| ShipOutboundValidationError::InvalidPackageCount)?;
+        if request.cold_chain_packages.len() > package_count {
+            return Err(ShipOutboundValidationError::InvalidColdChainPackageCount);
+        }
+        for package in &request.cold_chain_packages {
+            required_text(
+                &package.insulated_container_no,
+                "insulated_container_no",
+                64,
+            )?;
+        }
+    } else if request.loading_temperature_celsius.is_some()
+        || !request.cold_chain_packages.is_empty()
+    {
+        return Err(ShipOutboundValidationError::FieldForbidden(
+            "cold_chain_fields",
+        ));
+    }
+    Ok(())
+}
+
+fn required_option_text(
+    value: &Option<String>,
+    field: &'static str,
+    max_chars: usize,
+) -> Result<(), ShipOutboundValidationError> {
+    let value = value
+        .as_deref()
+        .ok_or(ShipOutboundValidationError::FieldRequired(field))?;
+    required_text(value, field, max_chars)
+}
+
+fn required_text(
+    value: &str,
+    field: &'static str,
+    max_chars: usize,
+) -> Result<(), ShipOutboundValidationError> {
+    let value = value.trim();
+    if value.is_empty() {
+        return Err(ShipOutboundValidationError::FieldRequired(field));
+    }
+    if value.chars().count() > max_chars {
+        return Err(ShipOutboundValidationError::FieldTooLong(field));
+    }
+    Ok(())
+}
+
+fn forbidden_option(
+    value: &Option<String>,
+    field: &'static str,
+) -> Result<(), ShipOutboundValidationError> {
+    if value.is_some() {
+        Err(ShipOutboundValidationError::FieldForbidden(field))
+    } else {
+        Ok(())
+    }
 }
 
 /// M4 采购退货出库固定单据类型。
@@ -416,13 +587,7 @@ mod tests {
     use chrono::TimeZone;
     use uuid::Uuid;
 
-    use super::{
-        validate_create_receiving_order_request, validate_review_submission,
-        CreateReceivingOrderRequest, OutboundOrderLine, ReceivingOrderLine,
-        ReceivingOrderRequestValidationError, ReviewOutboundOrderLineRequest,
-        ReviewOutboundOrderRequest, ReviewValidationError, UpdateReceivingOrderRequest,
-        RECEIVING_DOCUMENT_TYPE_PURCHASE_INBOUND, REVIEW_MODE_PDA_LOOSE,
-    };
+    use super::*;
 
     fn request() -> CreateReceivingOrderRequest {
         CreateReceivingOrderRequest {
@@ -464,6 +629,59 @@ mod tests {
             ),
             Err(ReceivingOrderRequestValidationError::MissingSupplier)
         );
+    }
+
+    #[test]
+    fn ship_request_validates_provider_signature_and_cold_chain_fields() {
+        let signature_attachment_id = Uuid::new_v4();
+        let mut request = ShipOutboundOrderRequest {
+            delivery_provider_type: "third_party_express".to_string(),
+            vehicle_no: None,
+            plate_no: "沪A12345".to_string(),
+            driver_user_id: None,
+            courier_name: Some("快递员".to_string()),
+            courier_phone: Some("13800000000".to_string()),
+            signature_attachment_id: Some(signature_attachment_id),
+            loading_temperature_celsius: None,
+            cold_chain_packages: Vec::new(),
+            package_count: 1,
+        };
+        assert_eq!(validate_ship_outbound_request(&request, false), Ok(()));
+
+        request.signature_attachment_id = None;
+        assert_eq!(
+            validate_ship_outbound_request(&request, false),
+            Err(ShipOutboundValidationError::FieldRequired(
+                "signature_attachment_id"
+            ))
+        );
+        request.signature_attachment_id = Some(signature_attachment_id);
+        request.loading_temperature_celsius = Some(4.2);
+        request.cold_chain_packages = vec![OutboundColdChainPackage {
+            insulated_container_no: "BOX-COLD-001".to_string(),
+            ice_pack_count: 4,
+        }];
+        assert_eq!(validate_ship_outbound_request(&request, true), Ok(()));
+
+        request.loading_temperature_celsius = Some(f64::NAN);
+        assert_eq!(
+            validate_ship_outbound_request(&request, true),
+            Err(ShipOutboundValidationError::InvalidTemperature)
+        );
+
+        let own_fleet = ShipOutboundOrderRequest {
+            delivery_provider_type: "own_fleet".to_string(),
+            vehicle_no: Some("VEHICLE-001".to_string()),
+            plate_no: "沪A12345".to_string(),
+            driver_user_id: Some(Uuid::new_v4()),
+            courier_name: None,
+            courier_phone: None,
+            signature_attachment_id: None,
+            loading_temperature_celsius: None,
+            cold_chain_packages: Vec::new(),
+            package_count: 1,
+        };
+        assert_eq!(validate_ship_outbound_request(&own_fleet, false), Ok(()));
     }
 
     #[test]

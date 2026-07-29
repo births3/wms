@@ -1,7 +1,8 @@
 # 前端编码规范
 
-> 适用范围：`prototypes/`（当前）+ Wave 1 起 `apps/web-admin/` `apps/pda-mobile/`
-> 关联：[ADR-0001](adr/0001-tech-stack.md) 技术栈 / [ADR-0015](adr/0015-multi-end-rules.md) 多端规则 / [ADR-0021](adr/0021-high-fidelity-prototype-strategy.md) 原型策略 / [ADR-0022](adr/0022-prototype-component-spec.md) 组件规范
+> 适用范围：`apps/web-admin/`、`apps/pda-mobile/`、`packages/ui/`；`prototypes/` 仅维护既有历史资产。
+> 关联：[ADR-0001](adr/0001-tech-stack.md) 技术栈 / [ADR-0015](adr/0015-multi-end-rules.md) 多端规则 / [ADR-0043](adr/0043-direct-production-frontend-workflow.md) 直接生产前端工作流。
+> ADR-0043 生效后不再新增原型页；本文中原型目录、基线和迁移条款仅用于维护既有历史资产。
 > 前后端生产分层边界见 `docs/layered-design.md`。
 > 治理：4 个 `check_component_*.py` 脚本（T1）
 
@@ -641,9 +642,9 @@ StatusBadge.displayName = "StatusBadge";
 
 ---
 
-## 12. 视觉回归治理（T3）
+## 12. 历史原型资产视觉回归治理（T3）
 
-每次 UI 改动**强制**对比 baseline 截图。流程：
+本节不适用于新增页面。修改既有历史原型 UI 时，仍须对比 baseline 截图：
 
 ```bash
 cd prototypes && pnpm dev &                                    # 1. 起 vite
@@ -666,9 +667,9 @@ just matrix-e2e-full                                           # 4. T4 全量矩
 - ✅ 业务方走查 approved 的视觉调整 → 先跑截图，再用 `accept_baseline.py --reviewer="<name>"` dry-run，确认通过后用 `--apply` 接受；禁止裸 `cp`
 - ❌ 回归 bug 不能更新 baseline（先修代码让脚本回到 0 差异）
 
-### 12.3 加新原型页的强制流程（红线）
+### 12.3 历史原型页登记完整性（红线）
 
-加 page 必须**同步三处**，否则 `check_baseline_completeness.py` 会阻断 PR：
+不得新增原型页。修复或补登记既有历史页面时必须**同步三处**，否则 `check_baseline_completeness.py` 会阻断 PR：
 
 1. 写 `prototypes/src/pages/<kebab-name>/<PascalName>.tsx`
 2. 在 `prototypes/src/Tabs.tsx` 的 `TABS` 数组追加：
@@ -721,34 +722,28 @@ just matrix-e2e-full                                           # 4. T4 全量矩
 
 Matrix E2E 详细规范见 [docs/prototypes/matrix-e2e-screenshot-gate.md](prototypes/matrix-e2e-screenshot-gate.md)。
 
-## 13. 前端原型先行与生产迁移（ADR-0029）
+## 13. 直接生产前端开发与开发 Mock 走查（ADR-0043）
 
 ### 13.1 三个前端层的职责
 
 | 位置 | 职责 | 禁止 |
 |---|---|---|
-| `prototypes/` | 高保真原型、业务走查、mock 流程、视觉 baseline | 生产 API 调用、真实权限判断、持久化写操作 |
-| `packages/ui` | 共享 primitive / 业务复合组件 / design tokens / stories | 页面级编排、API 调用、领域规则 |
-| `apps/web-admin` | 生产 PC/PAD 前端：路由、权限门控、API client、TanStack Query | 未确认原型、mock-only 逻辑、裸 `fetch` |
+| `apps/web-admin` / `apps/pda-mobile` | 生产页面、路由、权限门控、API client、TanStack Query | 裸 `fetch`、把开发 Mock 当生产完成证据 |
+| `packages/ui` | 共享 primitive、业务复合组件、design tokens、stories | 页面级编排、API 调用、领域规则 |
+| `prototypes/` | 只读维护既有历史资产和回归基线 | 新增页面、承载新需求确认、复制进生产应用 |
 
-### 13.2 新原型页规则
+### 13.2 新页面规则
 
-1. 必须关联用户故事；没有故事覆盖时先走缺口确认流程。
-2. mock 数据字段必须来自用户故事字段表或 OpenAPI 草案，禁止为展示随意发明字段。
-3. 复用 `@wms/ui`，跨 3 个页面以上复用的交互必须提取到 Layer 2 组件。
-4. 必须执行 §12.3 的 Tabs.tsx / manifest.toml / baseline PNG 三同步。
-5. 原型走查 approved 后，才能进入生产迁移。
+1. 直接在目标生产应用中按外向内 TDD 开发，并关联用户故事、菜单节点和权限语义。
+2. 需要业务走查时使用仅开发环境启用的 typed dev mock；字段必须来自用户故事或 API 契约。
+3. 列表页遵守 QueryPanel、DataGrid、页面查询登记和质量矩阵门禁。
+4. 页面交互通过生产应用 E2E 截图确认，不新增 `prototypes/src/pages/*`、Tab、manifest 或原型 baseline。
+5. 开发 Mock 只能证明交互切片，不能替代真实 API、数据库、权限、审计、幂等和文件存储证据。
 
-### 13.3 原型转生产规则
-
-迁移到 `apps/web-admin` 或 `apps/pda-mobile` 前，必须完成 `docs/prototypes/prototype-to-production.md` checklist。
-
-生产页必须：
+### 13.3 接入正式能力
 
 - 使用 `@wms/api-client` 和 TanStack Query，禁止裸 `fetch`。
 - 使用 H1 权限门控页面入口、按钮和数据范围。
 - 写操作明确 H2 审计事件或豁免理由。
 - 写操作覆盖 ADR-0006 必备维度：L4 错误、L5 数据一致、L8 权限、L11 幂等。
-- 删除原型专用 mock、演示账号、演示说明和假交互。
-
-禁止把 `prototypes/src/pages/*` 直接复制到 `apps/web-admin` 后只改 import；页面必须按生产路由、API 契约和 TDD 测试重新落地。
+- 正式接口接入时删除相应页面内开发 Mock 状态和假写入；不得保留双路径兼容层。
