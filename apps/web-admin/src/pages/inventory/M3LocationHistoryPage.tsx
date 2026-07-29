@@ -25,6 +25,10 @@ import {
   type LocationHistoryMovement,
   type LocationHistoryQuery,
 } from "@/features/inventory/inventory-queries";
+import { errorText } from "@/lib/error-text";
+import { formatDateTime } from "@/lib/format";
+import { queryString, queryValueFromUnknown } from "@/lib/query-value";
+import { usePageQueryState } from "@/lib/use-page-query-state";
 
 const PENDING_LOCATION_KEY = "m3-location-history-code";
 
@@ -63,8 +67,14 @@ export function M3LocationHistoryPage({ onBack, initialLocationCode }: M3Locatio
     return value;
   }, [initialLocationCode]);
 
-  const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(() => defaultQuery(pendingLocation));
-  const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(() => defaultQuery(pendingLocation));
+  const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
+    usePageQueryState<QueryPanelValue>(() => defaultQuery(""), normalizeQuery);
+  const pendingLocationAppliedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!pendingLocation || pendingLocationAppliedRef.current) return;
+    pendingLocationAppliedRef.current = true;
+    applyQuery(defaultQuery(pendingLocation));
+  }, [pendingLocation, applyQuery]);
   const apiQuery = React.useMemo(() => toApiQuery(appliedQuery), [appliedQuery]);
   const enabled = Boolean(apiQuery.location_code);
   const historyQuery = useLocationHistoryQuery(apiQuery, enabled);
@@ -215,12 +225,8 @@ export function M3LocationHistoryPage({ onBack, initialLocationCode }: M3Locatio
         defaultVisibleFieldKeys={m3LocationHistoryCoreQueryFieldKeys}
         value={draftQuery}
         onValueChange={setDraftQuery}
-        onQuery={() => setAppliedQuery(normalizeQuery(draftQuery))}
-        onReset={() => {
-          const next = defaultQuery("");
-          setDraftQuery(next);
-          setAppliedQuery(next);
-        }}
+        onQuery={() => applyQuery(draftQuery)}
+        onReset={resetQuery}
       />
       {risks.length > 0 && (
         <section className="rounded-lg border border-amber-300 bg-amber-50 p-4" aria-label="库位风险识别">
@@ -261,23 +267,15 @@ export function M3LocationHistoryPage({ onBack, initialLocationCode }: M3Locatio
               !enabled
                 ? "从 M3 批号管理库位专项视图跳转，或在此输入库位编码后查询"
                 : historyQuery.isError
-                  ? errorText(historyQuery.error)
+                  ? errorText(historyQuery.error, "请检查鉴权和 API 服务")
                   : "该库位在所选时间范围内没有流水"
             }
             exportFileBaseName="M3-库位历史"
             refreshAction={refreshAction}
             queryState={appliedQuery}
             querySummaryItems={querySummaryItems}
-            onApplyQueryState={(value) => {
-              const next = normalizeQuery(queryValueFromUnknown(value));
-              setDraftQuery(next);
-              setAppliedQuery(next);
-            }}
-            onClearQueryState={() => {
-              const next = defaultQuery("");
-              setDraftQuery(next);
-              setAppliedQuery(next);
-            }}
+            onApplyQueryState={(value) => applyQuery(queryValueFromUnknown(value))}
+            onClearQueryState={resetQuery}
           />
         </CardContent>
       </Card>
@@ -319,25 +317,4 @@ function toApiQuery(query: QueryPanelValue): LocationHistoryQuery {
     product_code: queryString(query.productCode).trim() || undefined,
     batch_no: queryString(query.batchNo).trim() || undefined,
   };
-}
-
-function queryString(value: QueryPanelValue[string]) {
-  return typeof value === "string" ? value : "";
-}
-
-function formatDateTime(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("zh-CN", { hour12: false });
-}
-
-function errorText(error: unknown) {
-  if (error && typeof error === "object" && "message" in error && typeof error.message === "string") {
-    return error.message;
-  }
-  return "请检查鉴权和 API 服务";
-}
-
-function queryValueFromUnknown(value: unknown): QueryPanelValue {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as QueryPanelValue) : {};
 }

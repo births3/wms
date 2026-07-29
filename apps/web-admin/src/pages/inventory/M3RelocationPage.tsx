@@ -32,6 +32,9 @@ import {
   useRelocateInventoryMutation,
   type InventoryRelocation,
 } from "@/features/inventory/m3-ops-queries";
+import { formatDateTime } from "@/lib/format";
+import { queryValueFromUnknown } from "@/lib/query-value";
+import { usePageQueryState } from "@/lib/use-page-query-state";
 
 export const m3RelocationQueryFields: QueryPanelField[] = [
   { key: "keyword", label: "关键字", type: "text", placeholder: "商品 / 批号 / 库位" },
@@ -39,8 +42,8 @@ export const m3RelocationQueryFields: QueryPanelField[] = [
 export const m3RelocationCoreQueryFieldKeys = ["keyword"];
 
 export function M3RelocationPage() {
-  const [draft, setDraft] = React.useState<QueryPanelValue>({ keyword: "" });
-  const [applied, setApplied] = React.useState<QueryPanelValue>({ keyword: "" });
+  const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
+    usePageQueryState<QueryPanelValue>(() => ({ keyword: "" }));
   const [open, setOpen] = React.useState(false);
   const [form, setForm] = React.useState({
     batch_id: "",
@@ -52,16 +55,16 @@ export function M3RelocationPage() {
   const query = useInventoryRelocationsQuery();
   const relocate = useRelocateInventoryMutation();
   const rows = React.useMemo(() => {
-    const keyword = String(applied.keyword ?? "").toLowerCase();
+    const keyword = String(appliedQuery.keyword ?? "").toLowerCase();
     return (query.data ?? []).filter((row) => {
       const text = `${row.product_code} ${row.batch_no} ${row.from_location_code} ${row.to_location_code}`.toLowerCase();
       return !keyword || text.includes(keyword);
     });
-  }, [applied, query.data]);
+  }, [appliedQuery, query.data]);
 
   const columns = React.useMemo<DataGridColumn<InventoryRelocation>[]>(
     () => [
-      { key: "created_at", header: "创建时间", width: 180, render: (row) => formatTime(row.created_at) },
+      { key: "created_at", header: "创建时间", width: 180, render: (row) => formatDateTime(row.created_at) },
       { key: "product_code", header: "商品", width: 120, mono: true, render: (row) => row.product_code },
       { key: "batch_no", header: "批号", width: 120, mono: true, render: (row) => row.batch_no },
       { key: "qty", header: "数量", width: 80, render: (row) => row.qty },
@@ -90,14 +93,10 @@ export function M3RelocationPage() {
       <QueryPanel
         fields={m3RelocationQueryFields}
         defaultVisibleFieldKeys={m3RelocationCoreQueryFieldKeys}
-        value={draft}
-        onValueChange={setDraft}
-        onQuery={() => setApplied(draft)}
-        onReset={() => {
-          const next = { keyword: "" };
-          setDraft(next);
-          setApplied(next);
-        }}
+        value={draftQuery}
+        onValueChange={setDraftQuery}
+        onQuery={() => applyQuery(draftQuery)}
+        onReset={resetQuery}
       />
       <Card>
         <CardContent className="p-5">
@@ -111,18 +110,10 @@ export function M3RelocationPage() {
             exportFileBaseName="M3-库内移库"
             refreshAction={refreshAction}
             createAction={createAction}
-            queryState={applied}
-            querySummaryItems={buildQueryPanelSummaryItems(m3RelocationQueryFields, applied)}
-            onApplyQueryState={(value) => {
-              const next = (value && typeof value === "object" ? value : {}) as QueryPanelValue;
-              setDraft(next);
-              setApplied(next);
-            }}
-            onClearQueryState={() => {
-              const next = { keyword: "" };
-              setDraft(next);
-              setApplied(next);
-            }}
+            queryState={appliedQuery}
+            querySummaryItems={buildQueryPanelSummaryItems(m3RelocationQueryFields, appliedQuery)}
+            onApplyQueryState={(value) => applyQuery(queryValueFromUnknown(value))}
+            onClearQueryState={resetQuery}
           />
         </CardContent>
       </Card>
@@ -140,7 +131,9 @@ export function M3RelocationPage() {
                   to_location_code: form.to_location_code.trim(),
                   reason: form.reason.trim() || undefined,
                 })
-                .then(() => setOpen(false));
+                .then(() => setOpen(false))
+                // 错误已由 relocate.error 在弹窗内展示，这里仅吞掉 unhandled rejection。
+                .catch(() => undefined);
             }}
           >
             <DialogHeader>
@@ -161,9 +154,4 @@ export function M3RelocationPage() {
       </Dialog>
     </div>
   );
-}
-
-function formatTime(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { hour12: false });
 }

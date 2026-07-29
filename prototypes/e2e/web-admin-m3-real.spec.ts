@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { completeH9BusinessPrint } from "./h9-business-print";
 
 const artifactsDir = path.resolve("../artifacts/screenshot-portal/real-web/m3-batches");
 const statusConfigArtifactsDir = path.resolve("../artifacts/screenshot-portal/real-web/m3-status-config");
@@ -53,6 +54,17 @@ test("M3 库存查询使用真实 API 传递组合筛选并展示结果", async 
   await expect(page.getByText("E2E 冷藏胰岛素", { exact: true })).toBeVisible();
   await expect(page.getByText("LPN-E2E-001", { exact: true })).toBeVisible();
   await page.screenshot({ path: path.join(artifactsDir, "inventory-query.png"), fullPage: false });
+  const batchRow = page.getByRole("row").filter({ hasText: "LPN-E2E-001" }).first();
+  await batchRow.getByRole("checkbox", { name: "选择此行" }).check();
+  await completeH9BusinessPrint(page, {
+    actionName: "LPN",
+    dialogName: "M3 LPN 标签 E2E 模板",
+    businessModule: "M3",
+    templateType: "lpn_label",
+    expectedField: "container_lpn",
+    expectedValue: "LPN-E2E-001",
+    screenshotPath: path.join(artifactsDir, "lpn-label-preview.png"),
+  });
 
   await page.getByRole("button", { name: "导出", exact: true }).click();
   const exportDialog = page.getByRole("dialog", { name: "导出列表" });

@@ -3,6 +3,11 @@ import { Button, Card, CardContent, DataGrid, Dialog, DialogClose, DialogContent
 import type { CurrentUser } from "@/features/auth/auth-queries";
 import { useSystemDictionaryItemOptionsQuery } from "@/features/master-data/master-data-queries";
 import { useInventoryStatusTransitionsQuery, useUpsertInventoryStatusTransitionMutation, type InventoryStatusTransition } from "@/features/inventory/inventory-status-config-queries";
+import { errorText } from "@/lib/error-text";
+import { formatDateTime } from "@/lib/format";
+import { queryString, queryValueFromUnknown } from "@/lib/query-value";
+import { useDialogState } from "@/lib/use-dialog-state";
+import { usePageQueryState } from "@/lib/use-page-query-state";
 
 type Form = { scope: "owner" | "global"; fromStatus: string; toStatus: string; approvalSources: string; enabled: boolean };
 type Notice = { kind: "success" | "error"; text: string } | null;
@@ -18,8 +23,8 @@ const columns: DataGridColumn<InventoryStatusTransition>[] = [
   { key: "to_status", header: "目标状态", width: 160, mono: true, sortable: true, filterValue: (row) => row.to_status, copyValue: (row) => row.to_status, filter: { type: "text" } },
   { key: "approval_sources", header: "原因/审批要求", width: 260, render: (row) => row.approval_sources.join("、"), filterValue: (row) => row.approval_sources.join(" "), copyValue: (row) => row.approval_sources.join(", "), filter: { type: "text" } },
   { key: "enabled", header: "状态", width: 100, render: (row) => <StatusBadge status={row.enabled ? "completed" : "isolated"} label={row.enabled ? "允许" : "禁止"} size="sm" />, filterValue: (row) => row.enabled ? "enabled" : "disabled", filter: { type: "multiSelect", options: [{ label: "允许", value: "enabled" }, { label: "禁止", value: "disabled" }] } },
-  { key: "created_at", header: "创建时间", width: 180, sortable: true, sortValue: (row) => row.created_at, copyValue: (row) => row.created_at, render: (row) => formatDate(row.created_at), filter: { type: "dateRange" } },
-  { key: "updated_at", header: "更新时间", width: 180, sortable: true, sortValue: (row) => row.updated_at, copyValue: (row) => row.updated_at, render: (row) => formatDate(row.updated_at), filter: { type: "dateRange" } },
+  { key: "created_at", header: "创建时间", width: 180, sortable: true, sortValue: (row) => row.created_at, copyValue: (row) => row.created_at, render: (row) => formatDateTime(row.created_at), filter: { type: "dateRange" } },
+  { key: "updated_at", header: "更新时间", width: 180, sortable: true, sortValue: (row) => row.updated_at, copyValue: (row) => row.updated_at, render: (row) => formatDateTime(row.updated_at), filter: { type: "dateRange" } },
 ];
 
 export function M3InventoryStatusConfigPage({ currentUser }: { currentUser: CurrentUser }) {
@@ -27,11 +32,11 @@ export function M3InventoryStatusConfigPage({ currentUser }: { currentUser: Curr
   const statusesQuery = useSystemDictionaryItemOptionsQuery("inventory_quality_status");
   const saveMutation = useUpsertInventoryStatusTransitionMutation();
   const [selected, setSelected] = React.useState<string[]>([]);
-  const [query, setQuery] = React.useState<QueryPanelValue>(defaultQuery());
-  const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(defaultQuery());
+  const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
+    usePageQueryState<QueryPanelValue>(defaultQuery, normalizeQuery);
   const [form, setForm] = React.useState<Form>(emptyForm());
-  const [editing, setEditing] = React.useState<InventoryStatusTransition | null>(null);
-  const [dialogOpen, setDialogOpen] = React.useState(false);
+  const { open: dialogOpen, target: editing, setOpen: setDialogOpen, setTarget: setEditing } =
+    useDialogState<InventoryStatusTransition>();
   const [notice, setNotice] = React.useState<Notice>(null);
   const statusOptions = (statusesQuery.data ?? []).map(([value, label]) => ({ value, label: typeof label === "string" && label.trim() ? label : value }));
   const rows = React.useMemo(() => filterRows(transitionsQuery.data?.data ?? [], appliedQuery), [appliedQuery, transitionsQuery.data]);
@@ -57,8 +62,8 @@ export function M3InventoryStatusConfigPage({ currentUser }: { currentUser: Curr
     <PageHeader title="M3 库存状态管理" subtitle={`当前货主 ${currentUser.owner_code} · 展示全局规则与当前货主覆盖规则`} />
     {notice && <div className={notice.kind === "error" ? "rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" : "rounded-md border border-wms-success/30 bg-wms-success/10 px-3 py-2 text-sm text-wms-success"} role={notice.kind === "error" ? "alert" : "status"}>{notice.text}</div>}
     {statusError && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">{statusError}</div>}
-    <QueryPanel fields={queryFields} defaultVisibleFieldKeys={defaultVisibleFieldKeys} value={query} onValueChange={setQuery} onQuery={() => setAppliedQuery(query)} onReset={() => { const next = defaultQuery(); setQuery(next); setAppliedQuery(next); }} />
-    <Card><CardContent className="p-5"><DataGrid storageKey="m3.inventory-status-config" columns={columns} data={rows} rowKey={(row) => row.id} selectable selectedRowKeys={selected} onSelectedRowKeysChange={setSelected} caption={transitionsQuery.isPending ? "加载状态转换规则..." : undefined} emptyTitle={transitionsQuery.isError ? "读取状态转换规则失败" : "暂无状态转换规则"} emptyDescription={transitionsQuery.isError ? errorText(transitionsQuery.error, "请检查鉴权和 API 服务") : "请新增全局或当前货主状态转换规则"} exportFileBaseName="M3-inventory-status-transitions" refreshAction={refreshAction} createAction={createAction} editAction={editAction} queryState={appliedQuery} querySummaryItems={buildQueryPanelSummaryItems(queryFields, appliedQuery)} onApplyQueryState={(value) => { const next = normalizeQuery(value); setQuery(next); setAppliedQuery(next); }} onClearQueryState={() => { const next = defaultQuery(); setQuery(next); setAppliedQuery(next); }} /></CardContent></Card>
+    <QueryPanel fields={queryFields} defaultVisibleFieldKeys={defaultVisibleFieldKeys} value={draftQuery} onValueChange={setDraftQuery} onQuery={() => applyQuery(draftQuery)} onReset={resetQuery} />
+    <Card><CardContent className="p-5"><DataGrid storageKey="m3.inventory-status-config" columns={columns} data={rows} rowKey={(row) => row.id} selectable selectedRowKeys={selected} onSelectedRowKeysChange={setSelected} caption={transitionsQuery.isPending ? "加载状态转换规则..." : undefined} emptyTitle={transitionsQuery.isError ? "读取状态转换规则失败" : "暂无状态转换规则"} emptyDescription={transitionsQuery.isError ? errorText(transitionsQuery.error, "请检查鉴权和 API 服务") : "请新增全局或当前货主状态转换规则"} exportFileBaseName="M3-inventory-status-transitions" refreshAction={refreshAction} createAction={createAction} editAction={editAction} queryState={appliedQuery} querySummaryItems={buildQueryPanelSummaryItems(queryFields, appliedQuery)} onApplyQueryState={(value) => applyQuery(queryValueFromUnknown(value))} onClearQueryState={resetQuery} /></CardContent></Card>
     <Dialog open={dialogOpen} onOpenChange={(open) => !busy && setDialogOpen(open)}><DialogContent className="sm:max-w-xl"><form className="grid gap-4" onSubmit={submit}><DialogHeader><DialogTitle>{editing ? "修改库存状态转换规则" : "新增库存状态转换规则"}</DialogTitle><DialogDescription>状态必须来自库存质量状态字典；原因/审批要求对应后端 approval_sources。</DialogDescription></DialogHeader><div className="grid gap-4 sm:grid-cols-2"><Field label="作用域"><select className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={form.scope} onChange={(event) => update("scope", event.target.value)}><option value="owner">当前货主（{currentUser.owner_code}）</option><option value="global">全局</option></select></Field><Field label="允许转换"><label className="flex h-10 items-center gap-2"><input type="checkbox" checked={form.enabled} onChange={(event) => update("enabled", event.target.checked)} />允许</label></Field><Field label="起始状态"><select required className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={form.fromStatus} onChange={(event) => update("fromStatus", event.target.value)}><option value="">请选择</option>{statusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}（{option.value}）</option>)}</select></Field><Field label="目标状态"><select required className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={form.toStatus} onChange={(event) => update("toStatus", event.target.value)}><option value="">请选择</option>{statusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}（{option.value}）</option>)}</select></Field></div><Field label="原因/审批来源"><Input required value={form.approvalSources} onChange={(event) => update("approvalSources", event.target.value)} placeholder="多个来源用英文逗号分隔" /></Field><DialogFooter><DialogClose asChild><Button type="button" variant="outline" disabled={busy}>取消</Button></DialogClose><Button type="submit" disabled={busy || Boolean(statusError)}>{busy ? "保存中..." : "保存"}</Button></DialogFooter></form></DialogContent></Dialog>
   </section>;
 }
@@ -66,9 +71,6 @@ export function M3InventoryStatusConfigPage({ currentUser }: { currentUser: Curr
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="grid gap-1 text-sm">{label}{children}</label>; }
 function defaultQuery(): QueryPanelValue { return { keyword: "", scope: "", status: "" }; }
 function emptyForm(fromStatus = ""): Form { return { scope: "owner", fromStatus, toStatus: "", approvalSources: "", enabled: true }; }
-function normalizeQuery(value: unknown): QueryPanelValue { const r = value && typeof value === "object" ? value as Record<string, unknown> : {}; return { keyword: text(r.keyword), scope: text(r.scope), status: text(r.status) }; }
-function filterRows(rows: InventoryStatusTransition[], query: QueryPanelValue) { const keyword = text(query.keyword).trim().toLowerCase(); const scope = text(query.scope); const status = text(query.status); return rows.filter((row) => (!keyword || [row.from_status, row.to_status, ...row.approval_sources].join(" ").toLowerCase().includes(keyword)) && (!scope || (row.owner_id ? "owner" : "global") === scope) && (!status || (row.enabled ? "enabled" : "disabled") === status)); }
+function normalizeQuery(value: QueryPanelValue): QueryPanelValue { return { keyword: queryString(value.keyword), scope: queryString(value.scope), status: queryString(value.status) }; }
+function filterRows(rows: InventoryStatusTransition[], query: QueryPanelValue) { const keyword = queryString(query.keyword).trim().toLowerCase(); const scope = queryString(query.scope); const status = queryString(query.status); return rows.filter((row) => (!keyword || [row.from_status, row.to_status, ...row.approval_sources].join(" ").toLowerCase().includes(keyword)) && (!scope || (row.owner_id ? "owner" : "global") === scope) && (!status || (row.enabled ? "enabled" : "disabled") === status)); }
 function validate(form: Form, hasStatuses: boolean) { if (!hasStatuses) return "库存质量状态字典不可用，不能保存规则"; if (!form.fromStatus || !form.toStatus) return "起始状态和目标状态不能为空"; if (form.fromStatus === form.toStatus) return "起始状态和目标状态不能相同"; if (!form.approvalSources.split(",").some((value) => value.trim())) return "至少填写一个原因/审批来源"; return null; }
-function text(value: unknown) { return typeof value === "string" ? value : ""; }
-function formatDate(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { hour12: false }); }
-function errorText(error: unknown, fallback: string) { return error instanceof Error ? error.message : fallback; }

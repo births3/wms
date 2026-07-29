@@ -30,7 +30,7 @@ assert.match(page, /<DataGrid\b/, "M3 批号管理页应复用 DataGrid");
 assert.match(page, /exportFileBaseName="M3 批号管理"/, "M3 库存查询应使用可识别的 Excel 导出文件名");
 assert.doesNotMatch(page, /showExportAction=\{false\}/, "M3 库存查询不得关闭 DataGrid 标准 Excel 导出");
 assert.match(page, /detailAction=\{gridDetailAction\}/, "M3 批号管理应提供标准详情动作");
-assert.match(page, /toolbarActions=\{\[statusAction, recallAction, cancelRecallAction\]\}/, "M3 批号管理应提供状态、召回和撤回动作");
+assert.match(page, /toolbarActions=\{\[[\s\S]*statusAction,[\s\S]*recallAction,[\s\S]*cancelRecallAction,[\s\S]*canPrint \? \[printLpnAction\]/, "M3 批号管理应按权限提供标签打印，并保留状态、召回和撤回动作");
 assert.match(page, /M3BatchRecallDialog/, "M3 召回必须使用独立弹窗");
 assert.match(page, /M3BatchRecallCancelDialog/, "M3 取消召回必须使用独立弹窗");
 assert.match(page, /变更库存状态|确认变更/, "M3 状态变更必须使用弹窗确认");
@@ -41,7 +41,7 @@ assert.match(detailDialog, /useInventoryBatchTraceQuery/, "M3 详情应读取批
 assert.match(detailDialog, /title="流转追踪"/, "M3 详情应展示流转追踪分区");
 assert.match(page, /useSystemDictionaryItemOptionsQuery\(\s*"inventory_quality_status"\s*\)/, "M3 应查询库存质量状态系统字典");
 assert.match(page, /options:\s*qualityStatusOptions/, "M3 质量状态筛选应消费字典选项");
-assert.match(page, /statusOptionsFor\([^,]+,\s*qualityStatusOptions\)/, "M3 状态目标应消费字典选项");
+assert.match(page, /statusOptionsFor\([^,]+,\s*qualityStatusOptions/, "M3 状态目标应消费字典选项");
 assert.match(page, /qualityStatusQuery\.isPending/, "M3 应明确处理质量状态字典加载中");
 assert.match(page, /qualityStatusQuery\.error/, "M3 应明确处理质量状态字典加载失败");
 assert.match(page, /qualityStatusOptions\.length === 0/, "M3 应明确处理无启用质量状态字典项");

@@ -28,7 +28,9 @@ import {
   type QueryPanelRangeValue,
   type QueryPanelValue,
 } from "@wms/ui";
+import { Printer } from "lucide-react";
 
+import { useCurrentUserQuery } from "@/features/auth/auth-queries";
 import {
   useChangeInventoryStatusMutation,
   useCancelInventoryRecallMutation,
@@ -39,7 +41,13 @@ import {
   type InventoryBatchQuery,
 } from "@/features/inventory/inventory-queries";
 import type { CancelInventoryRecallRequest, MarkInventoryRecallRequest } from "@/features/inventory/inventory-queries";
+import {
+  useInventoryStatusTransitionsQuery,
+  type InventoryStatusTransition,
+} from "@/features/inventory/inventory-status-config-queries";
 import { useSystemDictionaryItemOptionsQuery } from "@/features/master-data/master-data-queries";
+import { useDialogState } from "@/lib/use-dialog-state";
+import { usePageQueryState } from "@/lib/use-page-query-state";
 import { M3BatchDetailDialog } from "./M3BatchDetailDialog";
 import { M3BatchRecallDialog } from "./M3BatchRecallDialog";
 import { M3BatchRecallCancelDialog } from "./M3BatchRecallCancelDialog";
@@ -50,13 +58,17 @@ import {
 } from "./M3BatchViewHelpers";
 import { buildBatchColumns } from "./M3BatchColumns";
 import { rememberLocationHistoryCode } from "./M3LocationHistoryPage";
+import {
+  H9BusinessPrintDialog,
+  type H9BusinessPrintTarget,
+} from "../print-template/H9BusinessPrintDialog";
 
 interface M3BatchManagementPageProps {
   onBack: () => void;
   onOpenLocationHistory?: () => void;
 }
 
-/** 近效期阈值：有效期在 90 天内（含）视为近效期 */
+/** 近效期阈值：有效期在 180 天内（含）视为近效期 */
 const DEFAULT_NEAR_EXPIRY_DAYS = 180;
 
 const m3BatchCoreQueryFieldKeys = ["keyword", "qualityStatus"];
@@ -137,15 +149,22 @@ type StatusForm = {
 };
 
 export function M3BatchManagementPage({ onOpenLocationHistory }: M3BatchManagementPageProps) {
-  const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(() => defaultM3BatchQueryValue());
-  const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(() => defaultM3BatchQueryValue());
+  const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
+    usePageQueryState<QueryPanelValue>(defaultM3BatchQueryValue, normalizeM3BatchQueryValue);
   const normalizedAppliedQuery = React.useMemo(() => normalizeM3BatchQueryValue(appliedQuery), [appliedQuery]);
   const inventoryBatchQuery = React.useMemo(
     () => toInventoryBatchQuery(normalizedAppliedQuery),
     [normalizedAppliedQuery],
   );
   const batchesQuery = useInventoryBatchesQuery(inventoryBatchQuery);
+  const currentUserQuery = useCurrentUserQuery(true);
+  const canPrint = currentUserQuery.data?.permissions.includes("h9.print_template.print") ?? false;
   const expiryPolicyQuery = useInventoryExpiryPolicyQuery();
+  const statusTransitionsQuery = useInventoryStatusTransitionsQuery();
+  const statusTransitions = React.useMemo(
+    () => transitionsFromRules(statusTransitionsQuery.data?.data),
+    [statusTransitionsQuery.data],
+  );
   const qualityStatusQuery = useSystemDictionaryItemOptionsQuery("inventory_quality_status");
   const qualityStatusOptions = React.useMemo<QualityStatusOption[]>(
     () => (qualityStatusQuery.data ?? []).map(([value, label]) => ({
@@ -160,15 +179,36 @@ export function M3BatchManagementPage({ onOpenLocationHistory }: M3BatchManageme
   );
   const expiryWarningDays = expiryPolicyQuery.data?.warningDays ?? DEFAULT_NEAR_EXPIRY_DAYS;
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
-  const [detailOpen, setDetailOpen] = React.useState(false);
-  const [detailBatch, setDetailBatch] = React.useState<InventoryBatch | null>(null);
-  const [statusOpen, setStatusOpen] = React.useState(false);
-  const [statusBatch, setStatusBatch] = React.useState<InventoryBatch | null>(null);
+  const {
+    open: detailOpen,
+    target: detailBatch,
+    openWith: openDetailWith,
+    setOpen: setDetailOpen,
+    setTarget: setDetailBatch,
+  } = useDialogState<InventoryBatch>();
+  const {
+    open: statusOpen,
+    target: statusBatch,
+    openWith: openStatusWith,
+    setOpen: setStatusOpen,
+    setTarget: setStatusBatch,
+  } = useDialogState<InventoryBatch>();
   const [statusForm, setStatusForm] = React.useState<StatusForm>(emptyStatusForm);
-  const [recallOpen, setRecallOpen] = React.useState(false);
-  const [recallBatch, setRecallBatch] = React.useState<InventoryBatch | null>(null);
-  const [cancelRecallOpen, setCancelRecallOpen] = React.useState(false);
-  const [cancelRecallBatch, setCancelRecallBatch] = React.useState<InventoryBatch | null>(null);
+  const {
+    open: recallOpen,
+    target: recallBatch,
+    openWith: openRecallWith,
+    setOpen: setRecallOpen,
+    setTarget: setRecallBatch,
+  } = useDialogState<InventoryBatch>();
+  const {
+    open: cancelRecallOpen,
+    target: cancelRecallBatch,
+    openWith: openCancelRecallWith,
+    setOpen: setCancelRecallOpen,
+    setTarget: setCancelRecallBatch,
+  } = useDialogState<InventoryBatch>();
+  const [printTarget, setPrintTarget] = React.useState<H9BusinessPrintTarget | null>(null);
   const [lastEvent, setLastEvent] = React.useState<string | null>(null);
   const statusMutation = useChangeInventoryStatusMutation();
   const recallMutation = useMarkInventoryRecallMutation();
@@ -186,8 +226,17 @@ export function M3BatchManagementPage({ onOpenLocationHistory }: M3BatchManageme
     const batch = (batchesQuery.data ?? []).find((item) => item.id === id) ?? batches.find((item) => item.id === id);
     if (!batch) return;
     setSelectedId(id);
-    setDetailBatch(batch);
-    setDetailOpen(true);
+    openDetailWith(batch);
+  }
+
+  function applyGridQueryState(queryState: unknown) {
+    applyQuery(queryValueFromUnknown(queryState));
+    setSelectedId(null);
+  }
+
+  function clearGridQueryState() {
+    resetQuery();
+    setSelectedId(null);
   }
 
   async function refreshBatches() {
@@ -225,15 +274,14 @@ export function M3BatchManagementPage({ onOpenLocationHistory }: M3BatchManageme
         || statusMutation.isPending
         || qualityStatusQuery.isPending
         || Boolean(qualityStatusQuery.error)
-        || statusOptionsFor(batch?.quality_status ?? "", qualityStatusOptions).length === 0
+        || statusOptionsFor(batch?.quality_status ?? "", qualityStatusOptions, statusTransitions).length === 0
       );
     },
     onClick: ({ selectedRowKeys }) => {
       const batch = batches.find((item) => item.id === selectedRowKeys[0]);
       if (!batch) return;
-      setStatusBatch(batch);
-      setStatusForm(statusFormFor(batch, qualityStatusOptions));
-      setStatusOpen(true);
+      openStatusWith(batch);
+      setStatusForm(statusFormFor(batch, qualityStatusOptions, statusTransitions));
     },
   };
 
@@ -249,8 +297,7 @@ export function M3BatchManagementPage({ onOpenLocationHistory }: M3BatchManageme
       const batch = batches.find((item) => item.id === selectedRowKeys[0]);
       if (!batch) return;
       recallMutation.reset();
-      setRecallBatch(batch);
-      setRecallOpen(true);
+      openRecallWith(batch);
     },
   };
 
@@ -266,8 +313,22 @@ export function M3BatchManagementPage({ onOpenLocationHistory }: M3BatchManageme
       const batch = batches.find((item) => item.id === selectedRowKeys[0]);
       if (!batch) return;
       cancelRecallMutation.reset();
-      setCancelRecallBatch(batch);
-      setCancelRecallOpen(true);
+      openCancelRecallWith(batch);
+    },
+  };
+
+  const printLpnAction: DataGridToolbarAction = {
+    key: "print-lpn",
+    label: "LPN",
+    description: "打印容器或托盘 LPN 标签",
+    icon: <Printer className="size-4" aria-hidden />,
+    disabled: ({ selectedRowKeys }) => {
+      const batch = batches.find((item) => item.id === selectedRowKeys[0]);
+      return selectedRowKeys.length !== 1 || !batch?.container_lpn;
+    },
+    onClick: ({ selectedRowKeys }) => {
+      const batch = batches.find((item) => item.id === selectedRowKeys[0]);
+      if (batch?.container_lpn) setPrintTarget(lpnPrintTarget(batch));
     },
   };
 
@@ -297,7 +358,7 @@ export function M3BatchManagementPage({ onOpenLocationHistory }: M3BatchManageme
       await batchesQuery.refetch();
       setRecallOpen(false);
       setRecallBatch(null);
-      setLastEvent(`${request.batch_id} 已标记召回`);
+      setLastEvent(`${recallBatch?.batch_no ?? request.batch_id} 已标记召回`);
     } catch {
       // 错误由弹窗展示，保留表单便于修正后重试。
     }
@@ -309,14 +370,14 @@ export function M3BatchManagementPage({ onOpenLocationHistory }: M3BatchManageme
       await batchesQuery.refetch();
       setCancelRecallOpen(false);
       setCancelRecallBatch(null);
-      setLastEvent(`${request.batch_id} 已取消召回`);
+      setLastEvent(`${cancelRecallBatch?.batch_no ?? request.batch_id} 已取消召回`);
     } catch {
       // 错误由弹窗展示，保留表单便于修正后重试。
     }
   }
 
   const columns = buildBatchColumns(openBatchDetail, expiryWarningDays, qualityStatusOptions);
-  const targetStatusOptions = statusOptionsFor(statusBatch?.quality_status ?? "", qualityStatusOptions);
+  const targetStatusOptions = statusOptionsFor(statusBatch?.quality_status ?? "", qualityStatusOptions, statusTransitions);
 
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
@@ -340,15 +401,10 @@ export function M3BatchManagementPage({ onOpenLocationHistory }: M3BatchManageme
         value={draftQuery}
         onValueChange={(next) => setDraftQuery(normalizeM3BatchQueryValue(next))}
         onQuery={() => {
-          setAppliedQuery(normalizeM3BatchQueryValue(draftQuery));
+          applyQuery(draftQuery);
           setLastEvent("批号列表已查询");
         }}
-        onReset={() => {
-          const next = defaultM3BatchQueryValue();
-          setDraftQuery(next);
-          setAppliedQuery(next);
-          setSelectedId(null);
-        }}
+        onReset={clearGridQueryState}
       />
 
       {batchesQuery.error && (
@@ -393,7 +449,12 @@ export function M3BatchManagementPage({ onOpenLocationHistory }: M3BatchManageme
         exportFileBaseName="M3 批号管理"
         refreshAction={gridRefreshAction}
         detailAction={gridDetailAction}
-        toolbarActions={[statusAction, recallAction, cancelRecallAction]}
+        toolbarActions={[
+          statusAction,
+          recallAction,
+          cancelRecallAction,
+          ...(canPrint ? [printLpnAction] : []),
+        ]}
         selectedKey={selectedId ?? undefined}
         selectedRowKeys={selectedId ? [selectedId] : []}
         onSelectedRowKeysChange={(keys) => setSelectedId(keys.at(-1) ?? null)}
@@ -402,18 +463,8 @@ export function M3BatchManagementPage({ onOpenLocationHistory }: M3BatchManageme
         tableClassName="min-w-[1670px]"
         queryState={appliedQuery}
         querySummaryItems={querySummaryItems}
-        onApplyQueryState={(queryState) => {
-          const next = normalizeM3BatchQueryValue(queryValueFromUnknown(queryState));
-          setDraftQuery(next);
-          setAppliedQuery(next);
-          setSelectedId(null);
-        }}
-        onClearQueryState={() => {
-          const next = defaultM3BatchQueryValue();
-          setDraftQuery(next);
-          setAppliedQuery(next);
-          setSelectedId(null);
-        }}
+        onApplyQueryState={applyGridQueryState}
+        onClearQueryState={clearGridQueryState}
       />
 
       <InventoryDimensionSummary
@@ -490,8 +541,28 @@ export function M3BatchManagementPage({ onOpenLocationHistory }: M3BatchManageme
         }}
         onSubmit={submitCancelRecall}
       />
+      <H9BusinessPrintDialog
+        open={Boolean(printTarget)}
+        target={printTarget}
+        onOpenChange={(next) => {
+          if (!next) setPrintTarget(null);
+        }}
+        onPrinted={(target) => setLastEvent(`${target.description}已登记打印结果`)}
+      />
     </section>
   );
+}
+
+export function lpnPrintTarget(batch: InventoryBatch): H9BusinessPrintTarget {
+  if (!batch.container_lpn) throw new Error("库存批次未绑定 LPN");
+  return {
+    templateTypeCode: "lpn_label",
+    businessModule: "M3",
+    businessDocumentType: "lpn_label",
+    businessDocumentId: batch.id,
+    description: `${batch.container_lpn} · LPN 标签`,
+    data: batch,
+  };
 }
 
 function defaultM3BatchQueryValue(): QueryPanelValue {
@@ -518,6 +589,10 @@ const emptyStatusForm: StatusForm = {
   reason: "",
 };
 
+/**
+ * 硬编码回退迁移表：仅在状态转换配置接口尚未返回或读取失败时兜底，
+ * 正常情况下目标状态由 M3 库存状态管理页维护的规则（status-transitions 接口）驱动。
+ */
 const qualityStatusTransitions: Record<string, readonly string[]> = {
   qualified: ["quarantined", "loss_deducted"],
   quarantined: ["qualified", "unqualified", "loss_deducted"],
@@ -525,15 +600,36 @@ const qualityStatusTransitions: Record<string, readonly string[]> = {
   unqualified: ["pending_destruction", "loss_deducted"],
 };
 
-function statusFormFor(batch: InventoryBatch, qualityStatusOptions: QualityStatusOption[]): StatusForm {
+/** 把状态转换规则整理为 from_status → to_status[]；接口无数据（加载中/失败）时返回 null 以启用回退表。 */
+function transitionsFromRules(
+  rules: readonly InventoryStatusTransition[] | undefined,
+): Record<string, readonly string[]> | null {
+  if (!rules) return null;
+  const map: Record<string, string[]> = {};
+  for (const rule of rules) {
+    if (!rule.enabled) continue;
+    (map[rule.from_status] ??= []).push(rule.to_status);
+  }
+  return map;
+}
+
+function statusFormFor(
+  batch: InventoryBatch,
+  qualityStatusOptions: QualityStatusOption[],
+  transitions?: Record<string, readonly string[]> | null,
+): StatusForm {
   return {
     ...emptyStatusForm,
-    targetStatus: statusOptionsFor(batch.quality_status, qualityStatusOptions)[0]?.value ?? "",
+    targetStatus: statusOptionsFor(batch.quality_status, qualityStatusOptions, transitions)[0]?.value ?? "",
   };
 }
 
-function statusOptionsFor(status: string, qualityStatusOptions: readonly QualityStatusOption[]) {
-  const allowedStatuses = qualityStatusTransitions[status] ?? [];
+function statusOptionsFor(
+  status: string,
+  qualityStatusOptions: readonly QualityStatusOption[],
+  transitions?: Record<string, readonly string[]> | null,
+) {
+  const allowedStatuses = (transitions ?? qualityStatusTransitions)[status] ?? [];
   return qualityStatusOptions.filter((option) => allowedStatuses.includes(option.value));
 }
 

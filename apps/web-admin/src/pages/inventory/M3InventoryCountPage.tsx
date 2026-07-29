@@ -34,6 +34,9 @@ import {
   useSubmitInventoryCountLineMutation,
   type InventoryCountSummary,
 } from "@/features/inventory/m3-ops-queries";
+import { formatDateTime } from "@/lib/format";
+import { queryValueFromUnknown } from "@/lib/query-value";
+import { usePageQueryState } from "@/lib/use-page-query-state";
 
 export const m3CountQueryFields: QueryPanelField[] = [
   { key: "keyword", label: "关键字", type: "text", placeholder: "状态 / 类型 / 商品" },
@@ -52,20 +55,21 @@ export const m3CountQueryFields: QueryPanelField[] = [
 export const m3CountCoreQueryFieldKeys = ["keyword", "status"];
 
 export function M3InventoryCountPage() {
-  const [draft, setDraft] = React.useState<QueryPanelValue>({ keyword: "", status: "" });
-  const [applied, setApplied] = React.useState<QueryPanelValue>({ keyword: "", status: "" });
+  const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
+    usePageQueryState<QueryPanelValue>(() => ({ keyword: "", status: "" }));
   const [open, setOpen] = React.useState(false);
   const [countType, setCountType] = React.useState("cycle");
   const [productCode, setProductCode] = React.useState("");
   const [selected, setSelected] = React.useState<InventoryCountSummary | null>(null);
   const [physicalQtyByLine, setPhysicalQtyByLine] = React.useState<Record<string, string>>({});
+  const [qtyError, setQtyError] = React.useState<string | null>(null);
   const query = useInventoryCountsQuery();
   const create = useCreateInventoryCountMutation();
   const submitLine = useSubmitInventoryCountLineMutation();
   const approve = useApproveInventoryCountMutation();
   const rows = React.useMemo(() => {
-    const keyword = String(applied.keyword ?? "").toLowerCase();
-    const status = String(applied.status ?? "");
+    const keyword = String(appliedQuery.keyword ?? "").toLowerCase();
+    const status = String(appliedQuery.status ?? "");
     return (query.data ?? []).filter((row) => {
       const hitKeyword =
         !keyword ||
@@ -75,16 +79,16 @@ export function M3InventoryCountPage() {
       const hitStatus = !status || row.status === status;
       return hitKeyword && hitStatus;
     });
-  }, [applied, query.data]);
+  }, [appliedQuery, query.data]);
 
   const columns = React.useMemo<DataGridColumn<InventoryCountSummary>[]>(
     () => [
-      { key: "created_at", header: "创建时间", width: 180, render: (row) => formatTime(row.created_at) },
+      { key: "created_at", header: "创建时间", width: 180, render: (row) => formatDateTime(row.created_at) },
       { key: "count_type", header: "类型", width: 100, render: (row) => row.count_type },
       { key: "status", header: "状态", width: 120, render: (row) => row.status },
       { key: "product_code", header: "商品范围", width: 140, render: (row) => row.product_code ?? "全部" },
       { key: "lines", header: "明细数", width: 90, render: (row) => row.lines?.length ?? 0 },
-      { key: "started_at", header: "开始时间", width: 180, render: (row) => formatTime(row.started_at) },
+      { key: "started_at", header: "开始时间", width: 180, render: (row) => formatDateTime(row.started_at) },
       {
         key: "actions",
         header: "操作",
@@ -96,6 +100,7 @@ export function M3InventoryCountPage() {
             variant="outline"
             onClick={() => {
               setSelected(row);
+              setQtyError(null);
               const next: Record<string, string> = {};
               for (const line of row.lines ?? []) {
                 next[line.id] =
@@ -138,14 +143,10 @@ export function M3InventoryCountPage() {
       <QueryPanel
         fields={m3CountQueryFields}
         defaultVisibleFieldKeys={m3CountCoreQueryFieldKeys}
-        value={draft}
-        onValueChange={setDraft}
-        onQuery={() => setApplied(draft)}
-        onReset={() => {
-          const next = { keyword: "", status: "" };
-          setDraft(next);
-          setApplied(next);
-        }}
+        value={draftQuery}
+        onValueChange={setDraftQuery}
+        onQuery={() => applyQuery(draftQuery)}
+        onReset={resetQuery}
       />
       <Card>
         <CardContent className="p-5">
@@ -159,18 +160,10 @@ export function M3InventoryCountPage() {
             exportFileBaseName="M3-库存盘点"
             refreshAction={refreshAction}
             createAction={createAction}
-            queryState={applied}
-            querySummaryItems={buildQueryPanelSummaryItems(m3CountQueryFields, applied)}
-            onApplyQueryState={(value) => {
-              const next = (value && typeof value === "object" ? value : {}) as QueryPanelValue;
-              setDraft(next);
-              setApplied(next);
-            }}
-            onClearQueryState={() => {
-              const next = { keyword: "", status: "" };
-              setDraft(next);
-              setApplied(next);
-            }}
+            queryState={appliedQuery}
+            querySummaryItems={buildQueryPanelSummaryItems(m3CountQueryFields, appliedQuery)}
+            onApplyQueryState={(value) => applyQuery(queryValueFromUnknown(value))}
+            onClearQueryState={resetQuery}
           />
         </CardContent>
       </Card>
@@ -185,7 +178,9 @@ export function M3InventoryCountPage() {
                   count_type: countType,
                   product_code: productCode.trim() || undefined,
                 })
-                .then(() => setOpen(false));
+                .then(() => setOpen(false))
+                // 错误已由 create.error 在弹窗内展示，这里仅吞掉 unhandled rejection。
+                .catch(() => undefined);
             }}
           >
             <DialogHeader>
@@ -261,14 +256,21 @@ export function M3InventoryCountPage() {
                       if (!selected) return;
                       const qty = Number(physicalQtyByLine[line.id]);
                       if (!Number.isFinite(qty) || qty < 0) return;
+                      if (!Number.isInteger(qty)) {
+                        setQtyError(`批号 ${line.batch_no} 的实盘数量必须是整数`);
+                        return;
+                      }
+                      setQtyError(null);
                       void submitLine.mutateAsync({
                         countId: selected.id,
                         lineId: line.id,
-                        physical_qty: Math.trunc(qty),
+                        physical_qty: qty,
                       }).then(() => query.refetch().then((result) => {
                         const next = (result.data ?? []).find((item) => item.id === selected.id) ?? null;
                         setSelected(next);
-                      }));
+                      }))
+                        // 错误已由 submitLine.error 在弹窗内展示，这里仅吞掉 unhandled rejection。
+                        .catch(() => undefined);
                     }}
                   >
                     提交实盘
@@ -277,9 +279,9 @@ export function M3InventoryCountPage() {
               ))
             )}
           </div>
-          {(submitLine.error || approve.error) && (
+          {(qtyError || submitLine.error || approve.error) && (
             <p className="text-sm text-destructive">
-              {submitLine.error?.message ?? approve.error?.message}
+              {qtyError ?? submitLine.error?.message ?? approve.error?.message}
             </p>
           )}
           <DialogFooter>
@@ -305,7 +307,9 @@ export function M3InventoryCountPage() {
                   })
                   .then(() => {
                     setSelected(null);
-                  });
+                  })
+                  // 错误已由 approve.error 在弹窗内展示，这里仅吞掉 unhandled rejection。
+                  .catch(() => undefined);
               }}
             >
               {approve.isPending ? "审批中..." : "审批差异并调账"}
@@ -315,9 +319,4 @@ export function M3InventoryCountPage() {
       </Dialog>
     </div>
   );
-}
-
-function formatTime(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { hour12: false });
 }

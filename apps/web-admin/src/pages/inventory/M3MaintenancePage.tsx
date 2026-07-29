@@ -33,6 +33,9 @@ import {
   useMaintenanceTasksQuery,
   type MaintenanceTask,
 } from "@/features/inventory/m3-ops-queries";
+import { formatDateTime } from "@/lib/format";
+import { queryValueFromUnknown } from "@/lib/query-value";
+import { usePageQueryState } from "@/lib/use-page-query-state";
 
 export const m3MaintenanceQueryFields: QueryPanelField[] = [
   { key: "keyword", label: "关键字", type: "text", placeholder: "商品 / 批号 / 库位" },
@@ -50,33 +53,42 @@ export const m3MaintenanceQueryFields: QueryPanelField[] = [
 export const m3MaintenanceCoreQueryFieldKeys = ["keyword", "status"];
 
 export function M3MaintenancePage() {
-  const [draft, setDraft] = React.useState<QueryPanelValue>({ keyword: "", status: "" });
-  const [applied, setApplied] = React.useState<QueryPanelValue>({ keyword: "", status: "" });
+  const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
+    usePageQueryState<QueryPanelValue>(() => ({ keyword: "", status: "" }));
   const [selected, setSelected] = React.useState<MaintenanceTask | null>(null);
   const [temperature, setTemperature] = React.useState("22");
   const [humidity, setHumidity] = React.useState("45");
   const [conclusion, setConclusion] = React.useState("normal");
   const [exceptionType, setExceptionType] = React.useState("package_damage");
   const [notes, setNotes] = React.useState("");
+  // 打开某个任务的提交弹窗时重置结果表单，避免上一个任务填写的内容串到下一个任务。
+  function openResultDialog(task: MaintenanceTask) {
+    setTemperature("22");
+    setHumidity("45");
+    setConclusion("normal");
+    setExceptionType("package_damage");
+    setNotes("");
+    setSelected(task);
+  }
   const query = useMaintenanceTasksQuery();
   const generate = useGenerateMaintenanceTasksMutation();
   const createRecord = useCreateMaintenanceRecordMutation();
   const rows = React.useMemo(() => {
-    const keyword = String(applied.keyword ?? "").toLowerCase();
-    const status = String(applied.status ?? "");
+    const keyword = String(appliedQuery.keyword ?? "").toLowerCase();
+    const status = String(appliedQuery.status ?? "");
     return (query.data ?? []).filter((row) => {
       const text = `${row.product_code} ${row.batch_no} ${row.location_code}`.toLowerCase();
       return (!keyword || text.includes(keyword)) && (!status || row.status === status);
     });
-  }, [applied, query.data]);
+  }, [appliedQuery, query.data]);
 
   const columns = React.useMemo<DataGridColumn<MaintenanceTask>[]>(
     () => [
-      { key: "created_at", header: "创建时间", width: 180, render: (row) => formatTime(row.created_at) },
+      { key: "created_at", header: "创建时间", width: 180, render: (row) => formatDateTime(row.created_at) },
       { key: "product_code", header: "商品", width: 140, mono: true, render: (row) => row.product_code },
       { key: "batch_no", header: "批号", width: 140, mono: true, render: (row) => row.batch_no },
       { key: "location_code", header: "库位", width: 140, mono: true, render: (row) => row.location_code },
-      { key: "planned_at", header: "计划时间", width: 180, render: (row) => formatTime(row.planned_at) },
+      { key: "planned_at", header: "计划时间", width: 180, render: (row) => formatDateTime(row.planned_at) },
       { key: "status", header: "状态", width: 100, render: (row) => row.status },
       {
         key: "actions",
@@ -84,7 +96,7 @@ export function M3MaintenancePage() {
         width: 120,
         render: (row) =>
           row.status === "pending" ? (
-            <Button type="button" size="sm" variant="outline" onClick={() => setSelected(row)}>
+            <Button type="button" size="sm" variant="outline" onClick={() => openResultDialog(row)}>
               提交结果
             </Button>
           ) : (
@@ -107,7 +119,8 @@ export function M3MaintenancePage() {
     description: "按重点/一般周期与近效期窗口生成养护任务",
     disabled: generate.isPending,
     onClick: () => {
-      void generate.mutateAsync();
+      // 错误已由页面顶部 generate.error 展示，这里仅吞掉 unhandled rejection。
+      void generate.mutateAsync().catch(() => undefined);
     },
   };
 
@@ -117,14 +130,10 @@ export function M3MaintenancePage() {
       <QueryPanel
         fields={m3MaintenanceQueryFields}
         defaultVisibleFieldKeys={m3MaintenanceCoreQueryFieldKeys}
-        value={draft}
-        onValueChange={setDraft}
-        onQuery={() => setApplied(draft)}
-        onReset={() => {
-          const next = { keyword: "", status: "" };
-          setDraft(next);
-          setApplied(next);
-        }}
+        value={draftQuery}
+        onValueChange={setDraftQuery}
+        onQuery={() => applyQuery(draftQuery)}
+        onReset={resetQuery}
       />
       {(generate.error || query.error || createRecord.error) && (
         <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -143,18 +152,10 @@ export function M3MaintenancePage() {
             exportFileBaseName="M3-在库养护"
             refreshAction={refreshAction}
             toolbarActions={[generateAction]}
-            queryState={applied}
-            querySummaryItems={buildQueryPanelSummaryItems(m3MaintenanceQueryFields, applied)}
-            onApplyQueryState={(value) => {
-              const next = (value && typeof value === "object" ? value : {}) as QueryPanelValue;
-              setDraft(next);
-              setApplied(next);
-            }}
-            onClearQueryState={() => {
-              const next = { keyword: "", status: "" };
-              setDraft(next);
-              setApplied(next);
-            }}
+            queryState={appliedQuery}
+            querySummaryItems={buildQueryPanelSummaryItems(m3MaintenanceQueryFields, appliedQuery)}
+            onApplyQueryState={(value) => applyQuery(queryValueFromUnknown(value))}
+            onClearQueryState={resetQuery}
           />
         </CardContent>
       </Card>
@@ -188,7 +189,9 @@ export function M3MaintenancePage() {
                   exception_type: conclusion === "abnormal" ? exceptionType : null,
                   notes: notes.trim() || null,
                 })
-                .then(() => setSelected(null));
+                .then(() => setSelected(null))
+                // 错误已由页面顶部 createRecord.error 展示，这里仅吞掉 unhandled rejection。
+                .catch(() => undefined);
             }}
           >
             <DialogHeader>
@@ -252,9 +255,4 @@ export function M3MaintenancePage() {
       </Dialog>
     </div>
   );
-}
-
-function formatTime(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { hour12: false });
 }
